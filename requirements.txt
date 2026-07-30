@@ -1,0 +1,13 @@
+playwright
+beautifulsoup4
+requests
+pdfplumber
+python-docx
+openai
+sqlalchemy
+rapidfuzz
+python-dotenv
+streamlit
+pyyaml
+pandas
+reportlab

@@ -1,0 +1,128 @@
+# Per-council configuration for the Idox Public Access scraper.
+#
+# doc_system:
+#   idox        - documents are listed directly on the Idox portal
+#   idox_anite  - documents are hosted on a separate legacy "Anite" system;
+#                 the Idox portal only links out to it (Bury's setup)
+#
+# date_field_mode controls which pair of date inputs is used on the advanced
+# search form:
+#   received  -> date(applicationReceivedStart) / date(applicationReceivedEnd)
+#   validated -> date(applicationValidatedStart) / date(applicationValidatedEnd)
+
+councils:
+  bury:
+    name: "Bury Metropolitan Borough Council"
+    base_url: "https://planning.bury.gov.uk/online-applications"
+    date_field_mode: received
+    doc_system: idox_anite
+    anite_base_url: "https://pad-planning.bury.gov.uk"
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  stockport:
+    name: "Stockport Metropolitan Borough Council"
+    base_url: "https://planning.stockport.gov.uk/PlanningData-live"
+    date_field_mode: validated
+    doc_system: idox
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+    further_info_tab: details  # Stockport's "Further Information" link uses activeTab=details, not =furtherInformation
+    request_delay_seconds: 2.5  # started 429'ing heavily during a full multi-year backfill at the 0.4s default
+
+  trafford:
+    name: "Trafford Council"
+    base_url: "https://pa.trafford.gov.uk/online-applications"
+    date_field_mode: received
+    doc_system: idox
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  rochdale:
+    name: "Rochdale Borough Council"
+    # Migrated off Idox (publicaccess.rochdale.gov.uk, now 503s) to the same
+    # Arcus/Salesforce Experience Cloud portal Salford uses - confirmed via
+    # the council's own site linking to
+    # account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register,
+    # the identical register name arcus_portal.py already expects. See
+    # app/scrapers/arcus_portal.py.
+    base_url: "https://account.rochdale.gov.uk/pr"
+    date_field_mode: validated  # "Valid Date" is this portal's equivalent field
+    doc_system: arcus
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  manchester:
+    name: "Manchester City Council"
+    # Migrated off Idox (pa.manchester.gov.uk, now 503s) to the Arcus Global
+    # platform in 2026 - confirmed via the council's own site linking to
+    # arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register,
+    # the same Arcus/Salesforce system Salford and Rochdale use. See
+    # app/scrapers/arcus_portal.py.
+    base_url: "https://arcusbe.manchester.gov.uk/pr"
+    date_field_mode: validated  # "Valid Date" is this portal's equivalent field
+    doc_system: arcus
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  oldham:
+    name: "Oldham Council"
+    base_url: "https://planningpa.oldham.gov.uk/online-applications"
+    date_field_mode: received
+    doc_system: idox
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  tameside:
+    name: "Tameside Metropolitan Borough Council"
+    base_url: "https://publicaccess.tameside.gov.uk/online-applications"
+    date_field_mode: received
+    doc_system: idox
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  bolton:
+    name: "Bolton Council"
+    base_url: "https://paplanning.bolton.gov.uk/online-applications"
+    date_field_mode: received
+    doc_system: idox
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  wigan:
+    name: "Wigan Council"
+    base_url: "https://planning.wigan.gov.uk/online-applications"
+    date_field_mode: received
+    doc_system: idox
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
+
+  salford:
+    name: "Salford City Council"
+    # Migrated off Idox entirely to an Arcus/Salesforce Experience Cloud
+    # portal - base_url is the site root, not an Idox "online-applications"
+    # path. See app/scrapers/arcus_portal.py.
+    base_url: "https://salfordcitycouncil.my.site.com/pr"
+    date_field_mode: validated  # "Valid Date" is this portal's equivalent field
+    doc_system: arcus
+    anite_base_url: null
+    unit_threshold: 10
+    region: "Greater Manchester"
+    country: "England"
