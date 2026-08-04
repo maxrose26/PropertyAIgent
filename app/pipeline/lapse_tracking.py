@@ -11,15 +11,32 @@ import datetime as dt
 from app.db.models import Application, Site
 
 
+_PORTAL_DATE_FORMATS = [
+    "%a %d %b %Y",  # Idox: "Tue 21 Apr 2026" - plain string comparison sorts
+                    # on the day-of-week prefix, not the actual date, so this
+                    # must be parsed properly rather than compared as text.
+    "%d/%m/%Y",     # Arcus's "Valid Date" field: "16/8/2024" - no day name,
+                    # no zero-padding. Confirmed real bug: every Arcus
+                    # council's dates were silently parsing to date.min here
+                    # (day-name format never matches D/M/YYYY text), which
+                    # fed date.min into every consumer of this function -
+                    # lapse/commencement deadlines, phase "latest grant"
+                    # selection, related-application anchor selection, "most
+                    # recent first" sorting - across all of Rochdale,
+                    # Manchester and Salford.
+]
+
+
 def parse_portal_date(value: str | None) -> dt.date:
-    """Portal dates come as e.g. "Tue 21 Apr 2026" - plain string comparison
-    sorts on the day-of-week prefix, not the actual date, so parse properly."""
     if not value:
         return dt.date.min
-    try:
-        return dt.datetime.strptime(value.strip(), "%a %d %b %Y").date()
-    except ValueError:
-        return dt.date.min
+    stripped = value.strip()
+    for fmt in _PORTAL_DATE_FORMATS:
+        try:
+            return dt.datetime.strptime(stripped, fmt).date()
+        except ValueError:
+            continue
+    return dt.date.min
 
 
 # Most full planning permissions carry a standard condition requiring
@@ -32,6 +49,48 @@ def parse_portal_date(value: str | None) -> dt.date:
 GRANTED_KEYWORDS = ["approve", "grant"]
 COMMENCEMENT_YEARS = 3
 LAPSE_WARNING_DAYS = 180  # ~6 months out
+
+# UK statutory target for a "major" application (10+ dwellings, or 0.5ha+
+# site area) is 13 weeks from validation, versus 8 weeks for a minor one -
+# every application in this database is either a qualifying 10+ unit scheme
+# itself or directly tied to one, so 13 weeks is used uniformly rather than
+# trying to infer major/minor per application. Councils routinely agree
+# extensions of time, so this is a statutory default, not a promise - always
+# labelled as an estimate, never presented as a scraped fact.
+STATUTORY_MAJOR_DECISION_WEEKS = 13
+
+
+def estimate_statutory_decision_date(application_validated: str | None) -> dt.date | None:
+    """Idox portals don't publish a target/expected decision date field the
+    way Arcus councils do (see Application.expected_decision_date) - this
+    computes the statutory default instead of leaving the question
+    unanswered. Returns None when there's no validation date to compute
+    from (e.g. not yet validated)."""
+    validated = parse_portal_date(application_validated)
+    if validated == dt.date.min:
+        return None
+    return validated + dt.timedelta(weeks=STATUTORY_MAJOR_DECISION_WEEKS)
+
+
+def get_expected_decision(app: Application) -> dict:
+    """Best available "when might a decision come" answer for one still-
+    undecided application - real scraped value where the portal publishes
+    one (Arcus councils), the computed statutory default otherwise (Idox).
+    Returns date=None, source=None once a decision already exists - the
+    question is moot."""
+    if app.decision:
+        return {"date": None, "source": None}
+
+    if app.expected_decision_date:
+        date = parse_portal_date(app.expected_decision_date)
+        if date != dt.date.min:
+            return {"date": date, "source": "scraped"}
+
+    estimated = estimate_statutory_decision_date(app.application_validated or app.application_received)
+    if estimated:
+        return {"date": estimated, "source": "estimated"}
+
+    return {"date": None, "source": None}
 
 LAPSE_STATUS_LABELS = {
     "lapsed": "⚠️ Permission may have lapsed",

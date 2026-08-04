@@ -121,14 +121,12 @@ def _parse_result_page(body_text: str, ref_to_url: dict[str, str]) -> list[dict]
     return rows
 
 
-def collect_result_rows(page: Page, council: CouncilConfig, date_from_iso: str, date_to_iso: str) -> list[dict]:
-    """Full pipeline for one date range: build the search URL, walk every
-    results page (Next link), return one dict per application (reference,
-    application_type, address, description, status, decision_date, detail_url)."""
-    url = build_search_url(council.base_url, date_from_iso, date_to_iso)
-    page.goto(url, wait_until="networkidle", timeout=45000)
-    page.wait_for_timeout(WAIT_SECONDS * 1000)
-
+def _walk_result_pages(page: Page) -> list[dict]:
+    """Walks every page of results (Next link) on the CURRENTLY LOADED
+    results page and returns one dict per application - shared by
+    collect_result_rows (date-range advanced search) and
+    search_related_applications (quick search) below, which only differ in
+    how they construct the URL navigated to before calling this."""
     rows: list[dict] = []
     seen_refs: set[str] = set()
 
@@ -170,16 +168,93 @@ def collect_result_rows(page: Page, council: CouncilConfig, date_from_iso: str, 
     return rows
 
 
+def collect_result_rows(page: Page, council: CouncilConfig, date_from_iso: str, date_to_iso: str) -> list[dict]:
+    """Full pipeline for one date range: build the search URL, walk every
+    results page (Next link), return one dict per application (reference,
+    application_type, address, description, status, decision_date, detail_url)."""
+    url = build_search_url(council.base_url, date_from_iso, date_to_iso)
+    page.goto(url, wait_until="networkidle", timeout=45000)
+    page.wait_for_timeout(WAIT_SECONDS * 1000)
+    return _walk_result_pages(page)
+
+
+def build_quick_search_url(base_url: str, query: str) -> str:
+    """Arcus's "quick search" (a single free-text box, distinct from the
+    date-range advanced search build_search_url constructs) - confirmed real
+    payload shape by submitting the quick-search box by hand and reading the
+    resulting URL. Matches build_search_url's own base64-JSON-in-c__q
+    pattern, just with searchType "quick" and a single searchTerm instead of
+    the advanced form's date-range filters."""
+    payload = {
+        "register": REGISTER_NAME,
+        "requests": [{
+            "registerName": REGISTER_NAME, "searchType": "quick",
+            "searchTerm": query, "searchName": "Planning_Applications",
+        }],
+    }
+    encoded = base64.b64encode(json.dumps(payload).encode()).decode()
+    q = urllib.parse.quote(encoded, safe="")
+    return f"{base_url}/s/register-view?c__q={q}&c__r={REGISTER_NAME}"
+
+
+def search_related_applications(page: Page, council: CouncilConfig, query: str) -> list[dict]:
+    """Free-text search across every application on the portal for
+    citations of `query` (typically a verified reference) - the Arcus
+    equivalent of app.scrapers.idox_portal.search_related_applications,
+    using the same "quick search" mechanism fetch_application_by_reference
+    below uses for an exact-reference lookup. Unlike that function, which
+    discards every row except the one whose OWN reference matches exactly,
+    this keeps every result the search returns and walks every results page
+    - a citing application's own reference is obviously different from the
+    one being searched for, and a genuinely well-cited parent can have many
+    more results than fit on one page (confirmed on the Idox side: Wigan's
+    North Leigh site alone returned 31)."""
+    url = build_quick_search_url(council.base_url, query)
+    page.goto(url, wait_until="networkidle", timeout=45000)
+    page.wait_for_timeout(WAIT_SECONDS * 1000)
+    return _walk_result_pages(page)
+
+
 DETAIL_FIELD_RE = re.compile(r"^([A-Za-z][A-Za-z /]*?)\t\s*(.*?)\s*$")
 
 
 def _parse_detail_fields(body_text: str) -> dict[str, str]:
+    # Keys lowercased - different councils on this same Arcus/Salesforce
+    # platform render otherwise-identical fields with different casing
+    # (confirmed real case: Manchester's "Valid date" vs Rochdale/Salford's
+    # "Valid Date"), so an exact-case lookup silently missed it for
+    # Manchester specifically - see _detail_field() below.
     fields: dict[str, str] = {}
     for line in body_text.split("\n"):
         m = DETAIL_FIELD_RE.match(line)
         if m:
-            fields[m.group(1).strip()] = m.group(2).strip()
+            fields[m.group(1).strip().lower()] = m.group(2).strip()
     return fields
+
+
+def _detail_field(detail_fields: dict[str, str], *labels: str) -> str:
+    """First non-empty value among several accepted label variants for the
+    same field - confirmed real case: Manchester labels its decision date
+    "Decision notice sent date" where Rochdale/Salford use "Decision date"
+    for the same concept, which silently left decision_issued_date empty
+    for all 79 of Manchester's decided applications (every lapse/
+    commencement-deadline calculation, phase "latest grant" selection, and
+    "most recent first" sort depends on this field).
+
+    Named distinctly from the OTHER _field() above (chunk-based, for
+    result-list rows) rather than reusing that name - confirmed a real
+    regression from doing exactly that once already: this function silently
+    shadowed the result-list one in the module namespace, so
+    _parse_result_page's own _field(chunk, "Application type") calls
+    silently started calling THIS one instead, passing a plain string where
+    a dict was expected - breaking every date-range scrape (collect_result_rows)
+    and related-application search (search_related_applications) for all
+    three Arcus councils until caught by a full 3-year Rochdale backfill."""
+    for label in labels:
+        value = detail_fields.get(label.lower())
+        if value:
+            return value
+    return ""
 
 
 @dataclass
@@ -284,14 +359,21 @@ def fetch_application_detail(
         detail_text = page.inner_text("body")
         detail_fields = _parse_detail_fields(detail_text)
         fields.update({
-            "Application Type": detail_fields.get("Application type", fields["Application Type"]),
-            "Applicant Name": detail_fields.get("Applicant", ""),
-            "Status": detail_fields.get("Status", fields["Status"]),
-            "Agent": detail_fields.get("Agent", ""),
-            "Decision Issued Date": detail_fields.get("Decision date", ""),
-            "Decision": detail_fields.get("Decision", ""),
-            "Application Received": detail_fields.get("Valid Date", ""),
-            "Ward": detail_fields.get("Ward", ""),
+            "Application Type": _detail_field(detail_fields, "Application type") or fields["Application Type"],
+            "Applicant Name": _detail_field(detail_fields, "Applicant"),
+            "Status": _detail_field(detail_fields, "Status") or fields["Status"],
+            "Agent": _detail_field(detail_fields, "Agent"),
+            "Decision Issued Date": _detail_field(detail_fields, "Decision date", "Decision notice sent date"),
+            "Decision": _detail_field(detail_fields, "Decision"),
+            "Application Received": _detail_field(detail_fields, "Valid Date"),
+            "Ward": _detail_field(detail_fields, "Ward"),
+            # Statutory target decision date - confirmed present on all 3
+            # Arcus councils, but under two different labels (Manchester/
+            # Salford: "Target decision date", Rochdale: "Decision Date
+            # Due"). Idox portals don't expose an equivalent public field -
+            # see lapse_tracking.estimate_statutory_decision_date for the
+            # computed fallback used there instead.
+            "Expected Decision Date": _detail_field(detail_fields, "Target decision date", "Decision Date Due"),
         })
 
         if is_administrative_application_type(fields.get("Application Type")):
@@ -330,17 +412,7 @@ def fetch_application_by_reference(page: Page, council: CouncilConfig, reference
     and reading the resulting URL - matches build_search_url's own
     base64-JSON-in-c__q pattern, just with searchType "quick" and a single
     searchTerm instead of the advanced form's date-range filters."""
-    payload = {
-        "register": REGISTER_NAME,
-        "requests": [{
-            "registerName": REGISTER_NAME, "searchType": "quick",
-            "searchTerm": reference, "searchName": "Planning_Applications",
-        }],
-    }
-    encoded = base64.b64encode(json.dumps(payload).encode()).decode()
-    q = urllib.parse.quote(encoded, safe="")
-    url = f"{council.base_url}/s/register-view?c__q={q}&c__r={REGISTER_NAME}"
-
+    url = build_quick_search_url(council.base_url, reference)
     page.goto(url, wait_until="networkidle", timeout=45000)
     page.wait_for_timeout(WAIT_SECONDS * 1000)
 

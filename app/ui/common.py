@@ -7,6 +7,7 @@ own top-level script under Streamlit's pages/ convention).
 """
 from __future__ import annotations
 
+import datetime as dt
 import os
 import sys
 from pathlib import Path
@@ -20,7 +21,16 @@ from openai import OpenAI
 from sqlalchemy import select
 
 from app.config import load_councils
-from app.db.models import Application, ApplicationCompany, Company, Contact, Officer, PersonWithSignificantControl, Site
+from app.db.models import (
+    Application,
+    ApplicationCompany,
+    Company,
+    Contact,
+    LocalPlanSite,
+    Officer,
+    PersonWithSignificantControl,
+    Site,
+)
 from app.db.session import get_session, get_settings, init_db
 from app.enrichment import companies_house
 from app.enrichment.contact_pipeline import enrich_company, upsert_company_from_enrichment
@@ -34,8 +44,21 @@ from app.pipeline.lapse_tracking import (
     is_granted_decision,
     parse_portal_date,
 )
-from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown
+from app.extraction.local_plan import assess_delivery_scope
+from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
+from app.policy.site_view import build_site_policy_intelligence
 from app.scrapers.unit_filter import classify_application_category, qualify
+
+PROGRESSION_SIGNAL_LABELS = {
+    "early_stage": "🌱 Early stage",
+    "progressing": "➡️ Progressing",
+    "advanced": "🔶 Advanced",
+    "adopted": "✅ Adopted",
+    "stalled": "⏸️ Stalled",
+    "removed": "❌ Removed / no longer listed",
+    "unknown": "❔ Unknown",
+    None: "❔ Not yet classified",
+}
 
 # Fields pulled from scheme_intelligence and merged across every application
 # linked to a site (not just one "representative" application) - a detail
@@ -216,6 +239,58 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     st.subheader(site.display_address)
     st.caption(f"{site.council_code} — {len(apps)} linked application(s)")
 
+    if site.excluded:
+        st.error(
+            f"🚫 Excluded from results — {site.excluded_reason or 'marked not a genuine residential scheme'} "
+            f"({site.excluded_at.strftime('%d %b %Y') if site.excluded_at else 'date unknown'})"
+        )
+        if st.button("Un-exclude — restore to results"):
+            site.excluded = False
+            site.excluded_reason = None
+            site.excluded_at = None
+            session.commit()
+            st.rerun()
+
+    # Policy Intelligence (Part 12 of the Policy Intelligence Foundation
+    # sprint) - every fact shown here carries its own source page/document
+    # link (Part 13 traceability), never a summary detached from where it
+    # came from. build_site_policy_intelligence is a pure function (see
+    # app.policy.site_view) so this exact assembly is covered by
+    # tests/test_site_policy_display.py independently of Streamlit.
+    local_plan_entries = session.execute(
+        select(LocalPlanSite).where(LocalPlanSite.matched_site_id == site.id)
+    ).scalars().all()
+    for entry, policy_row in zip(local_plan_entries, build_site_policy_intelligence(local_plan_entries)):
+        confidence_bit = f" (match confidence {policy_row['match_confidence']:.0f}%)" if policy_row["match_confidence"] else ""
+        page_link = (
+            f" [Open plan page {policy_row['source_page']}]({policy_row['source_document_url']}#page={policy_row['source_page']})"
+            if policy_row["source_document_url"] and policy_row["source_page"] else ""
+        )
+        capacity_bits = [
+            f"{policy_row[k]} {label}" for k, label in (
+                ("minimum_dwellings", "min"), ("indicative_capacity", "indicative"), ("maximum_capacity", "max"),
+            ) if policy_row[k]
+        ]
+        capacity_text = " / ".join(capacity_bits) if capacity_bits else "dwelling count not stated"
+        plan_status_text = policy_row["plan_raw_status"] or policy_row["plan_status"] or "status unknown"
+        st.info(
+            f"📋 Allocated in the **{policy_row['plan_name']}** ({plan_status_text}) as "
+            f"**{policy_row['allocation_reference']} {policy_row['allocation_name']}** — {capacity_text}, "
+            f"{policy_row['category'] or 'no category given'}{confidence_bit}.{page_link}"
+        )
+        st.caption(
+            f"{PROGRESSION_SIGNAL_LABELS.get(policy_row['progression_signal'], PROGRESSION_SIGNAL_LABELS[None])}"
+            + (f" — {'; '.join(policy_row['progression_reasons'])}" if policy_row["progression_reasons"] else "")
+            + (f" · allocation status: {policy_row['allocation_raw_status'] or policy_row['allocation_status']}"
+               if policy_row["allocation_status"] else "")
+            + (f" · plan checked {policy_row['last_checked'].strftime('%d %b %Y')}" if policy_row["last_checked"] else "")
+        )
+        scope = assess_delivery_scope(entry.minimum_dwellings, merged.get("total_units_final"))
+        if scope["status"] == "partial":
+            st.warning(f"🔍 {scope['note']}")
+        elif scope["status"] in ("full_site", "roughly_matches"):
+            st.caption(f"✓ {scope['note']}")
+
     # site.applications (raw relationship), not the display-filtered `apps`
     # parameter - that filter drops administrative applications (condition
     # discharge, variation of condition) as noise for the "Application
@@ -240,22 +315,125 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     else:
         st.markdown(f"**Commencement status:** {lapse_label}")
 
-    if lapse["status"] == "underway" and unstarted_phase_count:
-        # A single material operation anywhere on the site saves the WHOLE
-        # permission from lapsing under UK planning law - there's then no
-        # statutory deadline forcing the developer to start the rest. That
-        # cuts both ways: it means "Build underway" here is not a signal the
-        # whole site is progressing, and - because there's no legal urgency
-        # left pushing the developer to build out the remaining phases - an
-        # unstarted phase can sit indefinitely without them ever being
-        # forced to act, which if anything makes it a more durable
-        # acquisition opportunity, not a time-pressured one.
-        st.info(
-            f"ℹ️ Build has started elsewhere on this site, so the permission as a whole won't lapse - but "
-            f"that also means there's no legal deadline forcing the developer to start the "
-            f"{unstarted_phase_count} phase(s) still sitting unstarted (see Phase breakdown below). "
-            f"They could remain available indefinitely."
-        )
+    if site.status_summary:
+        # Weekly AI synthesis across every linked application - see
+        # app.pipeline.run_weekly.stage_generate_scheme_summaries. Purely a
+        # narrative layer over data already shown elsewhere on this page
+        # (phase breakdown, application history, planning stage, expected
+        # decision date).
+        st.markdown("**AI status summary:**")
+        st.markdown(site.status_summary)
+        if site.status_summary_updated_at:
+            st.caption(f"Generated {site.status_summary_updated_at.strftime('%d %b %Y')} from every linked application at the time.")
+
+        # Both the expanded state and any pending result message are tracked
+        # in session_state, not just returned inline - confirmed a real bug:
+        # st.expander defaults to collapsed on every rerun, so a message
+        # rendered inline inside it (the obvious first approach) gets
+        # rendered then immediately hidden the instant st.rerun() fires,
+        # since the expander snaps shut again before the user ever sees it.
+        # Storing the message and reading+clearing it on the NEXT render
+        # (with expanded forced True whenever one is pending) means it
+        # actually survives the rerun that was needed to refresh the page's
+        # other data (site.excluded, application history) after the change.
+        expanded_key = f"review_expanded_{site.id}"
+        message_key = f"review_message_{site.id}"
+        pending_message = st.session_state.pop(message_key, None)
+        with st.expander("Review this scheme", expanded=st.session_state.pop(expanded_key, False)):
+            if pending_message:
+                level, text = pending_message
+                getattr(st, level)(text)
+            st.caption(
+                "Reading the summary above shows this isn't actually what it looks like on paper? "
+                "Correct it here rather than leaving a wrong entry in the results."
+            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Not a genuine residential scheme**")
+                exclude_reason = st.text_area(
+                    "Why", key=f"exclude_reason_{site.id}", label_visibility="collapsed",
+                    placeholder="e.g. commercial-only despite portal keyword match",
+                )
+                if st.button("Exclude from results", key=f"exclude_btn_{site.id}"):
+                    site.excluded = True
+                    site.excluded_reason = exclude_reason or None
+                    site.excluded_at = dt.datetime.now(dt.timezone.utc)
+                    session.commit()
+                    st.session_state[expanded_key] = True
+                    st.session_state[message_key] = ("success", "Excluded - won't show up in results anymore.")
+                    st.rerun()
+            with col2:
+                st.markdown("**Actually part of a different scheme**")
+                parent_ref = st.text_input(
+                    "Parent application reference", key=f"parent_ref_{site.id}", label_visibility="collapsed",
+                    placeholder="e.g. A/12/76665 - must already be in the database",
+                )
+                if st.button("Link to that scheme", key=f"link_btn_{site.id}") and parent_ref:
+                    st.session_state[expanded_key] = True
+                    target = session.execute(
+                        select(Application).where(
+                            Application.council_code == site.council_code, Application.reference == parent_ref.strip(),
+                        )
+                    ).scalar_one_or_none()
+                    if not target:
+                        st.session_state[message_key] = ("error", f"No application {parent_ref!r} found for {site.council_code} - it needs to already be scraped.")
+                    elif not target.site_id:
+                        st.session_state[message_key] = ("error", f"{parent_ref} exists but isn't linked to a site itself yet - can't merge into it.")
+                    elif target.site_id == site.id:
+                        st.session_state[message_key] = ("warning", "That application is already part of this same site.")
+                    else:
+                        for a in site.applications:
+                            a.site_id = target.site_id
+                            a.site_link_method = "manual"
+                        session.commit()
+                        st.session_state[message_key] = ("success", f"Linked to {parent_ref}'s site.")
+                    st.rerun()
+
+    if phase_breakdown:
+        unit_summary = summarize_phase_units(phase_breakdown)
+
+        def _bucket_text(bucket: dict) -> str:
+            n = bucket["phase_count"]
+            if n == 0:
+                return None
+            phase_word = f"{n} phase{'s' if n != 1 else ''}"
+            if bucket["units"]:
+                unit_bit = f"{bucket['units']} units"
+                if bucket["phases_with_known_units"] < n:
+                    unit_bit += f" across {bucket['phases_with_known_units']} of {n} phases"
+                    return f"{unit_bit} ({phase_word} total)"
+                return f"{unit_bit} across {phase_word}"
+            return f"{phase_word} (unit count not confirmed)"
+
+        underway_text = _bucket_text(unit_summary["underway"])
+        available_text = _bucket_text(unit_summary["approved_not_started"])
+        awaiting_text = _bucket_text(unit_summary["not_yet_approved"])
+
+        if underway_text:
+            st.markdown(f"🏗️ **Under construction:** {underway_text}")
+        if available_text:
+            st.markdown(f"🎯 **Approved, not yet started:** {available_text}")
+        if awaiting_text:
+            st.markdown(f"⏳ **Awaiting decision:** {awaiting_text}")
+
+        if unit_summary["approved_not_started"]["phase_count"]:
+            # A single material operation anywhere on the site saves the
+            # WHOLE permission from lapsing under UK planning law - there's
+            # then no statutory deadline forcing the developer to start the
+            # rest. That cuts both ways: it means "Build underway" is not a
+            # signal the whole site is progressing, and - because there's no
+            # legal urgency left pushing the developer to build out the
+            # remaining phases - an unstarted phase can sit indefinitely
+            # without them ever being forced to act, which if anything makes
+            # it a more durable acquisition opportunity, not a
+            # time-pressured one.
+            st.info(
+                "🎯 The phase(s) above with full planning permission but no start of works are a "
+                "potential land-buying opportunity - and because a single material operation elsewhere "
+                "on the site already protects the whole permission from lapsing, there's no legal "
+                "deadline forcing the current developer to act on them. They could remain available "
+                "indefinitely (see Phase & plot breakdown below for details)."
+            )
 
     if merged.get("external_consultation_source"):
         st.warning(
@@ -300,27 +478,43 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         )
 
     if phase_breakdown:
-        label = f"Phase breakdown ({len(phase_breakdown)} phases"
+        phase_count = sum(1 for p in phase_breakdown if p["kind"] == "phase" and p["code"] != "Whole site / unphased")
+        plot_count = sum(1 for p in phase_breakdown if p["kind"] == "plot")
+        label_bits = []
+        if phase_count:
+            label_bits.append(f"{phase_count} phase{'s' if phase_count != 1 else ''}")
+        if plot_count:
+            label_bits.append(f"{plot_count} named plot{'s' if plot_count != 1 else ''}")
+        label = f"Phase & plot breakdown ({', '.join(label_bits)}"
         label += f", {unstarted_phase_count} not yet started)" if unstarted_phase_count else ")"
         with st.expander(label, expanded=bool(unstarted_phase_count)):
             if unstarted_phase_count:
                 st.info(
-                    f"🎯 {unstarted_phase_count} phase(s) have full planning permission but no "
+                    f"🎯 {unstarted_phase_count} group(s) have full planning permission but no "
                     f"commencement/discharge-of-conditions filing since - the main developer "
-                    f"hasn't started these yet, a potential plot-acquisition opportunity."
+                    f"hasn't started these yet, a potential acquisition opportunity."
                 )
             phase_rows = []
             for phase in phase_breakdown:
                 grant = phase["latest_grant"]
                 progress = phase["progress_filing"]
+                units = phase.get("unit_count")
+                units_display = str(units) if units else ("—" if phase["kind"] == "phase" else "")
                 phase_rows.append({
-                    "Phase": phase["label"],
+                    "Phase / plot": phase["label"],
+                    "Units": units_display,
                     "Status": PHASE_STATUS_LABELS[phase["status"]],
                     "Latest grant": f"{grant.reference} ({grant.decision_issued_date})" if grant else None,
                     "Latest progress filing": f"{progress.reference} ({progress.application_received})" if progress else None,
-                    "Applications in phase": len(phase["applications"]),
+                    "Applications": len(phase["applications"]),
                 })
             st.dataframe(pd.DataFrame(phase_rows), use_container_width=True, hide_index=True)
+            if any(p.get("unit_count_source") == "portal_text" for p in phase_breakdown):
+                st.caption(
+                    "Units sourced from a phase application's own portal listing text where no "
+                    "document extraction has run yet for it; — means no application in that "
+                    "phase states its own unit count directly."
+                )
 
     if not has_scheme:
         st.info("No AI extraction yet for this site's applications.")

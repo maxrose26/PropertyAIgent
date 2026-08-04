@@ -23,7 +23,7 @@ import streamlit as st
 from openai import OpenAI
 from sqlalchemy import func, select
 
-from app.db.models import Application, Site
+from app.db.models import Application, LocalPlanSite, Site
 from app.pipeline.lapse_tracking import (
     DECISION_STATUS_LABELS,
     LAPSE_STATUS_COLORS,
@@ -71,6 +71,39 @@ if suggested_count:
     REVIEW_PAGE = Path(__file__).resolve().parent / "pages" / "2_Review_Site_Links.py"
     st.page_link(REVIEW_PAGE, label=f"{suggested_count} suggested site links awaiting review →", icon="🔗")
 
+# --- Local Plan allocated sites with no application yet - see
+# pages/3_Local_Plan_Sites.py and app.extraction.local_plan. The genuinely
+# NEW signal this whole feature exists for: a site the council has already
+# earmarked for housing that nobody has applied for yet.
+
+unmatched_local_plan_count = session.execute(
+    select(func.count(LocalPlanSite.id)).where(LocalPlanSite.matched_site_id.is_(None))
+).scalar()
+
+if unmatched_local_plan_count:
+    LOCAL_PLAN_PAGE = Path(__file__).resolve().parent / "pages" / "3_Local_Plan_Sites.py"
+    st.page_link(
+        LOCAL_PLAN_PAGE,
+        label=f"{unmatched_local_plan_count} Local Plan allocated sites with no application yet →",
+        icon="📋",
+    )
+
+# --- Excluded sites (manually killed as not genuinely residential) ---------
+# Hidden from the main table below by default (see the `sites` query) - kept
+# here rather than deleted so the exclusion reason stays visible and it can
+# be undone if it turns out to be wrong.
+
+excluded_sites = session.execute(select(Site).where(Site.excluded.is_(True))).scalars().all()
+if excluded_sites:
+    with st.expander(f"🚫 {len(excluded_sites)} site(s) excluded from results", expanded=False):
+        for s in excluded_sites:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"**{s.display_address}** ({s.council_code}) — {s.excluded_reason or 'no reason given'}")
+            with col2:
+                if st.button("View / un-exclude", key=f"view_excluded_{s.id}"):
+                    st.switch_page("pages/1_Scheme_Detail.py", query_params={"site_id": str(s.id)})
+
 # --- Watchlist: screening/scoping opinions ----------------------------------
 # Not qualifying schemes in their own right (no real applicant/documents
 # behind them yet), so kept out of the main results below - but a genuine
@@ -101,7 +134,7 @@ if watchlist_apps:
 
 # --- Main site-level table --------------------------------------------------
 
-sites = session.execute(select(Site)).scalars().all()
+sites = session.execute(select(Site).where(Site.excluded.is_not(True))).scalars().all()
 if not sites:
     st.info("No schemes yet. Run: python -m app.pipeline.run_weekly --council bury")
     st.stop()
@@ -422,7 +455,15 @@ if not map_points.empty:
     style_options = {"Road": "road", "Light": "light", "Dark": "dark"}
     if has_mapbox_key:
         style_options["Satellite"] = "satellite"
-    map_style_label = st.radio("Map style", list(style_options.keys()), horizontal=True, key="map_style_choice")
+    map_col1, map_col2 = st.columns([3, 2])
+    with map_col1:
+        map_style_label = st.radio("Map style", list(style_options.keys()), horizontal=True, key="map_style_choice")
+    with map_col2:
+        show_local_plan_layer = st.checkbox(
+            "Show Local Plan allocated sites with no application yet", value=False,
+            help="Gold markers - sites the council has already earmarked for housing that nobody has "
+                 "applied for yet. See the dedicated Local Plan Sites page for the full list and detail.",
+        )
     chosen_style = style_options[map_style_label]
 
     # Fill = planning status, outline ring = housing type - two independent
@@ -453,20 +494,66 @@ if not map_points.empty:
         auto_highlight=True,
         highlight_color=[255, 255, 0, 255],
     )
+    layers = [layer]
+
+    if show_local_plan_layer:
+        # Only sites with NO application yet - the ones already matched to a
+        # Site show up as a normal marker in the layer above already, adding
+        # them again here would just be visual clutter for no new signal.
+        unmatched_local_plan = session.execute(
+            select(LocalPlanSite).where(
+                LocalPlanSite.matched_site_id.is_(None),
+                LocalPlanSite.latitude.isnot(None), LocalPlanSite.longitude.isnot(None),
+            )
+        ).scalars().all()
+        if unmatched_local_plan:
+            # Reuses the SAME field names the tooltip template below already
+            # expects (Total Units, Housing Type, etc.) rather than adding
+            # local-plan-specific ones - pydeck's tooltip is one global
+            # template shared across every layer, not a per-layer template,
+            # so introducing new field names here would leave that text
+            # blank on every hover of a NORMAL scheme marker too (and vice
+            # versa). Reusing the same names keeps one tooltip working
+            # sensibly for both layers with no template changes needed.
+            lp_df = pd.DataFrame([{
+                "latitude": s.latitude, "longitude": s.longitude,
+                "Total Units": s.minimum_dwellings or "?",
+                "Housing Type": f"{s.policy_reference} {s.site_name}",
+                "Affordable Units": "?", "Affordable %": "?",
+                "Latest Status": "Local Plan allocation - no application yet",
+                "Lapse Risk": "n/a", "housing_note_line": "",
+            } for s in unmatched_local_plan])
+            layers.append(pdk.Layer(
+                "ScatterplotLayer",
+                id="local_plan",
+                data=lp_df,
+                get_position=["longitude", "latitude"],
+                get_radius=160,
+                get_fill_color=[255, 191, 0, 220],
+                get_line_color=[153, 101, 0, 255],
+                line_width_min_pixels=2,
+                stroked=True,
+                pickable=True,
+            ))
+
     view_state = pdk.ViewState(
         latitude=map_points["latitude"].mean(),
         longitude=map_points["longitude"].mean(),
         zoom=9,
     )
     deck = pdk.Deck(
-        layers=[layer],
+        layers=layers,
         initial_view_state=view_state,
         map_provider="mapbox" if chosen_style == "satellite" else "carto",
         map_style=chosen_style,
         tooltip={
             # Address/reference are redundant with the click-through, and not
             # useful for a quick scan while hovering - lead with the figures
-            # that actually help decide whether to click in.
+            # that actually help decide whether to click in. pydeck's
+            # tooltip is one global template shared across every layer, not
+            # per-layer - the local_plan layer's dataframe reuses these same
+            # column names (see above) rather than adding its own, so this
+            # one template reads sensibly for both layers unchanged.
             "text": "{Total Units} units ({Housing Type})\n"
                     "Affordable: {Affordable Units} ({Affordable %}%)\n"
                     "Status: {Latest Status} | Lapse risk: {Lapse Risk}"

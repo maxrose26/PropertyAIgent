@@ -49,6 +49,7 @@ from app.config import CouncilConfig, get_council
 from app.db.models import Application, ApplicationCompany, Council, Document, SchemeIntelligence, Site
 from app.db.session import get_session, init_db
 from app.enrichment.contact_pipeline import enrich_company, upsert_company_from_enrichment
+from app.ui.common import aggregate_scheme_fields
 from app.enrichment.epc_lookup import NOMINATIM_MIN_INTERVAL_SECONDS, check_build_status, geocode_address, geocode_postcode
 from app.extraction.pdf_text import (
     USEFUL_DOC_TYPES,
@@ -61,11 +62,20 @@ from app.extraction.pdf_text import (
     standardise_document_type,
 )
 from app.extraction.run_extraction import run_extraction_for_application
-from app.pipeline.lapse_tracking import PROGRESS_SIGNAL_CATEGORIES, is_granted_decision
+from app.pipeline.lapse_tracking import (
+    PROGRESS_SIGNAL_CATEGORIES,
+    compute_lapse_status,
+    is_granted_decision,
+    parse_portal_date,
+)
+from app.pipeline.phase_tracking import build_phase_breakdown
+from app.reporting.scheme_summary import MIN_APPLICATIONS_FOR_SUMMARY, generate_scheme_summary
 from app.pipeline.site_linking import extract_parent_reference, link_application_to_site
 from app.scrapers.documents import discover_documents
 from app.scrapers.arcus_portal import fetch_application_by_reference as fetch_application_by_reference_arcus
+from app.scrapers.arcus_portal import fetch_application_detail as fetch_application_detail_arcus
 from app.scrapers.arcus_portal import scrape_month as scrape_month_arcus
+from app.scrapers.arcus_portal import search_related_applications as search_related_applications_arcus
 from app.scrapers.idox_portal import HEADERS, generate_month_ranges, keyval_from_url
 from app.scrapers.idox_portal import fetch_application_by_reference as fetch_application_by_reference_idox
 from app.scrapers.idox_portal import fetch_application_detail, search_related_applications
@@ -94,6 +104,7 @@ FIELD_MAP = {
     "decision_issued_date": "Decision Issued Date",
     "application_received": "Application Received",
     "application_validated": "Application Validated",
+    "expected_decision_date": "Expected Decision Date",
     "ward": "Ward",
     "case_officer": "Case Officer",
     "applicant_name_raw": "Applicant Name",
@@ -256,26 +267,22 @@ def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig) 
     search instead.
     """
     candidates = session.execute(
-        select(Application).where(
-            Application.council_code == council.code,
-            # Not just reserved_matters - confirmed real cases (Trafford
-            # 119012/VLA/26, Oldham VAR/349651/22) of variation_or_amendment
-            # and condition_discharge_or_details applications citing a
-            # parent that's missing from the DB too, previously invisible
-            # to this stage entirely since it only ever scanned
-            # reserved_matters. The qualification-override logic below
-            # still only meaningfully applies to reserved_matters (the
-            # other two categories already have their own
-            # unit_confirmation_status resolved elsewhere and simply no-op
-            # past it) - what matters for them here is recovering the
-            # missing parent itself, which feeds stage_link_sites'
-            # parent_reference tier and, from there,
-            # stage_fetch_related_applications.
-            Application.application_category.in_(
-                ["reserved_matters", "variation_or_amendment", "condition_discharge_or_details"]
-            ),
-        )
+        select(Application).where(Application.council_code == council.code)
     ).scalars().all()
+    # Every application on the council, not just reserved_matters/
+    # variation_or_amendment/condition_discharge_or_details (an earlier,
+    # narrower version of this filter - confirmed real cases of citations on
+    # applications outside all three categories too). This is cheap and safe
+    # to run broadly: extract_parent_reference only matches genuine citation
+    # phrasing ("pursuant to...", "following...approval...", "relating to
+    # app..."), so a standalone application with no citation just doesn't
+    # match - no portal call happens unless a real reference is actually
+    # found AND it's missing from the DB. The qualification-override logic
+    # below only meaningfully applies to reserved_matters (other categories
+    # already have their own unit_confirmation_status resolved elsewhere and
+    # simply no-op past it) - what matters for them here is recovering the
+    # missing parent itself, which feeds stage_link_sites' parent_reference
+    # tier and, from there, stage_fetch_related_applications.
 
     ref_to_id = {
         row[0]: row[1] for row in session.execute(
@@ -362,16 +369,25 @@ def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig) 
             session.commit()
             print(f"  [parent-lookup] {application.reference}: parent {parent_ref} confirms {parent_qualify.unit_count} units")
 
-    print(f"\n[parent-lookup] {len(candidates)} reserved matters applications checked, {fetched} parent(s) fetched")
+    print(f"\n[parent-lookup] {len(candidates)} applications checked for a parent citation, {fetched} parent(s) fetched")
     return fetched
 
 
 def stage_fetch_related_applications(session: Session, page, council: CouncilConfig) -> int:
-    """Once a parent application is verified (site_link_method ==
-    "parent_reference" - either auto-detected from a child's own citation,
-    or fetched by stage_fetch_missing_parents above), search the portal for
-    every OTHER application that names it by reference (see
-    app.scrapers.idox_portal.search_related_applications).
+    """Search the portal for every application that names a given reference
+    by number (see app.scrapers.idox_portal.search_related_applications),
+    for every site's most senior granted application - not just citation-
+    verified parents (site_link_method == "parent_reference").
+
+    That narrower version left a real gap: a genuinely single-application
+    site, by definition, has never been CITED by anything else yet, so it
+    never qualified as a "verified parent" - but that doesn't mean nothing's
+    happened on it since. Confirmed real scale: 134 single-application,
+    already-granted sites across the database had never had their own
+    reference searched for newer filings (a discharge of conditions, a
+    non-material amendment) that would prove work has actually started.
+    Every granted site gets the same regular check now, whether or not
+    anything currently cites it.
 
     This is deliberately NOT the same thing as Idox's own "Related Cases"
     tab - confirmed a real case (Stockport DC/060928, a hybrid outline for a
@@ -380,11 +396,11 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
     non-material amendments) only discoverable by searching its own
     reference, since child filings routinely name their parent in their own
     description rather than through the portal's officer-maintained linking.
-    This is how a large site's full phase history - and therefore whether
-    construction has actually started somewhere on it, even where no single
-    application says so on its own - gets built up.
+    This is how a site's full phase history - and therefore whether
+    construction has actually started, even where no single application
+    says so on its own - gets built up.
 
-    Each found application is linked straight to the parent's own site
+    Each found application is linked straight to the anchor's own site
     rather than left for stage_link_sites' regex-based citation parsing,
     which routinely can't (e.g. "Discharge of condition 24 of DC/060928"
     doesn't match any pursuant-to/following/relating-to phrasing
@@ -396,36 +412,126 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
     their own independently-reportable qualifying scheme, matching
     stage_scrape's own progress_signal_only convention.
 
-    Idox only (search_related_applications isn't implemented for Arcus).
-    Not time-bounded like stage_check_build_status's 30-day cooldown - a
-    parent's family of filings grows slowly and unpredictably as a scheme
-    progresses, with no natural "recently checked" cutoff. Re-running this
-    against an already-searched parent mostly just re-finds already-known
-    applications (harmless - upserts in place) plus occasionally a
-    genuinely new one."""
-    if council.doc_system == "arcus":
-        return 0
+    Works against both doc systems - app.scrapers.idox_portal and
+    app.scrapers.arcus_portal each implement their own
+    search_related_applications, since the two portal platforms have
+    nothing in common under the hood (Idox: HTML form + BeautifulSoup;
+    Arcus: Salesforce Lightning, base64-JSON quick-search URL). The two
+    branches below differ in fetch/dedup mechanics for the same reason.
 
-    verified_parents = session.execute(
-        select(Application).where(
-            Application.council_code == council.code,
-            Application.site_link_method == "parent_reference",
-            Application.site_id.is_not(None),
-        )
-    ).scalars().all()
-    print(f"\n[related-applications] {len(verified_parents)} verified parent application(s) to search")
+    Time-bounded like stage_check_build_status's 30-day cooldown, tracked
+    per anchor application (Application.related_search_checked_at) - a
+    site's family of filings grows slowly and unpredictably, so a monthly
+    recheck is enough to catch real progression without re-hitting the
+    portal on every single weekly run."""
+    cutoff = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=30)
+    sites = session.execute(select(Site).where(Site.council_code == council.code)).scalars().all()
+
+    to_search: list[Application] = []
+    for site in sites:
+        apps = site.applications
+        if not apps:
+            continue
+        # A citation-verified parent is the most trustworthy anchor when one
+        # exists (confirmed relationship, not just "this site's earliest
+        # granted application") - otherwise fall back to the earliest-
+        # received granted application, which is what a genuinely single-
+        # application site has.
+        verified = [a for a in apps if a.site_link_method == "parent_reference"]
+        if verified:
+            anchor = verified[0]
+        else:
+            granted = [a for a in apps if is_granted_decision(a.decision)]
+            if not granted:
+                continue  # nothing granted yet on this site - nothing to search from
+            anchor = min(granted, key=lambda a: parse_portal_date(a.application_received))
+
+        checked_at = anchor.related_search_checked_at
+        if checked_at and checked_at.replace(tzinfo=None) > cutoff:
+            continue
+        to_search.append(anchor)
+
+    print(f"\n[related-applications] {len(to_search)} site(s) need a related-application search")
+
+    found_total = 0
+
+    if council.doc_system == "arcus":
+        for parent in to_search:
+            try:
+                rows = search_related_applications_arcus(page, council, parent.reference)
+            except Exception as e:
+                # Deliberately NOT setting related_search_checked_at here - a
+                # transient portal error should be retried next run, not
+                # suppressed for 30 days like a genuine "found nothing new".
+                print(f"  [related-applications] error searching for {parent.reference}: {e}")
+                continue
+
+            parent.related_search_checked_at = dt.datetime.now(dt.timezone.utc)
+            session.commit()
+
+            new_this_parent = 0
+            for row in rows:
+                reference = row.get("reference")
+                if not reference:
+                    continue
+                # No keyval concept on Arcus (ScrapedApplication.keyval is
+                # always None) - dedup by reference instead, same key the
+                # DB's own uq_council_reference constraint uses.
+                existing = session.execute(
+                    select(Application).where(Application.council_code == council.code, Application.reference == reference)
+                ).scalar_one_or_none()
+                if existing:
+                    continue
+                try:
+                    # force_qualify=True, same reasoning as
+                    # fetch_application_by_reference_arcus above - Arcus's
+                    # own fetch_application_detail only visits the real
+                    # detail page (populating decision/dates/etc.) when the
+                    # application qualifies on its own wording, which a bare
+                    # "Discharge of condition 24 of..." filing routinely
+                    # doesn't. We already know it's relevant - it just
+                    # showed up citing a verified reference.
+                    result = fetch_application_detail_arcus(page, row, unit_threshold=council.unit_threshold, force_qualify=True)
+                except Exception as e:
+                    print(f"    error fetching {reference}: {e}")
+                    continue
+
+                proposal = result.fields.get("Proposal", "")
+                category = classify_application_category(proposal)
+                is_progress_signal = category in PROGRESS_SIGNAL_CATEGORIES
+                status = "progress_signal_only" if is_progress_signal else (
+                    "confirmed_qualifying" if result.qualifies else None
+                )
+
+                application = _upsert_scraped_application(
+                    session, council, result, batch_id=None, unit_confirmation_status=status,
+                )
+                application.site_id = parent.site_id
+                application.site_link_method = "related_search"
+                session.commit()
+
+                new_this_parent += 1
+                found_total += 1
+                tag = "progress signal" if is_progress_signal else ("qualifying" if result.qualifies else "not independently qualifying")
+                print(f"    {parent.reference} -> found {result.reference} ({tag}): {proposal[:80]}")
+
+            print(f"  [related-applications] {parent.reference}: {len(rows)} search result(s), {new_this_parent} new")
+
+        return found_total
 
     requests_session = requests.Session()
     requests_session.headers.update(HEADERS)
 
-    found_total = 0
-    for parent in verified_parents:
+    for parent in to_search:
         try:
             summary_urls = search_related_applications(page, council, parent.reference)
         except Exception as e:
             print(f"  [related-applications] error searching for {parent.reference}: {e}")
             continue
         time.sleep(council.request_delay_seconds)
+
+        parent.related_search_checked_at = dt.datetime.now(dt.timezone.utc)
+        session.commit()
 
         new_this_parent = 0
         for summary_url in summary_urls:
@@ -818,6 +924,60 @@ def stage_check_build_status(session: Session, council: CouncilConfig, epc_key: 
     return len(candidates)
 
 
+def stage_generate_scheme_summaries(session: Session, client: OpenAI, council: CouncilConfig) -> int:
+    """Weekly AI synthesis of every site's full application history (phase/
+    plot breakdown, progress-signal filings, lapse/build status) into one
+    plain-English status note - see app.reporting.scheme_summary. Grounded-
+    numbers-then-narrate, same as the PDF report: everything the model is
+    given (phase count, phase statuses, application list) is already
+    verified data, it only ever writes the connective prose.
+
+    Every site gets a summary, including single-application ones still
+    awaiting a decision - useful even then for stating the real planning
+    stage and expected decision date (see app.pipeline.lapse_tracking.
+    get_expected_decision), not just build progress on granted schemes.
+    Regenerated whenever a NEWER application has been linked to
+    the site since the last summary was written, not on a blind time
+    cooldown - a site's application history grows in discrete jumps (a new
+    filing appears on the portal), not gradually, so "has anything actually
+    changed" is the meaningful trigger, not "has N days passed"."""
+    sites = session.execute(select(Site).where(Site.council_code == council.code)).scalars().all()
+
+    candidates = []
+    for site in sites:
+        apps = site.applications
+        if len(apps) < MIN_APPLICATIONS_FOR_SUMMARY:
+            continue
+        # Naive-vs-aware comparison, same reasoning as stage_check_build_status
+        # above - SQLite round-trips a stored tz-aware datetime as naive.
+        latest_seen = max((a.last_seen_at for a in apps if a.last_seen_at), default=None)
+        summarised_at = site.status_summary_updated_at
+        if summarised_at and latest_seen:
+            if summarised_at.replace(tzinfo=None) >= latest_seen.replace(tzinfo=None):
+                continue  # nothing new since the last summary
+        candidates.append((site, apps))
+
+    print(f"\n[scheme-summary] {len(candidates)} sites need a status summary")
+
+    generated = 0
+    for site, apps in candidates:
+        merged = aggregate_scheme_fields(apps)
+        lapse = compute_lapse_status(apps, site)
+        phase_breakdown = build_phase_breakdown(apps)
+        try:
+            summary = generate_scheme_summary(client, site, apps, merged, lapse, phase_breakdown)
+        except Exception as e:
+            print(f"  [scheme-summary] error for site {site.id}: {e}")
+            continue
+        site.status_summary = summary
+        site.status_summary_updated_at = dt.datetime.now(dt.timezone.utc)
+        session.commit()
+        generated += 1
+        print(f"  [scheme-summary] site {site.id} ({site.display_address[:50]}): {summary[:120]}...")
+
+    return generated
+
+
 def parse_uk_date(value: str | None) -> dt.date | None:
     if not value:
         return None
@@ -890,6 +1050,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-extraction", action="store_true")
     parser.add_argument("--skip-geocode", action="store_true")
     parser.add_argument("--skip-build-status", action="store_true")
+    parser.add_argument("--skip-scheme-summary", action="store_true")
     parser.add_argument(
         "--enrich", action="store_true",
         help="Also run contact enrichment (Companies House/website/Apollo/Hunter) for every scheme found. "
@@ -996,6 +1157,12 @@ def main() -> None:
 
     if not args.skip_build_status:
         stage_check_build_status(session, council, os.getenv("EPC_API_KEY"))
+
+    if not args.skip_scheme_summary:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY not set in .env")
+        stage_generate_scheme_summaries(session, OpenAI(api_key=api_key), council)
 
     if args.enrich:
         ch_key = os.getenv("CH_API_KEY")

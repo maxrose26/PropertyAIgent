@@ -620,6 +620,31 @@ def classify_application_category(proposal: str | None) -> str:
     if VARIATION_OF_OBLIGATION_RE.search(proposal_norm):
         return "variation_or_amendment"
 
+    # A genuine Reserved Matters submission is procedurally required to
+    # reference the outline condition it discharges ("...pursuant to
+    # condition 2 attached to outline planning permission...") as standard
+    # boilerplate - that phrase alone doesn't mean the application itself is
+    # a minor condition-discharge filing. Confirmed real case (Wigan North
+    # Leigh): "Application for the approval of reserved matters, namely
+    # layout, scale, appearance, and landscaping pursuant to condition 2...
+    # for the erection of 257 dwellings" was being caught by the generic
+    # "pursuant to condition" check below and classified as
+    # condition_discharge_or_details, hiding a genuinely substantive
+    # 257-dwelling phase-defining application (with its own real unit count
+    # stated directly in the text) from the qualifying-scheme pipeline
+    # entirely - it never got its documents downloaded or AI-extracted.
+    # Narrowly scoped to require BOTH the RM-application opening phrase AND
+    # an explicit dwelling/unit count in the same text, so an actual small
+    # discharge filing that merely mentions "reserved matters permission"
+    # in passing (e.g. "discharge of condition 5 attached to reserved
+    # matters permission A/20/88859/RMMAJ") isn't caught by this - checked
+    # against the full existing dataset with zero false positives.
+    if (
+        re.search(r"application for (?:the )?approval of reserved matters", proposal_norm)
+        and extract_unit_count(proposal) is not None
+    ):
+        return "reserved_matters"
+
     if any(x in proposal_norm for x in [
         "discharge of condition", "approval of details",
         "pursuant to condition", "condition attached",
