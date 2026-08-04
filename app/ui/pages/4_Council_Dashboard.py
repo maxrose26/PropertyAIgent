@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import pandas as pd
 import streamlit as st
 
-from app.db.models import LocalPlan
+from sqlalchemy import select
+
+from app.db.models import LocalPlan, MonitoredReport
 from app.policy.council_dashboard import build_council_dashboard
 from app.policy.plan_evidence_view import build_plan_evidence_view
 from app.ui.common import bootstrap, credits_sidebar, get_db
@@ -82,13 +84,19 @@ EVIDENCE_FIELD_LABELS = {
 def _render_evidence_field(entry: dict) -> None:
     # Part 10: never show missing/unsupported evidence as a bare zero or
     # blank row - a field with nothing at all (no trusted value, no
-    # pending proposal) is simply omitted from the page.
-    if not entry["has_value"] and entry["pending_value"] is None:
+    # pending proposal, AND no newer report waiting to fill it in) is
+    # simply omitted from the page. newer_report_pending is included here
+    # (Part 6) so a field that's still empty but has a fresh, not-yet-
+    # extracted report sitting behind it doesn't just silently vanish.
+    if not entry["has_value"] and entry["pending_value"] is None and not entry["newer_report_pending"]:
         return
 
     label = EVIDENCE_FIELD_LABELS.get(entry["field"], entry["field"])
     if entry["has_value"]:
         stale_bit = " ⏸️ *stale evidence*" if entry["is_stale"] else ""
+        # Part 6: never label an older figure "current" where a newer
+        # report has been discovered but not yet reviewed/extracted.
+        newer_bit = " 🆕 *a newer report exists, not yet extracted*" if entry["newer_report_pending"] else ""
         source_bit = ""
         page_note = f", page {entry['source_page']}" if entry["source_page"] else ""
         if entry["source_document_url"]:
@@ -97,12 +105,49 @@ def _render_evidence_field(entry: dict) -> None:
             source_bit = f" — [{title}]({entry['source_document_url']}{anchor}){page_note}"
         elif entry["source_document_title"]:
             source_bit = f" — {entry['source_document_title']}{page_note}"
-        st.markdown(f"**{label}:** {entry['value']}{stale_bit}{source_bit}")
+        st.markdown(f"**{label}:** {entry['value']}{stale_bit}{newer_bit}{source_bit}")
     else:
-        st.markdown(f"**{label}:** _not available_")
+        newer_bit = " 🆕 *a newer report exists, not yet extracted*" if entry["newer_report_pending"] else ""
+        st.markdown(f"**{label}:** _not available_{newer_bit}")
 
     if entry["pending_value"] is not None:
         st.caption(f"🕗 Proposed change awaiting review: → **{entry['pending_value']}**")
+
+    if entry["historic_values"]:
+        with st.expander(f"Previous values ({len(entry['historic_values'])})"):
+            for h in entry["historic_values"]:
+                date_bit = h["extracted_at"].strftime("%d %b %Y") if h["extracted_at"] else "date unknown"
+                source_bit = f" — {h['source_document_title']}" if h["source_document_title"] else ""
+                st.caption(f"{h['value']} (as of {date_bit}{source_bit})")
+
+
+REPORT_STATUS_LABELS = {"current": "✅ Current", "superseded": "🗄️ Superseded"}
+REPORT_CLASSIFICATION_LABELS = {"auto": "Auto-classified", "needs_review": "⚠️ Needs review"}
+
+
+def _render_monitored_reports(council_code: str) -> None:
+    reports = session.execute(
+        select(MonitoredReport).where(MonitoredReport.council_code == council_code)
+        .order_by(MonitoredReport.discovered_at.desc())
+    ).scalars().all()
+    if not reports:
+        return
+
+    rows = [{
+        "Report": r.title or r.url,
+        "Type": r.source_type or "(unclassified)",
+        "Status": REPORT_STATUS_LABELS.get(r.status, r.status),
+        "Classification": REPORT_CLASSIFICATION_LABELS.get(r.classification_status, r.classification_status),
+        "Reporting period": r.reporting_period or "—",
+        "Last checked": r.last_checked.strftime("%d %b %Y") if r.last_checked else "Never",
+        "Extracted": "Yes" if r.last_extracted_at else "No",
+    } for r in reports]
+
+    with st.expander(f"Monitored reports ({len(reports)})"):
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        needs_review = [r for r in reports if r.classification_status == "needs_review"]
+        if needs_review:
+            st.warning(f"⚠️ {len(needs_review)} discovered document(s) need a human to confirm their report type.")
 
 summary_rows = [{
     "Council": r["council_name"],
@@ -121,6 +166,13 @@ for r in rows:
     with st.expander(f"{r['council_name']} - {len(r['local_plans'])} Local Plan(s)"):
         if r["review_items_pending"]:
             st.warning(f"⚠️ {r['review_items_pending']} change(s) awaiting review approval for this council.")
+
+        # Housing-supply monitoring amendment ("Add monitored housing
+        # supply and delivery reports", Part 6) - every discovered report
+        # for this council, regardless of which plan (if any) it's linked
+        # to, so an ambiguous/unreviewed discovery is never invisible.
+        _render_monitored_reports(r["council_code"])
+
         if not r["local_plans"]:
             st.caption("No Local Plan ingested yet.")
         for plan in r["local_plans"]:
@@ -142,7 +194,7 @@ for r in rows:
                 evidence_view = build_plan_evidence_view(session, plan_row)
                 sections_with_content = [
                     (title, evidence_view[key]) for key, title in EVIDENCE_SECTIONS
-                    if any(e["has_value"] or e["pending_value"] is not None for e in evidence_view[key])
+                    if any(e["has_value"] or e["pending_value"] is not None or e["newer_report_pending"] for e in evidence_view[key])
                 ]
                 if sections_with_content:
                     with st.expander("Plan evidence (housing requirement, delivery, five-year supply)"):

@@ -20,7 +20,7 @@ import json
 
 from sqlalchemy import select
 
-from app.db.models import LocalPlan, LocalPlanSite, PolicyChangeEvent
+from app.db.models import LocalPlan, LocalPlanSite, MonitoredReport, PolicyChangeEvent
 from app.policy.history import snapshot_allocation, snapshot_field, snapshot_plan_status
 from app.policy.progression import classify_progression
 
@@ -55,6 +55,14 @@ _RESOLVABLE_FIELDS_PLAN_EVIDENCE = {
     "supply_position_notes",
 }
 _RESOLVABLE_FIELDS_PLAN = _RESOLVABLE_FIELDS_PLAN_LEGACY | _RESOLVABLE_FIELDS_PLAN_EVIDENCE
+# Housing-supply monitoring amendment ("Add monitored housing supply and
+# delivery reports") - resolves report_classification_needs_review
+# (proposed_data supplies a reviewer-confirmed source_type, typically via
+# approve_change's override_data param below, since an AMBIGUOUS
+# classification has no machine-proposed value to just replay) and
+# report_supersession_needs_review (proposed_data is
+# {"status": "superseded", "superseded_by_id": <new report id>}) events.
+_RESOLVABLE_FIELDS_REPORT = {"source_type", "classification_status", "matched_classification_rule", "status", "superseded_by_id"}
 
 
 def _recompute_allocation_review_status(session, row: LocalPlanSite) -> None:
@@ -70,19 +78,28 @@ def _recompute_allocation_review_status(session, row: LocalPlanSite) -> None:
     row.review_status = "needs_review" if still_pending else "confirmed"
 
 
-def approve_change(session, event: PolicyChangeEvent, note: str | None = None) -> None:
-    """Applies event.proposed_data onto the LocalPlan or LocalPlanSite it
-    targets, snapshotting the PRE-change state into history first, then
-    marks the event confirmed. Raises if the event isn't actually pending -
+def approve_change(session, event: PolicyChangeEvent, note: str | None = None, override_data: dict | None = None) -> None:
+    """Applies event.proposed_data (or override_data, if given) onto the
+    LocalPlan/LocalPlanSite/MonitoredReport it targets, snapshotting the
+    PRE-change state into history first where that applies, then marks the
+    event confirmed. Raises if the event isn't actually pending -
     approving/rejecting twice, or approving something that was already
-    auto-applied, is a programming error, not a silent no-op."""
+    auto-applied, is a programming error, not a silent no-op.
+
+    override_data exists for report_classification_needs_review events
+    (housing-supply monitoring amendment): an AMBIGUOUS classification has
+    no machine-proposed source_type to just replay - the reviewer supplies
+    the real value themselves, e.g.
+    approve_change(session, event, override_data={"source_type": "housing_delivery_report", "classification_status": "auto"}).
+    Ignored for every other event type, which always applies proposed_data
+    exactly as detected."""
     if event.review_status != "needs_review":
         raise ValueError(
             f"PolicyChangeEvent {event.id} is not pending review (review_status={event.review_status!r}) - "
             f"nothing to approve."
         )
 
-    proposed = json.loads(event.proposed_data) if event.proposed_data else {}
+    proposed = override_data if override_data is not None else (json.loads(event.proposed_data) if event.proposed_data else {})
 
     if event.allocation_id is not None:
         row = session.get(LocalPlanSite, event.allocation_id)
@@ -98,6 +115,18 @@ def approve_change(session, event: PolicyChangeEvent, note: str | None = None) -
         row.progression_signal = signal
         row.progression_reasons = json.dumps(reasons)
         row.progression_computed_at = dt.datetime.now(dt.timezone.utc)
+    elif event.monitored_report_id is not None:
+        # Checked BEFORE local_plan_id below: a report_supersession_needs_
+        # review event's proposed_data uses field names ("status") that
+        # ALSO happen to be resolvable LocalPlan fields - report events
+        # always carry a monitored_report_id, so branching on that first
+        # (rather than local_plan_id, which such an event may incidentally
+        # also carry for dashboard visibility) is what keeps these two
+        # targets from ever being confused.
+        report = session.get(MonitoredReport, event.monitored_report_id)
+        for field, value in proposed.items():
+            if field in _RESOLVABLE_FIELDS_REPORT:
+                setattr(report, field, value)
     elif event.local_plan_id is not None:
         plan = session.get(LocalPlan, event.local_plan_id)
         snapshot_plan_status(session, plan, note=f"Pre-approval snapshot before applying event {event.id} ({event.event_type}).")

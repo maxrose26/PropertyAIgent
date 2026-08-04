@@ -104,8 +104,13 @@ def test_run_monitor_is_idempotent(session):
     content = "Site HOM 2.30 - 40 dwellings"
 
     with patch("app.policy.monitor.requests.get", return_value=_FakeResponse(content)):
+        # force=True on the second call: a genuinely due-date-aware rerun
+        # would normally SKIP a source just checked moments ago (see
+        # test_run_monitor_skips_sources_not_yet_due below) - this test's
+        # own intent is "checking an unchanged source again is idempotent",
+        # which needs an explicit forced recheck to actually exercise.
         first = run_monitor(session, "testcouncil")
-        second = run_monitor(session, "testcouncil")
+        second = run_monitor(session, "testcouncil", force=True)
 
     assert first["checked"] == 1
     assert second["checked"] == 1
@@ -114,6 +119,21 @@ def test_run_monitor_is_idempotent(session):
 
     events = session.execute(select(PolicyChangeEvent)).scalars().all()
     assert events == []  # first_check then unchanged - never anything to queue
+
+
+def test_run_monitor_skips_sources_not_yet_due(session):
+    # Housing-supply monitoring amendment ("Add monitored housing supply
+    # and delivery reports", Part 3): "the monitoring command should
+    # normally check only sources that are due" - a source just checked
+    # moments ago should not be re-checked again on the very next run.
+    plan, source = _make_plan_and_source(session)
+    with patch("app.policy.monitor.requests.get", return_value=_FakeResponse("content")):
+        first = run_monitor(session, "testcouncil")
+        second = run_monitor(session, "testcouncil")  # not forced - should skip, nothing is due yet
+
+    assert first["checked"] == 1
+    assert second["checked"] == 0
+    assert second["skipped_not_due"] == 1
 
 
 def test_run_monitor_only_checks_active_sources(session):

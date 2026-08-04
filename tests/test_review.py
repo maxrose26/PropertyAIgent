@@ -3,7 +3,7 @@ import json
 import pytest
 from sqlalchemy import select
 
-from app.db.models import AllocationVersion, LocalPlan, LocalPlanSite, LocalPlanStatusHistory, PolicyChangeEvent
+from app.db.models import AllocationVersion, LocalPlan, LocalPlanSite, LocalPlanStatusHistory, MonitoredReport, PolicyChangeEvent
 from app.policy.change_detection import classify_confidence, diff_allocations
 from app.policy.progression import classify_progression
 from app.policy.review import approve_change, reject_change
@@ -195,3 +195,108 @@ def test_approving_plan_adoption_does_not_cascade_to_allocations(session):
     signal_removed, _ = classify_progression(plan.status, removed.allocation_status)
     assert signal_unconfirmed != "adopted"
     assert signal_removed == "removed"
+
+
+# --- MonitoredReport review branch (housing-supply monitoring amendment,
+# "Add monitored housing supply and delivery reports", Part 2/Part 7) ---
+
+def _make_ambiguous_report(session):
+    report = MonitoredReport(
+        council_code="testcouncil", source_type=None, classification_status="needs_review",
+        title="Housing Update Document", url="https://example.invalid/mystery.pdf", status="current",
+    )
+    session.add(report)
+    session.commit()
+    event = PolicyChangeEvent(
+        monitored_report_id=report.id, event_type="report_classification_needs_review",
+        old_value=None, new_value=report.url, detail="Ambiguous classification",
+        auto_applied=False, review_status="needs_review",
+    )
+    session.add(event)
+    session.commit()
+    return report, event
+
+
+def test_approving_an_ambiguous_classification_applies_the_reviewers_override_data(session):
+    report, event = _make_ambiguous_report(session)
+
+    approve_change(session, event, note="Confirmed by hand - this is a housing delivery report.",
+                    override_data={"source_type": "housing_delivery_report", "classification_status": "auto"})
+
+    session.refresh(report)
+    assert report.source_type == "housing_delivery_report"
+    assert report.classification_status == "auto"
+    session.refresh(event)
+    assert event.review_status == "confirmed"
+
+
+def test_rejecting_an_ambiguous_classification_leaves_the_report_unclassified(session):
+    report, event = _make_ambiguous_report(session)
+
+    reject_change(session, event, note="Not a report this platform tracks - a council newsletter.")
+
+    session.refresh(report)
+    assert report.source_type is None
+    assert report.classification_status == "needs_review"  # untouched
+    session.refresh(event)
+    assert event.review_status == "rejected"
+
+
+def test_approving_a_supersession_review_marks_the_old_report_superseded(session):
+    old = MonitoredReport(
+        council_code="testcouncil", source_type="authority_monitoring_report", classification_status="auto",
+        title="AMR 2022/23", url="https://example.invalid/amr-2022.pdf", status="current",
+    )
+    new = MonitoredReport(
+        council_code="testcouncil", source_type="authority_monitoring_report", classification_status="auto",
+        title="AMR 2023/24", url="https://example.invalid/amr-2023.pdf", status="current",
+    )
+    session.add_all([old, new])
+    session.commit()
+    event = PolicyChangeEvent(
+        monitored_report_id=old.id, event_type="report_supersession_needs_review",
+        old_value=old.url, new_value=new.url,
+        proposed_data=json.dumps({"status": "superseded", "superseded_by_id": new.id}),
+        auto_applied=False, review_status="needs_review",
+    )
+    session.add(event)
+    session.commit()
+
+    approve_change(session, event, note="Confirmed - this is the newer edition.")
+
+    session.refresh(old)
+    assert old.status == "superseded"
+    assert old.superseded_by_id == new.id
+
+
+def test_approving_a_report_event_never_touches_a_local_plan_even_if_local_plan_id_is_set(session):
+    # Regression: a report event may ALSO carry local_plan_id (for
+    # dashboard visibility) - proposed_data's "status" key must apply to
+    # the MonitoredReport, never be mistaken for LocalPlan.status just
+    # because both happen to be resolvable field names on their own model.
+    plan = _make_plan(session, status="draft_consultation", raw_status="draft")
+    old = MonitoredReport(
+        council_code="testcouncil", local_plan_id=plan.id, source_type="authority_monitoring_report",
+        classification_status="auto", title="AMR 2022/23", url="https://example.invalid/amr-2022.pdf", status="current",
+    )
+    new = MonitoredReport(
+        council_code="testcouncil", local_plan_id=plan.id, source_type="authority_monitoring_report",
+        classification_status="auto", title="AMR 2023/24", url="https://example.invalid/amr-2023.pdf", status="current",
+    )
+    session.add_all([old, new])
+    session.commit()
+    event = PolicyChangeEvent(
+        local_plan_id=plan.id, monitored_report_id=old.id, event_type="report_supersession_needs_review",
+        old_value=old.url, new_value=new.url,
+        proposed_data=json.dumps({"status": "superseded", "superseded_by_id": new.id}),
+        auto_applied=False, review_status="needs_review",
+    )
+    session.add(event)
+    session.commit()
+
+    approve_change(session, event)
+
+    session.refresh(plan)
+    session.refresh(old)
+    assert plan.status == "draft_consultation"  # untouched - the event targets the report, not the plan
+    assert old.status == "superseded"

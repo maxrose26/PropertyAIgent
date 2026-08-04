@@ -37,7 +37,7 @@ from openai import OpenAI
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import LocalPlan, PolicyChangeEvent
+from app.db.models import LocalPlan, MonitoredReport, PolicyChangeEvent
 from app.extraction.plan_evidence import (
     CATEGORIES,
     MODEL,
@@ -154,6 +154,7 @@ def run_extraction(
     source_url: str | None = None,
     dry_run: bool = False,
     reprocess_unchanged: bool = False,
+    monitored_report_id: int | None = None,
 ) -> dict:
     """Runs every extraction category eligible for source_type (or just
     category_override, if given) against pdf_path[first_page:last_page],
@@ -227,7 +228,7 @@ def run_extraction(
                     setattr(plan, model_field, parsed_value)
 
                 session.add(PolicyChangeEvent(
-                    local_plan_id=plan.id, event_type="plan_evidence_proposed",
+                    local_plan_id=plan.id, monitored_report_id=monitored_report_id, event_type="plan_evidence_proposed",
                     old_value=None if current_value is None else str(current_value),
                     new_value=str(parsed_value),
                     detail=f"{model_field} proposed from {source_title or pdf_path} (category={category}).",
@@ -252,16 +253,97 @@ def run_extraction(
     return stats
 
 
+def should_extract(report: MonitoredReport, force: bool = False) -> bool:
+    """Housing-supply monitoring amendment ("Add monitored housing supply
+    and delivery reports", Part 4 - "trigger extraction only on change"):
+    True when this report has never been extracted, its content_hash has
+    changed since the last extraction, or force=True (an explicit
+    reprocess - Part 4 is explicit that a bumped prompt/model version
+    ALONE, without an explicit request to reprocess, must not silently
+    trigger AI cost - force is that explicit request, whatever the
+    reason)."""
+    if force:
+        return True
+    if report.last_extracted_content_hash is None:
+        return True
+    return report.last_extracted_content_hash != report.content_hash
+
+
+def _empty_stats() -> dict:
+    return {
+        "categories": [], "passes_run": 0, "facts_extracted": 0, "facts_rejected": 0,
+        "unchanged_skipped": 0, "events_created": 0, "auto_applied": 0, "needs_review": 0,
+        "input_tokens": 0, "output_tokens": 0, "estimated_cost_usd": 0.0, "proposals": [],
+    }
+
+
+def run_extraction_for_report(
+    session: Session,
+    client: OpenAI,
+    report: MonitoredReport,
+    pdf_path: str,
+    first_page: int | None = None,
+    last_page: int | None = None,
+    force: bool = False,
+    dry_run: bool = False,
+) -> dict:
+    """The MonitoredReport-driven counterpart to run_extraction: resolves
+    the plan/category from the report itself (its own local_plan_id and
+    source_type via app.policy.document_selection.DOCUMENT_TYPE_TO_CATEGORIES),
+    gates on should_extract, and - unless dry_run - records that
+    extraction ran against this report's current content_hash/prompt
+    version so a later unchanged re-run is skipped without re-deriving
+    that from PolicyChangeEvent history. Returns run_extraction's own
+    stats dict plus "skipped": bool."""
+    if not should_extract(report, force=force):
+        stats = _empty_stats()
+        stats["skipped"] = True
+        return stats
+
+    if report.local_plan_id is None:
+        raise ValueError(f"MonitoredReport {report.id} has no local_plan_id set - cannot run plan-level extraction against it.")
+    plan = session.get(LocalPlan, report.local_plan_id)
+
+    if first_page is None or last_page is None:
+        import pdfplumber
+        with pdfplumber.open(pdf_path) as pdf:
+            first_page, last_page = 1, len(pdf.pages)
+
+    stats = run_extraction(
+        session, client, plan, pdf_path, first_page, last_page, report.source_type or "other",
+        source_title=report.title, source_url=report.final_url or report.url,
+        dry_run=dry_run, monitored_report_id=report.id,
+    )
+    stats["skipped"] = False
+
+    if not dry_run:
+        report.last_extracted_content_hash = report.content_hash
+        report.last_extracted_prompt_version = PROMPT_VERSION
+        report.last_extracted_at = dt.datetime.now(dt.timezone.utc)
+        session.commit()
+
+    return stats
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--council", required=True)
+    parser.add_argument("--council", default=None, help="Required unless --report-id is given")
     parser.add_argument("--plan-id", type=int, default=None, help="Disambiguates when a council has more than one LocalPlan")
+    parser.add_argument("--report-id", type=int, default=None,
+                         help="Run in MonitoredReport-driven mode (Part 4: extraction only runs when the report's "
+                              "content actually changed since its last extraction, unless --force-extract). Reads "
+                              "council/plan/source-type/title/url from the report itself - --council, --plan-id, "
+                              "--source-type, --title and --source-url are all ignored when this is given.")
+    parser.add_argument("--force-extract", action="store_true",
+                         help="With --report-id: re-run extraction even if this report's content hasn't changed "
+                              "since it was last extracted (Part 4's explicit reprocess trigger).")
     parser.add_argument("--pdf", required=True, help="Path to the downloaded policy document")
     parser.add_argument("--pages", default=None, help="1-indexed inclusive page range, e.g. 1-20 (default: whole document)")
-    parser.add_argument("--source-type", required=True,
+    parser.add_argument("--source-type", default=None,
                          help="MonitoredSource.source_type - determines which extraction categories run "
                               "(see app.policy.document_selection.DOCUMENT_TYPE_TO_CATEGORIES); a source type "
-                              "with no eligible category means this run does nothing, by design.")
+                              "with no eligible category means this run does nothing, by design. Required unless "
+                              "--report-id is given.")
     parser.add_argument("--category", default=None, choices=sorted(CATEGORIES),
                          help="Force a single extraction category instead of --source-type's full eligible set")
     parser.add_argument("--title", default=None, help="Human-readable document title, stored as evidence")
@@ -270,7 +352,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reprocess-unchanged", action="store_true",
                          help="Create a change event even when the extracted value equals the current trusted "
                               "value (off by default - re-running unchanged inputs must not create duplicate events)")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.report_id is None and (args.council is None or args.source_type is None):
+        parser.error("--council and --source-type are required unless --report-id is given")
+    return args
 
 
 def _resolve_page_range(pdf_path: str, pages_arg: str | None) -> tuple[int, int]:
@@ -291,17 +376,36 @@ def main() -> None:
     session = get_session()
     client = OpenAI()
 
-    plan = resolve_plan(session, args.council, args.plan_id)
-    first_page, last_page = _resolve_page_range(args.pdf, args.pages)
+    if args.report_id is not None:
+        report = session.get(MonitoredReport, args.report_id)
+        if report is None:
+            raise ValueError(f"No MonitoredReport {args.report_id} found")
+        first_page, last_page = (None, None)
+        if args.pages:
+            first_page, last_page = (int(p) for p in args.pages.split("-"))
 
-    stats = run_extraction(
-        session, client, plan, args.pdf, first_page, last_page, args.source_type,
-        category_override=args.category, source_title=args.title, source_url=args.source_url,
-        dry_run=args.dry_run, reprocess_unchanged=args.reprocess_unchanged,
-    )
+        stats = run_extraction_for_report(
+            session, client, report, args.pdf, first_page=first_page, last_page=last_page,
+            force=args.force_extract, dry_run=args.dry_run,
+        )
+        mode = "DRY RUN - nothing written" if args.dry_run else "applied"
+        if stats["skipped"]:
+            print(f"[plan-evidence] report {report.id} ({report.title!r}) - SKIPPED: unchanged since last "
+                  f"extraction (pass --force-extract to reprocess anyway)")
+            return
+        print(f"[plan-evidence] report {report.id} ({report.title!r}), council {report.council_code} [{mode}]")
+    else:
+        plan = resolve_plan(session, args.council, args.plan_id)
+        first_page, last_page = _resolve_page_range(args.pdf, args.pages)
 
-    mode = "DRY RUN - nothing written" if args.dry_run else "applied"
-    print(f"[plan-evidence] {args.council} plan {plan.id} ({plan.plan_name!r}), pages {first_page}-{last_page} [{mode}]")
+        stats = run_extraction(
+            session, client, plan, args.pdf, first_page, last_page, args.source_type,
+            category_override=args.category, source_title=args.title, source_url=args.source_url,
+            dry_run=args.dry_run, reprocess_unchanged=args.reprocess_unchanged,
+        )
+        mode = "DRY RUN - nothing written" if args.dry_run else "applied"
+        print(f"[plan-evidence] {args.council} plan {plan.id} ({plan.plan_name!r}), pages {first_page}-{last_page} [{mode}]")
+
     print(f"  categories run: {stats['categories'] or '(none - source-type has no eligible category)'}")
     print(f"  extraction passes: {stats['passes_run']}")
     print(f"  facts extracted: {stats['facts_extracted']} | rejected by validation: {stats['facts_rejected']} | "

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from app.policy.document_selection import (
     DOCUMENT_TYPE_TO_CATEGORIES,
     resolve_fact_conflict,
+    resolve_report_conflict,
     select_sources_for_category,
 )
 
@@ -17,10 +18,20 @@ def _source(source_type, published_date=None, name="src"):
     return SimpleNamespace(source_type=source_type, published_date=published_date, name=name)
 
 
+def _report(source_type, status="current", base_date=None, reporting_period=None, publication_date=None, name="report"):
+    return SimpleNamespace(
+        source_type=source_type, status=status, base_date=base_date,
+        reporting_period=reporting_period, publication_date=publication_date, name=name,
+    )
+
+
 # --- targeted document selection (Part 4) ---
 
-def test_annual_monitoring_report_is_only_eligible_for_housing_delivery():
-    assert DOCUMENT_TYPE_TO_CATEGORIES["annual_monitoring_report"] == frozenset({"housing_delivery"})
+def test_annual_monitoring_report_is_eligible_for_housing_delivery_and_five_year_supply():
+    # Housing-supply monitoring amendment ("Add monitored housing supply
+    # and delivery reports", Part 4): an AMR covers annual delivery and,
+    # where a council bundles it in, the five-year supply position too.
+    assert DOCUMENT_TYPE_TO_CATEGORIES["annual_monitoring_report"] == frozenset({"housing_delivery", "five_year_supply"})
 
 
 def test_five_year_supply_statement_is_only_eligible_for_five_year_supply():
@@ -110,3 +121,57 @@ def test_tied_precedence_with_different_values_is_a_genuine_conflict():
     chosen, is_conflict = resolve_fact_conflict(candidates)
     assert chosen is None
     assert is_conflict is True
+
+
+# --- report-level conflict resolution (housing-supply monitoring
+# amendment, "Add monitored housing supply and delivery reports", Part 5) ---
+
+def test_newer_amr_by_reporting_period_outranks_an_older_amr_for_annual_delivery():
+    # Part 5: "a newer AMR normally outranks an older AMR for annual
+    # delivery" - decided by reporting_period/base_date, NOT publication
+    # date (an older report re-published later must not win just because
+    # its download date is more recent).
+    candidates = [
+        {"report": _report("authority_monitoring_report", reporting_period="2021/22", publication_date="2024-01-01"), "fact": {"value": "400"}},
+        {"report": _report("authority_monitoring_report", reporting_period="2023/24", publication_date="2022-01-01"), "fact": {"value": "452"}},
+    ]
+    chosen, is_conflict = resolve_report_conflict(candidates)
+    assert is_conflict is False
+    assert chosen["fact"]["value"] == "452"
+
+
+def test_housing_land_supply_statement_outranks_amr_for_five_year_supply():
+    candidates = [
+        {"report": _report("authority_monitoring_report", reporting_period="2023/24"), "fact": {"value": "5.1"}},
+        {"report": _report("housing_land_supply_statement", reporting_period="2023/24"), "fact": {"value": "3.2"}},
+    ]
+    chosen, is_conflict = resolve_report_conflict(candidates)
+    assert is_conflict is False
+    assert chosen["fact"]["value"] == "3.2"
+
+
+def test_superseded_reports_are_never_chosen_even_if_otherwise_highest_precedence():
+    candidates = [
+        {"report": _report("housing_land_supply_statement", status="superseded", reporting_period="2024/25"), "fact": {"value": "2.9"}},
+        {"report": _report("authority_monitoring_report", status="current", reporting_period="2023/24"), "fact": {"value": "5.1"}},
+    ]
+    chosen, is_conflict = resolve_report_conflict(candidates)
+    assert is_conflict is False
+    assert chosen["fact"]["value"] == "5.1"
+
+
+def test_two_current_reports_of_the_same_type_and_period_with_different_values_is_a_conflict():
+    candidates = [
+        {"report": _report("authority_monitoring_report", reporting_period="2023/24"), "fact": {"value": "400"}},
+        {"report": _report("authority_monitoring_report", reporting_period="2023/24"), "fact": {"value": "450"}},
+    ]
+    chosen, is_conflict = resolve_report_conflict(candidates)
+    assert chosen is None
+    assert is_conflict is True
+
+
+def test_no_current_report_has_a_value_returns_nothing_to_propose():
+    candidates = [{"report": _report("authority_monitoring_report"), "fact": {"value": None}}]
+    chosen, is_conflict = resolve_report_conflict(candidates)
+    assert chosen is None
+    assert is_conflict is False

@@ -19,7 +19,10 @@ import json
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import LocalPlan, PolicyChangeEvent
+from app.db.models import LocalPlan, MonitoredReport, PolicyChangeEvent
+from app.extraction.plan_evidence import CATEGORIES
+from app.policy.document_selection import DOCUMENT_TYPE_TO_CATEGORIES
+from app.policy.extract_plan_evidence import EXTRACTION_FIELD_TO_MODEL_FIELD, should_extract
 
 # Part 10's four sections, using LocalPlan's own attribute names throughout
 # (see app.policy.extract_plan_evidence.EXTRACTION_FIELD_TO_MODEL_FIELD for
@@ -48,6 +51,16 @@ FIVE_YEAR_SUPPLY_FIELDS = [
 # year-old five-year-supply position is exactly the kind of thing Part 10
 # asks to be visibly distinguished from a freshly-extracted one.
 STALE_AFTER_DAYS = 365
+
+# field_name (LocalPlan attribute) -> the set of app.extraction.plan_evidence
+# categories that can speak to it - the reverse of CATEGORIES, translated
+# through EXTRACTION_FIELD_TO_MODEL_FIELD so this deals only in real
+# LocalPlan column names, same convention as app.policy.review.
+_FIELD_TO_EXTRACTION_CATEGORIES: dict[str, set[str]] = {}
+for _category_name, _category_fields in CATEGORIES.items():
+    for _extraction_field in _category_fields:
+        _model_field_name = EXTRACTION_FIELD_TO_MODEL_FIELD.get(_extraction_field, _extraction_field)
+        _FIELD_TO_EXTRACTION_CATEGORIES.setdefault(_model_field_name, set()).add(_category_name)
 
 
 def get_field_evidence(session: Session, local_plan_id: int, field_name: str) -> PolicyChangeEvent | None:
@@ -91,6 +104,62 @@ def get_pending_proposals(session: Session, local_plan_id: int) -> dict[str, Pol
     return result
 
 
+def get_historic_values(session: Session, local_plan_id: int, field_name: str, exclude_event_id: int | None = None) -> list[dict]:
+    """Every CONFIRMED/auto-applied value this field has ever had, most
+    recent first, excluding the one currently trusted (exclude_event_id) -
+    Part 6: "previous historic figures where available". Nothing is ever
+    deleted (Part 1/Part 5's "preserve all historic reports"/"never delete
+    or overwrite a previous year's evidence"), so this is always the
+    complete history, not a best-effort log."""
+    events = session.execute(
+        select(PolicyChangeEvent).where(
+            PolicyChangeEvent.local_plan_id == local_plan_id,
+            PolicyChangeEvent.event_type == "plan_evidence_proposed",
+            PolicyChangeEvent.review_status.in_(("confirmed", "auto_applied")),
+        ).order_by(PolicyChangeEvent.detected_at.desc())
+    ).scalars().all()
+    history = []
+    for event in events:
+        if event.id == exclude_event_id or not event.proposed_data:
+            continue
+        data = json.loads(event.proposed_data)
+        if field_name in data:
+            history.append({
+                "value": data[field_name], "extracted_at": event.extracted_at,
+                "source_document_title": event.source_document_title, "event_id": event.id,
+            })
+    return history
+
+
+def _has_newer_unreviewed_report(session: Session, plan: LocalPlan, field_name: str) -> bool:
+    """Part 6: "Do not label an older figure as current where a newer
+    report has been discovered but not yet reviewed." Scoped, pragmatic
+    interpretation: True when a "current"-status MonitoredReport exists
+    that's eligible (by source_type routing) to speak to this field's
+    category and hasn't had extraction run against it yet (see
+    app.policy.extract_plan_evidence.should_extract) - i.e. a report that
+    could change this field's trusted value but genuinely hasn't been
+    looked at. Does not attempt to compare THIS specific field's evidence
+    date against the new report's date - the coarser "any not-yet-
+    extracted eligible report exists" signal is what Part 6 actually asks
+    the UI to distinguish, without requiring per-field publication-date
+    bookkeeping this scale of check doesn't need."""
+    categories = _FIELD_TO_EXTRACTION_CATEGORIES.get(field_name)
+    if not categories:
+        return False
+    eligible_types = [t for t, cats in DOCUMENT_TYPE_TO_CATEGORIES.items() if cats & categories]
+    if not eligible_types:
+        return False
+    reports = session.execute(
+        select(MonitoredReport).where(
+            MonitoredReport.local_plan_id == plan.id,
+            MonitoredReport.status == "current",
+            MonitoredReport.source_type.in_(eligible_types),
+        )
+    ).scalars().all()
+    return any(should_extract(report) for report in reports)
+
+
 def _is_stale(extracted_at: dt.datetime | None) -> bool:
     if extracted_at is None:
         return False
@@ -102,9 +171,10 @@ def _is_stale(extracted_at: dt.datetime | None) -> bool:
     return (now_naive - extracted_at.replace(tzinfo=None)).days > STALE_AFTER_DAYS
 
 
-def _build_field_entry(plan: LocalPlan, field_name: str, evidence: PolicyChangeEvent | None, pending: PolicyChangeEvent | None) -> dict:
+def _build_field_entry(session: Session, plan: LocalPlan, field_name: str, evidence: PolicyChangeEvent | None, pending: PolicyChangeEvent | None) -> dict:
     value = getattr(plan, field_name)
     pending_value = json.loads(pending.proposed_data)[field_name] if pending else None
+    newer_pending = _has_newer_unreviewed_report(session, plan, field_name)
     return {
         "field": field_name,
         "value": value,
@@ -116,6 +186,10 @@ def _build_field_entry(plan: LocalPlan, field_name: str, evidence: PolicyChangeE
         "is_stale": _is_stale(evidence.extracted_at) if evidence else False,
         "pending_value": pending_value,
         "pending_event_id": pending.id if pending else None,
+        # Part 6: never label an older figure "current" where a newer
+        # report has been discovered but not yet reviewed/extracted.
+        "newer_report_pending": newer_pending,
+        "historic_values": get_historic_values(session, plan.id, field_name, exclude_event_id=evidence.id if evidence else None),
     }
 
 
@@ -132,7 +206,7 @@ def build_plan_evidence_view(session: Session, plan: LocalPlan) -> dict:
     ):
         sections[section_key] = [
             _build_field_entry(
-                plan, field_name,
+                session, plan, field_name,
                 get_field_evidence(session, plan.id, field_name) if getattr(plan, field_name) is not None else None,
                 pending_by_field.get(field_name),
             )
