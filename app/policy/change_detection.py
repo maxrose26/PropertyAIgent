@@ -27,6 +27,13 @@ EVENT_TYPES = (
     # carries no proposed_data of its own; re-ingestion is what would
     # produce a concrete, applyable proposed change.
     "source_content_changed",
+    # A single plan-level fact (housing requirement, delivery, five-year
+    # supply, etc.) proposed by app.extraction.plan_evidence /
+    # app.policy.extract_plan_evidence - see that module's own confidence
+    # classification (app.policy.evidence_validation), which is more
+    # nuanced than the blanket event-type check below and is NOT governed
+    # by _AUTO_APPLY_EVENT_TYPES.
+    "plan_evidence_proposed",
 )
 
 # Only these event types are safe to auto-apply (Part 11): a brand new

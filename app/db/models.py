@@ -171,18 +171,79 @@ class LocalPlan(Base):
     status: Mapped[str] = mapped_column(String(50), default="unknown")
     raw_status: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
-    plan_period: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "2024-2042"
+    plan_period: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "2024-2042" - kept for backwards compatibility
+    # Sprint 3B ("AI Local Plan Evidence Extraction") - structured start/end
+    # years alongside the existing free-text plan_period, so date-range
+    # validation (plan_period_end must not precede plan_period_start) is
+    # possible without re-parsing a string every time.
+    plan_period_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    plan_period_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
     adoption_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
     publication_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # --- Sprint 3B additions: plan identity/status fields Part 2 asks for
+    # that didn't already exist. ---
+    submission_date: Mapped[str | None] = mapped_column(String(50), nullable=True)  # submitted to the Secretary of State
+    examination_status: Mapped[str | None] = mapped_column(String(200), nullable=True)  # e.g. "Hearings concluded", "Awaiting main modifications"
+    inspector_report_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status_notes: Mapped[str | None] = mapped_column(Text, nullable=True)  # free-text nuance a normalised status can't carry
 
     # The plan's OWN stated housing number - distinct from a housing need
     # study's output and distinct from housing land supply (see
-    # specifications/003-policy-intelligence-v1.md Sec.2).
+    # specifications/003-policy-intelligence-v1.md Sec.2). annual_/total_
+    # housing_requirement are the plan's OWN adopted/proposed figures;
+    # housing_need_annual/total (Sprint 3B) are a housing need STUDY's
+    # output - the two are frequently different numbers and must never be
+    # collapsed into one field (Part 3: "housing need is not automatically
+    # the adopted housing requirement").
     annual_housing_requirement: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_housing_requirement: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    housing_need_annual: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    housing_need_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The council's own wording for how the requirement figure was reached
+    # (e.g. "standard method", "standard method uplifted for affordability",
+    # "locally-derived") - kept verbatim, never inferred.
+    requirement_basis: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    unmet_need: Mapped[int | None] = mapped_column(Integer, nullable=True)  # dwellings the plan itself states it cannot accommodate
+    neighbouring_authority_contribution: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. "met via Places for Everyone redistribution"
+    requirement_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Sprint 3B: Housing delivery (Part 2) - represents the LATEST
+    # known reporting period's position, sourced from the most recent
+    # Annual Monitoring Report / housing delivery statement / trajectory
+    # found for this plan. A housing trajectory's forward projection is
+    # NOT the same as an adopted requirement (Part 3) - trajectory_
+    # remaining_requirement is kept as its own field, never folded into
+    # annual_housing_requirement above. ---
+    latest_reporting_period: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "2023/24"
+    homes_delivered_latest_period: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cumulative_homes_delivered: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delivery_requirement_for_period: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delivery_surplus_or_shortfall: Mapped[int | None] = mapped_column(Integer, nullable=True)  # signed - negative is a shortfall
+    housing_delivery_test_result: Mapped[str | None] = mapped_column(String(100), nullable=True)  # the HDT's own published %/result, verbatim
+    trajectory_remaining_requirement: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delivery_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Sprint 3B: Five-year housing land supply (Part 2) - a genuinely
+    # new structured layer; housing_land_supply (below, pre-existing) stays
+    # as the free-text fallback for whatever a source states in a form
+    # these structured fields can't capture. five_year_supply_years must
+    # never be inferred from unrelated dwelling figures (Part 3) - see
+    # app.policy.evidence_validation's explicit-evidence requirement for it. ---
+    five_year_supply_years: Mapped[float | None] = mapped_column(Float, nullable=True)
+    five_year_supply_base_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    five_year_supply_publication_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    deliverable_supply_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    five_year_requirement_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    five_year_shortfall_or_surplus_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    buffer_percentage: Mapped[float | None] = mapped_column(Float, nullable=True)  # e.g. 5/20% NPPF buffer, as the source states it
+    calculation_method: Mapped[str | None] = mapped_column(String(300), nullable=True)  # e.g. "Sedgefield", "Liverpool" - verbatim
+    supply_position_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Kept as free text (e.g. "5.2 years") rather than a bare float - councils
     # state this in inconsistent units/bases, and the raw figure is more
-    # trustworthy than a value we've silently reinterpreted.
+    # trustworthy than a value we've silently reinterpreted. Superseded in
+    # practice by five_year_supply_years above where the source supports a
+    # clean number, but retained for anything that doesn't fit that shape.
     housing_land_supply: Mapped[str | None] = mapped_column(String(100), nullable=True)
     housing_land_supply_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
@@ -242,6 +303,36 @@ class LocalPlanStatusHistory(Base):
     captured_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     local_plan: Mapped["LocalPlan"] = relationship(back_populates="status_history")
+
+
+class LocalPlanFieldHistory(Base):
+    """Generic append-only snapshot of a single LocalPlan field's PRE-change
+    value, for any of the Sprint 3B evidence fields (housing requirement/
+    need, delivery, five-year supply, examination/status fields) -
+    deliberately separate from LocalPlanStatusHistory (which stays exactly
+    as Sprint 1 built it, still used for status/raw_status/plan_version
+    only) rather than adding ~25 mostly-null columns to that table.
+
+    Written by app.policy.review.approve_change immediately before it
+    applies a proposed value from proposed_data - the full evidence trail
+    behind why a value changed always remains recoverable from the
+    PolicyChangeEvent that was approved (never deleted), so this table only
+    needs to hold the bare old/new value, not re-duplicate the evidence."""
+
+    __tablename__ = "local_plan_field_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    local_plan_id: Mapped[int] = mapped_column(ForeignKey("local_plans.id"))
+
+    field_name: Mapped[str] = mapped_column(String(100))
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The PolicyChangeEvent.event_type that caused this change - "why", not
+    # "what changed" (that's field_name/old_value/new_value already).
+    change_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    captured_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    local_plan: Mapped["LocalPlan"] = relationship()
 
 
 class LocalPlanSite(Base):
@@ -448,8 +539,14 @@ class MonitoredSource(Base):
     final_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # after redirects, when different
     # landing_page | adopted_plan | emerging_plan | timetable |
     # consultation_portal | examination_library | policies_map |
-    # evidence_library | pdf | other - the full vocabulary Sprint 2 Part 3
-    # names (emerging_plan/evidence_library/landing_page are new here;
+    # evidence_library | pdf | other (Sprint 2, Part 3) plus, since Sprint 3B
+    # ("AI Local Plan Evidence Extraction", Part 1): local_development_scheme |
+    # annual_monitoring_report | housing_delivery_statement | housing_trajectory |
+    # five_year_supply_statement | housing_need_assessment | inspectors_report |
+    # main_modifications | adoption_statement - see
+    # app.policy.document_selection.DOCUMENT_TYPE_TO_CATEGORIES for how each
+    # maps to an evidence-extraction category. Still a free string, not a DB
+    # enum, so the vocabulary can keep growing without a migration.
     # Sprint 1's "webpage" is kept as an accepted synonym for landing_page
     # for backwards compatibility with Stockport's existing registration,
     # not removed).
@@ -537,6 +634,20 @@ class PolicyChangeEvent(Base):
     source_document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # --- Sprint 3B ("AI Local Plan Evidence Extraction") additions - real
+    # evidence for events proposed by app.extraction.plan_evidence, always
+    # null for the allocation/status events Sprint 1/2 already produce
+    # (those never had a numeric confidence or a verbatim excerpt to give). ---
+    source_document_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # The verbatim sentence/table row the value was read from - short
+    # enough for a reviewer to check quickly, but never blank when a value
+    # is present (Part 5: "Do not store only an AI explanation without the
+    # underlying evidence").
+    source_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extraction_method: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "ai_structured_extraction"
+    extraction_model: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g. "gpt-4o-mini"
+    extraction_prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    extracted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # High-confidence, unambiguous changes (a brand new allocation/plan, or
     # one confirmed unchanged) are applied immediately at detection time;

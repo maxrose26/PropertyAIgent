@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import pandas as pd
 import streamlit as st
 
+from app.db.models import LocalPlan
 from app.policy.council_dashboard import build_council_dashboard
+from app.policy.plan_evidence_view import build_plan_evidence_view
 from app.ui.common import bootstrap, credits_sidebar, get_db
 
 st.set_page_config(page_title="Council dashboard - UK Planning Deal Finder", layout="wide")
@@ -44,6 +46,64 @@ HEALTH_LABELS = {
     "never_checked": "❔ Never checked", "no_sources": "— No sources registered",
 }
 
+# Sprint 3B ("AI Local Plan Evidence Extraction", Part 10) - display labels
+# for app.policy.plan_evidence_view's four sections.
+EVIDENCE_SECTIONS = (
+    ("status", "Plan status"),
+    ("requirement", "Housing requirement"),
+    ("delivery", "Housing delivery"),
+    ("five_year_supply", "Five-year housing land supply"),
+)
+EVIDENCE_FIELD_LABELS = {
+    "status": "Status", "raw_status": "Raw authority status",
+    "plan_period_start": "Plan period start", "plan_period_end": "Plan period end",
+    "expected_adoption_date": "Expected adoption date", "adoption_date": "Adoption date",
+    "next_milestone": "Next milestone", "next_milestone_date": "Next milestone date",
+    "examination_status": "Examination status", "publication_date": "Publication date",
+    "submission_date": "Submission date", "inspector_report_date": "Inspector's report date",
+    "annual_housing_requirement": "Annual housing requirement",
+    "total_housing_requirement": "Total plan housing requirement",
+    "housing_need_annual": "Housing need (annual)", "housing_need_total": "Housing need (total)",
+    "requirement_basis": "Requirement basis", "unmet_need": "Unmet need",
+    "latest_reporting_period": "Latest reporting period",
+    "homes_delivered_latest_period": "Homes delivered (latest period)",
+    "delivery_requirement_for_period": "Delivery requirement (period)",
+    "delivery_surplus_or_shortfall": "Surplus / shortfall",
+    "housing_delivery_test_result": "Housing Delivery Test result",
+    "trajectory_remaining_requirement": "Trajectory - remaining requirement",
+    "five_year_supply_years": "Years of supply", "five_year_supply_base_date": "Supply base date",
+    "five_year_supply_publication_date": "Supply publication date",
+    "deliverable_supply_dwellings": "Deliverable supply (dwellings)",
+    "five_year_requirement_dwellings": "Five-year requirement (dwellings)",
+    "five_year_shortfall_or_surplus_dwellings": "Shortfall / surplus", "buffer_percentage": "Buffer %",
+}
+
+
+def _render_evidence_field(entry: dict) -> None:
+    # Part 10: never show missing/unsupported evidence as a bare zero or
+    # blank row - a field with nothing at all (no trusted value, no
+    # pending proposal) is simply omitted from the page.
+    if not entry["has_value"] and entry["pending_value"] is None:
+        return
+
+    label = EVIDENCE_FIELD_LABELS.get(entry["field"], entry["field"])
+    if entry["has_value"]:
+        stale_bit = " ⏸️ *stale evidence*" if entry["is_stale"] else ""
+        source_bit = ""
+        page_note = f", page {entry['source_page']}" if entry["source_page"] else ""
+        if entry["source_document_url"]:
+            anchor = f"#page={entry['source_page']}" if entry["source_page"] else ""
+            title = entry["source_document_title"] or "source"
+            source_bit = f" — [{title}]({entry['source_document_url']}{anchor}){page_note}"
+        elif entry["source_document_title"]:
+            source_bit = f" — {entry['source_document_title']}{page_note}"
+        st.markdown(f"**{label}:** {entry['value']}{stale_bit}{source_bit}")
+    else:
+        st.markdown(f"**{label}:** _not available_")
+
+    if entry["pending_value"] is not None:
+        st.caption(f"🕗 Proposed change awaiting review: → **{entry['pending_value']}**")
+
 summary_rows = [{
     "Council": r["council_name"],
     "Monitoring": "Enabled" if r["monitoring_enabled"] else "Disabled",
@@ -70,3 +130,23 @@ for r in rows:
                 f"{plan['allocations_imported']} allocation(s) imported, {plan['sites_matched']} matched to an "
                 f"existing Site" + (f", checked {plan['last_checked'].strftime('%d %b %Y')}" if plan["last_checked"] else "")
             )
+
+            # Sprint 3B ("AI Local Plan Evidence Extraction", Part 10) - plan-
+            # level housing requirement/delivery/five-year-supply evidence,
+            # extending this existing Policy Intelligence view rather than
+            # building a separate page for it. build_plan_evidence_view is a
+            # pure function (see app.policy.plan_evidence_view) so this exact
+            # assembly is testable independently of Streamlit.
+            plan_row = session.get(LocalPlan, plan["plan_id"])
+            if plan_row is not None:
+                evidence_view = build_plan_evidence_view(session, plan_row)
+                sections_with_content = [
+                    (title, evidence_view[key]) for key, title in EVIDENCE_SECTIONS
+                    if any(e["has_value"] or e["pending_value"] is not None for e in evidence_view[key])
+                ]
+                if sections_with_content:
+                    with st.expander("Plan evidence (housing requirement, delivery, five-year supply)"):
+                        for title, entries in sections_with_content:
+                            st.markdown(f"###### {title}")
+                            for entry in entries:
+                                _render_evidence_field(entry)

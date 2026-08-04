@@ -21,14 +21,40 @@ import json
 from sqlalchemy import select
 
 from app.db.models import LocalPlan, LocalPlanSite, PolicyChangeEvent
-from app.policy.history import snapshot_allocation, snapshot_plan_status
+from app.policy.history import snapshot_allocation, snapshot_field, snapshot_plan_status
 from app.policy.progression import classify_progression
 
 _RESOLVABLE_FIELDS_ALLOCATION = {
     "site_name", "minimum_dwellings", "indicative_capacity", "maximum_capacity",
     "category", "allocation_status", "raw_allocation_status",
 }
-_RESOLVABLE_FIELDS_PLAN = {"status", "raw_status", "plan_version"}
+# Sprint 1's original three - kept snapshotted via snapshot_plan_status
+# (LocalPlanStatusHistory), unchanged, below.
+_RESOLVABLE_FIELDS_PLAN_LEGACY = {"status", "raw_status", "plan_version"}
+# Sprint 3B ("AI Local Plan Evidence Extraction") - every LocalPlan column an
+# extracted evidence fact can propose a value for. Named after the actual
+# LocalPlan attribute, NOT the app.extraction.plan_evidence field name where
+# the two differ (raw_plan_status -> raw_status, total_plan_housing_
+# requirement -> total_housing_requirement) - app.policy.extract_plan_evidence
+# is responsible for that translation before proposed_data is ever written,
+# so this module only ever deals in real LocalPlan attribute names.
+_RESOLVABLE_FIELDS_PLAN_EVIDENCE = {
+    "plan_name", "planning_system", "plan_period_start", "plan_period_end",
+    "publication_date", "submission_date", "examination_status", "inspector_report_date",
+    "adoption_date", "expected_adoption_date", "next_milestone", "next_milestone_date",
+    "status_notes",
+    "annual_housing_requirement", "total_housing_requirement", "housing_need_annual",
+    "housing_need_total", "requirement_basis", "unmet_need", "neighbouring_authority_contribution",
+    "requirement_notes",
+    "latest_reporting_period", "homes_delivered_latest_period", "cumulative_homes_delivered",
+    "delivery_requirement_for_period", "delivery_surplus_or_shortfall", "housing_delivery_test_result",
+    "trajectory_remaining_requirement", "delivery_notes",
+    "five_year_supply_years", "five_year_supply_base_date", "five_year_supply_publication_date",
+    "deliverable_supply_dwellings", "five_year_requirement_dwellings",
+    "five_year_shortfall_or_surplus_dwellings", "buffer_percentage", "calculation_method",
+    "supply_position_notes",
+}
+_RESOLVABLE_FIELDS_PLAN = _RESOLVABLE_FIELDS_PLAN_LEGACY | _RESOLVABLE_FIELDS_PLAN_EVIDENCE
 
 
 def _recompute_allocation_review_status(session, row: LocalPlanSite) -> None:
@@ -76,8 +102,15 @@ def approve_change(session, event: PolicyChangeEvent, note: str | None = None) -
         plan = session.get(LocalPlan, event.local_plan_id)
         snapshot_plan_status(session, plan, note=f"Pre-approval snapshot before applying event {event.id} ({event.event_type}).")
         for field, value in proposed.items():
-            if field in _RESOLVABLE_FIELDS_PLAN:
-                setattr(plan, field, value)
+            if field not in _RESOLVABLE_FIELDS_PLAN:
+                continue
+            if field in _RESOLVABLE_FIELDS_PLAN_EVIDENCE:
+                # snapshot_plan_status above only ever captures status/
+                # raw_status/plan_version - every other resolvable field
+                # needs its own pre-change value recorded here, or approving
+                # this event would lose it with no audit trail at all.
+                snapshot_field(session, plan, field_name=field, old_value=getattr(plan, field), new_value=value, change_reason=event.event_type)
+            setattr(plan, field, value)
         # A plan's own status/version changing does NOT cascade onto its
         # allocations' individual allocation_status - each allocation's
         # adopted/removed/etc. state stays exactly what it already was.
