@@ -32,6 +32,81 @@ So that I can make a pursue/don't-pursue decision quickly, with evidence, instea
 
 ---
 
+# Target Customers
+
+## Primary Customers
+
+The platform is initially designed for:
+
+- Regional housebuilders
+- Land promoters
+- Land agents
+
+These users need to:
+
+- identify opportunities
+- evaluate opportunities
+- progress opportunities
+- present opportunities
+
+## Secondary Customers
+
+The platform should also be designed so it naturally expands into:
+
+- Institutional investors
+- Single Family Housing (SFH) investors
+- Build-to-Rent (BTR) investors
+- Affordable Housing Providers
+- Registered Providers (RPs)
+- Housing Associations
+- Residential investment funds
+
+These customers use the same underlying Site Intelligence but focus on different stages of the development lifecycle.
+
+---
+
+# Residential Development Lifecycle
+
+PropertyAIgent follows the lifecycle of a residential development, rather than a single planning application.
+
+Example lifecycle:
+
+Land
+↓
+Policy & Allocation
+↓
+Planning
+↓
+Approval
+↓
+Construction
+↓
+Completion
+↓
+Sales / Disposal
+↓
+Institutional Investment
+↓
+Affordable Housing Acquisition
+↓
+Long-term Ownership & Portfolio Management
+
+Different customers engage with the Site at different stages of this lifecycle, but the intelligence engine underneath them remains the same.
+
+---
+
+# One Intelligence Engine
+
+PropertyAIgent should not evolve into separate products for different customer types.
+
+Instead:
+
+- There should be one Site Intelligence Engine.
+- Different customer types should see different views, dashboards and reports built from the same underlying intelligence.
+- Intelligence should be collected once and reused throughout the platform.
+
+---
+
 ## The Core Object
 
 The Site is the centre of PropertyAIgent.
@@ -204,6 +279,10 @@ PropertyAIgent should:
 - remain scalable to every planning authority in England and Wales
 - answer real investment questions
 - keep the Site as the centre of the platform
+- collect intelligence once, use it many times
+- keep the Site as the single source of truth
+- treat reports as outputs, not data stores
+- let different customers consume the same intelligence in different ways
 
 ---
 
