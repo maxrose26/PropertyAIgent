@@ -15,9 +15,17 @@ import pydeck as pdk
 import streamlit as st
 from sqlalchemy import select
 
+from app.config import load_councils
 from app.db.models import LocalPlanSite
 from app.extraction.local_plan import assess_delivery_scope
 from app.policy.site_view import build_site_policy_intelligence
+from app.ui.allocation_selector import (
+    FILTER_CHOICES,
+    coverage_message,
+    filter_allocations_by_image_status,
+    format_allocation_option,
+    sort_allocations,
+)
 from app.ui.common import (
     PROGRESSION_SIGNAL_LABELS,
     aggregate_scheme_fields,
@@ -27,7 +35,7 @@ from app.ui.common import (
     load_site_applications,
     render_visual_evidence,
 )
-from app.visuals.site_view import build_allocation_visual_evidence
+from app.visuals.site_view import build_allocation_image_status, build_allocation_visual_evidence
 
 st.set_page_config(page_title="Local Plan sites - UK Planning Deal Finder", layout="wide")
 
@@ -134,10 +142,29 @@ st.caption(
 )
 
 st.subheader("Allocation detail")
+
+# Deterministic order (council, reference, name, id) - an unordered SQL
+# SELECT previously left the selectbox below defaulting to whichever
+# allocation happened to come back first, almost always one with no image,
+# silently burying the ones that actually have a confirmed map.
+council_names = {code: cfg.name for code, cfg in load_councils().items()}
+ordered_allocations = sort_allocations(filtered, council_names)
+
+# One batched query for every allocation currently in view, never one
+# query per allocation (Part 3 of the fix).
+image_status = build_allocation_image_status(session, [s.id for s in ordered_allocations])
+
+st.caption(coverage_message(ordered_allocations, image_status))
+
+image_filter = st.selectbox("Filter by image availability", FILTER_CHOICES, index=0)
+selector_options = filter_allocations_by_image_status(ordered_allocations, image_status, image_filter)
+
 selected = st.selectbox(
     "Choose an allocation to view its map/visual evidence",
-    filtered,
-    format_func=lambda s: f"{s.policy_reference or '(no ref)'} — {s.site_name} ({s.council_code})",
+    selector_options,
+    index=None,
+    placeholder="Select an allocation",
+    format_func=lambda s: format_allocation_option(s, image_status.get(s.id, "none")),
 )
 if selected is not None:
     st.markdown(f"**{selected.policy_reference or '(no ref)'} — {selected.site_name}**")
