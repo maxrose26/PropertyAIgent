@@ -18,7 +18,7 @@ A specification is a short document that explains **what** we are building and *
 ## Numbering and naming
 
 - `000-template.md` is the reusable template every new specification is copied from.
-- Specifications are numbered sequentially (`001-`, `002-`, ...) in the order they were written, e.g. `001-site-intelligence.md`.
+- Specifications are numbered sequentially (`001-`, `002-`, ...) in the order they were written, e.g. `001-platform-vision.md`.
 - File names are short, lowercase, and hyphenated after the number.
 
 ## What belongs here

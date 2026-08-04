@@ -20,6 +20,16 @@ Every new feature should ultimately answer one question:
 
 "Does this help somebody make a better development or investment decision about this Site?"
 
+## Business Value
+
+A land/planning acquisition professional's real question is never "what applications exist" - it's "which of these physical opportunities is worth pursuing, and what do I need to know about it before I act." Every intelligence layer this platform adds is answering a piece of that question. The more layers a Site has, the more of that question is already answered before a human has to go and find it themselves.
+
+## User Story
+
+As a UK residential land/planning acquisition professional
+I want every physical development opportunity I might pursue to already have as much verified context attached to it as possible - not just "an application exists", but who's behind it, what's actually being delivered, how far it's progressed, and what constraints or opportunities surround it
+So that I can make a pursue/don't-pursue decision quickly, with evidence, instead of re-researching each site from scratch
+
 ---
 
 ## The Core Object
@@ -200,6 +210,8 @@ PropertyAIgent should:
 # Long-Term Vision
 
 The long-term goal is for a user to open a Site and immediately understand everything relevant about that opportunity from one screen.
+
+The Site, not the Application, is the primary unit of interaction with the platform. A user should see accumulated evidence synthesised into something they can act on quickly - not a list of raw filings they have to interpret themselves. Individual Applications, documents, and other raw evidence remain inspectable underneath, for anyone who wants to verify the synthesis, but they are not the primary view.
 
 Rather than searching multiple planning portals, GIS systems, Land Registry records, market reports and policy documents, the platform should consolidate all relevant intelligence into one coherent view.
 
