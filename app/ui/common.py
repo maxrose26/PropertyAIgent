@@ -19,6 +19,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.config import load_councils
 from app.db.models import (
@@ -118,7 +119,15 @@ def load_site_applications(session, site_id: int) -> list[Application]:
     apps = session.execute(select(Application).where(Application.site_id == site_id)).scalars().all()
     council = load_councils().get(apps[0].council_code) if apps else None
     threshold = council.unit_threshold if council else 10
+    return _filter_visible_applications(apps, threshold)
 
+
+def _filter_visible_applications(apps: list[Application], threshold: int) -> list[Application]:
+    """The per-application "is this actually a visible qualifying scheme"
+    rule, shared by load_site_applications (one site, one query) and
+    load_applications_for_sites (many sites, one batched query) below - a
+    single implementation so the two can never drift out of sync with each
+    other."""
     visible = []
     for a in apps:
         si = a.scheme_intelligence
@@ -144,6 +153,42 @@ def load_site_applications(session, site_id: int) -> list[Application]:
             continue
         visible.append(a)
     return visible
+
+
+def load_applications_for_sites(session, site_ids: list[int]) -> dict[int, list[Application]]:
+    """Batched sibling of load_site_applications - ONE query for every
+    given site_id instead of one query per Site, then the same per-
+    application visibility rule (_filter_visible_applications) applied per
+    group. Built for the map/table home page, which otherwise queries once
+    per Site on every page load (Sprint 3A, "Map Navigation and Site UX",
+    Part 6: "avoid one database query per marker"). Returns every requested
+    site_id, even ones with no visible applications (an empty list, not a
+    missing key), so callers can index the result without a .get() default."""
+    if not site_ids:
+        return {}
+    # selectinload, not the default lazy load - _filter_visible_applications
+    # reads a.scheme_intelligence for every application, which would
+    # otherwise fire one extra query PER application (confirmed by a real
+    # query-count test) - exactly the same "one query per marker" problem
+    # this whole function exists to eliminate, just one join deeper. This
+    # keeps the total query count at 2 (applications + their
+    # scheme_intelligence, batched) no matter how many Sites or
+    # Applications are involved.
+    apps = session.execute(
+        select(Application).where(Application.site_id.in_(site_ids)).options(selectinload(Application.scheme_intelligence))
+    ).scalars().all()
+
+    by_site: dict[int, list[Application]] = {site_id: [] for site_id in site_ids}
+    for a in apps:
+        by_site.setdefault(a.site_id, []).append(a)
+
+    councils = load_councils()
+    result: dict[int, list[Application]] = {}
+    for site_id, site_apps in by_site.items():
+        council = councils.get(site_apps[0].council_code) if site_apps else None
+        threshold = council.unit_threshold if council else 10
+        result[site_id] = _filter_visible_applications(site_apps, threshold)
+    return result
 
 
 def load_watchlist_applications(session) -> list[Application]:
