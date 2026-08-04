@@ -60,12 +60,83 @@ class Site(Base):
     build_status_checked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     epc_dwellings_found: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # AI-narrated synthesis across every linked application (phases, progress
+    # filings, lapse/build status, planning stage, expected decision date) -
+    # see app.reporting.scheme_summary. Regenerated weekly by the pipeline,
+    # not on every page view - see app.pipeline.run_weekly.
+    # stage_generate_scheme_summaries.
+    status_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_summary_updated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Manual review kill-switch - a human reviewing the AI status summary
+    # confirms this isn't actually a genuine residential scheme (e.g. the
+    # regex/AI qualification pipeline let through something that turns out
+    # non-residential on closer reading). Excluded from search results by
+    # default rather than deleted, so the decision and its reasoning are
+    # kept - see app.ui.streamlit_app's "Show excluded sites" toggle.
+    excluded: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    excluded_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     first_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     applications: Mapped[list["Application"]] = relationship(
         back_populates="site", foreign_keys="Application.site_id"
     )
+
+
+class LocalPlanSite(Base):
+    """One site allocated for housing in a council's Local Plan - a
+    leading-indicator signal distinct from everything else in this database,
+    since these are sites identified BEFORE any planning application exists
+    for them at all (see app.extraction.local_plan). Sourced from whatever
+    document the council actually publishes (usually a PDF site-allocations
+    schedule) - there's no equivalent of the Idox/Arcus portal for this, so
+    ingestion is necessarily semi-manual and per-council, unlike
+    applications."""
+
+    __tablename__ = "local_plan_sites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
+
+    policy_reference: Mapped[str] = mapped_column(String(50))  # e.g. "HOM 2.30"
+    site_name: Mapped[str] = mapped_column(String(300))
+    minimum_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Council-specific grouping as it appears in the source document (e.g.
+    # "List 1: built-up area", "List 2: grey belt") - kept verbatim rather
+    # than normalised into an enum, since this varies by council and the
+    # exact wording is meaningful context in its own right.
+    category: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    plan_name: Mapped[str] = mapped_column(String(300))
+    # draft | emerging | examination | adopted - an allocation in a draft/
+    # emerging plan can still be added, dropped, or resized before adoption,
+    # so this must travel with every record, not just live in a README.
+    plan_status: Mapped[str] = mapped_column(String(50))
+    source_document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Cross-reference to an already-scraped Site, where one has been matched
+    # by address/name similarity (see app.extraction.local_plan.
+    # match_to_existing_sites) - null means no planning application has been
+    # submitted for this allocation yet, which is itself the useful signal:
+    # a genuinely pre-application opportunity, not just an early one.
+    matched_site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
+    match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Copied from matched_site when matched (already geocoded there) or
+    # free-text geocoded directly from site_name otherwise (see
+    # app.extraction.local_plan.geocode_local_plan_site) - a genuinely
+    # unmatched allocation has no scraped application to inherit coordinates
+    # from, so this is the only way to plot it on the map at all.
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    extracted_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    matched_site: Mapped["Site | None"] = relationship(foreign_keys=[matched_site_id])
 
 
 class Application(Base):
@@ -85,6 +156,12 @@ class Application(Base):
     decision_issued_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
     application_received: Mapped[str | None] = mapped_column(String(50), nullable=True)
     application_validated: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Real scraped value on Arcus councils ("Target decision date"/"Decision
+    # Date Due" - label varies per council, see arcus_portal.py). Idox
+    # portals don't expose an equivalent field publicly - for those, UI/
+    # summary code falls back to lapse_tracking.estimate_statutory_decision_date,
+    # a computed estimate from application_validated, not a scraped fact.
+    expected_decision_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ward: Mapped[str | None] = mapped_column(String(200), nullable=True)
     case_officer: Mapped[str | None] = mapped_column(String(200), nullable=True)
     applicant_name_raw: Mapped[str | None] = mapped_column(String(300), nullable=True)
@@ -113,6 +190,14 @@ class Application(Base):
     scrape_batch_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     first_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    # Cooldown tracking for app.pipeline.run_weekly.stage_fetch_related_applications
+    # - when this application was last searched for other applications
+    # citing it, regardless of whether it's a citation-verified parent or
+    # just a site's own granted application with no known children yet
+    # (still worth periodic rechecking - a discharge/amendment filing can
+    # appear months after the grant).
+    related_search_checked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
     site_link_method: Mapped[str | None] = mapped_column(String(30), nullable=True)  # exact_address | parent_reference | suggested_fuzzy | created
