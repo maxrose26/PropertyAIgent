@@ -151,6 +151,23 @@ If the answer is unclear, stop and explain the concern before implementing.
 
 \---
 
+# Specification Workflow
+
+Every major feature begins as a specification, not as code. Specifications live in the `specifications/` folder and are the long-term source of truth for PropertyAIgent - they explain **what** is being built and **why**, deliberately before implementation, so the design is settled before the code is.
+
+Before implementing any significant feature, you must:
+
+1. Read this file (CLAUDE.md).
+2. Read the relevant document in the `specifications/` folder.
+3. Ensure the implementation aligns with the long-term vision of PropertyAIgent described there.
+4. If no relevant specification exists, stop and ask for one to be written before implementing the feature.
+
+Implementation should follow the specification, not reinterpret it. If a specification turns out to be wrong or incomplete once work starts, update the specification first and let the implementation follow from that - don't silently diverge from what's written.
+
+Specifications take precedence over implementation convenience. A feature being easier to build a different way than the specification describes is not a reason to build it that way instead.
+
+\---
+
 # Implementation Rules
 
 * Inspect the existing implementation before changing code.
