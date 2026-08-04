@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import LocalPlan, MonitoredSource
+from app.policy.document_types import classify_policy_document_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCES_YAML = PROJECT_ROOT / "config" / "policy_sources.yaml"
@@ -79,10 +80,21 @@ def register_sources_for_council(session: Session, council_code: str, config: di
             )
         ).scalar_one_or_none()
         local_plan_id = _resolve_local_plan_id(session, council_code, source_entry)
+        # Sprint 3D ("Policy Document Coverage & Discovery", Part 2) - a
+        # source registered directly here (the actual Local Plan PDF, a
+        # Policies Map registered by hand rather than found via
+        # app.policy.report_discovery's link-scraping) still needs a
+        # policy_document_type or app.policy.coverage would never see it
+        # as "discovered" at all, wrongly reporting a document the
+        # platform has genuinely already ingested as still missing.
+        policy_document_type, _ = classify_policy_document_type(source_entry.get("title"), source_entry["url"])
 
         if existing:
             if existing.local_plan_id is None and local_plan_id is not None:
                 existing.local_plan_id = local_plan_id
+            if existing.policy_document_type is None:
+                existing.policy_document_type = policy_document_type
+                existing.policy_document_type_raw_label = source_entry.get("title")
             registered.append(existing)
             continue
 
@@ -90,6 +102,7 @@ def register_sources_for_council(session: Session, council_code: str, config: di
             council_code=council_code, local_plan_id=local_plan_id,
             url=source_entry["url"], source_type=source_entry["source_type"],
             title=source_entry.get("title"),
+            policy_document_type=policy_document_type, policy_document_type_raw_label=source_entry.get("title"),
             monitoring_frequency_days=int(source_entry.get("monitoring_frequency_days", 7)),
         )
         session.add(source)

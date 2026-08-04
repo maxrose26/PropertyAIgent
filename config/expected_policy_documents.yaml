@@ -1,0 +1,45 @@
+# Expected planning-policy document types per council (Sprint 3D, "Policy
+# Document Coverage & Discovery", Part 1) - a configurable checklist, not
+# hardcoded in Python. app.policy.coverage reads this to know what SHOULD
+# exist for a council before it can report anything as "missing".
+#
+# "default" applies to every council with Policy Intelligence monitoring
+# enabled, unless extended below. Every value must be one of
+# app.policy.document_types.POLICY_DOCUMENT_TYPES - an unrecognised slug
+# is silently dropped by app.policy.expected_documents rather than
+# surfaced as a phantom expected document nothing can ever satisfy.
+#
+# Per-council entries may add ("additional") or drop ("exclude") types
+# relative to the default list - never redefine the whole list per
+# council, so a new default addition reaches every council automatically.
+default:
+  - local_plan
+  - policies_map
+  - authority_monitoring_report
+  - housing_land_supply
+  - housing_trajectory
+  - housing_delivery_test
+  - local_development_scheme
+  - evidence_base
+
+councils:
+  stockport:
+    # Stockport's own Local Plan is still an emerging (Regulation 18)
+    # draft whose site boundaries are published on a separate Policies
+    # Map / interactive mapping service rather than embedded in the plan
+    # PDF itself (confirmed during Sprint 3C's live validation and this
+    # sprint's own Part 5/10 investigation) - interactive_map is
+    # explicitly expected here, not just the default policies_map.
+    additional:
+      - interactive_map
+
+  bury:
+    # Bury's strategic housing allocations were adopted through the
+    # separate, multi-borough Places for Everyone joint plan (Sprint 2's
+    # validation write-up, specifications/003-policy-intelligence-v1.md
+    # Sec.9) - a masterplan/strategic-framework document is a real,
+    # expected document for at least its Northern Gateway allocation
+    # (confirmed to exist during Sprint 3C's pilot, page 260 of the PfE
+    # plan itself).
+    additional:
+      - masterplan

@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import MonitoredReport, MonitoredSource, PolicyChangeEvent
 from app.policy.change_detection import classify_source_check, compute_content_hash
+from app.policy.document_types import classify_policy_document_type
 from app.policy.report_cadence import compute_next_check_due, is_due
 
 DEFAULT_TIMEOUT_SECONDS = 15
@@ -124,11 +125,22 @@ def register_discovered_reports(session: Session, source: MonitoredSource, links
 
         report_type, matched_rule = classify_report_type(link["link_text"], link["url"])
         classification_status = "auto" if report_type else "needs_review"
+        # Sprint 3D ("Policy Document Coverage & Discovery", Part 2) - a
+        # SEPARATE, broader classification alongside the extraction-
+        # routing one above. A document classify_report_type can't place
+        # (a Policies Map, an SPD, a masterplan - none of these are AI
+        # extraction targets, so classify_report_type correctly has no
+        # rule for them) can still be usefully typed here for the
+        # coverage engine (app.policy.coverage) to know it exists at all -
+        # this never affects classification_status/extraction eligibility
+        # above, which is unchanged.
+        policy_document_type, _ = classify_policy_document_type(link["link_text"], link["url"])
 
         report = MonitoredReport(
             council_code=source.council_code, local_plan_id=source.local_plan_id,
             monitored_source_id=source.id, source_type=report_type,
             classification_status=classification_status, matched_classification_rule=matched_rule,
+            policy_document_type=policy_document_type, policy_document_type_raw_label=link["link_text"],
             title=link["link_text"], url=link["url"], status="current",
             next_check_due=compute_next_check_due(report_type or "other"),
         )
@@ -265,6 +277,12 @@ def check_report_for_changes(session: Session, report: MonitoredReport, timeout:
             council_code=report.council_code, local_plan_id=report.local_plan_id,
             monitored_source_id=report.monitored_source_id, source_type=report.source_type,
             classification_status=report.classification_status, matched_classification_rule=report.matched_classification_rule,
+            # Sprint 3D - carried over from the superseded row, same as
+            # every other classification field here: a same-URL content
+            # swap is still the same DOCUMENT slot, so its Part 2
+            # classification doesn't need re-deriving (title/URL haven't
+            # changed even though the file's bytes have).
+            policy_document_type=report.policy_document_type, policy_document_type_raw_label=report.policy_document_type_raw_label,
             title=report.title, url=report.url, final_url=report.final_url, content_hash=new_hash,
             status="current", next_check_due=compute_next_check_due(report.source_type or "other"),
         )

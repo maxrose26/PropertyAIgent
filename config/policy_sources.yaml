@@ -37,6 +37,25 @@ councils:
         plan_name: "Stockport Local Plan"
         plan_version: null
 
+      # Sprint 3D ("Policy Document Coverage & Discovery", Part 5/10) -
+      # confirmed via direct live research (real requests.get fetches
+      # against stockport.gov.uk, not a search-engine summary) that
+      # Stockport's Local Plan Policies Map is a single, unambiguous,
+      # static PDF - "https://www.stockport.gov.uk/the-local-plan-
+      # documents" lists it right alongside the already-registered Local
+      # Plan PDF itself, same S3 bucket/folder, no competing candidates
+      # found anywhere else, so this did NOT need Part 5's ambiguous-
+      # candidate review queue. Sprint 3C's earlier finding ("the
+      # allocation boundaries genuinely were not present" in the Local
+      # Plan PDF) stands - they were never meant to be there; they live
+      # here instead, in a document that had simply never been
+      # registered before this sprint.
+      - url: "https://live-iag-static-assets.s3.eu-west-1.amazonaws.com/pdf/Local+Plan+evidence/Local+Plan+Policies+Map+-+2025+October.pdf"
+        source_type: policies_map
+        title: "Stockport Local Plan Policies Map (2025 October)"
+        plan_name: "Stockport Local Plan"
+        plan_version: null
+
   bury:
     # Confirmed via direct research (WebFetch/pdfplumber against the
     # primary documents, not just a search summary) that Bury's OWN Local
