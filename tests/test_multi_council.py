@@ -116,7 +116,11 @@ def test_monitoring_changes_stay_isolated_to_the_correct_council(session):
         run_monitor(session, "testcouncil")
         run_monitor(session, "othercouncil")
     with patch("app.policy.monitor.requests.get", return_value=_FakeResponse("v2")):
-        run_monitor(session, "testcouncil")  # only testcouncil's source changes
+        # force=True: this second check happens moments after the first in
+        # test time, which a real due-date-aware run would normally skip
+        # (see tests/test_monitor.py::test_run_monitor_skips_sources_not_yet_due) -
+        # this test's own intent is isolation between councils, not cadence.
+        run_monitor(session, "testcouncil", force=True)  # only testcouncil's source changes
 
     events = session.execute(select(PolicyChangeEvent)).scalars().all()
     assert len(events) == 1

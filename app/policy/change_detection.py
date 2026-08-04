@@ -27,6 +27,27 @@ EVENT_TYPES = (
     # carries no proposed_data of its own; re-ingestion is what would
     # produce a concrete, applyable proposed change.
     "source_content_changed",
+    # A single plan-level fact (housing requirement, delivery, five-year
+    # supply, etc.) proposed by app.extraction.plan_evidence /
+    # app.policy.extract_plan_evidence - see that module's own confidence
+    # classification (app.policy.evidence_validation), which is more
+    # nuanced than the blanket event-type check below and is NOT governed
+    # by _AUTO_APPLY_EVENT_TYPES.
+    "plan_evidence_proposed",
+    # Housing-supply monitoring amendment ("Add monitored housing supply and
+    # delivery reports", Part 2) - app.policy.report_discovery's own event
+    # types. report_discovered is purely additive (a new MonitoredReport row
+    # appearing changes nothing that already existed) so it IS governed by
+    # _AUTO_APPLY_EVENT_TYPES below, same as new_allocation. The other three
+    # each carry their own explicit auto_applied/review_status decided by
+    # report_discovery.py itself (a same-URL hash-change supersession is
+    # unambiguous and auto-applied; a cross-URL supersession match and any
+    # ambiguous type classification are always needs_review) - NOT governed
+    # by the blanket set, same reasoning as plan_evidence_proposed above.
+    "report_discovered",
+    "report_superseded",
+    "report_classification_needs_review",
+    "report_supersession_needs_review",
 )
 
 # Only these event types are safe to auto-apply (Part 11): a brand new
@@ -36,7 +57,7 @@ EVENT_TYPES = (
 # user may already be relying on, so it goes to the review queue instead -
 # deliberately more conservative than it strictly needs to be, since a
 # wrongly-auto-applied change here would misinform an acquisition decision.
-_AUTO_APPLY_EVENT_TYPES = frozenset({"new_allocation", "allocation_retained"})
+_AUTO_APPLY_EVENT_TYPES = frozenset({"new_allocation", "allocation_retained", "report_discovered"})
 
 _CAPACITY_FIELDS = ("minimum_dwellings", "indicative_capacity", "maximum_capacity")
 
