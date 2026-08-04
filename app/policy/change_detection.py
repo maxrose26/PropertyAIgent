@@ -22,6 +22,11 @@ EVENT_TYPES = (
     "allocation_retained",
     "allocation_amended",
     "capacity_changed",
+    # A monitored source's raw content hash changed (see app.policy.monitor) -
+    # says THAT something changed, not what, so it's never auto-applied and
+    # carries no proposed_data of its own; re-ingestion is what would
+    # produce a concrete, applyable proposed change.
+    "source_content_changed",
 )
 
 # Only these event types are safe to auto-apply (Part 11): a brand new

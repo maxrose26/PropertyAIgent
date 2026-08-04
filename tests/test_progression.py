@@ -81,6 +81,38 @@ def test_unknown_when_nothing_matches():
     assert reasons
 
 
+def test_explicit_adoption_evidence_applies_automatically():
+    # The one positive case: BOTH the plan and the allocation's own status
+    # explicitly say adopted - this is the only combination classify_
+    # progression is allowed to report as "adopted".
+    signal, reasons = classify_progression("adopted", "adopted_allocation")
+    assert signal == "adopted"
+    assert reasons
+
+
+def test_adopted_plan_does_not_adopt_removed_allocations():
+    signal, reasons = classify_progression("adopted", "removed")
+    assert signal == "removed"
+    assert signal != "adopted"
+    assert reasons
+
+
+def test_adopted_plan_does_not_adopt_rejected_allocations():
+    signal, _ = classify_progression("adopted", "rejected")
+    assert signal == "removed"
+    assert signal != "adopted"
+
+
+def test_adopted_plan_does_not_adopt_allocations_with_no_confirmed_status():
+    # An allocation that predates independent confirmation (still whatever
+    # app.policy.status.derive_allocation_status_from_plan_status defaulted
+    # it to) must not inherit "adopted" just because the plan around it now
+    # is - see test_status.py's matching derive_allocation_status_from_plan_status test.
+    for unconfirmed_status in ("draft_allocation", "under_consideration", "proposed_submission_allocation", None):
+        signal, _ = classify_progression("adopted", unconfirmed_status)
+        assert signal != "adopted"
+
+
 def test_never_predicts_certainty_language():
     # No branch of the classifier should ever produce a reason claiming a
     # future outcome is certain (Part 7: "Never claim an allocation will

@@ -1,0 +1,22 @@
+# Policy Intelligence monitored sources - registered here as data, not
+# hardcoded inside app.policy.monitor's checking logic (Sprint 1 CTO-review
+# amendment, Part 3: "Confirm source registration").
+#
+# Each council entry names the LocalPlan it belongs to (matched on
+# plan_name + plan_version, same key app.db.models.LocalPlan is uniquely
+# constrained on) - that plan must already exist (via ingest_local_plan.py)
+# before app.policy.sources.register_sources_for_council can attach any
+# sources to it. This file only says WHAT to watch; it has no opinion on
+# HOW a source is checked (that's app.policy.monitor) or what a change to
+# it means (that's app.policy.change_detection / app.policy.review).
+#
+# Deliberately Stockport-only for this amendment - see Part 3's own scope
+# note ("Do not add sources for every council").
+councils:
+  stockport:
+    plan_name: "Stockport Local Plan"
+    plan_version: null
+    sources:
+      - url: "https://live-iag-static-assets.s3.eu-west-1.amazonaws.com/pdf/Local+Plan+evidence/LocalPlan.pdf"
+        source_type: pdf
+        title: "Stockport Local Plan (housing site allocations, pages 110-111)"

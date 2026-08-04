@@ -10,18 +10,27 @@ extraction/matching/storage.
         --pages 110-111 --plan-name "Stockport Local Plan" --plan-status draft \\
         --source-url "https://live-iag-static-assets.s3.eu-west-1.amazonaws.com/pdf/Local+Plan+evidence/LocalPlan.pdf"
 
-Re-running for a council/plan you've already ingested no longer deletes and
-replaces its rows (Policy Intelligence Foundation sprint, Part 9/10): the
-freshly extracted allocations are diffed against what's already stored, the
-PRE-CHANGE values are preserved as an AllocationVersion snapshot before
-anything is overwritten, and every detected change (new/removed/amended
-allocation, capacity change) is logged as a PolicyChangeEvent - see
-app.policy.change_detection. High-confidence changes (a brand new
-allocation, one confirmed unchanged) apply immediately; anything more
-ambiguous is still applied (this script only ever runs because a document
-was actually re-read) but flagged with review_status="needs_review" so a
-human can confirm it before relying on it, rather than being silently
-absorbed into "the site's current state" (Part 11 review queue).
+Re-running for a council/plan you've already ingested never deletes and
+replaces its rows, and - since the Sprint 1 CTO-review amendment ("Protect
+trusted state from ambiguous changes") - never silently overwrites an
+existing LocalPlan/LocalPlanSite's trusted fields either:
+
+  - Brand new plans and brand new allocations are safe by construction
+    (there's no existing trusted value to protect) and are written
+    immediately.
+  - Everything else a fresh extraction disagrees with an EXISTING plan or
+    allocation about (a status/stage change, a capacity change, an
+    allocation that's vanished from this run's page range) is queued as a
+    PolicyChangeEvent with review_status="needs_review" and a
+    proposed_data payload - the actual LocalPlan/LocalPlanSite row is left
+    completely untouched until a human calls
+    app.policy.review.approve_change or reject_change.
+
+Site-matching and geocoding (matched_site_id, match_confidence, latitude,
+longitude) are a separate concern from plan/allocation CONTENT and are
+still recomputed and applied on every run, same as before this amendment -
+see the module docstring reasoning in app.policy.review for why that
+distinction is deliberate.
 """
 from __future__ import annotations
 
@@ -35,7 +44,7 @@ from openai import OpenAI
 from sqlalchemy import select
 
 from app.config import get_council
-from app.db.models import AllocationVersion, LocalPlan, LocalPlanSite, LocalPlanStatusHistory, PolicyChangeEvent, Site
+from app.db.models import LocalPlan, LocalPlanSite, PolicyChangeEvent, Site
 from app.db.session import get_session, init_db
 from app.enrichment.epc_lookup import NOMINATIM_MIN_INTERVAL_SECONDS
 from app.extraction.local_plan import (
@@ -80,17 +89,6 @@ def _allocation_snapshot(row: LocalPlanSite) -> dict:
     }
 
 
-def _snapshot_version(session, row: LocalPlanSite, change_reason: str) -> None:
-    session.add(AllocationVersion(
-        allocation_id=row.id, local_plan_id=row.local_plan_id,
-        policy_reference=row.policy_reference, site_name=row.site_name,
-        minimum_dwellings=row.minimum_dwellings, indicative_capacity=row.indicative_capacity,
-        maximum_capacity=row.maximum_capacity, category=row.category,
-        allocation_status=row.allocation_status, raw_allocation_status=row.raw_allocation_status,
-        change_reason=change_reason,
-    ))
-
-
 def main() -> None:
     args = parse_args()
     first_page, last_page = (int(p) for p in args.pages.split("-"))
@@ -110,34 +108,47 @@ def main() -> None:
         )
     ).scalar_one_or_none()
 
-    plan_is_new = plan is None
-    old_plan_snapshot = None if plan_is_new else _plan_snapshot(plan)
+    new_plan_snapshot = {"plan_version": args.plan_version, "status": normalised_status}
 
     if plan is None:
+        # A brand-new plan has no existing trusted value to protect -
+        # writing it immediately is exactly as safe as a new_allocation.
         plan = LocalPlan(
             council_code=args.council, plan_name=args.plan_name, plan_version=args.plan_version,
             status=normalised_status, raw_status=raw_status, source_webpage=args.source_url,
         )
         session.add(plan)
-    else:
-        plan.status = normalised_status
-        plan.raw_status = raw_status
-        plan.source_webpage = args.source_url
-    plan.last_checked = dt.datetime.now(dt.timezone.utc)
-    session.commit()  # assigns plan.id if newly created
-
-    for event in diff_plan(old_plan_snapshot, _plan_snapshot(plan)):
+        session.commit()  # assigns plan.id
         session.add(PolicyChangeEvent(
-            local_plan_id=plan.id, event_type=event["event_type"],
-            old_value=event["old_value"], new_value=event["new_value"], detail=event["detail"],
-            auto_applied=classify_confidence(event["event_type"]) == "auto_applied",
-            review_status=classify_confidence(event["event_type"]),
+            local_plan_id=plan.id, event_type="new_plan_version", old_value=None, new_value=args.plan_version,
+            detail="First time this Local Plan has been recorded.",
+            proposed_data=json.dumps(new_plan_snapshot), source_document_url=args.source_url,
+            auto_applied=True, review_status="auto_applied",
         ))
-        if event["event_type"] in ("stage_change", "adoption", "withdrawal"):
-            session.add(LocalPlanStatusHistory(
-                local_plan_id=plan.id, status=plan.status, raw_status=plan.raw_status,
-                plan_version=plan.plan_version, note=event["detail"],
+        plan_events_applied = ["new_plan_version"]
+    else:
+        old_plan_snapshot = _plan_snapshot(plan)
+        plan_diff_events = diff_plan(old_plan_snapshot, new_plan_snapshot)
+        plan_events_applied = []
+        for event in plan_diff_events:
+            session.add(PolicyChangeEvent(
+                local_plan_id=plan.id, event_type=event["event_type"],
+                old_value=event["old_value"], new_value=event["new_value"], detail=event["detail"],
+                proposed_data=json.dumps(new_plan_snapshot), source_document_url=args.source_url,
+                auto_applied=False, review_status="needs_review",
             ))
+            # NOT applying plan.status/plan_version here - an EXISTING
+            # plan's own trusted status only changes via
+            # app.policy.review.approve_change, never automatically at
+            # ingest time (see module docstring).
+        if plan_diff_events:
+            print(f"[local-plan] {args.council}: plan-level change(s) detected ({[e['event_type'] for e in plan_diff_events]}) "
+                  f"- queued for review, current plan status left unchanged")
+    # source_webpage/last_checked are operational bookkeeping (which
+    # document we're currently pointed at), not trusted plan CONTENT - safe
+    # to update unconditionally.
+    plan.source_webpage = args.source_url
+    plan.last_checked = dt.datetime.now(dt.timezone.utc)
     session.commit()
 
     text = extract_pdf_page_range(args.pdf, first_page, last_page)
@@ -160,6 +171,11 @@ def main() -> None:
         "minimum_dwellings": s["minimum_dwellings"],
         "indicative_capacity": None,
         "maximum_capacity": None,
+        # For an EXISTING allocation, the extraction schema doesn't itself
+        # produce a status, so this compares the current DB value against
+        # itself (never a spontaneous diff) - allocation_amended only ever
+        # fires from a status change made some other way (e.g. a previously
+        # approved change). New allocations get the derived default.
         "allocation_status": existing_rows[s["policy_reference"]].allocation_status
         if s["policy_reference"] in existing_rows else derived_status,
     } for s in extracted]
@@ -171,6 +187,7 @@ def main() -> None:
 
     matched_count = 0
     geocoded_count = 0
+    queued_count = 0
     seen_refs: set[str] = set()
 
     for s in extracted:
@@ -178,7 +195,6 @@ def main() -> None:
         seen_refs.add(ref)
         row = existing_rows.get(ref)
         events = events_by_ref.get(ref, [])
-        confidence = classify_confidence(events[0]["event_type"]) if events else "auto_applied"
 
         matched_site, score = match_to_existing_site(s["site_name"], site_candidates)
         if matched_site:
@@ -191,95 +207,104 @@ def main() -> None:
             geocoded_count += 1
 
         if row is None:
+            # New allocation - nothing existing to protect, write it now.
             row = LocalPlanSite(
                 council_code=args.council, local_plan_id=plan.id,
                 policy_reference=ref, site_name=s["site_name"], minimum_dwellings=s["minimum_dwellings"],
                 category=s["category"], plan_name=args.plan_name, plan_status=args.plan_status,
                 allocation_status=derived_status, raw_allocation_status=derived_note,
                 source_document_url=args.source_url, source_page=first_page,
-                review_status=confidence,
+                review_status="auto_applied",
             )
             session.add(row)
-            session.flush()  # assigns row.id for the version snapshot below
+            session.flush()  # assigns row.id
+            for event in events:  # a single new_allocation event, per diff_allocations
+                session.add(PolicyChangeEvent(
+                    local_plan_id=plan.id, allocation_id=row.id, event_type=event["event_type"],
+                    old_value=event["old_value"], new_value=event["new_value"], detail=event["detail"],
+                    proposed_data=json.dumps(_allocation_snapshot(row)), source_document_url=args.source_url,
+                    source_page=first_page, auto_applied=True, review_status="auto_applied",
+                ))
+            signal, reasons = classify_progression(plan.status, row.allocation_status, present_in_latest_version=True)
+            row.progression_signal = signal
+            row.progression_reasons = json.dumps(reasons)
+            row.progression_computed_at = dt.datetime.now(dt.timezone.utc)
             tag = "new"
         else:
-            # Snapshot BEFORE overwriting, so the pre-change values are never
-            # lost (Part 10) - even for fields that didn't change this run,
-            # a full snapshot is cheap and keeps every version self-contained
-            # to read on its own, not a diff against a diff.
-            _snapshot_version(session, row, change_reason=events[0]["event_type"] if events else "reingested_unchanged")
+            # Existing allocation - apply only what's safe (nothing changed
+            # this run - "allocation_retained"), queue everything else.
+            row_changed = False
+            for event in events:
+                confidence = classify_confidence(event["event_type"])
+                if event["event_type"] == "capacity_changed":
+                    proposed = {
+                        "minimum_dwellings": s["minimum_dwellings"],
+                        "indicative_capacity": None, "maximum_capacity": None,
+                    }
+                elif event["event_type"] == "allocation_amended":
+                    proposed = {"allocation_status": row.allocation_status}  # see new_dicts comment above
+                else:  # allocation_retained
+                    proposed = None
+
+                session.add(PolicyChangeEvent(
+                    local_plan_id=plan.id, allocation_id=row.id, event_type=event["event_type"],
+                    old_value=event["old_value"], new_value=event["new_value"], detail=event["detail"],
+                    proposed_data=json.dumps(proposed) if proposed else None,
+                    source_document_url=args.source_url, source_page=first_page,
+                    auto_applied=confidence == "auto_applied", review_status=confidence,
+                ))
+                if confidence == "needs_review":
+                    row.review_status = "needs_review"
+                    row_changed = True
+
+            # Fields the diff doesn't gate at all (cosmetic re-wording, not
+            # a materially trust-sensitive fact) stay auto-updated, same as
+            # before this amendment.
             row.site_name = s["site_name"]
-            row.minimum_dwellings = s["minimum_dwellings"]
             row.category = s["category"]
             row.plan_name = args.plan_name
             row.plan_status = args.plan_status
             row.source_document_url = args.source_url
             row.source_page = first_page
-            row.review_status = confidence
-            tag = "updated" if events and events[0]["event_type"] != "allocation_retained" else "unchanged"
+
+            tag = "queued for review" if row_changed else "unchanged"
 
         row.matched_site_id = matched_site.id if matched_site else None
         row.match_confidence = score if matched_site else None
         if coords:
             row.latitude, row.longitude = coords
-
-        signal, reasons = classify_progression(
-            plan.status, row.allocation_status,
-            expected_adoption_date=_parse_date(plan.expected_adoption_date), present_in_latest_version=True,
-        )
-        row.progression_signal = signal
-        row.progression_reasons = json.dumps(reasons)
-        row.progression_computed_at = dt.datetime.now(dt.timezone.utc)
-
-        for event in events:
-            session.add(PolicyChangeEvent(
-                local_plan_id=plan.id, allocation_id=row.id, event_type=event["event_type"],
-                old_value=event["old_value"], new_value=event["new_value"], detail=event["detail"],
-                auto_applied=classify_confidence(event["event_type"]) == "auto_applied",
-                review_status=classify_confidence(event["event_type"]),
-            ))
+        if tag == "queued for review":
+            queued_count += 1
 
         match_tag = f"matched -> site {matched_site.id} (score={score:.0f})" if matched_site else "no application yet"
         geo_tag = "geocoded" if coords else "NOT geocoded"
-        print(f"  [{tag:9}] {ref:12} {s['site_name']:45} {s['minimum_dwellings']!s:>6}  {match_tag} | {geo_tag}")
+        print(f"  [{tag:16}] {ref:12} {s['site_name']:45} {s['minimum_dwellings']!s:>6}  {match_tag} | {geo_tag}")
 
     # Allocations that existed before this ingest but weren't in this run's
-    # extraction - never deleted (Part 10), left exactly as they are, but
-    # flagged for a human to confirm whether they were genuinely dropped
-    # from the plan or just outside this run's page range (Part 11).
+    # extraction - never deleted, never reclassified as "removed" here
+    # (that's an ambiguous change, per the amendment's own examples) - only
+    # a PolicyChangeEvent is queued; the allocation's own status and
+    # progression signal are left exactly as they were until a human
+    # approves the removal.
     removed_count = 0
     for ref, row in existing_rows.items():
         if ref in seen_refs:
             continue
         removed_count += 1
         row.review_status = "needs_review"
-        for event in events_by_ref.get(ref, []):
+        for event in events_by_ref.get(ref, []):  # exactly one: allocation_removed
             session.add(PolicyChangeEvent(
                 local_plan_id=plan.id, allocation_id=row.id, event_type=event["event_type"],
                 old_value=event["old_value"], new_value=event["new_value"], detail=event["detail"],
-                auto_applied=False, review_status="needs_review",
+                proposed_data=json.dumps({"allocation_status": "removed"}),
+                source_document_url=args.source_url, auto_applied=False, review_status="needs_review",
             ))
-        signal, reasons = classify_progression(
-            plan.status, row.allocation_status,
-            expected_adoption_date=_parse_date(plan.expected_adoption_date), present_in_latest_version=False,
-        )
-        row.progression_signal = signal
-        row.progression_reasons = json.dumps(reasons)
-        row.progression_computed_at = dt.datetime.now(dt.timezone.utc)
+        queued_count += 1
 
     session.commit()
     print(f"\n[local-plan] {args.council}: {len(extracted)} sites in latest extraction, {matched_count} matched to "
-          f"an existing application, {geocoded_count} geocoded, {removed_count} previously-stored allocation(s) "
-          f"not seen this run (flagged for review, not deleted)")
-
-
-def _parse_date(value: str | None) -> dt.date | None:
-    if not value:
-        return None
-    try:
-        return dt.date.fromisoformat(value)
-    except ValueError:
-        return None
+          f"an existing application, {geocoded_count} geocoded, {queued_count} change(s) queued for review "
+          f"(trusted state left unchanged), {removed_count} previously-stored allocation(s) not seen this run")
 
 
 if __name__ == "__main__":

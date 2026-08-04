@@ -276,6 +276,23 @@ class LocalPlanSite(Base):
     # match_to_existing_sites) - null means no planning application has been
     # submitted for this allocation yet, which is itself the useful signal:
     # a genuinely pre-application opportunity, not just an early one.
+    #
+    # KNOWN V1 LIMITATION (documented per Sprint 1 CTO review, not fixed in
+    # this amendment): this is a single nullable FK, so V1 supports at most
+    # ONE confirmed Site per allocation. An allocation can conceptually
+    # correspond to several Sites (a large allocation delivered as separate
+    # physical parcels/phases, or split across more than one planning
+    # application that was never itself consolidated into one Site) - V1
+    # has no way to represent that; only the single best match is kept. A
+    # future specification should introduce an explicit many-to-many
+    # relationship table (allocation_id, site_id, relationship_type: full |
+    # partial | phased, confidence) rather than widening this column -
+    # see specifications/003-policy-intelligence-v1.md Sec.5 and the
+    # partial-delivery reasoning in app.extraction.local_plan.
+    # assess_delivery_scope, which already works around this limitation at
+    # the UNIT-COUNT level (comparing minimum_dwellings against whatever the
+    # one matched Site's applications total) without a real multi-Site
+    # relationship underneath it.
     matched_site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
     match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     # auto_applied | needs_confirmation | confirmed | rejected - set
@@ -369,9 +386,17 @@ class MonitoredSource(Base):
     last_checked: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_successful_check: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_changed: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # ok | error | never_checked - a quick-glance signal for "is this source
-    # still reachable", independent of whether its content has changed.
+    # ok | error | stale | never_checked - a quick-glance signal for "is
+    # this source still reachable", independent of whether its content has
+    # changed. "stale" (vs a fresh "error") means it's been failing for
+    # long enough that the LAST successful check is itself old - see
+    # app.policy.monitor.check_source.
     monitoring_health: Mapped[str] = mapped_column(String(20), default="never_checked")
+    # Sources are registered via config/policy_sources.yaml (see
+    # app.policy.sources), never hardcoded in monitoring logic - this flag
+    # is how one gets deactivated (a document moved/retired) without
+    # deleting its row and losing its check history.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -384,7 +409,14 @@ class PolicyChangeEvent(Base):
     queue: a queue is just the rows here with review_status="needs_review",
     not a separate table duplicating the same shape. Deliberately never
     overwritten - each detected change is its own row, so the full change
-    history is reconstructable from this table alone."""
+    history is reconstructable from this table alone.
+
+    Sprint 1 CTO-review amendment ("Protect trusted state from ambiguous
+    changes"): for anything NOT auto-applied, the underlying LocalPlan/
+    LocalPlanSite row is left completely unchanged at the moment this event
+    is created - proposed_data is what WOULD be applied, not what already
+    has been. See app.policy.review.approve_change/reject_change for the
+    only code paths allowed to apply it."""
 
     __tablename__ = "policy_change_events"
 
@@ -395,18 +427,37 @@ class PolicyChangeEvent(Base):
 
     # new_plan_version | stage_change | adoption | withdrawal | new_allocation |
     # allocation_removed | allocation_retained | allocation_amended |
-    # capacity_changed - see app.policy.change_detection.EVENT_TYPES.
+    # capacity_changed | source_content_changed - see
+    # app.policy.change_detection.EVENT_TYPES.
     event_type: Mapped[str] = mapped_column(String(50))
     old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # High-confidence, unambiguous changes (a status that only ever moves
-    # forward, e.g. draft -> adopted with a matching plan-level adoption) are
-    # applied automatically; anything ambiguous (a PDF changed with no clear
-    # status delta, an allocation vanishing, unusual wording that doesn't
-    # match a known status) is left for a human - see
-    # app.policy.change_detection.classify_confidence.
+    # JSON-encoded {field_name: proposed_value} - exactly what
+    # app.policy.review.approve_change would setattr onto the target
+    # LocalPlan/LocalPlanSite row if approved. Null for event types with
+    # nothing to apply (allocation_retained, source_content_changed - a raw
+    # hash change says THAT something changed, not what, so there's no
+    # concrete field value to propose without a human re-reading it first).
+    proposed_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Source evidence, kept at the top level (not just buried in
+    # proposed_data) so a reviewer can see where a proposed change came from
+    # without parsing JSON. confidence is deliberately nullable and mostly
+    # null today - AI extraction in this platform is schema-structured, not
+    # confidence-scored, so there is no real number to put here yet for
+    # most event types; the column exists as honest infrastructure for when
+    # one becomes available, not a fabricated placeholder.
+    source_document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # High-confidence, unambiguous changes (a brand new allocation/plan, or
+    # one confirmed unchanged) are applied immediately at detection time;
+    # everything else is queued here with the TRUSTED row left untouched
+    # until a human calls app.policy.review.approve_change or reject_change -
+    # see app.policy.change_detection.classify_confidence.
     auto_applied: Mapped[bool] = mapped_column(Boolean, default=False)
     review_status: Mapped[str] = mapped_column(String(30), default="auto_applied")  # auto_applied | needs_review | confirmed | rejected
     reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
