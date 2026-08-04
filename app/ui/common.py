@@ -46,7 +46,19 @@ from app.pipeline.lapse_tracking import (
 )
 from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
+from app.policy.site_view import build_site_policy_intelligence
 from app.scrapers.unit_filter import classify_application_category, qualify
+
+PROGRESSION_SIGNAL_LABELS = {
+    "early_stage": "🌱 Early stage",
+    "progressing": "➡️ Progressing",
+    "advanced": "🔶 Advanced",
+    "adopted": "✅ Adopted",
+    "stalled": "⏸️ Stalled",
+    "removed": "❌ Removed / no longer listed",
+    "unknown": "❔ Unknown",
+    None: "❔ Not yet classified",
+}
 
 # Fields pulled from scheme_intelligence and merged across every application
 # linked to a site (not just one "representative" application) - a detail
@@ -239,19 +251,39 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             session.commit()
             st.rerun()
 
+    # Policy Intelligence (Part 12 of the Policy Intelligence Foundation
+    # sprint) - every fact shown here carries its own source page/document
+    # link (Part 13 traceability), never a summary detached from where it
+    # came from. build_site_policy_intelligence is a pure function (see
+    # app.policy.site_view) so this exact assembly is covered by
+    # tests/test_site_policy_display.py independently of Streamlit.
     local_plan_entries = session.execute(
         select(LocalPlanSite).where(LocalPlanSite.matched_site_id == site.id)
     ).scalars().all()
-    for entry in local_plan_entries:
-        confidence_bit = f" (match confidence {entry.match_confidence:.0f}%)" if entry.match_confidence else ""
+    for entry, policy_row in zip(local_plan_entries, build_site_policy_intelligence(local_plan_entries)):
+        confidence_bit = f" (match confidence {policy_row['match_confidence']:.0f}%)" if policy_row["match_confidence"] else ""
         page_link = (
-            f" [Open plan page {entry.source_page}]({entry.source_document_url}#page={entry.source_page})"
-            if entry.source_document_url and entry.source_page else ""
+            f" [Open plan page {policy_row['source_page']}]({policy_row['source_document_url']}#page={policy_row['source_page']})"
+            if policy_row["source_document_url"] and policy_row["source_page"] else ""
         )
+        capacity_bits = [
+            f"{policy_row[k]} {label}" for k, label in (
+                ("minimum_dwellings", "min"), ("indicative_capacity", "indicative"), ("maximum_capacity", "max"),
+            ) if policy_row[k]
+        ]
+        capacity_text = " / ".join(capacity_bits) if capacity_bits else "dwelling count not stated"
+        plan_status_text = policy_row["plan_raw_status"] or policy_row["plan_status"] or "status unknown"
         st.info(
-            f"📋 Allocated in the **{entry.plan_name}** ({entry.plan_status}) as **{entry.policy_reference} "
-            f"{entry.site_name}** — {entry.minimum_dwellings or '?'} dwellings, {entry.category or 'no category given'}"
-            f"{confidence_bit}.{page_link}"
+            f"📋 Allocated in the **{policy_row['plan_name']}** ({plan_status_text}) as "
+            f"**{policy_row['allocation_reference']} {policy_row['allocation_name']}** — {capacity_text}, "
+            f"{policy_row['category'] or 'no category given'}{confidence_bit}.{page_link}"
+        )
+        st.caption(
+            f"{PROGRESSION_SIGNAL_LABELS.get(policy_row['progression_signal'], PROGRESSION_SIGNAL_LABELS[None])}"
+            + (f" — {'; '.join(policy_row['progression_reasons'])}" if policy_row["progression_reasons"] else "")
+            + (f" · allocation status: {policy_row['allocation_raw_status'] or policy_row['allocation_status']}"
+               if policy_row["allocation_status"] else "")
+            + (f" · plan checked {policy_row['last_checked'].strftime('%d %b %Y')}" if policy_row["last_checked"] else "")
         )
         scope = assess_delivery_scope(entry.minimum_dwellings, merged.get("total_units_final"))
         if scope["status"] == "partial":

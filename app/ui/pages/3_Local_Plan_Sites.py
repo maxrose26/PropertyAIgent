@@ -17,7 +17,8 @@ from sqlalchemy import select
 
 from app.db.models import LocalPlanSite
 from app.extraction.local_plan import assess_delivery_scope
-from app.ui.common import aggregate_scheme_fields, bootstrap, credits_sidebar, get_db, load_site_applications
+from app.policy.site_view import build_site_policy_intelligence
+from app.ui.common import PROGRESSION_SIGNAL_LABELS, aggregate_scheme_fields, bootstrap, credits_sidebar, get_db, load_site_applications
 
 st.set_page_config(page_title="Local Plan sites - UK Planning Deal Finder", layout="wide")
 
@@ -64,6 +65,7 @@ st.subheader(f"{len(filtered)} sites ({matched_count} already have an applicatio
 
 geo_points = []
 rows = []
+policy_rows = {row["policy_reference"]: row for row in build_site_policy_intelligence(filtered)}
 for s in filtered:
     delivery_note = None
     if s.matched_site_id:
@@ -75,6 +77,7 @@ for s in filtered:
     plan_page_url = (
         f"{s.source_document_url}#page={s.source_page}" if s.source_document_url and s.source_page else None
     )
+    policy_row = policy_rows[s.policy_reference]
 
     rows.append({
         "Council": s.council_code,
@@ -83,6 +86,11 @@ for s in filtered:
         "Min. dwellings": s.minimum_dwellings,
         "Category": s.category,
         "Plan": f"{s.plan_name} ({s.plan_status})",
+        # Allocation status is distinct from the Local Plan's own status
+        # (Part 6 of the Policy Intelligence Foundation sprint) - never
+        # collapse the two, and never show a draft allocation as adopted.
+        "Allocation status": policy_row["allocation_raw_status"] or policy_row["allocation_status"] or "not yet classified",
+        "Progression signal": PROGRESSION_SIGNAL_LABELS.get(policy_row["progression_signal"], PROGRESSION_SIGNAL_LABELS[None]),
         "Application status": "Has application" if s.matched_site_id else "No application yet",
         "Match confidence": f"{s.match_confidence:.0f}%" if s.match_confidence else None,
         "Delivery vs. allocation": delivery_note,

@@ -11,3 +11,4 @@ streamlit
 pyyaml
 pandas
 reportlab
+pytest

@@ -86,6 +86,114 @@ class Site(Base):
     )
 
 
+class LocalPlan(Base):
+    """One individual Local Plan or plan version for a council - the
+    plan-level entity that sits above individual site Allocations
+    (LocalPlanSite). Introduced in the Policy Intelligence Foundation sprint
+    (specifications/004-core-domain-model.md's "Policy" domain object) to
+    give a Local Plan an independent lifecycle - status, timetable, housing
+    requirement - rather than the plan being just a name/status string
+    repeated on every allocation row, as it was in the original single-
+    council pilot. A council may have more than one LocalPlan row over time
+    (a superseded plan and its adopted successor), and in principle more
+    than one live at once during a transition between plan periods."""
+
+    __tablename__ = "local_plans"
+    __table_args__ = (UniqueConstraint("council_code", "plan_name", "plan_version", name="uq_council_plan_version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
+    # LPA code (e.g. ONS/PINS local authority code) where available - not
+    # every source states one, so this stays optional rather than blocking
+    # ingestion when it's unknown.
+    authority_code: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    plan_name: Mapped[str] = mapped_column(String(300))
+    # Free text ("Regulation 18", "Regulation 19", "Adopted 2024") - plan
+    # versioning terminology isn't standardised across councils, so this is
+    # kept as the council's own label rather than forced into an enum.
+    plan_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # legacy (2004 Act development plan system) | new (Levelling-up and
+    # Regeneration Act 2023 system, once councils start transitioning) -
+    # affects which stages/terminology are expected to appear for this plan.
+    planning_system: Mapped[str] = mapped_column(String(20), default="legacy")
+
+    # Normalised against app.policy.status.PLAN_STATUSES (see
+    # app.policy.status.normalise_plan_status) - raw_status is always kept
+    # alongside it, since normalisation is best-effort keyword matching and
+    # a council's own wording is the only ground truth when it disagrees.
+    status: Mapped[str] = mapped_column(String(50), default="unknown")
+    raw_status: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    plan_period: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "2024-2042"
+    adoption_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    publication_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # The plan's OWN stated housing number - distinct from a housing need
+    # study's output and distinct from housing land supply (see
+    # specifications/003-policy-intelligence-v1.md Sec.2).
+    annual_housing_requirement: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_housing_requirement: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Kept as free text (e.g. "5.2 years") rather than a bare float - councils
+    # state this in inconsistent units/bases, and the raw figure is more
+    # trustworthy than a value we've silently reinterpreted.
+    housing_land_supply: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    housing_land_supply_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    source_webpage: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # JSON-encoded list of {"title": ..., "url": ...} - a simple record of
+    # which documents this plan's data was drawn from. Full monitoring
+    # metadata (hash, last-checked, health) lives on MonitoredSource, not
+    # here - this field is just "what documents exist", not "how they're
+    # being watched".
+    source_documents: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Status/lifecycle monitoring (Part 5) ---
+    current_stage_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    next_milestone: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    next_milestone_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    expected_adoption_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    timetable_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_checked: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Distinct from updated_at (generic row-bookkeeping, bumped on ANY
+    # field change) - this is specifically "when did the plan's real-world
+    # content last change", the fact change-detection cares about.
+    content_last_updated: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    monitoring_confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)  # high | medium | low
+    monitoring_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    allocations: Mapped[list["LocalPlanSite"]] = relationship(back_populates="local_plan")
+    status_history: Mapped[list["LocalPlanStatusHistory"]] = relationship(
+        back_populates="local_plan", cascade="all, delete-orphan"
+    )
+    monitored_sources: Mapped[list["MonitoredSource"]] = relationship(
+        back_populates="local_plan", cascade="all, delete-orphan"
+    )
+
+
+class LocalPlanStatusHistory(Base):
+    """Append-only snapshot of a LocalPlan's status whenever it changes -
+    never overwritten, never deleted (Part 10). Written by
+    app.policy.change_detection whenever an ingest or a monitoring check
+    finds a LocalPlan's status has moved on from what's currently stored."""
+
+    __tablename__ = "local_plan_status_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    local_plan_id: Mapped[int] = mapped_column(ForeignKey("local_plans.id"))
+
+    status: Mapped[str] = mapped_column(String(50))
+    raw_status: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    plan_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    captured_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    local_plan: Mapped["LocalPlan"] = relationship(back_populates="status_history")
+
+
 class LocalPlanSite(Base):
     """One site allocated for housing in a council's Local Plan - a
     leading-indicator signal distinct from everything else in this database,
@@ -94,29 +202,74 @@ class LocalPlanSite(Base):
     document the council actually publishes (usually a PDF site-allocations
     schedule) - there's no equivalent of the Idox/Arcus portal for this, so
     ingestion is necessarily semi-manual and per-council, unlike
-    applications."""
+    applications.
+
+    This is the "Local Plan Allocation" domain object (specifications/
+    004-core-domain-model.md) - kept under its original class name to avoid
+    disturbing every existing reference to it (app.extraction.local_plan,
+    ingest_local_plan.py, the Local Plan browse page), but conceptually and
+    going forward it IS the Allocation entity, distinct from - never to be
+    confused with - a Site or a Planning Application."""
 
     __tablename__ = "local_plan_sites"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
 
+    # Nullable for backwards compatibility with rows created before this
+    # sprint - backfilled by scripts/migrate_policy_intelligence.py. New
+    # ingestion always sets this.
+    local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
+
     policy_reference: Mapped[str] = mapped_column(String(50))  # e.g. "HOM 2.30"
     site_name: Mapped[str] = mapped_column(String(300))
+    # The plan's stated intended use for this allocation as printed - most
+    # are residential, some are mixed use. Recording what the plan actually
+    # says rather than assuming residential-only (see
+    # specifications/003-policy-intelligence-v1.md Sec.2).
+    intended_use: Mapped[str | None] = mapped_column(String(200), nullable=True, default="residential")
+
+    # minimum_dwellings IS this allocation's minimum-capacity figure (the
+    # plan's own stated dwelling count) - kept under its original name
+    # rather than duplicated as a new "minimum_capacity" column, since it's
+    # already exactly that field and every existing caller depends on this
+    # name. indicative/maximum are new, genuinely additional figures some
+    # plans state alongside (or instead of) a single minimum.
     minimum_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    indicative_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    maximum_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Council-specific grouping as it appears in the source document (e.g.
     # "List 1: built-up area", "List 2: grey belt") - kept verbatim rather
     # than normalised into an enum, since this varies by council and the
     # exact wording is meaningful context in its own right.
     category: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
+    # Normalised against app.policy.status.ALLOCATION_STATUSES (Part 6) -
+    # raw_allocation_status preserves the source wording alongside it, same
+    # pattern as LocalPlan.status/raw_status. Nullable because allocations
+    # ingested before this sprint don't have one yet until the migration
+    # derives a best-effort value for them (flagged for review, never
+    # guessed as "adopted").
+    allocation_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    raw_allocation_status: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    # DEPRECATED in favour of local_plan.plan_name/plan_status - kept
+    # populated (not removed) so existing code reading these two fields
+    # directly (the Local Plan browse page, the Site-page display before
+    # this sprint) keeps working unchanged. New code should read
+    # local_plan.plan_name / local_plan.status instead.
     plan_name: Mapped[str] = mapped_column(String(300))
-    # draft | emerging | examination | adopted - an allocation in a draft/
-    # emerging plan can still be added, dropped, or resized before adoption,
-    # so this must travel with every record, not just live in a README.
     plan_status: Mapped[str] = mapped_column(String(50))
+
     source_document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Reserved for future GIS work (specifications/004 explicitly puts
+    # polygon/boundary work out of scope for this sprint) - a place to hold
+    # a raw geometry string (WKT/GeoJSON) once that's built, without another
+    # schema change. Genuinely unused today.
+    geometry_placeholder: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Cross-reference to an already-scraped Site, where one has been matched
     # by address/name similarity (see app.extraction.local_plan.
@@ -125,6 +278,23 @@ class LocalPlanSite(Base):
     # a genuinely pre-application opportunity, not just an early one.
     matched_site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
     match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # auto_applied | needs_confirmation | confirmed | rejected - set
+    # whenever a change is ambiguous enough to need a human look (Part 11's
+    # review queue is PolicyChangeEvent rows with review_status=
+    # needs_review; this field is the allocation's OWN current review state,
+    # e.g. after a low-confidence Site match or an ambiguous status derived
+    # by migration).
+    review_status: Mapped[str] = mapped_column(String(30), default="auto_applied")
+
+    # --- Progression signal (Part 7) - deterministic, never AI-derived.
+    # See app.policy.progression.classify_progression. ---
+    progression_signal: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # JSON-encoded list of the deterministic reasons behind the signal -
+    # always stored alongside it, since a bare label with no explanation is
+    # exactly the kind of unexplainable decision CLAUDE.md's product
+    # principles rule out.
+    progression_reasons: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progression_computed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Copied from matched_site when matched (already geocoded there) or
     # free-text geocoded directly from site_name otherwise (see
@@ -135,8 +305,114 @@ class LocalPlanSite(Base):
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     extracted_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     matched_site: Mapped["Site | None"] = relationship(foreign_keys=[matched_site_id])
+    local_plan: Mapped["LocalPlan | None"] = relationship(back_populates="allocations")
+    versions: Mapped[list["AllocationVersion"]] = relationship(
+        back_populates="allocation", cascade="all, delete-orphan"
+    )
+
+
+class AllocationVersion(Base):
+    """Append-only snapshot of a LocalPlanSite's fields, written whenever an
+    ingest or migration finds it materially changed from what's stored
+    (Part 10 - version history). Never updated or deleted once written -
+    the current LocalPlanSite row is always the latest state; this table is
+    purely the audit trail behind it."""
+
+    __tablename__ = "allocation_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    allocation_id: Mapped[int] = mapped_column(ForeignKey("local_plan_sites.id"))
+    local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
+
+    policy_reference: Mapped[str] = mapped_column(String(50))
+    site_name: Mapped[str] = mapped_column(String(300))
+    minimum_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    indicative_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    maximum_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    category: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    allocation_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    raw_allocation_status: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    # initial_migration | new_allocation | capacity_changed | status_changed |
+    # amended | removed - see app.policy.change_detection.
+    change_reason: Mapped[str] = mapped_column(String(50))
+    captured_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    allocation: Mapped["LocalPlanSite"] = relationship(back_populates="versions")
+
+
+class MonitoredSource(Base):
+    """A single URL/document being watched for change, belonging to a
+    LocalPlan - the foundation for Part 8's continuous monitoring. Checking
+    a source (fetching it, hashing its content, comparing to
+    content_hash) is a separate concern (app.pipeline.policy_monitoring)
+    from this table, which just holds the current watched state."""
+
+    __tablename__ = "monitored_sources"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    local_plan_id: Mapped[int] = mapped_column(ForeignKey("local_plans.id"))
+
+    url: Mapped[str] = mapped_column(String(500))
+    final_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # after redirects, when different
+    # webpage | timetable | consultation_portal | examination_library |
+    # adopted_plan | policies_map | pdf | other
+    source_type: Mapped[str] = mapped_column(String(50))
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # sha256 hex digest
+    published_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    last_checked: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_successful_check: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_changed: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # ok | error | never_checked - a quick-glance signal for "is this source
+    # still reachable", independent of whether its content has changed.
+    monitoring_health: Mapped[str] = mapped_column(String(20), default="never_checked")
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    local_plan: Mapped["LocalPlan"] = relationship(back_populates="monitored_sources")
+
+
+class PolicyChangeEvent(Base):
+    """A single detected change in Policy Intelligence data - the log Part 9
+    (change detection) writes to, and simultaneously the Part 11 review
+    queue: a queue is just the rows here with review_status="needs_review",
+    not a separate table duplicating the same shape. Deliberately never
+    overwritten - each detected change is its own row, so the full change
+    history is reconstructable from this table alone."""
+
+    __tablename__ = "policy_change_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
+    allocation_id: Mapped[int | None] = mapped_column(ForeignKey("local_plan_sites.id"), nullable=True)
+    monitored_source_id: Mapped[int | None] = mapped_column(ForeignKey("monitored_sources.id"), nullable=True)
+
+    # new_plan_version | stage_change | adoption | withdrawal | new_allocation |
+    # allocation_removed | allocation_retained | allocation_amended |
+    # capacity_changed - see app.policy.change_detection.EVENT_TYPES.
+    event_type: Mapped[str] = mapped_column(String(50))
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # High-confidence, unambiguous changes (a status that only ever moves
+    # forward, e.g. draft -> adopted with a matching plan-level adoption) are
+    # applied automatically; anything ambiguous (a PDF changed with no clear
+    # status delta, an allocation vanishing, unusual wording that doesn't
+    # match a known status) is left for a human - see
+    # app.policy.change_detection.classify_confidence.
+    auto_applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    review_status: Mapped[str] = mapped_column(String(30), default="auto_applied")  # auto_applied | needs_review | confirmed | rejected
+    reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    detected_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Application(Base):
