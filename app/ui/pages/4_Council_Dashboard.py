@@ -6,6 +6,8 @@ app.policy.council_dashboard for the pure data assembly this renders.
 """
 from __future__ import annotations
 
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,12 +15,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import pandas as pd
 import streamlit as st
-
+from openai import OpenAI
 from sqlalchemy import select
 
 from app.db.models import LocalPlan, MonitoredReport
 from app.policy.council_dashboard import build_council_dashboard
 from app.policy.plan_evidence_view import build_plan_evidence_view
+from app.reporting.local_plan_summary import generate_local_plan_summary, is_summary_stale
 from app.ui.common import bootstrap, credits_sidebar, get_db
 
 st.set_page_config(page_title="Council dashboard - UK Planning Deal Finder", layout="wide")
@@ -121,6 +124,56 @@ def _render_evidence_field(entry: dict) -> None:
                 st.caption(f"{h['value']} (as of {date_bit}{source_bit})")
 
 
+def _render_ai_summary(plan_row: LocalPlan) -> None:
+    """Sprint 3B.1 ("AI Local Plan Summary", Part 7) - shown at the TOP of
+    each Local Plan section, above the existing detailed evidence
+    expander. Never regenerates on its own (Part 6) - generate_local_plan_
+    summary is only ever called from inside the Refresh button's own
+    click branch below, so a plain page view/rerun never spends AI cost."""
+    st.markdown("##### 🤖 AI Local Plan Summary")
+
+    has_summary = plan_row.ai_summary_text is not None
+    button_label = "🔄 Refresh" if has_summary else "Generate summary"
+    if st.button(button_label, key=f"refresh_summary_{plan_row.id}"):
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
+            st.error("OPENAI_API_KEY not set in .env.")
+        else:
+            with st.spinner("Generating summary from verified evidence..."):
+                result = generate_local_plan_summary(session, OpenAI(api_key=openai_key), plan_row, force=True)
+            if result["rejected"]:
+                st.error(
+                    f"The generated summary referenced figures not supported by this plan's evidence "
+                    f"({', '.join(result['rejection_reason'])}) and was rejected - the previous summary, if any, "
+                    f"has been kept."
+                )
+            st.rerun()
+
+    if not has_summary:
+        st.info("No AI summary generated yet for this plan.")
+        return
+
+    if is_summary_stale(session, plan_row):
+        st.warning("⚠️ The underlying evidence has changed since this summary was generated - click Refresh for an up-to-date version.")
+
+    st.caption("AI-generated from verified PropertyAIgent evidence")
+    st.write(plan_row.ai_summary_text)
+
+    key_risks = json.loads(plan_row.ai_summary_key_risks) if plan_row.ai_summary_key_risks else []
+    key_opportunities = json.loads(plan_row.ai_summary_key_opportunities) if plan_row.ai_summary_key_opportunities else []
+    evidence_gaps = json.loads(plan_row.ai_summary_evidence_gaps) if plan_row.ai_summary_evidence_gaps else []
+
+    if key_risks:
+        st.markdown("**Key risks:**\n" + "\n".join(f"- {r}" for r in key_risks))
+    if key_opportunities:
+        st.markdown("**Key opportunities:**\n" + "\n".join(f"- {o}" for o in key_opportunities))
+    if evidence_gaps:
+        st.markdown("**Evidence gaps:**\n" + "\n".join(f"- {g}" for g in evidence_gaps))
+
+    generated_bit = plan_row.ai_summary_generated_at.strftime("%d %b %Y %H:%M") if plan_row.ai_summary_generated_at else "unknown"
+    st.caption(f"Generated {generated_bit} · model {plan_row.ai_summary_model or '?'} · prompt version {plan_row.ai_summary_prompt_version or '?'}")
+
+
 REPORT_STATUS_LABELS = {"current": "✅ Current", "superseded": "🗄️ Superseded"}
 REPORT_CLASSIFICATION_LABELS = {"auto": "Auto-classified", "needs_review": "⚠️ Needs review"}
 
@@ -191,6 +244,8 @@ for r in rows:
             # assembly is testable independently of Streamlit.
             plan_row = session.get(LocalPlan, plan["plan_id"])
             if plan_row is not None:
+                _render_ai_summary(plan_row)
+
                 evidence_view = build_plan_evidence_view(session, plan_row)
                 sections_with_content = [
                     (title, evidence_view[key]) for key, title in EVIDENCE_SECTIONS
