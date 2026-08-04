@@ -18,7 +18,16 @@ from sqlalchemy import select
 from app.db.models import LocalPlanSite
 from app.extraction.local_plan import assess_delivery_scope
 from app.policy.site_view import build_site_policy_intelligence
-from app.ui.common import PROGRESSION_SIGNAL_LABELS, aggregate_scheme_fields, bootstrap, credits_sidebar, get_db, load_site_applications
+from app.ui.common import (
+    PROGRESSION_SIGNAL_LABELS,
+    aggregate_scheme_fields,
+    bootstrap,
+    credits_sidebar,
+    get_db,
+    load_site_applications,
+    render_visual_evidence,
+)
+from app.visuals.site_view import build_allocation_visual_evidence
 
 st.set_page_config(page_title="Local Plan sites - UK Planning Deal Finder", layout="wide")
 
@@ -123,6 +132,20 @@ st.caption(
     "Cross-referencing is approximate (a short site-plan name fuzzy-matched against a full scraped "
     "address) - a low match confidence is worth checking by eye before relying on it."
 )
+
+st.subheader("Allocation detail")
+selected = st.selectbox(
+    "Choose an allocation to view its map/visual evidence",
+    filtered,
+    format_func=lambda s: f"{s.policy_reference or '(no ref)'} — {s.site_name} ({s.council_code})",
+)
+if selected is not None:
+    st.markdown(f"**{selected.policy_reference or '(no ref)'} — {selected.site_name}**")
+    render_visual_evidence(
+        build_allocation_visual_evidence(session, selected.id),
+        missing_message="No confirmed allocation map image has been extracted yet.",
+        expander_label="Other visual evidence",
+    )
 
 if geo_points:
     st.subheader("Map")
