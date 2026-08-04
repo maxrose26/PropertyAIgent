@@ -49,6 +49,8 @@ from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
 from app.policy.site_view import build_site_policy_intelligence
 from app.scrapers.unit_filter import classify_application_category, qualify
+from app.visuals import IMAGE_TYPE_LABELS
+from app.visuals.site_view import build_site_visual_evidence
 
 PROGRESSION_SIGNAL_LABELS = {
     "early_stage": "🌱 Early stage",
@@ -271,6 +273,55 @@ def credits_sidebar(session, settings) -> None:
         st.divider()
 
 
+def render_visual_evidence(evidence: dict, *, missing_message: str, expander_label: str) -> None:
+    """Shared rendering for both the Site Profile (Part 11) and Allocation
+    (Part 12) "Visual Evidence" sections - evidence is the dict returned by
+    app.visuals.site_view's build_site_visual_evidence/
+    build_allocation_visual_evidence. Never prints a local file path (Part
+    17) - image_path/thumbnail_path are only ever passed to st.image as a
+    source, never shown as text - and never renders unsafe HTML (no
+    unsafe_allow_html=True anywhere here, so an AI-written "reason" string
+    can never inject markup)."""
+    primary = evidence["primary"]
+    if primary is None:
+        st.caption(missing_message)
+        return
+
+    if primary.thumbnail_path and os.path.exists(primary.thumbnail_path):
+        st.image(primary.thumbnail_path, width=320)
+    # No broken-image placeholder (Part 11) - if the file is missing on
+    # disk, the caption/metadata below still renders, just without the
+    # image itself, rather than Streamlit's own broken-image icon.
+
+    label = IMAGE_TYPE_LABELS.get(primary.image_type, primary.image_type)
+    detail = label
+    if primary.source_document_title:
+        detail += f" — {primary.source_document_title}"
+    if primary.source_page:
+        detail += f", page {primary.source_page}"
+    st.caption(detail)
+
+    if primary.review_status == "confirmed":
+        st.caption("✓ Confirmed by a human reviewer")
+    else:
+        confidence = f"{primary.extraction_confidence:.0%}" if primary.extraction_confidence is not None else "unknown"
+        st.caption(f"⚠️ Not yet reviewed - AI classification confidence {confidence}")
+
+    if primary.source_document_url:
+        st.caption(f"[View source document]({primary.source_document_url})")
+
+    others = evidence["others"]
+    if others:
+        with st.expander(f"{expander_label} ({len(others)})"):
+            cols = st.columns(min(len(others), 4))
+            for i, image in enumerate(others):
+                with cols[i % len(cols)]:
+                    if image.thumbnail_path and os.path.exists(image.thumbnail_path):
+                        st.image(image.thumbnail_path, width=150)
+                    other_label = IMAGE_TYPE_LABELS.get(image.image_type, image.image_type)
+                    st.caption(other_label + (" ✓" if image.review_status == "confirmed" else " (unreviewed)"))
+
+
 def render_scheme_detail(session, settings, site: Site, apps: list[Application]) -> None:
     """Full scheme detail block - application history, proposal/scheme
     fields, evidence, companies & contacts with on-demand unlock. Shared
@@ -359,6 +410,13 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         )
     else:
         st.markdown(f"**Commencement status:** {lapse_label}")
+
+    st.markdown("**Site Plans and Visual Evidence**")
+    render_visual_evidence(
+        build_site_visual_evidence(session, site.id),
+        missing_message="No confirmed Site plan image has been extracted yet.",
+        expander_label="Other visual evidence",
+    )
 
     if site.status_summary:
         # Weekly AI synthesis across every linked application - see

@@ -1163,3 +1163,143 @@ class Settings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     credits_remaining: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class VisualEvidence(Base):
+    """One rendered, source-linked page image showing a Site's or
+    Allocation's physical extent or proposed layout (Sprint 3C,
+    "Allocation and Site-Plan Image Extraction"). Evidence, not geometry -
+    this table never stores a boundary, an acreage, or any GIS geometry,
+    only a picture of a specific page of a specific real document, with
+    full provenance back to it.
+
+    Every relationship below is nullable and independent - a single image
+    may belong to an Application, a Site, an Allocation, a LocalPlan, or
+    any combination (Part 2: "do not force every image to belong to every
+    object"). Two different SOURCE lineages are both nullable and mutually
+    exclusive in practice: document_id for a planning-application document
+    (see Document), monitored_report_id for a Local Plan / monitored
+    source document (see MonitoredReport) - never both set for the same
+    row, since a given rendered page only ever came from one real document.
+
+    Nothing is ever deleted: a source document changing at the same URL
+    gets its old images marked status="superseded" (superseded_by_id
+    points at the fresh row), never overwritten or removed - the exact
+    same pattern MonitoredReport already established for report editions."""
+
+    __tablename__ = "visual_evidence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # --- source lineage (exactly one of these two is normally set) ---
+    document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
+    monitored_report_id: Mapped[int | None] = mapped_column(ForeignKey("monitored_reports.id"), nullable=True)
+
+    # --- target object(s) this image is evidence for - all independent,
+    # all nullable until a match is confirmed (Part 2/Part 8) ---
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
+    application_id: Mapped[int | None] = mapped_column(ForeignKey("applications.id"), nullable=True)
+    local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
+    allocation_id: Mapped[int | None] = mapped_column(ForeignKey("local_plan_sites.id"), nullable=True)
+
+    # --- provenance, kept at the top level (not just derivable via the
+    # source_id FKs) so a reviewer/UI never has to join back through
+    # Document/MonitoredReport just to show where an image came from -
+    # same reasoning as PolicyChangeEvent's own source_document_title/url. ---
+    source_document_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    source_document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_page: Mapped[int] = mapped_column(Integer)
+
+    # allocation_map | site_location_plan | red_line_boundary |
+    # blue_line_boundary | proposed_site_layout | masterplan |
+    # phasing_plan | parameter_plan | access_plan | policies_map_extract |
+    # development_framework | other_site_visual | unknown - see
+    # app.visuals.IMAGE_TYPES. Never label red_line_boundary/
+    # blue_line_boundary unless the visual evidence itself supports it
+    # (Part 3) - app.visuals.classification's prompt enforces this, not a
+    # DB constraint, since the vocabulary must stay a free string for the
+    # same reason MonitoredSource.source_type does (room to grow without a
+    # migration).
+    image_type: Mapped[str] = mapped_column(String(50), default="unknown")
+    # The source document's own label for this drawing where available
+    # (a title-block string, a document name) - kept verbatim alongside
+    # the normalised image_type, same "never collapse raw wording into a
+    # normalised field without retaining it" principle as Sprint 3B's
+    # plan-status normalisation.
+    raw_classification_label: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+    # Storage keys/paths, not raw bytes - kept as plain strings deliberately
+    # (not a dedicated "storage backend" abstraction) so swapping local
+    # disk for object storage later only means changing what these strings
+    # point at and how app.visuals.rendering resolves them, not the schema.
+    image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    thumbnail_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    image_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # sha256 of the SOURCE document's own bytes - Part 14's idempotency/
+    # change-detection key ("the source document hash changes"). Distinct
+    # from page_render_hash below, which additionally covers the page
+    # number and render version, so a hash change can be attributed to
+    # either cause independently.
+    file_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # sha256 of (file_hash, source_page, render version) - Part 14's other
+    # trigger ("the page-render version changes"). Two rows can share a
+    # file_hash (same source PDF, different pages) but never a
+    # page_render_hash, which is what actually gates re-rendering/re-
+    # classification idempotency in app.visuals.pipeline.
+    page_render_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    extraction_method: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "ai_vision_classification"
+    extraction_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    extraction_prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    extraction_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Deterministic Stage 1 reason this PAGE was even considered a
+    # candidate before any AI call was spent on it (Part 5: "store why
+    # each candidate page was selected") - e.g. "text matched 'red line
+    # boundary'; drawing number found". Distinct from the AI's own
+    # classification reason, which lives in candidate_reason's counterpart
+    # inside the stored extraction_confidence/review flow - kept here as
+    # the pre-AI justification for cost/audit purposes.
+    candidate_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # needs_review | confirmed | rejected - nothing here ever auto-applies
+    # itself the way plan_evidence_proposed facts can (Part 9/Part 10):
+    # displaying the WRONG image is a worse failure than a wrong number,
+    # so every AI classification starts needs_review and only a human
+    # confirm/reject call (app.visuals.review) ever moves it - no
+    # confidence threshold skips that step.
+    review_status: Mapped[str] = mapped_column(String(20), default="needs_review")
+    # True only for a human-confirmed OR highest-ranked-candidate image
+    # selected as the one to show by default for its (object, purpose) -
+    # see app.visuals.primary_selection. Never more than one primary per
+    # object in practice, enforced by app.visuals.primary_selection always
+    # clearing any previous primary before setting a new one, not a DB
+    # constraint (an object with zero linked images has nothing to enforce
+    # against anyway).
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # current | superseded - Part 14: "retain prior visual records and
+    # mark them superseded rather than deleting them" when the source PDF
+    # changes at the same URL. Mirrors MonitoredReport's own status/
+    # superseded_by_id pattern exactly.
+    status: Mapped[str] = mapped_column(String(20), default="current")
+    superseded_by_id: Mapped[int | None] = mapped_column(ForeignKey("visual_evidence.id"), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    # Free text, not a FK to a users table - this remains a single-user
+    # tool with no authentication (explicitly out of scope this sprint),
+    # so "confirmed_by" is just a short label the reviewer types/selects,
+    # kept for audit completeness rather than real multi-user attribution.
+    confirmed_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    confirmed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    document: Mapped["Document | None"] = relationship()
+    monitored_report: Mapped["MonitoredReport | None"] = relationship()
+    site: Mapped["Site | None"] = relationship()
+    application: Mapped["Application | None"] = relationship()
+    local_plan: Mapped["LocalPlan | None"] = relationship()
+    allocation: Mapped["LocalPlanSite | None"] = relationship()
+    superseded_by: Mapped["VisualEvidence | None"] = relationship(remote_side=[id])
