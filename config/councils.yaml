@@ -20,6 +20,12 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    # Policy Intelligence fields (Sprint 2) - GSS code confirmed via ONS
+    # register (Bury MBC = E08000002).
+    gss_code: "E08000002"
+    authority_type: "Metropolitan Borough Council"
+    website: "https://www.bury.gov.uk"
+    monitoring_enabled: true
 
   stockport:
     name: "Stockport Metropolitan Borough Council"
@@ -32,6 +38,12 @@ councils:
     country: "England"
     further_info_tab: details  # Stockport's "Further Information" link uses activeTab=details, not =furtherInformation
     request_delay_seconds: 2.5  # started 429'ing heavily during a full multi-year backfill at the 0.4s default
+    # Policy Intelligence fields (Sprint 2) - GSS code confirmed via ONS
+    # register (Stockport MBC = E08000007).
+    gss_code: "E08000007"
+    authority_type: "Metropolitan Borough Council"
+    website: "https://www.stockport.gov.uk"
+    monitoring_enabled: true
 
   trafford:
     name: "Trafford Council"
@@ -42,6 +54,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   rochdale:
     name: "Rochdale Borough Council"
@@ -58,6 +71,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   manchester:
     name: "Manchester City Council"
@@ -73,6 +87,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   oldham:
     name: "Oldham Council"
@@ -83,6 +98,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   tameside:
     name: "Tameside Metropolitan Borough Council"
@@ -93,6 +109,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   bolton:
     name: "Bolton Council"
@@ -103,6 +120,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   wigan:
     name: "Wigan Council"
@@ -113,6 +131,7 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"
 
   salford:
     name: "Salford City Council"
@@ -126,3 +145,4 @@ councils:
     unit_threshold: 10
     region: "Greater Manchester"
     country: "England"
+    authority_type: "Metropolitan Borough Council"

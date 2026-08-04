@@ -24,6 +24,14 @@ def session():
         code="testcouncil", name="Test Council", base_url="https://example.invalid",
         date_field_mode="received", doc_system="idox",
     ))
+    # A second council, present in every test - Sprint 2 ("Greater
+    # Manchester Policy Intelligence Framework") is specifically about
+    # multi-council correctness, so having two councils available by
+    # default catches isolation bugs a single-council fixture never would.
+    db.add(Council(
+        code="othercouncil", name="Other Council", base_url="https://other.invalid",
+        date_field_mode="received", doc_system="idox",
+    ))
     db.commit()
     yield db
     db.close()

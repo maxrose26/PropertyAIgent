@@ -1,10 +1,11 @@
 """Registers monitored Policy Intelligence sources for a council from
-config/policy_sources.yaml (see app.policy.sources). The council's Local
-Plan must already be ingested (python ingest_local_plan.py --council ...)
-before its sources can be registered - this only attaches watch targets to
-an existing plan.
+config/policy_sources.yaml (see app.policy.sources). Sources are council-
+level, not plan-level (Sprint 2 generalisation) - a council's Local Plan
+does NOT need to be ingested first; a source naming a specific plan_name
+just stays unlinked (local_plan_id=None) until that plan exists, and gets
+linked up automatically on a later call once it does.
 
-    python -m scripts.register_policy_sources --council stockport
+    python -m scripts.register_policy_sources --council bury
 
 Safe to re-run - already-registered sources are found, not duplicated.
 """

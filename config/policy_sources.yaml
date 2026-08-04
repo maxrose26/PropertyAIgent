@@ -1,22 +1,67 @@
 # Policy Intelligence monitored sources - registered here as data, not
 # hardcoded inside app.policy.monitor's checking logic (Sprint 1 CTO-review
-# amendment, Part 3: "Confirm source registration").
+# amendment, Part 3; generalised in Sprint 2 - "Greater Manchester Policy
+# Intelligence Framework" - Part 3: "Confirm source registration").
 #
-# Each council entry names the LocalPlan it belongs to (matched on
-# plan_name + plan_version, same key app.db.models.LocalPlan is uniquely
-# constrained on) - that plan must already exist (via ingest_local_plan.py)
-# before app.policy.sources.register_sources_for_council can attach any
-# sources to it. This file only says WHAT to watch; it has no opinion on
-# HOW a source is checked (that's app.policy.monitor) or what a change to
-# it means (that's app.policy.change_detection / app.policy.review).
+# Schema (per source, under councils.<code>.sources):
+#   url                      - required
+#   source_type              - required. One of: landing_page | adopted_plan |
+#                               emerging_plan | timetable | consultation_portal |
+#                               examination_library | policies_map |
+#                               evidence_library | pdf | other
+#   title                    - optional, human-readable label
+#   plan_name / plan_version - OPTIONAL. Names the specific LocalPlan this
+#                               source is tied to (matched the same way
+#                               app.db.models.LocalPlan is uniquely
+#                               constrained: council_code + plan_name +
+#                               plan_version). Omit both for a council-level
+#                               source (a landing page, a consultation
+#                               portal) that isn't tied to one specific
+#                               ingested plan/version - see
+#                               app.policy.sources._resolve_local_plan_id.
+#                               A plan_name that doesn't match any ingested
+#                               LocalPlan yet is not an error - the source
+#                               is still registered, just unlinked until a
+#                               later registration call resolves it.
+#   monitoring_frequency_days - optional, default 7.
 #
-# Deliberately Stockport-only for this amendment - see Part 3's own scope
-# note ("Do not add sources for every council").
+# This file only says WHAT to watch; it has no opinion on HOW a source is
+# checked (that's app.policy.monitor) or what a change to it means (that's
+# app.policy.change_detection / app.policy.review).
 councils:
   stockport:
-    plan_name: "Stockport Local Plan"
-    plan_version: null
     sources:
       - url: "https://live-iag-static-assets.s3.eu-west-1.amazonaws.com/pdf/Local+Plan+evidence/LocalPlan.pdf"
-        source_type: pdf
+        source_type: emerging_plan
         title: "Stockport Local Plan (housing site allocations, pages 110-111)"
+        plan_name: "Stockport Local Plan"
+        plan_version: null
+
+  bury:
+    # Confirmed via direct research (WebFetch/pdfplumber against the
+    # primary documents, not just a search summary) that Bury's OWN Local
+    # Plan carries no site allocations of its own - the Borough's strategic
+    # housing sites were allocated through the separately-adopted,
+    # multi-borough Places for Everyone joint plan instead. Both documents
+    # are genuinely different LocalPlan entities and are registered/
+    # ingested as such - see Sprint 2's validation write-up
+    # (specifications/003-policy-intelligence-v1.md) for why this is a
+    # real structural difference from Stockport, not a workaround.
+    sources:
+      - url: "https://www.bury.gov.uk/planning-building-control/planning-policy/bury-local-plan"
+        source_type: landing_page
+        title: "Bury Local Plan landing page"
+        # No plan_name - council-level source, watches for the plan's
+        # existence/stage changing at all, not tied to one specific PDF.
+
+      - url: "https://www.bury.gov.uk/asset-library/publication-local-plan-june-2026.pdf"
+        source_type: emerging_plan
+        title: "Bury Publication Local Plan (June 2026, Regulation 19)"
+        plan_name: "Bury Local Plan"
+        plan_version: "Publication June 2026"
+
+      - url: "https://www.greatermanchester-ca.gov.uk/media/9578/places-for-everyone-joint-development-plan-document.pdf"
+        source_type: adopted_plan
+        title: "Places for Everyone Joint Development Plan (Bury allocations JPA7-9, pages 311-325)"
+        plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+        plan_version: "2022-2039"

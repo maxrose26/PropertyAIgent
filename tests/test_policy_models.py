@@ -138,7 +138,8 @@ def test_monitored_source_defaults_to_never_checked(session):
     session.commit()
 
     source = MonitoredSource(
-        local_plan_id=plan.id, url="https://example.invalid/local-plan.pdf", source_type="pdf", title="Local Plan PDF",
+        council_code="testcouncil", local_plan_id=plan.id,
+        url="https://example.invalid/local-plan.pdf", source_type="pdf", title="Local Plan PDF",
     )
     session.add(source)
     session.commit()

@@ -25,7 +25,7 @@ import requests
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import LocalPlan, MonitoredSource, PolicyChangeEvent
+from app.db.models import MonitoredSource, PolicyChangeEvent
 from app.policy.change_detection import classify_source_check, compute_content_hash
 
 DEFAULT_TIMEOUT_SECONDS = 15
@@ -100,9 +100,15 @@ def check_source(session: Session, source: MonitoredSource, timeout: int = DEFAU
 
 
 def run_monitor(session: Session, council_code: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict:
+    # Filters on MonitoredSource.council_code directly (Sprint 2
+    # generalisation), not via a join through LocalPlan - a council-level
+    # source (a Local Plan landing page, registered before any plan exists
+    # yet) has local_plan_id=None and would be silently skipped by an
+    # inner join, exactly the kind of council-level watch this sprint's
+    # source-registration generalisation exists to support.
     sources = session.execute(
-        select(MonitoredSource).join(LocalPlan).where(
-            LocalPlan.council_code == council_code, MonitoredSource.is_active.is_(True),
+        select(MonitoredSource).where(
+            MonitoredSource.council_code == council_code, MonitoredSource.is_active.is_(True),
         )
     ).scalars().all()
 

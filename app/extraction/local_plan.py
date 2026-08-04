@@ -45,8 +45,24 @@ SCHEMA = {
                     "type": "object",
                     "properties": {
                         "policy_reference": {
-                            "type": "string",
-                            "description": "The site's own policy code exactly as printed, e.g. 'HOM 2.30' - not the parent policy code.",
+                            "type": ["string", "null"],
+                            # Nullable (Sprint 2, "Greater Manchester Policy
+                            # Intelligence Framework" - onboarding Bury):
+                            # confirmed a real fabrication case when this was
+                            # a required string. Bury's own Local Plan
+                            # narratively NAMES sites PfE allocates elsewhere
+                            # ("PfE identifies several strategic housing
+                            # allocations... at Seedfield, Walshaw...") with
+                            # no policy code stated on that page at all - the
+                            # model, previously forced to fill a required
+                            # field, invented plausible-looking codes copying
+                            # this very prompt's OWN example format ("HOM
+                            # 2.30", Stockport's convention, not Bury's).
+                            # Null is the honest, correct answer when a
+                            # document genuinely doesn't print one.
+                            "description": "The site's own policy code EXACTLY as printed against it, e.g. 'HOM 2.30' or 'JPA7' - "
+                                           "not the parent policy code. Use null if no code is printed for this specific site anywhere "
+                                           "in the source text - NEVER invent, infer, or reuse a code from this schema's own example.",
                         },
                         "site_name": {"type": "string"},
                         "minimum_dwellings": {
@@ -85,6 +101,19 @@ Extract every individual site listed, exactly as printed. Do not invent,
 estimate, merge, or omit any site. Do not include list subtotals or the
 overall total as sites. If a site's own dwelling count isn't stated, use
 null rather than guessing one from context.
+
+Only extract a site if THIS document is itself the one allocating/
+designating it (it appears in a formal allocations list, schedule, or
+table with its own entry). Do NOT extract a site that this text merely
+NAMES or REFERENCES as being allocated by a DIFFERENT plan or authority
+(e.g. "the Joint Plan identifies strategic sites at X, Y and Z" is a
+cross-reference, not this document's own allocation - do not extract X, Y,
+Z from a sentence like that).
+
+Never invent a policy reference/code. If no code is printed for a specific
+site anywhere in the source text, use null for policy_reference rather
+than guessing, reusing an example format, or inferring one from a nearby
+site's code.
 
 SOURCE TEXT:
 {source_text}
