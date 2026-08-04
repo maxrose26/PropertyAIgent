@@ -23,7 +23,9 @@ def _make_plan_and_source(session, url="https://example.invalid/plan.pdf"):
     plan = LocalPlan(council_code="testcouncil", plan_name="Test Local Plan", status="draft_consultation")
     session.add(plan)
     session.commit()
-    source = MonitoredSource(local_plan_id=plan.id, url=url, source_type="pdf", title="Test source")
+    source = MonitoredSource(
+        council_code="testcouncil", local_plan_id=plan.id, url=url, source_type="pdf", title="Test source",
+    )
     session.add(source)
     session.commit()
     return plan, source

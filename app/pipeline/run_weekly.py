@@ -114,16 +114,34 @@ FIELD_MAP = {
 
 def ensure_council_row(session: Session, council: CouncilConfig) -> None:
     existing = session.get(Council, council.code)
-    if existing:
-        return
-    session.add(
-        Council(
-            code=council.code, name=council.name, base_url=council.base_url,
-            date_field_mode=council.date_field_mode, doc_system=council.doc_system,
-            anite_base_url=council.anite_base_url, unit_threshold=council.unit_threshold,
-            region=council.region, country=council.country,
+    if existing is None:
+        session.add(
+            Council(
+                code=council.code, name=council.name, base_url=council.base_url,
+                date_field_mode=council.date_field_mode, doc_system=council.doc_system,
+                anite_base_url=council.anite_base_url, unit_threshold=council.unit_threshold,
+                region=council.region, country=council.country,
+                gss_code=council.gss_code, authority_type=council.authority_type,
+                website=council.website, monitoring_enabled=council.monitoring_enabled,
+            )
         )
-    )
+        session.commit()
+        return
+
+    # A Council row created before Sprint 2 (or before its Policy
+    # Intelligence fields were added to councils.yaml) only backfills what's
+    # currently null - never overwrites a value someone/something else has
+    # since set (e.g. via a future admin edit), and never touches the
+    # scraping-config fields (base_url/doc_system/etc.), which are already
+    # correctly managed and unrelated to this.
+    if existing.gss_code is None and council.gss_code:
+        existing.gss_code = council.gss_code
+    if existing.authority_type is None and council.authority_type:
+        existing.authority_type = council.authority_type
+    if existing.website is None and council.website:
+        existing.website = council.website
+    if not existing.monitoring_enabled and council.monitoring_enabled:
+        existing.monitoring_enabled = council.monitoring_enabled
     session.commit()
 
 

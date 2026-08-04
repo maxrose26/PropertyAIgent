@@ -1,18 +1,21 @@
 """Registers MonitoredSource rows from data/configuration
 (config/policy_sources.yaml), rather than embedding source URLs inside
-monitoring logic itself (Sprint 1 CTO-review amendment, Part 3).
+monitoring logic itself (Sprint 1 CTO-review amendment, Part 3; generalised
+in Sprint 2 - "Greater Manchester Policy Intelligence Framework" - Part 3).
 
-app.policy.monitor only ever reads MonitoredSource rows that already
-exist - this module is how they get there. A council's Local Plan must
-already be ingested (see ingest_local_plan.py) before its sources can be
-registered; this module attaches watch targets to an existing plan, it
-doesn't create one.
+Sprint 1 only allowed registering a source once a specific LocalPlan
+already existed in the database, which meant a council-level watch (a
+Local Plan landing page, a consultation portal - exactly the source types
+Sprint 2's brief names) couldn't be registered until AFTER a plan had
+already been manually ingested - backwards for a source whose whole
+purpose is detecting that a plan exists or has changed stage in the first
+place. Sources are now registered per COUNCIL; a source entry optionally
+names the plan_name/plan_version it belongs to, and gets linked to that
+LocalPlan's id if (and once) it exists - if it doesn't yet, the source is
+still registered, just with local_plan_id left null until a later call
+(after ingestion) resolves it.
 
-Stockport's sources are registered as a config/policy_sources.yaml entry
-under councils.stockport, pointing at the same Local Plan PDF URL
-ingest_local_plan.py already uses as --source-url. Registering it:
-
-    python -m scripts.register_policy_sources --council stockport
+    python -m scripts.register_policy_sources --council bury
 """
 from __future__ import annotations
 
@@ -34,41 +37,60 @@ def load_source_config(path: Path = SOURCES_YAML) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def register_sources_for_council(session: Session, council_code: str, config: dict | None = None) -> list[MonitoredSource]:
-    """Find-or-create every MonitoredSource listed for this council in
-    config/policy_sources.yaml. Idempotent - already-registered sources
-    (matched on local_plan_id + url) are returned as-is, never duplicated.
-    Returns an empty list (not an error) if the council has no config
-    entry, or if its LocalPlan hasn't been ingested yet - both are normal,
-    expected states, not failures."""
-    config = config if config is not None else load_source_config()
-    entry = (config.get("councils") or {}).get(council_code)
-    if not entry:
-        return []
-
+def _resolve_local_plan_id(session: Session, council_code: str, source_entry: dict) -> int | None:
+    """A source entry MAY name the specific plan it belongs to
+    (plan_name/plan_version) - if it does and that plan has already been
+    ingested, link to it. A source with no plan_name at all (a council-
+    level landing page or consultation portal) always resolves to None,
+    which is a valid, expected steady state, not a placeholder waiting to
+    be filled in."""
+    plan_name = source_entry.get("plan_name")
+    if not plan_name:
+        return None
     plan = session.execute(
         select(LocalPlan).where(
             LocalPlan.council_code == council_code,
-            LocalPlan.plan_name == entry["plan_name"],
-            LocalPlan.plan_version == entry.get("plan_version"),
+            LocalPlan.plan_name == plan_name,
+            LocalPlan.plan_version == source_entry.get("plan_version"),
         )
     ).scalar_one_or_none()
-    if plan is None:
+    return plan.id if plan else None
+
+
+def register_sources_for_council(session: Session, council_code: str, config: dict | None = None) -> list[MonitoredSource]:
+    """Find-or-create every MonitoredSource listed for this council in
+    config/policy_sources.yaml. Idempotent - already-registered sources
+    (matched on council_code + url) are found, not duplicated; if a
+    matching LocalPlan has since been ingested where one didn't exist
+    before, this call also resolves the now-findable local_plan_id onto
+    the existing row. Returns an empty list (not an error) if the council
+    has no config entry - a normal, expected state for any council not yet
+    onboarded, not a failure."""
+    config = config if config is not None else load_source_config()
+    entry = (config.get("councils") or {}).get(council_code)
+    if not entry:
         return []
 
     registered = []
     for source_entry in entry.get("sources", []):
         existing = session.execute(
             select(MonitoredSource).where(
-                MonitoredSource.local_plan_id == plan.id, MonitoredSource.url == source_entry["url"],
+                MonitoredSource.council_code == council_code, MonitoredSource.url == source_entry["url"],
             )
         ).scalar_one_or_none()
+        local_plan_id = _resolve_local_plan_id(session, council_code, source_entry)
+
         if existing:
+            if existing.local_plan_id is None and local_plan_id is not None:
+                existing.local_plan_id = local_plan_id
             registered.append(existing)
             continue
+
         source = MonitoredSource(
-            local_plan_id=plan.id, url=source_entry["url"], source_type=source_entry["source_type"],
+            council_code=council_code, local_plan_id=local_plan_id,
+            url=source_entry["url"], source_type=source_entry["source_type"],
             title=source_entry.get("title"),
+            monitoring_frequency_days=int(source_entry.get("monitoring_frequency_days", 7)),
         )
         session.add(source)
         registered.append(source)

@@ -67,6 +67,16 @@ _PLAN_STATUS_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("proposed submission", "proposed_submission"),
     ("regulation 19", "proposed_submission"),
     ("reg 19", "proposed_submission"),
+    # "Publication" (often "Publication stage"/"Publication Local Plan",
+    # with no "Regulation 19" wording alongside it) is the standalone term
+    # several councils use for this same stage - confirmed real case: Bury
+    # Council's own Local Plan pages call it "Publication" throughout,
+    # discovered onboarding Bury in Sprint 2 ("Greater Manchester Policy
+    # Intelligence Framework"). Checked before the generic "submission"/
+    # "submitted" keywords below and before "draft" - "Publication Draft
+    # Local Plan" phrasing exists too and Publication is the further-along,
+    # more specific signal of the two.
+    ("publication", "proposed_submission"),
     ("submitted", "submitted"),
     ("submission", "submitted"),
     ("preferred option", "preferred_options"),

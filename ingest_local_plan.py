@@ -79,9 +79,21 @@ def _plan_snapshot(plan: LocalPlan) -> dict:
     return {"plan_version": plan.plan_version, "status": plan.status}
 
 
+def _dedup_key(policy_reference: str | None, site_name: str) -> str:
+    """Allocations are matched across ingestion runs primarily by
+    policy_reference, but that field is legitimately nullable now (Sprint
+    2, onboarding Bury) - a council's own document can name a site with no
+    code printed against it anywhere (see app.extraction.local_plan's
+    SCHEMA docstring for the real case this fixed). Falling back to
+    site_name for the DEDUP KEY only - never stored as the actual
+    policy_reference value - keeps two different uncoded sites from
+    colliding into "the same" allocation just because neither has one."""
+    return policy_reference if policy_reference else f"__unref__:{site_name}"
+
+
 def _allocation_snapshot(row: LocalPlanSite) -> dict:
     return {
-        "policy_reference": row.policy_reference,
+        "policy_reference": _dedup_key(row.policy_reference, row.site_name),
         "minimum_dwellings": row.minimum_dwellings,
         "indicative_capacity": row.indicative_capacity,
         "maximum_capacity": row.maximum_capacity,
@@ -159,7 +171,7 @@ def main() -> None:
     council_name = get_council(args.council).name
 
     existing_rows = {
-        r.policy_reference: r for r in session.execute(
+        _dedup_key(r.policy_reference, r.site_name): r for r in session.execute(
             select(LocalPlanSite).where(LocalPlanSite.local_plan_id == plan.id)
         ).scalars().all()
     }
@@ -167,7 +179,7 @@ def main() -> None:
 
     derived_status, derived_note = derive_allocation_status_from_plan_status(raw_status)
     new_dicts = [{
-        "policy_reference": s["policy_reference"],
+        "policy_reference": _dedup_key(s["policy_reference"], s["site_name"]),
         "minimum_dwellings": s["minimum_dwellings"],
         "indicative_capacity": None,
         "maximum_capacity": None,
@@ -176,8 +188,8 @@ def main() -> None:
         # itself (never a spontaneous diff) - allocation_amended only ever
         # fires from a status change made some other way (e.g. a previously
         # approved change). New allocations get the derived default.
-        "allocation_status": existing_rows[s["policy_reference"]].allocation_status
-        if s["policy_reference"] in existing_rows else derived_status,
+        "allocation_status": existing_rows[_dedup_key(s["policy_reference"], s["site_name"])].allocation_status
+        if _dedup_key(s["policy_reference"], s["site_name"]) in existing_rows else derived_status,
     } for s in extracted]
 
     allocation_events = diff_allocations(old_dicts, new_dicts)
@@ -191,7 +203,7 @@ def main() -> None:
     seen_refs: set[str] = set()
 
     for s in extracted:
-        ref = s["policy_reference"]
+        ref = _dedup_key(s["policy_reference"], s["site_name"])
         seen_refs.add(ref)
         row = existing_rows.get(ref)
         events = events_by_ref.get(ref, [])
@@ -208,9 +220,12 @@ def main() -> None:
 
         if row is None:
             # New allocation - nothing existing to protect, write it now.
+            # policy_reference stores the TRUE extracted value (may be
+            # None) - ref (the dedup key) is only ever used for dict
+            # lookups/matching, never persisted as the field itself.
             row = LocalPlanSite(
                 council_code=args.council, local_plan_id=plan.id,
-                policy_reference=ref, site_name=s["site_name"], minimum_dwellings=s["minimum_dwellings"],
+                policy_reference=s["policy_reference"], site_name=s["site_name"], minimum_dwellings=s["minimum_dwellings"],
                 category=s["category"], plan_name=args.plan_name, plan_status=args.plan_status,
                 allocation_status=derived_status, raw_allocation_status=derived_note,
                 source_document_url=args.source_url, source_page=first_page,
@@ -278,7 +293,8 @@ def main() -> None:
 
         match_tag = f"matched -> site {matched_site.id} (score={score:.0f})" if matched_site else "no application yet"
         geo_tag = "geocoded" if coords else "NOT geocoded"
-        print(f"  [{tag:16}] {ref:12} {s['site_name']:45} {s['minimum_dwellings']!s:>6}  {match_tag} | {geo_tag}")
+        display_ref = s["policy_reference"] or "(no code printed)"
+        print(f"  [{tag:16}] {display_ref:20} {s['site_name']:45} {s['minimum_dwellings']!s:>6}  {match_tag} | {geo_tag}")
 
     # Allocations that existed before this ingest but weren't in this run's
     # extraction - never deleted, never reclassified as "removed" here

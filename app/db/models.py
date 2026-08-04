@@ -24,6 +24,21 @@ def utcnow() -> dt.datetime:
 
 
 class Council(Base):
+    """A planning authority - the parent object for both planning-
+    application scraping (base_url/date_field_mode/doc_system, existing
+    since this project's first version) AND Policy Intelligence
+    (Sprint 2, "Greater Manchester Policy Intelligence Framework": GSS
+    code/authority_type/website/monitoring_enabled below, plus the
+    local_plans relationship).
+
+    Deliberately the SAME row/table as the original scraping config, not a
+    new parallel entity - a Council extended with more capabilities is
+    exactly what specifications/004-core-domain-model.md's "extend existing
+    domain objects wherever possible, avoid new core objects unless
+    absolutely necessary" principle asks for, and LocalPlan.council_code
+    already pointed at this table's primary key from Sprint 1 - there was
+    never a second "Council" concept to reconcile."""
+
     __tablename__ = "councils"
 
     code: Mapped[str] = mapped_column(String(50), primary_key=True)
@@ -36,7 +51,38 @@ class Council(Base):
     region: Mapped[str | None] = mapped_column(String(100), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # --- Policy Intelligence fields (Sprint 2, Part 2) ---
+    # Government Statistical Service code (e.g. "E08000002" for Bury) -
+    # nullable since not every source used to populate this table states
+    # one; a genuine gap is left null, not guessed.
+    gss_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # e.g. "Metropolitan Borough Council", "Unitary Authority", "District
+    # Council" - free text, not an enum, since England/Wales genuinely mix
+    # authority types and a new one showing up for council 11+ shouldn't
+    # need a schema change.
+    authority_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # The council's own general website - distinct from base_url, which is
+    # specifically the PLANNING PORTAL base URL used for application
+    # scraping. Two different things that happen to both be "a URL for this
+    # council" - kept as two columns rather than overloading base_url's
+    # existing, already-depended-upon meaning.
+    website: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # A real, independent per-council setting - whether Policy Intelligence
+    # monitoring should run for this council at all - not a rollup of its
+    # sources' own state. monitoring_health and "last monitored" are
+    # deliberately NOT stored columns here (see
+    # app.policy.council_dashboard.summarise_council) - they're always
+    # computed live from this council's MonitoredSource rows, so there is
+    # no cached rollup that can drift out of sync with the sources it's
+    # supposedly summarising.
+    monitoring_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
     applications: Mapped[list["Application"]] = relationship(back_populates="council")
+    local_plans: Mapped[list["LocalPlan"]] = relationship(back_populates="council")
+    monitored_sources: Mapped[list["MonitoredSource"]] = relationship(back_populates="council")
 
 
 class Site(Base):
@@ -165,13 +211,17 @@ class LocalPlan(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+    council: Mapped["Council"] = relationship(back_populates="local_plans")
     allocations: Mapped[list["LocalPlanSite"]] = relationship(back_populates="local_plan")
     status_history: Mapped[list["LocalPlanStatusHistory"]] = relationship(
         back_populates="local_plan", cascade="all, delete-orphan"
     )
-    monitored_sources: Mapped[list["MonitoredSource"]] = relationship(
-        back_populates="local_plan", cascade="all, delete-orphan"
-    )
+    # Sources tied to THIS specific plan/version once one has been ingested
+    # - a strict subset of Council.monitored_sources, which also includes
+    # council-level sources (a Local Plan landing page, a consultation
+    # portal) registered before any LocalPlan exists at all - see
+    # MonitoredSource's docstring (Sprint 2, Part 3).
+    monitored_sources: Mapped[list["MonitoredSource"]] = relationship(back_populates="local_plan")
 
 
 class LocalPlanStatusHistory(Base):
@@ -221,7 +271,13 @@ class LocalPlanSite(Base):
     # ingestion always sets this.
     local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
 
-    policy_reference: Mapped[str] = mapped_column(String(50))  # e.g. "HOM 2.30"
+    # Nullable (Sprint 2, onboarding Bury) - confirmed a real case where a
+    # council's own document names an allocation with no code printed
+    # against it anywhere; forcing this non-null previously caused the AI
+    # extraction to fabricate one (see app.extraction.local_plan's SCHEMA
+    # docstring). site_name is the fallback identity for deduplication
+    # when this is null - see ingest_local_plan.py's _dedup_key.
+    policy_reference: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "HOM 2.30"
     site_name: Mapped[str] = mapped_column(String(300))
     # The plan's stated intended use for this allocation as printed - most
     # are residential, some are mixed use. Recording what the plan actually
@@ -344,7 +400,7 @@ class AllocationVersion(Base):
     allocation_id: Mapped[int] = mapped_column(ForeignKey("local_plan_sites.id"))
     local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
 
-    policy_reference: Mapped[str] = mapped_column(String(50))
+    policy_reference: Mapped[str | None] = mapped_column(String(50), nullable=True)
     site_name: Mapped[str] = mapped_column(String(300))
     minimum_dwellings: Mapped[int | None] = mapped_column(Integer, nullable=True)
     indicative_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -362,21 +418,41 @@ class AllocationVersion(Base):
 
 
 class MonitoredSource(Base):
-    """A single URL/document being watched for change, belonging to a
-    LocalPlan - the foundation for Part 8's continuous monitoring. Checking
-    a source (fetching it, hashing its content, comparing to
-    content_hash) is a separate concern (app.pipeline.policy_monitoring)
-    from this table, which just holds the current watched state."""
+    """A single URL/document being watched for change - the foundation for
+    Part 8 (Sprint 1) / Part 3 (Sprint 2)'s continuous monitoring. Checking
+    a source (fetching it, hashing its content, comparing to content_hash)
+    is a separate concern (app.policy.monitor) from this table, which just
+    holds the current watched state.
+
+    Sprint 2 generalisation ("Greater Manchester Policy Intelligence
+    Framework", Part 3): owned by a COUNCIL first (council_code, always
+    set), with an OPTIONAL link to a specific LocalPlan once one has
+    actually been ingested. Sprint 1 required local_plan_id up front, which
+    meant a council-level watch (a Local Plan landing page, a consultation
+    portal - exactly the sources Part 3 names) couldn't be registered until
+    after a plan already existed in the database - backwards for sources
+    whose entire purpose is detecting a plan BEFORE anyone has manually
+    ingested it. local_plan_id is set once ingest_local_plan.py links a
+    specific document to a specific plan/version; council-level sources
+    (a landing page watching for "has anything changed at all") keep it
+    null indefinitely, and that's a valid, expected steady state, not a
+    half-finished registration."""
 
     __tablename__ = "monitored_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    local_plan_id: Mapped[int] = mapped_column(ForeignKey("local_plans.id"))
+    council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
+    local_plan_id: Mapped[int | None] = mapped_column(ForeignKey("local_plans.id"), nullable=True)
 
     url: Mapped[str] = mapped_column(String(500))
     final_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # after redirects, when different
-    # webpage | timetable | consultation_portal | examination_library |
-    # adopted_plan | policies_map | pdf | other
+    # landing_page | adopted_plan | emerging_plan | timetable |
+    # consultation_portal | examination_library | policies_map |
+    # evidence_library | pdf | other - the full vocabulary Sprint 2 Part 3
+    # names (emerging_plan/evidence_library/landing_page are new here;
+    # Sprint 1's "webpage" is kept as an accepted synonym for landing_page
+    # for backwards compatibility with Stockport's existing registration,
+    # not removed).
     source_type: Mapped[str] = mapped_column(String(50))
     title: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
@@ -392,6 +468,14 @@ class MonitoredSource(Base):
     # long enough that the LAST successful check is itself old - see
     # app.policy.monitor.check_source.
     monitoring_health: Mapped[str] = mapped_column(String(20), default="never_checked")
+    # How often this source is expected to be worth re-checking, in days -
+    # a real per-source setting (a fast-moving consultation portal vs a
+    # rarely-changing adopted plan don't need the same cadence), NOT
+    # currently enforced by any scheduler (nothing in this codebase runs
+    # unattended yet - see app.policy.monitor's own docstring) but recorded
+    # now so a future scheduler has something real to read rather than a
+    # blanket assumption baked into its own code.
+    monitoring_frequency_days: Mapped[int] = mapped_column(Integer, default=7)
     # Sources are registered via config/policy_sources.yaml (see
     # app.policy.sources), never hardcoded in monitoring logic - this flag
     # is how one gets deactivated (a document moved/retired) without
@@ -400,7 +484,8 @@ class MonitoredSource(Base):
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    local_plan: Mapped["LocalPlan"] = relationship(back_populates="monitored_sources")
+    council: Mapped["Council"] = relationship(back_populates="monitored_sources")
+    local_plan: Mapped["LocalPlan | None"] = relationship(back_populates="monitored_sources")
 
 
 class PolicyChangeEvent(Base):

@@ -30,6 +30,15 @@ class CouncilConfig:
     # that's unusually strict.
     request_delay_seconds: float = 0.4
 
+    # --- Policy Intelligence fields (Sprint 2, Part 2) - config-driven, not
+    # hardcoded anywhere in app.policy: see app.pipeline.run_weekly.
+    # ensure_council_row, which is what actually writes these onto the
+    # Council DB row. ---
+    gss_code: str | None = None
+    authority_type: str | None = None
+    website: str | None = None
+    monitoring_enabled: bool = False
+
     @property
     def search_url(self) -> str:
         return f"{self.base_url}/search.do?action=advanced&searchType=Application"
@@ -63,6 +72,10 @@ def load_councils() -> dict[str, CouncilConfig]:
             country=entry.get("country"),
             further_info_tab=entry.get("further_info_tab", "furtherInformation"),
             request_delay_seconds=float(entry.get("request_delay_seconds", 0.4)),
+            gss_code=entry.get("gss_code"),
+            authority_type=entry.get("authority_type"),
+            website=entry.get("website"),
+            monitoring_enabled=bool(entry.get("monitoring_enabled", False)),
         )
     return councils
 
