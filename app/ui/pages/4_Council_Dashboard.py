@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.db.models import LocalPlan, MonitoredReport
 from app.policy.council_dashboard import build_council_dashboard
+from app.policy.coverage import build_coverage_inventory
 from app.policy.plan_evidence_view import build_plan_evidence_view
 from app.reporting.local_plan_summary import generate_local_plan_summary, is_summary_stale
 from app.ui.common import bootstrap, credits_sidebar, get_db
@@ -202,6 +203,40 @@ def _render_monitored_reports(council_code: str) -> None:
         if needs_review:
             st.warning(f"⚠️ {len(needs_review)} discovered document(s) need a human to confirm their report type.")
 
+
+_YES_NO = {True: "✅ Yes", False: "—"}
+
+
+def _render_document_coverage(council_code: str, council_name: str) -> None:
+    """Sprint 3D ("Policy Document Coverage & Discovery", Part 7) - a
+    lightweight, operational-only table of which planning-policy document
+    types are expected for this council and how far each one has
+    actually got through the pipeline. See app.policy.coverage for the
+    pure data assembly this renders."""
+    inventory = build_coverage_inventory(session, council_code)
+    if not inventory:
+        return
+
+    missing = [row["label"] for row in inventory if row["missing"]]
+    if missing:
+        st.warning(f"⚠️ We are missing: {', '.join(missing)}.")
+
+    rows = [{
+        "Document Type": row["label"],
+        "Expected": _YES_NO[row["expected"]],
+        "Found": _YES_NO[row["discovered"]],
+        "Current": _YES_NO[row["current"]],
+        "Missing": _YES_NO[row["missing"]],
+        "Superseded": _YES_NO[row["superseded"]],
+        "Visual Extraction Complete": _YES_NO[row["visual_evidence_extracted"]],
+        "Policy Extraction Complete": _YES_NO[row["policy_evidence_extracted"]],
+        "Monitoring Active": _YES_NO[row["monitoring_active"]],
+    } for row in inventory]
+
+    with st.expander(f"Policy document coverage ({len(missing)} missing of {len(inventory)} expected)"):
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
 summary_rows = [{
     "Council": r["council_name"],
     "Monitoring": "Enabled" if r["monitoring_enabled"] else "Disabled",
@@ -225,6 +260,10 @@ for r in rows:
         # for this council, regardless of which plan (if any) it's linked
         # to, so an ambiguous/unreviewed discovery is never invisible.
         _render_monitored_reports(r["council_code"])
+
+        # Sprint 3D ("Policy Document Coverage & Discovery", Part 7) - what
+        # SHOULD exist for this council versus what's actually been found.
+        _render_document_coverage(r["council_code"], r["council_name"])
 
         if not r["local_plans"]:
             st.caption("No Local Plan ingested yet.")

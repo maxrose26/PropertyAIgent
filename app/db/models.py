@@ -628,6 +628,25 @@ class MonitoredSource(Base):
     # deleting its row and losing its check history.
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # --- Sprint 3D ("Policy Document Coverage & Discovery") ---
+    # A richer, document-level classification than source_type above -
+    # source_type is the coarse ROUTING label app.policy.document_selection
+    # already depends on for extraction eligibility (untouched by this
+    # sprint); policy_document_type is app.policy.document_types'
+    # PolicyDocumentType vocabulary (Part 2), covering map/SPD/framework
+    # types source_type has no rules for. Populated for the case where the
+    # SOURCE ITSELF is the artifact (e.g. a directly-registered interactive
+    # map/GIS viewer URL with no separate document link to discover
+    # underneath it) - see app.policy.coverage, which reads this alongside
+    # MonitoredReport.policy_document_type when building the per-council
+    # inventory.
+    policy_document_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # The source's own title/label as found, preserved verbatim alongside
+    # the normalised policy_document_type (Part 2: "preserve the raw source
+    # label") - same "never collapse raw wording without retaining it"
+    # principle as every other classification field in this codebase.
+    policy_document_type_raw_label: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     council: Mapped["Council"] = relationship(back_populates="monitored_sources")
@@ -726,6 +745,23 @@ class MonitoredReport(Base):
     last_extracted_content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_extracted_prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
     last_extracted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # --- Sprint 3D ("Policy Document Coverage & Discovery") ---
+    # See MonitoredSource.policy_document_type's docstring for the
+    # source_type-vs-policy_document_type distinction - this is the
+    # DOCUMENT-level classification (app.policy.document_types), the
+    # primary place Part 2's fuller vocabulary (policies_map,
+    # interactive_map, allocation_map, masterplan, SPD...) actually lands,
+    # since a MonitoredReport is one specific discovered document.
+    policy_document_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    policy_document_type_raw_label: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Where this document has actually been downloaded to on local disk -
+    # null until a real download happens (app.policy.document_discovery.
+    # download_policy_document), mirroring Document.local_path. This is
+    # the coverage engine's (app.policy.coverage) "Downloaded?" signal -
+    # distinct from merely being discovered/registered, since a report row
+    # can exist (a link was found and classified) with nothing fetched yet.
+    local_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     discovered_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
