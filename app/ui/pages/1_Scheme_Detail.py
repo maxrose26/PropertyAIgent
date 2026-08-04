@@ -23,6 +23,7 @@ import streamlit as st
 
 from app.db.models import Site
 from app.ui.common import bootstrap, credits_sidebar, get_db, load_site_applications, render_scheme_detail
+from app.ui.map_selection import parse_site_id_param
 
 st.set_page_config(page_title="Scheme detail - UK Planning Deal Finder", layout="wide")
 
@@ -37,14 +38,12 @@ HOME_PAGE = Path(__file__).resolve().parents[1] / "streamlit_app.py"
 st.page_link(HOME_PAGE, label="← Back to search", icon="🔙")
 
 raw_site_id = st.query_params.get("site_id")
-if not raw_site_id:
-    st.info("No scheme selected - go back and click a site on the map or table.")
-    st.stop()
-
-try:
-    site_id = int(raw_site_id)
-except ValueError:
+site_id = parse_site_id_param(raw_site_id)
+if raw_site_id and site_id is None:
     st.error("Invalid site id in URL.")
+    st.stop()
+if site_id is None:
+    st.info("No scheme selected - go back and click a site on the map or table.")
     st.stop()
 
 site = session.get(Site, site_id)

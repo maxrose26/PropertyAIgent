@@ -34,22 +34,26 @@ from app.search.query_parser import SearchFilters, compute_aggregate_answer, par
 from app.ui.common import (
     BUILD_STATUS_LABELS,
     LAPSE_STATUS_LABELS,
+    PROGRESSION_SIGNAL_LABELS,
     aggregate_scheme_fields,
     bootstrap,
     compute_lapse_status,
     credits_sidebar,
     get_db,
-    load_site_applications,
+    load_applications_for_sites,
     load_watchlist_applications,
     pick_representative_application,
     render_scheme_detail,
 )
 from app.reporting.pdf_report import compute_aggregate_stats, generate_narrative, render_pdf
 from app.ui.housing_type import HOUSING_TYPE_COLORS, HOUSING_TYPE_LABELS, classify_housing_type, housing_type_note
+from app.ui.map_selection import resolve_selected_site_id
+from app.ui.site_headline import build_site_headline, clean_tooltip_text, format_site_tooltip
 
 st.set_page_config(page_title="UK Planning Deal Finder", layout="wide")
 
 council_regions = {code: cfg.region for code, cfg in bootstrap().items()}
+council_names = {code: cfg.name for code, cfg in bootstrap().items()}
 session, settings = get_db()
 
 st.title("UK Planning Deal Finder")
@@ -139,10 +143,40 @@ if not sites:
     st.info("No schemes yet. Run: python -m app.pipeline.run_weekly --council bury")
     st.stop()
 
+# Batched - ONE query for every Site's applications and ONE query for every
+# Site's matched Local Plan allocation(s), instead of a query per Site in
+# the loop below (Sprint 3A, "Map Navigation and Site UX", Part 6: "avoid
+# one database query per marker" - this page can render dozens of markers
+# on a single load).
+site_ids = [s.id for s in sites]
+apps_by_site = load_applications_for_sites(session, site_ids)
+
+local_plan_by_site: dict[int, list[LocalPlanSite]] = {}
+for entry in session.execute(
+    select(LocalPlanSite).where(LocalPlanSite.matched_site_id.in_(site_ids))
+).scalars().all():
+    local_plan_by_site.setdefault(entry.matched_site_id, []).append(entry)
+
+
+def _local_plan_headline_text(entries: list[LocalPlanSite]) -> str | None:
+    """One compact line for the map tooltip - not the full multi-field
+    Policy Intelligence block already shown on the Site detail page (see
+    app.ui.common.render_scheme_detail), just enough to flag that an
+    allocation exists. Picks the first entry when a Site is matched to more
+    than one allocation (rare, but the model allows it) rather than trying
+    to summarise all of them in one tooltip line."""
+    if not entries:
+        return None
+    entry = entries[0]
+    ref = entry.policy_reference or entry.site_name
+    signal_label = PROGRESSION_SIGNAL_LABELS.get(entry.progression_signal, "")
+    return f"Allocated ({ref}{f', {signal_label}' if signal_label else ''})"
+
+
 site_applications: dict[int, list[Application]] = {}
 rows = []
 for site in sites:
-    apps = load_site_applications(session, site.id)
+    apps = apps_by_site.get(site.id, [])
     if not apps:
         continue
     site_applications[site.id] = apps
@@ -164,8 +198,19 @@ for site in sites:
     housing_note = housing_type_note(merged["development_type"], merged["housing_typology"])
     decision_status = classify_decision_status(rep_app.decision if rep_app else None, rep_app.status if rep_app else None)
 
+    # Reuses the merged/lapse/decision_status already computed above for
+    # the table row - zero additional queries or aggregation per marker
+    # (Sprint 3A Part 5: "avoid additional per-marker queries", Part 6).
+    headline = build_site_headline(
+        site_id=site.id, address=site.display_address, council_label=council_names.get(site.council_code, site.council_code),
+        merged=merged, lapse=lapse, decision_status=decision_status,
+        local_plan_status=_local_plan_headline_text(local_plan_by_site.get(site.id, [])),
+    )
+    tooltip_text = format_site_tooltip(headline)
+
     rows.append({
         "site_id": site.id,
+        "tooltip_text": tooltip_text,
         "Council": site.council_code,
         "Region": council_regions.get(site.council_code),
         "Address": site.display_address,
@@ -470,14 +515,12 @@ if not map_points.empty:
     # pydeck-native channels on the same marker, rather than picking one
     # dimension to show at a time. See LAPSE_STATUS_COLORS/HOUSING_TYPE_COLORS
     # for the palettes and the caption below the map for the legend.
+    # tooltip_text was already built once per Site in the main loop above
+    # (app.ui.site_headline.format_site_tooltip) - nothing left to compute
+    # here, just carry the column through.
     map_points = map_points.assign(
         fill_color=map_points["lapse_status"].map(LAPSE_STATUS_COLORS),
         line_color=map_points["housing_type"].map(HOUSING_TYPE_COLORS),
-        # pydeck's tooltip template does plain {ColumnName} substitution with
-        # no conditional logic, so a null note would otherwise print the
-        # literal text "None" on every scheme without one - collapse to an
-        # empty string instead, only a real note adds a visible line.
-        housing_note_line=map_points["Housing Type Note"].map(lambda n: f"\n⚠️ {n}" if n else ""),
     )
 
     layer = pdk.Layer(
@@ -507,21 +550,20 @@ if not map_points.empty:
             )
         ).scalars().all()
         if unmatched_local_plan:
-            # Reuses the SAME field names the tooltip template below already
-            # expects (Total Units, Housing Type, etc.) rather than adding
-            # local-plan-specific ones - pydeck's tooltip is one global
-            # template shared across every layer, not a per-layer template,
-            # so introducing new field names here would leave that text
-            # blank on every hover of a NORMAL scheme marker too (and vice
-            # versa). Reusing the same names keeps one tooltip working
-            # sensibly for both layers with no template changes needed.
+            # pydeck's tooltip is one global template shared across every
+            # layer, not per-layer - this dataframe supplies the SAME
+            # tooltip_text column name the Site layer uses (see
+            # app.ui.site_headline.format_site_tooltip above) rather than
+            # its own field names, so one shared template reads sensibly
+            # for both layers.
             lp_df = pd.DataFrame([{
                 "latitude": s.latitude, "longitude": s.longitude,
-                "Total Units": s.minimum_dwellings or "?",
-                "Housing Type": f"{s.policy_reference} {s.site_name}",
-                "Affordable Units": "?", "Affordable %": "?",
-                "Latest Status": "Local Plan allocation - no application yet",
-                "Lapse Risk": "n/a", "housing_note_line": "",
+                "tooltip_text": "\n".join(filter(None, [
+                    clean_tooltip_text(s.site_name, max_length=70),
+                    f"{s.minimum_dwellings} units" if s.minimum_dwellings else None,
+                    "Local Plan allocation - no application yet",
+                    "See the Local Plan Sites page for details",
+                ])),
             } for s in unmatched_local_plan])
             layers.append(pdk.Layer(
                 "ScatterplotLayer",
@@ -547,18 +589,18 @@ if not map_points.empty:
         map_provider="mapbox" if chosen_style == "satellite" else "carto",
         map_style=chosen_style,
         tooltip={
-            # Address/reference are redundant with the click-through, and not
-            # useful for a quick scan while hovering - lead with the figures
-            # that actually help decide whether to click in. pydeck's
-            # tooltip is one global template shared across every layer, not
-            # per-layer - the local_plan layer's dataframe reuses these same
-            # column names (see above) rather than adding its own, so this
-            # one template reads sensibly for both layers unchanged.
-            "text": "{Total Units} units ({Housing Type})\n"
-                    "Affordable: {Affordable Units} ({Affordable %}%)\n"
-                    "Status: {Latest Status} | Lapse risk: {Lapse Risk}"
-                    "{housing_note_line}\n"
-                    "Click to open scheme details"
+            # Plain TEXT (not "html") deliberately - pydeck/deck.gl renders
+            # a "text" tooltip as literal text, never interpreted as markup,
+            # so there is no HTML/script injection surface to defend
+            # against here even though the content includes scraped/AI-
+            # extracted values (developer names, addresses) - see
+            # app.ui.site_headline's module docstring. tooltip_text is
+            # already fully composed (every field present-or-omitted,
+            # already safely truncated/cleaned) per Site by
+            # app.ui.site_headline.format_site_tooltip in the main loop
+            # above, so this is a single substitution, not a template built
+            # up from several possibly-null columns like before.
+            "text": "{tooltip_text}",
         },
     )
     map_event = st.pydeck_chart(deck, on_select="rerun", selection_mode="single-object", key="site_map")
@@ -585,11 +627,12 @@ if not map_points.empty:
         objects_by_layer = map_event["selection"]["objects"]
         if objects_by_layer:
             selected_objects = objects_by_layer.get("sites", [])
-    if selected_objects:
-        open_scheme(selected_objects[0].get("site_id"))
+    clicked_site_id = resolve_selected_site_id(selected_objects)
+    if clicked_site_id is not None:
+        open_scheme(clicked_site_id)
 
 table_display = filtered.drop(
-    columns=["site_id", "latitude", "longitude", "lapse_status", "housing_type", "decision_status", "build_status"]
+    columns=["site_id", "tooltip_text", "latitude", "longitude", "lapse_status", "housing_type", "decision_status", "build_status"]
 ).reset_index(drop=True)
 table_event = st.dataframe(
     table_display,
