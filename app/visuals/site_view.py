@@ -46,3 +46,33 @@ def build_allocation_visual_evidence(session, allocation_id: int) -> dict:
     """Returns {"primary": VisualEvidence | None, "others": [...]} for one
     Allocation (LocalPlanSite)'s images."""
     return _split_primary(_current_non_rejected(session, allocation_id=allocation_id))
+
+
+def build_allocation_image_status(session, allocation_ids: list[int]) -> dict[int, str]:
+    """One batched query (feature/allocation-image-discovery-ui) returning
+    {allocation_id: "confirmed" | "needs_review" | "none"} for every id in
+    allocation_ids - never one query per allocation, so a page listing
+    dozens of allocations can label each one's image availability without
+    an N+1 lookup.
+
+    "confirmed" outranks "needs_review" when an allocation happens to have
+    more than one current, non-rejected image in different review states -
+    the same "confirmed is the trustworthy signal" precedence
+    app.visuals.primary_selection already applies to ranking. An
+    allocation with no current, non-rejected image at all gets "none"."""
+    if not allocation_ids:
+        return {}
+    rows = session.execute(
+        select(VisualEvidence.allocation_id, VisualEvidence.review_status).where(
+            VisualEvidence.allocation_id.in_(allocation_ids),
+            VisualEvidence.status == "current",
+            VisualEvidence.review_status != "rejected",
+        )
+    ).all()
+    best: dict[int, str] = {}
+    for allocation_id, review_status in rows:
+        if review_status == "confirmed":
+            best[allocation_id] = "confirmed"
+        elif best.get(allocation_id) != "confirmed":
+            best[allocation_id] = "needs_review"
+    return {aid: best.get(aid, "none") for aid in allocation_ids}
