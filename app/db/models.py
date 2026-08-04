@@ -269,6 +269,29 @@ class LocalPlan(Base):
     monitoring_confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)  # high | medium | low
     monitoring_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # --- Sprint 3B.1 ("AI Local Plan Summary") - a concise AI-narrated
+    # synthesis of this plan's own trusted/pending evidence, same
+    # grounded-numbers-then-narrate discipline as app.reporting.
+    # scheme_summary. Persisted (not regenerated on every page view) and
+    # gated by ai_summary_evidence_fingerprint - see
+    # app.reporting.local_plan_summary.should_regenerate. key_risks/
+    # key_opportunities/evidence_gaps are JSON-encoded lists of strings,
+    # not free text, so the UI can render them as distinct bullet lists
+    # without re-parsing prose.
+    ai_summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_key_risks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_key_opportunities: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_evidence_gaps: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_generated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # sha256 over the narrative-relevant portion of the summary payload
+    # (fact values/trust-state/staleness/conflicts, allocation and
+    # progression counts) - deliberately NOT including last_checked or any
+    # other pure-bookkeeping timestamp, so a routine monitoring pass that
+    # finds nothing new never forces a regeneration/AI-cost event.
+    ai_summary_evidence_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ai_summary_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ai_summary_prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

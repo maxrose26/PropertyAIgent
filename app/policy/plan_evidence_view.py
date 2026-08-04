@@ -104,6 +104,31 @@ def get_pending_proposals(session: Session, local_plan_id: int) -> dict[str, Pol
     return result
 
 
+def get_conflicting_fields(session: Session, local_plan_id: int) -> dict[str, list]:
+    """field_name -> the distinct proposed values still awaiting review for
+    it, wherever there's more than one - a genuine conflict (two different
+    sources proposing two different values, neither yet resolved), not
+    just an ordinary single pending change. Sprint 3B.1 ("AI Local Plan
+    Summary", Part 1/Part 2) needs this to warn honestly rather than pick
+    one silently."""
+    events = session.execute(
+        select(PolicyChangeEvent).where(
+            PolicyChangeEvent.local_plan_id == local_plan_id,
+            PolicyChangeEvent.event_type == "plan_evidence_proposed",
+            PolicyChangeEvent.review_status == "needs_review",
+        ).order_by(PolicyChangeEvent.detected_at.asc())
+    ).scalars().all()
+    values_by_field: dict[str, list] = {}
+    for event in events:
+        if not event.proposed_data:
+            continue
+        for field_name, value in json.loads(event.proposed_data).items():
+            values_by_field.setdefault(field_name, [])
+            if value not in values_by_field[field_name]:
+                values_by_field[field_name].append(value)
+    return {field: values for field, values in values_by_field.items() if len(values) > 1}
+
+
 def get_historic_values(session: Session, local_plan_id: int, field_name: str, exclude_event_id: int | None = None) -> list[dict]:
     """Every CONFIRMED/auto-applied value this field has ever had, most
     recent first, excluding the one currently trusted (exclude_event_id) -
@@ -175,10 +200,29 @@ def _build_field_entry(session: Session, plan: LocalPlan, field_name: str, evide
     value = getattr(plan, field_name)
     pending_value = json.loads(pending.proposed_data)[field_name] if pending else None
     newer_pending = _has_newer_unreviewed_report(session, plan, field_name)
+    # "confirmed" (a human approved it via app.policy.review.approve_change),
+    # "auto_applied" (filled automatically - see app.policy.extract_plan_
+    # evidence.classify_evidence_confidence), "pending" (a value's proposed
+    # but the trusted field is still empty), or "missing" - Sprint 3B.1 ("AI
+    # Local Plan Summary", Part 2) needs this exact distinction so the
+    # summary can tell an approved fact apart from an auto-applied one and
+    # never state either as more certain than it is. Checked on VALUE
+    # first, not evidence: a field can genuinely hold a trusted value with
+    # no traceable PolicyChangeEvent behind it (data ingested before
+    # Sprint 3B's evidence-tracking existed, or set some other legacy way)
+    # - that is still a real, live trusted value sitting on the row, never
+    # "missing", which is reserved for value is None.
+    if value is None:
+        trust = "pending" if pending_value is not None else "missing"
+    elif evidence is not None:
+        trust = evidence.review_status
+    else:
+        trust = "confirmed"
     return {
         "field": field_name,
         "value": value,
         "has_value": value is not None,
+        "trust": trust,
         "source_document_title": evidence.source_document_title if evidence else None,
         "source_document_url": evidence.source_document_url if evidence else None,
         "source_page": evidence.source_page if evidence else None,
