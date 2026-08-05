@@ -12,16 +12,19 @@ selected via pg.run(). No business logic lives in this file.
 
 Navigation groups follow docs/NAVIGATION_ARCHITECTURE.md: Dashboard is the
 default landing page (Sprint 4.2, "Intelligence Dashboard"), Explore is the
-second destination; Policy groups Local Plan Sites; Administration groups
-Council Dashboard and Site Matching. Site Profile is declared with
-visibility="hidden" - reached by clicking a site on Explore's map/table,
-not as a persistent top-level tab (matching docs/WIREFRAMES.md Part 5's
-"reached via Explore/search, not a standalone nav item").
+second destination; Policy groups Council Intelligence (Sprint 4.3, the
+customer-facing per-council view) and Local Plan Sites; Administration
+groups Council Operations (Sprint 4.3 - renamed from "Council Dashboard",
+the internal monitoring/coverage view the customer-facing Council
+Intelligence pages were split out of) and Site Matching. Site Profile and
+the Council Intelligence detail page are both declared with
+visibility="hidden" - reached by clicking through from their own list/map
+page, not as persistent top-level tabs (matching docs/WIREFRAMES.md Part
+5's "reached via Explore/search, not a standalone nav item").
 
 Deliberately NOT implemented (see the Sprint 4.2 completion report): a
-customer-facing Council Intelligence page and a Reports page - both remain
-locked "Coming soon" Quick Action cards on the Dashboard, per that sprint's
-explicit scope restriction to "only build the Dashboard."
+Reports page - remains a locked "Coming soon" Quick Action card on the
+Dashboard.
 """
 from __future__ import annotations
 

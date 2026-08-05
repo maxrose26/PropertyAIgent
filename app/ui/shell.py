@@ -524,6 +524,63 @@ def live_leaderboard(tabs: dict[str, list[dict]], *, key: str) -> None:
                 _leaderboard_row(i, row, key=f"{key}-{label}-{row['id']}")
 
 
+def evidence_confidence_badge(trust: str, *, source_label: str | None = None) -> None:
+    """Sprint 4.3 ("Council Intelligence") - the evidence-confidence signal
+    Part 6 asks every housing-position figure to carry, built from
+    app.policy.plan_evidence_view's own trust vocabulary ("confirmed" - a
+    human approved it; "auto_applied" - the pipeline applied it
+    automatically at high confidence, not yet independently reviewed;
+    "pending" - a value is proposed but not yet trusted). Reuses the
+    existing Status/Review/Evidence badge vocabulary rather than inventing
+    a fourth badge kind - never shown at all for "missing" (nothing to
+    have confidence about)."""
+    if trust == "confirmed":
+        review_badge(confirmed=True)
+    elif trust == "auto_applied":
+        status_badge("info", "Auto-extracted, not yet reviewed")
+    elif trust == "pending":
+        status_badge("pending", "Proposed, awaiting review")
+    if source_label:
+        evidence_badge(source_label)
+
+
+def housing_stat_card(label: str, value, *, help: str | None = None, trust: str | None = None, source_label: str | None = None) -> None:
+    """A Stat Tile (docs/UI_DESIGN_SYSTEM.md) extended with an inline
+    evidence-confidence badge beneath the figure (Sprint 4.3, Part 6:
+    "each value should display its evidence confidence") - metric_card
+    itself stays untouched (still used everywhere a plain figure with no
+    evidence-tracking is shown) since not every Stat Tile in the product
+    has a trust state to display."""
+    with st.container(border=True):
+        st.metric(label, value if value not in (None, "") else "—", help=help)
+        if trust is not None and value not in (None, ""):
+            evidence_confidence_badge(trust, source_label=source_label)
+
+
+def timeline(entries: list[dict], *, key: str, empty_message: str = "Nothing to show yet.") -> None:
+    """A generic activity timeline (Sprint 4.3, Part 10/Part 12) - icon,
+    label, right-aligned relative time. Distinct from Dashboard's own
+    activity_timeline (which renders already-GROUPED, count-bearing rows
+    from app.reporting.dashboard specifically) - this is the plain,
+    ungrouped chronological form any page can reuse, e.g. entries: [{"icon",
+    "label", "when"}, ...]."""
+    if not entries:
+        st.caption(empty_message)
+        return
+    for i, entry in enumerate(entries):
+        with st.container(key=f"{key}-timeline-{i}"):
+            col_icon, col_main, col_time = st.columns([1, 7, 3], vertical_alignment="center")
+            with col_icon:
+                st.markdown(f"<div style='font-size:1.1rem'>{entry['icon']}</div>", unsafe_allow_html=True)
+            with col_main:
+                st.markdown(f"**{_escape(entry['label'])}**")
+            with col_time:
+                st.markdown(
+                    f'<div class="pig-leaderboard-time">{relative_time(entry.get("when"))}</div>',
+                    unsafe_allow_html=True,
+                )
+
+
 def render_footer() -> None:
     """A lightweight footer (Part 8) - product name, version, environment
     only, no clutter."""
