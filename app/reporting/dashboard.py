@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.db.models import (
     Application,
@@ -36,6 +36,16 @@ from app.db.models import (
     Site,
     VisualEvidence,
 )
+from app.pipeline.lapse_tracking import (
+    BUILD_STATUS_LABELS,
+    DECISION_STATUS_LABELS,
+    GRANTED_KEYWORDS,
+    LAPSE_WARNING_DAYS,
+    classify_decision_status,
+    compute_lapse_status,
+    parse_portal_date,
+)
+from app.pipeline.phase_tracking import build_phase_breakdown
 from app.visuals import IMAGE_TYPE_LABELS
 
 # LocalPlan.status values (app.policy.status.PLAN_STATUSES) that represent a
@@ -828,6 +838,419 @@ def build_ai_summary_carousel_items(session: Session, limit: int = 8) -> list[di
     return items[:limit]
 
 
+# --- Planning Intelligence scheme stack (Dashboard refinement) -------------
+#
+# Replaces the leaderboard's plain rows with richer, per-scheme cards for
+# the stacked-card presentation. Every field is read from Application,
+# SchemeIntelligence (via the existing .scheme_intelligence relationship,
+# always eager-loaded via selectinload below - never a per-row lazy query)
+# and Site - the exact same tables the rest of this module already reads,
+# batched with the same one-query-per-stream discipline as everything
+# above. "Do not show None/zero for missing facts" is enforced entirely at
+# render time (app.ui.shell) - this module always returns every key so the
+# rendering layer has a single, predictable shape to check.
+
+SCHEME_STACK_TAB_ORDER = ("New Applications", "Scheme Updates", "Decision Changes", "Build Progress", "Needs Attention")
+
+
+def _scheme_card(app: Application, *, why: str, when, page: str | None = None, params: dict | None = None) -> dict:
+    si = app.scheme_intelligence
+    site = app.site
+    resolved_page, resolved_params = (page, params if params is not None else {}) if page else (
+        ("pages/1_Scheme_Detail.py", {"site_id": str(app.site_id)}) if app.site_id else (None, None)
+    )
+    decision_status = classify_decision_status(app.decision, app.status)
+    build_status_raw = site.build_status if site else None
+    return {
+        "id": f"scheme-{app.id}",
+        "reference": app.reference,
+        "council_code": app.council_code,
+        "address": app.address,
+        "total_units": si.total_units_final if si else None,
+        "affordable_units": si.affordable_units_final if si else None,
+        "affordable_percentage": si.affordable_percentage_final if si else None,
+        "planning_status": app.status,
+        "decision_status": DECISION_STATUS_LABELS.get(decision_status) if decision_status != "not_yet_decided" else None,
+        "build_status": BUILD_STATUS_LABELS.get(build_status_raw) if build_status_raw else None,
+        "developer": si.developer if si else None,
+        "why": why,
+        "when": when,
+        "page": resolved_page, "params": resolved_params,
+    }
+
+
+def _load_primary_application_by_site(session: Session, site_ids: list[int]) -> dict[int, Application]:
+    """One batched query - the most recently-updated Application per site,
+    for a caller (e.g. build_scheme_stack's Build Progress tab) that has a
+    list of Sites but needs an Application to build a scheme card from.
+    Never one query per site."""
+    if not site_ids:
+        return {}
+    apps = session.execute(
+        select(Application).options(selectinload(Application.scheme_intelligence), selectinload(Application.site))
+        .where(Application.site_id.in_(site_ids))
+        .order_by(Application.site_id, Application.last_seen_at.desc(), Application.id.desc())
+    ).scalars().all()
+    by_site: dict[int, Application] = {}
+    for a in apps:
+        by_site.setdefault(a.site_id, a)
+    return by_site
+
+
+def build_scheme_stack(session: Session, limit_per_tab: int = 8) -> dict[str, list[dict]]:
+    """Every populated tab, keyed by its display name - a tab with no rows
+    is simply absent (same convention as build_leaderboard), never an
+    invented empty placeholder tab."""
+    tabs: dict[str, list[dict]] = {}
+    load_opts = (selectinload(Application.scheme_intelligence), selectinload(Application.site))
+
+    new_apps = session.execute(
+        select(Application).options(*load_opts)
+        .order_by(Application.first_seen_at.desc(), Application.id.desc()).limit(limit_per_tab)
+    ).scalars().all()
+    if new_apps:
+        tabs["New Applications"] = [_scheme_card(a, why="New application scraped", when=a.first_seen_at) for a in new_apps]
+
+    updated = session.execute(
+        select(Application).options(*load_opts)
+        .where(Application.site_id.is_not(None))
+        .order_by(Application.last_seen_at.desc(), Application.id.desc()).limit(limit_per_tab)
+    ).scalars().all()
+    if updated:
+        tabs["Scheme Updates"] = [_scheme_card(a, why="Application details refreshed", when=a.last_seen_at) for a in updated]
+
+    # decision_issued_date is free text (portal-native formats), not a real
+    # date column - fetched a little wider then re-sorted by the same
+    # parse_portal_date already used throughout app.pipeline.lapse_tracking,
+    # rather than trusting an unreliable string ORDER BY.
+    decided_candidates = session.execute(
+        select(Application).options(*load_opts)
+        .where(Application.decision.is_not(None), Application.decision_issued_date.is_not(None))
+        .order_by(Application.last_seen_at.desc(), Application.id.desc()).limit(limit_per_tab * 3)
+    ).scalars().all()
+    decided = sorted(decided_candidates, key=lambda a: parse_portal_date(a.decision_issued_date), reverse=True)[:limit_per_tab]
+    if decided:
+        tabs["Decision Changes"] = [_scheme_card(a, why=f"Decision issued: {a.decision}", when=a.last_seen_at) for a in decided]
+
+    build_sites = session.execute(
+        select(Site).where(Site.build_status.is_not(None), Site.excluded.is_not(True))
+        .order_by(Site.build_status_checked_at.desc(), Site.id.desc()).limit(limit_per_tab)
+    ).scalars().all()
+    if build_sites:
+        apps_by_site = _load_primary_application_by_site(session, [s.id for s in build_sites])
+        rows = [
+            _scheme_card(
+                apps_by_site[s.id],
+                why=f"Build status: {BUILD_STATUS_LABELS.get(s.build_status, s.build_status)}",
+                when=s.build_status_checked_at,
+            )
+            for s in build_sites if s.id in apps_by_site
+        ]
+        if rows:
+            tabs["Build Progress"] = rows
+
+    # Needs Attention - the scheme-scoped slice of the platform's review
+    # backlog (suggested site links only have a real "scheme" shape;
+    # PolicyChangeEvent items belong to a council/plan, not a scheme, so
+    # they're deliberately left out of this specific stack).
+    suggested = session.execute(
+        select(Application).options(*load_opts)
+        .where(Application.site_link_method == "suggested_fuzzy", Application.site_id.is_(None))
+        .order_by(Application.last_seen_at.desc(), Application.id.desc()).limit(limit_per_tab)
+    ).scalars().all()
+    if suggested:
+        tabs["Needs Attention"] = [
+            _scheme_card(
+                a, why="Suggested site match awaiting review", when=a.last_seen_at,
+                page="pages/2_Review_Site_Links.py", params={},
+            )
+            for a in suggested
+        ]
+
+    return {name: tabs[name] for name in SCHEME_STACK_TAB_ORDER if tabs.get(name)}
+
+
+# --- Opportunity categories (Dashboard refinement) --------------------------
+#
+# Each category builder below reuses an already-established filter/order
+# definition where one exists (low_supply, allocations_without_application,
+# emerging_policy, recent_policy_activity, recently_adopted all mirror
+# build_opportunities/build_opportunity_cards' own conditions exactly -
+# never redefined) - only approaching_lapse and undeveloped_phase are
+# genuinely new, and both are built entirely from existing, already-tested
+# deterministic modules (app.pipeline.lapse_tracking.compute_lapse_status,
+# app.pipeline.phase_tracking.build_phase_breakdown) rather than new
+# ranking/scoring logic of their own.
+
+_OPPORTUNITY_SECTION_ORDER = (
+    "approaching_lapse", "low_supply", "undeveloped_phase", "allocations_without_application",
+    "emerging_policy", "recent_policy_activity", "recently_adopted",
+)
+_OPPORTUNITY_SECTION_META = {
+    "approaching_lapse": {
+        "heading": "Approaching lapse date",
+        "explanation": f"Full permissions with no build activity detected, within {LAPSE_WARNING_DAYS} days of their statutory commencement deadline.",
+    },
+    "low_supply": {
+        "heading": "Low housing supply",
+        "explanation": "Councils with a verified five-year housing land supply position below five years.",
+    },
+    "undeveloped_phase": {
+        "heading": "Undeveloped phase / remaining delivery",
+        "explanation": "Multi-phase schemes with a named phase that has full permission but no commencement filing since.",
+    },
+    "allocations_without_application": {
+        "heading": "Allocations without planning applications",
+        "explanation": "Confirmed Local Plan allocations with no linked planning application yet.",
+    },
+    "emerging_policy": {
+        "heading": "Emerging policy opportunity",
+        "explanation": "Local Plans still progressing toward adoption - not yet settled.",
+    },
+    "recent_policy_activity": {
+        "heading": "Recent policy activity",
+        "explanation": "Councils whose monitored policy sources have changed recently.",
+    },
+    "recently_adopted": {
+        "heading": "Recently adopted plans",
+        "explanation": "Local Plans that have reached adopted status.",
+    },
+}
+
+
+def _approaching_lapse_cards(session: Session, limit: int) -> list[dict]:
+    granted_filter = or_(*(Application.decision.ilike(f"%{kw}%") for kw in GRANTED_KEYWORDS))
+    granted_site_ids = list(session.execute(
+        select(Application.site_id).where(
+            Application.site_id.is_not(None), Application.decision_issued_date.is_not(None), granted_filter,
+        ).distinct()
+    ).scalars())
+    if not granted_site_ids:
+        return []
+    sites = session.execute(
+        select(Site).where(Site.id.in_(granted_site_ids), Site.excluded.is_not(True))
+    ).scalars().all()
+    apps = session.execute(
+        select(Application).where(Application.site_id.in_([s.id for s in sites]))
+    ).scalars().all() if sites else []
+    apps_by_site: dict[int, list[Application]] = {}
+    for a in apps:
+        apps_by_site.setdefault(a.site_id, []).append(a)
+
+    today = dt.date.today()
+    scored: list[tuple[int, dict]] = []
+    for site in sites:
+        result = compute_lapse_status(apps_by_site.get(site.id, []), site)
+        if result["status"] != "approaching" or result["deadline"] is None:
+            continue
+        days_left = (result["deadline"] - today).days
+        grant_date = parse_portal_date(result["granted_app"].decision_issued_date) if result["granted_app"] else None
+        scored.append((days_left, {
+            "id": f"opp-lapse-{site.id}", "title": site.display_address, "subtitle": site.council_code,
+            "reason": f"Commencement deadline {result['deadline'].strftime('%d %b %Y')} - no build activity detected since the grant",
+            "metric": f"{days_left} day{'s' if days_left != 1 else ''} left",
+            "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else None,
+            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+        }))
+    scored.sort(key=lambda pair: pair[0])
+    return [card for _, card in scored[:limit]]
+
+
+def _low_supply_cards(session: Session, limit: int) -> list[dict]:
+    rows = session.execute(
+        select(LocalPlan).where(LocalPlan.five_year_supply_years.is_not(None), LocalPlan.five_year_supply_years < 5)
+        .order_by(LocalPlan.five_year_supply_years.asc(), LocalPlan.id.desc()).limit(limit)
+    ).scalars().all()
+    return [{
+        "id": f"opp-low-supply-{p.id}", "title": p.plan_name, "subtitle": p.council_code,
+        "reason": "Verified housing land supply below the five-year threshold",
+        "metric": f"{p.five_year_supply_years:.2f} years supply",
+        "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+    } for p in rows]
+
+
+def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
+    """Bounded to Sites with 2+ linked applications - build_phase_breakdown
+    needs multiple filings to detect a phase at all, and returns [] for a
+    single-application site by its own definition. One batched query for
+    every Application/Site involved; phase detection itself
+    (app.pipeline.phase_tracking) is pure Python over already-fetched rows,
+    never a further query per site."""
+    apps = session.execute(
+        select(Application).where(Application.site_id.is_not(None))
+        .join(Site, Application.site_id == Site.id).where(Site.excluded.is_not(True))
+        .options(selectinload(Application.scheme_intelligence))
+    ).scalars().all()
+    by_site: dict[int, list[Application]] = {}
+    for a in apps:
+        by_site.setdefault(a.site_id, []).append(a)
+
+    candidate_site_ids = [sid for sid, group in by_site.items() if len(group) >= 2]
+    if not candidate_site_ids:
+        return []
+    sites = {s.id: s for s in session.execute(select(Site).where(Site.id.in_(candidate_site_ids))).scalars()}
+
+    cards: list[dict] = []
+    for site_id in candidate_site_ids:
+        site = sites.get(site_id)
+        if site is None:
+            continue
+        breakdown = build_phase_breakdown(by_site[site_id])
+        undeveloped = [row for row in breakdown if row["status"] == "approved_not_started"]
+        if not undeveloped:
+            continue
+        phase = undeveloped[0]
+        grant_date = (
+            parse_portal_date(phase["latest_grant"].decision_issued_date) if phase.get("latest_grant") else None
+        )
+        cards.append({
+            "id": f"opp-phase-{site.id}-{phase['code']}", "title": f"{site.display_address} — {phase['label']}",
+            "subtitle": site.council_code,
+            "reason": f"{phase['label']} has full permission but no commencement filing detected since the grant",
+            "metric": f"{len(undeveloped)} phase(s) not yet started" if len(undeveloped) > 1 else "Not yet started",
+            "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else site.updated_at,
+            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+        })
+    cards.sort(key=lambda c: _naive(c["when"]), reverse=True)
+    return cards[:limit]
+
+
+def _allocations_without_application_cards(session: Session, limit: int) -> list[dict]:
+    rows = session.execute(
+        select(LocalPlanSite).where(
+            LocalPlanSite.matched_site_id.is_(None), LocalPlanSite.minimum_dwellings.is_not(None)
+        ).order_by(LocalPlanSite.minimum_dwellings.desc(), LocalPlanSite.id.desc()).limit(limit)
+    ).scalars().all()
+    return [{
+        "id": f"opp-unmatched-{a.id}", "title": a.policy_reference or a.site_name, "subtitle": a.council_code,
+        "reason": "Confirmed allocation with no linked planning application yet",
+        "metric": f"{a.minimum_dwellings} dwellings",
+        "when": a.updated_at, "page": "pages/3_Local_Plan_Sites.py", "params": {},
+    } for a in rows]
+
+
+def _emerging_policy_cards(session: Session, limit: int) -> list[dict]:
+    rows = session.execute(
+        select(LocalPlan).where(LocalPlan.status.in_(_EMERGING_PLAN_STATUSES))
+        .order_by(LocalPlan.updated_at.desc(), LocalPlan.id.desc()).limit(limit)
+    ).scalars().all()
+    return [{
+        "id": f"opp-emerging-{p.id}", "title": p.plan_name, "subtitle": p.council_code,
+        "reason": "Progressing toward adoption - not yet settled",
+        "metric": (p.status or "unknown").replace("_", " "),
+        "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+    } for p in rows]
+
+
+def _recent_policy_activity_cards(session: Session, limit: int) -> list[dict]:
+    rows = session.execute(
+        select(MonitoredSource.council_code, func.max(MonitoredSource.last_changed).label("last_changed"))
+        .where(MonitoredSource.last_changed.is_not(None))
+        .group_by(MonitoredSource.council_code)
+        .order_by(func.max(MonitoredSource.last_changed).desc())
+        .limit(limit)
+    ).all()
+    return [{
+        "id": f"opp-policy-activity-{council_code}", "title": f"{council_code} monitored sources updated", "subtitle": council_code,
+        "reason": "Monitored source content changed recently", "metric": relative_time_placeholder(last_changed),
+        "when": last_changed, "page": "pages/4_Council_Dashboard.py", "params": {},
+    } for council_code, last_changed in rows]
+
+
+def _recently_adopted_cards(session: Session, limit: int) -> list[dict]:
+    rows = session.execute(
+        select(LocalPlan).where(LocalPlan.status == "adopted")
+        .order_by(LocalPlan.updated_at.desc(), LocalPlan.id.desc()).limit(limit)
+    ).scalars().all()
+    return [{
+        "id": f"opp-adopted-{p.id}", "title": p.plan_name, "subtitle": p.council_code,
+        "reason": "Local Plan reached adopted status", "metric": "Adopted",
+        "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+    } for p in rows]
+
+
+_OPPORTUNITY_CATEGORY_BUILDERS = {
+    "approaching_lapse": _approaching_lapse_cards,
+    "low_supply": _low_supply_cards,
+    "undeveloped_phase": _undeveloped_phase_cards,
+    "allocations_without_application": _allocations_without_application_cards,
+    "emerging_policy": _emerging_policy_cards,
+    "recent_policy_activity": _recent_policy_activity_cards,
+    "recently_adopted": _recently_adopted_cards,
+}
+
+
+def build_opportunity_categories(session: Session, limit_per_category: int = 4) -> list[dict]:
+    """One entry per category in _OPPORTUNITY_SECTION_ORDER - every category
+    here is genuinely calculable from existing evidence (see each builder's
+    own docstring/comment), so none needs an "unavailable" state today; the
+    shape still carries "available"/"unavailable_reason" so a future
+    category that genuinely can't be computed yet has somewhere honest to
+    say so, per this task's own "do not fabricate it" instruction."""
+    categories = []
+    for key in _OPPORTUNITY_SECTION_ORDER:
+        cards = _OPPORTUNITY_CATEGORY_BUILDERS[key](session, limit_per_category)
+        meta = _OPPORTUNITY_SECTION_META[key]
+        categories.append({
+            "key": key, "heading": meta["heading"], "explanation": meta["explanation"],
+            "count": len(cards), "cards": cards, "available": True, "unavailable_reason": None,
+        })
+    return categories
+
+
+# --- AI Summary rail relevance (Dashboard refinement, Part 9) ---------------
+#
+# Extends build_ai_summary_carousel_items (untouched, still covered by its
+# own tests) rather than duplicating its query - relevance is computed
+# entirely from fields already present on the same LocalPlan/Site rows a
+# small, additional batched fetch loads (two more queries total, not one
+# per carousel item), never a fresh per-item lookup.
+
+def _plan_relevance(plan: LocalPlan) -> str:
+    if plan.five_year_supply_years is not None and plan.five_year_supply_years < 5:
+        return f"{plan.five_year_supply_years:.2f} years of verified housing land supply - below the five-year threshold"
+    if plan.content_last_updated and plan.ai_summary_generated_at and _naive(plan.content_last_updated) > _naive(plan.ai_summary_generated_at):
+        return "The underlying evidence has changed since this summary was generated"
+    if plan.status in _EMERGING_PLAN_STATUSES and plan.next_milestone:
+        return f"Emerging plan - next milestone: {plan.next_milestone}"
+    if plan.status == "adopted":
+        return "This Local Plan has reached adopted status"
+    return "Generated recently from verified evidence"
+
+
+def _site_relevance(site: Site) -> str:
+    if site.status_summary_updated_at and site.updated_at and _naive(site.updated_at) >= _naive(site.status_summary_updated_at):
+        return "This Site has a recent planning update"
+    if site.build_status in ("complete", "partially_complete"):
+        return f"Build status: {BUILD_STATUS_LABELS.get(site.build_status, site.build_status)}"
+    return "Generated recently from verified evidence"
+
+
+def build_ai_summary_rail(session: Session, limit: int = 8) -> list[dict]:
+    """build_ai_summary_carousel_items's own items, each carrying a
+    deterministic "relevance" explanation - never a new AI call, never
+    altering the original ai_summary_text, never a new database write."""
+    items = build_ai_summary_carousel_items(session, limit)
+    if not items:
+        return []
+
+    plan_ids = [int(it["id"].rsplit("-", 1)[-1]) for it in items if it["id"].startswith("carousel-plan-")]
+    site_ids = [int(it["id"].rsplit("-", 1)[-1]) for it in items if it["id"].startswith("carousel-site-")]
+    plans_by_id = {p.id: p for p in session.execute(select(LocalPlan).where(LocalPlan.id.in_(plan_ids))).scalars()} if plan_ids else {}
+    sites_by_id = {s.id: s for s in session.execute(select(Site).where(Site.id.in_(site_ids))).scalars()} if site_ids else {}
+
+    enriched = []
+    for it in items:
+        if it["id"].startswith("carousel-plan-"):
+            plan = plans_by_id.get(int(it["id"].rsplit("-", 1)[-1]))
+            relevance = _plan_relevance(plan) if plan else "Generated recently from verified evidence"
+        else:
+            site = sites_by_id.get(int(it["id"].rsplit("-", 1)[-1]))
+            relevance = _site_relevance(site) if site else "Generated recently from verified evidence"
+        enriched.append({**it, "relevance": relevance})
+    return enriched
+
+
 def build_dashboard(session: Session) -> dict:
     """Everything the Dashboard page needs, assembled in one call so the
     page itself stays a pure rendering layer (CLAUDE.md's "keep business
@@ -842,5 +1265,8 @@ def build_dashboard(session: Session) -> dict:
         "activity_grouped": build_grouped_activity(session),
         "leaderboard": build_leaderboard(session),
         "ai_summary_carousel": build_ai_summary_carousel_items(session),
+        "scheme_stack": build_scheme_stack(session),
+        "opportunity_categories": build_opportunity_categories(session),
+        "ai_summary_rail": build_ai_summary_rail(session),
         "generated_at": dt.datetime.now(dt.timezone.utc),
     }

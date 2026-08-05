@@ -1,21 +1,29 @@
-"""The Intelligence Dashboard (Sprint 4.2, revised for visual hierarchy) -
-PropertyAIgent's default landing page. Answers three questions immediately:
-what has changed, where are the opportunities, what needs attention.
+"""The Intelligence Dashboard (Sprint 4.2, revised for visual hierarchy;
+Dashboard refinement; Dashboard layout correction) - PropertyAIgent's
+default landing page. Answers three questions immediately: what has
+changed, where are the opportunities, what needs attention.
 
 All data assembly lives in app.reporting.dashboard (a pure module, no
 Streamlit imports) - this file is rendering only, per CLAUDE.md's "keep
 business logic out of the UI". Every figure shown here is real; nothing is
-estimated or invented - see that module's own docstring for the "never
-fabricate metrics, never rename a real signal to match a nicer-sounding
-label" discipline this page relies on.
+estimated or invented.
 
-Section order (hierarchy revision): page header -> KPI strip -> AI Daily
-Brief -> Live Intelligence Leaderboard -> [Opportunities | Quick Actions
-side panel] -> Policy Intelligence -> Recent Activity -> Recent AI
-Summaries. From Opportunities onward the page is a two-column layout (main
-~72% / side ~28%) so Quick Actions stays visible alongside the detailed
-sections rather than competing with them at the very top or bottom of the
-page.
+Layout (Dashboard layout correction): Quick Actions live in Streamlit's own
+native left sidebar (st.sidebar), above Credits - not a column inside the
+page body, which is what made the earlier three-column version read as
+cramped (a body-level "left rail" competing with the sidebar for the same
+job). wide_canvas() widens this page's own .block-container so the KPI
+strip, scheme stack and AI rail all get meaningfully more room than the
+shared shell's normal contained width - every OTHER page keeps that
+default untouched (see wide_canvas's own docstring in app.ui.shell).
+
+Section order: KPI strip (full width) -> AI Daily Brief (full width) ->
+two-column split: main column (~76%: Planning Intelligence scheme stack ->
+Opportunities -> Policy Intelligence -> Recent Activity) and right rail
+(~24%: Recent AI Summaries). Declaring main_col before right_col means
+Streamlit's native narrow-width stacking naturally puts the main column
+first and the AI rail second - no CSS reordering trick needed now that the
+body no longer has a competing left column.
 """
 from __future__ import annotations
 
@@ -31,20 +39,33 @@ from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import (
     activity_timeline,
     ai_daily_brief_placeholder,
-    ai_summary_carousel,
+    ai_summary_rail,
     empty_state,
-    live_leaderboard,
     metric_row,
-    opportunity_card,
+    opportunity_category_section,
     page_header,
     quick_actions_panel,
     relative_time,
+    scheme_stack,
     section_container,
     section_header,
+    wide_canvas,
 )
 
 bootstrap()
 session, settings = get_db()
+
+wide_canvas()
+
+with st.sidebar:
+    quick_actions_panel([
+        {"icon": "🔍", "title": "Explore", "description": "Search, filter and browse every site.",
+         "page": "pages/0_Explore.py"},
+        {"icon": "📋", "title": "Local Plan Sites", "description": "Browse Local Plan allocations.",
+         "page": "pages/3_Local_Plan_Sites.py"},
+        {"icon": "⚙️", "title": "Administration", "description": "Council Dashboard & Site Matching.",
+         "page": "pages/4_Council_Dashboard.py"},
+    ])
 credits_sidebar(session, settings)
 
 page_header(
@@ -55,7 +76,15 @@ page_header(
 
 data = build_dashboard(session)
 
-# --- KPI strip ---------------------------------------------------------------
+# --- KPI strip (full width) --------------------------------------------------
+#
+# Four cards then three, not all seven in one row: measured against a
+# standard laptop width (~1000px, even after wide_canvas()'s extra room),
+# seven-across truncates every label ("Councils" -> "Cou...", "Applications"
+# -> "Appl...", even the 1381 value itself clipping to "1..."). Four-and-
+# three keeps every label and value fully legible at every width this was
+# tested at, at the cost of a little more vertical space - a trade this
+# task's own "ensure labels remain legible" instruction takes priority over.
 
 kpis = data["kpis"]
 metric_row([(k["label"], k["value"], k["help"]) for k in kpis[:4]])
@@ -65,9 +94,9 @@ st.divider()
 
 
 def _mini_list(items: list[str], empty_message: str) -> None:
-    """Shared rendering for every small "recent N things" list on this
-    page - a consistent, always-graceful-when-empty treatment (Part 9),
-    rather than each panel inventing its own."""
+    """Shared rendering for every small "recent N things" list in the
+    Policy Intelligence section - a consistent, always-graceful-when-empty
+    treatment rather than each panel inventing its own."""
     if not items:
         st.caption(empty_message)
         return
@@ -75,50 +104,29 @@ def _mini_list(items: list[str], empty_message: str) -> None:
         st.markdown(f"- {line}")
 
 
-# --- AI Daily Brief (moved near the top) -------------------------------------
+# --- AI Daily Brief (full width) ---------------------------------------------
 
 ai_daily_brief_placeholder()
 
 st.divider()
 
-# --- Live Intelligence Leaderboard -------------------------------------------
+# --- Main column: Planning Intelligence -> Opportunities ->
+#     Policy Intelligence -> Recent Activity | Right rail: AI Summaries -----
 
-section_header("Planning Intelligence", icon="🏗️")
-live_leaderboard(data["leaderboard"], key="dashboard")
-
-st.divider()
-
-# --- Opportunities (main column) + Quick Actions (side column) --------------
-
-main_col, side_col = st.columns([7, 3], gap="large")
-
-with side_col:
-    quick_actions_panel([
-        {"icon": "🔍", "title": "Explore", "description": "Search, filter and browse every site.",
-         "page": "pages/0_Explore.py"},
-        {"icon": "📋", "title": "Local Plan Sites", "description": "Browse Local Plan allocations.",
-         "page": "pages/3_Local_Plan_Sites.py"},
-        {"icon": "⚙️", "title": "Administration", "description": "Council Dashboard & Site Matching.",
-         "page": "pages/4_Council_Dashboard.py"},
-        {"icon": "🏛️", "title": "Council Intelligence", "description": "Coming soon"},
-        {"icon": "📄", "title": "Reports", "description": "Coming soon"},
-    ])
+main_col, right_col = st.columns([0.76, 0.24], gap="large")
 
 with main_col:
-    section_header("Opportunities", icon="🎯")
-    st.caption("Deterministic signals only - a plain filter/sort over real data, never a scored or predicted ranking.")
-    opportunity_cards = data["opportunity_cards"]
-    if not opportunity_cards:
-        st.caption("No opportunities to surface yet.")
-    else:
-        opp_cols = st.columns(2)
-        for i, card in enumerate(opportunity_cards):
-            with opp_cols[i % 2]:
-                opportunity_card(card, key=card["id"])
+    section_header("Planning Intelligence", icon="🏗️")
+    scheme_stack(data["scheme_stack"], key="dashboard")
 
     st.divider()
 
-    # --- Policy Intelligence - one contained, tinted section -----------------
+    section_header("Opportunities", icon="🎯")
+    st.caption("Deterministic signals only - a plain filter/sort over real data, never a scored or predicted ranking.")
+    for category in data["opportunity_categories"]:
+        opportunity_category_section(category, key="dashboard")
+
+    st.divider()
 
     policy = data["policy"]
     with section_container(
@@ -159,8 +167,7 @@ with main_col:
                     ],
                     "Nothing awaiting policy review.",
                 )
-            with st.container(border=True):
-                st.markdown("**Evidence & AI summary updates**")
+            with st.expander("Evidence & AI summary updates"):
                 _mini_list(
                     [
                         f"{v['label']}" + (f" — {v['source'][:40]}" if v["source"] else "") + f" · {relative_time(v['when'])}"
@@ -178,8 +185,6 @@ with main_col:
 
     st.divider()
 
-    # --- Recent Activity - aggregated, never a repeated identical list -------
-
     section_header("Recent Activity", icon="🕗")
     grouped_activity = data["activity_grouped"]
     if not grouped_activity:
@@ -191,10 +196,7 @@ with main_col:
     else:
         activity_timeline(grouped_activity, key="dashboard-activity")
 
-    st.divider()
-
-    # --- Recent AI Summaries carousel -----------------------------------------
-
+with right_col:
     section_header("Recent AI Summaries", icon="🤖")
     st.caption("Already-generated summaries only - nothing here triggers a new AI call.")
-    ai_summary_carousel(data["ai_summary_carousel"], key="dashboard")
+    ai_summary_rail(data["ai_summary_rail"], key="dashboard")
