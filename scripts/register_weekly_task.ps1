@@ -39,7 +39,7 @@ Register-ScheduledTask `
     -Action $Action `
     -Trigger $Trigger `
     -Settings $Settings `
-    -Description "Weekly UK Planning Deal Finder scrape/extraction/enrichment run for $Council" `
+    -Description "Weekly PropertyAIgent scrape/extraction/enrichment run for $Council" `
     -Force
 
 Write-Host "Registered scheduled task '$TaskName': every $DayOfWeek at $Time."

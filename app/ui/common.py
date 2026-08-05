@@ -49,6 +49,7 @@ from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
 from app.policy.site_view import build_site_policy_intelligence
 from app.scrapers.unit_filter import classify_application_category, qualify
+from app.ui.shell import ai_summary_card, review_badge
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_site_visual_evidence
 
@@ -261,16 +262,20 @@ def aggregate_scheme_fields(applications: list[Application]) -> dict:
 
 
 def credits_sidebar(session, settings) -> None:
+    # Sprint 4.1 ("Application Shell") - an internal spend-throttle, not a
+    # customer-facing concern (see docs/NAVIGATION_ARCHITECTURE.md's
+    # "Administration should not dominate the interface"), so this renders
+    # collapsed at the bottom of the sidebar rather than as the first,
+    # most prominent thing every page's sidebar shows - same session/DB
+    # behaviour as before, presentation only.
     with st.sidebar:
-        st.header("Credits")
-        st.metric("Remaining", settings.credits_remaining)
-        top_up = st.number_input("Add credits", min_value=0, value=0, step=10, label_visibility="collapsed")
-        if st.button("Add credits") and top_up:
-            settings.credits_remaining += top_up
-            session.commit()
-            st.rerun()
-        st.caption("Personal spend-throttle for Apollo/Hunter/Companies House lookups - not real billing.")
-        st.divider()
+        with st.expander(f"💳 Credits — {settings.credits_remaining} remaining", expanded=False):
+            top_up = st.number_input("Add credits", min_value=0, value=0, step=10, label_visibility="collapsed")
+            if st.button("Add credits") and top_up:
+                settings.credits_remaining += top_up
+                session.commit()
+                st.rerun()
+            st.caption("Personal spend-throttle for Apollo/Hunter/Companies House lookups - not real billing.")
 
 
 def render_visual_evidence(evidence: dict, *, missing_message: str, expander_label: str) -> None:
@@ -301,11 +306,7 @@ def render_visual_evidence(evidence: dict, *, missing_message: str, expander_lab
         detail += f", page {primary.source_page}"
     st.caption(detail)
 
-    if primary.review_status == "confirmed":
-        st.caption("✓ Confirmed by a human reviewer")
-    else:
-        confidence = f"{primary.extraction_confidence:.0%}" if primary.extraction_confidence is not None else "unknown"
-        st.caption(f"⚠️ Not yet reviewed - AI classification confidence {confidence}")
+    review_badge(primary.extraction_confidence, confirmed=primary.review_status == "confirmed")
 
     if primary.source_document_url:
         st.caption(f"[View source document]({primary.source_document_url})")
@@ -424,10 +425,11 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         # narrative layer over data already shown elsewhere on this page
         # (phase breakdown, application history, planning stage, expected
         # decision date).
-        st.markdown("**AI status summary:**")
-        st.markdown(site.status_summary)
-        if site.status_summary_updated_at:
-            st.caption(f"Generated {site.status_summary_updated_at.strftime('%d %b %Y')} from every linked application at the time.")
+        ai_summary_card(
+            site.status_summary,
+            generated_at=site.status_summary_updated_at.strftime("%d %b %Y") if site.status_summary_updated_at else None,
+            key=f"ai-summary-{site.id}",
+        )
 
         # Both the expanded state and any pending result message are tracked
         # in session_state, not just returned inline - confirmed a real bug:

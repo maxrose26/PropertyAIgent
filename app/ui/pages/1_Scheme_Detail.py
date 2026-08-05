@@ -24,8 +24,7 @@ import streamlit as st
 from app.db.models import Site
 from app.ui.common import bootstrap, credits_sidebar, get_db, load_site_applications, render_scheme_detail
 from app.ui.map_selection import parse_site_id_param
-
-st.set_page_config(page_title="Scheme detail - UK Planning Deal Finder", layout="wide")
+from app.ui.shell import empty_state
 
 bootstrap()
 session, settings = get_db()
@@ -34,28 +33,46 @@ session, settings = get_db()
 # silently failed to resolve when called from a page inside pages/ - Streamlit
 # resolved it relative to this script's directory instead, matching nothing,
 # and fell back to a self-link. An absolute path resolves reliably.
-HOME_PAGE = Path(__file__).resolve().parents[1] / "streamlit_app.py"
-st.page_link(HOME_PAGE, label="← Back to search", icon="🔙")
+HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
+st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
 raw_site_id = st.query_params.get("site_id")
 site_id = parse_site_id_param(raw_site_id)
 if raw_site_id and site_id is None:
-    st.error("Invalid site id in URL.")
+    empty_state(
+        "That link looks broken",
+        "The site id in this URL isn't valid. Search for the site you're looking for, or browse every "
+        "site in Explore.",
+        icon="⚠️",
+    )
     st.stop()
 if site_id is None:
-    st.info("No scheme selected - go back and click a site on the map or table.")
+    empty_state(
+        "No site selected",
+        "Open a Site Profile by clicking a site on the Explore map or table, or use quick search to jump "
+        "straight to one.",
+        icon="🔍",
+    )
     st.stop()
 
 site = session.get(Site, site_id)
 if site is None:
-    st.error("That scheme no longer exists.")
+    empty_state(
+        "This site no longer exists",
+        "It may have been merged into another site or removed. Browse Explore to find what you're looking for.",
+        icon="🚫",
+    )
     st.stop()
 
 credits_sidebar(session, settings)
 
 apps = load_site_applications(session, site_id)
 if not apps:
-    st.error("That scheme's applications are no longer shown here (e.g. a screening/scoping opinion or "
-             "consultation notice with no substantive scheme behind it) - go back and pick another site.")
+    empty_state(
+        "Nothing substantive to show yet",
+        "This site's only linked applications are things like a screening/scoping opinion or consultation "
+        "notice — no substantive scheme behind them yet. Go back and pick another site.",
+        icon="👀",
+    )
     st.stop()
 render_scheme_detail(session, settings, site, apps)

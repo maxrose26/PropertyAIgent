@@ -35,30 +35,34 @@ from app.ui.common import (
     load_site_applications,
     render_visual_evidence,
 )
+from app.ui.shell import empty_state, page_header
 from app.visuals.site_view import build_allocation_image_status, build_allocation_visual_evidence
-
-st.set_page_config(page_title="Local Plan sites - UK Planning Deal Finder", layout="wide")
 
 bootstrap()
 session, settings = get_db()
 
-HOME_PAGE = Path(__file__).resolve().parents[1] / "streamlit_app.py"
-st.page_link(HOME_PAGE, label="← Back to search", icon="🔙")
+HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
+st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
 credits_sidebar(session, settings)
 
-st.title("Local Plan allocated sites")
-st.caption(
+page_header(
+    "Local Plan Sites",
     "Sites a council has identified for housing in its Local Plan, whether or not a planning application "
     "has been submitted yet. Sourced from whatever document the council publishes - there's no portal "
     "for this the way there is for applications, so coverage is council-by-council as each is added. "
     "A site in a DRAFT/emerging plan can still be added, resized, or dropped before adoption - status is "
-    "shown against every row, never presented as final."
+    "shown against every row, never presented as final.",
+    icon="📋",
 )
 
 sites = session.execute(select(LocalPlanSite)).scalars().all()
 if not sites:
-    st.info("No Local Plan data ingested yet. Run ingest_local_plan.py for a council to add one.")
+    empty_state(
+        "No Local Plan data yet",
+        "Run ingest_local_plan.py for a council to add its Local Plan allocations.",
+        icon="📋",
+    )
     st.stop()
 
 with st.sidebar:

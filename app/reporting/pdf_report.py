@@ -292,7 +292,7 @@ def render_pdf(report_rows: list[dict], stats: AggregateStats, narrative: dict[s
     styles = _styles()
     story = []
 
-    story.append(Paragraph("UK Planning Deal Finder — Scheme Summary Report", styles["ReportTitle"]))
+    story.append(Paragraph("PropertyAIgent — Scheme Summary Report", styles["ReportTitle"]))
     subtitle = f"Generated {dt.datetime.now():%d %b %Y %H:%M} · {stats.site_count} schemes"
     if search_description:
         subtitle += f' · Search: "{search_description}"'
