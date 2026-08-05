@@ -1436,6 +1436,26 @@ class VisualEvidence(Base):
     # the pre-AI justification for cost/audit purposes.
     candidate_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # --- Sprint 3F ("Allocation Policy Page Extraction", Part 7) - the raw
+    # deterministic identification facts a page's own text carried, kept
+    # regardless of whether they resolved to a confident allocation_id
+    # match (Part 7: "No provenance may be lost" - a reviewer looking at a
+    # needs_review row with allocation_id still null should still be able
+    # to see WHAT identifier/title the page itself printed). Populated by
+    # app.visuals.allocation_identifiers via app.visuals.matching.
+    # match_allocation_reference, never invented. ---
+    detected_allocation_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    detected_allocation_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # exact_policy_reference | normalised_policy_reference |
+    # exact_allocation_title | policy_reference | site_name |
+    # document_application_inheritance | None - which tier of
+    # app.visuals.matching actually decided allocation_id/site_id (or that
+    # nothing did) - distinct from extraction_confidence above, which is
+    # the AI vision model's own confidence in the IMAGE classification,
+    # not this deterministic matching decision.
+    match_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     # needs_review | confirmed | rejected - nothing here ever auto-applies
     # itself the way plan_evidence_proposed facts can (Part 9/Part 10):
     # displaying the WRONG image is a worse failure than a wrong number,

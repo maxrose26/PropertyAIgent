@@ -298,6 +298,11 @@ def test_match_document_visual_inherits_application_and_site():
     assert result == {
         "application_id": 42, "site_id": 9, "local_plan_id": None, "allocation_id": None,
         "match_method": "document_application_inheritance", "match_confidence": 1.0, "ambiguous": False,
+        # Sprint 3F ("Allocation Policy Page Extraction", Part 7) - always
+        # present in the match dict shape, null here since a planning
+        # Application Document has no page-text-driven allocation
+        # identification at all (its linkage is pure inheritance).
+        "detected_allocation_reference": None, "detected_allocation_title": None,
     }
 
 
