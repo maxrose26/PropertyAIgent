@@ -199,6 +199,54 @@ def match_allocation_reference(page_text: str, allocations: list) -> dict:
     return _result(None, None, None, False)
 
 
+def match_stored_identifiers(detected_reference: str | None, detected_title: str | None, allocations: list) -> dict:
+    """Sprint 3G ("Places for Everyone Allocation Onboarding", Part 4) -
+    re-runs the SAME deterministic priority tiers as
+    match_allocation_reference, but against a VisualEvidence row's ALREADY
+    STORED detected_allocation_reference/detected_allocation_title fields
+    (Sprint 3F) rather than re-reading the source PDF - no rendering, no
+    Vision call, nothing but a database-level re-match against a (now
+    larger) set of allocations. Reuses normalise_policy_reference so "JPA 24"
+    (stored) still matches "JPA24" (or vice versa) exactly like the original
+    extraction pass. Returns {"allocation_id", "match_method",
+    "match_confidence", "ambiguous"} - never a full match_report_visual-
+    shaped dict, since there's no application_id/site_id/local_plan_id to
+    resolve here (the caller already knows those - this function only ever
+    answers "which allocation, if any")."""
+    def _result(allocation_id, method, confidence, ambiguous) -> dict:
+        return {"allocation_id": allocation_id, "match_method": method, "match_confidence": confidence, "ambiguous": ambiguous}
+
+    if detected_reference:
+        raw = detected_reference.strip().lower()
+        exact_hits = [a for a in allocations if a.policy_reference and a.policy_reference.strip().lower() == raw]
+        if len(exact_hits) == 1:
+            return _result(exact_hits[0].id, "exact_policy_reference", 1.0, False)
+        if len(exact_hits) > 1:
+            return _result(None, "exact_policy_reference", 1.0, True)
+
+        normalised = normalise_policy_reference(detected_reference)
+        norm_hits = [
+            a for a in allocations
+            if a.policy_reference and normalise_policy_reference(a.policy_reference) == normalised
+        ]
+        if len(norm_hits) == 1:
+            return _result(norm_hits[0].id, "normalised_policy_reference", 0.9, False)
+        if len(norm_hits) > 1:
+            return _result(None, "normalised_policy_reference", 0.9, True)
+
+    if detected_title:
+        title_hits = [
+            a for a in allocations
+            if a.site_name and a.site_name.strip().lower() == detected_title.strip().lower()
+        ]
+        if len(title_hits) == 1:
+            return _result(title_hits[0].id, "exact_allocation_title", 0.8, False)
+        if len(title_hits) > 1:
+            return _result(None, "exact_allocation_title", 0.8, True)
+
+    return _result(None, None, None, False)
+
+
 def match_report_visual(report, page_text: str, allocations: list) -> dict:
     """report: app.db.models.MonitoredReport (or anything duck-typing
     .local_plan_id). allocations: every LocalPlanSite belonging to
