@@ -1,5 +1,7 @@
 # PropertyAIgent — Architecture Status (v1)
 
+> **Superseded.** This snapshot is retained as the historical record of the platform's state at the Sprint 3G merge. See [ARCHITECTURE_STATUS_v2.md](ARCHITECTURE_STATUS_v2.md) for the current status, sprint history and roadmap.
+
 **As of:** Sprint 3G merge (`v0.3g-pfe-allocation-onboarding`), master commit `0a7a8f0`.
 
 This document is a snapshot of what the platform currently does, as built. It is not a specification and does not describe future work in detail — see `specifications/` for the "what and why" behind each capability, and the **Future Roadmap** section below for headings only.

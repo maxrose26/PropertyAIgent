@@ -1,5 +1,14 @@
 # PropertyAIgent Platform Vision
 
+> **Historical document.** This reflects the original platform vision as written during early development, before the platform's capability model was formalised. It is retained here for historical context only, and its content below is unchanged from that time.
+>
+> The current, authoritative product vision is maintained in:
+> - [docs/PRODUCT_VISION.md](../docs/PRODUCT_VISION.md) — mission, target users, capability stack, core philosophy
+> - [docs/PLATFORM_ARCHITECTURE.md](../docs/PLATFORM_ARCHITECTURE.md) — functional architecture per capability
+> - [docs/PRODUCT_ROADMAP.md](../docs/PRODUCT_ROADMAP.md) — build sequencing
+>
+> Where this document's six-pillar framing (Planning / Delivery / Market / Commercial / Location / Investment Intelligence) differs from the current six-capability model (Planning / Policy / Market / Development Economics / AI Decision Support / Workflow & Collaboration), the current documents take precedence.
+
 ## Mission
 
 PropertyAIgent is a Development Intelligence Platform.
