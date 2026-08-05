@@ -1,0 +1,12 @@
+# PropertyAIgent theme (Sprint 4.1, "Application Shell, Branding & Design
+# System") - the base palette/typography from docs/UI_DESIGN_SYSTEM.md,
+# applied once here so every page inherits it automatically. Presentation
+# only - no business logic, no secrets, nothing environment-specific.
+
+[theme]
+base = "light"
+primaryColor = "#1F3A5F"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F8"
+textColor = "#1A1A1A"
+font = "sans serif"

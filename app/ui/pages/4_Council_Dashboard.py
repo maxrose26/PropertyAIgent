@@ -24,27 +24,31 @@ from app.policy.coverage import build_coverage_inventory
 from app.policy.plan_evidence_view import build_plan_evidence_view
 from app.reporting.local_plan_summary import generate_local_plan_summary, is_summary_stale
 from app.ui.common import bootstrap, credits_sidebar, get_db
-
-st.set_page_config(page_title="Council dashboard - UK Planning Deal Finder", layout="wide")
+from app.ui.shell import ai_summary_card, empty_state, page_header
 
 bootstrap()
 session, settings = get_db()
 
-HOME_PAGE = Path(__file__).resolve().parents[1] / "streamlit_app.py"
-st.page_link(HOME_PAGE, label="← Back to search", icon="🔙")
+HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
+st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
 credits_sidebar(session, settings)
 
-st.title("Council administration dashboard")
-st.caption(
+page_header(
+    "Council Dashboard — Administration",
     "Internal view of Policy Intelligence onboarding per council - which Local Plans have been ingested, "
     "whether monitoring is actually reaching their sources, and what's waiting for a review decision. "
-    "Not part of the public site-browsing experience."
+    "Not part of the public site-browsing experience.",
+    icon="⚙️",
 )
 
 rows = build_council_dashboard(session)
 if not rows:
-    st.info("No council has any Policy Intelligence activity yet (no Local Plans ingested, no sources registered).")
+    empty_state(
+        "No Policy Intelligence activity yet",
+        "No Local Plans have been ingested and no monitoring sources are registered for any council.",
+        icon="📋",
+    )
     st.stop()
 
 HEALTH_LABELS = {
@@ -167,8 +171,14 @@ def _render_ai_summary(plan_row: LocalPlan, council_code: str) -> None:
     if is_summary_stale(session, plan_row):
         st.warning("⚠️ The underlying evidence has changed since this summary was generated - click Refresh for an up-to-date version.")
 
-    st.caption("AI-generated from verified PropertyAIgent evidence")
-    st.write(plan_row.ai_summary_text)
+    generated_bit = plan_row.ai_summary_generated_at.strftime("%d %b %Y %H:%M") if plan_row.ai_summary_generated_at else None
+    ai_summary_card(
+        plan_row.ai_summary_text,
+        generated_at=generated_bit,
+        model=plan_row.ai_summary_model,
+        prompt_version=plan_row.ai_summary_prompt_version,
+        key=f"ai-summary-card-{plan_row.id}-{council_code}",
+    )
 
     key_risks = json.loads(plan_row.ai_summary_key_risks) if plan_row.ai_summary_key_risks else []
     key_opportunities = json.loads(plan_row.ai_summary_key_opportunities) if plan_row.ai_summary_key_opportunities else []
@@ -180,9 +190,6 @@ def _render_ai_summary(plan_row: LocalPlan, council_code: str) -> None:
         st.markdown("**Key opportunities:**\n" + "\n".join(f"- {o}" for o in key_opportunities))
     if evidence_gaps:
         st.markdown("**Evidence gaps:**\n" + "\n".join(f"- {g}" for g in evidence_gaps))
-
-    generated_bit = plan_row.ai_summary_generated_at.strftime("%d %b %Y %H:%M") if plan_row.ai_summary_generated_at else "unknown"
-    st.caption(f"Generated {generated_bit} · model {plan_row.ai_summary_model or '?'} · prompt version {plan_row.ai_summary_prompt_version or '?'}")
 
 
 REPORT_STATUS_LABELS = {"current": "✅ Current", "superseded": "🗄️ Superseded"}

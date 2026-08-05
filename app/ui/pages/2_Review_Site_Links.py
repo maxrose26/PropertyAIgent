@@ -21,14 +21,13 @@ from app.ui.common import (
     get_db,
     pick_representative_application,
 )
-
-st.set_page_config(page_title="Review site links - UK Planning Deal Finder", layout="wide")
+from app.ui.shell import empty_state, page_header
 
 bootstrap()
 session, settings = get_db()
 
-HOME_PAGE = Path(__file__).resolve().parents[1] / "streamlit_app.py"
-st.page_link(HOME_PAGE, label="← Back to search", icon="🔙")
+HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
+st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
 credits_sidebar(session, settings)
 
@@ -36,13 +35,16 @@ suggested = session.execute(
     select(Application).where(Application.site_link_method == "suggested_fuzzy", Application.site_id.is_(None))
 ).scalars().all()
 
-st.title(f"{len(suggested)} suggested site links awaiting review")
+page_header(
+    f"Site Matching — {len(suggested)} awaiting review",
+    "These couldn't be auto-linked with full confidence - compare the two portal pages below, then "
+    "confirm if they're the same site or reject to keep them separate.",
+    icon="🔗",
+)
 
 if not suggested:
-    st.info("Nothing to review right now.")
+    empty_state("Nothing to review right now", "Every suggested site link has already been resolved.", icon="✅")
     st.stop()
-
-st.caption("These couldn't be auto-linked with full confidence - compare the two portal pages below, then confirm if they're the same site or reject to keep them separate.")
 
 for app in suggested:
     candidate = app.suggested_site
