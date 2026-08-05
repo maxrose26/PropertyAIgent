@@ -306,6 +306,72 @@ class LocalPlan(Base):
     # portal) registered before any LocalPlan exists at all - see
     # MonitoredSource's docstring (Sprint 2, Part 3).
     monitored_sources: Mapped[list["MonitoredSource"]] = relationship(back_populates="local_plan")
+    # Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation",
+    # Part 1) - every Council this plan is linked to, including the
+    # council_code above (which is kept, unremoved, as the backwards-
+    # compatible lead/legacy authority - see LocalPlanCouncil's own
+    # docstring for why council_code is not simply replaced).
+    council_links: Mapped[list["LocalPlanCouncil"]] = relationship(
+        back_populates="local_plan", cascade="all, delete-orphan"
+    )
+
+
+class LocalPlanCouncil(Base):
+    """Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation",
+    Part 1) - additive many-to-many join between LocalPlan and Council, for
+    genuinely joint/multi-authority plans (Places for Everyone: one adopted
+    plan, nine participating Greater Manchester authorities) that
+    LocalPlan.council_code alone cannot represent, since it is a single
+    non-nullable foreign key.
+
+    LocalPlan.council_code is deliberately NOT removed by this sprint (per
+    the brief: "keep it temporarily as a backwards-compatible lead/legacy
+    field") - every piece of code written before this sprint that reads
+    LocalPlan.council_code directly keeps working unchanged. This table is
+    the source of truth for "which councils does this plan apply to" going
+    forward; council_code is a convenience snapshot of ONE of those rows
+    (normally the one with is_lead_authority=True, or the authority the
+    plan happened to be ingested under first for a plan not yet linked here
+    at all).
+
+    A single-authority plan (Stockport's own Local Plan, Bury's own Local
+    Plan) gets exactly one LocalPlanCouncil row, matching council_code -
+    joint-plan support does not change how an ordinary plan is modelled,
+    only adds the ability for a plan to have more than one such row.
+
+    See app.policy.joint_plans for the config-driven (config/joint_plans.
+    yaml) linking logic, and scripts/migrate_joint_plan_support.py for the
+    idempotent backfill that populates this table for plans that predate
+    it."""
+
+    __tablename__ = "local_plan_councils"
+    __table_args__ = (UniqueConstraint("local_plan_id", "council_code", name="uq_local_plan_council"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    local_plan_id: Mapped[int] = mapped_column(ForeignKey("local_plans.id"))
+    council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
+
+    # participating_authority | lead_authority | host_authority | legacy_owner
+    # - "legacy_owner" is what the migration backfill assigns to the
+    # existing LocalPlan.council_code authority for a plan that has no
+    # config/joint_plans.yaml entry (i.e. every single-authority plan) -
+    # distinguishes "this is the one authority a plan has always belonged
+    # to" from "this authority is one of several confirmed participants in
+    # a genuinely joint plan" (role="participating_authority",
+    # role="lead_authority" for the plan's designated lead where a joint
+    # plan's own documents name one).
+    role: Mapped[str] = mapped_column(String(30), default="legacy_owner")
+    is_lead_authority: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    joined_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Free text - where this link's authority came from (a config entry
+    # citing the plan's own participating-authorities table/foreword, or
+    # "backfilled from LocalPlan.council_code" for the legacy_owner case) -
+    # every join row must be traceable to why it exists, not just asserted.
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    local_plan: Mapped["LocalPlan"] = relationship(back_populates="council_links")
+    council: Mapped["Council"] = relationship()
 
 
 class LocalPlanStatusHistory(Base):
@@ -473,6 +539,23 @@ class LocalPlanSite(Base):
     # by migration).
     review_status: Mapped[str] = mapped_column(String(30), default="auto_applied")
 
+    # --- Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation",
+    # Part 5) - never set at ingestion or migration time, only ever by an
+    # approved PolicyChangeEvent (event_type="duplicate_name_reconciliation_
+    # proposed", see app.policy.allocation_reconciliation) once a human has
+    # confirmed what a same-named row across two plans actually is. Null
+    # means "not reviewed" - never defaulted to "genuine" or "duplicate"
+    # automatically, since guessing either way is exactly the silent-
+    # misclassification risk this field exists to avoid.
+    #
+    # genuine_allocation | contextual_reference | duplicate_of_other_plan |
+    # uncertain_needs_review
+    duplicate_classification: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Free-text reasoning + the source excerpt the classification was based
+    # on - never a bare label with no evidence (same "no unexplainable
+    # decision" principle as progression_reasons above).
+    duplicate_classification_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # --- Progression signal (Part 7) - deterministic, never AI-derived.
     # See app.policy.progression.classify_progression. ---
     progression_signal: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -529,6 +612,60 @@ class AllocationVersion(Base):
     captured_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     allocation: Mapped["LocalPlanSite"] = relationship(back_populates="versions")
+
+
+class AllocationRelationship(Base):
+    """Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation",
+    Part 6) - records that two LocalPlanSite rows refer to the same
+    physical strategic site (or otherwise reference one another) WITHOUT
+    merging them into one record. Exists specifically because two
+    allocation rows sharing a name is not proof they're the same thing
+    (Part 6: "Do not treat two policy records as one simply because their
+    names match") - equally, when primary-source evidence DOES confirm
+    they're the same site (as it does for Bury's Seedfield/Walshaw/Elton
+    Reservoir rows against their Places for Everyone JPA8/JPA9/JPA7
+    counterparts - see app.policy.allocation_reconciliation), that fact
+    needs somewhere to live that isn't silent deletion or a guessed merge.
+
+    Both allocations named in a relationship keep their own independent
+    identity, source document, capacity figure, status and progression
+    signal forever - this table only ever ADDS a documented cross-
+    reference on top, never removes or overwrites either row."""
+
+    __tablename__ = "allocation_relationships"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    from_allocation_id: Mapped[int] = mapped_column(ForeignKey("local_plan_sites.id"))
+    # Nullable - a relationship's target is not always another specific
+    # allocation ROW (e.g. Bury's "Castle Road (Unsworth)" row references a
+    # sub-parcel described in Places for Everyone's Northern Gateway
+    # allocation narrative, not a separate JPA-coded row that exists in
+    # this database at all - see the real finding this was built for).
+    to_allocation_id: Mapped[int | None] = mapped_column(ForeignKey("local_plan_sites.id"), nullable=True)
+
+    # same_physical_site | referenced_by | superseded_by |
+    # implemented_through_joint_plan | uncertain
+    relationship_type: Mapped[str] = mapped_column(String(40))
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Provenance - same top-level-not-buried-in-JSON reasoning as
+    # PolicyChangeEvent's own source fields.
+    source_document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # needs_review | confirmed | rejected - a relationship record is itself
+    # a proposal until a human confirms it, same review discipline as every
+    # other ambiguous link in this codebase (PolicyChangeEvent, LocalPlanSite.
+    # review_status). Never "auto_applied" - Part 6 explicitly rules out
+    # ever inferring sameness automatically from a name match alone.
+    review_status: Mapped[str] = mapped_column(String(30), default="needs_review")
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    from_allocation: Mapped["LocalPlanSite"] = relationship(foreign_keys=[from_allocation_id])
+    to_allocation: Mapped["LocalPlanSite | None"] = relationship(foreign_keys=[to_allocation_id])
 
 
 class MonitoredSource(Base):
