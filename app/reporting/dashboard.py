@@ -82,9 +82,9 @@ def build_kpi_row(session: Session) -> list[dict]:
          "help": "Every scraped planning application tracked by the platform."},
         {"label": "Visual Evidence", "value": visual_evidence, "live": True,
          "help": "Current (non-superseded) extracted site plans and allocation maps."},
-        {"label": "AI summaries", "value": ai_local_plan_summaries + ai_site_summaries, "live": True,
+        {"label": "AI Summaries", "value": ai_local_plan_summaries + ai_site_summaries, "live": True,
          "help": f"{ai_local_plan_summaries} Local Plan summaries + {ai_site_summaries} Site summaries generated."},
-        {"label": "Review queue", "value": review_queue["total"], "live": True,
+        {"label": "Reviews", "value": review_queue["total"], "live": True,
          "help": "Suggested site links, policy changes and visual evidence awaiting a human decision."},
     ]
 
@@ -375,7 +375,7 @@ def _naive(value: dt.datetime) -> dt.datetime:
 # Ranking is always recency (a real timestamp column) then id (guaranteed
 # unique, stable across reruns) - never a score, never invented.
 
-LEADERBOARD_TAB_ORDER = ("New Applications", "Updated Schemes", "Policy Updates", "Evidence & AI", "Needs Attention")
+LEADERBOARD_TAB_ORDER = ("New Apps", "Scheme Updates", "Policy", "Evidence & AI", "Attention")
 
 
 def build_leaderboard_new_applications(session: Session, limit: int = 8) -> list[dict]:
@@ -524,13 +524,308 @@ def build_leaderboard(session: Session, limit_per_tab: int = 8) -> dict[str, lis
     this dict - the rendering layer hides it rather than this function
     inventing placeholder rows to fill an empty tab."""
     candidates = {
-        "New Applications": build_leaderboard_new_applications(session, limit_per_tab),
-        "Updated Schemes": build_leaderboard_updated_schemes(session, limit_per_tab),
-        "Policy Updates": build_leaderboard_policy_updates(session, limit_per_tab),
+        "New Apps": build_leaderboard_new_applications(session, limit_per_tab),
+        "Scheme Updates": build_leaderboard_updated_schemes(session, limit_per_tab),
+        "Policy": build_leaderboard_policy_updates(session, limit_per_tab),
         "Evidence & AI": build_leaderboard_evidence_and_ai(session, limit_per_tab),
-        "Needs Attention": build_leaderboard_needs_attention(session, limit_per_tab),
+        "Attention": build_leaderboard_needs_attention(session, limit_per_tab),
     }
     return {name: candidates[name] for name in LEADERBOARD_TAB_ORDER if candidates[name]}
+
+
+# --- Opportunity cards (hierarchy amendment) --------------------------------
+#
+# Deterministic-only, per Part 3's own instruction. Each card's "badge" is
+# the real category it came from (never an invented urgency score) - this
+# platform's own design principle is "never guess/invent a ranking," so
+# priority here is expressed as which real, already-deterministic signal
+# surfaced the card, not a synthesised high/medium/low weighting.
+
+_OPPORTUNITY_CATEGORY_ORDER = (
+    "low_supply", "large_unmatched", "emerging_plan", "recent_policy_activity", "recently_adopted",
+)
+_OPPORTUNITY_BADGES = {
+    "low_supply": "Low housing supply",
+    "large_unmatched": "Large allocation",
+    "emerging_plan": "Emerging plan",
+    "recent_policy_activity": "Policy activity",
+    "recently_adopted": "Recently adopted",
+}
+
+
+def build_opportunity_cards(session: Session, limit_per_category: int = 2) -> list[dict]:
+    """Reuses the exact same filter/order definitions as build_opportunities
+    (never redefined here) but returns presentation-ready cards - a title,
+    a real reason, a real metric, a category badge and a destination -
+    rather than that function's plainer per-category dict shape. Order is
+    always _OPPORTUNITY_CATEGORY_ORDER then the category's own existing
+    sort - never a cross-category score."""
+    low_supply = session.execute(
+        select(LocalPlan).where(LocalPlan.five_year_supply_years.is_not(None))
+        .order_by(LocalPlan.five_year_supply_years.asc(), LocalPlan.id.desc()).limit(limit_per_category)
+    ).scalars().all()
+    emerging_plans = session.execute(
+        select(LocalPlan).where(LocalPlan.status.in_(_EMERGING_PLAN_STATUSES))
+        .order_by(LocalPlan.updated_at.desc(), LocalPlan.id.desc()).limit(limit_per_category)
+    ).scalars().all()
+    large_unmatched = session.execute(
+        select(LocalPlanSite).where(
+            LocalPlanSite.matched_site_id.is_(None), LocalPlanSite.minimum_dwellings.is_not(None)
+        ).order_by(LocalPlanSite.minimum_dwellings.desc(), LocalPlanSite.id.desc()).limit(limit_per_category)
+    ).scalars().all()
+    recent_policy_activity = session.execute(
+        select(MonitoredSource.council_code, func.max(MonitoredSource.last_changed).label("last_changed"))
+        .where(MonitoredSource.last_changed.is_not(None))
+        .group_by(MonitoredSource.council_code)
+        .order_by(func.max(MonitoredSource.last_changed).desc())
+        .limit(limit_per_category)
+    ).all()
+    recently_adopted = session.execute(
+        select(LocalPlan).where(LocalPlan.status == "adopted")
+        .order_by(LocalPlan.updated_at.desc(), LocalPlan.id.desc()).limit(limit_per_category)
+    ).scalars().all()
+
+    cards: dict[str, list[dict]] = {"low_supply": [], "large_unmatched": [], "emerging_plan": [],
+                                     "recent_policy_activity": [], "recently_adopted": []}
+
+    for p in low_supply:
+        cards["low_supply"].append({
+            "id": f"opp-low-supply-{p.id}", "title": p.plan_name, "subtitle": p.council_code,
+            "reason": "Below five-year housing land supply", "metric": f"{p.five_year_supply_years:.1f} years supply",
+            "category": "low_supply", "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+    for a in large_unmatched:
+        cards["large_unmatched"].append({
+            "id": f"opp-large-unmatched-{a.id}", "title": a.policy_reference or a.site_name, "subtitle": a.council_code,
+            "reason": "Large allocation with no application yet", "metric": f"{a.minimum_dwellings} dwellings",
+            "category": "large_unmatched", "when": a.updated_at, "page": "pages/3_Local_Plan_Sites.py", "params": {},
+        })
+    for p in emerging_plans:
+        cards["emerging_plan"].append({
+            "id": f"opp-emerging-{p.id}", "title": p.plan_name, "subtitle": p.council_code,
+            "reason": "Progressing toward adoption", "metric": (p.status or "unknown").replace("_", " "),
+            "category": "emerging_plan", "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+    for council_code, last_changed in recent_policy_activity:
+        cards["recent_policy_activity"].append({
+            "id": f"opp-policy-activity-{council_code}", "title": f"{council_code} sources updated", "subtitle": council_code,
+            "reason": "Monitored source content changed recently", "metric": relative_time_placeholder(last_changed),
+            "category": "recent_policy_activity", "when": last_changed,
+            "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+    for p in recently_adopted:
+        cards["recently_adopted"].append({
+            "id": f"opp-adopted-{p.id}", "title": p.plan_name, "subtitle": p.council_code,
+            "reason": "Local Plan adopted", "metric": "Adopted",
+            "category": "recently_adopted", "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+
+    ordered: list[dict] = []
+    for category in _OPPORTUNITY_CATEGORY_ORDER:
+        for card in cards[category]:
+            card["badge"] = _OPPORTUNITY_BADGES[category]
+            ordered.append(card)
+    return ordered
+
+
+def relative_time_placeholder(value: dt.datetime) -> str:
+    """Opportunity cards need a metric string, not a raw datetime - this
+    just isoformats the date part (no relative-time wording computed here,
+    since "relative to now" is a presentation concern app.ui.shell.
+    relative_time already owns; kept as a plain, honest date string at the
+    data layer)."""
+    return value.strftime("%d %b %Y")
+
+
+# --- Recent Activity aggregation (hierarchy amendment) ----------------------
+#
+# build_recent_activity above is untouched (same queries, same pre-formatted
+# text, still covered by its own tests) - this is a parallel, STRUCTURED
+# version of the same six streams (same tables, same filters, same limits)
+# whose fields (action type, source, council, id, link) are kept separate
+# rather than pre-joined into one string, specifically so they can be
+# grouped for display. "Do not alter, delete or merge the underlying
+# database records" - nothing here writes anything; grouping happens only
+# to the in-memory list this function returns.
+
+_ACTIVITY_ACTION_LABELS = {
+    "visual_evidence_extracted": ("🖼️", "visual-evidence page", "extracted from"),
+    "document_discovered": ("📄", "policy document", "discovered for"),
+    "plan_updated": ("📋", "Local Plan update", "for"),
+    "source_changed": ("🔎", "monitored source change", "for"),
+    "allocation_matched": ("🔗", "allocation match", "in"),
+    "review_completed": ("✅", "review", "completed for"),
+}
+
+
+def build_activity_events(session: Session, limit: int = 40) -> list[dict]:
+    """The same six streams as build_recent_activity, kept structured
+    (action/source_key/source_label/council_code/link) instead of
+    pre-formatted text, so group_activity_events can group them
+    meaningfully. Never mutates or merges any database row - read-only,
+    same as every other function in this module."""
+    per_stream_limit = limit
+    events: list[dict] = []
+
+    for v in session.execute(
+        select(VisualEvidence).where(VisualEvidence.status == "current")
+        .order_by(VisualEvidence.created_at.desc(), VisualEvidence.id.desc()).limit(per_stream_limit)
+    ).scalars().all():
+        if v.site_id:
+            page, params = "pages/1_Scheme_Detail.py", {"site_id": str(v.site_id)}
+        elif v.allocation_id or v.local_plan_id:
+            page, params = "pages/3_Local_Plan_Sites.py", {}
+        else:
+            page, params = None, None
+        events.append({
+            "id": f"visual-{v.id}", "action": "visual_evidence_extracted",
+            "source_key": v.source_document_title or "unknown-document",
+            "source_label": v.source_document_title or "an unnamed document",
+            "when": v.created_at, "page": page, "params": params,
+        })
+
+    for r in session.execute(
+        select(MonitoredReport).order_by(MonitoredReport.discovered_at.desc(), MonitoredReport.id.desc()).limit(per_stream_limit)
+    ).scalars().all():
+        events.append({
+            "id": f"report-{r.id}", "action": "document_discovered",
+            "source_key": r.council_code, "source_label": r.council_code,
+            "when": r.discovered_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+
+    for p in session.execute(
+        select(LocalPlan).order_by(LocalPlan.updated_at.desc(), LocalPlan.id.desc()).limit(per_stream_limit)
+    ).scalars().all():
+        events.append({
+            "id": f"plan-{p.id}", "action": "plan_updated",
+            "source_key": p.plan_name, "source_label": p.plan_name,
+            "when": p.updated_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+
+    for s in session.execute(
+        select(MonitoredSource).where(MonitoredSource.last_changed.is_not(None))
+        .order_by(MonitoredSource.last_changed.desc(), MonitoredSource.id.desc()).limit(per_stream_limit)
+    ).scalars().all():
+        events.append({
+            "id": f"source-{s.id}", "action": "source_changed",
+            "source_key": s.council_code, "source_label": s.council_code,
+            "when": s.last_changed, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+
+    for a in session.execute(
+        select(LocalPlanSite).where(LocalPlanSite.matched_site_id.is_not(None))
+        .order_by(LocalPlanSite.updated_at.desc(), LocalPlanSite.id.desc()).limit(per_stream_limit)
+    ).scalars().all():
+        events.append({
+            "id": f"allocation-{a.id}", "action": "allocation_matched",
+            "source_key": a.council_code, "source_label": a.council_code,
+            "when": a.updated_at, "page": "pages/3_Local_Plan_Sites.py", "params": {},
+        })
+
+    for e in session.execute(
+        select(PolicyChangeEvent).where(
+            PolicyChangeEvent.review_status.in_(("confirmed", "rejected")), PolicyChangeEvent.reviewed_at.is_not(None)
+        ).order_by(PolicyChangeEvent.reviewed_at.desc(), PolicyChangeEvent.id.desc()).limit(per_stream_limit)
+    ).scalars().all():
+        events.append({
+            "id": f"change-{e.id}", "action": "review_completed",
+            "source_key": e.event_type, "source_label": e.event_type.replace("_", " "),
+            "when": e.reviewed_at, "page": "pages/4_Council_Dashboard.py", "params": {},
+        })
+
+    events.sort(key=lambda ev: (_naive(ev["when"]), ev["id"]), reverse=True)
+    return events[:limit]
+
+
+def group_activity_events(events: list[dict], limit_groups: int = 10) -> list[dict]:
+    """Pure, in-memory grouping only - Part 5's own "presentation
+    aggregation only" instruction. Groups by (action, source_key), which is
+    why unrelated activity is never grouped together: a Local Plan update
+    and a policy-document discovery for the same council have different
+    "action" values, so they can never merge into one row, even though
+    both mention the same council."""
+    groups: dict[tuple[str, str], dict] = {}
+    order: list[tuple[str, str]] = []
+    for ev in events:
+        group_key = (ev["action"], ev["source_key"])
+        if group_key not in groups:
+            groups[group_key] = {
+                "action": ev["action"], "source_label": ev["source_label"],
+                "count": 0, "latest_when": ev["when"], "page": ev["page"], "params": ev["params"],
+                "id": f"group-{ev['action']}-{ev['source_key']}",
+            }
+            order.append(group_key)
+        groups[group_key]["count"] += 1
+        if _naive(ev["when"]) > _naive(groups[group_key]["latest_when"]):
+            groups[group_key]["latest_when"] = ev["when"]
+            groups[group_key]["page"] = ev["page"]
+            groups[group_key]["params"] = ev["params"]
+
+    rows = []
+    for group_key in order:
+        g = groups[group_key]
+        icon, noun, preposition = _ACTIVITY_ACTION_LABELS[g["action"]]
+        noun_plural = noun if g["count"] == 1 else noun + "s"
+        if g["action"] == "plan_updated" and g["count"] == 1:
+            label = f"{g['source_label']} updated"
+        elif g["action"] == "plan_updated":
+            label = f"{g['source_label']} updated {g['count']} times"
+        else:
+            label = f"{g['count']} {noun_plural} {preposition} {g['source_label']}"
+        rows.append({
+            "id": g["id"], "icon": icon, "label": label, "count": g["count"],
+            "latest_when": g["latest_when"], "page": g["page"], "params": g["params"],
+        })
+
+    rows.sort(key=lambda r: (_naive(r["latest_when"]), r["id"]), reverse=True)
+    return rows[:limit_groups]
+
+
+def build_grouped_activity(session: Session, limit_events: int = 40, limit_groups: int = 10) -> list[dict]:
+    """Convenience wrapper - fetch then group, in one call."""
+    return group_activity_events(build_activity_events(session, limit_events), limit_groups)
+
+
+# --- Recent AI Summaries carousel (hierarchy amendment) ---------------------
+#
+# Reads already-persisted AI summaries only (LocalPlan.ai_summary_text,
+# Site.status_summary) - no AI client is imported or called anywhere in
+# this module, and nothing here writes to the database. Ordering is always
+# generation timestamp then id - never invented relevance.
+
+def build_ai_summary_carousel_items(session: Session, limit: int = 8) -> list[dict]:
+    plans = session.execute(
+        select(LocalPlan).where(LocalPlan.ai_summary_generated_at.is_not(None))
+        .order_by(LocalPlan.ai_summary_generated_at.desc(), LocalPlan.id.desc()).limit(limit)
+    ).scalars().all()
+    sites = session.execute(
+        select(Site).where(Site.status_summary.is_not(None), Site.status_summary_updated_at.is_not(None))
+        .order_by(Site.status_summary_updated_at.desc(), Site.id.desc()).limit(limit)
+    ).scalars().all()
+
+    def _excerpt(text: str, length: int = 180) -> str:
+        text = (text or "").strip()
+        return text if len(text) <= length else text[:length].rsplit(" ", 1)[0] + "…"
+
+    items = [
+        {
+            "id": f"carousel-plan-{p.id}", "type": "Local Plan Summary", "name": p.plan_name,
+            "council_code": p.council_code, "excerpt": _excerpt(p.ai_summary_text),
+            "generated_at": p.ai_summary_generated_at, "model": p.ai_summary_model,
+            "page": "pages/4_Council_Dashboard.py", "params": {},
+        }
+        for p in plans
+    ] + [
+        {
+            "id": f"carousel-site-{s.id}", "type": "Site Summary", "name": s.display_address,
+            "council_code": s.council_code, "excerpt": _excerpt(s.status_summary),
+            "generated_at": s.status_summary_updated_at, "model": None,
+            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(s.id)},
+        }
+        for s in sites
+    ]
+    items.sort(key=lambda it: (_naive(it["generated_at"]), it["id"]), reverse=True)
+    return items[:limit]
 
 
 def build_dashboard(session: Session) -> dict:
@@ -542,7 +837,10 @@ def build_dashboard(session: Session) -> dict:
         "planning": build_planning_intelligence(session),
         "policy": build_policy_intelligence(session),
         "opportunities": build_opportunities(session),
+        "opportunity_cards": build_opportunity_cards(session),
         "activity": build_recent_activity(session),
+        "activity_grouped": build_grouped_activity(session),
         "leaderboard": build_leaderboard(session),
+        "ai_summary_carousel": build_ai_summary_carousel_items(session),
         "generated_at": dt.datetime.now(dt.timezone.utc),
     }

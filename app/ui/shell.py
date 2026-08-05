@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+from contextlib import contextmanager
 
 import streamlit as st
 
@@ -104,11 +105,26 @@ def inject_global_styles() -> None:
         }
         .pig-rank { font-weight: 700; color: #8A97A3; font-size: 1rem; }
         .pig-leaderboard-time { color: #8A97A3; font-size: 0.85rem; text-align: right; }
-        [class*="st-key-lb-row-"] {
+        [class*="st-key-lb-row-"], [class*="st-key-act-row-"] {
             border-radius: 6px; padding: 0.25rem 0.4rem; margin: 0 -0.4rem;
             transition: background-color 0.12s ease;
         }
-        [class*="st-key-lb-row-"]:hover { background-color: #F4F6F8; }
+        [class*="st-key-lb-row-"]:hover, [class*="st-key-act-row-"]:hover { background-color: #F4F6F8; }
+
+        /* Dashboard hierarchy revision */
+        [class*="st-key-policy-section"] { background-color: #F3F6FA; border-color: #D7E1EC !important; }
+        [class*="st-key-opp-card-"] { border-width: 1.5px !important; }
+        [class*="st-key-opp-card-"]:hover { border-color: #1F3A5F !important; }
+        .pig-opportunity-dot {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background-color: #1F3A5F; margin-right: 5px; vertical-align: middle;
+            animation: pig-pulse 2.4s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .pig-live-dot, .pig-opportunity-dot { animation: none; opacity: 1; }
+        }
+        .pig-carousel-dots { text-align: center; margin-top: 0.5rem; letter-spacing: 3px; color: #C3CBD4; }
+        .pig-carousel-dots .pig-dot-active { color: #1F3A5F; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -273,6 +289,189 @@ def locked_card(icon: str, title: str, note: str = "Coming soon") -> None:
     with st.container(border=True):
         st.markdown(f"**🔒 {icon} {title}**")
         st.caption(note)
+
+
+def ai_daily_brief_placeholder() -> None:
+    """The AI Daily Brief (Dashboard hierarchy revision, Part 1) - deliberately
+    still a placeholder (no combined-dashboard AI summary exists yet, and
+    this component never calls an AI client or generates one), but styled
+    to look like an intentional, restrained product surface rather than an
+    afterthought: heading, an "Evidence-based briefing" badge, a concise
+    explanation, and an explicit not-yet-generated state - the same purple
+    AI accent as ai_summary_card, so it reads as the same design language
+    once real content lands here."""
+    container_key = "ai-daily-brief"
+    with st.container(border=True, key=container_key):
+        col_title, col_badge = st.columns([3, 2], vertical_alignment="center")
+        with col_title:
+            st.markdown("🤖 **AI Daily Brief**")
+        with col_badge:
+            st.badge("Evidence-based briefing", icon="📄", color="violet")
+        st.write(
+            "A short, plain-English summary of what changed across every council and Site this platform "
+            "tracks - written only from evidence already verified elsewhere on this Dashboard, never invented."
+        )
+        st.caption("Not yet generated — daily briefing will become available once dashboard aggregation is implemented.")
+    st.markdown(
+        f'<style>.st-key-{container_key} {{ border-left: 4px solid {_CUSTOM_ALERT_STYLE["ai"]["color"]} !important; }}</style>',
+        unsafe_allow_html=True,
+    )
+
+
+@contextmanager
+def section_container(title: str, subtitle: str | None = None, *, icon: str | None = None, key: str):
+    """A visually contained section (Dashboard hierarchy revision, Part 2) -
+    a single outer bordered/tinted container so a group of related cards
+    reads as one deliberate product component rather than loose content
+    scattered down the page. Usage:
+
+        with section_container("Policy Intelligence", "...", icon="📋", key="policy-section"):
+            ...cards...
+
+    The tint itself is applied via CSS scoped to this container's own
+    st-key-derived class (see inject_global_styles's ".st-key-policy-
+    section" rule) - callers don't choose a colour here, keeping every
+    section's palette centrally defined in one place."""
+    with st.container(border=True, key=key):
+        st.markdown(f"#### {icon + ' ' if icon else ''}{title}")
+        if subtitle:
+            st.caption(subtitle)
+        yield
+
+
+def opportunity_card(card: dict, *, key: str) -> None:
+    """A prominent Opportunity card (Dashboard hierarchy revision, Part 3) -
+    a stronger border, a subtle pulsing status dot (never a flashing full
+    card - reduced-motion respected via inject_global_styles's
+    prefers-reduced-motion override), and a category badge that is always
+    the real, deterministic signal the card came from, never an invented
+    urgency score (see app.reporting.dashboard.build_opportunity_cards)."""
+    container_key = f"opp-card-{key}"
+    with st.container(border=True, key=container_key):
+        st.markdown(
+            f'<span class="pig-opportunity-dot"></span>**{_escape(card["title"])}**', unsafe_allow_html=True,
+        )
+        st.caption(f"{card['subtitle']} · {card['reason']}")
+        col_metric, col_badge = st.columns([2, 2])
+        with col_metric:
+            st.markdown(f"**{_escape(str(card['metric']))}**")
+        with col_badge:
+            st.badge(card["badge"], color="blue")
+        if card.get("page"):
+            st.page_link(card["page"], label="View →", query_params=card.get("params") or {})
+
+
+def _activity_group_row(row: dict, *, key: str) -> None:
+    """One grouped Recent Activity row - icon, grouped label (already
+    aggregated by app.reporting.dashboard.group_activity_events, e.g.
+    "8 visual-evidence pages extracted from Stockport Local Plan"), and a
+    right-aligned "most recent" timestamp. Presentation only - the grouping
+    itself already happened at the data layer."""
+    with st.container(key=f"act-row-{key}"):
+        col_icon, col_main, col_time = st.columns([1, 7, 3], vertical_alignment="center")
+        with col_icon:
+            st.markdown(f"<div style='font-size:1.1rem'>{row['icon']}</div>", unsafe_allow_html=True)
+        with col_main:
+            if row.get("page"):
+                st.page_link(row["page"], label=row["label"], query_params=row.get("params") or {})
+            else:
+                st.markdown(f"**{_escape(row['label'])}**")
+        with col_time:
+            st.markdown(
+                f'<div class="pig-leaderboard-time">Most recent: {relative_time(row.get("latest_when"))}</div>',
+                unsafe_allow_html=True,
+            )
+
+
+def activity_timeline(rows: list[dict], *, key: str, empty_message: str = "Nothing to show yet.") -> None:
+    """The aggregated Recent Activity timeline (Dashboard hierarchy
+    revision, Part 5) - rows is already-grouped output from
+    app.reporting.dashboard.group_activity_events; this function only
+    renders it."""
+    if not rows:
+        st.caption(empty_message)
+        return
+    for row in rows:
+        _activity_group_row(row, key=f"{key}-{row['id']}")
+
+
+def ai_summary_carousel(items: list[dict], *, key: str) -> None:
+    """The Recent AI Summaries carousel (Dashboard hierarchy revision, Part
+    6) - reads only already-persisted summaries (see
+    app.reporting.dashboard.build_ai_summary_carousel_items), never
+    generates one. Auto-advance is deliberately NOT implemented: a native
+    Streamlit timer would require a sleep-triggered st.rerun() loop, which
+    forces a full-page rerun and disrupts whatever the user is doing
+    elsewhere on the page - exactly what this component must avoid. A
+    stable, manually-controlled carousel (Previous/Next + position dots) is
+    the documented, deliberate trade-off instead - see the Sprint 4.2
+    hierarchy-revision completion report for the full explanation."""
+    if not items:
+        st.caption("No AI summaries generated yet.")
+        return
+
+    index_key = f"{key}-carousel-index"
+    if index_key not in st.session_state:
+        st.session_state[index_key] = 0
+    # Clamp defensively - the underlying item count can shrink between
+    # reruns (e.g. a different filtered dashboard load), and an out-of-range
+    # index must never raise instead of just clamping back to the last item.
+    st.session_state[index_key] = min(st.session_state[index_key], len(items) - 1)
+    index = st.session_state[index_key]
+    item = items[index]
+
+    container_key = f"{key}-carousel-card"
+    with st.container(border=True, key=container_key):
+        col_type, col_badge = st.columns([3, 2], vertical_alignment="center")
+        with col_type:
+            st.markdown(f"**{_escape(item['type'])} — {_escape(item['name'])}**")
+        with col_badge:
+            st.badge(item["model"] or "AI", icon="🤖", color="violet")
+        st.caption(item["council_code"])
+        st.write(item["excerpt"])
+        meta_bits = [b for b in (f"Generated {relative_time(item['generated_at'])}",) if b]
+        st.caption(" · ".join(meta_bits) + " — built from evidence already verified by this platform.")
+        if item.get("page"):
+            st.page_link(item["page"], label="View source →", query_params=item.get("params") or {})
+
+        if len(items) > 1:
+            col_prev, col_dots, col_next = st.columns([1, 4, 1])
+            with col_prev:
+                if st.button("‹ Prev", key=f"{key}-carousel-prev", width="stretch"):
+                    st.session_state[index_key] = (index - 1) % len(items)
+                    st.rerun()
+            with col_dots:
+                dots = "".join(
+                    f'<span class="{"pig-dot-active" if i == index else ""}">●</span> ' for i in range(len(items))
+                )
+                st.markdown(f'<div class="pig-carousel-dots">{dots}</div>', unsafe_allow_html=True)
+            with col_next:
+                if st.button("Next ›", key=f"{key}-carousel-next", width="stretch"):
+                    st.session_state[index_key] = (index + 1) % len(items)
+                    st.rerun()
+    st.markdown(
+        f'<style>.st-key-{container_key} {{ border-left: 4px solid {_CUSTOM_ALERT_STYLE["ai"]["color"]} !important; }}</style>',
+        unsafe_allow_html=True,
+    )
+
+
+def quick_actions_panel(items: list[dict]) -> None:
+    """The compact Quick Actions side panel (Dashboard hierarchy revision,
+    Part 4) - a narrow vertical stack rather than the wide 5-card grid
+    Sprint 4.2's first pass used, since this now lives in a ~25-30% side
+    column alongside the main content instead of its own full-width row.
+    items: [{"icon","title","description","page"|None (locked if absent)}]."""
+    with st.container(border=True):
+        st.markdown("**⚡ Quick Actions**")
+        for item in items:
+            st.divider()
+            if item.get("page"):
+                st.markdown(f"{item['icon']} **{item['title']}**")
+                st.caption(item["description"])
+                st.page_link(item["page"], label="Open →")
+            else:
+                st.markdown(f"🔒 {item['icon']} **{item['title']}**")
+                st.caption(item.get("description", "Coming soon"))
 
 
 def _leaderboard_row(rank: int, row: dict, *, key: str) -> None:
