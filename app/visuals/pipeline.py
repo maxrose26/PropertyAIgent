@@ -277,6 +277,15 @@ def _process_pdf_pages(
         row.extraction_prompt_version = classification["prompt_version"]
         row.extraction_confidence = classification["confidence"]
         row.candidate_reason = "; ".join(candidate["reasons"])
+        # Sprint 3F ("Allocation Policy Page Extraction", Part 7) - the
+        # deterministic identification/matching facts, kept regardless of
+        # whether allocation_id ended up set (a needs_review row with no
+        # confident match still shows a reviewer exactly what identifier/
+        # title the page itself printed, and how the matcher scored it).
+        row.detected_allocation_reference = match.get("detected_allocation_reference")
+        row.detected_allocation_title = match.get("detected_allocation_title")
+        row.match_method = match.get("match_method")
+        row.match_confidence = match.get("match_confidence")
         # Every AI classification always starts needs_review - Part 9/10:
         # showing the WRONG image is a worse failure than a wrong number,
         # so nothing here is ever auto-applied regardless of confidence.
