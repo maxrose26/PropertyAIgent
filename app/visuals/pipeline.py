@@ -38,7 +38,7 @@ from app.db.models import Application, Document, LocalPlan, LocalPlanSite, Monit
 from app.visuals.classification import PROMPT_VERSION as CLASSIFICATION_PROMPT_VERSION
 from app.visuals.classification import classify_page
 from app.visuals.document_selection import select_candidate_documents
-from app.visuals.matching import match_document_visual, match_report_visual
+from app.visuals.matching import match_document_visual, match_report_visual, match_stored_identifiers
 from app.visuals.page_detection import detect_candidate_pages_in_pdf
 from app.visuals.primary_selection import compute_primary_flags
 from app.visuals.rendering import RENDER_VERSION, compute_file_hash, compute_page_render_hash, render_page
@@ -423,3 +423,157 @@ def run_for_council(
     applications = list(session.execute(select(Application).where(Application.council_code == council_code)).scalars())
     for application in applications:
         run_for_application(session, client, application, limits, stats, force=force, dry_run=dry_run)
+
+
+# --- Sprint 3G ("Places for Everyone Allocation Onboarding", Part 4/5) -----
+#
+# Deterministic RE-matching of already-extracted VisualEvidence rows
+# against a Local Plan's CURRENT (possibly since-grown) set of allocations -
+# never touches rendering or Vision classification at all, reusing exactly
+# the stored detected_allocation_reference/detected_allocation_title
+# (Sprint 3F) every extraction pass already wrote. This is what makes
+# onboarding new LocalPlanSite rows for a plan that already has extracted
+# images (Places for Everyone) cheap: the 156 images already exist, already
+# carry their own identifier text - only the matching DECISION needs
+# rerunning, not the $1.56 of Vision calls that produced them.
+
+# A "secondary page" (Part 5 - title page -> illustration -> masterplan ->
+# policy page) with no identifier of its own belongs to the immediately
+# preceding identified allocation's page, but only within a bounded window -
+# confirmed against real data (Sprint 3G live research: Places for
+# Everyone's own JPA 30 "New Carrington" spread its capacity figures 2-3
+# pages after its title page) - generous enough for that real case, bounded
+# enough that a page far past a title never gets silently attributed to it.
+SECONDARY_PAGE_WINDOW = 10
+
+
+@dataclasses.dataclass
+class RematchStats:
+    candidates_considered: int = 0
+    newly_linked: int = 0
+    secondary_page_suggestions: int = 0
+    skipped_confirmed: int = 0
+    skipped_rejected: int = 0
+    unmatched: int = 0
+
+
+def _find_proximity_anchor(page_number: int, anchors: list[tuple[int, int]]) -> int | None:
+    """anchors: [(page, allocation_id), ...] of every CONFIDENTLY-matched
+    current page for this plan, already sorted by page ascending. Returns
+    the allocation_id this page falls under, or None. A page belongs to
+    the NEAREST anchor at or before it - never an anchor AFTER it (a
+    secondary page always follows its own title page, never precedes it,
+    per the real observed document structure) - and only within
+    SECONDARY_PAGE_WINDOW pages, so a page far past the last known
+    allocation's own span is correctly left unmatched rather than
+    silently attributed to it."""
+    candidate: tuple[int, int] | None = None
+    for page, allocation_id in anchors:
+        if page <= page_number:
+            candidate = (page, allocation_id)
+        else:
+            break
+    if candidate is None:
+        return None
+    anchor_page, allocation_id = candidate
+    if page_number - anchor_page > SECONDARY_PAGE_WINDOW:
+        return None
+    return allocation_id
+
+
+def rematch_local_plan_evidence(session, local_plan_id: int, dry_run: bool = False) -> RematchStats:
+    """Re-matches every CURRENT, unlinked (allocation_id is None)
+    VisualEvidence row for this Local Plan against its full current set of
+    LocalPlanSite allocations - no rendering, no Vision call, no source PDF
+    read at all. Two passes:
+
+      1. Deterministic identifier/title re-match (Part 4) against each
+         row's own already-stored detected_allocation_reference/
+         detected_allocation_title, via match_stored_identifiers - the
+         exact same priority tiers a fresh extraction uses, just replayed
+         against a (now larger) allocation set.
+      2. Secondary-page review suggestions (Part 5) for rows with NO
+         identifier of their own at all, using page-proximity to an
+         already-matched anchor - NEVER sets allocation_id (Part 5:
+         "Never auto-link by page proximity alone"), only records a
+         match_method/match_confidence suggestion a human can act on.
+
+    Never touches a row whose review_status is "confirmed" or "rejected" -
+    Part 8's "never overwrite confirmed evidence" applies to confirmed rows
+    even when their own allocation_id happens to still be null (a human
+    already finalised that row; this pass leaves it exactly as they left
+    it), and a human's rejection is never silently reconsidered, matching
+    every other reprocessing path in this codebase."""
+    allocations = list(session.execute(select(LocalPlanSite).where(LocalPlanSite.local_plan_id == local_plan_id)).scalars())
+    all_current = list(session.execute(
+        select(VisualEvidence).where(VisualEvidence.local_plan_id == local_plan_id, VisualEvidence.status == "current")
+    ).scalars())
+
+    unlinked = [r for r in all_current if r.allocation_id is None]
+    stats = RematchStats(candidates_considered=len(unlinked))
+
+    touched_allocation_ids: set[int] = set()
+    # Pass 1's outcome, tracked independently of the ORM objects themselves
+    # (never read back off row.allocation_id) - this is what makes --dry-run
+    # report EXACTLY what a real run would do: pass 2's anchor search below
+    # must see pass 1's results even when dry_run=True leaves the actual
+    # rows unmodified, or a dry-run preview would (and, before this fix,
+    # did) undercount secondary-page suggestions relative to a real run.
+    pass1_matches: dict[int, int] = {}  # VisualEvidence.id -> allocation_id
+
+    for row in unlinked:
+        if row.review_status == "rejected":
+            stats.skipped_rejected += 1
+            continue
+        if row.review_status == "confirmed":
+            stats.skipped_confirmed += 1
+            continue
+        match = match_stored_identifiers(row.detected_allocation_reference, row.detected_allocation_title, allocations)
+        if match["allocation_id"] is not None:
+            if not dry_run:
+                row.allocation_id = match["allocation_id"]
+                row.match_method = match["match_method"]
+                row.match_confidence = match["match_confidence"]
+            pass1_matches[row.id] = match["allocation_id"]
+            stats.newly_linked += 1
+            touched_allocation_ids.add(match["allocation_id"])
+
+    # Anchors reflect pass 1's results (via pass1_matches) even in dry-run
+    # mode, so a page just linked above can anchor a later secondary-page
+    # suggestion in the same preview, identically to a real run.
+    anchors = sorted(
+        (
+            (r.source_page, pass1_matches.get(r.id, r.allocation_id))
+            for r in all_current
+            if r.allocation_id is not None or r.id in pass1_matches
+        ),
+        key=lambda t: t[0],
+    )
+    for row in unlinked:
+        if row.id in pass1_matches or row.review_status in ("rejected", "confirmed"):
+            continue  # linked in pass 1, or already counted/skipped above
+        if row.detected_allocation_reference or row.detected_allocation_title:
+            # Has its own signal, but pass 1 found no allocation for it
+            # (e.g. a not-yet-onboarded authority's own code) - a genuine
+            # "still needs review", not a proximity case.
+            stats.unmatched += 1
+            continue
+
+        suggested_allocation_id = _find_proximity_anchor(row.source_page, anchors)
+        if suggested_allocation_id is not None:
+            if not dry_run:
+                row.match_method = "page_proximity_suggestion"
+                row.match_confidence = 0.5
+                # allocation_id intentionally left None (Part 5).
+            stats.secondary_page_suggestions += 1
+        else:
+            stats.unmatched += 1
+
+    if not dry_run:
+        for allocation_id in touched_allocation_ids:
+            _recompute_primary_for_allocation(session, allocation_id)
+        session.commit()
+    else:
+        session.rollback()
+
+    return stats

@@ -1,0 +1,358 @@
+# Sprint 3G ("Places for Everyone Allocation Onboarding") - every remaining
+# Places for Everyone allocation NOT already represented as a LocalPlanSite
+# row (Bury's JPA 7/8/9 already exist from Sprint 2 - never recreated here).
+#
+# Every fact below was read directly from data/local_plans/bury/
+# places_for_everyone.pdf (never inferred, never invented - CLAUDE.md
+# "evidence over AI"):
+#   - district/council: Table 11.1 "List of Places for Everyone Allocations"
+#     (pages 253-255), cross-checked against Appendix B.1 "List of Places
+#     for Everyone Green Belt Additions" (page 522) where Table 11.1 itself
+#     only said "Cross Boundary" - see the "cross_boundary" section below
+#     for exactly which evidence resolved each one.
+#   - capacity/intended_use/source_page: each allocation's own "Policy JP
+#     Allocation N" policy section, read directly (page numbers below).
+#
+# council_code values match config/councils.yaml's existing codes exactly -
+# no new councils are onboarded (application scraping is NOT enabled for
+# any of these 7 beyond what Sprint 3E's LocalPlanCouncil already granted:
+# visibility of the Places for Everyone PLAN itself, not its allocations).
+#
+# local_plan_id is resolved at runtime by plan_name/plan_version (matching
+# LocalPlan's own uniqueness triple), never hardcoded as a raw id, so this
+# file stays valid if a fresh database assigns a different id.
+plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+plan_version: "2022-2039"
+
+single_authority_allocations:
+  # --- Bolton (JPA4-6) - all employment allocations, no dwelling count
+  # stated anywhere in their own policy text - intended_use recorded as
+  # the plan itself states it (CLAUDE.md: "record what the plan says
+  # rather than assuming residential-only"), not assumed. ---
+  - policy_reference: "JPA 4"
+    site_name: "Bewshill Farm"
+    council_code: bolton
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Employment - c.21,000 sqm industrial/warehousing floorspace"
+    source_page: 302
+  - policy_reference: "JPA 5"
+    site_name: "Chequerbent North"
+    council_code: bolton
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Employment - c.25,000 sqm industrial/warehousing floorspace"
+    source_page: 304
+  - policy_reference: "JPA 6"
+    site_name: "West of Wingates / M61 Junction 6"
+    council_code: bolton
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Employment - c.440,000 sqm industrial/warehousing floorspace"
+    source_page: 307
+
+  # --- Oldham (JPA10-16) ---
+  - policy_reference: "JPA 10"
+    site_name: "Beal Valley"
+    council_code: oldham
+    intended_use: residential
+    minimum_dwellings: 480
+    category: "Strategic housing allocation"
+    source_page: 330
+  - policy_reference: "JPA 11"
+    site_name: "Bottom Field Farm (Woodhouses)"
+    council_code: oldham
+    intended_use: residential
+    minimum_dwellings: 30
+    category: "Strategic housing allocation"
+    source_page: 337
+  - policy_reference: "JPA 12"
+    site_name: "Broadbent Moss"
+    council_code: oldham
+    intended_use: residential
+    minimum_dwellings: 1450
+    category: "Strategic housing allocation (c.376 of the 1,450 homes expected post-2039, stated verbatim in the source)"
+    source_page: 341
+  - policy_reference: "JPA 13"
+    site_name: "Chew Brook Vale (Robert Fletchers)"
+    council_code: oldham
+    intended_use: mixed use
+    minimum_dwellings: 138
+    category: "Mixed use - housing plus up to 3,000 sqm commercial/leisure/retail"
+    source_page: 350
+  - policy_reference: "JPA 14"
+    site_name: "Cowlishaw"
+    council_code: oldham
+    intended_use: residential
+    minimum_dwellings: 460
+    category: "Strategic housing allocation"
+    source_page: 357
+  - policy_reference: "JPA 15"
+    site_name: "Land South of Coal Pit Lane (Ashton Road)"
+    council_code: oldham
+    intended_use: residential
+    minimum_dwellings: 175
+    category: "Strategic housing allocation"
+    source_page: 361
+  - policy_reference: "JPA 16"
+    site_name: "South of Rosary Road"
+    council_code: oldham
+    intended_use: residential
+    minimum_dwellings: 60
+    category: "Strategic housing allocation"
+    source_page: 366
+
+  # --- Rochdale (JPA17-23) ---
+  - policy_reference: "JPA 17"
+    site_name: "Bamford / Norden"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 450
+    category: "Strategic housing allocation"
+    source_page: 372
+  - policy_reference: "JPA 18"
+    site_name: "Castleton Sidings"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 125
+    category: "Strategic housing allocation"
+    source_page: 377
+  - policy_reference: "JPA 19"
+    site_name: "Crimble Mill"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 250
+    category: "Strategic housing allocation (includes conversion of the Grade II* listed Crimble Mill)"
+    source_page: 381
+  - policy_reference: "JPA 20"
+    site_name: "Land North of Smithy Bridge"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 300
+    category: "Strategic housing allocation"
+    source_page: 386
+  - policy_reference: "JPA 21"
+    site_name: "Newhey Quarry"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 250
+    category: "Strategic housing allocation"
+    source_page: 391
+  - policy_reference: "JPA 22"
+    site_name: "Roch Valley"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 200
+    category: "Strategic housing allocation"
+    source_page: 396
+  - policy_reference: "JPA 23"
+    site_name: "Trows Farm"
+    council_code: rochdale
+    intended_use: residential
+    minimum_dwellings: 550
+    category: "Strategic housing allocation"
+    source_page: 400
+
+  # --- Salford (JPA24-26) ---
+  - policy_reference: "JPA 24"
+    site_name: "Land at Hazelhurst Farm"
+    council_code: salford
+    intended_use: residential
+    minimum_dwellings: 400
+    category: "Strategic housing allocation - at least 50% affordable housing stated"
+    source_page: 406
+  - policy_reference: "JPA 25"
+    site_name: "East of Boothstown"
+    council_code: salford
+    intended_use: residential
+    minimum_dwellings: 300
+    category: "Strategic housing allocation - low density, top-end market positioning stated"
+    source_page: 410
+  - policy_reference: "JPA 26"
+    site_name: "Port Salford Extension"
+    council_code: salford
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Employment - c.320,000 sqm logistics/industrial floorspace (Port Salford expansion)"
+    source_page: 415
+
+  # --- Tameside (JPA27-29) ---
+  - policy_reference: "JPA 27"
+    site_name: "Ashton Moss West"
+    council_code: tameside
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Employment - c.160,000 sqm floorspace"
+    source_page: 424
+  - policy_reference: "JPA 28"
+    site_name: "Godley Green Garden Village"
+    council_code: tameside
+    intended_use: residential
+    minimum_dwellings: 2350
+    category: "Strategic housing allocation - Garden City principles stated"
+    source_page: 430
+  - policy_reference: "JPA 29"
+    site_name: "South of Hyde"
+    council_code: tameside
+    intended_use: residential
+    minimum_dwellings: 440
+    category: "Strategic housing allocation"
+    source_page: 438
+
+  # --- Trafford (JPA30) - the plan's own largest single allocation. Its
+  # capacity figures sit 2-3 pages after its own title page (page 448),
+  # confirmed by direct reading of pages 450-451 - exactly the "title page
+  # -> illustration page -> masterplan page -> policy page" spread Part 5
+  # describes; source_page is still the title page (matching every other
+  # allocation's own convention), the capacity figures themselves were
+  # read from pages 450-451. ---
+  - policy_reference: "JPA 30"
+    site_name: "New Carrington"
+    council_code: trafford
+    intended_use: mixed use
+    minimum_dwellings: 5000
+    category: "Mixed use - c.5,000 homes at Carrington/Partington/Sale West plus c.350,000 sqm (gross) B2/B8 employment floorspace; capacity figures read from pages 450-451, not the title page itself"
+    source_page: 448
+
+  # --- Wigan (JPA31-34) ---
+  - policy_reference: "JPA 31"
+    site_name: "M6 Junction 25"
+    council_code: wigan
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Employment - c.140,000 sqm B2/B8 floorspace"
+    source_page: 466
+  - policy_reference: "JPA 32"
+    site_name: "North of Mosley Common"
+    council_code: wigan
+    intended_use: residential
+    minimum_dwellings: 1100
+    category: "Strategic housing allocation - Leigh-Salford-Manchester guided busway"
+    source_page: 470
+  - policy_reference: "JPA 33"
+    site_name: "Pocket Nook"
+    council_code: wigan
+    intended_use: residential
+    minimum_dwellings: 600
+    category: "Strategic housing allocation (c.75 homes west of the safeguarded HS2 route, stated verbatim in the source)"
+    source_page: 475
+  - policy_reference: "JPA 34"
+    site_name: "West of Gibfield"
+    council_code: wigan
+    intended_use: mixed use
+    minimum_dwellings: 500
+    category: "Mixed use - housing plus c.45,500 sqm E(g)/B2/B8 employment floorspace"
+    source_page: 479
+
+# --- Cross-boundary allocations (Part 3) ---
+#
+# Table 11.1 labels JPA1.1, JPA1.2, JPA2, JPA3.1 and JPA3.2 "Cross
+# Boundary" rather than naming one district. Every one of them, on
+# individual investigation, DOES have a single real host authority
+# (confirmed per-entry below) - "Cross Boundary" describes the wider
+# strategic grouping (the Atom Valley MDZ; the Manchester Airport
+# Strategic Location), not a genuine single-site multi-council span. Per
+# CLAUDE.md's "never invent" and this sprint's own "never infer
+# boundaries", each is marked review_status="needs_confirmation" rather
+# than "auto_applied" - the evidence is real and cited, but is
+# place-name/cross-reference-based rather than an explicit "this
+# allocation sits within [Council]'s boundary" sentence in the plan's own
+# text, so a human should confirm before this is treated as fully trusted.
+#
+# Northern Gateway (JPA1.1 + JPA1.2) is additionally a genuine duplicate-
+# across-plans case, the same pattern Sprint 3E already resolved for
+# Seedfield/Walshaw/Elton Reservoir: Bury's OWN Local Plan separately
+# already carries two rows for "Northern Gateway" (policy_reference
+# JPA1.1/JPA1.2, ids matched at runtime by council_code=bury AND
+# plan_name="Bury Local Plan" AND site_name="Northern Gateway") - these
+# are NOT recreated; instead an AllocationRelationship links the new
+# PfE-scoped rows to them (same_physical_site), reusing Sprint 3E's exact
+# reconciliation architecture rather than inventing a new one.
+cross_boundary_allocations:
+  - policy_reference: "JPA 1.1"
+    site_name: "Heywood / Pilsworth (Northern Gateway)"
+    council_code: rochdale
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Cross Boundary (Atom Valley MDZ) - employment, c.1,200,000 sqm industrial/warehousing"
+    source_page: 260
+    review_status: needs_confirmation
+    confidence_note: >
+      Table 11.1 (p.253) labels this "Cross Boundary". Attributed to
+      Rochdale on real-world place-name evidence (Heywood is a Rochdale
+      MBC town) - the plan's own policy text (p.260) does not itself name
+      a single administering council. Genuinely spans the Bury/Rochdale
+      boundary as part of the same Northern Gateway MDZ as JPA1.2 (Bury) -
+      see the AllocationRelationship linking both JPA1.1 and JPA1.2, and
+      linking JPA1.1 to Bury's own pre-existing "Northern Gateway" row.
+    link_to_bury_local_plan_site: "Northern Gateway"  # site_name match within plan_name="Bury Local Plan"
+    sibling_reference: "JPA 1.2"
+
+  - policy_reference: "JPA 1.2"
+    site_name: "Simister and Bowlee (Northern Gateway)"
+    council_code: bury
+    intended_use: residential
+    minimum_dwellings: 1550
+    category: "Cross Boundary (Atom Valley MDZ) - residential"
+    source_page: 269
+    review_status: needs_confirmation
+    confidence_note: >
+      Table 11.1 (p.253) labels this "Cross Boundary". Attributed to Bury
+      with high confidence - Bury's own separately-ingested Local Plan
+      independently already names "Northern Gateway" (the same MDZ) as
+      its own allocation (policy_reference JPA1.1/JPA1.2), corroborating
+      this from a second, independent source document, not just PfE's own
+      naming.
+    link_to_bury_local_plan_site: "Northern Gateway"
+    sibling_reference: "JPA 1.1"
+
+  - policy_reference: "JPA 2"
+    site_name: "Stakehill"
+    council_code: rochdale
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Cross Boundary (Atom Valley MDZ) - employment, c.150,000 sqm industrial/warehousing"
+    source_page: 274
+    review_status: needs_confirmation
+    confidence_note: >
+      Table 11.1 (p.253) labels this "Cross Boundary", but Appendix B.1
+      "List of Places for Everyone Green Belt Additions" (p.522) is
+      explicit: "Rochdale ... Land to west of Stakehill Business Park" -
+      the plan's own second table directly confirms Rochdale as the
+      administering authority. Kept needs_confirmation (not auto_applied)
+      only because this resolves Table 11.1's own ambiguous label via a
+      cross-reference within the same document, not a single explicit
+      sentence naming the council on Stakehill's own policy page.
+
+  - policy_reference: "JPA 3.1"
+    site_name: "Medipark"
+    council_code: trafford
+    intended_use: employment
+    minimum_dwellings: null
+    category: "Cross Boundary (Manchester Airport Strategic Location) - employment, health/biotech cluster"
+    source_page: 282
+    review_status: needs_confirmation
+    confidence_note: >
+      Table 11.1 does not list JPA3.1 individually (grouped under the
+      Medipark/Timperley Wedge introduction, p.282); the wider chapter
+      (p.81) explicitly distinguishes Medipark/Timperley Wedge from
+      "Airport City" and "Manchester Local Plan" - implying these two PfE
+      allocations sit OUTSIDE Manchester's own boundary. Attributed to
+      Trafford on real-world place-name evidence (Roundthorn Industrial
+      Estate, paired here with Medipark, sits within Trafford) - not an
+      explicit single sentence naming the council.
+
+  - policy_reference: "JPA 3.2"
+    site_name: "Timperley Wedge"
+    council_code: trafford
+    intended_use: mixed use
+    minimum_dwellings: 1800
+    category: "Cross Boundary (Manchester Airport Strategic Location) - c.1,800 homes plus c.60,000 sqm office floorspace"
+    source_page: 287
+    review_status: needs_confirmation
+    confidence_note: >
+      Table 11.1 does not list JPA3.2 individually (see JPA3.1's note).
+      Attributed to Trafford on real-world place-name evidence (Timperley
+      is a Trafford suburb) - high confidence but not an explicit single
+      sentence in the plan naming the council, hence needs_confirmation
+      rather than auto_applied.
