@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Council, LocalPlan, LocalPlanSite, MonitoredSource, PolicyChangeEvent
+from app.policy.joint_plans import plans_for_council
 
 # Worst-to-best - a council's overall monitoring_health is the WORST health
 # across its own sources, so a single failing source can't be hidden behind
@@ -30,9 +31,16 @@ def _rollup_monitoring_health(sources: list[MonitoredSource]) -> str:
     return min((s.monitoring_health for s in sources), key=lambda h: _HEALTH_SEVERITY.get(h, 99))
 
 
-def summarise_local_plan(session: Session, plan: LocalPlan) -> dict:
+def summarise_local_plan(session: Session, plan: LocalPlan, council_code: str) -> dict:
+    """council_code: the council this summary is being shown FOR - not
+    necessarily plan.council_code (Sprint 3E, Part 3). A joint plan's
+    allocations_imported/sites_matched must reflect only the allocations
+    that physically sit in the council being viewed (LocalPlanSite.
+    council_code, untouched by joint-plan support) - Places for Everyone
+    shown under, say, Trafford must not claim Bury's JPA7/8/9 allocations
+    as Trafford's own, even though the plan itself is jointly theirs."""
     allocations = session.execute(
-        select(LocalPlanSite).where(LocalPlanSite.local_plan_id == plan.id)
+        select(LocalPlanSite).where(LocalPlanSite.local_plan_id == plan.id, LocalPlanSite.council_code == council_code)
     ).scalars().all()
     return {
         "plan_id": plan.id,
@@ -47,7 +55,13 @@ def summarise_local_plan(session: Session, plan: LocalPlan) -> dict:
 
 
 def summarise_council(session: Session, council: Council) -> dict:
-    plans = session.execute(select(LocalPlan).where(LocalPlan.council_code == council.code)).scalars().all()
+    # Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation",
+    # Part 3) - plans_for_council includes plans linked via the new
+    # LocalPlanCouncil join table (a joint plan appears under every
+    # participating authority) as well as the legacy council_code column
+    # (unbackfilled plans, and every ordinary single-authority plan) -
+    # never a plan created twice, always the same underlying LocalPlan row.
+    plans = plans_for_council(session, council.code)
     sources = session.execute(select(MonitoredSource).where(MonitoredSource.council_code == council.code)).scalars().all()
 
     plan_ids = {p.id for p in plans}
@@ -67,34 +81,33 @@ def summarise_council(session: Session, council: Council) -> dict:
 
     last_checked_values = [s.last_checked for s in sources if s.last_checked is not None]
 
+    plan_summaries = [summarise_local_plan(session, p, council.code) for p in plans]
+
     return {
         "council_code": council.code,
         "council_name": council.name,
         "authority_type": council.authority_type,
         "monitoring_enabled": council.monitoring_enabled,
-        "local_plans": [summarise_local_plan(session, p) for p in plans],
+        "local_plans": plan_summaries,
         "sources_count": len(sources),
         "monitoring_health": _rollup_monitoring_health(sources),
         "last_checked": max(last_checked_values) if last_checked_values else None,
         "review_items_pending": review_items_pending,
-        "total_allocations_imported": sum(len(session.execute(
-            select(LocalPlanSite).where(LocalPlanSite.local_plan_id == p.id)
-        ).scalars().all()) for p in plans),
+        "total_allocations_imported": sum(p["allocations_imported"] for p in plan_summaries),
     }
 
 
 def build_council_dashboard(session: Session) -> list[dict]:
     """One row per council that has any real Policy Intelligence activity -
-    monitoring enabled, at least one LocalPlan, or at least one registered
-    source. A council configured for application scraping only (most of
-    the other 8 Greater Manchester boroughs, at this sprint) is correctly
-    left out - there is nothing to administer for it yet."""
+    monitoring enabled, at least one LocalPlan (directly or via a joint-plan
+    LocalPlanCouncil link), or at least one registered source. A council
+    configured for application scraping only, with no Policy Intelligence
+    activity of its own, is correctly left out - there is nothing to
+    administer for it yet."""
     councils = session.execute(select(Council)).scalars().all()
     rows = []
     for council in councils:
-        has_plans = session.execute(
-            select(LocalPlan).where(LocalPlan.council_code == council.code)
-        ).first() is not None
+        has_plans = len(plans_for_council(session, council.code)) > 0
         has_sources = session.execute(
             select(MonitoredSource).where(MonitoredSource.council_code == council.code)
         ).first() is not None

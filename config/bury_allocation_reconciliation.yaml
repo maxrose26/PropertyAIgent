@@ -1,0 +1,160 @@
+# Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation", Part
+# 5) - the recorded outcome of investigating five Bury Local Plan rows
+# (policy_reference=None, source page 20/22) whose site names duplicate or
+# reference Places for Everyone content. Every finding here was reached by
+# directly reading the primary source PDFs, never inferred from database
+# names alone (Part 5's explicit instruction):
+#
+#   - data/local_plans/bury/bury_publication_local_plan.pdf, page 22
+#     (printed page 21), paragraph 3.18: "...to address the shortfall, PfE
+#     identifies several strategic housing allocations on land that was
+#     previously designated as Green Belt at Seedfield, Walshaw, Elton
+#     Reservoir, Castle Road (Unsworth) and Simister." - Bury's own plan
+#     explicitly attributes these five sites to PfE, narrating them for
+#     context rather than allocating them itself.
+#   - data/local_plans/bury/places_for_everyone.pdf, Table 11.1 "List of
+#     Places for Everyone Allocations" (pages 253-254): the ONLY Bury-
+#     district entries are JPA7 Elton Reservoir, JPA8 Seedfield, JPA9
+#     Walshaw - JPA1.2 is officially named "Northern Gateway Simister and
+#     Bowlee" - and there is no separate JPA code for "Castle Road" at all.
+#   - data/local_plans/bury/places_for_everyone.pdf, page 265, paragraph
+#     11.31 (within the Northern Gateway/Heywood employment allocation
+#     text): "...the allocation is also considered to have the potential
+#     to accommodate around 200 further dwellings on land accessed via
+#     Castle Road in Unsworth." - confirms Castle Road is a sub-parcel
+#     described WITHIN the Northern Gateway allocation narrative, not an
+#     allocation in its own right.
+#
+# See app.policy.allocation_reconciliation for how this file is applied -
+# every entry only ever creates a reviewable PolicyChangeEvent (allocation_
+# id.duplicate_classification stays null until a human approves it) plus an
+# AllocationRelationship proposal (review_status="needs_review") - nothing
+# here mutates a LocalPlanSite row directly.
+
+reconciliations:
+  - council_code: bury
+    plan_name: "Bury Local Plan"          # the plan the FROM row is currently filed under
+    site_name: "Seedfield"
+    policy_reference: null
+    classification: duplicate_of_other_plan
+    relationship_type: same_physical_site
+    to_plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+    to_site_name: "Seedfield"
+    to_policy_reference: "JPA 8"
+    confidence: 0.95
+    note: >
+      Bury Local Plan p.22 (para 3.18) explicitly attributes this site's
+      allocation to Places for Everyone, not to Bury's own plan. Places
+      for Everyone Table 11.1 (p.254) and Policy JPA8 (p.318) confirm
+      Seedfield is allocated there for ~140 homes. Same physical site as
+      the Bury-side row, proposed for display as a cross-reference to the
+      genuine JPA8 allocation rather than a second, independent one.
+    source_document_url: "https://www.bury.gov.uk/asset-library/publication-local-plan-june-2026.pdf"
+    source_page: 22
+    source_excerpt: >
+      "PfE identifies several strategic housing allocations on land that
+      was previously designated as Green Belt at Seedfield, Walshaw, Elton
+      Reservoir, Castle Road (Unsworth) and Simister."
+
+  - council_code: bury
+    plan_name: "Bury Local Plan"
+    site_name: "Walshaw"
+    policy_reference: null
+    classification: duplicate_of_other_plan
+    relationship_type: same_physical_site
+    to_plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+    to_site_name: "Walshaw"
+    to_policy_reference: "JPA 9"
+    confidence: 0.95
+    note: >
+      Bury Local Plan p.22 (para 3.18) explicitly attributes this site's
+      allocation to Places for Everyone. Places for Everyone Table 11.1
+      (p.254) and Policy JPA9 (p.321) confirm Walshaw is allocated there
+      for ~1,250 homes. Same physical site as the Bury-side row.
+    source_document_url: "https://www.bury.gov.uk/asset-library/publication-local-plan-june-2026.pdf"
+    source_page: 22
+    source_excerpt: >
+      "PfE identifies several strategic housing allocations on land that
+      was previously designated as Green Belt at Seedfield, Walshaw, Elton
+      Reservoir, Castle Road (Unsworth) and Simister."
+
+  - council_code: bury
+    plan_name: "Bury Local Plan"
+    site_name: "Elton Reservoir"
+    policy_reference: null
+    classification: duplicate_of_other_plan
+    relationship_type: same_physical_site
+    to_plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+    to_site_name: "Elton Reservoir"
+    to_policy_reference: "JPA 7"
+    confidence: 0.95
+    note: >
+      Bury Local Plan p.22 (para 3.18) explicitly attributes this site's
+      allocation to Places for Everyone. Places for Everyone Table 11.1
+      (p.254) and Policy JPA7 (p.311) confirm Elton Reservoir is allocated
+      there for ~3,500 homes. Same physical site as the Bury-side row.
+    source_document_url: "https://www.bury.gov.uk/asset-library/publication-local-plan-june-2026.pdf"
+    source_page: 22
+    source_excerpt: >
+      "PfE identifies several strategic housing allocations on land that
+      was previously designated as Green Belt at Seedfield, Walshaw, Elton
+      Reservoir, Castle Road (Unsworth) and Simister."
+
+  - council_code: bury
+    plan_name: "Bury Local Plan"
+    site_name: "Castle Road (Unsworth)"
+    policy_reference: null
+    classification: contextual_reference
+    relationship_type: referenced_by
+    # No standalone PfE allocation row exists for this - Places for
+    # Everyone's Table 11.1 has no separate JPA code for "Castle Road" at
+    # all (confirmed - only JPA7/8/9 are Bury-district entries). The
+    # ~200-dwelling potential is described WITHIN the Northern Gateway
+    # (Heywood/Pilsworth, JPA1.1) allocation narrative - the relationship
+    # points there, at Bury's own already-ingested Northern Gateway row,
+    # not at a nonexistent PfE row.
+    to_plan_name: "Bury Local Plan"
+    to_site_name: "Northern Gateway"
+    to_policy_reference: "JPA1.1"
+    confidence: 0.8
+    note: >
+      Bury Local Plan p.22 (para 3.18) narratively lists this alongside
+      the genuine PfE allocations, but Places for Everyone's own
+      allocations table has no separate JPA code for "Castle Road" at
+      all. Places for Everyone p.265 (para 11.31) confirms the ~200
+      further dwellings this refers to are described as part of the
+      Northern Gateway (Heywood/Pilsworth, JPA1.1) allocation's own
+      capacity, not a distinct allocation - this is a contextual mention
+      of a sub-parcel, not a formal allocation of its own.
+    source_document_url: "https://www.bury.gov.uk/asset-library/publication-local-plan-june-2026.pdf"
+    source_page: 22
+    source_excerpt: >
+      "...the allocation is also considered to have the potential to
+      accommodate around 200 further dwellings on land accessed via
+      Castle Road in Unsworth." (Places for Everyone, p.265, para 11.31)
+
+  - council_code: bury
+    plan_name: "Bury Local Plan"
+    site_name: "Simister"
+    policy_reference: null
+    classification: contextual_reference
+    relationship_type: referenced_by
+    # JPA1.2's own official Places for Everyone name is "Northern Gateway
+    # Simister and Bowlee" (Table 11.1, p.253) - Simister is part of that
+    # allocation, already separately represented as Bury's own JPA1.2 row,
+    # not a distinct allocation with its own code.
+    to_plan_name: "Bury Local Plan"
+    to_site_name: "Northern Gateway"
+    to_policy_reference: "JPA1.2"
+    confidence: 0.85
+    note: >
+      Places for Everyone Table 11.1 (p.253) names JPA1.2 "Northern
+      Gateway Simister and Bowlee" - Simister is the place-name component
+      of an allocation already ingested as Bury's own JPA1.2 row, not a
+      separate allocation with its own code.
+    source_document_url: "https://www.bury.gov.uk/asset-library/publication-local-plan-june-2026.pdf"
+    source_page: 22
+    source_excerpt: >
+      "PfE identifies several strategic housing allocations on land that
+      was previously designated as Green Belt at Seedfield, Walshaw, Elton
+      Reservoir, Castle Road (Unsworth) and Simister."

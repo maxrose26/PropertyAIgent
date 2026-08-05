@@ -125,17 +125,27 @@ def _render_evidence_field(entry: dict) -> None:
                 st.caption(f"{h['value']} (as of {date_bit}{source_bit})")
 
 
-def _render_ai_summary(plan_row: LocalPlan) -> None:
+def _render_ai_summary(plan_row: LocalPlan, council_code: str) -> None:
     """Sprint 3B.1 ("AI Local Plan Summary", Part 7) - shown at the TOP of
     each Local Plan section, above the existing detailed evidence
     expander. Never regenerates on its own (Part 6) - generate_local_plan_
     summary is only ever called from inside the Refresh button's own
-    click branch below, so a plain page view/rerun never spends AI cost."""
+    click branch below, so a plain page view/rerun never spends AI cost.
+
+    council_code: Sprint 3E ("Joint Plan Support and Bury Allocation
+    Reconciliation") - a joint plan like Places for Everyone now renders
+    once per participating authority's own expander (Part 3), all showing
+    the SAME plan_row - the button's key must include which council's
+    expander it's rendering inside, or Streamlit raises
+    StreamlitDuplicateElementKey the moment a plan appears under a second
+    council. The underlying ai_summary_* fields stay genuinely shared
+    (Part 3: "plan-wide metadata remains shared") - only the widget's own
+    identity needs to differ per render location."""
     st.markdown("##### 🤖 AI Local Plan Summary")
 
     has_summary = plan_row.ai_summary_text is not None
     button_label = "🔄 Refresh" if has_summary else "Generate summary"
-    if st.button(button_label, key=f"refresh_summary_{plan_row.id}"):
+    if st.button(button_label, key=f"refresh_summary_{plan_row.id}_{council_code}"):
         openai_key = os.getenv("OPENAI_API_KEY")
         if not openai_key:
             st.error("OPENAI_API_KEY not set in .env.")
@@ -283,7 +293,7 @@ for r in rows:
             # assembly is testable independently of Streamlit.
             plan_row = session.get(LocalPlan, plan["plan_id"])
             if plan_row is not None:
-                _render_ai_summary(plan_row)
+                _render_ai_summary(plan_row, r["council_code"])
 
                 evidence_view = build_plan_evidence_view(session, plan_row)
                 sections_with_content = [

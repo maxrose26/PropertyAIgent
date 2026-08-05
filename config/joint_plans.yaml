@@ -1,0 +1,44 @@
+# Config-driven list of genuinely joint/multi-authority Local Plans, for
+# Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation", Part
+# 1/2). A joint plan is still stored as exactly ONE LocalPlan row (matched
+# below by council_code/plan_name/plan_version - the same uniqueness triple
+# LocalPlan is already constrained on) - this file only says which
+# additional Councils that one row should be linked to via
+# LocalPlanCouncil, not a second plan to create.
+#
+# Every entry here needs its participating authorities traceable to a real
+# source, same "evidence over AI" discipline as everywhere else in this
+# codebase - see each entry's source_note for where it was confirmed.
+#
+# app.policy.joint_plans.load_joint_plans_config() reads this; see
+# scripts/migrate_joint_plan_support.py for the idempotent backfill that
+# actually writes the LocalPlanCouncil rows.
+
+joint_plans:
+  - council_code: bury  # the authority this LocalPlan row is currently ingested/registered under (its legacy_owner/lead)
+    plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+    plan_version: "2022-2039"
+    lead_authority: null  # PfE's own documents (data/local_plans/bury/places_for_everyone.pdf) name no single "lead" authority among the nine - all nine sign the plan jointly as equal participants (see source_note)
+    participating_authorities:
+      - bolton
+      - bury
+      - oldham
+      - rochdale
+      - salford
+      - stockport
+      - tameside
+      - trafford
+      - wigan
+    source_note: >
+      Places for Everyone Joint Development Plan 2022-2039, adopted with
+      effect from 21 March 2024. Participating authorities confirmed by
+      direct reading of data/local_plans/bury/places_for_everyone.pdf,
+      Table 11.1 "List of Places for Everyone Allocations" (pages 253-254),
+      which lists allocations by District for exactly these nine
+      authorities (Bolton, Bury, Oldham, Rochdale, Salford, Stockport,
+      Tameside, Trafford, Wigan) plus cross-boundary allocations shared
+      between two of them - not a search-engine summary. Manchester City
+      Council is a Greater Manchester authority but is NOT a Places for
+      Everyone participant (it withdrew early in the plan's development
+      and produced its own separate Manchester Local Plan instead) and is
+      deliberately absent from this list.

@@ -27,6 +27,11 @@ from app.policy.progression import classify_progression
 _RESOLVABLE_FIELDS_ALLOCATION = {
     "site_name", "minimum_dwellings", "indicative_capacity", "maximum_capacity",
     "category", "allocation_status", "raw_allocation_status",
+    # Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation",
+    # Part 5) - applied only via an approved duplicate_name_reconciliation_
+    # proposed event (see app.policy.allocation_reconciliation), never set
+    # any other way.
+    "duplicate_classification", "duplicate_classification_note",
 }
 # Sprint 1's original three - kept snapshotted via snapshot_plan_status
 # (LocalPlanStatusHistory), unchanged, below.

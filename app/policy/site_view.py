@@ -22,6 +22,14 @@ def build_site_policy_intelligence(allocations: list["LocalPlanSite"]) -> list[d
         plan = allocation.local_plan
         reasons = json.loads(allocation.progression_reasons) if allocation.progression_reasons else []
         rows.append({
+            # Sprint 3E ("Joint Plan Support and Bury Allocation
+            # Reconciliation", Part 4) - the caller-side stable key a UI
+            # must use to look this row back up. policy_reference (below)
+            # is legitimately nullable and non-unique (see LocalPlanSite's
+            # own docstring) - keying a lookup off it collapsed every
+            # ref=None allocation into whichever was built last, the exact
+            # defect this field exists to let callers avoid.
+            "allocation_id": allocation.id,
             "plan_name": plan.plan_name if plan else allocation.plan_name,
             "plan_status": plan.status if plan else None,
             "plan_raw_status": plan.raw_status if plan else allocation.plan_status,

@@ -82,7 +82,15 @@ st.subheader(f"{len(filtered)} sites ({matched_count} already have an applicatio
 
 geo_points = []
 rows = []
-policy_rows = {row["policy_reference"]: row for row in build_site_policy_intelligence(filtered)}
+# Sprint 3E ("Joint Plan Support and Bury Allocation Reconciliation", Part
+# 4) - keyed by allocation ID, never policy_reference. policy_reference is
+# legitimately nullable AND non-unique (several allocations can share
+# policy_reference=None, or - in principle - the same code across two
+# different plans) - a dict keyed by it collapses every colliding
+# allocation down to whichever was built last, silently showing that one
+# row's status/progression signal for every other allocation that shared
+# the key. allocation.id is the one thing guaranteed unique per row.
+policy_rows = {row["allocation_id"]: row for row in build_site_policy_intelligence(filtered)}
 for s in filtered:
     delivery_note = None
     if s.matched_site_id:
@@ -94,7 +102,7 @@ for s in filtered:
     plan_page_url = (
         f"{s.source_document_url}#page={s.source_page}" if s.source_document_url and s.source_page else None
     )
-    policy_row = policy_rows[s.policy_reference]
+    policy_row = policy_rows[s.id]
 
     rows.append({
         "Council": s.council_code,
