@@ -48,7 +48,7 @@ council_intelligence_page = st.Page("pages/5_Council_Intelligence.py", title="Co
 council_intelligence_detail_page = st.Page(
     "pages/6_Council_Intelligence_Detail.py", title="Council Intelligence", icon="🏛️", visibility="hidden"
 )
-local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Local Plan Sites", icon="📋")
+local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Allocation Discovery", icon="🗺️")
 council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️")
 review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗")
 

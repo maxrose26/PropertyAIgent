@@ -49,6 +49,20 @@ _BADGE_KIND_STYLE = {
     "not_identified": {"color": "gray", "icon": "❔", "label": "Not identified"},
     "stale": {"color": "orange", "icon": "🕗", "label": "Stale"},
     "superseded": {"color": "gray", "icon": "🗂", "label": "Superseded"},
+    # Allocation Discovery (Sprint 4.5, Part 8) - the plan-status chip
+    # vocabulary, restrained/text-first per that sprint's colour treatment
+    # rules: Adopted green, Emerging/Regulation 19 purple, Regulation
+    # 18/consultation amber, Examination blue, Withdrawn/superseded red,
+    # Unknown/insufficient evidence slate/gray. Distinct from the generic
+    # "confirmed"/"review" kinds above - a plan's status is never the same
+    # signal as an evidence-review state, so it gets its own kinds rather
+    # than reusing "confirmed" for "adopted".
+    "plan_adopted": {"color": "green", "icon": "✅", "label": "Adopted"},
+    "plan_emerging": {"color": "violet", "icon": "🟣", "label": "Emerging"},
+    "plan_consultation": {"color": "orange", "icon": "🟠", "label": "Consultation"},
+    "plan_examination": {"color": "blue", "icon": "🔵", "label": "Examination"},
+    "plan_withdrawn": {"color": "red", "icon": "🛑", "label": "Withdrawn / superseded"},
+    "plan_unknown": {"color": "gray", "icon": "❔", "label": "Unknown"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -62,6 +76,13 @@ _CUSTOM_ALERT_STYLE = {
     "review": {"color": "#B7791F", "icon": "⚠", "label": "Review required"},
     "ai": {"color": "#6B4FA0", "icon": "🤖", "label": "AI-generated"},
     "evidence_missing": {"color": "#3B5773", "icon": "📄", "label": "Evidence missing"},
+    # Allocation Discovery (Sprint 4.5a, "Commercial Polish", Part 6) - the
+    # "no linked planning application" commercial signal. Reuses the same
+    # blue already assigned to "Informational/neutral" in the badge palette
+    # above (never a new colour) - a magnifying-glass icon fits "worth
+    # investigating" without implying a data-quality problem (amber/review)
+    # or a value judgement (green/red) the way those other kinds would.
+    "opportunity_signal": {"color": "#3B5773", "icon": "🔍", "label": "Worth investigating"},
 }
 
 
@@ -1034,6 +1055,110 @@ def visual_evidence_gallery(gallery: dict) -> None:
         for i, card in enumerate(gallery["needs_review"]):
             with cols[i % len(cols)]:
                 _visual_evidence_card(card)
+
+
+def status_badge_row(badges: list[tuple[str, str]]) -> None:
+    """A row of status_badge calls, each column proportionally sized to its
+    own label length (Sprint 4.5a, "Commercial Polish", Part 8: "badge text
+    must not truncate at common laptop widths") - the same fix already
+    proven on site_profile_header's own badge row, reused here (and by any
+    other page needing a multi-badge row) rather than invented per call
+    site. Equal-width st.columns clips a long label with Streamlit's
+    native badge ellipsis well before a typical laptop's column width
+    runs out; sizing each column to len(label) instead gives a long badge
+    the room it needs and keeps short ones compact."""
+    cols = st.columns([max(len(label), 10) for _, label in badges])
+    for col, (kind, label) in zip(cols, badges):
+        with col:
+            status_badge(kind, label)
+
+
+def allocation_card(card: dict, *, key: str) -> None:
+    """One Allocation Discovery gallery card (Sprint 4.5, Part 7; commercial
+    presentation refined in Sprint 4.5a, Part 1) - card is
+    app.reporting.allocation_discovery.build_allocation_card's own output;
+    this only renders it, never re-derives or embellishes any fact. Layout
+    follows Sprint 4.5a's specified scan order - name, development type,
+    capacity, planning status, why it matters, actions - with the policy
+    reference demoted to a small caption alongside council/plan context
+    rather than leading the card (Part 1: "avoid presenting policy
+    references as the primary information"). Every card renders with
+    identical size/border/emphasis regardless of capacity - larger
+    allocations are never made visually more prominent (Sprint 4.5a's
+    product principle: PropertyAIgent never decides what the "best" site
+    is; only the descriptive wording, never the visual weight, varies with
+    scale). Reuses _visual_evidence_card for the thumbnail, status_badge/
+    joint_plan_badge for badges, and render_alert for the "no linked
+    application" commercial signal - no new badge/image/alert rendering
+    invented here beyond registering that one new render_alert kind."""
+    with st.container(border=True, key=f"alloc-card-{key}"):
+        # 1. Allocation name
+        st.markdown(f"##### {_escape(card['site_name'])}")
+        # 2. Development type - a concise commercial description, omitted
+        # honestly when no existing evidence supports one.
+        if card.get("development_type"):
+            st.caption(f"🏘️ {_escape(card['development_type'])}")
+
+        context_bits = [b for b in (card["council_name"], card["plan_name"], card.get("policy_reference")) if b]
+        st.caption(" · ".join(_escape(str(b)) for b in context_bits))
+
+        # 3. Capacity - a natural sentence fragment, not a bare field/value pair.
+        st.markdown(f"**{_escape(card['capacity']['display'])}**")
+
+        # 4. Planning status
+        badges = [(card["plan_status_chip_kind"], card["plan_status_label"]), (card["review_status_badge_kind"], card["review_status_label"])]
+        status_badge_row(badges)
+        if card["is_multi_authority"]:
+            joint_plan_badge()
+
+        visual = card["visual_primary"] or card["visual_fallback"]
+        if visual:
+            _visual_evidence_card(visual, width=280)
+            if card["visual_fallback"] and not card["visual_primary"]:
+                st.caption(
+                    "Published as part of the council's authority-wide Policies Map, not a boundary image "
+                    "specific to this allocation."
+                )
+        else:
+            st.caption("🖼 No confirmed or suggested visual evidence yet.")
+
+        if card.get("show_no_application_panel"):
+            render_alert(
+                "opportunity_signal", card["no_application_panel_message"],
+                title=card["no_application_panel_title"], key=f"alloc-no-app-{key}",
+            )
+        else:
+            st.caption(card["matched_summary"], help=card["matched_summary_help"])
+        if card.get("build_status_label"):
+            st.caption(card["build_status_label"])
+        if card.get("delivery_note"):
+            st.caption(card["delivery_note"])
+
+        # 5. Why it matters
+        st.caption(f"**Why it matters:** {card['why_it_matters']}")
+        st.caption(f"**Investigate next:** {card['investigate_next']}")
+
+        # 6. Actions - the primary action stands alone, secondary
+        # navigation links follow, the external source link (smallest,
+        # least important) last - a simple visual hierarchy rather than
+        # four identical, undifferentiated links in a row.
+        st.divider()
+        st.page_link(
+            "pages/3_Local_Plan_Sites.py", label="Open Allocation →",
+            query_params={"allocation_id": str(card["id"])},
+        )
+        if card["matched_site_id"]:
+            st.page_link(
+                "pages/1_Scheme_Detail.py", label="Open Site Profile →",
+                query_params={"site_id": str(card["matched_site_id"])},
+            )
+        st.page_link(
+            "pages/6_Council_Intelligence_Detail.py", label="Open Council Intelligence →",
+            query_params={"council": card["council_code"]},
+        )
+        source_link = card.get("plan_page_url") or card.get("source_document_url")
+        if source_link:
+            st.caption(f"[Open source document →]({source_link})")
 
 
 def ai_status_summary_view(ai_summary: dict) -> None:
