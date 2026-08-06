@@ -12,16 +12,19 @@ selected via pg.run(). No business logic lives in this file.
 
 Navigation groups follow docs/NAVIGATION_ARCHITECTURE.md: Dashboard is the
 default landing page (Sprint 4.2, "Intelligence Dashboard"), Explore is the
-second destination; Policy groups Local Plan Sites; Administration groups
-Council Dashboard and Site Matching. Site Profile is declared with
-visibility="hidden" - reached by clicking a site on Explore's map/table,
-not as a persistent top-level tab (matching docs/WIREFRAMES.md Part 5's
-"reached via Explore/search, not a standalone nav item").
+second destination; Policy groups Council Intelligence (Sprint 4.3, the
+customer-facing per-council view) and Local Plan Sites; Administration
+groups Council Operations (Sprint 4.3 - renamed from "Council Dashboard",
+the internal monitoring/coverage view the customer-facing Council
+Intelligence pages were split out of) and Site Matching. Site Profile and
+the Council Intelligence detail page are both declared with
+visibility="hidden" - reached by clicking through from their own list/map
+page, not as persistent top-level tabs (matching docs/WIREFRAMES.md Part
+5's "reached via Explore/search, not a standalone nav item").
 
 Deliberately NOT implemented (see the Sprint 4.2 completion report): a
-customer-facing Council Intelligence page and a Reports page - both remain
-locked "Coming soon" Quick Action cards on the Dashboard, per that sprint's
-explicit scope restriction to "only build the Dashboard."
+Reports page - remains a locked "Coming soon" Quick Action card on the
+Dashboard.
 """
 from __future__ import annotations
 
@@ -41,15 +44,19 @@ st.logo("🏠", size="medium")
 dashboard_page = st.Page("pages/00_Dashboard.py", title="Dashboard", icon="🏠", default=True)
 explore_page = st.Page("pages/0_Explore.py", title="Explore", icon="🔍")
 site_profile_page = st.Page("pages/1_Scheme_Detail.py", title="Site Profile", icon="📍", visibility="hidden")
-council_dashboard_page = st.Page("pages/4_Council_Dashboard.py", title="Council Dashboard", icon="⚙️")
+council_intelligence_page = st.Page("pages/5_Council_Intelligence.py", title="Council Intelligence", icon="🏛️")
+council_intelligence_detail_page = st.Page(
+    "pages/6_Council_Intelligence_Detail.py", title="Council Intelligence", icon="🏛️", visibility="hidden"
+)
 local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Local Plan Sites", icon="📋")
+council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️")
 review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗")
 
 pg = st.navigation(
     {
         "": [dashboard_page, explore_page, site_profile_page],
-        "Policy": [local_plan_page],
-        "Administration": [council_dashboard_page, review_links_page],
+        "Policy": [council_intelligence_page, council_intelligence_detail_page, local_plan_page],
+        "Administration": [council_operations_page, review_links_page],
     },
     position="top",
 )
