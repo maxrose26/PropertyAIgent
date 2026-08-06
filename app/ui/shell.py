@@ -125,6 +125,41 @@ def inject_global_styles() -> None:
         }
         .pig-carousel-dots { text-align: center; margin-top: 0.5rem; letter-spacing: 3px; color: #C3CBD4; }
         .pig-carousel-dots .pig-dot-active { color: #1F3A5F; }
+
+        /* Dashboard refinement - scheme stack (layered/stacked cards) */
+        [class*="st-key-scheme-card-"] {
+            margin-top: -6px; transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        [class*="st-key-scheme-card-"]:first-child { margin-top: 0; }
+        [class*="st-key-scheme-card-"]:hover {
+            transform: translateY(-2px); box-shadow: 0 4px 10px rgba(31, 58, 95, 0.12); border-color: #1F3A5F !important;
+        }
+        .pig-scheme-rank {
+            display: inline-block; min-width: 1.6rem; font-weight: 700; color: #8A97A3; font-size: 0.9rem;
+        }
+        .pig-scheme-why { color: #6B4FA0; font-size: 0.82rem; }
+
+        /* Dashboard refinement - opportunity category sections */
+        [class*="st-key-opp-cat-card-"] { transition: border-color 0.12s ease; }
+        [class*="st-key-opp-cat-card-"]:hover { border-color: #1F3A5F !important; }
+
+        /* Dashboard refinement - right-hand AI summary rail: a purely
+           CSS-driven "live" highlight that steps down the rail over time -
+           no JS timer, no st.rerun(), so it never disrupts interaction
+           elsewhere on the page. Each card's animation-delay is set inline
+           per-card (a small, static, developer-controlled offset - not
+           caller-supplied text) so the highlight visits one card at a time. */
+        @keyframes pig-rail-pulse {
+            0%, 88%, 100% { border-left-color: #E4E8EC; background-color: transparent; }
+            4% { border-left-color: #6B4FA0; background-color: rgba(107, 79, 160, 0.05); }
+        }
+        [class*="st-key-rail-card-"] {
+            border-left: 4px solid #E4E8EC !important;
+            animation: pig-rail-pulse var(--pig-rail-cycle, 40s) ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            [class*="st-key-rail-card-"] { animation: none; border-left-color: #E4E8EC !important; }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -524,6 +559,159 @@ def live_leaderboard(tabs: dict[str, list[dict]], *, key: str) -> None:
                 _leaderboard_row(i, row, key=f"{key}-{label}-{row['id']}")
 
 
+def _scheme_stack_card(card: dict, *, rank: int, key: str) -> None:
+    """One Planning Intelligence scheme card (Dashboard refinement, Part 3) -
+    a layered/stacked look (negative margin-top + hover-lift, see
+    inject_global_styles) rather than a plain leaderboard row. Every field
+    is optional and simply omitted when absent - "do not show None/zero for
+    missing facts" is enforced here, at render time, not upstream."""
+    with st.container(border=True, key=f"scheme-card-{key}"):
+        col_rank, col_main, col_time = st.columns([1, 7, 3], vertical_alignment="center")
+        with col_rank:
+            st.markdown(f'<span class="pig-scheme-rank">{rank:02d}</span>', unsafe_allow_html=True)
+        with col_main:
+            title = card.get("reference") or card.get("address") or "Scheme"
+            if card.get("page"):
+                st.page_link(card["page"], label=title, query_params=card.get("params") or {})
+            else:
+                st.markdown(f"**{_escape(title)}**")
+            subtitle_bits = [b for b in (card.get("council_code"), card.get("address")) if b]
+            if subtitle_bits and card.get("reference"):
+                st.caption(" · ".join(_escape(str(b)) for b in subtitle_bits))
+        with col_time:
+            st.markdown(f'<div class="pig-leaderboard-time">{relative_time(card.get("when"))}</div>', unsafe_allow_html=True)
+
+        badge_cols = st.columns(4)
+        badge_fields = [
+            ("total_units", lambda v: f"{v} units"),
+            ("affordable_units", lambda v: f"{v} affordable"),
+            ("affordable_percentage", lambda v: f"{v:.0f}% affordable"),
+            ("decision_status", lambda v: v),
+            ("build_status", lambda v: v),
+            ("planning_status", lambda v: v),
+        ]
+        shown = [(field, fmt) for field, fmt in badge_fields if card.get(field) not in (None, "", 0)]
+        for col, (field, fmt) in zip(badge_cols, shown[:4]):
+            with col:
+                st.caption(fmt(card[field]))
+
+        if card.get("developer"):
+            st.caption(f"Developer: {card['developer']}")
+        if card.get("why"):
+            st.markdown(f'<div class="pig-scheme-why">{_escape(card["why"])}</div>', unsafe_allow_html=True)
+
+
+def scheme_stack(tabs: dict[str, list[dict]], *, key: str) -> None:
+    """The Planning Intelligence scheme stack (Dashboard refinement, Parts 3
+    & 4) - tabs is app.reporting.dashboard.build_scheme_stack's own output;
+    a tab absent from that dict has no supporting data and is never
+    rendered (never an empty tab invented to match a fixed design)."""
+    if not tabs:
+        st.caption("No live scheme activity to show yet.")
+        return
+
+    st.markdown('<span class="pig-live-dot"></span><span class="pig-live-label">Live</span>', unsafe_allow_html=True)
+    tab_labels = list(tabs.keys())
+    rendered_tabs = st.tabs(tab_labels)
+    for rendered_tab, label in zip(rendered_tabs, tab_labels):
+        with rendered_tab:
+            rows = tabs[label]
+            if not rows:
+                st.caption("Nothing here right now.")
+                continue
+            for i, row in enumerate(rows, start=1):
+                _scheme_stack_card(row, rank=i, key=f"{key}-{label}-{row['id']}")
+
+
+def opportunity_category_section(category: dict, *, key: str) -> None:
+    """One Opportunities category (Dashboard refinement, Parts 5 & 6) -
+    heading, a short explanation, a real count, and a grid of cards. Shows
+    an honest empty/unavailable state rather than fabricating a card -
+    category["available"] is False only for a category this platform
+    genuinely cannot compute yet (none exist today, see
+    app.reporting.dashboard.build_opportunity_categories)."""
+    with st.container(border=True, key=f"opp-cat-{key}-{category['key']}"):
+        col_heading, col_count = st.columns([5, 1], vertical_alignment="center")
+        with col_heading:
+            st.markdown(f"**{_escape(category['heading'])}**")
+        with col_count:
+            st.badge(str(category["count"]), color="blue")
+        st.caption(category["explanation"])
+
+        if not category["available"]:
+            st.caption(f"Not yet available - {category['unavailable_reason']}")
+            return
+        if not category["cards"]:
+            st.caption("Nothing in this category right now.")
+            return
+
+        cols = st.columns(2)
+        for i, card in enumerate(category["cards"]):
+            with cols[i % 2]:
+                with st.container(border=True, key=f"opp-cat-card-{key}-{card['id']}"):
+                    st.markdown(f"**{_escape(card['title'])}**")
+                    st.caption(f"{card['subtitle']} · {card['reason']}")
+                    st.markdown(f"**{_escape(str(card['metric']))}**")
+                    if card.get("page"):
+                        st.page_link(card["page"], label="View →", query_params=card.get("params") or {})
+
+
+def ai_summary_rail(items: list[dict], *, key: str, cycle_seconds: int = 40) -> None:
+    """The right-hand Recent AI Summaries rail (Dashboard refinement, Parts
+    7-9) - a static vertical stack (every item visible at once, no
+    Prev/Next state), with a purely CSS-driven highlight that steps from
+    card to card via animation-delay (see inject_global_styles's
+    pig-rail-pulse keyframe) - never a sleep()+st.rerun() loop, so this can
+    never disrupt whatever else the user is doing on the page. Each item's
+    relevance line comes from app.reporting.dashboard.build_ai_summary_rail
+    - already a deterministic explanation grounded in real fields, never
+    invented here."""
+    if not items:
+        st.caption("No AI summaries generated yet.")
+        return
+
+    st.markdown('<span class="pig-live-dot"></span><span class="pig-live-label">Live</span>', unsafe_allow_html=True)
+    per_card_seconds = max(cycle_seconds, len(items) * 4) / len(items)
+    for i, item in enumerate(items):
+        container_key = f"rail-card-{key}-{item['id']}"
+        with st.container(border=True, key=container_key):
+            st.markdown(f"**{_escape(item['type'])}**")
+            st.caption(_escape(item["name"]))
+            st.write(item["excerpt"])
+            st.caption(f"Why now: {item['relevance']}")
+            meta_col, badge_col = st.columns([3, 2], vertical_alignment="center")
+            with meta_col:
+                st.caption(f"Generated {relative_time(item['generated_at'])}")
+            with badge_col:
+                st.badge(item["model"] or "AI", icon="🤖", color="violet")
+            if item.get("page"):
+                st.page_link(item["page"], label="View →", query_params=item.get("params") or {})
+        total_cycle = per_card_seconds * len(items)
+        st.markdown(
+            f'<style>.st-key-{container_key} {{ '
+            f'animation-delay: {i * per_card_seconds:.2f}s; '
+            f'--pig-rail-cycle: {total_cycle:.2f}s; }}</style>',
+            unsafe_allow_html=True,
+        )
+
+
+def wide_canvas(max_width: str = "94%") -> None:
+    """A page-scoped override of inject_global_styles's own .block-container
+    max-width (Dashboard layout correction) - Streamlit re-runs a page's
+    entire script from scratch on navigation, so a page that calls this
+    widens only ITS OWN render; every other page keeps the shared shell's
+    default 1200px contained width untouched (deliberately not changed in
+    inject_global_styles itself, per this task's "do not make every page
+    edge-to-edge" instruction). Call once, early, from a page that
+    genuinely benefits from more horizontal room - today, only the
+    Dashboard, whose KPI strip, scheme stack and AI rail were all reading
+    as cramped inside the shared shell's normal contained width."""
+    st.markdown(
+        f'<style>.block-container {{ max-width: {max_width} !important; }}</style>',
+        unsafe_allow_html=True,
+    )
+
+
 def evidence_confidence_badge(trust: str, *, source_label: str | None = None) -> None:
     """Sprint 4.3 ("Council Intelligence") - the evidence-confidence signal
     Part 6 asks every housing-position figure to carry, built from
@@ -579,8 +767,6 @@ def timeline(entries: list[dict], *, key: str, empty_message: str = "Nothing to 
                     f'<div class="pig-leaderboard-time">{relative_time(entry.get("when"))}</div>',
                     unsafe_allow_html=True,
                 )
-
-
 def render_footer() -> None:
     """A lightweight footer (Part 8) - product name, version, environment
     only, no clutter."""
