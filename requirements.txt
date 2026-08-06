@@ -5,6 +5,7 @@ pdfplumber
 python-docx
 openai
 sqlalchemy
+psycopg[binary]>=3.1
 rapidfuzz
 python-dotenv
 streamlit

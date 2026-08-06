@@ -39,3 +39,16 @@ Today the platform covers 10 Greater Manchester councils: automated planning-app
    ```
 
 Council-specific behaviour lives in config (`config/councils.yaml`, `config/policy_sources.yaml`), not in code — onboarding a new council is a config change. See [CLAUDE.md](CLAUDE.md) for the engineering conventions and workflow this repository follows, and [docs/DESIGN_PRINCIPLES.md](docs/DESIGN_PRINCIPLES.md) for the principles every feature is expected to follow.
+
+## Database configuration
+
+By default the platform uses the local SQLite database at `data/deal_finder.db`, with no configuration needed. This is Stage 1 of an in-progress migration to Supabase (PostgreSQL) — SQLite remains fully supported and is still the default.
+
+**To use Supabase/PostgreSQL instead:** set `DATABASE_URL` in your `.env` to your Supabase connection string (see `.env.example` for the placeholder format). When `DATABASE_URL` is set, the app connects to Postgres via the [psycopg 3](https://www.psycopg.org/psycopg3/) driver instead of SQLite — no other configuration changes are needed, and a bare `postgresql://...`/`postgres://...` string (exactly what Supabase's dashboard gives you) is automatically rewritten to use the psycopg 3 driver.
+
+**To migrate your existing SQLite data into Postgres:**
+```
+DATABASE_URL=postgresql://... python -m scripts.migrate_to_postgres --dry-run   # preview row counts, no writes
+DATABASE_URL=postgresql://... python -m scripts.migrate_to_postgres             # actually copy the data
+```
+This is non-destructive and safe to rerun: the SQLite source is opened read-only and is never modified, primary keys/foreign keys/relationships are preserved exactly, and rows already present in the target are skipped rather than duplicated — an interrupted run can simply be rerun. See the docstring at the top of [scripts/migrate_to_postgres.py](scripts/migrate_to_postgres.py) for the full detail on how this is guaranteed.
