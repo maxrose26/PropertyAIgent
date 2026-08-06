@@ -191,17 +191,19 @@ def inject_global_styles() -> None:
         }
 
         /* Council Intelligence overview refinement - restrained,
-           status-based card colour (Commercial Planning Readiness
-           refinement, Part 7): Adopted / Emerging / Regulation 18 /
-           Examination / Withdrawn / Joint-plan only. Status is also always
-           shown as text/a badge/chip on the card itself - colour is never
-           the only signal. */
+           status-based card colour (Sprint 4.3a, Part 3): Adopted /
+           Emerging / Regulation 18 / Examination / Withdrawn / no plan at
+           all. Colour ALWAYS reflects the displayed plan's own status -
+           joint-plan participation no longer overrides it (that's now a
+           separate, neutral "Joint Plan" badge - see joint_plan_badge
+           below); status is also always shown as text/a badge/chip on
+           the card itself, colour is never the only signal. */
         [class*="st-key-cc-adopted-"] { background-color: #F1FAF4 !important; border-color: #BFE3C9 !important; }
         [class*="st-key-cc-emerging-"] { background-color: #F5F0FB !important; border-color: #D9C8ED !important; }
         [class*="st-key-cc-regulation-18-"] { background-color: #FBF3E3 !important; border-color: #ECD9A6 !important; }
         [class*="st-key-cc-examination-"] { background-color: #EFF5FC !important; border-color: #C9DCF0 !important; }
         [class*="st-key-cc-withdrawn-"] { background-color: #FBEEEE !important; border-color: #EFC3C3 !important; }
-        [class*="st-key-cc-joint-plan-only-"] { background-color: #F4F5F7 !important; border-color: #DEE2E7 !important; }
+        [class*="st-key-cc-no-plan-"] { background-color: #F4F5F7 !important; border-color: #DEE2E7 !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -853,14 +855,35 @@ def planning_readiness_chip(chip: dict) -> None:
         st.caption(chip["sublabel"])
 
 
-def planning_health_banner(health: dict) -> None:
-    """The Planning Health banner (Commercial Planning Readiness
-    refinement, Part 4) - a short, deterministic classification (never AI-
-    generated) computed by app.reporting.council_intelligence.
-    _planning_health_banner from evidence already stored; this renders it
-    as a single compact line, coloured by the SAME emoji already carried
-    in health (never a separate colour decision)."""
-    st.markdown(f"{health['emoji']} **{_escape(health['label'])}**")
+def joint_plan_badge() -> None:
+    """A neutral "Joint Plan" badge (Sprint 4.3a, Part 3) - shown
+    alongside the Planning Readiness chip whenever the card's displayed
+    plan is NOT this council's own (app.reporting.council_intelligence's
+    primary_plan_is_own), communicating that fact separately from the
+    card's status colour/chip instead of overriding them - joint-plan
+    participation and the plan's own status are two different pieces of
+    information and must not replace one another."""
+    st.badge("Joint Plan", icon="⬜", color="gray")
+
+
+def planning_outlook_banner(outlook: dict) -> None:
+    """The Planning Outlook banner (Sprint 4.3a, Part 1 - renamed from
+    "Planning Health", reworded so it never reads as "more likely to get
+    planning permission") - a short, deterministic classification (never
+    AI-generated) computed by app.reporting.council_intelligence.
+    _planning_outlook from evidence already stored; renders it as a single
+    compact line, coloured by the SAME emoji already carried in outlook
+    (never a separate colour decision)."""
+    st.markdown(f"{outlook['emoji']} **{_escape(outlook['label'])}**")
+
+
+def why_it_matters_line(text: str) -> None:
+    """"Why it matters" (Sprint 4.3a, Part 2) - a short, deterministic
+    (never AI-generated) sentence directly beneath the Planning Outlook
+    banner, explaining what that outlook means in plain English. text is
+    app.reporting.council_intelligence._why_it_matters's own output -
+    this only renders it."""
+    st.caption(text)
 
 
 def timeline(entries: list[dict], *, key: str, empty_message: str = "Nothing to show yet.") -> None:

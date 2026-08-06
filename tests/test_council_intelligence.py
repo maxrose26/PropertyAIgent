@@ -23,11 +23,12 @@ from app.reporting.council_intelligence import (
     _five_year_supply_state,
     _format_five_year_supply,
     _format_housing_requirement,
-    _headline_delivery_or_milestone,
+    _format_next_milestone,
     _plan_age_years,
-    _planning_health_banner,
+    _planning_outlook,
     _planning_readiness_chip,
     _status_color_category,
+    _why_it_matters,
     build_council_detail,
     build_council_overview,
 )
@@ -560,34 +561,27 @@ def test_headline_tiles_use_wrapping_components_not_st_metric():
     assert "stat_tile(" in render_fn
 
 
-def test_headline_delivery_or_milestone_prefers_delivery_over_milestone(session):
+def test_next_milestone_metric_always_shows_milestone_never_delivery(session):
+    """Sprint 4.3a, Part 5: the fourth headline metric is STANDARDISED to
+    always be the next milestone - never swapped for a delivery figure
+    even when one is available, unlike the previous refinement's
+    delivery-preferring behaviour."""
     plan = LocalPlan(
         council_code="testcouncil", plan_name="Delivered Plan", status="adopted",
         homes_delivered_latest_period=120, latest_reporting_period="2024/25",
         next_milestone="Submission", next_milestone_date="November 2026",
     )
-    metric = _headline_delivery_or_milestone(plan)
-    assert metric["kind"] == "delivery"
-    assert metric["value"] == "120 homes"
-    assert "2024/25" in metric["label"]
-
-
-def test_headline_delivery_or_milestone_falls_back_to_milestone_when_no_delivery(session):
-    plan = LocalPlan(
-        council_code="testcouncil", plan_name="Emerging Plan", status="draft_consultation",
-        next_milestone="Submission", next_milestone_date="November 2026",
-    )
-    metric = _headline_delivery_or_milestone(plan)
-    assert metric["kind"] == "milestone"
+    metric = _format_next_milestone(plan)
     assert metric["value"] == "November 2026"
     assert metric["caption"] == "Submission"
+    assert "120" not in metric["value"]
 
 
-def test_headline_delivery_or_milestone_honest_when_neither_exists(session):
+def test_next_milestone_metric_honest_when_no_milestone_on_file(session):
     plan = LocalPlan(council_code="testcouncil", plan_name="Quiet Plan", status="preparation")
-    metric = _headline_delivery_or_milestone(plan)
-    assert metric["kind"] == "none"
-    assert metric["value"] == "Not yet stated"
+    metric = _format_next_milestone(plan)
+    assert metric["value"] == "Not yet verified"
+    assert metric["caption"] is None
 
 
 # --- Presentation refinement: fully readable, non-truncated values -----------
@@ -611,6 +605,35 @@ def test_overview_card_housing_requirement_display_field(session):
     card = build_council_overview(session)[0]
     assert card["housing_requirement_display"] == "9,486 homes"
     assert "…" not in card["housing_requirement_display"]
+
+
+def test_headline_metric_uses_homes_required_terminology_not_housing_requirement():
+    """Sprint 4.3a, Part 6: the overview card's headline label reads
+    "Homes Required" - detailed planning terminology ("Housing
+    requirement") stays on the Council Detail page only."""
+    page_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "5_Council_Intelligence.py"
+    ).read_text(encoding="utf-8")
+    render_fn = page_source[page_source.index("def _render_council_card"):page_source.index("with st.container(key=\"council-grid\")")]
+    assert "Homes Required" in render_fn
+    assert '"Housing requirement"' not in render_fn
+    assert "Strategic allocations" in render_fn
+
+
+def test_standard_metric_row_order_never_swapped():
+    """Sprint 4.3a, Part 5: every card shows the same four metrics in the
+    same order - five-year supply, Homes Required, Strategic allocations,
+    Next milestone - verified by their textual order of appearance in the
+    render function's source."""
+    page_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "5_Council_Intelligence.py"
+    ).read_text(encoding="utf-8")
+    render_fn = page_source[page_source.index("def _render_council_card"):page_source.index("with st.container(key=\"council-grid\")")]
+    supply_pos = render_fn.index("five_year_supply_tile(")
+    homes_pos = render_fn.index("Homes Required")
+    alloc_pos = render_fn.index("Strategic allocations")
+    milestone_pos = render_fn.index('"Next milestone"')
+    assert supply_pos < homes_pos < alloc_pos < milestone_pos
 
 
 # --- Presentation refinement: five-year housing supply ------------------------
@@ -666,34 +689,50 @@ def test_overview_card_reflects_stale_or_missing_supply_evidence_as_unverified_n
 # --- Presentation refinement: status-based card colour ------------------------
 
 
-def test_status_color_category_six_bucket_taxonomy(session):
-    """Commercial Planning Readiness refinement (Part 7): six buckets -
-    Adopted / Emerging / Regulation 18 / Examination / Withdrawn /
-    Joint-plan only. A plan that is genuinely this council's OWN drives the
-    status-based bucket; a plan that ISN'T (primary_plan_is_own=False, or
-    no plan at all) always gets "joint-plan-only", regardless of that
-    plan's own status."""
+def test_status_color_category_reflects_plan_status_only(session):
+    """Sprint 4.3a, Part 3: status colour always reflects the plan's own
+    status - the previous refinement's "joint-plan-only overrides
+    everything" behaviour is gone. An ADOPTED joint plan a council merely
+    participates in must colour the card green, exactly like a genuinely
+    own adopted plan - joint-plan participation is communicated separately
+    via the Joint Plan badge, never by recolouring the card."""
     own = lambda status: LocalPlan(council_code="x", plan_name="p", status=status)  # noqa: E731
-    assert _status_color_category(own("adopted"), True) == "adopted"
-    assert _status_color_category(own("proposed_submission"), True) == "emerging"
-    assert _status_color_category(own("main_modifications"), True) == "emerging"
-    assert _status_color_category(own("draft_consultation"), True) == "regulation-18"
-    assert _status_color_category(own("issues_and_options"), True) == "regulation-18"
-    assert _status_color_category(own("examination"), True) == "examination"
-    assert _status_color_category(own("submitted"), True) == "examination"
-    assert _status_color_category(own("withdrawn"), True) == "withdrawn"
-    assert _status_color_category(own("paused"), True) == "withdrawn"
-    assert _status_color_category(None, False) == "joint-plan-only"
-    # Even an ADOPTED joint plan gets joint-plan-only when it isn't this
-    # council's own plan - the commercially relevant signal is "this
-    # council has no Local Plan of its own", which outranks the joint
-    # plan's own status.
-    assert _status_color_category(own("adopted"), False) == "joint-plan-only"
+    assert _status_color_category(own("adopted")) == "adopted"
+    assert _status_color_category(own("proposed_submission")) == "emerging"
+    assert _status_color_category(own("main_modifications")) == "emerging"
+    assert _status_color_category(own("draft_consultation")) == "regulation-18"
+    assert _status_color_category(own("issues_and_options")) == "regulation-18"
+    assert _status_color_category(own("examination")) == "examination"
+    assert _status_color_category(own("submitted")) == "examination"
+    assert _status_color_category(own("withdrawn")) == "withdrawn"
+    assert _status_color_category(own("paused")) == "withdrawn"
+    assert _status_color_category(None) == "no-plan"
+
+
+def test_joint_plan_councils_retain_adopted_colouring(session):
+    """A participating (non-owning) authority whose only linked plan is an
+    ADOPTED joint plan must still get the green "adopted" card colour -
+    the colour reflects the plan's status regardless of ownership."""
+    session.add(Council(
+        code="participant", name="Participant Council", base_url="https://participant.invalid",
+        date_field_mode="received", doc_system="idox",
+    ))
+    joint_plan = LocalPlan(council_code="testcouncil", plan_name="Places for Everyone", status="adopted")
+    session.add(joint_plan)
+    session.commit()
+    session.add(LocalPlanCouncil(local_plan_id=joint_plan.id, council_code="testcouncil", role="legacy_owner", is_lead_authority=True))
+    session.add(LocalPlanCouncil(local_plan_id=joint_plan.id, council_code="participant", role="participating_authority", is_lead_authority=False))
+    session.commit()
+
+    cards = build_council_overview(session)
+    participant_card = next(c for c in cards if c["council_code"] == "participant")
+    assert participant_card["status_color"] == "adopted"
+    assert participant_card["primary_plan_is_own"] is False
 
 
 def test_status_color_css_classes_defined_for_every_category():
     shell_source = Path(__file__).resolve().parents[1].joinpath("app", "ui", "shell.py").read_text(encoding="utf-8")
-    for category in ("adopted", "emerging", "regulation-18", "examination", "withdrawn", "joint-plan-only"):
+    for category in ("adopted", "emerging", "regulation-18", "examination", "withdrawn", "no-plan"):
         assert f'st-key-cc-{category}-' in shell_source
 
 
@@ -712,7 +751,7 @@ def test_status_remains_represented_in_text_not_colour_alone():
     assert 'status_badge("info", "No Local Plan yet")' in page_source
 
     shell_source = Path(__file__).resolve().parents[1].joinpath("app", "ui", "shell.py").read_text(encoding="utf-8")
-    render_fn = shell_source[shell_source.index("def planning_readiness_chip"):shell_source.index("def planning_health_banner")]
+    render_fn = shell_source[shell_source.index("def planning_readiness_chip"):shell_source.index("def joint_plan_badge")]
     assert "chip['label']" in render_fn or 'chip["label"]' in render_fn
 
 
@@ -833,63 +872,185 @@ def test_plan_age_years_none_when_year_unavailable():
     assert _plan_age_years(None) is None
 
 
-# --- Commercial Planning Readiness refinement: Planning Health banner --------
+def test_planning_readiness_chip_age_only_shown_beyond_five_years():
+    """Sprint 4.3a, Part 4: avoid clutter such as "Adopted 2024 (1 year
+    old)" - the age sublabel only appears once the plan is genuinely old
+    (more than 5 years), never for a recently-adopted plan."""
+    this_year = dt.datetime.now(dt.timezone.utc).year
+    recent = LocalPlan(council_code="x", plan_name="p", status="adopted", adoption_date=f"1 Jan {this_year - 1}")
+    assert _planning_readiness_chip(recent)["sublabel"] is None
+
+    exactly_five = LocalPlan(council_code="x", plan_name="p", status="adopted", adoption_date=f"1 Jan {this_year - 5}")
+    assert _planning_readiness_chip(exactly_five)["sublabel"] is None
+
+    old = LocalPlan(council_code="x", plan_name="p", status="adopted", adoption_date=f"1 Jan {this_year - 7}")
+    assert _planning_readiness_chip(old)["sublabel"] == "7 years old"
 
 
-def test_planning_health_banner_strong_position_for_adopted_with_healthy_supply():
+# --- Sprint 4.3a: Planning Outlook (renamed from Planning Health) ------------
+
+
+def test_planning_outlook_stable_environment_for_adopted_with_healthy_supply():
     plan = LocalPlan(council_code="x", plan_name="p", status="adopted", five_year_supply_years=6.2)
-    health = _planning_health_banner(plan)
-    assert health["label"] == "Strong planning position"
-    assert health["emoji"] == "🟢"
+    outlook = _planning_outlook(plan)
+    assert outlook["label"] == "Stable planning environment"
+    assert outlook["emoji"] == "🟢"
 
 
-def test_planning_health_banner_growing_pressure_for_emerging_with_healthy_supply():
+def test_planning_outlook_major_policy_transition_for_emerging_with_healthy_supply():
     plan = LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=5.5)
-    health = _planning_health_banner(plan)
-    assert health["label"] == "Growing delivery pressure"
-    assert health["emoji"] == "🟠"
+    outlook = _planning_outlook(plan)
+    assert outlook["label"] == "Major policy transition underway"
+    assert outlook["emoji"] == "🟣"
 
 
-def test_planning_health_banner_high_opportunity_for_supply_below_five_years():
-    """Below-5-years supply is the strongest, most concrete evidence-based
-    signal - triggers "High planning opportunity" regardless of the plan's
-    own adopted/emerging status (Stockport's real case: emerging plan,
-    1.77-year supply)."""
+def test_planning_outlook_housing_delivery_pressure_for_supply_below_five_years():
+    """Below-5-years supply triggers "Housing delivery pressure" regardless
+    of the plan's own adopted/emerging status (Stockport's real case:
+    emerging plan, 1.77-year supply). Wording must never claim increased
+    planning likelihood or "opportunity"."""
     plan = LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=1.77)
-    health = _planning_health_banner(plan)
-    assert health["label"] == "High planning opportunity"
-    assert health["emoji"] == "🔴"
+    outlook = _planning_outlook(plan)
+    assert outlook["label"] == "Housing delivery pressure"
+    assert outlook["emoji"] == "🟠"
+    for banned in ("opportunity", "likely", "likelihood"):
+        assert banned not in outlook["label"].lower()
 
     adopted_but_short = LocalPlan(council_code="x", plan_name="p", status="adopted", five_year_supply_years=3.0)
-    assert _planning_health_banner(adopted_but_short)["label"] == "High planning opportunity"
+    assert _planning_outlook(adopted_but_short)["label"] == "Housing delivery pressure"
 
 
-def test_planning_health_banner_insufficient_evidence_never_invents_a_conclusion():
+def test_planning_outlook_insufficient_evidence_never_invents_a_conclusion():
     """Bury's real case: no verified five-year supply figure - must say
-    evidence is still being assessed, never guess a Strong/Growing/High
-    Opportunity classification without the supporting figure."""
+    evidence is still being assessed, never guess a classification without
+    the supporting figure."""
     plan = LocalPlan(council_code="x", plan_name="p", status="proposed_submission", five_year_supply_years=None)
-    health = _planning_health_banner(plan)
-    assert health["label"] == "Planning position still being assessed"
-    assert _planning_health_banner(None)["label"] == "Planning position still being assessed"
+    outlook = _planning_outlook(plan)
+    assert outlook["label"] == "Planning position still being assessed"
+    assert _planning_outlook(None)["label"] == "Planning position still being assessed"
 
 
-def test_overview_card_carries_planning_health_banner(session):
+def test_planning_outlook_never_uses_banned_permission_likelihood_wording():
+    """No outcome across the whole taxonomy may read as "more likely to
+    get planning permission" (Sprint 4.3a, Part 1)."""
+    banned_phrases = ("high planning opportunity", "increased planning likelihood", "more likely to gain planning permission")
+    plans = [
+        LocalPlan(council_code="x", plan_name="p", status="adopted", five_year_supply_years=6.0),
+        LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=5.5),
+        LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=1.77),
+        None,
+    ]
+    for plan in plans:
+        label = _planning_outlook(plan)["label"].lower()
+        for phrase in banned_phrases:
+            assert phrase not in label
+
+
+def test_overview_card_carries_planning_outlook(session):
     session.add(LocalPlan(
-        council_code="testcouncil", plan_name="Health Plan", status="draft_consultation", five_year_supply_years=1.77,
+        council_code="testcouncil", plan_name="Outlook Plan", status="draft_consultation", five_year_supply_years=1.77,
     ))
     session.commit()
 
     card = build_council_overview(session)[0]
-    assert card["planning_health"]["label"] == "High planning opportunity"
+    assert card["planning_outlook"]["label"] == "Housing delivery pressure"
 
 
-def test_planning_health_banner_rendered_in_page_not_ai_generated():
-    """The banner must be rendered via the deterministic
-    _planning_health_banner data, never routed through an AI call - the
-    page source itself must not construct this text near any AI client."""
+def test_planning_outlook_rendered_in_page_not_ai_generated():
+    """The banner must be rendered via the deterministic _planning_outlook
+    data, never routed through an AI call - the page source itself must
+    not construct this text near any AI client."""
     page_source = Path(__file__).resolve().parents[1].joinpath(
         "app", "ui", "pages", "5_Council_Intelligence.py"
     ).read_text(encoding="utf-8")
-    assert "planning_health_banner(card[" in page_source
+    assert "planning_outlook_banner(card[" in page_source
     assert "openai" not in page_source.lower()
+
+
+# --- Sprint 4.3a: Why it matters ----------------------------------------------
+
+
+def test_why_it_matters_no_plan():
+    assert _why_it_matters(None, False) == "No Local Plan has been identified for this council yet."
+
+
+def test_why_it_matters_supply_not_verified():
+    plan = LocalPlan(council_code="x", plan_name="p", status="proposed_submission", five_year_supply_years=None)
+    assert _why_it_matters(plan, True) == "The council's housing land supply has not yet been verified."
+
+
+def test_why_it_matters_delivery_pressure_when_supply_short():
+    plan = LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=1.77)
+    assert _why_it_matters(plan, True) == "Housing delivery remains an important planning priority."
+
+
+def test_why_it_matters_joint_plan_wording_names_the_plan(session):
+    plan = LocalPlan(council_code="x", plan_name="Places for Everyone Joint Development Plan", status="adopted", five_year_supply_years=6.0)
+    text = _why_it_matters(plan, False)
+    assert "Places for Everyone Joint Development Plan" in text
+    assert "adopted" in text.lower()
+
+
+def test_why_it_matters_own_emerging_plan():
+    plan = LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=6.0)
+    assert _why_it_matters(plan, True) == (
+        "The council is progressing a new Local Plan which may influence future planning policy."
+    )
+
+
+def test_why_it_matters_own_adopted_stable_plan():
+    plan = LocalPlan(council_code="x", plan_name="p", status="adopted", five_year_supply_years=6.0)
+    text = _why_it_matters(plan, True)
+    assert "adopted" in text.lower()
+    assert text  # a real, non-empty sentence, never blank
+
+
+def test_why_it_matters_never_overstates_certainty_or_implies_permission_is_likely():
+    banned = ("guaranteed", "certain", "likely to be approved", "will be granted")
+    plans = [
+        LocalPlan(council_code="x", plan_name="p", status="adopted", five_year_supply_years=6.0),
+        LocalPlan(council_code="x", plan_name="p", status="draft_consultation", five_year_supply_years=1.77),
+        None,
+    ]
+    for plan in plans:
+        text = _why_it_matters(plan, True).lower()
+        for phrase in banned:
+            assert phrase not in text
+
+
+def test_overview_card_carries_why_it_matters(session):
+    session.add(LocalPlan(council_code="testcouncil", plan_name="Matters Plan", status="adopted", five_year_supply_years=6.0))
+    session.commit()
+
+    card = build_council_overview(session)[0]
+    assert isinstance(card["why_it_matters"], str) and card["why_it_matters"]
+
+
+def test_why_it_matters_rendered_in_page_not_ai_generated():
+    page_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "5_Council_Intelligence.py"
+    ).read_text(encoding="utf-8")
+    assert "why_it_matters_line(card[" in page_source
+    assert "openai" not in page_source.lower()
+
+
+# --- Sprint 4.3a: Joint Plan badge --------------------------------------------
+
+
+def test_joint_plan_badge_shown_only_when_plan_is_not_own():
+    page_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "5_Council_Intelligence.py"
+    ).read_text(encoding="utf-8")
+    assert 'if not card["primary_plan_is_own"]:' in page_source
+    assert "joint_plan_badge()" in page_source
+
+
+def test_joint_plan_badge_is_a_distinct_neutral_component_from_status_colour():
+    """The badge is a separate signal from the card's status colour - it
+    must not itself claim a status (adopted/emerging/etc), only that the
+    plan is jointly held."""
+    shell_source = Path(__file__).resolve().parents[1].joinpath("app", "ui", "shell.py").read_text(encoding="utf-8")
+    badge_fn = shell_source[shell_source.index("def joint_plan_badge"):shell_source.index("def planning_outlook_banner")]
+    assert "Joint Plan" in badge_fn
+    for status_word in ("Adopted", "Emerging", "Withdrawn", "Examination"):
+        assert status_word not in badge_fn

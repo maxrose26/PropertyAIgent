@@ -30,13 +30,22 @@ Presentation refinement history:
   badge is replaced by a Planning Readiness chip (shell.
   planning_readiness_chip) - a finer-grained, colour-dotted label that
   includes the adoption year and plan age where LocalPlan.adoption_date
-  supports it; a deterministic Planning Health banner (shell.
-  planning_health_banner, never AI-generated) sits beneath the plan line;
-  and each card's "cc-<status_color>-<council_code>" container key now
-  drives a six-bucket colour treatment (Adopted / Emerging / Regulation 18
-  / Examination / Withdrawn / Joint-plan only) - see
-  app.reporting.council_intelligence's own docstrings for exactly how each
-  is derived from stored evidence.
+  supports it.
+- Sprint 4.3a ("Council Intelligence Commercial Polish") - Planning Health
+  renamed Planning Outlook (shell.planning_outlook_banner) and reworded so
+  nothing reads as "more likely to get planning permission"; a
+  deterministic "Why it matters" line (shell.why_it_matters_line, never
+  AI-generated) sits directly beneath it; the card's
+  "cc-<status_color>-<council_code>" container key now drives a FIVE-bucket
+  colour treatment (Adopted / Emerging / Regulation 18 / Examination /
+  Withdrawn) driven ONLY by the displayed plan's own status - the previous
+  "Joint-plan only" colour OVERRIDE is gone, replaced by a separate,
+  neutral shell.joint_plan_badge() shown alongside the chip whenever the
+  plan isn't this council's own; the four headline metrics are now
+  STANDARDISED (five-year supply, Homes Required, Strategic allocations,
+  next milestone) and never swapped depending on which evidence happens to
+  be available - see app.reporting.council_intelligence's own docstrings
+  for exactly how each is derived from stored evidence.
 """
 from __future__ import annotations
 
@@ -53,12 +62,14 @@ from app.ui.shell import (
     ai_badge,
     empty_state,
     five_year_supply_tile,
+    joint_plan_badge,
     page_header,
-    planning_health_banner,
+    planning_outlook_banner,
     planning_readiness_chip,
     relative_time,
     stat_tile,
     status_badge,
+    why_it_matters_line,
     wide_canvas,
 )
 
@@ -90,29 +101,38 @@ if not cards:
 def _render_council_card(card: dict) -> None:
     container_key = f"cc-{card['status_color']}-{card['council_code']}"
     with st.container(border=True, key=container_key):
-        # Header: council name + Planning Readiness chip (Commercial
-        # Planning Readiness refinement, Part 2) - replaces the plain
-        # Adopted/Emerging badge with a finer-grained, colour-dotted label.
+        # Header: council name + Planning Readiness chip - the strongest
+        # visual element on the card (Sprint 4.3a, Part 9) - plus a
+        # separate, neutral Joint Plan badge whenever the displayed plan
+        # isn't this council's own (Part 3 - joint-plan participation and
+        # plan status are different pieces of information and must not
+        # replace one another).
         col_name, col_status = st.columns([3, 2], vertical_alignment="center")
         with col_name:
             st.markdown(f"### {card['council_name']}")
         with col_status:
             if card["planning_readiness_chip"] is not None:
                 planning_readiness_chip(card["planning_readiness_chip"])
+                if not card["primary_plan_is_own"]:
+                    joint_plan_badge()
             else:
                 status_badge("info", "No Local Plan yet")
+
+        # Planning Outlook + Why it matters sit directly beneath the
+        # header (Part 9 - "Planning Outlook sits directly beneath"), both
+        # purely deterministic, never AI-generated.
+        planning_outlook_banner(card["planning_outlook"])
+        why_it_matters_line(card["why_it_matters"])
 
         # Plan line: primary Local Plan name + current stage.
         st.caption(
             f"{card['plan_name']} · {card['current_stage']}" if card["plan_name"] else card["current_stage"]
         )
 
-        # Planning Health banner (refinement Part 4) - a short, purely
-        # deterministic classification, never AI-generated.
-        planning_health_banner(card["planning_health"])
-
-        # Headline metrics - a 2x2 grid of non-truncating tiles (refinement
-        # Parts 2 & 3). "Evidence" is deliberately not one of these four.
+        # Headline metrics - STANDARDISED across every card (Part 5): the
+        # same four metrics, same order, never swapped depending on which
+        # evidence happens to be available. "Evidence" is deliberately not
+        # one of these four (kept as secondary information below).
         row1_col1, row1_col2 = st.columns(2)
         with row1_col1:
             five_year_supply_tile(
@@ -122,20 +142,21 @@ def _render_council_card(card: dict) -> None:
             )
         with row1_col2:
             stat_tile(
-                "Housing requirement",
-                card["housing_requirement_display"] or "Not yet stated",
+                "Homes Required",
+                card["housing_requirement_display"] or "Not yet verified",
                 help="Total plan-period figure where stated, otherwise the annual rate.",
             )
 
         row2_col1, row2_col2 = st.columns(2)
         with row2_col1:
-            stat_tile("Allocations", f"{card['allocation_count']:,}")
+            stat_tile("Strategic allocations", f"{card['allocation_count']:,}")
         with row2_col2:
-            metric4 = card["headline_metric_4"]
-            stat_tile(metric4["label"], metric4["value"], caption=metric4["caption"])
+            next_milestone = card["next_milestone_metric"]
+            stat_tile("Next milestone", next_milestone["value"], caption=next_milestone["caption"])
 
         # Secondary information - kept visible but subordinate to the
-        # headline metrics above (refinement Parts 2 & 6).
+        # headline metrics above (Part 8 - never competes visually with
+        # the headline information).
         secondary_bits = []
         if card["expected_adoption_date"]:
             secondary_bits.append(f"Expected adoption: {card['expected_adoption_date']}")

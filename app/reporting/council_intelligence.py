@@ -271,13 +271,19 @@ _READINESS_CHIP_STYLE: dict[str, tuple[str, str]] = {
 }
 
 
+_PLAN_AGE_DISPLAY_THRESHOLD = 5
+
+
 def _planning_readiness_chip(plan: LocalPlan | None) -> dict | None:
     """The overview card's Planning Readiness chip - None when there's no
     plan to describe at all (the existing "No Local Plan yet" badge covers
-    that case). For an adopted plan, the label includes the adoption year
-    and, where the year is known, the plan's age in whole years - both
-    parsed/derived from LocalPlan.adoption_date, never invented; falls back
-    to a bare "Adopted" when that field has no recognisable year."""
+    that case). For an adopted plan, the label includes the adoption year;
+    the plan's age in whole years is added as a sublabel ONLY once the plan
+    is genuinely old (Sprint 4.3a, Part 4 - "avoid clutter such as
+    'Adopted 2024 (1 year old)'"), never for a recently-adopted plan where
+    the age adds no useful signal. Both year and age are parsed/derived
+    from LocalPlan.adoption_date, never invented; falls back to a bare
+    "Adopted" when that field has no recognisable year."""
     if plan is None:
         return None
     if plan.status == "adopted":
@@ -285,26 +291,24 @@ def _planning_readiness_chip(plan: LocalPlan | None) -> dict | None:
         if year is None:
             return {"emoji": "🟢", "label": "Adopted", "sublabel": None}
         age = _plan_age_years(year)
-        sublabel = f"{age} year{'s' if age != 1 else ''} old" if age is not None else None
+        sublabel = (
+            f"{age} years old" if age is not None and age > _PLAN_AGE_DISPLAY_THRESHOLD else None
+        )
         return {"emoji": "🟢", "label": f"Adopted {year}", "sublabel": sublabel}
     emoji, label = _READINESS_CHIP_STYLE.get(plan.status, ("⚪", "Not yet stated"))
     return {"emoji": emoji, "label": label, "sublabel": None}
 
 
-# Restrained, status-based card colour categories (Commercial Planning
-# Readiness refinement, Part 7) - six buckets: Adopted / Emerging /
-# Regulation 18 / Examination / Withdrawn / Joint-plan only. A council
-# whose primary card plan is NOT its own (either no plan at all, or only a
-# joint plan it merely participates in - app.reporting.council_intelligence
-# already tracks this via primary_plan_is_own, mirroring
-# build_council_detail's own field) always gets the Joint-plan-only/
-# neutral slate treatment, regardless of that plan's status - the
-# commercially relevant signal for a card like this is "this council has
-# no Local Plan of its own yet", which outranks the joint plan's own
-# adopted/emerging position. Only once a plan genuinely belongs to this
-# council does its own status (adopted / withdrawn-or-paused-or-superseded
-# / examination-or-submitted / the various Regulation 18 stages / anything
-# else, folded into "emerging") drive the card's colour.
+# Restrained, status-based card colour categories (Sprint 4.3a, Part 3) -
+# five buckets, driven ONLY by the plan's own status: Adopted / Emerging /
+# Regulation 18 / Examination / Withdrawn. The previous refinement's
+# "Joint-plan only" colour OVERRIDE has been removed per this sprint's
+# explicit instruction - "Status colour should always reflect the plan
+# status" - joint-plan participation is now communicated separately via
+# the Joint Plan badge (see build_council_overview), never by recolouring
+# the card away from what its displayed plan's status actually is. A
+# council with no Local Plan onboarded at all still gets its own distinct
+# "no-plan" neutral treatment (there's genuinely no status to reflect).
 _STATUS_COLOR_CATEGORIES: dict[str, str] = {
     "adopted": "adopted",
     "withdrawn": "withdrawn",
@@ -320,47 +324,69 @@ _STATUS_COLOR_CATEGORIES: dict[str, str] = {
 }
 
 
-def _status_color_category(plan: LocalPlan | None, primary_plan_is_own: bool) -> str:
-    if plan is None or not primary_plan_is_own:
-        return "joint-plan-only"
+def _status_color_category(plan: LocalPlan | None) -> str:
+    if plan is None:
+        return "no-plan"
     return _STATUS_COLOR_CATEGORIES.get(plan.status, "emerging")
 
 
-def _planning_health_banner(plan: LocalPlan | None) -> dict:
-    """A deterministic Planning Health classification (Commercial Planning
-    Readiness refinement, Part 4) - built ONLY from plan.status and the
-    same five_year_supply_years already shown on the card, never AI-
-    generated and never inferring a conclusion beyond what those two
-    stored fields directly support. "delivery shortfall" is deliberately
-    NOT wired into this classification: computing it would mean calling
-    app.policy.plan_evidence_view.build_plan_evidence_view for every card
-    in the overview list, which this module's own performance discipline
-    (Part 14, "no N+1 queries") reuses only on the per-council Detail page,
-    not the overview - a documented trade-off, not an oversight."""
+def _planning_outlook(plan: LocalPlan | None) -> dict:
+    """A deterministic Planning Outlook classification (Sprint 4.3a, Part
+    1 - renamed from "Planning Health" and reworded so nothing here reads
+    as "this site is more likely to get planning permission"; it describes
+    the council's planning CONTEXT only). Built ONLY from plan.status and
+    the same five_year_supply_years already shown on the card, never AI-
+    generated. "delivery shortfall" is deliberately NOT wired into this
+    classification: computing it would mean calling app.policy.
+    plan_evidence_view.build_plan_evidence_view for every card in the
+    overview list, which this module's own performance discipline (Part
+    14, "no N+1 queries") reuses only on the per-council Detail page, not
+    the overview - a documented trade-off, not an oversight."""
     if plan is None or plan.five_year_supply_years is None:
         return {"emoji": "⚪", "label": "Planning position still being assessed"}
     years = plan.five_year_supply_years
     if years < _FIVE_YEAR_SUPPLY_WARNING_THRESHOLD:
-        return {"emoji": "🔴", "label": "High planning opportunity"}
+        return {"emoji": "🟠", "label": "Housing delivery pressure"}
     if plan.status == "adopted":
-        return {"emoji": "🟢", "label": "Strong planning position"}
-    return {"emoji": "🟠", "label": "Growing delivery pressure"}
+        return {"emoji": "🟢", "label": "Stable planning environment"}
+    return {"emoji": "🟣", "label": "Major policy transition underway"}
 
 
-def _headline_delivery_or_milestone(plan: LocalPlan | None) -> dict:
-    """The overview card's fourth headline metric tile (refinement Part 2)
-    - the latest housing-delivery figure when this platform genuinely has
-    one, otherwise the plan's next milestone, otherwise an honest "Not yet
-    stated" - never both fields at once (no room on a headline tile), and
-    never a fabricated placeholder when neither exists."""
-    if plan is not None and plan.homes_delivered_latest_period is not None:
-        label = f"Delivered ({plan.latest_reporting_period})" if plan.latest_reporting_period else "Latest delivery"
-        return {"kind": "delivery", "label": label, "value": f"{plan.homes_delivered_latest_period:,} homes", "caption": None}
+def _why_it_matters(plan: LocalPlan | None, primary_plan_is_own: bool) -> str:
+    """A short, deterministic (never AI-generated) 1-2 sentence explanation
+    beneath Planning Outlook (Sprint 4.3a, Part 2) - built from the same
+    evidence already used for the outlook classification plus whether the
+    displayed plan is this council's own, so the wording never overstates
+    certainty or implies planning permission is more or less likely."""
+    if plan is None:
+        return "No Local Plan has been identified for this council yet."
+    if plan.five_year_supply_years is None:
+        return "The council's housing land supply has not yet been verified."
+    if plan.five_year_supply_years < _FIVE_YEAR_SUPPLY_WARNING_THRESHOLD:
+        return "Housing delivery remains an important planning priority."
+    if not primary_plan_is_own:
+        if plan.status == "adopted":
+            return f"Strategic development is currently guided through the adopted {plan.plan_name}."
+        return f"Strategic development is currently guided through {plan.plan_name}."
+    if plan.status != "adopted":
+        return "The council is progressing a new Local Plan which may influence future planning policy."
+    return "This council has an adopted Local Plan providing a settled policy framework for development."
+
+
+def _format_next_milestone(plan: LocalPlan | None) -> dict:
+    """The overview card's fourth STANDARDISED headline metric (Sprint
+    4.3a, Part 5 - "every council card should display the same four
+    headline metrics... never replace a metric with a different one").
+    Always the plan's next milestone, never swapped out for a delivery
+    figure regardless of what evidence happens to be available - an
+    honest "Not yet verified" (the same fallback text used across every
+    standardised metric on this card, per Part 5) when there's no
+    milestone on file, never a fabricated placeholder."""
     if plan is not None and plan.next_milestone:
         value = plan.next_milestone_date or plan.next_milestone
         caption = plan.next_milestone if plan.next_milestone_date else None
-        return {"kind": "milestone", "label": "Next milestone", "value": value, "caption": caption}
-    return {"kind": "none", "label": "Next milestone", "value": "Not yet stated", "caption": None}
+        return {"value": value, "caption": caption}
+    return {"value": "Not yet verified", "caption": None}
 
 
 def _has_missing_evidence(plan: LocalPlan | None) -> bool:
@@ -388,7 +414,8 @@ def _build_overview_card(row: dict, plan: LocalPlan | None, primary_plan_is_own:
         "adopted_or_emerging": ("Adopted" if plan.status == "adopted" else "Emerging") if plan else None,
         "current_stage": (PLAN_STAGE_LABELS.get(plan.status, "Not yet stated") if plan else "No Local Plan yet"),
         "planning_readiness_chip": _planning_readiness_chip(plan),
-        "planning_health": _planning_health_banner(plan),
+        "planning_outlook": _planning_outlook(plan),
+        "why_it_matters": _why_it_matters(plan, primary_plan_is_own),
         "next_milestone": plan.next_milestone if plan else None,
         "next_milestone_date": plan.next_milestone_date if plan else None,
         "expected_adoption_date": plan.expected_adoption_date if plan else None,
@@ -401,9 +428,9 @@ def _build_overview_card(row: dict, plan: LocalPlan | None, primary_plan_is_own:
         "housing_requirement_display": _format_housing_requirement(requirement_value, requirement_basis),
         "homes_delivered_latest_period": plan.homes_delivered_latest_period if plan else None,
         "latest_reporting_period": plan.latest_reporting_period if plan else None,
-        "headline_metric_4": _headline_delivery_or_milestone(plan),
+        "next_milestone_metric": _format_next_milestone(plan),
         "allocation_count": row["total_allocations_imported"],
-        "status_color": _status_color_category(plan, primary_plan_is_own),
+        "status_color": _status_color_category(plan),
         "last_updated": max(last_updated_candidates) if last_updated_candidates else None,
         "ai_summary_excerpt": _excerpt(plan.ai_summary_text, length=180) if plan else None,
         "ai_summary_generated_at": plan.ai_summary_generated_at if plan else None,
