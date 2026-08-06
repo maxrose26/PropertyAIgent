@@ -142,16 +142,29 @@ def _plan_roles_by_council(session: Session, council_codes: list[str]) -> dict[s
 
 def _select_primary_plan(plans: list[LocalPlan], council_code: str, roles_by_plan: dict[int, str]) -> LocalPlan | None:
     """See module docstring - own plan over joint plan, adopted over
-    emerging, most recently checked as the final tie-breaker. A plan with
-    no LocalPlanCouncil row at all (not yet backfilled) is treated as the
-    council's own, matching app.policy.joint_plans' own "no config entry
-    means single-authority" default."""
+    emerging, most recently checked as the final tie-breaker.
+
+    "Own" means role == "legacy_owner" specifically - app.policy.
+    joint_plans only ever assigns that role to a genuine single-authority
+    plan (no config/joint_plans.yaml entry at all), or to a plan not yet
+    backfilled with any LocalPlanCouncil row (roles_by_plan.get(...,
+    "legacy_owner") default, matching that module's own "no config entry
+    means single-authority" convention). "lead_authority" is NOT treated
+    as own here even though it sounds like it should be: it's the role
+    given to whichever authority administratively coordinates a genuinely
+    joint plan (e.g. Places for Everyone) - the plan itself is still a
+    multi-authority plan, not that council's own single-authority Local
+    Plan, so it must rank the same as "participating_authority" for this
+    council-card headline-plan decision. Confirmed real case this guards
+    against: a council that happens to be the joint plan's coordinating
+    authority must still headline its OWN Local Plan first, not the joint
+    plan it merely leads administratively."""
     if not plans:
         return None
 
     def sort_key(plan: LocalPlan):
         role = roles_by_plan.get(plan.id, "legacy_owner")
-        is_own = role != "participating_authority"
+        is_own = role == "legacy_owner"
         is_adopted = plan.status == "adopted"
         last = plan.last_checked or plan.updated_at
         last_ts = last.timestamp() if last else 0.0
@@ -174,6 +187,19 @@ def _housing_requirement(plan: LocalPlan | None) -> tuple[int | None, str | None
     return None, None
 
 
+def _has_missing_evidence(plan: LocalPlan | None) -> bool:
+    """Overview-card "missing-evidence indicator" (Part 4) - a cheap,
+    card-level proxy (no coverage-engine query per card in a list of every
+    council) rather than the full build_coverage_inventory/evidence-gap
+    computation the detail page does. True whenever the plan is missing
+    either its five-year supply position or any housing requirement figure
+    - the two headline numbers a customer would expect to see filled in."""
+    if plan is None:
+        return True
+    has_requirement = plan.total_housing_requirement is not None or plan.annual_housing_requirement is not None
+    return plan.five_year_supply_years is None or not has_requirement
+
+
 def _build_overview_card(row: dict, plan: LocalPlan | None) -> dict:
     requirement_value, requirement_basis = _housing_requirement(plan)
     last_updated_candidates = [t for t in (row["last_checked"], plan.last_checked if plan else None) if t is not None]
@@ -186,6 +212,7 @@ def _build_overview_card(row: dict, plan: LocalPlan | None) -> dict:
         "current_stage": (PLAN_STAGE_LABELS.get(plan.status, "Not yet stated") if plan else "No Local Plan yet"),
         "next_milestone": plan.next_milestone if plan else None,
         "next_milestone_date": plan.next_milestone_date if plan else None,
+        "expected_adoption_date": plan.expected_adoption_date if plan else None,
         "five_year_supply_years": plan.five_year_supply_years if plan else None,
         "housing_requirement": requirement_value,
         "housing_requirement_basis": requirement_basis,
@@ -196,6 +223,7 @@ def _build_overview_card(row: dict, plan: LocalPlan | None) -> dict:
         "ai_summary_excerpt": _excerpt(plan.ai_summary_text) if plan else None,
         "ai_summary_generated_at": plan.ai_summary_generated_at if plan else None,
         "evidence_freshness": EVIDENCE_FRESHNESS_LABELS.get(row["monitoring_health"], "Not yet checked"),
+        "has_missing_evidence": _has_missing_evidence(plan),
         "page": "pages/6_Council_Intelligence_Detail.py",
         "params": {"council": row["council_code"]},
     }
@@ -378,6 +406,7 @@ def build_council_detail(session: Session, council_code: str) -> dict | None:
     plans = plans_for_council(session, council_code)
     roles = _plan_roles_by_council(session, [council_code]).get(council_code, {})
     primary = _select_primary_plan(plans, council_code, roles)
+    primary_plan_is_own = primary is not None and roles.get(primary.id, "legacy_owner") == "legacy_owner"
 
     summary = summarise_council(session, council)
 
@@ -393,7 +422,20 @@ def build_council_detail(session: Session, council_code: str) -> dict | None:
     evidence_view = build_plan_evidence_view(session, primary) if primary is not None else None
 
     plan_ids = [p.id for p in plans]
-    visual_evidence = _build_visual_evidence_summary(session, plan_ids, allocation_ids)
+    # Visual Evidence must only count images genuinely about THIS council -
+    # allocation-scoped images always qualify (LocalPlanSite.council_code is
+    # already council-specific), but plan-level images (VisualEvidence.
+    # local_plan_id, not tied to any one allocation) must be restricted to
+    # this council's OWN single-authority plan(s). Confirmed real bug this
+    # guards against: without this restriction, every one of Places for
+    # Everyone's ~150+ plan-wide extracted images (most of which show a
+    # SPECIFIC allocation in a DIFFERENT participating borough, just not
+    # confidently matched to an allocation_id) was being counted under
+    # every single one of the plan's 9 participating authorities - Trafford
+    # (3 allocations of its own) was showing "156 images" as if that many
+    # were genuinely about Trafford.
+    own_plan_ids = [p.id for p in plans if roles.get(p.id, "legacy_owner") == "legacy_owner"]
+    visual_evidence = _build_visual_evidence_summary(session, own_plan_ids, allocation_ids)
     timeline = _build_council_timeline(session, plan_ids)
     evidence_gaps = _build_evidence_gaps(coverage, evidence_view)
 
@@ -401,6 +443,7 @@ def build_council_detail(session: Session, council_code: str) -> dict | None:
         "council_code": council_code,
         "council_name": council.name,
         "primary_plan": primary,
+        "primary_plan_is_own": primary_plan_is_own,
         "plans": plans,
         "plan_summaries": summary["local_plans"],
         "monitoring_health": summary["monitoring_health"],
@@ -409,7 +452,9 @@ def build_council_detail(session: Session, council_code: str) -> dict | None:
         "allocations": {
             "total": len(allocations),
             "matched": sum(1 for a in allocations if a.matched_site_id is not None),
+            "without_application": sum(1 for a in allocations if a.matched_site_id is None),
             "with_images": sum(1 for a in allocations if image_status_by_id.get(a.id) == "confirmed"),
+            "images_needing_review": sum(1 for a in allocations if image_status_by_id.get(a.id) == "needs_review"),
             "needing_review": sum(1 for a in allocations if a.review_status == "needs_confirmation"),
         },
         "coverage": coverage,

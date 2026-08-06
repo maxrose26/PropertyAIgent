@@ -1,19 +1,17 @@
 """Council Intelligence detail (Sprint 4.3) - one council's full customer-
-facing planning intelligence: overview KPIs, the existing AI Local Plan
-Summary (prominently, never regenerated on page load), housing position
-with evidence confidence, policy document coverage, allocation and visual
-evidence summaries, an activity timeline, and known evidence gaps.
+facing planning intelligence: overview KPIs, every applicable Local Plan's
+existing AI summary (prominently, never regenerated on page load), housing
+position with evidence confidence, every Local Plan the council has, an
+allocation summary, policy document coverage, a visual-evidence summary,
+known evidence gaps, and a policy activity timeline.
 
 Reached via a "council" query param (mirrors app/ui/pages/1_Scheme_Detail.py's
 own site_id pattern) rather than being a standalone nav item - visited by
 clicking "Open Council ->" on app/ui/pages/5_Council_Intelligence.py.
 
-Section order: Overview -> Local Plans -> AI Summary -> Housing Position ->
-Policy Documents -> Allocations -> Visual Evidence -> Timeline -> Evidence
-Gaps. See this sprint's completion report for why AI Summary is placed
-immediately after Overview (Part 5's "prominently display", read together
-with Part 3's suggested structure and the Part 4-11 detailed breakdown,
-which itself orders AI Summary right after Overview).
+Section order (Sprint 4.3 resumption brief, Part 5): Council overview -> AI
+planning-policy summary -> Housing position -> Local Plans -> Allocations ->
+Policy documents -> Visual evidence -> Evidence gaps -> Policy timeline.
 """
 from __future__ import annotations
 
@@ -33,6 +31,7 @@ from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import (
     ai_summary_card,
     empty_state,
+    evidence_badge,
     housing_stat_card,
     metric_row,
     page_header,
@@ -74,7 +73,6 @@ plan = detail["primary_plan"]
 # to a list)") - reuses the same overview data the list page itself shows.
 with st.sidebar:
     st.markdown("**Switch council**")
-    from app.reporting.council_intelligence import build_council_overview
     other_cards = build_council_overview(session)
     options = {c["council_name"]: c["council_code"] for c in other_cards}
     names = list(options.keys())
@@ -91,7 +89,7 @@ page_header(
     icon="🏛️",
 )
 
-# --- Overview (Part 4) --------------------------------------------------
+# --- 1. Council overview -----------------------------------------------
 
 documents_current = sum(1 for row in detail["coverage"] if row["current"])
 documents_expected = len(detail["coverage"])
@@ -128,7 +126,121 @@ metric_row(overview_items_2)
 
 st.divider()
 
-# --- Local Plans (Part 3's structure) ------------------------------------
+# --- 2. AI planning-policy summary - prominent, never auto-regenerated --
+#
+# Part 6: "If multiple Local Plans apply to one council, present them
+# clearly and avoid blending facts incorrectly" - every one of the
+# council's own Local Plans (detail["plans"], not just the primary one)
+# gets its own clearly-labelled summary block below, each reading only
+# that plan's own persisted ai_summary_* columns - never merged.
+
+section_header("AI Local Plan Summary", icon="🤖")
+
+if not detail["plans"]:
+    st.caption("No Local Plan onboarded yet - nothing to summarise.")
+else:
+    for plan_row in detail["plans"]:
+        if len(detail["plans"]) > 1:
+            st.markdown(f"##### {plan_row.plan_name}")
+
+        has_summary = plan_row.ai_summary_text is not None
+        button_label = "🔄 Refresh" if has_summary else "Generate summary"
+        if st.button(button_label, key=f"ci-refresh-summary-{plan_row.id}"):
+            openai_key = os.getenv("OPENAI_API_KEY")
+            if not openai_key:
+                st.error("OPENAI_API_KEY not set in .env.")
+            else:
+                with st.spinner("Generating summary from verified evidence..."):
+                    result = generate_local_plan_summary(session, OpenAI(api_key=openai_key), plan_row, force=True)
+                if result["rejected"]:
+                    st.error(
+                        f"The generated summary referenced figures not supported by this plan's evidence "
+                        f"({', '.join(result['rejection_reason'])}) and was rejected - the previous summary, if any, "
+                        f"has been kept."
+                    )
+                st.rerun()
+
+        if not has_summary:
+            st.info("No AI summary generated yet for this Local Plan.")
+            continue
+
+        if is_summary_stale(session, plan_row):
+            st.warning("⚠️ The underlying evidence has changed since this summary was generated - click Refresh for an up-to-date version.")
+
+        evidence_badge("Evidence-based summary", help="Generated only from evidence already verified elsewhere on this platform.")
+        generated_bit = plan_row.ai_summary_generated_at.strftime("%d %b %Y %H:%M") if plan_row.ai_summary_generated_at else None
+        ai_summary_card(
+            plan_row.ai_summary_text, generated_at=generated_bit, model=plan_row.ai_summary_model,
+            prompt_version=plan_row.ai_summary_prompt_version, key=f"ci-ai-summary-{plan_row.id}",
+        )
+        key_risks = json.loads(plan_row.ai_summary_key_risks) if plan_row.ai_summary_key_risks else []
+        key_opportunities = json.loads(plan_row.ai_summary_key_opportunities) if plan_row.ai_summary_key_opportunities else []
+        ai_evidence_gaps = json.loads(plan_row.ai_summary_evidence_gaps) if plan_row.ai_summary_evidence_gaps else []
+        if key_risks:
+            st.markdown("**Key risks:**\n" + "\n".join(f"- {r}" for r in key_risks))
+        if key_opportunities:
+            st.markdown("**Key opportunities:**\n" + "\n".join(f"- {o}" for o in key_opportunities))
+        if ai_evidence_gaps:
+            st.markdown("**Evidence gaps:**\n" + "\n".join(f"- {g}" for g in ai_evidence_gaps))
+
+        if len(detail["plans"]) > 1 and plan_row is not detail["plans"][-1]:
+            st.markdown("---")
+
+st.divider()
+
+# --- 3. Housing position - every figure with its evidence confidence ----
+
+section_header("Housing Position", icon="🏘️")
+if detail["evidence_view"] is None:
+    st.caption("No Local Plan onboarded yet - no housing position to show.")
+else:
+    if plan:
+        ownership_bit = "this council's own Local Plan" if detail["primary_plan_is_own"] else "the joint plan this council participates in - it has no separate Local Plan of its own onboarded yet"
+        st.caption(f"Shown for {plan.plan_name} - {ownership_bit}.")
+    by_field = {
+        entry["field"]: entry
+        for section in ("requirement", "delivery", "five_year_supply")
+        for entry in detail["evidence_view"][section]
+    }
+
+    def _source_label(entry: dict) -> str | None:
+        if entry["source_page"]:
+            return f"p.{entry['source_page']}"
+        return entry["source_document_title"]
+
+    def _render_housing_row(fields: list[tuple[str, str]]) -> None:
+        cols = st.columns(len(fields))
+        for col, (field, label) in zip(cols, fields):
+            entry = by_field.get(field)
+            with col:
+                if entry is None:
+                    housing_stat_card(label, None)
+                else:
+                    housing_stat_card(
+                        label, entry["value"],
+                        trust=entry["trust"] if entry["has_value"] else None,
+                        source_label=_source_label(entry) if entry["has_value"] else None,
+                    )
+
+    _render_housing_row([
+        ("annual_housing_requirement", "Housing requirement"),
+        ("housing_need_annual", "Housing need"),
+        ("five_year_supply_years", "Five-year supply (years)"),
+        ("deliverable_supply_dwellings", "Deliverable supply"),
+    ])
+    _render_housing_row([
+        ("five_year_requirement_dwellings", "Five-year requirement"),
+        ("homes_delivered_latest_period", "Delivery (latest period)"),
+        ("five_year_shortfall_or_surplus_dwellings", "Shortfall / surplus"),
+        ("buffer_percentage", "NPPF buffer"),
+    ])
+    base_date_entry = by_field.get("five_year_supply_base_date")
+    if base_date_entry and base_date_entry["has_value"]:
+        st.caption(f"Five-year supply base date: {base_date_entry['value']}")
+
+st.divider()
+
+# --- 4. Local Plans (Part 8: single-authority, emerging, adopted, joint) -
 
 section_header("Local Plans", icon="📋")
 if not detail["plan_summaries"]:
@@ -143,102 +255,35 @@ else:
             with col_status:
                 status_badge("confirmed" if p["status"] == "adopted" else "pending", PLAN_STAGE_LABELS.get(p["status"], "Not yet stated"))
             st.caption(
-                f"{p['allocations_imported']} allocation(s), {p['sites_matched']} matched to a Site"
+                f"{p['allocations_imported']} allocation(s) in {detail['council_name']}, {p['sites_matched']} matched to a Site"
                 + (f" · checked {relative_time(p['last_checked'])}" if p["last_checked"] else "")
             )
 
 st.divider()
 
-# --- AI Summary (Part 5) - prominent, never auto-regenerated ------------
+# --- 5. Allocations - links out to Local Plan Sites, no duplication -----
 
-section_header("AI Local Plan Summary", icon="🤖")
-if plan is None:
-    st.caption("No Local Plan onboarded yet - nothing to summarise.")
-else:
-    has_summary = plan.ai_summary_text is not None
-    button_label = "🔄 Refresh" if has_summary else "Generate summary"
-    if st.button(button_label, key=f"ci-refresh-summary-{plan.id}"):
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not openai_key:
-            st.error("OPENAI_API_KEY not set in .env.")
-        else:
-            with st.spinner("Generating summary from verified evidence..."):
-                result = generate_local_plan_summary(session, OpenAI(api_key=openai_key), plan, force=True)
-            if result["rejected"]:
-                st.error(
-                    f"The generated summary referenced figures not supported by this plan's evidence "
-                    f"({', '.join(result['rejection_reason'])}) and was rejected - the previous summary, if any, "
-                    f"has been kept."
-                )
-            st.rerun()
-
-    if not has_summary:
-        st.info("No AI summary generated yet for this council's Local Plan.")
-    else:
-        if is_summary_stale(session, plan):
-            st.warning("⚠️ The underlying evidence has changed since this summary was generated - click Refresh for an up-to-date version.")
-        generated_bit = plan.ai_summary_generated_at.strftime("%d %b %Y %H:%M") if plan.ai_summary_generated_at else None
-        ai_summary_card(
-            plan.ai_summary_text, generated_at=generated_bit, model=plan.ai_summary_model,
-            prompt_version=plan.ai_summary_prompt_version, key=f"ci-ai-summary-{plan.id}",
-        )
-        key_risks = json.loads(plan.ai_summary_key_risks) if plan.ai_summary_key_risks else []
-        key_opportunities = json.loads(plan.ai_summary_key_opportunities) if plan.ai_summary_key_opportunities else []
-        if key_risks:
-            st.markdown("**Key risks:**\n" + "\n".join(f"- {r}" for r in key_risks))
-        if key_opportunities:
-            st.markdown("**Key opportunities:**\n" + "\n".join(f"- {o}" for o in key_opportunities))
+section_header("Allocations", icon="🗺️")
+allocations = detail["allocations"]
+metric_row([
+    ("Allocations", allocations["total"], None),
+    ("Matched to a Site", allocations["matched"], "Allocations with a planning application already submitted."),
+    ("Without an application", allocations["without_application"], None),
+    ("With confirmed images", allocations["with_images"], None),
+])
+metric_row([
+    ("Images awaiting review", allocations["images_needing_review"], "AI-suggested allocation images not yet confirmed by a reviewer."),
+    ("Allocations awaiting review", allocations["needing_review"], None),
+])
+st.page_link("pages/3_Local_Plan_Sites.py", label="View Local Plan Sites →")
+st.caption(
+    "Local Plan Sites doesn't yet support filtering straight to one council by link - this opens the full "
+    "allocation browser, where a council filter is available in the sidebar."
+)
 
 st.divider()
 
-# --- Housing Position (Part 6) - every figure with its evidence confidence
-
-section_header("Housing Position", icon="🏘️")
-if detail["evidence_view"] is None:
-    st.caption("No Local Plan onboarded yet - no housing position to show.")
-else:
-    by_field = {
-        entry["field"]: entry
-        for section in ("requirement", "delivery", "five_year_supply")
-        for entry in detail["evidence_view"][section]
-    }
-
-    def _source_label(entry: dict) -> str | None:
-        if entry["source_page"]:
-            return f"p.{entry['source_page']}"
-        return entry["source_document_title"]
-
-    housing_fields = [
-        ("annual_housing_requirement", "Housing requirement"),
-        ("housing_need_annual", "Housing need"),
-        ("five_year_supply_years", "Five-year supply (years)"),
-        ("deliverable_supply_dwellings", "Deliverable supply"),
-    ]
-    housing_fields_2 = [
-        ("homes_delivered_latest_period", "Delivery (latest period)"),
-        ("five_year_shortfall_or_surplus_dwellings", "Shortfall / surplus"),
-        ("buffer_percentage", "NPPF buffer"),
-    ]
-    cols = st.columns(4)
-    for col, (field, label) in zip(cols, housing_fields):
-        entry = by_field.get(field)
-        with col:
-            if entry is None:
-                housing_stat_card(label, None)
-            else:
-                housing_stat_card(label, entry["value"], trust=entry["trust"] if entry["has_value"] else None, source_label=_source_label(entry) if entry["has_value"] else None)
-    cols2 = st.columns(4)
-    for col, (field, label) in zip(cols2, housing_fields_2):
-        entry = by_field.get(field)
-        with col:
-            if entry is None:
-                housing_stat_card(label, None)
-            else:
-                housing_stat_card(label, entry["value"], trust=entry["trust"] if entry["has_value"] else None, source_label=_source_label(entry) if entry["has_value"] else None)
-
-st.divider()
-
-# --- Policy Documents (Part 7) - reuses app.policy.coverage unchanged ----
+# --- 6. Policy documents - reuses app.policy.coverage unchanged ---------
 
 section_header("Policy Documents", icon="📄")
 if not detail["coverage"]:
@@ -265,21 +310,7 @@ else:
 
 st.divider()
 
-# --- Allocations (Part 8) - links out to Local Plan Sites, no duplication
-
-section_header("Allocations", icon="🗺️")
-allocations = detail["allocations"]
-metric_row([
-    ("Allocations", allocations["total"], None),
-    ("Matched to a Site", allocations["matched"], "Allocations with a planning application already submitted."),
-    ("With confirmed images", allocations["with_images"], None),
-    ("Requiring review", allocations["needing_review"], None),
-])
-st.page_link("pages/3_Local_Plan_Sites.py", label="View Allocations →")
-
-st.divider()
-
-# --- Visual Evidence (Part 9) - concise summary, not a duplicate gallery -
+# --- 7. Visual evidence - concise summary, not a duplicate gallery ------
 
 section_header("Visual Evidence", icon="🖼️")
 ve = detail["visual_evidence"]
@@ -303,14 +334,7 @@ if ve["recent_allocation_maps"]:
 
 st.divider()
 
-# --- Timeline (Part 10) ---------------------------------------------------
-
-section_header("Timeline", icon="🕗")
-timeline(detail["timeline"], key="council-intel", empty_message="No recorded activity for this council yet.")
-
-st.divider()
-
-# --- Evidence Gaps (Part 11) - reuses the coverage engine + evidence view
+# --- 8. Evidence gaps - reuses the coverage engine + evidence view ------
 
 section_header("Evidence Gaps", icon="⚠️")
 if not detail["evidence_gaps"]:
@@ -319,3 +343,10 @@ else:
     with st.container(border=True):
         for gap in detail["evidence_gaps"]:
             st.markdown(f"- {gap}")
+
+st.divider()
+
+# --- 9. Policy timeline --------------------------------------------------
+
+section_header("Policy Timeline", icon="🕗")
+timeline(detail["timeline"], key="council-intel", empty_message="No recorded activity for this council yet.")

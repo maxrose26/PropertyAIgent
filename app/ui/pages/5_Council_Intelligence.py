@@ -88,6 +88,13 @@ def _render_council_card(card: dict) -> None:
 
         if card["next_milestone"]:
             st.caption(f"Next milestone: **{card['next_milestone']}**" + (f" ({card['next_milestone_date']})" if card["next_milestone_date"] else ""))
+        if card["expected_adoption_date"]:
+            st.caption(f"Expected adoption: **{card['expected_adoption_date']}**")
+        if card["homes_delivered_latest_period"] is not None and card["latest_reporting_period"]:
+            st.caption(f"Latest delivery: **{card['homes_delivered_latest_period']:,} homes** ({card['latest_reporting_period']})")
+
+        if card["has_missing_evidence"]:
+            status_badge("review", "Evidence gaps")
 
         if card["ai_summary_excerpt"]:
             ai_badge()

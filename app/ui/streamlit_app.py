@@ -44,15 +44,19 @@ st.logo("🏠", size="medium")
 dashboard_page = st.Page("pages/00_Dashboard.py", title="Dashboard", icon="🏠", default=True)
 explore_page = st.Page("pages/0_Explore.py", title="Explore", icon="🔍")
 site_profile_page = st.Page("pages/1_Scheme_Detail.py", title="Site Profile", icon="📍", visibility="hidden")
-council_dashboard_page = st.Page("pages/4_Council_Dashboard.py", title="Council Dashboard", icon="⚙️")
+council_intelligence_page = st.Page("pages/5_Council_Intelligence.py", title="Council Intelligence", icon="🏛️")
+council_intelligence_detail_page = st.Page(
+    "pages/6_Council_Intelligence_Detail.py", title="Council Intelligence", icon="🏛️", visibility="hidden"
+)
 local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Local Plan Sites", icon="📋")
+council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️")
 review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗")
 
 pg = st.navigation(
     {
         "": [dashboard_page, explore_page, site_profile_page],
-        "Policy": [local_plan_page],
-        "Administration": [council_dashboard_page, review_links_page],
+        "Policy": [council_intelligence_page, council_intelligence_detail_page, local_plan_page],
+        "Administration": [council_operations_page, review_links_page],
     },
     position="top",
 )

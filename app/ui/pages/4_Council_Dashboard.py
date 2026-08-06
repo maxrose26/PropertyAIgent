@@ -1,8 +1,17 @@
-"""Internal Council administration dashboard (Sprint 2, "Greater Manchester
-Policy Intelligence Framework", Part 7). For administration - confirming
-what's been onboarded and whether monitoring is actually working - not a
-page a prospective land buyer or investor would ever need. See
-app.policy.council_dashboard for the pure data assembly this renders.
+"""Council Operations (Sprint 2, "Greater Manchester Policy Intelligence
+Framework", Part 7; renamed from "Council Dashboard" in Sprint 4.3,
+"Council Intelligence", Part 11) - the internal Administration view for
+confirming what's been onboarded and whether monitoring is actually
+working. Not a page a prospective land buyer or investor would ever need -
+see app/ui/pages/5_Council_Intelligence.py and 6_Council_Intelligence_
+Detail.py for that customer-facing split, built from the same underlying
+data via app.reporting.council_intelligence.
+
+Sprint 4.3 deliberately did not redesign this page - only the rename and
+the navigation move (already under Administration, title updated) were in
+scope; every existing operational control, table and expander below is
+unchanged. See app.policy.council_dashboard for the pure data assembly
+this renders.
 """
 from __future__ import annotations
 
@@ -35,10 +44,10 @@ st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 credits_sidebar(session, settings)
 
 page_header(
-    "Council Dashboard — Administration",
+    "Council Operations",
     "Internal view of Policy Intelligence onboarding per council - which Local Plans have been ingested, "
     "whether monitoring is actually reaching their sources, and what's waiting for a review decision. "
-    "Not part of the public site-browsing experience.",
+    "Not part of the public site-browsing experience - see Council Intelligence under Policy for that.",
     icon="⚙️",
 )
 
