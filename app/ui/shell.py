@@ -908,6 +908,147 @@ def timeline(entries: list[dict], *, key: str, empty_message: str = "Nothing to 
                     f'<div class="pig-leaderboard-time">{relative_time(entry.get("when"))}</div>',
                     unsafe_allow_html=True,
                 )
+def site_profile_header(header: dict) -> None:
+    """The Site Profile executive header (Sprint 4.4, Part 2) - address,
+    primary application reference, and every status badge that's actually
+    available, laid out for a ~30-second read. header is
+    app.reporting.site_profile.build_site_header's own output - every
+    field is either a real fact or None, and this renders ONLY the
+    fields that are present, never "None" or an unsupported zero."""
+    st.title(header["address"])
+    caption_bits = [header["council_code"]]
+    if header["primary_reference"]:
+        caption_bits.append(header["primary_reference"])
+    st.caption(" · ".join(caption_bits))
+
+    badges = []
+    if header["planning_status_label"]:
+        badges.append(("info", header["planning_status_label"]))
+    if header["decision_status_label"]:
+        kind = "confirmed" if header["decision_status_label"] == "Granted" else (
+            "rejected" if header["decision_status_label"] == "Refused" else "pending"
+        )
+        badges.append((kind, header["decision_status_label"]))
+    if header["build_status_label"]:
+        badges.append(("info", header["build_status_label"]))
+    if header["lapse_status_label"] and header["lapse_status_label"] not in ("OK", "Not yet granted"):
+        badges.append(("review", header["lapse_status_label"]))
+    if header["allocation_badge"]:
+        badges.append(("info", f"📋 {header['allocation_badge']}"))
+
+    if badges:
+        # Equal-width columns clip a long badge (e.g. the build-status
+        # label's "(0 EPCs - may still be under construction)" detail)
+        # with Streamlit's native badge ellipsis - width each column by
+        # its own label length instead, so a long badge gets the room it
+        # needs and short ones stay compact.
+        cols = st.columns([max(len(label), 10) for _, label in badges])
+        for col, (kind, label) in zip(cols, badges):
+            with col:
+                status_badge(kind, label)
+
+    if header["latest_evidence_update"]:
+        st.caption(f"Evidence last updated {relative_time(header['latest_evidence_update'])}")
+
+
+def opportunity_position_card(op: dict) -> None:
+    """The Opportunity Position section (Sprint 4.4, Part 4) - a
+    deterministic, evidence-grounded explanation of why a scheme is
+    currently noteworthy, never a planning-permission prediction. op is
+    app.reporting.site_profile.build_opportunity_position's own output -
+    this only renders it, never re-derives or embellishes the wording."""
+    with st.container(border=True):
+        st.markdown("**🎯 Opportunity Position**")
+        st.write(op["headline"])
+        if len(op["reasons"]) > 1:
+            for reason in op["reasons"][1:]:
+                st.caption(f"• {reason}")
+        st.markdown(f"**Why it matters:** {op['why_it_matters']}")
+        st.markdown(f"**Investigate next:** {op['investigate_next']}")
+
+
+def evidence_gap_panel(gaps: list[str]) -> None:
+    """A short, honest list of what's missing (Sprint 4.4, Part 12/14) -
+    kept visible but secondary to headline information, never a reason to
+    hide a tab."""
+    if not gaps:
+        st.caption("No significant evidence gaps identified for this site.")
+        return
+    with st.container(border=True):
+        st.markdown("**⚠ Evidence gaps**")
+        for gap in gaps:
+            st.caption(f"• {gap}")
+
+
+def _visual_evidence_card(card: dict, *, width: int = 200) -> None:
+    if card.get("image_path") and os.path.exists(card["image_path"]):
+        st.image(card["image_path"], width=width)
+    detail = card["label"]
+    if card.get("source_title"):
+        detail += f" — {card['source_title']}"
+    if card.get("source_page"):
+        detail += f", page {card['source_page']}"
+    st.caption(detail)
+    review_badge(card.get("confidence"), confirmed=card.get("review_status") == "confirmed")
+    if card.get("source_url"):
+        st.caption(f"[View source document]({card['source_url']})")
+
+
+def visual_evidence_gallery(gallery: dict) -> None:
+    """The Visual Evidence tab's gallery (Sprint 4.4, Part 9) - confirmed
+    evidence always outranks suggested evidence in the layout (primary
+    first, other confirmed second, needs-review last, clearly labelled),
+    never a local filesystem path shown as text (image_path is only ever
+    passed to st.image as a source - see app.reporting.site_profile's own
+    docstring on this)."""
+    if not gallery["has_any"]:
+        st.info("No confirmed or suggested visual evidence has been extracted for this site yet.")
+        return
+
+    if gallery["primary"]:
+        st.markdown("**Primary evidence**")
+        _visual_evidence_card(gallery["primary"], width=360)
+
+    if gallery["other_confirmed"]:
+        st.markdown(f"**Other confirmed evidence ({len(gallery['other_confirmed'])})**")
+        cols = st.columns(min(len(gallery["other_confirmed"]), 4))
+        for i, card in enumerate(gallery["other_confirmed"]):
+            with cols[i % len(cols)]:
+                _visual_evidence_card(card)
+
+    if gallery["needs_review"]:
+        st.markdown(f"**Suggested evidence awaiting review ({len(gallery['needs_review'])})**")
+        st.caption("AI-suggested, not yet confirmed by a reviewer - shown here so nothing useful is hidden.")
+        cols = st.columns(min(len(gallery["needs_review"]), 4))
+        for i, card in enumerate(gallery["needs_review"]):
+            with cols[i % len(cols)]:
+                _visual_evidence_card(card)
+
+
+def ai_status_summary_view(ai_summary: dict) -> None:
+    """The AI Summary tab (Sprint 4.4, Part 11) - reuses the existing
+    stored Site status summary via ai_summary_card, never regenerates it.
+    Site.status_summary has no separately-stored Key Changes/Evidence
+    Gaps/Suggested Investigation subsections (unlike LocalPlan's own AI
+    summary) - see app.reporting.site_profile.build_ai_summary_view's own
+    docstring for why this shows the whole stored text as one "Current
+    position" block rather than fabricating a split the stored output
+    doesn't support, and why model/prompt version are omitted rather than
+    asserted without a stored per-row value."""
+    if not ai_summary["has_summary"]:
+        st.info("No AI status summary has been generated yet for this site.")
+        return
+    ai_summary_card(
+        ai_summary["text"],
+        generated_at=ai_summary["generated_at"].strftime("%d %b %Y") if ai_summary["generated_at"] else None,
+        key="site-ai-summary",
+    )
+    st.caption(
+        "This is the site's full stored status summary (Current position) - no separate Key Changes/"
+        "Evidence Gaps/Suggested Investigation subsections are stored for site-level summaries."
+    )
+
+
 def render_footer() -> None:
     """A lightweight footer (Part 8) - product name, version, environment
     only, no clutter."""

@@ -275,10 +275,13 @@ metric_row([
     ("Images awaiting review", allocations["images_needing_review"], "AI-suggested allocation images not yet confirmed by a reviewer."),
     ("Allocations awaiting review", allocations["needing_review"], None),
 ])
-st.page_link("pages/3_Local_Plan_Sites.py", label="View Local Plan Sites →")
+st.page_link(
+    "pages/3_Local_Plan_Sites.py", label="View Local Plan Sites →",
+    query_params={"council": detail["council_code"]},
+)
 st.caption(
-    "Local Plan Sites doesn't yet support filtering straight to one council by link - this opens the full "
-    "allocation browser, where a council filter is available in the sidebar."
+    "Opens Local Plan Sites pre-filtered to this council - the sidebar's council filter can still be "
+    "widened or cleared from there."
 )
 
 st.divider()
