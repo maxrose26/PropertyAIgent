@@ -1,8 +1,9 @@
-"""Council Intelligence (Sprint 4.3) - the customer-facing per-council
-planning intelligence overview. Lists every council this platform has real
-Policy Intelligence activity for as a card - Local Plan status, housing
-position, allocation coverage, evidence freshness, a short AI summary
-excerpt - with a link into that council's own detail page.
+"""Council Intelligence (Sprint 4.3, refined by the Sprint 4.3 presentation
+refinement) - the customer-facing per-council planning intelligence
+overview. Lists every council this platform has real Policy Intelligence
+activity for as a card - Local Plan status, headline housing position,
+allocation coverage, a short AI summary excerpt - with a link into that
+council's own detail page.
 
 This is deliberately NOT the same page as Council Operations (Administration
 - see app/ui/pages/4_Council_Dashboard.py): no monitoring health, no
@@ -11,6 +12,40 @@ app.reporting.council_intelligence for the pure data assembly this renders
 - every figure here is read from data Council Operations already tracks,
 reshaped for a planning consultant / land buyer audience rather than an
 administrator.
+
+Presentation refinement history:
+
+- wide_canvas() gives this page its own wider canvas (like the Dashboard)
+  since a card grid otherwise leaves substantial unused space on the right
+  at the shared shell's normal contained width; cards render inside a
+  "council-grid" container whose key app.ui.shell's global stylesheet
+  targets with a CSS Grid auto-fit/minmax rule (as many 320px+ cards per
+  row as the available content width actually allows - see
+  inject_global_styles's "Council Intelligence overview refinement" CSS
+  block); "Evidence" is no longer a headline KPI tile (it's now a compact
+  secondary caption alongside evidence gaps); headline values use
+  shell.stat_tile/five_year_supply_tile, which wrap long text instead of
+  truncating it.
+- Commercial Planning Readiness refinement: the plain Adopted/Emerging
+  badge is replaced by a Planning Readiness chip (shell.
+  planning_readiness_chip) - a finer-grained, colour-dotted label that
+  includes the adoption year and plan age where LocalPlan.adoption_date
+  supports it.
+- Sprint 4.3a ("Council Intelligence Commercial Polish") - Planning Health
+  renamed Planning Outlook (shell.planning_outlook_banner) and reworded so
+  nothing reads as "more likely to get planning permission"; a
+  deterministic "Why it matters" line (shell.why_it_matters_line, never
+  AI-generated) sits directly beneath it; the card's
+  "cc-<status_color>-<council_code>" container key now drives a FIVE-bucket
+  colour treatment (Adopted / Emerging / Regulation 18 / Examination /
+  Withdrawn) driven ONLY by the displayed plan's own status - the previous
+  "Joint-plan only" colour OVERRIDE is gone, replaced by a separate,
+  neutral shell.joint_plan_badge() shown alongside the chip whenever the
+  plan isn't this council's own; the four headline metrics are now
+  STANDARDISED (five-year supply, Homes Required, Strategic allocations,
+  next milestone) and never swapped depending on which evidence happens to
+  be available - see app.reporting.council_intelligence's own docstrings
+  for exactly how each is derived from stored evidence.
 """
 from __future__ import annotations
 
@@ -26,14 +61,23 @@ from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import (
     ai_badge,
     empty_state,
+    five_year_supply_tile,
+    joint_plan_badge,
     page_header,
+    planning_outlook_banner,
+    planning_readiness_chip,
     relative_time,
+    stat_tile,
     status_badge,
+    why_it_matters_line,
+    wide_canvas,
 )
 
 bootstrap()
 session, settings = get_db()
 credits_sidebar(session, settings)
+
+wide_canvas()
 
 page_header(
     "Council Intelligence",
@@ -55,47 +99,74 @@ if not cards:
 
 
 def _render_council_card(card: dict) -> None:
-    with st.container(border=True):
+    container_key = f"cc-{card['status_color']}-{card['council_code']}"
+    with st.container(border=True, key=container_key):
+        # Header: council name + Planning Readiness chip - the strongest
+        # visual element on the card (Sprint 4.3a, Part 9) - plus a
+        # separate, neutral Joint Plan badge whenever the displayed plan
+        # isn't this council's own (Part 3 - joint-plan participation and
+        # plan status are different pieces of information and must not
+        # replace one another).
         col_name, col_status = st.columns([3, 2], vertical_alignment="center")
         with col_name:
             st.markdown(f"### {card['council_name']}")
         with col_status:
-            if card["adopted_or_emerging"] == "Adopted":
-                status_badge("confirmed", "Adopted")
-            elif card["adopted_or_emerging"] == "Emerging":
-                status_badge("pending", "Emerging")
+            if card["planning_readiness_chip"] is not None:
+                planning_readiness_chip(card["planning_readiness_chip"])
+                if not card["primary_plan_is_own"]:
+                    joint_plan_badge()
             else:
                 status_badge("info", "No Local Plan yet")
 
+        # Planning Outlook + Why it matters sit directly beneath the
+        # header (Part 9 - "Planning Outlook sits directly beneath"), both
+        # purely deterministic, never AI-generated.
+        planning_outlook_banner(card["planning_outlook"])
+        why_it_matters_line(card["why_it_matters"])
+
+        # Plan line: primary Local Plan name + current stage.
         st.caption(
             f"{card['plan_name']} · {card['current_stage']}" if card["plan_name"] else card["current_stage"]
         )
 
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric(
-                "Five-year supply",
-                f"{card['five_year_supply_years']:g} yrs" if card["five_year_supply_years"] is not None else "—",
+        # Headline metrics - STANDARDISED across every card (Part 5): the
+        # same four metrics, same order, never swapped depending on which
+        # evidence happens to be available. "Evidence" is deliberately not
+        # one of these four (kept as secondary information below).
+        row1_col1, row1_col2 = st.columns(2)
+        with row1_col1:
+            five_year_supply_tile(
+                card["five_year_supply_display"],
+                card["five_year_supply_state"],
+                base_date=card["five_year_supply_base_date"],
             )
-        with col2:
-            requirement = card["housing_requirement"]
-            basis = " (total)" if card["housing_requirement_basis"] == "total" else " (annual)" if card["housing_requirement_basis"] == "annual" else ""
-            st.metric("Housing requirement", f"{requirement:,}{basis}" if requirement is not None else "—")
-        with col3:
-            st.metric("Allocations", card["allocation_count"] if card["allocation_count"] else "—")
-        with col4:
-            st.metric("Evidence", card["evidence_freshness"])
+        with row1_col2:
+            stat_tile(
+                "Homes Required",
+                card["housing_requirement_display"] or "Not yet verified",
+                help="Total plan-period figure where stated, otherwise the annual rate.",
+            )
 
-        if card["next_milestone"]:
-            st.caption(f"Next milestone: **{card['next_milestone']}**" + (f" ({card['next_milestone_date']})" if card["next_milestone_date"] else ""))
+        row2_col1, row2_col2 = st.columns(2)
+        with row2_col1:
+            stat_tile("Strategic allocations", f"{card['allocation_count']:,}")
+        with row2_col2:
+            next_milestone = card["next_milestone_metric"]
+            stat_tile("Next milestone", next_milestone["value"], caption=next_milestone["caption"])
+
+        # Secondary information - kept visible but subordinate to the
+        # headline metrics above (Part 8 - never competes visually with
+        # the headline information).
+        secondary_bits = []
         if card["expected_adoption_date"]:
-            st.caption(f"Expected adoption: **{card['expected_adoption_date']}**")
-        if card["homes_delivered_latest_period"] is not None and card["latest_reporting_period"]:
-            st.caption(f"Latest delivery: **{card['homes_delivered_latest_period']:,} homes** ({card['latest_reporting_period']})")
-
+            secondary_bits.append(f"Expected adoption: {card['expected_adoption_date']}")
+        secondary_bits.append(f"Updated {relative_time(card['last_updated'])}")
+        secondary_bits.append(card["evidence_freshness"])
+        st.caption(" · ".join(secondary_bits))
         if card["has_missing_evidence"]:
             status_badge("review", "Evidence gaps")
 
+        # AI summary - a short, stored excerpt only; never regenerated here.
         if card["ai_summary_excerpt"]:
             ai_badge()
             st.write(card["ai_summary_excerpt"])
@@ -103,11 +174,19 @@ def _render_council_card(card: dict) -> None:
         else:
             st.caption("No AI summary generated yet for this council's Local Plan.")
 
-        st.caption(f"Latest policy update: {relative_time(card['last_updated'])}")
         st.page_link(card["page"], label="Open Council →", query_params=card["params"])
 
 
-cols = st.columns(2)
-for i, card in enumerate(cards):
-    with cols[i % 2]:
-        _render_council_card(card)
+with st.container(key="council-grid"):
+    # A SINGLE st.columns() call for every card, not chunked into groups of
+    # 3 - Streamlit renders each st.columns() call as its own independent
+    # stHorizontalBlock, and CSS Grid's auto-fit only reflows children
+    # WITHIN one such block. Chunking into separate 3-wide Python rows
+    # created one independent grid per chunk, so at a width that only fits
+    # 2 cards per line each 3-card chunk wrapped into its own "2 then 1"
+    # pair rather than the whole card list flowing evenly across full
+    # rows. A single call gives auto-fit every card at once to lay out.
+    cols = st.columns(len(cards))
+    for col, card in zip(cols, cards):
+        with col:
+            _render_council_card(card)

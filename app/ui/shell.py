@@ -160,6 +160,50 @@ def inject_global_styles() -> None:
         @media (prefers-reduced-motion: reduce) {
             [class*="st-key-rail-card-"] { animation: none; border-left-color: #E4E8EC !important; }
         }
+
+        /* Council Intelligence overview refinement - responsive card grid.
+           Scoped to the "council-grid" container key only used on
+           pages/5_Council_Intelligence.py, so no other page's st.columns
+           layout is affected. Python still declares a fixed 3-per-row
+           chunk size; CSS Grid's auto-fit/minmax reflows that into
+           however many 320px+ cards actually fit the AVAILABLE content
+           width (viewport minus the sidebar, whichever way the user has
+           it) - 3 on a large desktop, 2 on a standard laptop, 1 on
+           mobile, self-adjusting rather than guessing from viewport-width
+           breakpoints alone (a fixed-pixel media query on window width
+           was tried first and produced inconsistent 2-3-per-row results,
+           since the sidebar's own width isn't part of that number).
+           The selector chain below (">" direct-child combinators,
+           matching Streamlit's actual DOM: council-grid's own
+           stVerticalBlock > stLayoutWrapper > stHorizontalBlock > stColumn)
+           deliberately targets ONLY that top-level row, never the nested
+           stHorizontalBlock/stColumn pairs each card renders internally
+           for its own 2x2 metric-tile grid - a plain descendant selector
+           here would also catch those nested columns and force them into
+           the same grid, breaking every card's internal layout. */
+        [data-testid="stVerticalBlock"][class*="st-key-council-grid"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.25rem;
+        }
+        [data-testid="stVerticalBlock"][class*="st-key-council-grid"] > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+            width: 100% !important; min-width: 0;
+        }
+
+        /* Council Intelligence overview refinement - restrained,
+           status-based card colour (Sprint 4.3a, Part 3): Adopted /
+           Emerging / Regulation 18 / Examination / Withdrawn / no plan at
+           all. Colour ALWAYS reflects the displayed plan's own status -
+           joint-plan participation no longer overrides it (that's now a
+           separate, neutral "Joint Plan" badge - see joint_plan_badge
+           below); status is also always shown as text/a badge/chip on
+           the card itself, colour is never the only signal. */
+        [class*="st-key-cc-adopted-"] { background-color: #F1FAF4 !important; border-color: #BFE3C9 !important; }
+        [class*="st-key-cc-emerging-"] { background-color: #F5F0FB !important; border-color: #D9C8ED !important; }
+        [class*="st-key-cc-regulation-18-"] { background-color: #FBF3E3 !important; border-color: #ECD9A6 !important; }
+        [class*="st-key-cc-examination-"] { background-color: #EFF5FC !important; border-color: #C9DCF0 !important; }
+        [class*="st-key-cc-withdrawn-"] { background-color: #FBEEEE !important; border-color: #EFC3C3 !important; }
+        [class*="st-key-cc-no-plan-"] { background-color: #F4F5F7 !important; border-color: #DEE2E7 !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -743,6 +787,103 @@ def housing_stat_card(label: str, value, *, help: str | None = None, trust: str 
         st.metric(label, value if value not in (None, "") else "—", help=help)
         if trust is not None and value not in (None, ""):
             evidence_confidence_badge(trust, source_label=source_label)
+
+
+def stat_tile(label: str, value: str, *, caption: str | None = None, help: str | None = None) -> None:
+    """A wrapping, non-truncating Stat Tile (Sprint 4.3 refinement, Part 3 -
+    "no headline value may appear as truncated text"). Unlike metric_card
+    (built on st.metric, which single-lines and ellipsis-truncates long
+    values at narrow column widths - the exact "9,48...", "Mon..." failure
+    this refinement fixes), this wraps a long value onto a second line
+    instead of cutting it off. Used for any headline figure that might run
+    longer than a plain 3-4 digit number (e.g. "9,486 homes",
+    "November 2027")."""
+    with st.container(border=True):
+        st.caption(label, help=help)
+        st.markdown(
+            f'<div style="font-size:1.35rem;font-weight:700;line-height:1.25;'
+            f'overflow-wrap:break-word;">{_escape(str(value))}</div>',
+            unsafe_allow_html=True,
+        )
+        if caption:
+            st.caption(caption)
+
+
+# Fixed, non-caller-controlled style per five-year-supply state (refinement
+# Part 4) - safe to interpolate into a static CSS/HTML snippet since these
+# three dicts are never built from user- or database-supplied text (see
+# module docstring's "static CSS/HTML snippets" carve-out).
+_SUPPLY_STATE_STYLE: dict[str, dict] = {
+    "warning": {"color": "#B7431F", "icon": "⚠", "note": "Below five-year requirement"},
+    "ok": {"color": "#1F7A4C", "icon": "✅", "note": None},
+    "unverified": {"color": "#5B6B7C", "icon": "❔", "note": None},
+}
+
+
+def five_year_supply_tile(display: str, state: str, *, base_date: str | None = None) -> None:
+    """The Five-Year Housing Supply headline tile (Sprint 4.3 refinement,
+    Part 4) - a warning-accented tile below the five-year threshold, a
+    plain positive tile at/above it, and an explicit "Not yet verified"
+    tile (never a bare em dash) when this council has no trusted supply
+    figure extracted yet. display/state are computed entirely by
+    app.reporting.council_intelligence from real extracted evidence - this
+    component only chooses how to present them, never infers or estimates
+    a number itself."""
+    style = _SUPPLY_STATE_STYLE.get(state, _SUPPLY_STATE_STYLE["unverified"])
+    with st.container(border=True):
+        st.caption("Five-year supply")
+        st.markdown(
+            f'<div style="font-size:1.35rem;font-weight:700;color:{style["color"]}">'
+            f'{style["icon"]} {_escape(display)}</div>',
+            unsafe_allow_html=True,
+        )
+        if style["note"]:
+            st.caption(style["note"])
+        elif base_date:
+            st.caption(f"Base date {base_date}")
+
+
+def planning_readiness_chip(chip: dict) -> None:
+    """The Planning Readiness chip (Commercial Planning Readiness
+    refinement, Part 2) - replaces the plain Adopted/Emerging badge with a
+    finer-grained, colour-dotted label (e.g. "🟢 Adopted 2018" with a
+    "7 years old" sub-line). chip is app.reporting.council_intelligence.
+    _planning_readiness_chip's own output - this renders it, never
+    computes or estimates any part of it itself."""
+    st.markdown(f"**{chip['emoji']} {_escape(chip['label'])}**")
+    if chip.get("sublabel"):
+        st.caption(chip["sublabel"])
+
+
+def joint_plan_badge() -> None:
+    """A neutral "Joint Plan" badge (Sprint 4.3a, Part 3) - shown
+    alongside the Planning Readiness chip whenever the card's displayed
+    plan is NOT this council's own (app.reporting.council_intelligence's
+    primary_plan_is_own), communicating that fact separately from the
+    card's status colour/chip instead of overriding them - joint-plan
+    participation and the plan's own status are two different pieces of
+    information and must not replace one another."""
+    st.badge("Joint Plan", icon="⬜", color="gray")
+
+
+def planning_outlook_banner(outlook: dict) -> None:
+    """The Planning Outlook banner (Sprint 4.3a, Part 1 - renamed from
+    "Planning Health", reworded so it never reads as "more likely to get
+    planning permission") - a short, deterministic classification (never
+    AI-generated) computed by app.reporting.council_intelligence.
+    _planning_outlook from evidence already stored; renders it as a single
+    compact line, coloured by the SAME emoji already carried in outlook
+    (never a separate colour decision)."""
+    st.markdown(f"{outlook['emoji']} **{_escape(outlook['label'])}**")
+
+
+def why_it_matters_line(text: str) -> None:
+    """"Why it matters" (Sprint 4.3a, Part 2) - a short, deterministic
+    (never AI-generated) sentence directly beneath the Planning Outlook
+    banner, explaining what that outlook means in plain English. text is
+    app.reporting.council_intelligence._why_it_matters's own output -
+    this only renders it."""
+    st.caption(text)
 
 
 def timeline(entries: list[dict], *, key: str, empty_message: str = "Nothing to show yet.") -> None:
