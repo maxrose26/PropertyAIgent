@@ -33,6 +33,7 @@ from app.ui.common import (
 from app.ui.shell import (
     ai_badge,
     ai_status_summary_view,
+    arrow_safe_count,
     evidence_gap_panel,
     opportunity_position_card,
     section_header,
@@ -88,7 +89,7 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
                 st.caption(f"**{label}:** {bucket['phase_count']} phase(s), {unit_bit}")
         phase_rows = [{
             "Phase / plot": p["label"],
-            "Units": p.get("unit_count") or ("—" if p["kind"] == "phase" else ""),
+            "Units": arrow_safe_count(p.get("unit_count"), "—" if p["kind"] == "phase" else ""),
             "Status": PHASE_STATUS_LABELS[p["status"]],
             "Applications": len(p["applications"]),
         } for p in phase_breakdown]
