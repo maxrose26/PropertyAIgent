@@ -76,6 +76,13 @@ _CUSTOM_ALERT_STYLE = {
     "review": {"color": "#B7791F", "icon": "⚠", "label": "Review required"},
     "ai": {"color": "#6B4FA0", "icon": "🤖", "label": "AI-generated"},
     "evidence_missing": {"color": "#3B5773", "icon": "📄", "label": "Evidence missing"},
+    # Allocation Discovery (Sprint 4.5a, "Commercial Polish", Part 6) - the
+    # "no linked planning application" commercial signal. Reuses the same
+    # blue already assigned to "Informational/neutral" in the badge palette
+    # above (never a new colour) - a magnifying-glass icon fits "worth
+    # investigating" without implying a data-quality problem (amber/review)
+    # or a value judgement (green/red) the way those other kinds would.
+    "opportunity_signal": {"color": "#3B5773", "icon": "🔍", "label": "Worth investigating"},
 }
 
 
@@ -1050,30 +1057,59 @@ def visual_evidence_gallery(gallery: dict) -> None:
                 _visual_evidence_card(card)
 
 
-def allocation_card(card: dict, *, key: str) -> None:
-    """One Allocation Discovery gallery card (Sprint 4.5, Part 7) - card is
-    app.reporting.allocation_discovery.build_allocation_card's own output;
-    this only renders it, never re-derives or embellishes any fact. Reuses
-    _visual_evidence_card for the thumbnail (card["visual_primary"]/
-    ["visual_fallback"] are built in the exact same {image_path, label,
-    source_title, ...} shape that function already expects), status_badge
-    for the plan-status chip and review state, and joint_plan_badge for the
-    multi-authority signal - no new badge/image rendering invented here."""
-    with st.container(border=True, key=f"alloc-card-{key}"):
-        st.markdown(f"**{_escape(card['site_name'])}**")
-        subtitle_bits = [b for b in (card.get("policy_reference"), card["council_name"]) if b]
-        if subtitle_bits:
-            st.caption(" · ".join(_escape(str(b)) for b in subtitle_bits))
-        st.caption(_escape(card["plan_name"]))
+def status_badge_row(badges: list[tuple[str, str]]) -> None:
+    """A row of status_badge calls, each column proportionally sized to its
+    own label length (Sprint 4.5a, "Commercial Polish", Part 8: "badge text
+    must not truncate at common laptop widths") - the same fix already
+    proven on site_profile_header's own badge row, reused here (and by any
+    other page needing a multi-badge row) rather than invented per call
+    site. Equal-width st.columns clips a long label with Streamlit's
+    native badge ellipsis well before a typical laptop's column width
+    runs out; sizing each column to len(label) instead gives a long badge
+    the room it needs and keeps short ones compact."""
+    cols = st.columns([max(len(label), 10) for _, label in badges])
+    for col, (kind, label) in zip(cols, badges):
+        with col:
+            status_badge(kind, label)
 
-        badge_cols = st.columns(3 if card["is_multi_authority"] else 2)
-        with badge_cols[0]:
-            status_badge(card["plan_status_chip_kind"], card["plan_status_label"])
-        with badge_cols[1]:
-            status_badge(card["review_status_badge_kind"], card["review_status_label"])
+
+def allocation_card(card: dict, *, key: str) -> None:
+    """One Allocation Discovery gallery card (Sprint 4.5, Part 7; commercial
+    presentation refined in Sprint 4.5a, Part 1) - card is
+    app.reporting.allocation_discovery.build_allocation_card's own output;
+    this only renders it, never re-derives or embellishes any fact. Layout
+    follows Sprint 4.5a's specified scan order - name, development type,
+    capacity, planning status, why it matters, actions - with the policy
+    reference demoted to a small caption alongside council/plan context
+    rather than leading the card (Part 1: "avoid presenting policy
+    references as the primary information"). Every card renders with
+    identical size/border/emphasis regardless of capacity - larger
+    allocations are never made visually more prominent (Sprint 4.5a's
+    product principle: PropertyAIgent never decides what the "best" site
+    is; only the descriptive wording, never the visual weight, varies with
+    scale). Reuses _visual_evidence_card for the thumbnail, status_badge/
+    joint_plan_badge for badges, and render_alert for the "no linked
+    application" commercial signal - no new badge/image/alert rendering
+    invented here beyond registering that one new render_alert kind."""
+    with st.container(border=True, key=f"alloc-card-{key}"):
+        # 1. Allocation name
+        st.markdown(f"##### {_escape(card['site_name'])}")
+        # 2. Development type - a concise commercial description, omitted
+        # honestly when no existing evidence supports one.
+        if card.get("development_type"):
+            st.caption(f"🏘️ {_escape(card['development_type'])}")
+
+        context_bits = [b for b in (card["council_name"], card["plan_name"], card.get("policy_reference")) if b]
+        st.caption(" · ".join(_escape(str(b)) for b in context_bits))
+
+        # 3. Capacity - a natural sentence fragment, not a bare field/value pair.
+        st.markdown(f"**{_escape(card['capacity']['display'])}**")
+
+        # 4. Planning status
+        badges = [(card["plan_status_chip_kind"], card["plan_status_label"]), (card["review_status_badge_kind"], card["review_status_label"])]
+        status_badge_row(badges)
         if card["is_multi_authority"]:
-            with badge_cols[2]:
-                joint_plan_badge()
+            joint_plan_badge()
 
         visual = card["visual_primary"] or card["visual_fallback"]
         if visual:
@@ -1086,16 +1122,27 @@ def allocation_card(card: dict, *, key: str) -> None:
         else:
             st.caption("🖼 No confirmed or suggested visual evidence yet.")
 
-        st.markdown(f"**{_escape(card['intended_use_label'])}** · {_escape(card['capacity']['display'])}")
-        st.caption(card["matched_summary"], help=card["matched_summary_help"])
+        if card.get("show_no_application_panel"):
+            render_alert(
+                "opportunity_signal", card["no_application_panel_message"],
+                title=card["no_application_panel_title"], key=f"alloc-no-app-{key}",
+            )
+        else:
+            st.caption(card["matched_summary"], help=card["matched_summary_help"])
         if card.get("build_status_label"):
             st.caption(card["build_status_label"])
         if card.get("delivery_note"):
             st.caption(card["delivery_note"])
 
-        st.caption(f"Why it matters: {card['why_it_matters']}")
-        st.caption(f"Investigate next: {card['investigate_next']}")
+        # 5. Why it matters
+        st.caption(f"**Why it matters:** {card['why_it_matters']}")
+        st.caption(f"**Investigate next:** {card['investigate_next']}")
 
+        # 6. Actions - the primary action stands alone, secondary
+        # navigation links follow, the external source link (smallest,
+        # least important) last - a simple visual hierarchy rather than
+        # four identical, undifferentiated links in a row.
+        st.divider()
         st.page_link(
             "pages/3_Local_Plan_Sites.py", label="Open Allocation →",
             query_params={"allocation_id": str(card["id"])},

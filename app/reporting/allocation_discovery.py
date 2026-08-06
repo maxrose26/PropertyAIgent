@@ -115,20 +115,67 @@ def format_capacity(allocation: LocalPlanSite) -> dict:
     """Never combines incompatible figures into one invented number (Part
     14) - minimum/indicative/maximum are shown for exactly what they are,
     labelled, and a genuine range only when both a minimum and a maximum are
-    stated AND they actually differ."""
+    stated AND they actually differ.
+
+    Sprint 4.5a ("Commercial Polish", Part 3) - reads as a natural
+    commercial sentence fragment ("Approximately 250 homes") rather than a
+    database field-and-value pair ("Capacity: 250") - "Approximately" is
+    used for both the minimum-only and indicative-only cases since both are
+    genuinely non-exact estimates (a stated minimum is a floor, not a
+    promise of the final count; an indicative figure is explicitly a
+    council's own estimate) - never claims more precision than the source
+    evidence actually supports."""
     minimum = allocation.minimum_dwellings
     indicative = allocation.indicative_capacity
     maximum = allocation.maximum_capacity
 
     if minimum is None and indicative is None and maximum is None:
-        return {"kind": "unknown", "display": "Capacity not stated", "value": None}
+        return {"kind": "unknown", "display": "Capacity not identified", "value": None}
     if minimum is not None and maximum is not None and minimum != maximum:
         return {"kind": "range", "display": f"{minimum:,}–{maximum:,} homes", "value": maximum}
     if minimum is not None:
-        return {"kind": "minimum", "display": f"{minimum:,} homes (minimum)", "value": minimum}
+        return {"kind": "minimum", "display": f"Approximately {minimum:,} homes", "value": minimum}
     if maximum is not None:
         return {"kind": "maximum", "display": f"Up to {maximum:,} homes", "value": maximum}
-    return {"kind": "indicative", "display": f"~{indicative:,} homes (indicative)", "value": indicative}
+    return {"kind": "indicative", "display": f"Approximately {indicative:,} homes", "value": indicative}
+
+
+# A separate, higher bar than MAJOR_HOUSING_CAPACITY_THRESHOLD - "strategic
+# urban extension" is a stronger commercial description than plain
+# "residential allocation" and should only be used for allocations that are
+# genuinely large-scale, not merely "major" by the platform's general
+# 100-home bar. Using capacity to choose WORDING is not the same as using
+# it to change a card's visual weight (Sprint 4.5a's product principle) -
+# every card renders with identical size/border/prominence regardless of
+# this label; only the descriptive text differs, grounded in the
+# allocation's own stated figures.
+STRATEGIC_EXTENSION_CAPACITY_THRESHOLD = 1000
+
+
+def development_type_label(*, site_name: str | None, category: str | None, intended_use: str | None, capacity_value: int | None) -> str | None:
+    """Sprint 4.5a ("Commercial Polish", Part 2) - a concise, deterministic
+    commercial description beneath the allocation title, built ONLY from
+    evidence already stored on the row (site_name, category, intended_use,
+    capacity) - never a fresh classification invented for this purpose.
+    Returns None when nothing in the existing evidence supports a
+    description more specific than the bare word "allocation" - an honest
+    omission, not a guess."""
+    name = (site_name or "").lower()
+    cat = (category or "").lower()
+
+    if "garden village" in name:
+        return "Garden village allocation"
+    if "regeneration" in name or "regeneration" in cat:
+        return "Urban regeneration allocation"
+    if intended_use == "employment":
+        return "Employment allocation"
+    if intended_use == "mixed use":
+        return "Mixed-use allocation"
+    if intended_use == "residential":
+        if capacity_value is not None and capacity_value >= STRATEGIC_EXTENSION_CAPACITY_THRESHOLD:
+            return "Strategic urban extension"
+        return "Residential allocation"
+    return None
 
 
 def is_major_housing_allocation(intended_use: str | None, capacity_value: int | None) -> bool:
@@ -176,44 +223,99 @@ def linked_application_help() -> str:
 
 
 def _why_it_matters_reasons(card: dict) -> list[str]:
+    """Sprint 4.5a ("Commercial Polish", Part 5) rewrote every string below
+    for a more commercially natural tone (e.g. "One of the council's
+    planned residential growth locations" rather than the bare category
+    label "Major housing allocation") - the underlying SIGNALS and their
+    priority order are unchanged from Sprint 4.5, only the wording. Still
+    entirely deterministic, still grounded in facts already present on the
+    card dict, still free of permission-likelihood or investment-advice
+    language (Part 6's explicit bans: "good buying opportunity",
+    "acquisition opportunity", "strong investment", "likely to gain
+    planning permission")."""
     reasons: list[str] = []
     capacity_value = card["capacity"]["value"]
 
     if card["plan_status_bucket"] == "adopted" and card["major_housing"]:
         reasons.append(
-            f"Adopted {card['intended_use_label'].lower()} allocation with capacity for approximately "
-            f"{capacity_value:,} homes."
+            f"One of {card['council_name']}'s planned {card['intended_use_label'].lower()} growth locations, "
+            f"adopted with capacity for approximately {capacity_value:,} homes."
         )
     elif card["plan_status_bucket"] == "adopted":
-        reasons.append(f"Adopted allocation within {card['plan_name']}.")
+        reasons.append(f"Confirmed as part of {card['plan_name']}, the council's adopted development plan.")
     elif card["plan_status_bucket"] == "emerging" and card["linked_application_count"] == 0:
-        reasons.append("Emerging allocation with no linked planning application currently held by the platform.")
+        reasons.append(
+            "Identified for future development through the emerging Local Plan, with no linked planning "
+            "application currently held by the platform."
+        )
     elif card["plan_status_bucket"] == "emerging":
-        reasons.append(f"Emerging allocation within {card['plan_name']}.")
+        reasons.append(f"Identified for future development through the emerging Local Plan ({card['plan_name']}).")
 
     if card["linked_application_count"] == 0 and card["plan_status_bucket"] != "emerging":
         reasons.append("No linked planning application currently held by the platform for this allocation.")
 
     if card["matched"] and card["lapse_status"] in _NOT_COMMENCED_LAPSE_STATUSES:
-        reasons.append("Linked permission has not yet commenced, based on available filing evidence.")
+        reasons.append("A linked planning permission exists but has not yet commenced, based on available filing evidence.")
 
     if card["council_five_year_supply"] is not None and card["council_five_year_supply"] < FIVE_YEAR_SUPPLY_WARNING_THRESHOLD:
         reasons.append(
-            f"{card['council_name']} has a verified housing land supply below five years "
+            f"{card['council_name']} currently reports a housing land supply below the five-year requirement "
             f"({card['council_five_year_supply']:.2f} years)."
         )
 
     if card["visual_status"] == "confirmed":
-        reasons.append("Confirmed allocation map is available, but development progress has not yet been established.")
+        reasons.append("Confirmed allocation mapping is available, though development progress has not yet been established.")
     elif card["visual_status"] == "needs_review" or card["visual_fallback"] is not None:
-        reasons.append("Evidence remains unreviewed - a suggested visual is awaiting confirmation.")
+        reasons.append("Suggested allocation mapping is available but has not yet been confirmed.")
 
     if card["is_multi_authority"] and card["major_housing"]:
-        reasons.append("Cross-boundary strategic allocation shared across multiple authorities.")
+        reasons.append("A cross-boundary strategic allocation shared across multiple authorities.")
 
     if not reasons:
-        reasons.append("No standout signals identified from currently held evidence for this allocation.")
+        reasons.append("No additional planning signals identified from evidence currently held by the platform.")
     return reasons
+
+
+# --- "No linked planning application" commercial signal (Part 6) ------------
+#
+# Deliberately its own, separately-labelled panel rather than folded into
+# the why-it-matters bullet list above - Part 6 frames this as "one of the
+# platform's strongest commercial signals" and asks for a highlighted
+# treatment, not a plain caption line easily missed among several others.
+
+NO_LINKED_APPLICATION_PANEL_TITLE = "No linked planning application currently identified"
+NO_LINKED_APPLICATION_PANEL_MESSAGE = (
+    "PropertyAIgent has not matched this allocation to a planning application. This may warrant further "
+    "investigation to determine whether an application exists or whether the allocation remains at a "
+    "pre-application stage."
+)
+
+
+def _no_development_identified(card: dict) -> bool:
+    """True only when the platform genuinely holds no evidence of
+    development activity for this allocation - never inferred from an
+    unmatched Site alone (Part 13: unmatched is not the same claim as "no
+    development"). A matched Site with a real build-status signal (even a
+    weak one, e.g. "no completions yet") is still evidence of SOME
+    activity being tracked, so it does not qualify."""
+    if card["linked_application_count"] > 0:
+        return False
+    if not card["matched"]:
+        return True
+    return card["build_status"] in (None, "unknown")
+
+
+def show_no_application_panel(card: dict) -> bool:
+    """Part 6's four-part conjunction: the allocation exists (trivially
+    true for any card), is adopted or emerging (not withdrawn/paused/
+    superseded/uncertain - a signal worth surfacing only for a plan
+    genuinely still in force or being progressed), has no linked
+    Application, and no development has been identified at all."""
+    return (
+        card["plan_status_bucket"] in ("adopted", "emerging")
+        and card["linked_application_count"] == 0
+        and _no_development_identified(card)
+    )
 
 
 def _investigate_next(card: dict) -> str:
@@ -250,6 +352,10 @@ def build_allocation_card(
     capacity = format_capacity(allocation)
     intended_use_label = INTENDED_USE_LABELS.get(allocation.intended_use, allocation.intended_use or "Not stated")
     major_housing = is_major_housing_allocation(allocation.intended_use, capacity["value"])
+    development_type = development_type_label(
+        site_name=allocation.site_name, category=allocation.category,
+        intended_use=allocation.intended_use, capacity_value=capacity["value"],
+    )
 
     matched = matched_site is not None
     linked_application_count = len(linked_applications)
@@ -315,6 +421,7 @@ def build_allocation_card(
         "cross_boundary_councils": [c for c in council_codes_on_plan if c != allocation.council_code],
         "intended_use": allocation.intended_use,
         "intended_use_label": intended_use_label,
+        "development_type": development_type,
         "capacity": capacity,
         "major_housing": major_housing,
         "category": allocation.category,
@@ -352,7 +459,48 @@ def build_allocation_card(
     card["why_it_matters_reasons"] = _why_it_matters_reasons(card)
     card["why_it_matters"] = card["why_it_matters_reasons"][0]
     card["investigate_next"] = _investigate_next(card)
+    card["show_no_application_panel"] = show_no_application_panel(card)
+    card["no_application_panel_title"] = NO_LINKED_APPLICATION_PANEL_TITLE
+    card["no_application_panel_message"] = NO_LINKED_APPLICATION_PANEL_MESSAGE
+    card["matching_attributes"] = build_matching_attributes(card)
     return card
+
+
+# --- Structured attributes for future matching (Part 9) ---------------------
+#
+# NOT a ranking, score, or recommendation - PropertyAIgent never decides
+# what the "best" allocation is (Sprint 4.5a's product principle: different
+# users value different opportunities, and only future user-defined
+# personalisation should determine relevance). This is a stable, narrowly-
+# named subset of the full card dict - the exact attribute list Part 9
+# names (capacity, intended use, planning status, build status, linked
+# application, matched site, visual evidence, review status, council,
+# Local Plan, housing supply context) - with every display-only/formatting
+# field left out, so a future matching feature has one clean, documented
+# seam to read from rather than reaching into the full display-oriented
+# card dict. Also rendered today (Part 9: "do not expose these purely for
+# debugging") as the Allocation Detail view's compact "Key attributes"
+# reference list - genuinely useful now for a user manually comparing
+# allocations, not just inert plumbing for later.
+
+
+def build_matching_attributes(card: dict) -> dict:
+    return {
+        "capacity_value": card["capacity"]["value"],
+        "capacity_kind": card["capacity"]["kind"],
+        "intended_use": card["intended_use"],
+        "planning_status_bucket": card["plan_status_bucket"],
+        "planning_status": card["plan_status"],
+        "build_status": card["build_status"],
+        "has_linked_application": card["linked_application_count"] > 0,
+        "linked_application_count": card["linked_application_count"],
+        "matched_site_id": card["matched_site_id"],
+        "visual_evidence_status": card["visual_status"],
+        "review_status": card["review_status"],
+        "council_code": card["council_code"],
+        "local_plan_id": card["local_plan_id"],
+        "council_five_year_supply": card["council_five_year_supply"],
+    }
 
 
 # --- Batched, bounded top-level builder --------------------------------------
@@ -455,9 +603,17 @@ def build_summary_metrics(cards: list[dict]) -> dict:
     allocation an approved AllocationRelationship review has already
     identified as the same physical site as another counted row is never
     counted twice (Part 14) - it still appears in the gallery itself,
-    just not in these aggregate totals."""
+    just not in these aggregate totals.
+
+    Sprint 4.5a ("Commercial Polish", Part 7) added total_homes_identified,
+    strategic_housing_allocations and confirmed_allocation_maps - metrics
+    that communicate development SCALE (how much housing this platform has
+    identified, how much of it is confirmed-mapped) rather than database
+    size (row counts alone). Every added figure is a straightforward sum/
+    count over facts each card already carries - never a new estimate."""
     countable = [c for c in cards if _counts_toward_summary(c)]
     total = len(countable)
+    known_capacities = [c["capacity"]["value"] for c in countable if c["capacity"]["value"] is not None]
     return {
         "total_allocations": total,
         "adopted_allocations": sum(1 for c in countable if c["plan_status_bucket"] == "adopted"),
@@ -466,6 +622,13 @@ def build_summary_metrics(cards: list[dict]) -> dict:
         "matched_to_sites": sum(1 for c in countable if c["matched"]),
         "no_linked_application": sum(1 for c in countable if c["linked_application_count"] == 0),
         "needs_review": sum(1 for c in countable if _needs_review(c)),
+        # Only a real total when at least one allocation has a known
+        # capacity - an empty list summed to 0 would misrepresent "we
+        # haven't identified any homes" as "no homes exist here", so this
+        # is None (never shown) rather than a false 0 when nothing is known.
+        "total_homes_identified": sum(known_capacities) if known_capacities else None,
+        "strategic_housing_allocations": sum(1 for c in countable if c["major_housing"]),
+        "confirmed_allocation_maps": sum(1 for c in countable if c["visual_status"] == "confirmed"),
     }
 
 

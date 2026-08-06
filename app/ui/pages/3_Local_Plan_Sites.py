@@ -40,9 +40,10 @@ from app.ui.shell import (
     evidence_gap_panel,
     joint_plan_badge,
     page_header,
+    render_alert,
     section_header,
     stat_tile,
-    status_badge,
+    status_badge_row,
     timeline,
     visual_evidence_gallery,
     wide_canvas,
@@ -84,17 +85,17 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         return
 
     page_header(card["site_name"], icon="🗺️")
-    caption_bits = [b for b in (card["policy_reference"], card["council_name"], card["plan_name"]) if b]
+    if card.get("development_type"):
+        st.caption(f"🏘️ {card['development_type']}")
+    caption_bits = [b for b in (card["council_name"], card["plan_name"], card.get("policy_reference")) if b]
     st.caption(" · ".join(caption_bits))
 
-    badge_cols = st.columns(3 if card["is_multi_authority"] else 2)
-    with badge_cols[0]:
-        status_badge(card["plan_status_chip_kind"], card["plan_status_label"])
-    with badge_cols[1]:
-        status_badge(card["review_status_badge_kind"], card["review_status_label"])
+    status_badge_row([
+        (card["plan_status_chip_kind"], card["plan_status_label"]),
+        (card["review_status_badge_kind"], card["review_status_label"]),
+    ])
     if card["is_multi_authority"]:
-        with badge_cols[2]:
-            joint_plan_badge()
+        joint_plan_badge()
 
     # 1. Allocation overview
     section_header("Overview", icon="📋")
@@ -116,6 +117,8 @@ def _render_detail(view: dict, allocation_id: int) -> None:
 
     # 3. Capacity and intended use
     section_header("Capacity and intended use", icon="🏗️")
+    if card.get("development_type"):
+        st.caption(f"🏘️ {card['development_type']}")
     cap_cols = st.columns(2)
     with cap_cols[0]:
         stat_tile("Intended use", card["intended_use_label"])
@@ -144,7 +147,13 @@ def _render_detail(view: dict, allocation_id: int) -> None:
 
     # 5. Matched Sites and Applications
     section_header("Matched Site and Applications", icon="🔗")
-    st.caption(card["matched_summary"], help=card["matched_summary_help"])
+    if card.get("show_no_application_panel"):
+        render_alert(
+            "opportunity_signal", card["no_application_panel_message"],
+            title=card["no_application_panel_title"], key=f"alloc-detail-no-app-{allocation_id}",
+        )
+    else:
+        st.caption(card["matched_summary"], help=card["matched_summary_help"])
     if card["matched"]:
         if card["matched_site_address"]:
             st.write(f"**Matched Site:** {card['matched_site_address']}")
@@ -208,6 +217,43 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         ]
         timeline(entries, key=f"alloc-timeline-{allocation_id}")
 
+    # Key attributes (Sprint 4.5a, "Commercial Polish", Part 9) - a
+    # compact, factual reference list sourced from card["matching_
+    # attributes"] (app.reporting.allocation_discovery.
+    # build_matching_attributes) - the same stable, narrowly-named
+    # attribute set a future user-defined matching feature would read from.
+    # Deliberately NOT a score or ranking - every allocation shows the same
+    # kind of reference list regardless of its own values, so this reads as
+    # neutral evidence, not an implied verdict.
+    section_header("Key attributes", icon="📊")
+    attrs = card["matching_attributes"]
+    supply_display = f"{attrs['council_five_year_supply']:.2f} years" if attrs["council_five_year_supply"] is not None else "Not available"
+    if attrs["visual_evidence_status"] == "confirmed":
+        visual_display = "Confirmed"
+    elif attrs["visual_evidence_status"] == "needs_review":
+        visual_display = "Suggested"
+    elif card["visual_fallback"] is not None:
+        visual_display = "Plan-wide only"
+    else:
+        visual_display = "None identified"
+    attribute_rows = [
+        ("Capacity", card["capacity"]["display"]),
+        ("Intended use", card["intended_use_label"]),
+        ("Planning status", card["plan_status_label"]),
+        ("Build status", card["build_status_label"] or "Not established"),
+        ("Linked Application", "Yes" if attrs["has_linked_application"] else "No"),
+        ("Matched Site", "Yes" if attrs["matched_site_id"] else "No"),
+        ("Visual evidence", visual_display),
+        ("Review status", card["review_status_label"]),
+        ("Council", card["council_name"]),
+        ("Local Plan", card["plan_name"]),
+        ("Housing supply context", supply_display),
+    ]
+    attr_cols = st.columns(2)
+    for i, (label, value) in enumerate(attribute_rows):
+        with attr_cols[i % 2]:
+            st.caption(f"**{label}:** {value}")
+
 
 _allocation_id_param = st.query_params.get("allocation_id")
 if _allocation_id_param and _allocation_id_param.isdigit():
@@ -236,20 +282,28 @@ if not all_cards:
     st.stop()
 
 summary = build_summary_metrics(all_cards)
-metric_cols = st.columns(5)
+# Sprint 4.5a ("Commercial Polish", Part 7) - metrics that communicate
+# development SCALE (how much housing this platform has identified, how
+# much of it is confirmed-mapped) rather than database size (a bare
+# allocation-row count). Every figure is a real sum/count already computed
+# by build_summary_metrics - never an invented metric.
+homes_display = f"{summary['total_homes_identified']:,}" if summary["total_homes_identified"] is not None else "Not yet identified"
+metric_cols = st.columns(6)
 with metric_cols[0]:
-    stat_tile("Total allocations", f"{summary['total_allocations']:,}")
+    stat_tile("Total Homes Identified", homes_display)
 with metric_cols[1]:
-    stat_tile("Adopted", f"{summary['adopted_allocations']:,}")
+    stat_tile("Strategic Housing Allocations", f"{summary['strategic_housing_allocations']:,}")
 with metric_cols[2]:
-    stat_tile("Emerging", f"{summary['emerging_allocations']:,}")
+    stat_tile("Adopted Allocations", f"{summary['adopted_allocations']:,}")
 with metric_cols[3]:
-    stat_tile("With visual evidence", f"{summary['with_visual_evidence']:,}")
+    stat_tile("Emerging Allocations", f"{summary['emerging_allocations']:,}")
 with metric_cols[4]:
-    stat_tile("Matched to Sites", f"{summary['matched_to_sites']:,}")
+    stat_tile("Without Linked Applications", f"{summary['no_linked_application']:,}")
+with metric_cols[5]:
+    stat_tile("Confirmed Allocation Maps", f"{summary['confirmed_allocation_maps']:,}")
 st.caption(
-    f"{summary['no_linked_application']:,} allocation(s) with no linked Application currently held by the "
-    f"platform · {summary['needs_review']:,} awaiting review."
+    f"{summary['total_allocations']:,} allocations tracked across {summary['matched_to_sites']:,} matched to a "
+    f"Site · {summary['needs_review']:,} awaiting review."
 )
 
 # --- Search ---------------------------------------------------------------

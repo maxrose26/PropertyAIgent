@@ -91,7 +91,7 @@ def _card(**overrides) -> dict:
         "plan_status": "adopted", "plan_status_label": "Adopted", "plan_status_bucket": "adopted",
         "plan_status_chip_kind": "plan_adopted", "is_multi_authority": False, "cross_boundary_councils": [],
         "intended_use": "residential", "intended_use_label": "Residential",
-        "capacity": {"kind": "minimum", "display": "150 homes (minimum)", "value": 150},
+        "capacity": {"kind": "minimum", "display": "Approximately 150 homes", "value": 150},
         "major_housing": True, "category": None, "allocation_status": None, "raw_allocation_status": None,
         "progression_signal": None, "review_status": "auto_applied", "review_status_label": "Auto-applied match",
         "review_status_badge_kind": "pending", "duplicate_classification": None, "matched": False,
@@ -116,7 +116,7 @@ def _card(**overrides) -> dict:
 def test_format_capacity_minimum_only():
     allocation = LocalPlanSite(council_code="c", site_name="A", plan_name="P", plan_status="adopted", minimum_dwellings=300)
     result = format_capacity(allocation)
-    assert result == {"kind": "minimum", "display": "300 homes (minimum)", "value": 300}
+    assert result == {"kind": "minimum", "display": "Approximately 300 homes", "value": 300}
 
 
 def test_format_capacity_range_when_min_and_max_differ():
@@ -131,7 +131,7 @@ def test_format_capacity_indicative_only():
     allocation = LocalPlanSite(council_code="c", site_name="A", plan_name="P", plan_status="adopted", indicative_capacity=50)
     result = format_capacity(allocation)
     assert result["kind"] == "indicative"
-    assert "indicative" in result["display"]
+    assert result["display"] == "Approximately 50 homes"
     assert result["value"] == 50
 
 
@@ -145,7 +145,7 @@ def test_format_capacity_maximum_only():
 def test_format_capacity_unknown_when_nothing_stated():
     allocation = LocalPlanSite(council_code="c", site_name="A", plan_name="P", plan_status="adopted")
     result = format_capacity(allocation)
-    assert result == {"kind": "unknown", "display": "Capacity not stated", "value": None}
+    assert result == {"kind": "unknown", "display": "Capacity not identified", "value": None}
 
 
 def test_format_capacity_never_fabricates_a_range_when_min_equals_max():
@@ -466,7 +466,7 @@ def test_why_it_matters_honest_fallback_when_no_signals():
         is_multi_authority=False,
     )
     reasons = _why_it_matters_reasons(plain)
-    assert reasons == ["No standout signals identified from currently held evidence for this allocation."]
+    assert reasons == ["No additional planning signals identified from evidence currently held by the platform."]
 
 
 # --- Summary metrics + duplicate/contextual handling (Part 14) --------------
@@ -706,7 +706,7 @@ def test_capacity_filter_inactive_at_default_full_range_position():
 
     cards = [
         _card(id=1, capacity={"kind": "minimum", "display": "50", "value": 50}),
-        _card(id=2, capacity={"kind": "unknown", "display": "Capacity not stated", "value": None}),
+        _card(id=2, capacity={"kind": "unknown", "display": "Capacity not identified", "value": None}),
     ]
     # Simulating the slider left untouched at its full observed range
     # (50-50 here, a degenerate single-value span) - both cards, including
