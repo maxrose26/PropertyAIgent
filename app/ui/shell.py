@@ -1098,6 +1098,22 @@ def relative_time(value: dt.datetime | None) -> str:
     return value.strftime("%d %b %Y")
 
 
+def arrow_safe_count(value: int | None, placeholder: str = "—") -> str:
+    """Render an optional integer count as a plain display string, for any
+    table column where some rows carry a known count and others fall back
+    to a placeholder - e.g. Planning Position's phase/plot Units column.
+    A pandas column built from a mix of raw int values and str placeholders
+    across different rows gets dtype "object", which PyArrow's
+    Table.from_pandas can't reliably infer a single Arrow type for and
+    raises ArrowInvalid on. Always returning a string here keeps the
+    column's dtype uniform regardless of which rows have a known value, so
+    st.dataframe can serialize it without relying on Streamlit's own
+    internal Arrow-incompatibility fallback. Treats a count of 0 the same
+    as "unknown" (falls back to the placeholder) - matches the truthiness
+    check the call sites already used before this helper existed."""
+    return str(value) if value else placeholder
+
+
 def _escape(text: str) -> str:
     """Minimal HTML-escaping for the handful of small static-template
     snippets above that interpolate a caller-supplied string directly into
