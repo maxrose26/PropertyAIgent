@@ -49,6 +49,20 @@ _BADGE_KIND_STYLE = {
     "not_identified": {"color": "gray", "icon": "❔", "label": "Not identified"},
     "stale": {"color": "orange", "icon": "🕗", "label": "Stale"},
     "superseded": {"color": "gray", "icon": "🗂", "label": "Superseded"},
+    # Allocation Discovery (Sprint 4.5, Part 8) - the plan-status chip
+    # vocabulary, restrained/text-first per that sprint's colour treatment
+    # rules: Adopted green, Emerging/Regulation 19 purple, Regulation
+    # 18/consultation amber, Examination blue, Withdrawn/superseded red,
+    # Unknown/insufficient evidence slate/gray. Distinct from the generic
+    # "confirmed"/"review" kinds above - a plan's status is never the same
+    # signal as an evidence-review state, so it gets its own kinds rather
+    # than reusing "confirmed" for "adopted".
+    "plan_adopted": {"color": "green", "icon": "✅", "label": "Adopted"},
+    "plan_emerging": {"color": "violet", "icon": "🟣", "label": "Emerging"},
+    "plan_consultation": {"color": "orange", "icon": "🟠", "label": "Consultation"},
+    "plan_examination": {"color": "blue", "icon": "🔵", "label": "Examination"},
+    "plan_withdrawn": {"color": "red", "icon": "🛑", "label": "Withdrawn / superseded"},
+    "plan_unknown": {"color": "gray", "icon": "❔", "label": "Unknown"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -1034,6 +1048,70 @@ def visual_evidence_gallery(gallery: dict) -> None:
         for i, card in enumerate(gallery["needs_review"]):
             with cols[i % len(cols)]:
                 _visual_evidence_card(card)
+
+
+def allocation_card(card: dict, *, key: str) -> None:
+    """One Allocation Discovery gallery card (Sprint 4.5, Part 7) - card is
+    app.reporting.allocation_discovery.build_allocation_card's own output;
+    this only renders it, never re-derives or embellishes any fact. Reuses
+    _visual_evidence_card for the thumbnail (card["visual_primary"]/
+    ["visual_fallback"] are built in the exact same {image_path, label,
+    source_title, ...} shape that function already expects), status_badge
+    for the plan-status chip and review state, and joint_plan_badge for the
+    multi-authority signal - no new badge/image rendering invented here."""
+    with st.container(border=True, key=f"alloc-card-{key}"):
+        st.markdown(f"**{_escape(card['site_name'])}**")
+        subtitle_bits = [b for b in (card.get("policy_reference"), card["council_name"]) if b]
+        if subtitle_bits:
+            st.caption(" · ".join(_escape(str(b)) for b in subtitle_bits))
+        st.caption(_escape(card["plan_name"]))
+
+        badge_cols = st.columns(3 if card["is_multi_authority"] else 2)
+        with badge_cols[0]:
+            status_badge(card["plan_status_chip_kind"], card["plan_status_label"])
+        with badge_cols[1]:
+            status_badge(card["review_status_badge_kind"], card["review_status_label"])
+        if card["is_multi_authority"]:
+            with badge_cols[2]:
+                joint_plan_badge()
+
+        visual = card["visual_primary"] or card["visual_fallback"]
+        if visual:
+            _visual_evidence_card(visual, width=280)
+            if card["visual_fallback"] and not card["visual_primary"]:
+                st.caption(
+                    "Published as part of the council's authority-wide Policies Map, not a boundary image "
+                    "specific to this allocation."
+                )
+        else:
+            st.caption("🖼 No confirmed or suggested visual evidence yet.")
+
+        st.markdown(f"**{_escape(card['intended_use_label'])}** · {_escape(card['capacity']['display'])}")
+        st.caption(card["matched_summary"], help=card["matched_summary_help"])
+        if card.get("build_status_label"):
+            st.caption(card["build_status_label"])
+        if card.get("delivery_note"):
+            st.caption(card["delivery_note"])
+
+        st.caption(f"Why it matters: {card['why_it_matters']}")
+        st.caption(f"Investigate next: {card['investigate_next']}")
+
+        st.page_link(
+            "pages/3_Local_Plan_Sites.py", label="Open Allocation →",
+            query_params={"allocation_id": str(card["id"])},
+        )
+        if card["matched_site_id"]:
+            st.page_link(
+                "pages/1_Scheme_Detail.py", label="Open Site Profile →",
+                query_params={"site_id": str(card["matched_site_id"])},
+            )
+        st.page_link(
+            "pages/6_Council_Intelligence_Detail.py", label="Open Council Intelligence →",
+            query_params={"council": card["council_code"]},
+        )
+        source_link = card.get("plan_page_url") or card.get("source_document_url")
+        if source_link:
+            st.caption(f"[Open source document →]({source_link})")
 
 
 def ai_status_summary_view(ai_summary: dict) -> None:

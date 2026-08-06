@@ -494,15 +494,24 @@ def test_wide_canvas_applied_only_to_council_intelligence_overview():
     """wide_canvas() must widen ONLY the overview page (refinement Part 1) -
     every other page keeps the shared shell's normal contained width,
     including the Council Intelligence Detail page (not asked for here) and
-    Council Operations."""
+    Council Operations. 3_Local_Plan_Sites.py is a deliberate, later
+    exception (Sprint 4.5, "Allocation Discovery", Part 2 - "use a
+    page-scoped wide layout") - it now widens itself too, for the same
+    "wide gallery/grid content is cramped in the shared shell's default
+    contained width" reason the overview page originally needed this."""
     overview_source = Path(__file__).resolve().parents[1].joinpath(
         "app", "ui", "pages", "5_Council_Intelligence.py"
     ).read_text(encoding="utf-8")
     assert "wide_canvas()" in overview_source
 
+    allocation_discovery_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "3_Local_Plan_Sites.py"
+    ).read_text(encoding="utf-8")
+    assert "wide_canvas()" in allocation_discovery_source
+
     other_pages = [
         "6_Council_Intelligence_Detail.py", "4_Council_Dashboard.py",
-        "3_Local_Plan_Sites.py", "0_Explore.py", "1_Scheme_Detail.py", "2_Review_Site_Links.py",
+        "0_Explore.py", "1_Scheme_Detail.py", "2_Review_Site_Links.py",
     ]
     for filename in other_pages:
         source = Path(__file__).resolve().parents[1].joinpath("app", "ui", "pages", filename).read_text(encoding="utf-8")

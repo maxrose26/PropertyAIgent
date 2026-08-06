@@ -640,9 +640,17 @@ def test_scheme_detail_page_uses_the_new_flagship_renderer():
 
 
 def test_local_plan_sites_council_query_param_fails_safe_on_invalid_value():
+    """Sprint 4.5 ("Allocation Discovery") rebuilt this page around a
+    multiselect filter rather than the single-select dropdown this test was
+    originally written against - an invalid/unknown council code still
+    fails safe (the multiselect simply pre-selects nothing, which the new
+    page's filter logic already treats as "no council constraint", i.e.
+    every allocation shown - never an error, never crashing on a bad
+    value), it just no longer needs to fall back to explicitly listing
+    every council code by name to achieve that."""
     source = Path("app/ui/pages/3_Local_Plan_Sites.py").read_text(encoding="utf-8")
     assert '_council_param in all_council_codes' in source
-    assert "_default_councils = [_council_param] if _council_param in all_council_codes else all_council_codes" in source
+    assert "_default_councils = [_council_param] if _council_param in all_council_codes else []" in source
 
 
 def test_council_intelligence_detail_links_to_local_plan_sites_with_council_filter():
