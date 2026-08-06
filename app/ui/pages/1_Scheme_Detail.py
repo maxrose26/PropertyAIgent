@@ -1,11 +1,14 @@
-"""Scheme detail page - navigated to by clicking a map dot or the "Open
-scheme details" button on the home page (app/ui/streamlit_app.py), which set
-st.query_params["site_id"] before calling st.switch_page. Reads that query
-param directly so the page is also bookmarkable/shareable on its own.
+"""Site Profile page (Sprint 4.4, "Flagship Site Profile") - navigated to by
+clicking a map dot or the "Open scheme details" button on the home page
+(app/ui/streamlit_app.py), which set st.query_params["site_id"] before
+calling st.switch_page. Reads that query param directly so the page is also
+bookmarkable/shareable on its own.
 
-The table on the home page renders the same scheme detail inline instead of
-navigating here (see render_scheme_detail in app.ui.common) - this page
-exists for the map-click and "Open scheme details" flows specifically.
+Explore's table renders the OLD, unchanged flat scheme-detail view inline
+instead of navigating here (see render_scheme_detail in app.ui.common) - per
+this sprint's explicit scope restriction ("do not redesign Explore"), that
+inline call site is untouched. This dedicated page is where the new
+tabbed, card-based flagship experience (app.ui.site_profile_view) lives.
 """
 from __future__ import annotations
 
@@ -22,9 +25,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import streamlit as st
 
 from app.db.models import Site
-from app.ui.common import bootstrap, credits_sidebar, get_db, load_site_applications, render_scheme_detail
+from app.ui.common import bootstrap, credits_sidebar, get_db, load_site_applications
 from app.ui.map_selection import parse_site_id_param
 from app.ui.shell import empty_state
+from app.ui.site_profile_view import render_site_profile
 
 bootstrap()
 session, settings = get_db()
@@ -75,4 +79,4 @@ if not apps:
         icon="👀",
     )
     st.stop()
-render_scheme_detail(session, settings, site, apps)
+render_site_profile(session, settings, site, apps)

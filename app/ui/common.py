@@ -703,6 +703,19 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             st.markdown(f"**Site evidence:** {merged['site_evidence']}")
 
     st.divider()
+    render_companies_and_contacts(session, settings, site, apps, merged, rep_app)
+
+
+def render_companies_and_contacts(session, settings, site: Site, apps: list[Application], merged: dict, rep_app: Application | None) -> None:
+    """The Companies & contacts block - extracted out of render_scheme_detail
+    (Sprint 4.4, "Flagship Site Profile") so the new flagship Site Profile
+    page (app/ui/site_profile_view.py) can reuse this exact stateful,
+    interactive logic (unlock-on-demand enrichment, credits deduction, PSC/
+    officer display, the editable contacts data_editor) without duplicating
+    it - the old call site above (render_scheme_detail, still used
+    unchanged by both the dedicated Scheme Detail page's legacy path and
+    Explore's inline row-expansion) keeps behaving identically, just via
+    this named function now instead of inline code."""
     st.subheader("Companies & contacts")
 
     app_ids = [a.id for a in apps]

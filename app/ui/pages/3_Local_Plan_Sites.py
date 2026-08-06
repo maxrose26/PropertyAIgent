@@ -65,12 +65,24 @@ if not sites:
     )
     st.stop()
 
+all_council_codes = sorted({s.council_code for s in sites})
+
+# Sprint 4.4 ("Flagship Site Profile", Part 13) - an optional ?council=
+# query-param pre-filter, so a link from Council Intelligence or a Site
+# Profile can open this page already scoped to the relevant council. Only
+# applied as the multiselect's initial `default` - once rendered, Streamlit
+# tracks the widget's own state from user interaction, not this `default`
+# value, on every subsequent rerun, so the user can freely add/remove
+# councils afterwards (the "must be able to clear the filter" requirement)
+# without this param fighting their choice. An invalid/unknown council code
+# in the URL is silently ignored (falls back to every council), never an
+# error - "invalid council parameters must fail safely".
+_council_param = st.query_params.get("council")
+_default_councils = [_council_param] if _council_param in all_council_codes else all_council_codes
+
 with st.sidebar:
     st.header("Filters")
-    councils = st.multiselect(
-        "Council", sorted({s.council_code for s in sites}),
-        default=sorted({s.council_code for s in sites}),
-    )
+    councils = st.multiselect("Council", all_council_codes, default=_default_councils)
     show_only_unmatched = st.checkbox(
         "Only sites with no application yet", value=False,
         help="The clearest pre-application opportunity signal - a site the council has already earmarked "

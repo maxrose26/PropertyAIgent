@@ -70,12 +70,14 @@ All six sit on top of one shared technical foundation — the **Evidence Platfor
 - Phase tracking — grouping and labelling a multi-phase scheme's applications under its one Site.
 - Build-status tracking via EPC Open Data lookups (has this Site actually been built out), and map geocoding via postcodes.io.
 - Companies House enrichment (name matching, officers, PSC, cross-appointments) and on-demand contact discovery (Apollo/Hunter), scoped per company rather than run automatically for every scraped scheme.
+- **Residential Mix Intelligence** (a specialist module within this layer, not a separate capability) — transforms a Site's already-reconciled scheme data into structured residential-composition evidence: affordable-homes count/percentage (stated vs. calculated, with an explicit review state for ambiguous or conflicting evidence — never a guessed unit count, never missing shown as zero), evidenced affordable tenure categories, and a deterministic "Structured summary" of these facts. Sourced entirely from the one current/preferred Application version for a Site (never blended across scheme versions) via the platform's existing scheme reconciliation, not a new extraction pipeline. **Phase 1** (current): structured mix, affordable provision, tenure, evidence, commentary — with bedroom mix and a quantified house/flat/bungalow split honestly reported as not yet extracted, since no such extraction exists on this platform today. **Future phases**: bedroom-mix and housing-type extraction; market comparison (Market Intelligence); Local Plan affordable-policy target comparison; mix sensitivity/optimisation (Development Economics). Designed for reuse beyond Site Profile — Reports, Planning Statements, Market Intelligence comparisons, Development Economics, AI Decision Support — none of which are built yet.
 
 **Future capabilities:**
 - Appeals history as a first-class signal (a refused/appealed site is a different opportunity than a clean one).
 - Constraint layers — Green Belt, flood risk, conservation areas, listed buildings, biodiversity — as their own queryable intelligence, not just narrative mentions inside a policy document.
 - Portal-native commencement/discharge-of-conditions signals used as a second, independent build-status check alongside EPC data.
 - National rollout beyond Greater Manchester's 10 councils.
+- Residential Mix Intelligence Phase 2+: structured bedroom-mix and house/flat/bungalow-type extraction, market comparison, Local Plan affordable-policy target comparison, mix sensitivity/optimisation (see above).
 
 **Dependencies:** The Evidence Platform (§0) for document discovery, AI extraction and provenance. Beyond that, none — this is the platform's foundation capability layer. Every other layer either enriches a Site that Planning Intelligence first identified, or (for Policy Intelligence's allocations) supplies the raw material a Site can later be matched against.
 
