@@ -21,6 +21,7 @@ from app.db.models import (
 from app.pipeline.lapse_tracking import classify_decision_status, compute_lapse_status
 from app.pipeline.phase_tracking import build_phase_breakdown
 from app.policy.site_view import build_site_policy_intelligence
+from app.reporting.residential_mix import compute_affordable_headline
 from app.reporting.site_profile import (
     FIVE_YEAR_SUPPLY_WARNING_THRESHOLD,
     MAJOR_UNIT_THRESHOLD,
@@ -63,14 +64,16 @@ def _make_app(session, site_id: int, reference: str, **kwargs) -> Application:
 def test_headline_metrics_are_four_consistent_tiles():
     merged = {"total_units_final": 45, "affordable_units_final": 12, "affordable_percentage_final": 26.7}
     lapse = {"build_status": "underway"}
-    metrics = build_headline_metrics(merged, lapse, "granted")
+    affordable_headline = compute_affordable_headline(None)
+    metrics = build_headline_metrics(merged, lapse, "granted", affordable_headline)
     assert [m["label"] for m in metrics] == ["Total homes", "Affordable homes", "Decision status", "Build status"]
 
 
 def test_headline_metrics_never_show_none_or_zero_for_missing_values():
     merged = {"total_units_final": None, "affordable_units_final": None}
     lapse = {"build_status": None}
-    metrics = build_headline_metrics(merged, lapse, None)
+    affordable_headline = compute_affordable_headline(None)
+    metrics = build_headline_metrics(merged, lapse, None, affordable_headline)
     for m in metrics:
         assert m["value"] not in ("None", "0", None)
         assert "…" not in m["value"]
@@ -79,8 +82,31 @@ def test_headline_metrics_never_show_none_or_zero_for_missing_values():
 
 def test_headline_metrics_estimated_units_labelled_not_silently_shown_as_confirmed():
     merged = {"total_units_final": 80, "total_units_is_estimated": True}
-    metrics = build_headline_metrics(merged, {"build_status": None}, None)
+    affordable_headline = compute_affordable_headline(None)
+    metrics = build_headline_metrics(merged, {"build_status": None}, None, affordable_headline)
     assert "(est.)" in metrics[0]["value"]
+
+
+def test_headline_metrics_affordable_tile_sourced_from_single_scheme_version(session):
+    """The Affordable homes tile must come from affordable_headline (one
+    scheme version), never merged['affordable_units_final'] (which can be
+    cross-application) - Sprint 4.4 Amendment Part 5's "never mix
+    affordable units from one scheme version with total homes from
+    another"."""
+    site = _make_site(session)
+    app = _make_app(session, site.id, "MIX/1")
+    scheme = SchemeIntelligence(
+        application_id=app.id, total_units_final=100, affordable_units_final=30, affordable_percentage_final=30.0,
+    )
+    session.add(scheme)
+    session.commit()
+    # merged deliberately disagrees with the scheme row, to prove it's ignored.
+    merged = {"total_units_final": 999, "affordable_units_final": 999}
+    affordable_headline = compute_affordable_headline(scheme)
+    metrics = build_headline_metrics(merged, {"build_status": None}, None, affordable_headline)
+    affordable_metric = next(m for m in metrics if m["label"] == "Affordable homes")
+    assert affordable_metric["value"] == "30 affordable homes"
+    assert affordable_metric["caption"] == "30% affordable"
 
 
 # --- Opportunity Position -----------------------------------------------
@@ -552,10 +578,13 @@ def test_flagship_page_uses_wide_canvas_scoped_via_site_profile_view():
 
 
 def test_flagship_page_tab_order_matches_the_brief():
+    """Sprint 4.4 Amendment, Part 2 - Residential Mix Intelligence sits as
+    its own tab #4, between Policy Position and Visual Evidence."""
     source = Path("app/ui/site_profile_view.py").read_text(encoding="utf-8")
     tabs_line = source[source.index("st.tabs("):source.index(")", source.index("st.tabs("))]
     assert tabs_line.index('"Overview"') < tabs_line.index('"Planning Position"') < tabs_line.index('"Policy Position"')
-    assert tabs_line.index('"Policy Position"') < tabs_line.index('"Visual Evidence"') < tabs_line.index('"Timeline"')
+    assert tabs_line.index('"Policy Position"') < tabs_line.index('"Residential Mix Intelligence"')
+    assert tabs_line.index('"Residential Mix Intelligence"') < tabs_line.index('"Visual Evidence"') < tabs_line.index('"Timeline"')
     assert tabs_line.index('"Timeline"') < tabs_line.index('"AI Summary"')
 
 
@@ -563,6 +592,37 @@ def test_flagship_page_does_not_add_market_intelligence_or_development_economics
     source = Path("app/ui/site_profile_view.py").read_text(encoding="utf-8")
     for banned in ("Market Intelligence", "Development Economics", "Nearby Development"):
         assert banned not in source
+
+
+def test_overview_tab_does_not_render_the_full_residential_mix_breakdown():
+    """Sprint 4.4 Amendment, Part 3 - the Overview tab must call only
+    residential_mix_overview_excerpt (a short excerpt + a link to the full
+    tab), never _render_residential_mix (the full bedroom/tenure/evidence
+    breakdown), which is reserved for its own dedicated tab."""
+    source = Path("app/ui/site_profile_view.py").read_text(encoding="utf-8")
+    overview_block = source[source.index("with tab_overview:"):source.index("with tab_planning:")]
+    assert "residential_mix_overview_excerpt(" in overview_block
+    assert "_render_residential_mix(" not in overview_block
+    assert "_bedroom_mix_section(" not in overview_block
+    assert "_affordable_tenure_section(" not in overview_block
+
+
+def test_residential_mix_tab_calls_the_dedicated_renderer():
+    source = Path("app/ui/site_profile_view.py").read_text(encoding="utf-8")
+    mix_block = source[source.index("with tab_mix:"):source.index("with tab_visual:")]
+    assert "_render_residential_mix(view[\"residential_mix\"])" in mix_block
+
+
+def test_residential_mix_never_makes_policy_market_viability_or_permission_claims():
+    """Scope restriction: Residential Mix Intelligence must never assess
+    policy compliance, market fit, viability or planning likelihood -
+    scanned across both the pure module and its rendering."""
+    module_source = Path("app/reporting/residential_mix.py").read_text(encoding="utf-8")
+    view_source = Path("app/ui/site_profile_view.py").read_text(encoding="utf-8")
+    banned = ["policy compliant", "policy-compliant", "viable", "market demand", "likely to be granted", "chance of approval"]
+    for phrase in banned:
+        assert phrase not in module_source.lower()
+        assert phrase not in view_source.lower()
 
 
 def test_explore_inline_scheme_detail_is_unchanged_by_this_sprint():

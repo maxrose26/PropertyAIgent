@@ -38,6 +38,17 @@ _BADGE_KIND_STYLE = {
     "error": {"color": "red", "icon": "🚫", "label": "Error"},
     "ai": {"color": "violet", "icon": "🤖", "label": "AI-generated"},
     "info": {"color": "blue", "icon": "ℹ", "label": "Info"},
+    # Residential Mix Intelligence (Sprint 4.4 Amendment, Part 16) - the
+    # three evidence-state words that vocabulary didn't already cover.
+    # "auto_applied" already exists as a distinct kind above under a
+    # different key name ("info" is used for it via evidence_confidence_
+    # badge) - these three are additions, not renames, so nothing already
+    # calling status_badge("review"/"pending"/...) changes meaning.
+    "calculated": {"color": "blue", "icon": "🧮", "label": "Calculated"},
+    "conflicting": {"color": "red", "icon": "⚠", "label": "Conflicting"},
+    "not_identified": {"color": "gray", "icon": "❔", "label": "Not identified"},
+    "stale": {"color": "orange", "icon": "🕗", "label": "Stale"},
+    "superseded": {"color": "gray", "icon": "🗂", "label": "Superseded"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.

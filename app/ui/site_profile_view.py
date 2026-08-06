@@ -23,6 +23,7 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
+from app.reporting.residential_mix import format_affordable_tile
 from app.reporting.site_profile import build_site_profile
 from app.ui.common import (
     aggregate_scheme_fields,
@@ -30,12 +31,14 @@ from app.ui.common import (
     render_companies_and_contacts,
 )
 from app.ui.shell import (
+    ai_badge,
     ai_status_summary_view,
     evidence_gap_panel,
     opportunity_position_card,
     section_header,
     site_profile_header,
     stat_tile,
+    status_badge,
     timeline,
     visual_evidence_gallery,
     wide_canvas,
@@ -140,6 +143,178 @@ def _render_policy_position(view: dict) -> None:
                 st.caption(f"[Open plan page {row['source_page']}]({row['source_document_url']}#page={row['source_page']})")
 
 
+def affordable_headline_tile(headline: dict) -> None:
+    """The Affordable Homes headline tile (Sprint 4.4 Amendment, Part 4) -
+    value first, evidence state secondary (Part 16). value/caption come
+    from format_affordable_tile, the one shared implementation of "which
+    line is primary" per state - also used by app.reporting.site_profile.
+    build_headline_metrics, so the Overview headline tile and every use of
+    this same tile inside the Residential Mix Intelligence tab can never
+    disagree with each other."""
+    value, caption = format_affordable_tile(headline)
+    stat_tile("Affordable homes", value, caption=caption)
+
+
+def residential_mix_overview_excerpt(mix: dict) -> None:
+    """Part 3 - the Overview tab's concise excerpt: a short commentary
+    excerpt where one exists, and a prompt to open the full tab. Never the
+    full bedroom/tenure breakdown - that lives only in the dedicated tab.
+    The Affordable Homes headline tile itself is rendered separately,
+    already one of the four Site Profile headline metrics."""
+    excerpt = mix["ai_commentary"]["text"] or mix["structured_summary"]
+    if excerpt:
+        label = "Residential Mix Commentary" if mix["ai_commentary"]["has_commentary"] else "Structured summary"
+        st.caption(f"**{label}:** {excerpt}")
+    st.caption("See the Residential Mix Intelligence tab for the full bedroom mix, tenure and evidence detail →")
+
+
+def _current_version_banner(current_version: dict) -> None:
+    if not current_version.get("application_id"):
+        st.info("No qualifying application is linked to this site yet.")
+        return
+    st.caption(f"Current preferred version: **{current_version['reference']}** — {current_version['why_preferred']}")
+    if current_version["version_conflict"]:
+        status_badge("conflicting", "Alternative versions record a different total — see Evidence and Reconciliation below")
+
+
+def _residential_mix_overview_section(mix: dict) -> None:
+    section_header("Residential Mix Overview", icon="🏘️")
+    _current_version_banner(mix["current_version"])
+    totals = mix["overview_totals"]
+    cols = st.columns(3)
+    with cols[0]:
+        stat_tile("Total homes", f"{totals['total_homes']:,}" if totals["total_homes"] is not None else "Not yet verified")
+    with cols[1]:
+        affordable_headline_tile(mix["affordable_headline"])
+    with cols[2]:
+        density = mix["density"]
+        stat_tile("Density", f"{density['density_dph']:g} dwellings/ha" if density["available"] else "Not yet verified")
+
+
+def _bedroom_mix_section(bedroom_mix: dict) -> None:
+    """Part 8 - honestly absent in Phase 1 (see app.reporting.
+    residential_mix.build_bedroom_mix's own docstring for why: no
+    structured bedroom-mix extraction exists on this platform today).
+    Never a table of invented zero-value categories."""
+    section_header("Bedroom Mix", icon="🛏️")
+    if not bedroom_mix["available"]:
+        st.info("No structured bedroom mix has been extracted for this platform yet.")
+
+
+def _housing_type_section(housing_type: dict) -> None:
+    section_header("Housing Type", icon="🏠")
+    if not housing_type["available"]:
+        st.info("No housing-type evidence has been extracted for this scheme yet.")
+        return
+    if housing_type["typology_description"]:
+        st.write(housing_type["typology_description"])
+    if housing_type["specialist_type"]:
+        st.caption(f"Specialist housing type: {housing_type['specialist_type']}")
+    if housing_type["development_type"]:
+        st.caption(f"Development type: {housing_type['development_type']}")
+    st.caption("Recorded as descriptive evidence, not a quantified house/flat/bungalow count.")
+
+
+def _affordable_housing_section(mix: dict) -> None:
+    section_header("Affordable Housing", icon="🏡")
+    scheme = mix["scheme"]
+    headline = mix["affordable_headline"]
+    affordable_headline_tile(headline)
+    if headline["percentage_is_calculated"]:
+        st.caption(
+            "Percentage calculated from affordable homes ÷ total homes for this scheme version - "
+            "not independently stated in evidence."
+        )
+    if scheme:
+        detail_bits = []
+        if scheme.affordable_classification_confidence:
+            detail_bits.append(f"confidence: {scheme.affordable_classification_confidence}")
+        if scheme.affordable_data_status:
+            detail_bits.append(f"status: {scheme.affordable_data_status}")
+        if detail_bits:
+            st.caption(" · ".join(detail_bits))
+        if scheme.affordable_classification_evidence:
+            with st.expander("Source evidence"):
+                st.write(scheme.affordable_classification_evidence)
+        if scheme.affordable_status_note:
+            status_badge("review")
+            st.caption(scheme.affordable_status_note)
+
+
+def _affordable_tenure_section(tenure: dict) -> None:
+    section_header("Affordable Tenure", icon="🔑")
+    if tenure["has_categories"]:
+        for category in tenure["categories"]:
+            st.markdown(f"- {category}")
+    elif tenure["affordable_known_tenure_unknown"]:
+        st.info("Affordable tenure not identified")
+    else:
+        st.caption("Not applicable - no affordable homes identified for this scheme.")
+
+
+def _residential_mix_commentary_section(mix: dict) -> None:
+    """Part 13/14/15 - reuses the existing stored Residential Mix
+    Commentary where one exists (none does today, see app.reporting.
+    residential_mix.build_ai_commentary_view); otherwise the deterministic
+    "Structured summary" (Part 15), visibly distinct from an AI commentary
+    (a different badge colour and an explicit different label, never
+    "AI Commentary")."""
+    section_header("Residential Mix Commentary", icon="📝")
+    commentary = mix["ai_commentary"]
+    if commentary["has_commentary"]:
+        ai_badge()
+        st.write(commentary["text"])
+        if commentary["is_stale"]:
+            status_badge("stale", "Stale — evidence has changed since this was generated")
+        return
+    if mix["structured_summary"]:
+        status_badge("info", "Structured summary")
+        st.write(mix["structured_summary"])
+    else:
+        st.caption("Residential Mix Commentary not yet generated")
+
+
+def _evidence_and_reconciliation_section(mix: dict) -> None:
+    section_header("Evidence and Reconciliation", icon="🔍")
+    current_version = mix["current_version"]
+    scheme = mix["scheme"]
+    if scheme:
+        st.caption(
+            f"Source application: {current_version['reference']} · "
+            f"reconciliation status: {scheme.unit_reconciliation_status or 'OK'}"
+        )
+    if current_version["alternatives"]:
+        st.markdown("**Alternative / superseded application versions on this site**")
+        for alt in current_version["alternatives"]:
+            bits = [alt["reference"]]
+            if alt["total_units_final"] is not None:
+                bits.append(f"{alt['total_units_final']:,} total homes")
+            if alt["affordable_units_final"] is not None:
+                bits.append(f"{alt['affordable_units_final']:,} affordable")
+            st.caption(" · ".join(bits) + " — not combined with the current version's figures above.")
+
+
+def _render_residential_mix(mix: dict) -> None:
+    """The dedicated Residential Mix Intelligence tab (Sprint 4.4
+    Amendment, Part 2/6) - suggested section order, each one degrading
+    honestly when its evidence doesn't exist rather than a dead panel."""
+    _residential_mix_overview_section(mix)
+    st.divider()
+    _bedroom_mix_section(mix["bedroom_mix"])
+    st.divider()
+    _housing_type_section(mix["housing_type"])
+    st.divider()
+    _affordable_housing_section(mix)
+    st.divider()
+    _affordable_tenure_section(mix["tenure"])
+    st.divider()
+    _residential_mix_commentary_section(mix)
+    st.divider()
+    _evidence_and_reconciliation_section(mix)
+    st.divider()
+    evidence_gap_panel(mix["evidence_gaps"])
+
+
 def render_site_profile(session, settings, site: Site, apps: list[Application]) -> None:
     """The flagship Site Profile entry point (Sprint 4.4) - called only
     from app/ui/pages/1_Scheme_Detail.py."""
@@ -179,8 +354,11 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
             f"({site.excluded_at.strftime('%d %b %Y') if site.excluded_at else 'date unknown'})"
         )
 
-    tab_overview, tab_planning, tab_policy, tab_visual, tab_timeline, tab_ai = st.tabs(
-        ["Overview", "Planning Position", "Policy Position", "Visual Evidence", "Timeline", "AI Summary"]
+    tab_overview, tab_planning, tab_policy, tab_mix, tab_visual, tab_timeline, tab_ai = st.tabs(
+        [
+            "Overview", "Planning Position", "Policy Position", "Residential Mix Intelligence",
+            "Visual Evidence", "Timeline", "AI Summary",
+        ]
     )
 
     with tab_overview:
@@ -193,6 +371,7 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
                 stat_tile(metric["label"], metric["value"], caption=metric["caption"])
 
         opportunity_position_card(view["opportunity_position"])
+        residential_mix_overview_excerpt(view["residential_mix"])
 
         st.divider()
         render_companies_and_contacts(session, settings, site, apps, merged, rep_app)
@@ -206,6 +385,9 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
 
     with tab_policy:
         _render_policy_position(view)
+
+    with tab_mix:
+        _render_residential_mix(view["residential_mix"])
 
     with tab_visual:
         visual_evidence_gallery(view["visual_evidence"])

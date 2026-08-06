@@ -35,6 +35,7 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.policy.site_view import build_site_policy_intelligence
+from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_site_visual_evidence
 
@@ -106,25 +107,28 @@ def build_site_header(
 # --- Headline metrics -----------------------------------------------------
 
 
-def build_headline_metrics(merged: dict, lapse: dict, decision_status: str | None) -> list[dict]:
+def build_headline_metrics(merged: dict, lapse: dict, decision_status: str | None, affordable_headline: dict) -> list[dict]:
     """Four consistent headline tiles (Part 3) - the same set, same order,
     on every Site Profile, never swapped per site depending on which
     evidence happens to be available. "Evidence" is deliberately not one
     of these four - evidence freshness/review state is secondary
-    information."""
+    information.
+
+    affordable_headline is app.reporting.residential_mix.
+    compute_affordable_headline's own output for the site's current
+    preferred scheme version (Residential Mix Intelligence, Sprint 4.4
+    Amendment Part 4/5) - sourced from that ONE application's
+    scheme_intelligence row, never the cross-application `merged` dict
+    used for the other three tiles, since affordable units and the total
+    they're a percentage of must never come from two different scheme
+    versions (Part 5's "never mix affordable units from one scheme
+    version with total homes from another")."""
     total = merged.get("total_units_final")
     total_display = _fmt_units(total)
     if total_display and merged.get("total_units_is_estimated"):
         total_display += " (est.)"
 
-    affordable = merged.get("affordable_units_final")
-    affordable_pct = merged.get("affordable_percentage_final")
-    if affordable is not None and affordable_pct is not None:
-        affordable_display = f"{affordable:,} ({affordable_pct:.0f}%)"
-    elif affordable is not None:
-        affordable_display = f"{affordable:,}"
-    else:
-        affordable_display = "Not yet verified"
+    affordable_value, affordable_caption = format_affordable_tile(affordable_headline)
 
     build_status = lapse.get("build_status")
     build_display = BUILD_STATUS_LABELS.get(build_status) if build_status not in (None, "unknown") else "Not yet verified"
@@ -133,7 +137,7 @@ def build_headline_metrics(merged: dict, lapse: dict, decision_status: str | Non
 
     return [
         {"label": "Total homes", "value": total_display or "Not yet verified", "caption": None},
-        {"label": "Affordable homes", "value": affordable_display, "caption": None},
+        {"label": "Affordable homes", "value": affordable_value, "caption": affordable_caption},
         {"label": "Decision status", "value": decision_display, "caption": None},
         {"label": "Build status", "value": build_display, "caption": None},
     ]
@@ -523,7 +527,8 @@ def build_site_profile(
         latest_visual_evidence_at, visual_evidence_count,
     )
     evidence_gaps = build_evidence_gaps(merged, lapse, policy_rows, visual_evidence, ai_summary)
-    headline_metrics = build_headline_metrics(merged, lapse, decision_status)
+    residential_mix = build_residential_mix(site, apps, rep_app=rep_app)
+    headline_metrics = build_headline_metrics(merged, lapse, decision_status, residential_mix["affordable_headline"])
 
     return {
         "header": header,
@@ -535,4 +540,5 @@ def build_site_profile(
         "ai_summary": ai_summary,
         "evidence_gaps": evidence_gaps,
         "policy_rows": policy_rows,
+        "residential_mix": residential_mix,
     }
