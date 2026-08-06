@@ -32,6 +32,8 @@ from app.reporting.allocation_discovery import (
     matched_status_help,
     search_allocations,
     sort_cards,
+    total_homes_kpi_caption,
+    total_homes_kpi_label,
 )
 from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db
 from app.ui.shell import (
@@ -286,11 +288,15 @@ summary = build_summary_metrics(all_cards)
 # development SCALE (how much housing this platform has identified, how
 # much of it is confirmed-mapped) rather than database size (a bare
 # allocation-row count). Every figure is a real sum/count already computed
-# by build_summary_metrics - never an invented metric.
+# by build_summary_metrics - never an invented metric. The homes total's
+# own label/caption switch to "Indicative..." wording whenever the sum
+# includes an estimated (not stated-minimum) figure - see
+# app.reporting.allocation_discovery.kpi_capacity_contribution's docstring
+# for the full documented rule (Evidence Terminology Amendment, Part 2).
 homes_display = f"{summary['total_homes_identified']:,}" if summary["total_homes_identified"] is not None else "Not yet identified"
 metric_cols = st.columns(6)
 with metric_cols[0]:
-    stat_tile("Total Homes Identified", homes_display)
+    stat_tile(total_homes_kpi_label(summary), homes_display, help=total_homes_kpi_caption(summary))
 with metric_cols[1]:
     stat_tile("Strategic Housing Allocations", f"{summary['strategic_housing_allocations']:,}")
 with metric_cols[2]:

@@ -92,6 +92,7 @@ def _card(**overrides) -> dict:
         "plan_status_chip_kind": "plan_adopted", "is_multi_authority": False, "cross_boundary_councils": [],
         "intended_use": "residential", "intended_use_label": "Residential",
         "capacity": {"kind": "minimum", "display": "Approximately 150 homes", "value": 150},
+        "kpi_capacity_contribution": {"value": 150, "is_estimate": False},
         "major_housing": True, "category": None, "allocation_status": None, "raw_allocation_status": None,
         "progression_signal": None, "review_status": "auto_applied", "review_status_label": "Auto-applied match",
         "review_status_badge_kind": "pending", "duplicate_classification": None, "matched": False,

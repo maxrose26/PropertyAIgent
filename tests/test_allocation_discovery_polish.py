@@ -13,7 +13,7 @@ import datetime as dt
 
 from app.db.models import LocalPlanSite
 from app.reporting.allocation_discovery import (
-    STRATEGIC_EXTENSION_CAPACITY_THRESHOLD,
+    LARGE_RESIDENTIAL_CAPACITY_THRESHOLD,
     NO_LINKED_APPLICATION_PANEL_MESSAGE,
     NO_LINKED_APPLICATION_PANEL_TITLE,
     build_matching_attributes,
@@ -41,6 +41,7 @@ def _card(**overrides) -> dict:
         "plan_status_chip_kind": "plan_adopted", "is_multi_authority": False, "cross_boundary_councils": [],
         "intended_use": "residential", "intended_use_label": "Residential", "development_type": "Residential allocation",
         "capacity": {"kind": "minimum", "display": "Approximately 150 homes", "value": 150},
+        "kpi_capacity_contribution": {"value": 150, "is_estimate": False},
         "major_housing": True, "category": None, "allocation_status": None, "raw_allocation_status": None,
         "progression_signal": None, "review_status": "auto_applied", "review_status_label": "Auto-applied match",
         "review_status_badge_kind": "pending", "duplicate_classification": None, "matched": False,
@@ -119,20 +120,69 @@ def test_development_type_mixed_use():
     assert label == "Mixed-use allocation"
 
 
-def test_development_type_strategic_urban_extension_at_high_capacity():
+def test_development_type_large_capacity_alone_is_not_strategic_urban_extension():
+    """Evidence Terminology Amendment, Part 1: a 1,500-home allocation with
+    no explicit supporting wording must never be labelled "Strategic urban
+    extension" on capacity alone - capacity may only choose between the
+    two capacity-neutral residential descriptions."""
     label = development_type_label(
-        site_name="New Carrington", category=None, intended_use="residential",
-        capacity_value=STRATEGIC_EXTENSION_CAPACITY_THRESHOLD,
+        site_name="New Carrington", category=None, intended_use="residential", capacity_value=1500,
+    )
+    assert label == "Large residential allocation"
+    assert label != "Strategic urban extension"
+
+
+def test_development_type_explicit_strategic_urban_extension_retains_the_label():
+    """An allocation whose own title/category text explicitly says "urban
+    extension" keeps that label - evidence-grounded, not scale-inferred -
+    even at a capacity below the "large residential" bar."""
+    label = development_type_label(
+        site_name="Land at Foxhall - Strategic Urban Extension", category=None, intended_use="residential",
+        capacity_value=300,
     )
     assert label == "Strategic urban extension"
 
 
-def test_development_type_plain_residential_below_strategic_threshold():
+def test_development_type_explicit_strategic_urban_extension_via_category():
+    label = development_type_label(
+        site_name="Anywhere", category="Strategic Extension to the settlement", intended_use="residential",
+        capacity_value=None,
+    )
+    assert label == "Strategic urban extension"
+
+
+def test_development_type_capacity_does_not_override_evidenced_type():
+    """A large capacity never displaces an explicit typology already
+    evidenced in the row's own text - garden village wording wins
+    regardless of scale."""
+    label = development_type_label(
+        site_name="Example Garden Village", category=None, intended_use="residential", capacity_value=5000,
+    )
+    assert label == "Garden village allocation"
+
+
+def test_development_type_plain_residential_below_large_threshold():
     label = development_type_label(
         site_name="Anywhere", category=None, intended_use="residential",
-        capacity_value=STRATEGIC_EXTENSION_CAPACITY_THRESHOLD - 1,
+        capacity_value=LARGE_RESIDENTIAL_CAPACITY_THRESHOLD - 1,
     )
     assert label == "Residential allocation"
+
+
+def test_development_type_large_residential_at_threshold_with_no_explicit_evidence():
+    label = development_type_label(
+        site_name="Anywhere", category=None, intended_use="residential",
+        capacity_value=LARGE_RESIDENTIAL_CAPACITY_THRESHOLD,
+    )
+    assert label == "Large residential allocation"
+
+
+def test_development_type_missing_evidence_produces_neutral_or_omitted_label():
+    """No intended_use, no capacity, no title/category signal - the
+    honest, evidence-led outcome is an omitted label (None), never a
+    guessed typology."""
+    label = development_type_label(site_name="Anywhere", category=None, intended_use=None, capacity_value=5000)
+    assert label is None
 
 
 def test_development_type_honestly_omitted_when_no_evidence_supports_one():
@@ -261,16 +311,17 @@ def test_no_application_panel_shown_when_matched_but_build_status_unknown():
 
 def test_summary_metrics_total_homes_identified_sums_known_capacities_only():
     cards = [
-        _card(id=1, capacity={"kind": "minimum", "display": "Approximately 100 homes", "value": 100}),
-        _card(id=2, capacity={"kind": "minimum", "display": "Approximately 400 homes", "value": 400}),
-        _card(id=3, capacity={"kind": "unknown", "display": "Capacity not identified", "value": None}),
+        _card(id=1, kpi_capacity_contribution={"value": 100, "is_estimate": False}),
+        _card(id=2, kpi_capacity_contribution={"value": 400, "is_estimate": False}),
+        _card(id=3, kpi_capacity_contribution={"value": None, "is_estimate": False}),
     ]
     summary = build_summary_metrics(cards)
     assert summary["total_homes_identified"] == 500
+    assert summary["total_homes_identified_is_estimate"] is False
 
 
 def test_summary_metrics_total_homes_identified_none_when_nothing_known():
-    cards = [_card(id=1, capacity={"kind": "unknown", "display": "Capacity not identified", "value": None})]
+    cards = [_card(id=1, kpi_capacity_contribution={"value": None, "is_estimate": False})]
     summary = build_summary_metrics(cards)
     assert summary["total_homes_identified"] is None
 
@@ -293,8 +344,8 @@ def test_summary_metrics_confirmed_allocation_maps_only_counts_confirmed_not_sug
 
 def test_summary_metrics_new_kpis_respect_duplicate_exclusion():
     cards = [
-        _card(id=1, capacity={"kind": "minimum", "display": "Approximately 100 homes", "value": 100}, major_housing=True, visual_status="confirmed"),
-        _card(id=2, capacity={"kind": "minimum", "display": "Approximately 100 homes", "value": 100}, major_housing=True, visual_status="confirmed", duplicate_classification="duplicate_of_other_plan"),
+        _card(id=1, kpi_capacity_contribution={"value": 100, "is_estimate": False}, major_housing=True, visual_status="confirmed"),
+        _card(id=2, kpi_capacity_contribution={"value": 100, "is_estimate": False}, major_housing=True, visual_status="confirmed", duplicate_classification="duplicate_of_other_plan"),
     ]
     summary = build_summary_metrics(cards)
     assert summary["total_homes_identified"] == 100
@@ -407,3 +458,249 @@ def test_build_allocation_discovery_still_makes_no_database_writes_after_polish(
     assert not session.new
     assert not session.dirty
     assert view["cards"][0]["matching_attributes"] is not None
+
+
+# =============================================================================
+# Evidence Terminology Amendment (following Sprint 4.5a) - tightens
+# development-type wording (Part 1, tested above) and the Total Homes
+# Identified KPI's capacity-aggregation rule (Parts 2-4, tested below).
+# =============================================================================
+
+from app.reporting.allocation_discovery import (  # noqa: E402
+    build_allocation_discovery,
+    kpi_capacity_contribution,
+    total_homes_kpi_caption,
+    total_homes_kpi_label,
+)
+
+
+def _allocation(**kwargs) -> LocalPlanSite:
+    defaults = {"council_code": "c", "site_name": "A", "plan_name": "P", "plan_status": "adopted"}
+    defaults.update(kwargs)
+    return LocalPlanSite(**defaults)
+
+
+# --- Part 2: KPI capacity-contribution rule ----------------------------------
+
+
+def test_kpi_contribution_minimum_only_counts_at_face_value_not_an_estimate():
+    result = kpi_capacity_contribution(_allocation(minimum_dwellings=250))
+    assert result == {"value": 250, "is_estimate": False}
+
+
+def test_kpi_contribution_range_uses_the_minimum_never_the_maximum():
+    """Part 4: "do not silently choose the maximum and add it as though
+    exact" - a 100-200 range contributes 100, not 200."""
+    result = kpi_capacity_contribution(_allocation(minimum_dwellings=100, maximum_capacity=200))
+    assert result == {"value": 100, "is_estimate": False}
+
+
+def test_kpi_contribution_maximum_only_is_excluded_not_zero():
+    """An upper bound alone is not evidence of a floor - excluded from the
+    total entirely (never contributes 0, which would silently pass a
+    falsy-but-present check downstream, and never contributes the
+    maximum, which would overstate)."""
+    result = kpi_capacity_contribution(_allocation(maximum_capacity=400))
+    assert result["value"] is None
+
+
+def test_kpi_contribution_indicative_only_counts_but_is_flagged_an_estimate():
+    result = kpi_capacity_contribution(_allocation(indicative_capacity=80))
+    assert result == {"value": 80, "is_estimate": True}
+
+
+def test_kpi_contribution_unknown_excluded():
+    result = kpi_capacity_contribution(_allocation())
+    assert result["value"] is None
+
+
+def test_kpi_contribution_minimum_present_takes_priority_over_indicative():
+    """A row that (unusually) states both a minimum and an indicative
+    figure uses the minimum - the more concrete, floor-type evidence -
+    never averages or otherwise blends the two."""
+    result = kpi_capacity_contribution(_allocation(minimum_dwellings=100, indicative_capacity=150))
+    assert result == {"value": 100, "is_estimate": False}
+
+
+def test_summary_metrics_range_capacity_does_not_overstate_the_total():
+    """Integration: a card built from a real range-capacity allocation
+    contributes its minimum to the KPI total, not its display "value"
+    (which is the range's maximum, used for sort/filter only)."""
+    from app.reporting.allocation_discovery import build_allocation_card
+
+    allocation = _allocation(id=1, minimum_dwellings=100, maximum_capacity=900, intended_use="residential")
+    card = build_allocation_card(
+        allocation, plan=None, council_name="Test Council", council_codes_on_plan=["c"], matched_site=None,
+        linked_applications=[], visual_summary={"status": "none", "primary": None, "others": []},
+        visual_fallback=None, council_five_year_supply=None,
+    )
+    assert card["capacity"]["value"] == 900  # display/sort value - unchanged, still the range's maximum
+    assert card["kpi_capacity_contribution"]["value"] == 100  # KPI contribution - the range's minimum
+    summary = build_summary_metrics([card])
+    assert summary["total_homes_identified"] == 100
+
+
+def test_summary_metrics_label_switches_to_indicative_when_an_estimate_contributes():
+    stated = _card(id=1, kpi_capacity_contribution={"value": 100, "is_estimate": False})
+    estimated = _card(id=2, kpi_capacity_contribution={"value": 80, "is_estimate": True})
+
+    summary_stated_only = build_summary_metrics([stated])
+    assert summary_stated_only["total_homes_identified_is_estimate"] is False
+    assert total_homes_kpi_label(summary_stated_only) == "Total Homes Identified"
+
+    summary_with_estimate = build_summary_metrics([stated, estimated])
+    assert summary_with_estimate["total_homes_identified_is_estimate"] is True
+    assert total_homes_kpi_label(summary_with_estimate) == "Indicative homes identified"
+
+
+def test_total_homes_kpi_caption_explains_the_rule_and_never_claims_a_firm_total():
+    summary = build_summary_metrics([_card(id=1, kpi_capacity_contribution={"value": 100, "is_estimate": False})])
+    caption = total_homes_kpi_caption(summary)
+    assert "minimum" in caption.lower()
+    assert "never" in caption.lower() or "not" in caption.lower()
+
+    estimate_summary = build_summary_metrics([_card(id=1, kpi_capacity_contribution={"value": 100, "is_estimate": True})])
+    estimate_caption = total_homes_kpi_caption(estimate_summary)
+    assert "indicative" in estimate_caption.lower()
+
+
+def test_local_plan_sites_page_shows_the_total_homes_kpi_caption():
+    from pathlib import Path
+
+    source = Path("app/ui/pages/3_Local_Plan_Sites.py").read_text(encoding="utf-8")
+    assert "total_homes_kpi_caption(summary)" in source
+    assert "total_homes_kpi_label(summary)" in source
+
+
+# --- Part 3: duplicate / contextual / cross-boundary handling ----------------
+
+
+def _make_local_plan(session, council_code="testcouncil", plan_name="Test Local Plan", status="adopted"):
+    from app.db.models import LocalPlan
+
+    plan = LocalPlan(council_code=council_code, plan_name=plan_name, status=status, raw_status=status)
+    session.add(plan)
+    session.commit()
+    return plan
+
+
+def _make_allocation(session, local_plan_id, *, council_code="testcouncil", site_name="Land off Test Road",
+                      policy_reference="REF-1", minimum_dwellings=100, **kwargs):
+    allocation = LocalPlanSite(
+        council_code=council_code, local_plan_id=local_plan_id, policy_reference=policy_reference,
+        site_name=site_name, plan_name="Test Local Plan", plan_status="adopted", minimum_dwellings=minimum_dwellings,
+        intended_use="residential", **kwargs,
+    )
+    session.add(allocation)
+    session.commit()
+    return allocation
+
+
+def test_approved_duplicate_of_other_plan_excluded_from_totals(session):
+    plan = _make_local_plan(session)
+    _make_allocation(session, plan.id, policy_reference="REF-A", minimum_dwellings=100)
+    _make_allocation(session, plan.id, policy_reference="REF-B", minimum_dwellings=100, duplicate_classification="duplicate_of_other_plan")
+
+    view = build_allocation_discovery(session)
+    summary = build_summary_metrics(view["cards"])
+    assert summary["total_allocations"] == 1
+    assert summary["total_homes_identified"] == 100
+
+
+def test_approved_contextual_reference_excluded_from_totals(session):
+    plan = _make_local_plan(session)
+    _make_allocation(session, plan.id, policy_reference="REF-A", minimum_dwellings=200)
+    _make_allocation(session, plan.id, policy_reference="REF-B", minimum_dwellings=200, duplicate_classification="contextual_reference")
+
+    view = build_allocation_discovery(session)
+    summary = build_summary_metrics(view["cards"])
+    assert summary["total_allocations"] == 1
+    assert summary["total_homes_identified"] == 200
+
+
+def test_unapproved_suspected_duplicate_remains_counted(session):
+    """Part 3: "do not deduplicate rows whose classification remains
+    unapproved" - uncertain_needs_review must never silently vanish from
+    the totals the way an approved classification does."""
+    plan = _make_local_plan(session)
+    _make_allocation(session, plan.id, policy_reference="REF-A", minimum_dwellings=150)
+    _make_allocation(session, plan.id, policy_reference="REF-B", minimum_dwellings=150, duplicate_classification="uncertain_needs_review")
+
+    view = build_allocation_discovery(session)
+    summary = build_summary_metrics(view["cards"])
+    assert summary["total_allocations"] == 2
+    assert summary["total_homes_identified"] == 300
+
+
+def test_unapproved_duplicate_rows_all_remain_visible_in_the_gallery(session):
+    """Part 3: "keep all records visible in the gallery" - exclusion from
+    summary METRICS never removes a row from view["cards"] itself, even
+    once approved."""
+    plan = _make_local_plan(session)
+    _make_allocation(session, plan.id, policy_reference="REF-A", minimum_dwellings=100)
+    _make_allocation(session, plan.id, policy_reference="REF-B", minimum_dwellings=100, duplicate_classification="duplicate_of_other_plan")
+
+    view = build_allocation_discovery(session)
+    assert len(view["cards"]) == 2
+
+
+def test_cross_plan_same_physical_site_relationship_excluded_once_approved(session):
+    """Two allocations on DIFFERENT LocalPlans (e.g. a council's own plan
+    and a joint plan) referring to the same physical site - once an
+    approved review confirms this via duplicate_classification, only the
+    canonical row counts toward the total."""
+    own_plan = _make_local_plan(session, council_code="bury", plan_name="Bury Local Plan")
+    joint_plan = _make_local_plan(session, council_code="bury", plan_name="Places for Everyone")
+    _make_allocation(session, own_plan.id, council_code="bury", policy_reference="JPA1.1", site_name="Northern Gateway", minimum_dwellings=1550)
+    _make_allocation(
+        session, joint_plan.id, council_code="bury", policy_reference="JPA 1.2", site_name="Northern Gateway (PfE)",
+        minimum_dwellings=1550, duplicate_classification="duplicate_of_other_plan",
+    )
+
+    view = build_allocation_discovery(session)
+    summary = build_summary_metrics(view["cards"])
+    assert summary["total_allocations"] == 1
+    assert summary["total_homes_identified"] == 1550
+
+
+def test_cross_boundary_allocation_counted_once_per_physical_row(session):
+    """A joint plan shared across multiple councils (via LocalPlanCouncil)
+    does not multiply an allocation's contribution - each council's own
+    distinct LocalPlanSite row is counted exactly once, never once per
+    participating council on the shared plan."""
+    from app.db.models import LocalPlanCouncil
+
+    joint_plan = _make_local_plan(session, council_code="bury", plan_name="Places for Everyone")
+    session.add(LocalPlanCouncil(local_plan_id=joint_plan.id, council_code="bury", role="participating_authority"))
+    session.add(LocalPlanCouncil(local_plan_id=joint_plan.id, council_code="stockport", role="participating_authority"))
+    session.commit()
+    _make_allocation(session, joint_plan.id, council_code="bury", policy_reference="JPA1", site_name="Bury allocation", minimum_dwellings=500)
+    _make_allocation(session, joint_plan.id, council_code="stockport", policy_reference="JPA2", site_name="Stockport allocation", minimum_dwellings=300)
+
+    view = build_allocation_discovery(session)
+    summary = build_summary_metrics(view["cards"])
+    assert summary["total_allocations"] == 2
+    assert summary["total_homes_identified"] == 800
+    for card in view["cards"]:
+        assert card["is_multi_authority"] is True
+
+
+# --- No AI calls / no database writes (amendment-scoped re-check) -----------
+
+
+def test_evidence_terminology_amendment_introduces_no_ai_calls():
+    from pathlib import Path
+
+    source = Path("app/reporting/allocation_discovery.py").read_text(encoding="utf-8").lower()
+    assert "openai" not in source
+
+
+def test_evidence_terminology_amendment_makes_no_database_writes(session):
+    plan = _make_local_plan(session)
+    _make_allocation(session, plan.id, minimum_dwellings=100, maximum_capacity=900)
+    assert not session.new
+    assert not session.dirty
+    view = build_allocation_discovery(session)
+    build_summary_metrics(view["cards"])
+    assert not session.new
+    assert not session.dirty

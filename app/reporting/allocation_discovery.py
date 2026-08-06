@@ -140,23 +140,82 @@ def format_capacity(allocation: LocalPlanSite) -> dict:
     return {"kind": "indicative", "display": f"Approximately {indicative:,} homes", "value": indicative}
 
 
-# A separate, higher bar than MAJOR_HOUSING_CAPACITY_THRESHOLD - "strategic
-# urban extension" is a stronger commercial description than plain
-# "residential allocation" and should only be used for allocations that are
-# genuinely large-scale, not merely "major" by the platform's general
-# 100-home bar. Using capacity to choose WORDING is not the same as using
-# it to change a card's visual weight (Sprint 4.5a's product principle) -
-# every card renders with identical size/border/prominence regardless of
-# this label; only the descriptive text differs, grounded in the
-# allocation's own stated figures.
-STRATEGIC_EXTENSION_CAPACITY_THRESHOLD = 1000
+def kpi_capacity_contribution(allocation: LocalPlanSite) -> dict:
+    """Evidence Terminology Amendment (following Sprint 4.5a) - the Total
+    Homes Identified KPI's own documented, deterministic rule. Distinct
+    from format_capacity's DISPLAY value above: that value picks a range's
+    MAXIMUM (a reasonable single ordering key for sorting/filtering cards),
+    which is exactly the figure Part 2/4 of this amendment says must never
+    be silently summed into one "homes identified" total, since a maximum
+    is an upper bound, not a count of homes this platform has actually
+    identified.
+
+    Only counts genuine FLOOR evidence, one documented rule, never a mix
+    of incompatible measures added as if equivalent:
+      - a stated minimum_dwellings (including the minimum half of a
+        range - minimum_dwellings is set whenever a range exists, so this
+        branch already covers ranges too) -> counted at face value, not
+        flagged as an estimate: a plan's own stated minimum IS a genuine
+        floor ("at least this many homes here").
+      - maximum_capacity alone, with no minimum stated -> EXCLUDED
+        entirely. An upper bound alone is not evidence of how many homes
+        are identified as a floor; including it would overstate exactly
+        what Part 4 warns against.
+      - indicative_capacity alone, with no minimum stated -> counted, but
+        flagged is_estimate=True (a council's own indicative figure is an
+        estimate, not a stated floor) - the caller uses this flag to
+        relabel the KPI "Indicative homes identified" rather than
+        presenting the aggregate as a firm total (Part 2).
+      - nothing stated -> excluded (never treated as zero)."""
+    minimum = allocation.minimum_dwellings
+    indicative = allocation.indicative_capacity
+
+    if minimum is not None:
+        return {"value": minimum, "is_estimate": False}
+    if indicative is not None:
+        return {"value": indicative, "is_estimate": True}
+    return {"value": None, "is_estimate": False}
+
+
+# A separate, higher bar than MAJOR_HOUSING_CAPACITY_THRESHOLD, used ONLY
+# to choose between "Residential allocation" and "Large residential
+# allocation" wording - Evidence Terminology Amendment (following Sprint
+# 4.5a): capacity alone is explicitly NOT evidence of development TYPE
+# (see development_type_label's own docstring) - "Strategic urban
+# extension" is reserved for allocations with an explicit textual signal
+# (title/category wording), never inferred from scale. Using capacity to
+# choose WORDING is not the same as using it to change a card's visual
+# weight (Sprint 4.5a's product principle) - every card renders with
+# identical size/border/prominence regardless of this label; only the
+# descriptive text differs, grounded in the allocation's own stated
+# figures/evidence.
+LARGE_RESIDENTIAL_CAPACITY_THRESHOLD = 1000
+
+# Explicit textual evidence required before "Strategic urban extension" is
+# ever used - deliberately NOT triggered by capacity (Evidence Terminology
+# Amendment, Part 1: "Capacity alone is not evidence of development
+# type"). Matched against site_name and category - the only free-text
+# fields this row carries that could genuinely state a planning typology.
+_STRATEGIC_EXTENSION_KEYWORDS = ("urban extension", "strategic extension", "strategic urban")
 
 
 def development_type_label(*, site_name: str | None, category: str | None, intended_use: str | None, capacity_value: int | None) -> str | None:
-    """Sprint 4.5a ("Commercial Polish", Part 2) - a concise, deterministic
-    commercial description beneath the allocation title, built ONLY from
-    evidence already stored on the row (site_name, category, intended_use,
+    """Sprint 4.5a ("Commercial Polish", Part 2; tightened by the Evidence
+    Terminology Amendment) - a concise, deterministic commercial
+    description beneath the allocation title, built ONLY from evidence
+    already stored on the row (site_name, category, intended_use,
     capacity) - never a fresh classification invented for this purpose.
+
+    "Strategic urban extension", "Garden village allocation" and "Urban
+    regeneration allocation" are planning TYPOLOGY claims - they are used
+    ONLY when the row's own title or category text explicitly says so.
+    Capacity is used exclusively to choose between two capacity-neutral
+    housing descriptions ("Residential allocation" vs "Large residential
+    allocation") - it is never allowed to promote an allocation into a
+    specific typology label on its own (Part 1: "Do not infer garden
+    village, urban extension, regeneration area or other planning
+    typologies from scale alone").
+
     Returns None when nothing in the existing evidence supports a
     description more specific than the bare word "allocation" - an honest
     omission, not a guess."""
@@ -167,13 +226,15 @@ def development_type_label(*, site_name: str | None, category: str | None, inten
         return "Garden village allocation"
     if "regeneration" in name or "regeneration" in cat:
         return "Urban regeneration allocation"
+    if any(keyword in name or keyword in cat for keyword in _STRATEGIC_EXTENSION_KEYWORDS):
+        return "Strategic urban extension"
     if intended_use == "employment":
         return "Employment allocation"
     if intended_use == "mixed use":
         return "Mixed-use allocation"
     if intended_use == "residential":
-        if capacity_value is not None and capacity_value >= STRATEGIC_EXTENSION_CAPACITY_THRESHOLD:
-            return "Strategic urban extension"
+        if capacity_value is not None and capacity_value >= LARGE_RESIDENTIAL_CAPACITY_THRESHOLD:
+            return "Large residential allocation"
         return "Residential allocation"
     return None
 
@@ -350,6 +411,7 @@ def build_allocation_card(
     plan_status = plan.status if plan else (allocation.plan_status or None)
     plan_meta = PLAN_STATUS_META.get(plan_status, PLAN_STATUS_META[None])
     capacity = format_capacity(allocation)
+    kpi_capacity = kpi_capacity_contribution(allocation)
     intended_use_label = INTENDED_USE_LABELS.get(allocation.intended_use, allocation.intended_use or "Not stated")
     major_housing = is_major_housing_allocation(allocation.intended_use, capacity["value"])
     development_type = development_type_label(
@@ -423,6 +485,7 @@ def build_allocation_card(
         "intended_use_label": intended_use_label,
         "development_type": development_type,
         "capacity": capacity,
+        "kpi_capacity_contribution": kpi_capacity,
         "major_housing": major_housing,
         "category": allocation.category,
         "allocation_status": allocation.allocation_status,
@@ -613,7 +676,17 @@ def build_summary_metrics(cards: list[dict]) -> dict:
     count over facts each card already carries - never a new estimate."""
     countable = [c for c in cards if _counts_toward_summary(c)]
     total = len(countable)
-    known_capacities = [c["capacity"]["value"] for c in countable if c["capacity"]["value"] is not None]
+    # Total Homes Identified (Evidence Terminology Amendment, Part 2): each
+    # card's own kpi_capacity_contribution (see kpi_capacity_contribution's
+    # docstring for the full documented rule) - never capacity["value"],
+    # which picks a range's MAXIMUM for display/sort purposes and would
+    # silently overstate the total if summed directly (Part 4). A maximum-
+    # only capacity contributes nothing (excluded, not zero); an
+    # indicative-only capacity contributes its figure but is flagged as an
+    # estimate so the caller can rename the metric accordingly.
+    contributions = [c["kpi_capacity_contribution"] for c in countable if c["kpi_capacity_contribution"]["value"] is not None]
+    total_homes = sum(c["value"] for c in contributions) if contributions else None
+    total_homes_is_estimate = any(c["is_estimate"] for c in contributions)
     return {
         "total_allocations": total,
         "adopted_allocations": sum(1 for c in countable if c["plan_status_bucket"] == "adopted"),
@@ -626,10 +699,38 @@ def build_summary_metrics(cards: list[dict]) -> dict:
         # capacity - an empty list summed to 0 would misrepresent "we
         # haven't identified any homes" as "no homes exist here", so this
         # is None (never shown) rather than a false 0 when nothing is known.
-        "total_homes_identified": sum(known_capacities) if known_capacities else None,
+        "total_homes_identified": total_homes,
+        # True whenever the total includes at least one indicative
+        # (estimated, not stated-minimum) figure - the caller must then
+        # present the metric as "Indicative homes identified", never as a
+        # firm deliverable total (Part 2).
+        "total_homes_identified_is_estimate": total_homes_is_estimate,
         "strategic_housing_allocations": sum(1 for c in countable if c["major_housing"]),
         "confirmed_allocation_maps": sum(1 for c in countable if c["visual_status"] == "confirmed"),
     }
+
+
+TOTAL_HOMES_KPI_LABEL = "Total Homes Identified"
+TOTAL_HOMES_KPI_LABEL_ESTIMATE = "Indicative homes identified"
+
+TOTAL_HOMES_KPI_CAPTION = (
+    "Sum of each allocation's stated minimum capacity (a range uses its minimum, never its maximum) - "
+    "never a firm delivery figure. Allocations with only an upper-bound capacity, or no stated capacity, "
+    "are excluded rather than counted as zero. Approved duplicate/contextual allocations are excluded once."
+)
+TOTAL_HOMES_KPI_CAPTION_ESTIMATE = (
+    "Includes one or more council-stated indicative (estimated, not a confirmed minimum) capacity figures - "
+    "shown as an indicative total, not a firm delivery figure. A range uses its minimum, never its maximum; "
+    "allocations with only an upper-bound or no stated capacity are excluded rather than counted as zero."
+)
+
+
+def total_homes_kpi_label(summary: dict) -> str:
+    return TOTAL_HOMES_KPI_LABEL_ESTIMATE if summary["total_homes_identified_is_estimate"] else TOTAL_HOMES_KPI_LABEL
+
+
+def total_homes_kpi_caption(summary: dict) -> str:
+    return TOTAL_HOMES_KPI_CAPTION_ESTIMATE if summary["total_homes_identified_is_estimate"] else TOTAL_HOMES_KPI_CAPTION
 
 
 # --- Search (Part 4) ---------------------------------------------------------
