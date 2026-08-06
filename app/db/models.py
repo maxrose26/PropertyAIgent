@@ -1122,7 +1122,12 @@ class SchemeIntelligence(Base):
     housing_typology: Mapped[str | None] = mapped_column(String(200), nullable=True)
     specialist_housing_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
     allocation_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    existing_use: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Text, not String(200) - LLM-narrated free text like its sibling
+    # site_evidence below, not a short categorical value; confirmed real
+    # extracted content already exceeds 200 chars (PostgreSQL migration:
+    # SQLite never enforced this bound at all, so it went unnoticed until
+    # Postgres's real VARCHAR(200) constraint rejected an insert).
+    existing_use: Mapped[str | None] = mapped_column(Text, nullable=True)
     proposed_use: Mapped[str | None] = mapped_column(String(200), nullable=True)
     site_evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     site_confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -1399,7 +1404,12 @@ class VisualEvidence(Base):
     # the normalised image_type, same "never collapse raw wording into a
     # normalised field without retaining it" principle as Sprint 3B's
     # plan-status normalisation.
-    raw_classification_label: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Text, not String(300) - this field's own purpose is to keep the
+    # source document's wording "verbatim", which a length cap contradicts
+    # by construction; confirmed real content already exceeds 300 chars
+    # (same PostgreSQL migration finding as SchemeIntelligence.existing_use
+    # above - SQLite never enforced the bound at all).
+    raw_classification_label: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Storage keys/paths, not raw bytes - kept as plain strings deliberately
     # (not a dedicated "storage backend" abstraction) so swapping local

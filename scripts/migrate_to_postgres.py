@@ -29,6 +29,18 @@ these two: every row in a table is first inserted with its self-referential
 column(s) nulled out, then a second pass UPDATEs just that column back to
 its real value now that every row in the table exists.
 
+SQLite does not enforce foreign key constraints unless PRAGMA foreign_keys
+is explicitly turned on per-connection, which this project's code never
+has - so the source database can (and, confirmed against the real data,
+does) contain rows whose foreign key points at a parent that no longer
+exists. A nullable such column (e.g. Application.suggested_site_id) is
+simply nulled out during migration, same principle as the self-referential
+case. A NOT NULL such column (e.g. Document.application_id) has no
+recoverable value to fall back to - that row is excluded from the migrated
+database rather than crashing the whole run or fabricating a parent, and
+every excluded row is printed (table, column, row id) so nothing is ever
+silently dropped - see split_dangling_rows.
+
 Usage:
     DATABASE_URL=postgresql://... python -m scripts.migrate_to_postgres
     DATABASE_URL=postgresql://... python -m scripts.migrate_to_postgres --dry-run
@@ -47,7 +59,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dotenv import load_dotenv
-from sqlalchemy import Table, create_engine, select, text
+from sqlalchemy import Table, create_engine, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine
 
@@ -121,19 +133,52 @@ def to_utc_aware(value):
     return value
 
 
+def resolve_missing_defaults(table: Table, row: dict) -> dict:
+    """Some columns that the current model declares NOT NULL still hold a
+    NULL value in the SQLite source, for rows created before that column
+    existed: app.db.session._add_missing_columns's ALTER TABLE ADD COLUMN
+    never enforces NOT NULL or backfills existing rows (confirmed against
+    the real data - e.g. councils.created_at/updated_at/monitoring_enabled
+    and sites.excluded), since SQLite itself doesn't require it, but
+    Postgres enforces the constraint for real on the freshly created
+    table. Only for a column that (a) the model declares NOT NULL and (b)
+    has a Python-side `default` declared, apply that same default here -
+    exactly what the ORM would have done for a brand new row left unset.
+    A column with no declared default is left alone; this never invents a
+    value for one, it only applies a default the model itself already
+    specifies."""
+    resolved = dict(row)
+    for column in table.columns:
+        if column.nullable or column.default is None:
+            continue
+        if resolved.get(column.name) is not None:
+            continue
+        default = column.default
+        # A callable default's .arg is SQLAlchemy's own internally-wrapped
+        # invoker, which always expects an ExecutionContext argument (even
+        # when, as here, the underlying user function like models.utcnow
+        # takes none itself and just ignores it) - None stands in for the
+        # real context, which nothing in this schema's defaults ever uses.
+        resolved[column.name] = default.arg(None) if default.is_callable else default.arg
+    return resolved
+
+
 def prepare_rows(
     table: Table, rows: list[dict], self_ref_columns: list[str]
 ) -> tuple[list[dict], list[dict]]:
     """Splits each source row into (insert_row, deferred_update). insert_row
-    has every self-referential column nulled and every naive datetime made
-    UTC-aware (see to_utc_aware); deferred_update carries the real
-    self-referential values, keyed by the table's own primary-key columns,
-    to be applied in a second pass once every row in the table exists."""
+    has every self-referential column nulled, every naive datetime made
+    UTC-aware (see to_utc_aware), and any missing-but-defaultable NOT NULL
+    value filled in (see resolve_missing_defaults); deferred_update carries
+    the real self-referential values, keyed by the table's own primary-key
+    columns, to be applied in a second pass once every row in the table
+    exists."""
     pk_columns = [c.name for c in table.primary_key.columns]
     insert_rows = []
     deferred_updates = []
     for row in rows:
         insert_row = {k: to_utc_aware(v) for k, v in row.items()}
+        insert_row = resolve_missing_defaults(table, insert_row)
         deferred = {}
         for col in self_ref_columns:
             if insert_row.get(col) is not None:
@@ -165,6 +210,117 @@ def sequence_reset_statement(table: Table) -> str | None:
     )
 
 
+def not_null_foreign_keys_to_other_tables(table: Table) -> list[tuple[str, Table]]:
+    """(column_name, target_table) for every NOT NULL foreign key column on
+    `table` that points at a DIFFERENT table - self-referential ones are
+    handled separately (see self_referential_columns/prepare_rows), since
+    those are recoverable (null-then-backfill), unlike a NOT NULL column
+    whose required parent genuinely doesn't exist at all."""
+    result = []
+    for column in table.columns:
+        if column.nullable:
+            continue
+        for fk in column.foreign_keys:
+            if fk.column.table is not table:
+                result.append((column.name, fk.column.table))
+    return result
+
+
+def nullable_foreign_keys_to_other_tables(table: Table) -> list[tuple[str, Table]]:
+    """(column_name, target_table) for every NULLABLE foreign key column on
+    `table` that points at a DIFFERENT table - the counterpart to
+    not_null_foreign_keys_to_other_tables. Confirmed against the real data:
+    2 Application.suggested_site_id values reference a Site that no longer
+    exists. Unlike the NOT NULL case, a row here doesn't need to be
+    excluded - it's simply nulled out (see null_out_orphaned_nullable_fks),
+    the same outcome the app itself would show today querying this via a
+    LEFT JOIN against a deleted row."""
+    result = []
+    for column in table.columns:
+        if not column.nullable:
+            continue
+        for fk in column.foreign_keys:
+            if fk.column.table is not table:
+                result.append((column.name, fk.column.table))
+    return result
+
+
+def null_out_orphaned_nullable_fks(
+    source_conn: Connection, table: Table, rows: list[dict]
+) -> tuple[list[dict], dict[str, int]]:
+    """Nulls out any nullable_foreign_keys_to_other_tables value that
+    doesn't correspond to a row that actually exists (checked against the
+    read-only SQLite source, same reasoning as split_dangling_rows - SQLite
+    never enforced this constraint, so such a value can exist without ever
+    having raised an error). Mutates and returns `rows` in place (each row
+    dict is this call's own copy, made in copy_table, so nothing shared
+    with the source is touched) along with a {column_name: count} report of
+    what was nulled, never done silently."""
+    fk_columns = nullable_foreign_keys_to_other_tables(table)
+    if not fk_columns:
+        return rows, {}
+
+    valid_ids: dict[str, set] = {}
+    for _, target_table in fk_columns:
+        if target_table.name not in valid_ids:
+            pk_col = list(target_table.primary_key.columns)[0]
+            valid_ids[target_table.name] = {r[0] for r in source_conn.execute(select(pk_col))}
+
+    nulled_counts: dict[str, int] = {}
+    for row in rows:
+        for col_name, target_table in fk_columns:
+            value = row.get(col_name)
+            if value is not None and value not in valid_ids[target_table.name]:
+                row[col_name] = None
+                nulled_counts[col_name] = nulled_counts.get(col_name, 0) + 1
+    return rows, nulled_counts
+
+
+def split_dangling_rows(
+    source_conn: Connection, table: Table, rows: list[dict]
+) -> tuple[list[dict], dict[str, list]]:
+    """Splits `rows` into (keepable, dangling_by_column). SQLite does not
+    enforce foreign key constraints unless PRAGMA foreign_keys=ON is set
+    per-connection (this project's own code has never done so), so a row
+    can reference a parent that was since deleted without SQLite ever
+    objecting - confirmed against the real data (e.g. 36 `documents` rows
+    reference an `applications` row that no longer exists). Postgres
+    enforces the constraint for real, so a NOT NULL foreign key pointing at
+    a genuinely missing parent can't be migrated as-is - there is no
+    parent to null it to (unlike a nullable FK, see
+    null_out_orphaned_nullable_fks), and fabricating one would misrepresent
+    the data. The only sound choice is
+    to leave such a row out of the migrated database - but always report
+    exactly what and how many, never silently drop it. Checked against the
+    read-only SQLite source (not the Postgres target): a table's parent is
+    always already fully copied by the time a child table is reached (see
+    Base.metadata.sorted_tables' topological order), so the source's own
+    parent-table contents are equally authoritative and available in both
+    --dry-run and a real run."""
+    fk_columns = not_null_foreign_keys_to_other_tables(table)
+    if not fk_columns:
+        return rows, {}
+
+    valid_ids: dict[str, set] = {}
+    for _, target_table in fk_columns:
+        if target_table.name not in valid_ids:
+            pk_col = list(target_table.primary_key.columns)[0]
+            valid_ids[target_table.name] = {r[0] for r in source_conn.execute(select(pk_col))}
+
+    keepable = []
+    dangling_by_column: dict[str, list] = {}
+    for row in rows:
+        dangling_col = next(
+            (col for col, target_table in fk_columns if row[col] not in valid_ids[target_table.name]),
+            None,
+        )
+        if dangling_col is None:
+            keepable.append(row)
+        else:
+            dangling_by_column.setdefault(dangling_col, []).append(row)
+    return keepable, dangling_by_column
+
+
 def copy_table(
     source_conn: Connection,
     target_conn: Connection | None,
@@ -178,21 +334,45 @@ def copy_table(
     if not source_rows:
         return 0
 
+    source_rows, nulled_counts = null_out_orphaned_nullable_fks(source_conn, table, source_rows)
+    for column_name, count in nulled_counts.items():
+        print(
+            f"[fix] {table.name}: {count} row(s) had {column_name} nulled out - it referenced "
+            "a row that no longer exists in the source database"
+        )
+
+    source_rows, dangling_by_column = split_dangling_rows(source_conn, table, source_rows)
+    for column_name, dangling_rows in dangling_by_column.items():
+        pk_columns = [c.name for c in table.primary_key.columns]
+        ids = [tuple(row[pk] for pk in pk_columns) for row in dangling_rows]
+        print(
+            f"[skip] {table.name}: {len(dangling_rows)} row(s) excluded - {column_name} "
+            f"references a row that no longer exists in the source database, ids={ids}"
+        )
+
     insert_rows, deferred_updates = prepare_rows(table, source_rows, self_ref_columns)
 
     if dry_run:
         print(f"[dry-run] {table.name}: would copy {len(insert_rows)} row(s)")
         return len(insert_rows)
 
+    if not insert_rows:
+        return 0
+
     assert target_conn is not None
     pk_columns = [c.name for c in table.primary_key.columns]
-    newly_inserted = 0
+    # cursor.rowcount is unreliable for a multi-row VALUES(...) INSERT ...
+    # ON CONFLICT DO NOTHING under psycopg (confirmed empirically: always
+    # -1, even when rows genuinely were inserted) - count the table before
+    # and after instead, which is accurate regardless of driver rowcount
+    # support and cheap at this scale (one extra COUNT per table).
+    before_count = target_conn.execute(select(func.count()).select_from(table)).scalar()
     for i in range(0, len(insert_rows), batch_size):
         batch = insert_rows[i : i + batch_size]
         stmt = pg_insert(table).values(batch).on_conflict_do_nothing(index_elements=pk_columns)
-        result = target_conn.execute(stmt)
-        if result.rowcount and result.rowcount > 0:
-            newly_inserted += result.rowcount
+        target_conn.execute(stmt)
+    after_count = target_conn.execute(select(func.count()).select_from(table)).scalar()
+    newly_inserted = after_count - before_count
 
     for update in deferred_updates:
         pk_filter = {pk: update.pop(pk) for pk in pk_columns}

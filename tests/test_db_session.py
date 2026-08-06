@@ -11,7 +11,14 @@ the real on-disk data/deal_finder.db.
 Each test resets app.db.session's module-level engine/session-factory cache
 via the autouse fixture below, so this file's monkeypatched DATABASE_URL
 values never leak into (or get overwritten by) another test module's own
-use of get_engine()/get_session().
+use of get_engine()/get_session(). The fixture also stubs out get_engine()'s
+own load_dotenv() call - without that, a developer's real .env (which, once
+Stage 2 configures a real Supabase connection, legitimately has its own
+DATABASE_URL) would get re-read on every call and silently refill a value a
+test had just deleted via monkeypatch.delenv, since load_dotenv() only ever
+fills in variables that are currently unset. Tests must exercise
+get_engine()'s own logic in isolation, independent of whatever happens to
+be in any developer's real .env file at the time.
 """
 from __future__ import annotations
 
@@ -24,6 +31,7 @@ import app.db.session as db_session
 def _reset_engine_cache(monkeypatch):
     monkeypatch.setattr(db_session, "_engine", None)
     monkeypatch.setattr(db_session, "_SessionLocal", None)
+    monkeypatch.setattr(db_session, "load_dotenv", lambda *a, **k: None)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     yield
     monkeypatch.setattr(db_session, "_engine", None)
