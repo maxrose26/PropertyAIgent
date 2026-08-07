@@ -17,13 +17,45 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import subprocess
 from contextlib import contextmanager
+from pathlib import Path
 
 import streamlit as st
 
 PRODUCT_NAME = "PropertyAIgent"
 APP_VERSION = "0.4.2"
 APP_ENVIRONMENT = os.getenv("PROPERTYAIGENT_ENV", "development")
+
+
+def _detect_commit_hash() -> str | None:
+    """Live Deployment Integrity audit (Part 2) - APP_VERSION above is a
+    hand-maintained string that in practice hasn't been bumped across three
+    merged sprints, so it can't tell a stale deployment apart from a current
+    one (both show "0.4.2"). A short commit hash can. Render sets
+    RENDER_GIT_COMMIT on every service automatically - checked first so
+    this never shells out in the deployed environment. The `git`
+    fallback is for local dev, where no such env var exists; it's wrapped
+    in a broad except because a missing `.git` dir, no git binary, or a
+    slim/exported copy of the repo must degrade to "no commit known", never
+    crash the app shell over a cosmetic footer detail."""
+    env_commit = os.getenv("RENDER_GIT_COMMIT")
+    if env_commit:
+        return env_commit[:7]
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=2,
+            cwd=Path(__file__).resolve().parent,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+APP_COMMIT = _detect_commit_hash()
 
 # One definition, used everywhere a status/evidence/review/AI signal is
 # shown (docs/UI_DESIGN_SYSTEM.md's "Icons" table) - never re-invented
@@ -1186,11 +1218,15 @@ def ai_status_summary_view(ai_summary: dict) -> None:
 
 
 def render_footer() -> None:
-    """A lightweight footer (Part 8) - product name, version, environment
-    only, no clutter."""
+    """A lightweight footer (Part 8; extended by the Live Deployment
+    Integrity audit, Part 2) - product name, version, commit and
+    environment only, no clutter. The commit hash is the reliable
+    drift-detection signal (see _detect_commit_hash's docstring) -
+    APP_VERSION alone can't distinguish deployments that never bumped it."""
     env_bit = f" · {APP_ENVIRONMENT}" if APP_ENVIRONMENT != "production" else ""
+    commit_bit = f" · {APP_COMMIT}" if APP_COMMIT else ""
     st.markdown(
-        f'<div class="pig-footer">{PRODUCT_NAME} · v{APP_VERSION}{env_bit}</div>',
+        f'<div class="pig-footer">{PRODUCT_NAME} · v{APP_VERSION}{commit_bit}{env_bit}</div>',
         unsafe_allow_html=True,
     )
 
