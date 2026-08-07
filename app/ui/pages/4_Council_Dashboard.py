@@ -33,7 +33,7 @@ from app.policy.coverage import build_coverage_inventory
 from app.policy.plan_evidence_view import build_plan_evidence_view
 from app.reporting.local_plan_summary import generate_local_plan_summary, is_summary_stale
 from app.ui.common import bootstrap, credits_sidebar, get_db
-from app.ui.shell import ai_summary_card, empty_state, page_header
+from app.ui.shell import ai_summary_card, empty_state, page_header, wide_canvas
 
 bootstrap()
 session, settings = get_db()
@@ -42,6 +42,11 @@ HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
 st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
 credits_sidebar(session, settings)
+# Live Deployment Integrity audit (Part 5) - this is an Administration-only
+# page (never linked from a customer-facing surface), so widening it here
+# doesn't touch any customer-facing page width - wide_canvas() is already
+# page-scoped (see its own docstring in app.ui.shell).
+wide_canvas()
 
 page_header(
     "Council Operations",
@@ -263,6 +268,58 @@ def _render_document_coverage(council_code: str, council_name: str) -> None:
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
+def _render_council_detail(r: dict) -> None:
+    """The full operational detail for one council row - shared by both the
+    row-selection panel and the legacy per-council expander below it (Part
+    6: "reuse the existing operational detail render path... do not create
+    duplicate business logic"), so the two entry points can never drift
+    apart into showing different things for the same council."""
+    if r["review_items_pending"]:
+        st.warning(f"⚠️ {r['review_items_pending']} change(s) awaiting review approval for this council.")
+
+    # Housing-supply monitoring amendment ("Add monitored housing
+    # supply and delivery reports", Part 6) - every discovered report
+    # for this council, regardless of which plan (if any) it's linked
+    # to, so an ambiguous/unreviewed discovery is never invisible.
+    _render_monitored_reports(r["council_code"])
+
+    # Sprint 3D ("Policy Document Coverage & Discovery", Part 7) - what
+    # SHOULD exist for this council versus what's actually been found.
+    _render_document_coverage(r["council_code"], r["council_name"])
+
+    if not r["local_plans"]:
+        st.caption("No Local Plan ingested yet.")
+    for plan in r["local_plans"]:
+        version_bit = f" ({plan['plan_version']})" if plan["plan_version"] else ""
+        st.markdown(f"**{plan['plan_name']}{version_bit}** — {plan['raw_status'] or plan['status']}")
+        st.caption(
+            f"{plan['allocations_imported']} allocation(s) imported, {plan['sites_matched']} matched to an "
+            f"existing Site" + (f", checked {plan['last_checked'].strftime('%d %b %Y')}" if plan["last_checked"] else "")
+        )
+
+        # Sprint 3B ("AI Local Plan Evidence Extraction", Part 10) - plan-
+        # level housing requirement/delivery/five-year-supply evidence,
+        # extending this existing Policy Intelligence view rather than
+        # building a separate page for it. build_plan_evidence_view is a
+        # pure function (see app.policy.plan_evidence_view) so this exact
+        # assembly is testable independently of Streamlit.
+        plan_row = session.get(LocalPlan, plan["plan_id"])
+        if plan_row is not None:
+            _render_ai_summary(plan_row, r["council_code"])
+
+            evidence_view = build_plan_evidence_view(session, plan_row)
+            sections_with_content = [
+                (title, evidence_view[key]) for key, title in EVIDENCE_SECTIONS
+                if any(e["has_value"] or e["pending_value"] is not None or e["newer_report_pending"] for e in evidence_view[key])
+            ]
+            if sections_with_content:
+                with st.expander("Plan evidence (housing requirement, delivery, five-year supply)"):
+                    for title, entries in sections_with_content:
+                        st.markdown(f"###### {title}")
+                        for entry in entries:
+                            _render_evidence_field(entry)
+
+
 summary_rows = [{
     "Council": r["council_name"],
     "Monitoring": "Enabled" if r["monitoring_enabled"] else "Disabled",
@@ -274,51 +331,23 @@ summary_rows = [{
     "Review items pending": r["review_items_pending"],
 } for r in rows]
 
-st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+# Live Deployment Integrity audit (Part 6) - clicking a row shows that
+# council's operational detail immediately beneath the table, reusing
+# _render_council_detail rather than a second copy of this rendering. The
+# expanders below are left in place (Part 6: "do not remove the existing
+# expanders until the replacement behaviour is proven complete") - this is
+# additive, not a replacement, until that's confirmed in a follow-up.
+table_event = st.dataframe(
+    pd.DataFrame(summary_rows), use_container_width=True, hide_index=True,
+    on_select="rerun", selection_mode="single-row", key="council-ops-table",
+)
+selected_rows = table_event.selection.rows if table_event and table_event.selection else []
+if selected_rows:
+    selected = rows[selected_rows[0]]
+    st.markdown(f"#### {selected['council_name']}")
+    _render_council_detail(selected)
+    st.divider()
 
 for r in rows:
     with st.expander(f"{r['council_name']} - {len(r['local_plans'])} Local Plan(s)"):
-        if r["review_items_pending"]:
-            st.warning(f"⚠️ {r['review_items_pending']} change(s) awaiting review approval for this council.")
-
-        # Housing-supply monitoring amendment ("Add monitored housing
-        # supply and delivery reports", Part 6) - every discovered report
-        # for this council, regardless of which plan (if any) it's linked
-        # to, so an ambiguous/unreviewed discovery is never invisible.
-        _render_monitored_reports(r["council_code"])
-
-        # Sprint 3D ("Policy Document Coverage & Discovery", Part 7) - what
-        # SHOULD exist for this council versus what's actually been found.
-        _render_document_coverage(r["council_code"], r["council_name"])
-
-        if not r["local_plans"]:
-            st.caption("No Local Plan ingested yet.")
-        for plan in r["local_plans"]:
-            version_bit = f" ({plan['plan_version']})" if plan["plan_version"] else ""
-            st.markdown(f"**{plan['plan_name']}{version_bit}** — {plan['raw_status'] or plan['status']}")
-            st.caption(
-                f"{plan['allocations_imported']} allocation(s) imported, {plan['sites_matched']} matched to an "
-                f"existing Site" + (f", checked {plan['last_checked'].strftime('%d %b %Y')}" if plan["last_checked"] else "")
-            )
-
-            # Sprint 3B ("AI Local Plan Evidence Extraction", Part 10) - plan-
-            # level housing requirement/delivery/five-year-supply evidence,
-            # extending this existing Policy Intelligence view rather than
-            # building a separate page for it. build_plan_evidence_view is a
-            # pure function (see app.policy.plan_evidence_view) so this exact
-            # assembly is testable independently of Streamlit.
-            plan_row = session.get(LocalPlan, plan["plan_id"])
-            if plan_row is not None:
-                _render_ai_summary(plan_row, r["council_code"])
-
-                evidence_view = build_plan_evidence_view(session, plan_row)
-                sections_with_content = [
-                    (title, evidence_view[key]) for key, title in EVIDENCE_SECTIONS
-                    if any(e["has_value"] or e["pending_value"] is not None or e["newer_report_pending"] for e in evidence_view[key])
-                ]
-                if sections_with_content:
-                    with st.expander("Plan evidence (housing requirement, delivery, five-year supply)"):
-                        for title, entries in sections_with_content:
-                            st.markdown(f"###### {title}")
-                            for entry in entries:
-                                _render_evidence_field(entry)
+        _render_council_detail(r)

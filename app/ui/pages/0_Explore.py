@@ -281,7 +281,12 @@ nl_filters: SearchFilters | None = None
 if nl_query:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        st.warning("OPENAI_API_KEY not set - can't parse natural language search.")
+        # Live Deployment Integrity audit (Part 10) - deterministic search
+        # (the sidebar filters, and the table/map above) never depends on
+        # this key and keeps working either way; this warning is scoped to
+        # the natural-language box only, and never names the underlying
+        # env var to an end user.
+        st.warning("AI-enhanced search unavailable - use the filters in the sidebar instead.")
     elif nl_submitted or st.session_state.get("_last_nl_query") == nl_query:
         if nl_submitted:
             client = OpenAI(api_key=api_key)
@@ -465,7 +470,7 @@ if len(filtered) > 0:
         if st.button(f"Generate PDF summary report ({len(filtered)} sites)", key="generate_pdf_report"):
             openai_key = os.getenv("OPENAI_API_KEY")
             if not openai_key:
-                st.error("OPENAI_API_KEY not set - can't generate the AI-written summary.")
+                st.error("AI-enhanced search unavailable - the AI-written PDF summary can't be generated right now.")
             else:
                 with st.spinner("Analysing schemes and writing the report..."):
                     stats = compute_aggregate_stats(filtered)

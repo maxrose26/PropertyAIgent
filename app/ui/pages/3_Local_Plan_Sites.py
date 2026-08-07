@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
+import pandas as pd
 import streamlit as st
 
 from app.reporting.allocation_discovery import (
@@ -146,6 +147,23 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         gallery["primary"] = card["visual_fallback"]
         gallery["has_any"] = True
     visual_evidence_gallery(gallery)
+
+    # 4a. Location (Live Deployment Integrity audit, Part 8) - strictly
+    # gated on a real stored coordinate. LocalPlanSite.geometry_placeholder
+    # is never populated platform-wide today (confirmed by direct query
+    # during this audit: 0 of 80 allocations), so a polygon/boundary map is
+    # never offered - only a point map, and only when latitude/longitude
+    # were actually captured (matched-Site copy or free-text geocoding),
+    # never inferred from the visual evidence image above. A one-point
+    # st.map keeps this consistent with "approximate location", never
+    # implying it's an allocation boundary the way a polygon would.
+    if card["latitude"] is not None and card["longitude"] is not None:
+        section_header("Location", icon="📍")
+        st.map(pd.DataFrame([{"lat": card["latitude"], "lon": card["longitude"]}]), size=40)
+        st.caption(
+            "Approximate location only, not an allocation boundary - PropertyAIgent does not yet store "
+            "boundary geometry for any allocation."
+        )
 
     # 5. Matched Sites and Applications
     section_header("Matched Site and Applications", icon="🔗")
