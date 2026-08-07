@@ -24,7 +24,7 @@ from pathlib import Path
 import streamlit as st
 
 PRODUCT_NAME = "PropertyAIgent"
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.5"
 APP_ENVIRONMENT = os.getenv("PROPERTYAIGENT_ENV", "development")
 
 
@@ -139,7 +139,7 @@ def inject_global_styles() -> None:
         [data-testid="stMetricValue"] { font-weight: 700; }
         .pig-page-subtitle { color: #5B6B7C; margin-top: -0.5rem; margin-bottom: 1rem; }
         .pig-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #E4E8EC;
-                      color: #8A97A3; font-size: 0.85rem; }
+                      color: #8A97A3; font-size: 0.85rem; line-height: 1.6; }
         .pig-empty-state { text-align: center; padding: 2.5rem 1.5rem; }
         .pig-empty-state-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
 
@@ -1220,13 +1220,21 @@ def ai_status_summary_view(ai_summary: dict) -> None:
 def render_footer() -> None:
     """A lightweight footer (Part 8; extended by the Live Deployment
     Integrity audit, Part 2) - product name, version, commit and
-    environment only, no clutter. The commit hash is the reliable
-    drift-detection signal (see _detect_commit_hash's docstring) -
-    APP_VERSION alone can't distinguish deployments that never bumped it."""
-    env_bit = f" · {APP_ENVIRONMENT}" if APP_ENVIRONMENT != "production" else ""
-    commit_bit = f" · {APP_COMMIT}" if APP_COMMIT else ""
+    environment, each on its own line, no clutter. The commit hash is the
+    reliable drift-detection signal (see _detect_commit_hash's docstring) -
+    APP_VERSION alone can't distinguish deployments that never bumped it.
+    Environment is always shown, including "Production" - earlier this was
+    suppressed for production to reduce clutter, but that meant production
+    and an unconfigured environment looked identical here, which defeats
+    the point of a drift-detection footer."""
+    commit_display = APP_COMMIT or "unknown"
     st.markdown(
-        f'<div class="pig-footer">{PRODUCT_NAME} · v{APP_VERSION}{commit_bit}{env_bit}</div>',
+        f'<div class="pig-footer">'
+        f'<div>{PRODUCT_NAME}</div>'
+        f'<div>Version: v{APP_VERSION}</div>'
+        f'<div>Commit: {commit_display}</div>'
+        f'<div>Environment: {APP_ENVIRONMENT.capitalize()}</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 

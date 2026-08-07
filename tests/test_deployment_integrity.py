@@ -54,12 +54,13 @@ def test_detect_commit_hash_never_raises_when_git_is_unavailable():
             assert _detect_commit_hash() is None
 
 
-def test_app_version_string_alone_cannot_prove_current_deployment():
-    """Documents the actual root cause this audit found for Part 1/Part 2:
-    APP_VERSION is a hand-maintained string that was never bumped across
+def test_app_version_bumped_to_match_the_last_tagged_sprint():
+    """APP_VERSION is a hand-maintained string that had gone unbumped across
     three merged sprints (Allocation Discovery, its commercial polish, and
-    the Arrow-serialization hotfix all shipped under the same "0.4.2") - so
-    on its own it cannot distinguish a stale deployment from a current one.
-    This is exactly why the footer now also shows a commit hash."""
-    assert APP_VERSION == "0.4.2"
-    assert APP_ENVIRONMENT in ("development", "production") or isinstance(APP_ENVIRONMENT, str)
+    the Arrow-serialization hotfix all shipped under the same "0.4.2") -
+    this audit bumped it to match the git tag already created for that
+    merged work (v0.4.5-allocation-discovery). A hand-maintained string can
+    still drift again in future - which is exactly why the footer also
+    shows a commit hash rather than relying on this alone."""
+    assert APP_VERSION == "0.4.5"
+    assert isinstance(APP_ENVIRONMENT, str) and APP_ENVIRONMENT
