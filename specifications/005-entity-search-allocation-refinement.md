@@ -69,7 +69,7 @@ Allocation Discovery gallery cards keep their existing content and layout, minus
 
 ### Ownership Intelligence (future Market Intelligence module)
 
-Not implemented in this sprint. Recorded here, and in `001-platform-vision.md`'s Market Intelligence section, as the agreed future home for land/title ownership research - see that document for the full note (purpose, dependency chain, and why point coordinates alone are not sufficient evidence of ownership today).
+Not implemented in this sprint. Product Owner amendment (continuation review): moved out of `specifications/001-platform-vision.md`, which the Product Owner identified as historical/superseded and not the right home for new architecture going forward. The canonical architecture record now lives in `docs/PLATFORM_ARCHITECTURE.md` §3 Market Intelligence instead. A short forward-looking mention was also added to `docs/PRODUCT_ROADMAP.md` §3 Market Intelligence's "Future functionality" list, without scheduling it into that section's implementation order, since it isn't ready to be sequenced yet.
 
 ### Future user-specific opportunity matching
 

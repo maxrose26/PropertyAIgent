@@ -103,6 +103,27 @@ _BADGE_KIND_STYLE = {
     # show_linked_application_tag, computed only from a real
     # linked_application_count).
     "linked_application": {"color": "green", "icon": "🔗", "label": "Planning application linked"},
+    # Sprint 4.5b Product Owner amendment (Part 21) - Development Type
+    # badges for the Explore mobile card view, built from app.ui.
+    # housing_type.classify_housing_type's existing, already-deterministic
+    # bucketing of the REAL stored development_type/housing_typology
+    # fields (not a new taxonomy - see that module's own docstring).
+    # Deliberately a different colour set from the plan_* kinds above, per
+    # the explicit requirement that "Planning-status colours and
+    # Development-Type colours represent different concepts and must
+    # remain distinguishable" - every one of these still carries its own
+    # visible text label too, never colour alone.
+    "dev_type_houses": {"color": "orange", "icon": "🏠", "label": "Houses"},
+    "dev_type_apartments": {"color": "blue", "icon": "🏢", "label": "Apartments"},
+    "dev_type_mixed": {"color": "violet", "icon": "🏘️", "label": "Mixed (houses & apartments)"},
+    "dev_type_other": {"color": "gray", "icon": "🏗️", "label": "Other/specialist"},
+    # A different icon from plan_unknown's "❔" (even though both
+    # deliberately share the "gray = uncertain" colour language already
+    # established across this design system) - the two badge kinds never
+    # actually appear on the same card (dev_type_* is Explore-only,
+    # plan_* is Allocation Discovery-only), but keeping them visually
+    # distinct removes any ambiguity regardless.
+    "dev_type_unknown": {"color": "gray", "icon": "◻️", "label": "Unknown"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -269,6 +290,23 @@ def inject_global_styles() -> None:
         [class*="st-key-cc-examination-"] { background-color: #EFF5FC !important; border-color: #C9DCF0 !important; }
         [class*="st-key-cc-withdrawn-"] { background-color: #FBEEEE !important; border-color: #EFC3C3 !important; }
         [class*="st-key-cc-no-plan-"] { background-color: #F4F5F7 !important; border-color: #DEE2E7 !important; }
+
+        /* Explore Development Site results (Sprint 4.5b Product Owner
+           amendment, Part 20) - CSS-only table/card switching, never a
+           JavaScript viewport check, timer, or other responsive hack. Both
+           the desktop table (st-key-explore-desktop-table) and the mobile
+           card list (st-key-explore-mobile-cards) are always rendered;
+           only one is ever visible, purely via a standard CSS media query
+           at a single breakpoint - the same "let CSS reflow it" approach
+           already proven by the council-grid rule above, not a new
+           technique. Scoped to these two container keys only, which exist
+           on no other page, so this can't affect anything elsewhere. */
+        @media (max-width: 640px) {
+            [class*="st-key-explore-desktop-table"] { display: none !important; }
+        }
+        @media (min-width: 641px) {
+            [class*="st-key-explore-mobile-cards"] { display: none !important; }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1223,11 +1261,18 @@ def entity_search_results_panel(results, *, key_prefix: str) -> None:
     """`results` is an app.reporting.entity_search.EntitySearchResults -
     grouped, never-merged sections (Part 8), each entity type in its own
     labelled subsection so a user can never mistake an Allocation result
-    for a Planning Site result or vice versa."""
+    for a Development Site result or vice versa.
+
+    "Development Sites" is the Sprint 4.5b Product Owner amendment's
+    customer-facing rename of the entity_type="planning_site" group (Part
+    2) - the underlying Site/Application domain model and internal names
+    (entity_type value, results.planning_sites attribute,
+    search_planning_site_entities) are deliberately unchanged, since this
+    is a terminology change, not a domain-model rewrite."""
     if results.is_empty:
         empty_state(
             "No matches found",
-            f"No Planning Sites or Allocations matched \"{results.query}\" - try a shorter search term.",
+            f"No Development Sites or Allocations matched \"{results.query}\" - try a shorter search term.",
             icon="🔍", show_home_link=False,
         )
         return
@@ -1236,7 +1281,7 @@ def entity_search_results_panel(results, *, key_prefix: str) -> None:
         for i, result in enumerate(results.allocations):
             entity_search_result_row(result, key=f"{key_prefix}-alloc-{i}-{result.entity_id}")
     if results.planning_sites:
-        st.markdown(f"###### 📍 Planning Sites ({len(results.planning_sites)})")
+        st.markdown(f"###### 📍 Development Sites ({len(results.planning_sites)})")
         for i, result in enumerate(results.planning_sites):
             entity_search_result_row(result, key=f"{key_prefix}-site-{i}-{result.entity_id}")
 

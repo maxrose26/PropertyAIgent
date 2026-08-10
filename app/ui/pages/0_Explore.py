@@ -51,11 +51,19 @@ from app.ui.common import (
     pick_representative_application,
     render_scheme_detail,
 )
+from app.reporting.allocation_discovery import linked_application_help
 from app.reporting.entity_search import search_entities
 from app.reporting.pdf_report import compute_aggregate_stats, generate_narrative, render_pdf
-from app.ui.housing_type import HOUSING_TYPE_COLORS, HOUSING_TYPE_LABELS, classify_housing_type, housing_type_note
+from app.ui.housing_type import (
+    HOUSING_TYPE_BADGE_KIND,
+    HOUSING_TYPE_COLORS,
+    HOUSING_TYPE_LABELS,
+    classify_housing_type,
+    format_affordable_display,
+    housing_type_note,
+)
 from app.ui.map_selection import resolve_selected_site_id
-from app.ui.shell import entity_search_results_panel, page_header
+from app.ui.shell import entity_search_results_panel, page_header, status_badge
 from app.ui.site_headline import build_site_headline, clean_tooltip_text, format_site_tooltip
 
 council_regions = {code: cfg.region for code, cfg in bootstrap().items()}
@@ -387,17 +395,25 @@ if nl_filters and nl_filters.query_type == "aggregate" and nl_filters.aggregate_
 # filter inputs and renders the returned view model (CLAUDE.md: "keep
 # business logic out of the UI"). --------------------------------------
 
-st.markdown("##### 🔎 Search Planning Sites & Allocations")
+st.markdown("##### 🔎 Search Development Sites & Allocations")
 st.caption(
     "Deterministic search by address, Application reference, allocation name, policy reference or council - "
     "never uses AI, and works with no OpenAI key configured."
 )
+# "Development Sites" is the customer-facing name (Sprint 4.5b Product
+# Owner amendment, Part 2) for what this search actually queries -
+# existing Site/Application planning intelligence. The scope-key mapping
+# below intentionally still targets entity_search's internal
+# "planning_sites" scope value - only the label users see changed, not
+# the underlying domain model or its internal identifiers (Part 2: "Do
+# NOT rename the underlying Site/Application domain model merely for UI
+# terminology").
 search_scope_label = st.radio(
-    "Search scope", ["All", "Planning Sites", "Allocations"], horizontal=True,
+    "Search scope", ["All", "Development Sites", "Allocations"], horizontal=True,
     label_visibility="collapsed", key="entity-search-scope",
 )
 entity_query = st.text_input(
-    "Search Planning Sites & Allocations", key="entity-search-query", label_visibility="collapsed",
+    "Search Development Sites & Allocations", key="entity-search-query", label_visibility="collapsed",
     placeholder='Search by address, reference, allocation name or policy reference (e.g. "JPA 8", "HOM 2.1")...',
 )
 
@@ -417,6 +433,7 @@ if search_scope_label in ("All", "Allocations"):
             )
             alloc_linked_filter = st.selectbox(
                 "Linked Application", ["Any", "Linked", "Not linked"], index=0, key="entity-search-alloc-linked",
+                help=linked_application_help(),
             )
         with alloc_filter_cols[1]:
             alloc_use_filter = st.multiselect(
@@ -431,10 +448,10 @@ if search_scope_label in ("All", "Allocations"):
         })
 
 if entity_query.strip():
-    _scope_key = {"All": "all", "Planning Sites": "planning_sites", "Allocations": "allocations"}[search_scope_label]
-    # Planning Sites scope reuses whatever the sidebar Council/housing-type/
-    # unit filters above already narrowed `filtered` to (Part 12: "retain
-    # existing Explore filters") - never a second, parallel filter pipeline.
+    _scope_key = {"All": "all", "Development Sites": "planning_sites", "Allocations": "allocations"}[search_scope_label]
+    # Development Sites scope reuses whatever the sidebar Council/housing-
+    # type/unit filters above already narrowed `filtered` to (Part 12:
+    # "retain existing Explore filters") - never a second, parallel filter pipeline.
     entity_results = search_entities(
         session, entity_query, scope=_scope_key, allocation_filters=allocation_search_filters,
         allowed_site_ids=set(filtered["site_id"]),
@@ -706,17 +723,92 @@ if not map_points.empty:
     if clicked_site_id is not None:
         open_scheme(clicked_site_id)
 
-table_display = filtered.drop(
-    columns=["site_id", "tooltip_text", "latitude", "longitude", "lapse_status", "housing_type", "decision_status", "build_status"]
-).reset_index(drop=True)
-table_event = st.dataframe(
-    table_display,
-    use_container_width=True,
-    column_config={"Portal URL": st.column_config.LinkColumn()},
-    on_select="rerun",
-    selection_mode="multi-row",
-    key="sites_table",
-)
+# --- Explore results (Sprint 4.5b Product Owner amendment, Parts 16-21) -
+# a commercial discovery table, not a database inspection grid. Every field
+# removed from this DEFAULT display remains fully intact in `filtered`
+# itself and in the CSV/PDF export below (build_report_rows) - see this
+# sprint's final report for the column-by-column reasoning. "Development
+# Type" here reads the SAME classify_housing_type bucket already computed
+# into `filtered["housing_type"]` for the map's ring-outline colour -
+# reused, not a new taxonomy. -------------------------------------------
+
+_display = filtered.reset_index(drop=True).copy()
+_display["Development Type"] = _display["housing_type"].map(HOUSING_TYPE_LABELS).fillna(HOUSING_TYPE_LABELS["unknown"])
+# "Affordable Units"/"Affordable %" are float64 columns with NaN (not
+# None) for missing values, the same pandas quirk as "Total Units" below -
+# format_affordable_display checks `is None`, so NaN must be normalised to
+# None first or it would format as the literal string "nan (nan%)".
+_display["Affordable"] = [
+    format_affordable_display(
+        None if pd.isna(u) else u, None if pd.isna(p) else p,
+    ) for u, p in zip(_display["Affordable Units"], _display["Affordable %"])
+]
+_display = _display.rename(columns={
+    "Total Units": "Units", "References": "Application Ref(s)",
+    "Latest Status": "Planning Status", "Decision Status": "Decision", "Portal URL": "Planning portal",
+})
+
+# Desktop table (Part 17/18/19) - a deliberately short column set: Tenure
+# Split, Units Estimated, Housing Type Note, Landowner, Planning Agent,
+# Housing Association/RP, Data Quality and Needs Review are Part 17's
+# explicit removals; Applications (raw count, redundant with Application
+# Ref(s)), Private Units (derivable from Units - Affordable), Applicant
+# Company (often the same entity as Developer or a planning agent - see
+# aggregate_scheme_fields's own note on applicant != developer) and Region
+# (Council already groups by locality) were additionally trimmed after
+# inspecting real data (Part 18) - all still present in `filtered`/CSV.
+DESKTOP_TABLE_COLUMNS = [
+    "Address", "Council", "Units", "Affordable", "Development Type",
+    "Planning Status", "Decision", "Build Status", "Application Ref(s)", "Developer", "Planning portal",
+]
+with st.container(key="explore-desktop-table"):
+    table_display = _display[DESKTOP_TABLE_COLUMNS]
+    table_event = st.dataframe(
+        table_display,
+        use_container_width=True,
+        # A true per-cell coloured Development Type badge (Part 21) is not
+        # achievable inside st.dataframe - Streamlit's column_config has no
+        # rich/HTML cell renderer, only the fixed set below - so this stays
+        # plain text on desktop; the mobile card view below shows the full
+        # coloured badge treatment instead, from the same underlying bucket.
+        column_config={"Planning portal": st.column_config.LinkColumn(display_text="Planning portal ↗")},
+        on_select="rerun",
+        selection_mode="multi-row",
+        key="sites_table",
+    )
+
+# Mobile card list (Part 20) - always rendered; CSS (see app.ui.shell.
+# inject_global_styles) shows only this OR the desktop table above,
+# switching purely on viewport width, never JavaScript detection, a
+# timer, or any other brittle technique. Deliberately fewer fields than
+# the desktop table (Part 20: "Do not expose every desktop field on
+# mobile") - full detail remains one tap away via Site Profile.
+with st.container(key="explore-mobile-cards"):
+    for _, row in _display.iterrows():
+        with st.container(border=True, key=f"explore-card-{row['site_id']}"):
+            st.markdown(f"**{row['Address']}**")
+            badge_kind = HOUSING_TYPE_BADGE_KIND.get(row["housing_type"], "dev_type_unknown")
+            status_badge(badge_kind, row["Development Type"])
+            meta_bits = []
+            # "Total Units" started life as a mix of int/None in `rows`
+            # (see the main loop above), so pandas stored it as float64
+            # with NaN for missing rather than None - a bare `if row["Units"]`
+            # is True for NaN (any non-zero float is truthy in Python,
+            # NaN included), which crashed a bare int(NaN). pd.notna() is
+            # the correct missing-value check here.
+            if pd.notna(row["Units"]):
+                meta_bits.append(f"{int(row['Units']):,} units")
+            if row["Affordable"] != "Not stated":
+                meta_bits.append(f"{row['Affordable']} affordable")
+            if meta_bits:
+                st.caption(" · ".join(meta_bits))
+            status_bits = [str(b) for b in (row["Planning Status"], row["Decision"]) if b]
+            if status_bits:
+                st.caption(" · ".join(status_bits))
+            if row["Developer"]:
+                st.caption(f"Developer: {row['Developer']}")
+            if st.button("Open Site →", key=f"explore-card-open-{row['site_id']}", use_container_width=True):
+                open_scheme(int(row["site_id"]))
 
 selected_site_ids: list[int] = []
 if table_event is not None:

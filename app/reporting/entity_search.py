@@ -158,7 +158,14 @@ def search_allocation_entities(
 
 
 def _allocation_result(card: dict, *, rank: int) -> SearchResult:
-    matched_label = "Linked planning Site" if card["matched"] else None
+    from app.reporting.allocation_discovery import has_trusted_site_match
+
+    # Sprint 4.5b Product Owner amendment (Part 13): "Do not present
+    # needs_confirmation/fuzzy relationships as confirmed" - gated on the
+    # canonical has_trusted_site_match, not raw card["matched"] (which
+    # would show this label even for an unreviewed, possibly-wrong Site
+    # match).
+    matched_label = "Linked planning Site" if has_trusted_site_match(card) else None
     subtitle_bits = [b for b in (card["policy_reference"], card["council_name"], card["plan_status_label"]) if b]
     return SearchResult(
         entity_type="allocation",
@@ -247,7 +254,7 @@ def search_planning_site_entities(
             continue
         allocation = allocation_by_site_id.get(app.site_id) if app.site_id else None
         matched_label = None
-        if allocation is not None:
+        if allocation is not None and allocation["trusted"]:
             matched_label = f"Linked to allocation {allocation['reference_or_name']}"
         results.append(SearchResult(
             entity_type="planning_site",
@@ -278,21 +285,31 @@ def _units_display(app: Application) -> str | None:
 def _load_allocation_links(session, site_ids: list[int]) -> dict[int, dict]:
     """One batched query: which of these matched_site_ids already have a
     LocalPlanSite pointing at them (Part 8's "Planning Site <-> allocation
-    already linked" indicator). Never one query per Application."""
+    already linked" indicator). Never one query per Application.
+
+    Includes review_status so the caller can apply the same
+    has_trusted_site_match trust gate (Sprint 4.5b Product Owner amendment,
+    Part 13) to this reverse direction as _allocation_result already
+    applies to the forward one - a needs_confirmation match must not show
+    a confident "Linked to allocation X" label either."""
     if not site_ids:
         return {}
     rows = session.execute(
-        select(LocalPlanSite.matched_site_id, LocalPlanSite.id, LocalPlanSite.policy_reference, LocalPlanSite.site_name)
+        select(
+            LocalPlanSite.matched_site_id, LocalPlanSite.id, LocalPlanSite.policy_reference,
+            LocalPlanSite.site_name, LocalPlanSite.review_status,
+        )
         .where(LocalPlanSite.matched_site_id.in_(site_ids))
     ).all()
     result: dict[int, dict] = {}
-    for matched_site_id, allocation_id, policy_reference, site_name in rows:
+    for matched_site_id, allocation_id, policy_reference, site_name, review_status in rows:
         # A Site could in principle match more than one allocation row;
         # the first one found is shown - a search result's cross-link is a
         # pointer for navigation, not an exhaustive relationship list (that
         # full detail already lives on the Allocation Detail page itself).
         result.setdefault(matched_site_id, {
             "id": allocation_id, "reference_or_name": policy_reference or site_name,
+            "trusted": review_status != "needs_confirmation",
         })
     return result
 

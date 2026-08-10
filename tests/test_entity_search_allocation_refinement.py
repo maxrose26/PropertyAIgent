@@ -15,9 +15,14 @@ from app.reporting.allocation_discovery import (
     ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE,
     ALLOCATION_DETAIL_NO_APPLICATION_NOTE,
     LINKED_APPLICATION_TAG_LABEL,
+    apply_filters,
     build_allocation_card,
     build_linked_application_summaries,
-    show_linked_application_tag,
+    build_matching_attributes,
+    build_summary_metrics,
+    compute_categories,
+    has_trusted_linked_application,
+    has_trusted_site_match,
 )
 from app.reporting.entity_search import (
     DEFAULT_RESULT_LIMIT,
@@ -104,34 +109,145 @@ def test_allocation_card_badge_row_includes_linked_application_tag_conditionally
     assert '"linked_application"' in body
 
 
-def test_show_linked_application_tag_true_when_confirmed_link_exists():
+# --- Canonical trusted-linked-Application definition (Product Owner
+# amendment, Part 5-9) - has_trusted_linked_application is THE ONE
+# function every caller below (badge, filter, category, matching
+# attributes, KPI) must read, so the badge and the filter can never
+# disagree - the exact defect the Product Owner review found. -----------
+
+
+def test_has_trusted_linked_application_true_when_confirmed_link_exists():
     card = {"linked_application_count": 1, "review_status": "confirmed"}
-    assert show_linked_application_tag(card) is True
+    assert has_trusted_linked_application(card) is True
 
 
-def test_show_linked_application_tag_true_for_auto_applied_match():
+def test_has_trusted_linked_application_true_for_auto_applied_match():
     """auto_applied is the platform's own deterministic match outcome, not
     a human-unreviewed guess - it is trusted the same way card["matched"]
     already is everywhere else."""
     card = {"linked_application_count": 1, "review_status": "auto_applied"}
-    assert show_linked_application_tag(card) is True
+    assert has_trusted_linked_application(card) is True
 
 
-def test_show_linked_application_tag_false_when_no_link():
+def test_has_trusted_linked_application_false_when_no_link():
     card = {"linked_application_count": 0, "review_status": "confirmed"}
-    assert show_linked_application_tag(card) is False
+    assert has_trusted_linked_application(card) is False
 
 
-def test_show_linked_application_tag_false_for_unconfirmed_fuzzy_match():
-    """Part 2: "no fuzzy suggestion should be presented as confirmed" -
+def test_has_trusted_linked_application_false_for_unconfirmed_fuzzy_match():
+    """Part 2/5: "no fuzzy suggestion should be presented as confirmed" -
     even with a real linked Application, a needs_confirmation allocation-
-    to-Site match must not show the confident green tag."""
+    to-Site match must not count as a trusted link."""
     card = {"linked_application_count": 1, "review_status": "needs_confirmation"}
-    assert show_linked_application_tag(card) is False
+    assert has_trusted_linked_application(card) is False
 
 
 def test_linked_application_tag_label_is_the_specified_wording():
     assert LINKED_APPLICATION_TAG_LABEL == "Planning application linked"
+
+
+def _matching_card(**overrides) -> dict:
+    """A minimal card dict covering exactly the fields apply_filters/
+    CATEGORY_DEFINITIONS/build_matching_attributes/build_summary_metrics
+    read, for testing the canonical-definition fix without needing a full
+    build_allocation_card() assembly."""
+    base = {
+        "id": 1, "council_code": "testcouncil", "council_name": "Test Council", "local_plan_id": 1,
+        "plan_status_bucket": "adopted", "intended_use": "residential",
+        "capacity": {"value": 100, "kind": "minimum"}, "matched": True, "matched_site_id": 1,
+        "linked_application_count": 1, "review_status": "needs_confirmation",
+        "visual_status": "none", "visual_fallback": None, "review_states": None,
+        "is_multi_authority": False, "cross_boundary_councils": [], "major_housing": False,
+        "duplicate_classification": None, "plan_name": "Test Plan", "build_status": None,
+        "plan_status": "adopted", "kpi_capacity_contribution": {"value": 100, "is_estimate": False},
+        "lapse_status": None, "council_five_year_supply": None,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_apply_filters_linked_excludes_needs_confirmation():
+    """The correctness defect: filtering "Linked" must never return an
+    allocation that shows no badge - both now read
+    has_trusted_linked_application."""
+    unconfirmed = _matching_card(id=1, linked_application_count=1, review_status="needs_confirmation")
+    confirmed = _matching_card(id=2, linked_application_count=1, review_status="confirmed")
+    result = apply_filters([unconfirmed, confirmed], {"application_linkage": "linked"})
+    assert [c["id"] for c in result] == [2]
+
+
+def test_apply_filters_not_linked_includes_needs_confirmation():
+    """The negation: "Not linked" must include a needs_confirmation match
+    with a real Application row, since it isn't a TRUSTED link either."""
+    unconfirmed = _matching_card(id=1, linked_application_count=1, review_status="needs_confirmation")
+    confirmed = _matching_card(id=2, linked_application_count=1, review_status="confirmed")
+    zero_apps = _matching_card(id=3, linked_application_count=0, review_status="confirmed")
+    result = apply_filters([unconfirmed, confirmed, zero_apps], {"application_linkage": "not_linked"})
+    assert sorted(c["id"] for c in result) == [1, 3]
+
+
+def test_apply_filters_linked_application_composes_with_council_and_plan_status():
+    """Part 7: filters compose with clear AND semantics."""
+    match = _matching_card(id=1, council_code="bury", plan_status_bucket="adopted", linked_application_count=1, review_status="confirmed")
+    wrong_council = _matching_card(id=2, council_code="stockport", plan_status_bucket="adopted", linked_application_count=1, review_status="confirmed")
+    wrong_status = _matching_card(id=3, council_code="bury", plan_status_bucket="emerging", linked_application_count=1, review_status="confirmed")
+    not_trusted = _matching_card(id=4, council_code="bury", plan_status_bucket="adopted", linked_application_count=1, review_status="needs_confirmation")
+    result = apply_filters(
+        [match, wrong_council, wrong_status, not_trusted],
+        {"councils": ["bury"], "plan_status_buckets": ["adopted"], "application_linkage": "linked"},
+    )
+    assert [c["id"] for c in result] == [1]
+
+
+def test_no_linked_application_category_uses_canonical_definition():
+    unconfirmed = _matching_card(id=1, linked_application_count=1, review_status="needs_confirmation")
+    trusted = _matching_card(id=2, linked_application_count=1, review_status="confirmed")
+    categories = {c["key"]: c for c in compute_categories([unconfirmed, trusted])}
+    assert [c["id"] for c in categories["no_linked_application"]["cards"]] == [1]
+
+
+def test_build_matching_attributes_has_linked_application_uses_canonical_definition():
+    unconfirmed = _matching_card(linked_application_count=1, review_status="needs_confirmation")
+    assert build_matching_attributes(unconfirmed)["has_linked_application"] is False
+    trusted = _matching_card(linked_application_count=1, review_status="confirmed")
+    assert build_matching_attributes(trusted)["has_linked_application"] is True
+
+
+def test_summary_metrics_no_linked_application_kpi_uses_canonical_definition():
+    unconfirmed = _matching_card(id=1, linked_application_count=1, review_status="needs_confirmation")
+    trusted = _matching_card(id=2, linked_application_count=1, review_status="confirmed")
+    summary = build_summary_metrics([unconfirmed, trusted])
+    assert summary["no_linked_application"] == 1
+
+
+def test_summary_metrics_matched_to_sites_kpi_is_not_affected_by_trust_definition():
+    """Part 8: matched_to_sites means "matched to a Site", a genuinely
+    different claim from "has a trusted linked Application" - a
+    needs_confirmation match still counts here."""
+    unconfirmed_but_matched = _matching_card(id=1, matched=True, linked_application_count=0, review_status="needs_confirmation")
+    summary = build_summary_metrics([unconfirmed_but_matched])
+    assert summary["matched_to_sites"] == 1
+
+
+# --- has_trusted_site_match - a deliberately separate concept (Part 8) --
+
+
+def test_has_trusted_site_match_false_for_needs_confirmation():
+    card = {"matched": True, "review_status": "needs_confirmation"}
+    assert has_trusted_site_match(card) is False
+
+
+def test_has_trusted_site_match_true_for_confirmed_even_with_zero_applications():
+    """A trustworthy Site match with no Application filed yet is still a
+    genuine "linked planning Site" - has_trusted_site_match doesn't
+    require an Application the way has_trusted_linked_application does."""
+    card = {"matched": True, "review_status": "confirmed", "linked_application_count": 0}
+    assert has_trusted_site_match(card) is True
+
+
+def test_has_trusted_site_match_false_when_not_matched():
+    card = {"matched": False, "review_status": None}
+    assert has_trusted_site_match(card) is False
 
 
 # --- Part 3 - allocation detail: every linked Application, never one picked
