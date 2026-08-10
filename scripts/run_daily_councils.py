@@ -82,6 +82,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import re
 import subprocess
 import sys
@@ -147,6 +148,65 @@ def _application_count(session, council_code: str) -> int:
     ).scalar()
 
 
+def _run_council_subprocess(command: list[str], *, cwd: Path, timeout_seconds: int) -> subprocess.CompletedProcess:
+    """subprocess.run(..., timeout=...) equivalent, except on timeout it
+    kills the CHILD'S WHOLE PROCESS GROUP, not just the one PID it tracks
+    (Render Daily Discovery memory audit - "check for resource leaks",
+    subprocess timeout handling).
+
+    run_weekly.py opens its own Playwright driver process, which in turn
+    launches its own Chromium process tree (browser + GPU/renderer/utility
+    processes - confirmed via scripts/diagnose_browser_memory.py: 4-5
+    processes for one page). On the NORMAL exit path this is fully
+    self-cleaning (`browser.close()`, and even an uncaught Python
+    exception still runs `with sync_playwright()`'s own teardown - both
+    verified locally). But `subprocess.run(..., timeout=N)`'s own timeout
+    handling calls `Popen.kill()`, which sends SIGKILL to ONLY the one
+    tracked child PID (run_weekly.py's own Python interpreter) - a
+    SIGKILL'd process gets no chance to run any cleanup code at all, and
+    on POSIX, killing a parent does NOT automatically kill its own
+    children (they're simply re-parented, not terminated). A council that
+    genuinely hangs long enough to hit the (generous, 3600s default)
+    per-council timeout could therefore leave an entire orphaned
+    Playwright-driver-plus-Chromium process tree running inside the SAME
+    container for the rest of the Cron Job's lifetime, compounding with
+    every subsequent council's own fresh browser launch - a plausible
+    contributor to the observed 512Mi OOM once enough councils have run.
+
+    Fixed on POSIX by starting the child in its own new session/process
+    group (`start_new_session=True`, equivalent to calling setsid() before
+    exec) and, on timeout, killing that WHOLE process group
+    (os.killpg(.... SIGKILL)) rather than only the one PID - guarantees
+    the Playwright driver and every Chromium descendant die with it.
+    Windows has no equivalent process-group model (production - Render -
+    is Linux; this repo's local dev happens to run on Windows), so this
+    falls back to plain subprocess.run()'s existing behaviour there,
+    unchanged from before this audit."""
+    if os.name != "posix":
+        return subprocess.run(command, cwd=cwd, timeout=timeout_seconds, capture_output=True, text=True)
+
+    process = subprocess.Popen(
+        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        try:
+            # 9 == SIGKILL's POSIX-standard value, used as a portable literal
+            # rather than signal.SIGKILL - the `signal` module's Windows
+            # build has no SIGKILL attribute at all (this branch never
+            # actually runs on Windows in production - os.name is always
+            # "posix" here - but referencing the named constant directly
+            # would break even importing this module cleanly under test on
+            # this repo's own Windows dev environment).
+            os.killpg(os.getpgid(process.pid), 9)
+        except ProcessLookupError:
+            pass  # already gone between the timeout firing and us getting here - fine
+        stdout, stderr = process.communicate()  # reap the now-dead process, collect whatever partial output exists
+        raise subprocess.TimeoutExpired(command, timeout_seconds, output=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(args=command, returncode=process.returncode, stdout=stdout, stderr=stderr)
+
+
 def run_one_council(
     session, council_code: str, *, timeout_seconds: int, triggered_by: str, include_ai_stages: bool = False,
 ) -> ScrapeRun:
@@ -168,11 +228,7 @@ def run_one_council(
 
     return_code = None
     try:
-        result = subprocess.run(
-            command,
-            cwd=PROJECT_ROOT, timeout=timeout_seconds,
-            capture_output=True, text=True,
-        )
+        result = _run_council_subprocess(command, cwd=PROJECT_ROOT, timeout_seconds=timeout_seconds)
         return_code = result.returncode
         success = result.returncode == 0
         # Council-level failure isolation lives here: a non-zero exit code

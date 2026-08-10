@@ -13,3 +13,4 @@ pyyaml
 pandas
 reportlab
 pytest
+psutil
