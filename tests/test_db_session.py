@@ -99,25 +99,20 @@ def test_normalize_database_url(raw, expected):
     assert db_session._normalize_database_url(raw) == expected
 
 
-# --- Requirement 4: SQLite-only schema-upgrade logic never touches Postgres
-
-def test_add_missing_columns_skips_non_sqlite_dialect_without_inspecting():
-    # A fake engine that would raise if _add_missing_columns tried to do
-    # anything with it at all - confirms the guard returns immediately for
-    # a non-SQLite dialect, never calling inspect()/begin() against it.
-    class _FakeDialect:
-        name = "postgresql"
-
-    class _FakeEngine:
-        dialect = _FakeDialect()
-
-        def begin(self):
-            raise AssertionError("must not open a transaction for a non-sqlite engine")
-
-        def connect(self):
-            raise AssertionError("must not connect to a non-sqlite engine")
-
-    db_session._add_missing_columns(_FakeEngine())  # no exception raised = guard worked
+# --- Requirement 4 (superseded): schema-upgrade logic now runs on every
+# dialect, not just SQLite.
+#
+# Originally this test asserted the opposite - that _add_missing_columns
+# returned immediately, untouched, for any non-SQLite engine. That guard
+# was removed during the Pilot Readiness PR-2 pre-merge architecture check
+# ("Database Schema Deployment Safety"): it meant a brand-new column added
+# to an existing model (like LocalPlanSite.confirmed_by in this same
+# sprint) would never be added to the real production PostgreSQL database
+# by init_db() alone, creating a deployment-ordering risk. The underlying
+# diff-and-ALTER logic was already dialect-agnostic; only the early-return
+# was PostgreSQL-specific. See tests/test_pr2_premerge_ai_cost_and_migration_safety.py
+# for the tests covering the corrected behaviour (dialect-compiled DDL
+# validity, idempotency, and a full SQLite functional add-column proof).
 
 
 def test_add_missing_columns_still_runs_for_sqlite():

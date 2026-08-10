@@ -34,7 +34,34 @@ month") already bounds each daily run to a small, upsert-idempotent
 window - never a historical re-scrape. Running this daily instead of
 weekly does not change that default; it just checks it more often.
 
-    python -m scripts.run_daily_councils [--council CODE ...] [--timeout-seconds N]
+AI cost safety (Pilot Readiness PR-2 pre-merge architecture check, "Daily
+Pipeline / AI Cost Safety"): run_weekly.py's own stage_extraction and
+stage_generate_scheme_summaries are each individually well-gated (the
+former only processes an Application with no scheme_intelligence row yet;
+the latter only regenerates a Site's summary when a newer Application has
+been linked since the last one) - genuinely incremental once a steady
+state is reached, not a blind re-run. But main() invokes BOTH
+unconditionally by default, with no orchestrator-level control, and BOTH
+raise immediately if OPENAI_API_KEY is unset - meaning this daily cron, if
+simply pointed at the existing entry point unmodified, would (a) require
+OPENAI_API_KEY to exist at all just to run scraping/document-discovery,
+and (b) on its very first-ever production run, potentially attempt AI
+extraction across however large an already-accumulated backlog of
+never-extracted qualifying Applications happens to exist, all in one
+subprocess invocation, with no operator visibility into that cost before
+it happens. Neither is a redesign of the extraction architecture (both
+stages' own gating is correct and untouched) - it is purely a question of
+whether the DAILY SCHEDULED job should include them by default. It should
+not: this script defaults to `--skip-extraction --skip-scheme-summary` on
+every subprocess invocation (a flag run_weekly.py already exposes - no
+change to that file was needed), so the scheduled daily job is
+deterministic discovery/document-collection/site-linking ONLY, and does
+not require OPENAI_API_KEY. Pass --include-ai-stages to opt a specific
+invocation IN to extraction/summary generation as well (e.g. for a
+manually-triggered catch-up run once an operator has reviewed how large
+the current backlog is).
+
+    python -m scripts.run_daily_councils [--council CODE ...] [--timeout-seconds N] [--include-ai-stages]
 """
 from __future__ import annotations
 
@@ -65,6 +92,13 @@ def parse_args() -> argparse.Namespace:
         "--triggered-by", default="scheduled", choices=["scheduled", "manual"],
         help="Recorded on each ScrapeRun row - 'manual' for an operator-triggered re-run, distinct from the daily schedule.",
     )
+    parser.add_argument(
+        "--include-ai-stages", action="store_true",
+        help=(
+            "Also run run_weekly.py's AI extraction and scheme-summary stages for each council "
+            "(requires OPENAI_API_KEY). Off by default - see this module's own docstring for why."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -74,7 +108,9 @@ def _application_count(session, council_code: str) -> int:
     ).scalar()
 
 
-def run_one_council(session, council_code: str, *, timeout_seconds: int, triggered_by: str) -> ScrapeRun:
+def run_one_council(
+    session, council_code: str, *, timeout_seconds: int, triggered_by: str, include_ai_stages: bool = False,
+) -> ScrapeRun:
     applications_before = _application_count(session, council_code)
 
     run = ScrapeRun(council_code=council_code, status="running", triggered_by=triggered_by)
@@ -83,9 +119,17 @@ def run_one_council(session, council_code: str, *, timeout_seconds: int, trigger
 
     print(f"\n[run-daily-councils] {council_code}: starting (ScrapeRun id={run.id})")
 
+    command = [sys.executable, "-m", "app.pipeline.run_weekly", "--council", council_code]
+    if not include_ai_stages:
+        # See this module's own docstring ("AI cost safety") - the daily
+        # schedule is deterministic discovery/documents only by default;
+        # run_weekly.py already exposes these two flags, nothing new added
+        # to that file.
+        command += ["--skip-extraction", "--skip-scheme-summary"]
+
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "app.pipeline.run_weekly", "--council", council_code],
+            command,
             cwd=PROJECT_ROOT, timeout=timeout_seconds,
             capture_output=True, text=True,
         )
@@ -132,6 +176,7 @@ def main() -> None:
         try:
             run = run_one_council(
                 session, council_code, timeout_seconds=args.timeout_seconds, triggered_by=args.triggered_by,
+                include_ai_stages=args.include_ai_stages,
             )
             results.append(run)
         except Exception as e:  # noqa: BLE001 - one council's bookkeeping failure must not stop the rest

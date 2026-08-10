@@ -59,19 +59,29 @@ def _add_missing_columns(engine) -> None:
     safe for nullable columns with no server-side default logic, which is
     all we've ever added post-launch.
 
-    SQLite-only: this exists purely to evolve an existing on-disk SQLite
-    file across app versions, one column at a time, with no real migration
-    tool in place. A PostgreSQL/Supabase target is always created fresh via
-    Base.metadata.create_all (see init_db, just above where this is called)
-    against an empty database, which already includes every column the
-    current models define - there is nothing to diff there. Once the
-    Postgres schema needs to evolve after its initial creation, it should
-    get a real migration tool (e.g. Alembic) rather than this ad hoc
-    ALTER TABLE approach, which is why this returns immediately for any
-    non-SQLite dialect rather than attempting the equivalent there."""
-    if engine.dialect.name != "sqlite":
-        return
-
+    Runs for every dialect, including PostgreSQL/Supabase (Pilot Readiness
+    PR-2 pre-merge architecture check, "Database Schema Deployment
+    Safety") - PREVIOUSLY SQLite-only, on the documented assumption that
+    "a PostgreSQL/Supabase target is always created fresh via
+    Base.metadata.create_all... against an empty database, which already
+    includes every column the current models define." PR-2 itself proved
+    that assumption false: it was the first time this codebase added a
+    column to an EXISTING, already-populated production Postgres database
+    (LocalPlanSite.confirmed_by/confirmed_at/match_review_note), and doing
+    so required a one-off manual script (scripts/
+    add_allocation_match_review_columns.py) run as a separate, easy-to-
+    forget step before the dependent code could safely deploy - exactly
+    the kind of deployment-ordering risk this function generalising to
+    cover Postgres now eliminates. The diffing logic below (inspector.
+    get_columns, dialect-compiled column type) was already fully dialect-
+    agnostic; the ONLY change is removing the early-return that used to
+    skip every non-SQLite engine. Postgres DDL is transactional (unlike
+    MySQL), so wrapping every ALTER TABLE in the one engine.begin() block
+    below still fails loudly and rolls back atomically rather than
+    partially applying a migration, on Postgres exactly as on SQLite. A
+    brand-new TABLE (e.g. ScrapeRun) is unaffected by this change either
+    way - create_all() above already creates those, on both dialects,
+    before this function ever runs."""
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
 

@@ -13,15 +13,37 @@
 #   anything in Render. Render only acts on a render.yaml when you
 #   explicitly "New +" -> "Blueprint" (or "Sync Blueprint" on an existing
 #   Blueprint-linked repo) in the Render dashboard, pointed at this repo.
-#   See the deployment instructions in docs/ARCHITECTURE_STATUS_v2.md's
-#   PR-2 entry (and this sprint's final report) for the exact manual steps,
-#   including which environment variables must be set in the Render
-#   dashboard (this file deliberately does not - and cannot - contain
-#   DATABASE_URL/OPENAI_API_KEY/etc. secret values).
+#   See the production-scheduling architecture note in
+#   docs/PLATFORM_ARCHITECTURE.md §1 (and this sprint's final report) for
+#   the exact manual steps, including which environment variables must be
+#   set in the Render dashboard (this file deliberately does not - and
+#   cannot - contain DATABASE_URL's actual secret value).
 #
 # This is IMPLEMENTED (the repository side). It is NOT DEPLOYED and NOT
 # VERIFIED RUNNING until an operator with Render dashboard access completes
 # the manual steps above and confirms a real run in Render's own logs.
+#
+# ENVIRONMENT VARIABLES (Pilot Readiness PR-2 pre-merge architecture check,
+# "Render Blueprint Safety" - re-reviewed and corrected from the version
+# originally proposed):
+#   DATABASE_URL   REQUIRED. The pipeline cannot run at all without it.
+#   OPENAI_API_KEY NOT required by the default schedule below.
+#                  scripts/run_daily_councils.py passes --skip-extraction
+#                  --skip-scheme-summary on every subprocess invocation
+#                  unless started with --include-ai-stages (an operator's
+#                  own explicit, manually-triggered choice, not this
+#                  scheduled job's default) - see that script's own
+#                  docstring ("AI cost safety") for the full reasoning. Do
+#                  not add this variable unless the schedule below is
+#                  deliberately changed to pass --include-ai-stages.
+#   EPC_API_KEY    NOT required. app.enrichment.epc_lookup.check_build_status
+#                  degrades gracefully to status="unknown" when this is
+#                  absent (confirmed in code - no crash, no exception) -
+#                  it improves build-status accuracy if set, but the daily
+#                  discovery/document job runs correctly without it.
+# Neither OPENAI_API_KEY nor EPC_API_KEY is declared below as a result -
+# requiring a secret a job does not actually need is itself a safety risk
+# (unnecessary exposure, unnecessary operator setup friction).
 
 services:
   - type: cron
@@ -36,14 +58,10 @@ services:
     buildCommand: "pip install -r requirements.txt && playwright install --with-deps chromium"
     startCommand: "python -m scripts.run_daily_councils"
     envVars:
-      # Values are set in the Render dashboard, never committed here -
+      # Value is set in the Render dashboard, never committed here -
       # sync: false means "this variable is required but Render will not
       # generate or store a value for it automatically; an operator must
       # set it manually", the correct declaration for a secret this
       # Blueprint needs to exist but must never contain.
       - key: DATABASE_URL
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: EPC_API_KEY
         sync: false
