@@ -63,12 +63,18 @@ from app.ui.housing_type import (
     housing_type_note,
 )
 from app.ui.map_selection import resolve_selected_site_id
-from app.ui.shell import entity_search_results_panel, page_header, status_badge
+from app.ui.shell import clean_display_text, entity_search_results_panel, page_header, status_badge, wide_canvas
 from app.ui.site_headline import build_site_headline, clean_tooltip_text, format_site_tooltip
 
 council_regions = {code: cfg.region for code, cfg in bootstrap().items()}
 council_names = {code: cfg.name for code, cfg in bootstrap().items()}
 session, settings = get_db()
+
+# Post-Sprint-4.5b hotfix: Explore is a data-heavy discovery workspace that
+# was never given the page-scoped wide_canvas() override Dashboard/Council
+# Intelligence/Local Plan Sites/Site Profile already use, leaving it capped
+# at the shared shell's 1200px default on wide desktop viewports.
+wide_canvas()
 
 page_header("Explore", "Search, filter and browse every site this platform tracks.", icon="🔍")
 
@@ -802,11 +808,22 @@ with st.container(key="explore-mobile-cards"):
                 meta_bits.append(f"{row['Affordable']} affordable")
             if meta_bits:
                 st.caption(" · ".join(meta_bits))
-            status_bits = [str(b) for b in (row["Planning Status"], row["Decision"]) if b]
+            # clean_display_text (app.ui.shell) - "Planning Status"/"Decision"/
+            # "Developer" are free-text columns that can be missing per row;
+            # pandas silently coerces a missing entry to NaN even in an
+            # otherwise all-string column, and a bare `if value`/`str(value)`
+            # check is truthy for that NaN, rendering the literal text "nan"
+            # (confirmed live for Developer - fixed here for all three
+            # fields sharing this render path rather than just that one).
+            status_bits = [
+                text for text in (clean_display_text(row["Planning Status"]), clean_display_text(row["Decision"]))
+                if text
+            ]
             if status_bits:
                 st.caption(" · ".join(status_bits))
-            if row["Developer"]:
-                st.caption(f"Developer: {row['Developer']}")
+            developer = clean_display_text(row["Developer"])
+            if developer:
+                st.caption(f"Developer: {developer}")
             if st.button("Open Site →", key=f"explore-card-open-{row['site_id']}", use_container_width=True):
                 open_scheme(int(row["site_id"]))
 

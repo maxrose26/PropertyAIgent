@@ -21,10 +21,15 @@ from app.ui.common import (
     get_db,
     pick_representative_application,
 )
-from app.ui.shell import empty_state, page_header
+from app.ui.shell import empty_state, page_header, wide_canvas
 
 bootstrap()
 session, settings = get_db()
+
+# Post-Sprint-4.5b hotfix: this data-review page was never given the
+# page-scoped wide_canvas() override, so its side-by-side comparison rows
+# were confined to the shared shell's 1200px default on wide viewports.
+wide_canvas()
 
 HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
 st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
