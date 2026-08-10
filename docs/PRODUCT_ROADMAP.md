@@ -37,12 +37,12 @@ Each capability section below gives its own internal suggested order too, since 
 
 **Implemented functionality:** `LocalPlan`/`LocalPlanSite` model with status, evidence and progression tracking; joint-plan support (Places for Everyone); allocation-to-allocation relationships; change-protected ingestion and monitoring; policy document coverage tracking; AI Local Plan Summary; visual evidence extraction and deterministic allocation matching. Bury and Stockport have their own Local Plans onboarded; all 9 Places for Everyone authorities have their PfE allocations onboarded.
 
-**Future functionality:** NPPF and national Planning Practice Guidance as a versioned policy layer; Supplementary Planning Documents and Design Codes as monitored document types; appeal decisions linked to the policy they tested; independent Local Plan monitoring for the 7 GM authorities currently known only through Places for Everyone.
+**Future functionality:** NPPF and national Planning Practice Guidance as a versioned policy layer; Supplementary Planning Documents and Design Codes as monitored document types; appeal decisions linked to the policy they tested; independent Local Plan monitoring for the 8 GM authorities currently known only through Places for Everyone (corrected from 7 by Pilot Readiness PR-2's PfE authority-membership fix — see `docs/PLATFORM_ARCHITECTURE.md` §2).
 
 **Dependencies:** Planning Intelligence's Site records, for the eventual Allocation↔Site match (not a hard blocker — an allocation is real evidence on its own).
 
 **Suggested implementation order:**
-1. Independent Local Plan monitoring for the remaining 7 Greater Manchester authorities — closes the biggest known coverage gap using patterns that already exist (Bury/Stockport are the proof of concept).
+1. Independent Local Plan monitoring for the remaining 8 Greater Manchester authorities — closes the biggest known coverage gap using patterns that already exist (Bury/Stockport are the proof of concept).
 2. Supplementary Planning Documents and Design Codes — natural extension of the existing document-coverage/monitoring machinery.
 3. NPPF / national PPG as a versioned reference layer — needed before AI Decision Support can honestly cite national policy, not just local policy.
 4. Appeal decisions.

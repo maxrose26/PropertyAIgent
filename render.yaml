@@ -1,0 +1,121 @@
+# Render Blueprint - Pilot Readiness PR-2 ("Production Scheduling").
+#
+# This file adds TWO Cron Job services, deliberately separate (Pilot
+# Readiness PR-2 final pre-merge amendment, "Automated Intelligence
+# Cadence" / "Render Architecture" - Product Owner review: "do not couple
+# them so tightly that a scraping failure prevents existing queued
+# intelligence work from being processed... prefer separate jobs/services
+# if this provides better fault isolation"):
+#   1. propertyaigent-daily-scrape         - Daily Discovery (deterministic
+#      scraping/document-collection only, scripts/run_daily_councils.py)
+#   2. propertyaigent-intelligence-processing - bounded AI extraction/
+#      summary generation (scripts/run_intelligence_processing.py)
+# It does not define the existing Streamlit web service, which - per this
+# sprint's own PR-2 architecture audit - was almost certainly created
+# manually in the Render dashboard rather than from a Blueprint (no
+# render.yaml existed in this repository before this sprint, and the web
+# service has no corresponding entry here). Applying this Blueprint
+# therefore creates or updates exactly these two Cron Job services and
+# nothing else - it cannot recreate, modify, or interfere with the
+# existing web service.
+#
+# IMPORTANT - what this file does NOT do by itself:
+#   Committing this file to the repository does not create or schedule
+#   anything in Render. Render only acts on a render.yaml when you
+#   explicitly "New +" -> "Blueprint" (or "Sync Blueprint" on an existing
+#   Blueprint-linked repo) in the Render dashboard, pointed at this repo.
+#   See the production-scheduling architecture note in
+#   docs/PLATFORM_ARCHITECTURE.md §1 (and this sprint's final report) for
+#   the exact manual steps, including which environment variables must be
+#   set in the Render dashboard (this file deliberately does not - and
+#   cannot - contain any secret's actual value) and the required
+#   deployment ORDER (schema migration before either cron job runs - see
+#   scripts/migrate_schema.py's own docstring).
+#
+# This is IMPLEMENTED (the repository side). It is NOT DEPLOYED and NOT
+# VERIFIED RUNNING until an operator with Render dashboard access completes
+# the manual steps above and confirms a real run in Render's own logs.
+#
+# ENVIRONMENT VARIABLES - each job declares only what it genuinely needs
+# (Pilot Readiness PR-2 pre-merge + final pre-merge architecture checks,
+# "Render Blueprint Safety" / "Render Architecture"):
+#   Daily Discovery (propertyaigent-daily-scrape):
+#     DATABASE_URL    REQUIRED. The pipeline cannot run at all without it.
+#     OPENAI_API_KEY  NOT required. scripts/run_daily_councils.py passes
+#                     --skip-extraction --skip-scheme-summary on every
+#                     subprocess invocation unless started with
+#                     --include-ai-stages (an operator's own explicit,
+#                     manually-triggered choice, not this scheduled job's
+#                     default) - see that script's own docstring ("AI cost
+#                     safety") for the full reasoning.
+#     EPC_API_KEY     NOT required. app.enrichment.epc_lookup.
+#                     check_build_status degrades gracefully to
+#                     status="unknown" when absent (confirmed in code - no
+#                     crash) - improves build-status accuracy if set, but
+#                     the daily discovery/document job runs correctly
+#                     without it.
+#   Intelligence Processing (propertyaigent-intelligence-processing):
+#     DATABASE_URL    REQUIRED, same reason as above.
+#     OPENAI_API_KEY  REQUIRED. This job's entire purpose is calling
+#                     run_weekly.py's stage_extraction/stage_generate_
+#                     scheme_summaries, both of which call the OpenAI API -
+#                     see scripts/run_intelligence_processing.py's own
+#                     docstring for the one exception (a run with zero
+#                     outstanding work never reads this variable at all,
+#                     but the Cron Job's own environment must still have it
+#                     available for every run that DOES find work).
+#     EPC_API_KEY     NOT required. This job never calls
+#                     stage_check_build_status or anything else that
+#                     touches EPC data.
+# No secret's actual value is ever declared below (sync: false everywhere)
+# - requiring a secret a job does not genuinely need is itself a safety
+# risk (unnecessary exposure, unnecessary operator setup friction).
+
+services:
+  - type: cron
+    name: propertyaigent-daily-scrape
+    runtime: python
+    plan: starter
+    # Once a day. Render cron schedules are UTC - 05:00 UTC is before the
+    # UK working day starts, matching this platform's existing
+    # scripts/register_weekly_task.ps1 local-dev precedent of running
+    # overnight/early morning rather than during business hours.
+    schedule: "0 5 * * *"
+    buildCommand: "pip install -r requirements.txt && playwright install --with-deps chromium"
+    startCommand: "python -m scripts.run_daily_councils"
+    envVars:
+      # Value is set in the Render dashboard, never committed here -
+      # sync: false means "this variable is required but Render will not
+      # generate or store a value for it automatically; an operator must
+      # set it manually", the correct declaration for a secret this
+      # Blueprint needs to exist but must never contain.
+      - key: DATABASE_URL
+        sync: false
+
+  - type: cron
+    name: propertyaigent-intelligence-processing
+    runtime: python
+    plan: starter
+    # 07:00 UTC - two hours after Daily Discovery's 05:00 UTC start, giving
+    # a normal-length discovery run (all 10 councils) time to finish and
+    # commit its data first, while still keeping the two jobs as separate,
+    # independently-schedulable services rather than one calling the other
+    # (Part 7: "do not couple them so tightly that a scraping failure
+    # prevents existing queued intelligence work from being processed" - a
+    # failed or slow Discovery run does not block this job from running
+    # and processing whatever backlog already exists from EARLIER days).
+    schedule: "0 7 * * *"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m scripts.run_intelligence_processing"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # PROPERTYAIGENT_MAX_EXTRACTIONS_PER_RUN / _MAX_SUMMARIES_PER_RUN are
+      # deliberately NOT declared here - scripts/run_intelligence_
+      # processing.py already has conservative built-in defaults (20/20)
+      # when unset, and these are workload TUNING knobs, not secrets or
+      # required configuration - an operator can add them later via the
+      # Render dashboard (or --max-extractions/--max-summaries) without
+      # needing a Blueprint change first.

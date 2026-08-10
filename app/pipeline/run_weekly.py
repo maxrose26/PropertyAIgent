@@ -42,7 +42,7 @@ import requests
 from dotenv import load_dotenv
 from openai import OpenAI
 from playwright.sync_api import sync_playwright
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig, get_council
@@ -819,7 +819,55 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
     return processed
 
 
-def stage_extraction(session: Session, client: OpenAI, council: CouncilConfig) -> int:
+def count_pending_extraction(session: Session, council_code: str) -> int:
+    """Read-only count of exactly what stage_extraction() below would
+    attempt to process for one council - same WHERE clause, kept
+    deliberately right next to it. Used by scripts.run_intelligence_
+    processing (Pilot Readiness PR-2 final pre-merge amendment, "Backlog
+    Safety" / "Bounded AI Workload") to size the backlog and decide
+    whether an OpenAI client needs to be created at all, without running
+    the extraction pipeline itself - if this changes, keep stage_
+    extraction's own WHERE clause in sync."""
+    return session.execute(
+        select(func.count(Application.id)).where(
+            Application.council_code == council_code,
+            Application.scheme_intelligence == None,  # noqa: E711
+            UNIT_GATE_PASSED,
+        )
+    ).scalar()
+
+
+def count_pending_summaries(session: Session, council_code: str) -> int:
+    """Read-only count of exactly what stage_generate_scheme_summaries()
+    below would attempt to process for one council - same candidate
+    selection (site-by-site, since the trigger is "a newer application
+    than the last summary", not expressible as a single SQL WHERE),
+    deliberately kept right next to that function. Same usage/rationale as
+    count_pending_extraction above - keep stage_generate_scheme_summaries'
+    own candidate-selection logic in sync if this changes."""
+    sites = session.execute(select(Site).where(Site.council_code == council_code)).scalars().all()
+    count = 0
+    for site in sites:
+        apps = site.applications
+        if len(apps) < MIN_APPLICATIONS_FOR_SUMMARY:
+            continue
+        latest_seen = max((a.last_seen_at for a in apps if a.last_seen_at), default=None)
+        summarised_at = site.status_summary_updated_at
+        if summarised_at and latest_seen:
+            if summarised_at.replace(tzinfo=None) >= latest_seen.replace(tzinfo=None):
+                continue
+        count += 1
+    return count
+
+
+def stage_extraction(session: Session, client: OpenAI, council: CouncilConfig, *, limit: int | None = None) -> int:
+    """limit caps how many of the pending applications this call actually
+    processes (used by scripts.run_intelligence_processing's bounded
+    workload - Pilot Readiness PR-2 final pre-merge amendment, "Bounded AI
+    Workload"). Defaults to None (unbounded) - run_weekly.py's own
+    unconditional call below is unaffected by this amendment; it always
+    processes every pending application for the one council it runs
+    against, exactly as before."""
     pending = session.execute(
         select(Application).where(
             Application.council_code == council.code,
@@ -827,7 +875,11 @@ def stage_extraction(session: Session, client: OpenAI, council: CouncilConfig) -
             UNIT_GATE_PASSED,
         )
     ).scalars().all()
-    print(f"\n[extraction] {len(pending)} applications need AI extraction")
+    total_pending = len(pending)
+    if limit is not None:
+        pending = pending[:limit]
+    print(f"\n[extraction] {total_pending} applications need AI extraction"
+          + (f" ({len(pending)} this run, limit={limit})" if limit is not None else ""))
 
     processed = 0
     for application in pending:
@@ -942,8 +994,16 @@ def stage_check_build_status(session: Session, council: CouncilConfig, epc_key: 
     return len(candidates)
 
 
-def stage_generate_scheme_summaries(session: Session, client: OpenAI, council: CouncilConfig) -> int:
-    """Weekly AI synthesis of every site's full application history (phase/
+def stage_generate_scheme_summaries(
+    session: Session, client: OpenAI, council: CouncilConfig, *, limit: int | None = None
+) -> int:
+    """limit caps how many of the candidate sites this call actually
+    processes (used by scripts.run_intelligence_processing's bounded
+    workload - Pilot Readiness PR-2 final pre-merge amendment, "Bounded AI
+    Workload"). Defaults to None (unbounded) - run_weekly.py's own
+    unconditional call below is unaffected by this amendment.
+
+    Weekly AI synthesis of every site's full application history (phase/
     plot breakdown, progress-signal filings, lapse/build status) into one
     plain-English status note - see app.reporting.scheme_summary. Grounded-
     numbers-then-narrate, same as the PDF report: everything the model is
@@ -975,7 +1035,11 @@ def stage_generate_scheme_summaries(session: Session, client: OpenAI, council: C
                 continue  # nothing new since the last summary
         candidates.append((site, apps))
 
-    print(f"\n[scheme-summary] {len(candidates)} sites need a status summary")
+    total_candidates = len(candidates)
+    if limit is not None:
+        candidates = candidates[:limit]
+    print(f"\n[scheme-summary] {total_candidates} sites need a status summary"
+          + (f" ({len(candidates)} this run, limit={limit})" if limit is not None else ""))
 
     generated = 0
     for site, apps in candidates:
