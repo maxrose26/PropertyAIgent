@@ -53,55 +53,153 @@ def get_engine():
     return _engine
 
 
-def _add_missing_columns(engine) -> None:
-    """No Alembic for this solo project - just diff each model's columns
-    against what's actually in the table and ADD COLUMN anything new. Only
-    safe for nullable columns with no server-side default logic, which is
-    all we've ever added post-launch.
+class SchemaVerificationError(RuntimeError):
+    """Raised by init_db() on a non-SQLite engine when Base.metadata
+    declares a table or column that does not yet exist in the connected
+    database. Fixing this requires running the explicit migration command
+    (python -m scripts.migrate_schema) - init_db() itself deliberately
+    never mutates a non-SQLite schema to fix it automatically. See this
+    module's own docstring-level comments on init_db()/migrate_schema()
+    for the full reasoning (Pilot Readiness PR-2 final pre-merge
+    amendment, "Database Migrations Must Not Be A Page-Load Side
+    Effect")."""
 
-    Runs for every dialect, including PostgreSQL/Supabase (Pilot Readiness
-    PR-2 pre-merge architecture check, "Database Schema Deployment
-    Safety") - PREVIOUSLY SQLite-only, on the documented assumption that
-    "a PostgreSQL/Supabase target is always created fresh via
-    Base.metadata.create_all... against an empty database, which already
-    includes every column the current models define." PR-2 itself proved
-    that assumption false: it was the first time this codebase added a
-    column to an EXISTING, already-populated production Postgres database
-    (LocalPlanSite.confirmed_by/confirmed_at/match_review_note), and doing
-    so required a one-off manual script (scripts/
-    add_allocation_match_review_columns.py) run as a separate, easy-to-
-    forget step before the dependent code could safely deploy - exactly
-    the kind of deployment-ordering risk this function generalising to
-    cover Postgres now eliminates. The diffing logic below (inspector.
-    get_columns, dialect-compiled column type) was already fully dialect-
-    agnostic; the ONLY change is removing the early-return that used to
-    skip every non-SQLite engine. Postgres DDL is transactional (unlike
-    MySQL), so wrapping every ALTER TABLE in the one engine.begin() block
-    below still fails loudly and rolls back atomically rather than
-    partially applying a migration, on Postgres exactly as on SQLite. A
-    brand-new TABLE (e.g. ScrapeRun) is unaffected by this change either
-    way - create_all() above already creates those, on both dialects,
-    before this function ever runs."""
+
+def _diff_missing_columns(engine) -> tuple[list[str], list[tuple[str, str]]]:
+    """Read-only diff of Base.metadata against the connected database.
+    Returns (missing_table_names, [(table_name, column_name), ...]) -
+    shared by both migrate_schema() (which then ADD COLUMNs/CREATE
+    TABLEs what this finds) and verify_schema() (which only ever reports
+    it). Never opens a transaction or mutates anything itself."""
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
 
+    missing_tables: list[str] = []
+    missing_columns: list[tuple[str, str]] = []
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            missing_tables.append(table.name)
+            continue
+        existing_columns = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name not in existing_columns:
+                missing_columns.append((table.name, column.name))
+    return missing_tables, missing_columns
+
+
+def verify_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
+    """Read-only check: does the connected database already have every
+    table and column Base.metadata currently declares? Returns
+    (missing_table_names, [(table_name, column_name), ...]), both empty
+    when the schema is fully current. Never mutates anything - this is
+    the "verify/use expected schema" half of the startup/migration split
+    (see init_db() and scripts/migrate_schema.py)."""
+    return _diff_missing_columns(engine)
+
+
+def _add_missing_columns(engine) -> list[tuple[str, str]]:
+    """The actual ADD COLUMN mutation - diff Base.metadata against what's
+    actually in the table (via _diff_missing_columns) and ALTER TABLE
+    whatever's missing. Only safe for nullable columns with no server-side
+    default logic, which is all this project has ever added post-launch.
+    Dialect-agnostic (Pilot Readiness PR-2 pre-merge architecture check,
+    "Database Schema Deployment Safety") - shared by migrate_schema() (the
+    explicit, operator-invoked production command) and init_db()'s SQLite
+    branch (still automatic there - see init_db()'s own docstring for why
+    that split exists). Transactional (engine.begin()): a failure partway
+    through rolls back atomically on both SQLite and PostgreSQL, rather
+    than partially applying - "fail loudly rather than partially
+    corrupt". Returns the list of (table_name, column_name) added."""
+    _missing_tables, missing_columns = _diff_missing_columns(engine)
+    if not missing_columns:
+        return []
     with engine.begin() as conn:
-        for table in Base.metadata.sorted_tables:
-            if table.name not in existing_tables:
-                continue  # brand-new table - create_all already handled it
-            existing_columns = {c["name"] for c in inspector.get_columns(table.name)}
-            for column in table.columns:
-                if column.name in existing_columns:
-                    continue
-                col_type = column.type.compile(dialect=engine.dialect)
-                conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))
-                print(f"[migration] added column {table.name}.{column.name}")
+        for table_name, column_name in missing_columns:
+            column = Base.metadata.tables[table_name].columns[column_name]
+            col_type = column.type.compile(dialect=engine.dialect)
+            conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN "{column_name}" {col_type}'))
+            print(f"[migration] added column {table_name}.{column_name}")
+    return missing_columns
+
+
+def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
+    """The EXPLICIT, operator-invoked production migration step (Pilot
+    Readiness PR-2 final pre-merge amendment, "Implement The Smallest
+    Explicit Migration Mechanism") - creates any table Base.metadata
+    declares that doesn't exist yet (Base.metadata.create_all, which is
+    itself already idempotent - a no-op for tables that already exist),
+    then ADD COLUMNs anything create_all() couldn't retroactively add to
+    an EXISTING table via _add_missing_columns(). Returns
+    (created_table_names, [(table_name, column_name), ...] added) for the
+    caller to log/report.
+
+    Not called automatically by init_db() on a non-SQLite engine - see
+    that function's own docstring for why. Invoke explicitly via
+        python -m scripts.migrate_schema
+    before deploying/restarting application code that depends on new
+    schema, per docs/PLATFORM_ARCHITECTURE.md's documented deployment
+    order. Idempotent (safe to run any number of times, including against
+    an already-fully-current database - a logged no-op)."""
+    missing_tables, _missing_columns = _diff_missing_columns(engine)
+
+    Base.metadata.create_all(engine)  # only ever creates tables that don't already exist
+    for table_name in missing_tables:
+        print(f"[migrate-schema] created table {table_name}")
+
+    added_columns = _add_missing_columns(engine)  # already logs each one as it goes
+    return missing_tables, added_columns
 
 
 def init_db() -> None:
+    """Ensures the engine exists and the schema is ready to use - called
+    on every ordinary application/pipeline startup (app.ui.common.
+    bootstrap on the first Streamlit page load per server process,
+    app.pipeline.run_weekly.main, scripts.run_daily_councils.main, every
+    operator script). Deliberately does NOT mutate a production schema
+    (Pilot Readiness PR-2 final pre-merge amendment, "Database Migrations
+    Must Not Be A Page-Load Side Effect" - Product Owner review: "Normal
+    customer page loads should NOT perform schema evolution").
+
+    SQLite (local dev / tests / CI - the default with no DATABASE_URL
+    set): auto-creates any missing table/column exactly as before this
+    amendment - zero production risk (there is no real "customer" on a
+    developer's own throwaway local database), and keeps local/test setup
+    exactly as low-friction as it has always been. All of this project's
+    tests build their own engine via Base.metadata.create_all() directly
+    (see tests/conftest.py) rather than through init_db() at all, so this
+    branch's behaviour is untouched by anything this amendment changes.
+
+    PostgreSQL/Supabase (production - DATABASE_URL set): read-only
+    verify_schema() only, never a mutation. Raises SchemaVerificationError
+    - loudly, before any query that would otherwise hit a missing
+    table/column - if the schema is not already fully current, naming
+    exactly what's missing and pointing at the fix (python -m
+    scripts.migrate_schema). This is "application startup -> verify/use
+    expected schema" from the desired principle; the actual schema
+    evolution now only ever happens via migrate_schema(), invoked
+    explicitly as its own deployment step - see that function's own
+    docstring and docs/PLATFORM_ARCHITECTURE.md for the full deployment
+    order."""
     engine = get_engine()
-    Base.metadata.create_all(engine)
-    _add_missing_columns(engine)
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(engine)
+        _add_missing_columns(engine)
+        return
+
+    missing_tables, missing_columns = verify_schema(engine)
+    if missing_tables or missing_columns:
+        parts = []
+        if missing_tables:
+            parts.append(f"missing table(s): {', '.join(sorted(missing_tables))}")
+        if missing_columns:
+            cols = ", ".join(f"{t}.{c}" for t, c in missing_columns)
+            parts.append(f"missing column(s): {cols}")
+        raise SchemaVerificationError(
+            "Database schema is out of date - " + "; ".join(parts) + ". "
+            "Run `python -m scripts.migrate_schema` before starting this process. "
+            "init_db() no longer mutates a non-SQLite schema automatically - "
+            "see app.db.session.init_db's own docstring."
+        )
 
 
 def get_session() -> Session:

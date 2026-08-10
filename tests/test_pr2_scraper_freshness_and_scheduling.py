@@ -245,16 +245,23 @@ def test_one_council_failure_does_not_prevent_the_next_council_from_running(sess
 
 
 def test_render_yaml_exists_and_defines_a_cron_service():
+    """Updated by the PR-2 final pre-merge amendment ("Automated
+    Intelligence Cadence"): render.yaml now defines TWO Cron Jobs (Daily
+    Discovery + Intelligence Processing), not one - see
+    tests/test_pr2_final_amendment_migration_and_intelligence_processing.py
+    for the tests covering that split specifically. This test now just
+    confirms Daily Discovery's own entry still reuses the existing
+    scraping entry point, unaffected by that amendment."""
     render_yaml_path = REPO_ROOT / "render.yaml"
     assert render_yaml_path.exists()
     config = yaml.safe_load(render_yaml_path.read_text(encoding="utf-8"))
     services = config["services"]
     cron_services = [s for s in services if s.get("type") == "cron"]
-    assert len(cron_services) == 1
-    cron = cron_services[0]
+    assert len(cron_services) >= 1
+    daily_discovery = next(s for s in cron_services if s["name"] == "propertyaigent-daily-scrape")
     # Reuses the existing entry point - never a second scraping system.
-    assert "scripts.run_daily_councils" in cron["startCommand"]
-    assert cron["schedule"]  # a real cron expression is present
+    assert "scripts.run_daily_councils" in daily_discovery["startCommand"]
+    assert daily_discovery["schedule"]  # a real cron expression is present
 
 
 def test_render_yaml_does_not_contain_secret_values():

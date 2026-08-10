@@ -1602,3 +1602,58 @@ class ScrapeRun(Base):
     triggered_by: Mapped[str] = mapped_column(String(20), default="scheduled")
 
     council: Mapped["Council"] = relationship()
+
+
+class IntelligenceRun(Base):
+    """One attempted run of the bounded Intelligence Processing job
+    (scripts.run_intelligence_processing) - the operational evidence Pilot
+    Readiness PR-2's final pre-merge amendment ("Continuous Intelligence
+    Processing" / "Observability") needs to answer "is genuinely
+    outstanding AI extraction/summary work actually getting processed" as
+    a question distinct from ScrapeRun above (which only ever answers "did
+    scraping/document-collection succeed" - Daily Discovery never invokes
+    AI by design, see run_daily_councils.py's own docstring).
+
+    Deliberately mirrors ScrapeRun's shape (append-only, one row per
+    invocation of the whole job - not per council/application, since the
+    job's own workload cap is applied across all councils in one run, not
+    per council) rather than introducing a new observability pattern -
+    "reuse existing architecture where possible" (CLAUDE.md)."""
+
+    __tablename__ = "intelligence_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # running | success | failed - no "partial" here (unlike ScrapeRun):
+    # an individual application/site failing is recorded in the counters
+    # below and never fails the whole run (Part 5: "one failed extraction
+    # does not corrupt remaining work") - "failed" is reserved for the job
+    # itself erroring out before completing its planned work.
+    status: Mapped[str] = mapped_column(String(20), default="running")
+
+    # Extraction (Application -> SchemeIntelligence) counters.
+    extractions_attempted: Mapped[int] = mapped_column(Integer, default=0)
+    extractions_succeeded: Mapped[int] = mapped_column(Integer, default=0)
+    extractions_failed: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Scheme-summary (Site.status_summary) counters.
+    summaries_attempted: Mapped[int] = mapped_column(Integer, default=0)
+    summaries_succeeded: Mapped[int] = mapped_column(Integer, default=0)
+    summaries_failed: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Backlog still outstanding AFTER this run - the bounded-workload
+    # mechanism's whole point (Part 6/8): a large backlog is deliberately
+    # NOT drained in one run, so this is what tells an operator "there is
+    # still more to do, expect N further bounded runs" rather than that
+    # being invisible between runs.
+    applications_backlog_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sites_backlog_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Free text - short human-readable summary, or the job-level error on
+    # a "failed" run. Same discipline as ScrapeRun.detail.
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    triggered_by: Mapped[str] = mapped_column(String(20), default="scheduled")

@@ -232,31 +232,53 @@ def test_generated_alter_table_statement_is_valid_postgresql_ddl():
 
 def test_scrape_run_new_table_creation_is_unaffected_by_the_column_fix():
     """A brand-new table (ScrapeRun) must still be created by create_all()
-    alone, on every dialect - _add_missing_columns explicitly skips any
-    table not already present (create_all's job), so this fix must not
-    change that division of responsibility."""
+    alone, on every dialect - the diffing helper explicitly reports (never
+    mutates) any table not already present, since create_all's job is
+    creating it - so neither _add_missing_columns nor migrate_schema()
+    change that division of responsibility.
+
+    Updated by the PR-2 final pre-merge amendment ("Implement The
+    Smallest Explicit Migration Mechanism"): the diff logic itself moved
+    into a separate _diff_missing_columns helper shared by _add_missing_
+    columns (init_db()'s SQLite auto-mutation) and migrate_schema() (the
+    new explicit command) - see tests/
+    test_pr2_final_amendment_migration_and_intelligence_processing.py for
+    the tests covering that split specifically."""
     source = (REPO_ROOT / "app" / "db" / "session.py").read_text(encoding="utf-8")
-    body = source[source.index("def _add_missing_columns"):source.index("def init_db")]
+    body = source[source.index("def _diff_missing_columns"):source.index("def verify_schema")]
     assert 'if table.name not in existing_tables' in body
-    assert 'continue  # brand-new table - create_all already handled it' in body
+    assert 'missing_tables.append(table.name)' in body
 
 
 def test_add_allocation_match_review_columns_script_is_now_a_thin_wrapper():
     """The standalone script is documented as superseded - confirms it no
-    longer contains its own duplicate ALTER TABLE logic."""
+    longer contains its own duplicate ALTER TABLE logic. Updated by the
+    PR-2 final pre-merge amendment: this script now delegates to
+    scripts.migrate_schema (the explicit migration command), not
+    init_db() directly (init_db() no longer mutates a non-SQLite schema -
+    see this module's own docstring for why)."""
     source = (REPO_ROOT / "scripts" / "add_allocation_match_review_columns.py").read_text(encoding="utf-8")
     assert "ALTER TABLE" not in source
-    assert "init_db()" in source
+    assert "migrate_schema" in source
 
 
 # --- Part 3: render.yaml Blueprint safety -----------------------------------
+#
+# NOTE: render.yaml grew a second Cron Job (Intelligence Processing) in the
+# PR-2 final pre-merge amendment ("Automated Intelligence Cadence" /
+# "Render Architecture") - see
+# tests/test_pr2_final_amendment_migration_and_intelligence_processing.py
+# for the tests covering the two-service structure specifically. The tests
+# below still hold: services[0] remains propertyaigent-daily-scrape,
+# unchanged by that amendment.
 
 
-def test_render_yaml_defines_exactly_one_service_and_it_is_a_cron_job():
+def test_render_yaml_defines_at_least_the_original_cron_job():
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     services = config["services"]
-    assert len(services) == 1
-    assert services[0]["type"] == "cron"
+    assert len(services) >= 1
+    assert all(s["type"] == "cron" for s in services)
+    assert services[0]["name"] == "propertyaigent-daily-scrape"
 
 
 def test_render_yaml_does_not_declare_a_web_service():
