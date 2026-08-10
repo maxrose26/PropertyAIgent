@@ -54,6 +54,46 @@
 #                     crash) - improves build-status accuracy if set, but
 #                     the daily discovery/document job runs correctly
 #                     without it.
+#
+# BUILD (Render Cron Job Playwright build hotfix - "Switching to root user
+# to install dependencies... su: Authentication failure" observed on the
+# first real Blueprint sync):
+#   Daily Discovery's build previously ran
+#     playwright install --with-deps chromium
+#   `--with-deps` doesn't just download the Chromium binary - it ALSO
+#   apt-get installs the OS-level shared libraries Chromium needs, and
+#   Playwright's own install-deps step escalates to root (sudo/su) to run
+#   that apt-get. Render's native Python build container has no
+#   interactive root/sudo access, so that escalation fails outright - a
+#   build-environment mismatch, not a scraping or code bug. Fixed by
+#   dropping --with-deps: `playwright install chromium` alone only
+#   downloads the compiled binary over plain HTTP - no apt-get, no su/sudo,
+#   no root ever involved. Immediately followed by
+#   `python -m scripts.verify_browser_runtime` (see that script's own
+#   docstring) so a still-missing OS shared library turns into an
+#   unambiguous BUILD failure right away, rather than a cryptic scrape
+#   failure discovered only at the next 05:00 UTC scheduled run. Every
+#   council (idox, idox_anite, arcus doc_system alike) is scraped through
+#   the one shared Playwright Chromium session run_weekly.py's own main()
+#   opens - Playwright is required unconditionally for Daily Discovery,
+#   for all 10 councils, not just some.
+#   Intelligence Processing's own buildCommand deliberately has NO
+#   playwright install step at all (not even without --with-deps) -
+#   scripts/run_intelligence_processing.py never launches a browser (it
+#   only calls run_weekly.py's stage_extraction/stage_generate_scheme_
+#   summaries, neither of which touches Playwright); importing app.
+#   pipeline.run_weekly still imports the playwright PYTHON PACKAGE at
+#   module level, which `pip install -r requirements.txt` alone already
+#   satisfies - only actually LAUNCHING a browser needs the binary
+#   download step, and this job never does that.
+#   If Render's base image is ever found to be missing a Chromium shared
+#   library even after this fix (verify_browser_runtime.py's own failure
+#   message will say so explicitly in the build log), the next escalation
+#   is a Docker-based Cron Job runtime using the official Playwright image
+#   (mcr.microsoft.com/playwright/python), which ships Chromium with every
+#   OS dependency already baked into the image - not attempted here since
+#   there is no current evidence it's needed, and it is meaningfully more
+#   infrastructure than this fix required.
 #   Intelligence Processing (propertyaigent-intelligence-processing):
 #     DATABASE_URL    REQUIRED, same reason as above.
 #     OPENAI_API_KEY  REQUIRED. This job's entire purpose is calling
@@ -81,7 +121,7 @@ services:
     # scripts/register_weekly_task.ps1 local-dev precedent of running
     # overnight/early morning rather than during business hours.
     schedule: "0 5 * * *"
-    buildCommand: "pip install -r requirements.txt && playwright install --with-deps chromium"
+    buildCommand: "pip install -r requirements.txt && playwright install chromium && python -m scripts.verify_browser_runtime"
     startCommand: "python -m scripts.run_daily_councils"
     envVars:
       # Value is set in the Render dashboard, never committed here -
