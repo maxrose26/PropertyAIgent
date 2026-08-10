@@ -503,7 +503,19 @@ def test_wide_canvas_applied_only_to_council_intelligence_overview():
     Integrity audit, Part 5 - "Council Operations is constrained to a
     narrow central frame") - it is Administration-only, never linked from a
     customer-facing surface, so widening it doesn't affect any
-    customer-facing page width, which is what this test actually guards."""
+    customer-facing page width, which is what this test actually guards.
+    0_Explore.py and 2_Review_Site_Links.py are a third, later exception
+    (post-Sprint-4.5b hotfix, "Core Page Width" - both were discovered still
+    capped at the shared shell's 1200px default on wide desktop viewports,
+    the same defect this test's earlier exceptions already fixed elsewhere,
+    so both now call wide_canvas() directly in their own source too).
+    1_Scheme_Detail.py is NOT a source-text exception here even though it
+    genuinely IS wide - it delegates entirely to
+    app.ui.site_profile_view.render_site_profile, which has called
+    wide_canvas() since Sprint 4.4 ("Flagship Site Profile"), so the literal
+    text never appears in 1_Scheme_Detail.py's own source (see
+    test_site_profile.py::test_flagship_page_uses_wide_canvas_scoped_via_site_profile_view
+    for that page's own equivalent guard)."""
     overview_source = Path(__file__).resolve().parents[1].joinpath(
         "app", "ui", "pages", "5_Council_Intelligence.py"
     ).read_text(encoding="utf-8")
@@ -519,10 +531,18 @@ def test_wide_canvas_applied_only_to_council_intelligence_overview():
     ).read_text(encoding="utf-8")
     assert "wide_canvas()" in council_operations_source
 
-    customer_facing_pages = [
-        "6_Council_Intelligence_Detail.py", "0_Explore.py", "1_Scheme_Detail.py", "2_Review_Site_Links.py",
-    ]
-    for filename in customer_facing_pages:
+    explore_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "0_Explore.py"
+    ).read_text(encoding="utf-8")
+    assert "wide_canvas()" in explore_source
+
+    review_site_links_source = Path(__file__).resolve().parents[1].joinpath(
+        "app", "ui", "pages", "2_Review_Site_Links.py"
+    ).read_text(encoding="utf-8")
+    assert "wide_canvas()" in review_site_links_source
+
+    still_unwidened_pages = ["6_Council_Intelligence_Detail.py", "1_Scheme_Detail.py"]
+    for filename in still_unwidened_pages:
         source = Path(__file__).resolve().parents[1].joinpath("app", "ui", "pages", filename).read_text(encoding="utf-8")
         assert "wide_canvas()" not in source, f"{filename} must not be widened by this refinement"
 

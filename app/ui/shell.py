@@ -21,6 +21,7 @@ import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 PRODUCT_NAME = "PropertyAIgent"
@@ -1374,6 +1375,26 @@ def arrow_safe_count(value: int | None, placeholder: str = "—") -> str:
     as "unknown" (falls back to the placeholder) - matches the truthiness
     check the call sites already used before this helper existed."""
     return str(value) if value else placeholder
+
+
+def clean_display_text(value: object) -> str | None:
+    """Normalises an optional free-text presentation value (e.g. a mobile
+    card's Developer/status caption) to either a real, non-empty string or
+    None - never a value that renders as the literal text "nan". A column
+    built from a mix of str and Python None (e.g. via pd.DataFrame(rows))
+    silently coerces None to a pandas/numpy float NaN even when every other
+    value is a string, so a bare `if value:`/`str(value)` check is truthy
+    for that NaN and prints "nan" - the same class of bug
+    app.ui.housing_type.format_affordable_display exists to avoid for the
+    Affordable column. pd.isna() catches NaN, pandas.NA and None uniformly;
+    a str() coercion first is required because pd.isna() raises on some
+    non-scalar inputs, which a free-text presentation value should never be
+    here, but this keeps the check unconditionally safe regardless. Genuine
+    empty-string or whitespace-only text is treated as equally absent."""
+    if pd.isna(value):
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _escape(text: str) -> str:
