@@ -404,8 +404,21 @@ def has_trusted_linked_application(card: dict) -> bool:
     `linked_application_count > 0`, disagreeing with the badge's own
     (correct) needs_confirmation exclusion - an allocation could pass a
     "Linked" filter while showing no badge at all. This function is the
-    fix: one definition, one place, every caller reads it."""
-    return card["linked_application_count"] > 0 and card["review_status"] != "needs_confirmation"
+    fix: one definition, one place, every caller reads it.
+
+    Pilot Readiness PR-2 ("Existing Allocation <-> Site Matches") amendment:
+    also excludes review_status == "rejected", not just "needs_confirmation".
+    app.policy.site_match_review.reject_site_match already clears
+    matched_site_id (so linked_application_count becomes 0 and this line
+    would never even be reached for a rejected match created through that
+    function) - this second, explicit exclusion is defence in depth against
+    any other code path that might set review_status="rejected" without
+    also clearing the FK, so a rejected relationship can never silently read
+    as trusted regardless of how it got that way. This exact gap had never
+    been exercised before PR-2, since review_status="rejected" had never
+    once been set on a matched allocation in this platform's history until
+    this sprint's individual match review."""
+    return card["linked_application_count"] > 0 and card["review_status"] not in ("needs_confirmation", "rejected")
 
 
 def has_trusted_site_match(card: dict) -> bool:
@@ -425,8 +438,12 @@ def has_trusted_site_match(card: dict) -> bool:
     has_trusted_linked_application instead. card["matched"] itself (Site
     genuinely matched, regardless of review confidence) remains its own,
     unchanged, third concept - see build_summary_metrics's
-    matched_to_sites KPI, deliberately left reading card["matched"]."""
-    return card["matched"] and card["review_status"] != "needs_confirmation"
+    matched_to_sites KPI, deliberately left reading card["matched"].
+
+    Pilot Readiness PR-2 amendment: also excludes review_status ==
+    "rejected" - same defence-in-depth reasoning as
+    has_trusted_linked_application above."""
+    return card["matched"] and card["review_status"] not in ("needs_confirmation", "rejected")
 
 
 def build_linked_application_summaries(linked_applications: list, matched_site: Site | None) -> list[dict]:

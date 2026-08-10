@@ -28,10 +28,12 @@ from openai import OpenAI
 from sqlalchemy import select
 
 from app.db.models import LocalPlan, MonitoredReport
+from app.pipeline.freshness import FRESH, STALE, WARNING
 from app.policy.council_dashboard import build_council_dashboard
 from app.policy.coverage import build_coverage_inventory
 from app.policy.plan_evidence_view import build_plan_evidence_view
 from app.reporting.local_plan_summary import generate_local_plan_summary, is_summary_stale
+from app.reporting.scraper_health import build_scraper_health_summary
 from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import ai_summary_card, empty_state, page_header, wide_canvas
 
@@ -55,6 +57,42 @@ page_header(
     "Not part of the public site-browsing experience - see Council Intelligence under Policy for that.",
     icon="⚙️",
 )
+
+# Pilot Readiness PR-2 ("Production Freshness & Core Data Integrity", Part
+# 6) - Planning Application scraper health is a DIFFERENT pipeline from the
+# Policy Intelligence monitoring table below (app.policy.council_dashboard
+# tracks Local Plan/policy source monitoring; this tracks the scraper that
+# discovers Applications) - kept as its own section rather than merged into
+# that table, since conflating the two would blur exactly the distinction
+# PR-1/PR-2 both insist on ("scraper execution health and source activity
+# are different concepts", and different again from Policy monitoring).
+_FRESHNESS_ICON = {FRESH: "✅", WARNING: "⏰", STALE: "🔴"}
+
+
+def _freshness_display(state: str, label: str) -> str:
+    return f"{_FRESHNESS_ICON.get(state, '❔')} {label}"
+
+
+st.markdown("### 🕷️ Planning Application Scraper Health")
+scraper_rows = build_scraper_health_summary(session)
+scraper_table_rows = [{
+    "Council": r["council_name"],
+    "Freshness": _freshness_display(r["freshness"], r["freshness_label"]),
+    "Last successful run": r["last_successful_at"].strftime("%d %b %Y %H:%M") if r["last_successful_at"] else "Never",
+    "Last attempt": r["last_attempted_at"].strftime("%d %b %Y %H:%M") if r["last_attempted_at"] else "Never",
+    "Last attempt status": r["last_attempt_status"] or "—",
+    "Applications discovered (last run)": (
+        r["last_run_applications_discovered"] if r["last_run_applications_discovered"] is not None else "—"
+    ),
+    "Runs recorded": r["total_runs_recorded"],
+} for r in scraper_rows]
+st.dataframe(pd.DataFrame(scraper_table_rows), use_container_width=True, hide_index=True)
+st.caption(
+    "Fresh = a successful run completed within the last 48 hours. Ageing = 48-72 hours. Stale = over 72 hours. "
+    "\"No run evidence\" means this council has never had a recorded scraper attempt from the production "
+    "orchestrator (scripts/run_daily_councils.py) - distinct from Stale, which means a run happened but is now old."
+)
+st.divider()
 
 rows = build_council_dashboard(session)
 if not rows:

@@ -1,0 +1,49 @@
+# Render Blueprint - Pilot Readiness PR-2 ("Production Scheduling").
+#
+# This file adds ONE new service: a daily Cron Job running the existing
+# scraper pipeline across all 10 councils via scripts/run_daily_councils.py.
+# It does not define the existing Streamlit web service, which - per this
+# sprint's own PR-2 architecture audit - was almost certainly created
+# manually in the Render dashboard rather than from a Blueprint (no
+# render.yaml existed in this repository before this sprint, and the web
+# service has no corresponding entry here).
+#
+# IMPORTANT - what this file does NOT do by itself:
+#   Committing this file to the repository does not create or schedule
+#   anything in Render. Render only acts on a render.yaml when you
+#   explicitly "New +" -> "Blueprint" (or "Sync Blueprint" on an existing
+#   Blueprint-linked repo) in the Render dashboard, pointed at this repo.
+#   See the deployment instructions in docs/ARCHITECTURE_STATUS_v2.md's
+#   PR-2 entry (and this sprint's final report) for the exact manual steps,
+#   including which environment variables must be set in the Render
+#   dashboard (this file deliberately does not - and cannot - contain
+#   DATABASE_URL/OPENAI_API_KEY/etc. secret values).
+#
+# This is IMPLEMENTED (the repository side). It is NOT DEPLOYED and NOT
+# VERIFIED RUNNING until an operator with Render dashboard access completes
+# the manual steps above and confirms a real run in Render's own logs.
+
+services:
+  - type: cron
+    name: propertyaigent-daily-scrape
+    runtime: python
+    plan: starter
+    # Once a day. Render cron schedules are UTC - 05:00 UTC is before the
+    # UK working day starts, matching this platform's existing
+    # scripts/register_weekly_task.ps1 local-dev precedent of running
+    # overnight/early morning rather than during business hours.
+    schedule: "0 5 * * *"
+    buildCommand: "pip install -r requirements.txt && playwright install --with-deps chromium"
+    startCommand: "python -m scripts.run_daily_councils"
+    envVars:
+      # Values are set in the Render dashboard, never committed here -
+      # sync: false means "this variable is required but Render will not
+      # generate or store a value for it automatically; an operator must
+      # set it manually", the correct declaration for a secret this
+      # Blueprint needs to exist but must never contain.
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EPC_API_KEY
+        sync: false

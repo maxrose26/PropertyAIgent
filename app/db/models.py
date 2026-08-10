@@ -531,6 +531,22 @@ class LocalPlanSite(Base):
     # relationship underneath it.
     matched_site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
     match_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # --- Pilot Readiness PR-2 ("Existing Allocation <-> Site Matches") -
+    # human review provenance for a Site-match decision, mirroring
+    # VisualEvidence.confirmed_by/confirmed_at/rejection_reason's already-
+    # established pattern (app.visuals.review.confirm_image/reject_image)
+    # rather than inventing a new shape. See app.policy.site_match_review
+    # for the two functions allowed to set these. match_review_note covers
+    # BOTH a confirm's supporting-evidence rationale and a reject's reason
+    # (a rejected match's matched_site_id/match_confidence are cleared by
+    # reject_site_match, so the note is what preserves which candidate was
+    # rejected and why - unlike VisualEvidence, an allocation-Site match
+    # being wrong means the relationship itself is false, not just a low-
+    # quality image of a still-real relationship, so nothing keeps pointing
+    # at a Site a human said this allocation is NOT). ---
+    confirmed_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    confirmed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    match_review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # auto_applied | needs_confirmation | confirmed | rejected - set
     # whenever a change is ambiguous enough to need a human look (Part 11's
     # review queue is PolicyChangeEvent rows with review_status=
@@ -1506,3 +1522,83 @@ class VisualEvidence(Base):
     local_plan: Mapped["LocalPlan | None"] = relationship()
     allocation: Mapped["LocalPlanSite | None"] = relationship()
     superseded_by: Mapped["VisualEvidence | None"] = relationship(remote_side=[id])
+
+
+class ScrapeRun(Base):
+    """One attempted run of the Planning Application scraper pipeline
+    (app.pipeline.run_weekly) for one council - the operational evidence
+    Pilot Readiness PR-2 ("Production Freshness & Core Data Integrity",
+    Part 6) needs to answer "is this council's data actually fresh" as a
+    question distinct from "does this council have recent Application
+    activity" (Part 7: "Scraper execution health and source activity are
+    different concepts" - a council can genuinely have zero new
+    Applications in a healthy run, and a stalled scraper can sit next to
+    old-but-real Application data that looks superficially fine).
+
+    No equivalent tracking existed anywhere in this codebase before this
+    sprint - MonitoredSource/MonitoredReport track POLICY source
+    monitoring (a different pipeline, already covered), and
+    Application.first_seen_at/last_seen_at only ever reflect the data
+    itself, never whether the run that touched it actually succeeded. This
+    is therefore new, deliberately minimal state (Part 6: "Only add
+    schema/state if there is a genuine missing operational requirement"),
+    not a duplicate of anything that already exists.
+
+    Written by scripts/run_daily_councils.py (the production orchestrator
+    entry point), one row per attempted council per invocation - never
+    updated in place mid-run beyond the one create-then-finalise sequence
+    a single attempt naturally involves, and never deleted (an append-only
+    run history, same "nothing silently overwritten" discipline as
+    AllocationVersion/LocalPlanStatusHistory)."""
+
+    __tablename__ = "scrape_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
+
+    started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # running | success | partial | failed - "partial" is a real,
+    # meaningful distinct outcome (see run_weekly.py's own per-month
+    # try/except in stage_scrape: one month failing doesn't fail the
+    # whole run) - never collapsed into a binary success/failure.
+    status: Mapped[str] = mapped_column(String(20), default="running")
+
+    # Application row count for this council, queried immediately before
+    # and after the subprocess runs - the orchestrator's own before/after
+    # diff, not anything run_weekly.py itself reports (no change to that
+    # script's internals was needed for this). "Discovered" (net new rows)
+    # is what's actually measurable this way; "updated" (an existing row's
+    # non-identity fields changing) is not cheaply measurable from outside
+    # the pipeline without a second, wider query, so is deliberately left
+    # null here rather than approximated - see this model's own field
+    # comment on applications_updated below.
+    applications_before: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    applications_after: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Always net-new rows (applications_after - applications_before) once
+    # both are known - a denormalised convenience the orchestrator fills
+    # in directly, not a generated column (portable across SQLite/Postgres
+    # without a dialect-specific expression).
+    applications_discovered: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Deliberately left unset (None) by every current writer - an existing
+    # Application row's non-identity fields (status/decision/documents)
+    # changing is real but not cheaply measurable from outside the
+    # pipeline via a before/after count the way new rows are; a future
+    # sprint that wants this would need run_weekly.py itself to report it,
+    # not the orchestrator guessing from row counts alone. Kept as a named
+    # column now (rather than added later) so this model's shape doesn't
+    # need to change again once that's built.
+    applications_updated: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Free text - the subprocess's own stderr tail on failure, or a short
+    # human-readable summary on success/partial. Never silently discarded
+    # on failure (Part 6: "failure/error state" is an explicit requirement).
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # scheduled | manual - who/what triggered this attempt, so a manually
+    # re-run council after an operator noticed staleness isn't confused
+    # with the daily production schedule actually having run.
+    triggered_by: Mapped[str] = mapped_column(String(20), default="scheduled")
+
+    council: Mapped["Council"] = relationship()

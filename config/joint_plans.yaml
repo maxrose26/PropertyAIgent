@@ -22,23 +22,30 @@ joint_plans:
     participating_authorities:
       - bolton
       - bury
+      - manchester
       - oldham
       - rochdale
       - salford
-      - stockport
       - tameside
       - trafford
       - wigan
     source_note: >
       Places for Everyone Joint Development Plan 2022-2039, adopted with
-      effect from 21 March 2024. Participating authorities confirmed by
-      direct reading of data/local_plans/bury/places_for_everyone.pdf,
-      Table 11.1 "List of Places for Everyone Allocations" (pages 253-254),
-      which lists allocations by District for exactly these nine
-      authorities (Bolton, Bury, Oldham, Rochdale, Salford, Stockport,
-      Tameside, Trafford, Wigan) plus cross-boundary allocations shared
-      between two of them - not a search-engine summary. Manchester City
-      Council is a Greater Manchester authority but is NOT a Places for
-      Everyone participant (it withdrew early in the plan's development
-      and produced its own separate Manchester Local Plan instead) and is
-      deliberately absent from this list.
+      effect from 21 March 2024. Participating authorities corrected
+      (Pilot Readiness PR-2, "PfE Authority Integrity") by direct reading
+      of data/local_plans/bury/places_for_everyone.pdf's own title page
+      ("PLACES FOR EVERYONE JOINT DEVELOPMENT PLAN DOCUMENT FOR BOLTON,
+      BURY, MANCHESTER, OLDHAM, ROCHDALE, SALFORD, TAMESIDE, TRAFFORD AND
+      WIGAN") and confirmed by full-document scan (Manchester referenced
+      on 325 of 561 pages; Stockport on only 14, all contextual/cross-
+      boundary mentions, never as a listed co-author). The PREVIOUS
+      version of this note (removed by this correction) asserted the
+      opposite - that Stockport was a participant and Manchester had
+      withdrawn - a claim this same PDF's own title page directly
+      contradicts; that prior note's citation was incorrect, not this
+      document. Stockport withdrew from the plan's predecessor (the
+      Greater Manchester Spatial Framework) in December 2020 and produces
+      its own separate Stockport Local Plan (already ingested as its own
+      LocalPlan row, unaffected by this correction) - also independently
+      confirmed via the Greater Manchester Combined Authority's own PfE
+      page (greatermanchester-ca.gov.uk).
