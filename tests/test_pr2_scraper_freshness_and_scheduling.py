@@ -265,13 +265,27 @@ def test_render_yaml_exists_and_defines_a_cron_service():
 
 
 def test_render_yaml_does_not_contain_secret_values():
+    """Every genuinely SECRET env var must be sync: false (operator-set in
+    the Render dashboard), never a literal value committed here.
+
+    Updated by the Render Daily Discovery runtime failure hotfix:
+    PLAYWRIGHT_BROWSERS_PATH=0 is a deliberate, documented exception - a
+    plain Playwright configuration constant, not a secret (see render.
+    yaml's own "BUILD/RUNTIME" header comment for why it's safe to commit
+    directly). This test still asserts every OTHER declared variable
+    remains sync: false with no committed value, and separately asserts
+    the one literal-value variable that does exist is exactly the expected
+    non-secret constant - not a blanket exemption."""
     render_yaml_path = REPO_ROOT / "render.yaml"
     text = render_yaml_path.read_text(encoding="utf-8")
-    # Every declared env var must be sync: false (operator-set in the
-    # Render dashboard), never a literal value committed here.
     config = yaml.safe_load(text)
+    KNOWN_NON_SECRET_LITERALS = {"PLAYWRIGHT_BROWSERS_PATH"}
     for service in config["services"]:
         for env_var in service.get("envVars", []):
+            if env_var["key"] in KNOWN_NON_SECRET_LITERALS:
+                assert env_var["key"] == "PLAYWRIGHT_BROWSERS_PATH"
+                assert env_var["value"] == "0"
+                continue
             assert env_var.get("sync") is False or "value" not in env_var
 
 

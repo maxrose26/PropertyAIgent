@@ -424,10 +424,14 @@ def test_render_yaml_declares_exactly_two_cron_jobs_no_web_service():
 
 
 def test_render_yaml_daily_discovery_still_does_not_require_openai_key():
+    """Updated by the Render Daily Discovery runtime failure hotfix:
+    PLAYWRIGHT_BROWSERS_PATH is a legitimate addition (a non-secret
+    Playwright config constant - see render.yaml's own "BUILD/RUNTIME"
+    header) - OPENAI_API_KEY is still correctly absent."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     discovery = next(s for s in config["services"] if s["name"] == "propertyaigent-daily-scrape")
     env_var_keys = {e["key"] for e in discovery.get("envVars", [])}
-    assert env_var_keys == {"DATABASE_URL"}
+    assert env_var_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH"}
 
 
 def test_render_yaml_intelligence_processing_requires_database_and_openai():
@@ -451,10 +455,16 @@ def test_render_yaml_intelligence_processing_start_command_matches_the_new_scrip
 
 
 def test_render_yaml_no_service_commits_an_actual_secret_value():
-    """Every declared env var must be sync: false (operator-set in the
-    Render dashboard) - none may carry a literal `value:` in this file."""
+    """Every genuinely SECRET env var must be sync: false (operator-set in
+    the Render dashboard) - none may carry a literal `value:` in this
+    file. PLAYWRIGHT_BROWSERS_PATH=0 (Render Daily Discovery runtime
+    failure hotfix) is the one deliberate, documented exception - a plain
+    Playwright configuration constant, not a secret."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     for service in config["services"]:
         for env_var in service.get("envVars", []):
+            if env_var["key"] == "PLAYWRIGHT_BROWSERS_PATH":
+                assert env_var["value"] == "0"
+                continue
             assert env_var.get("sync") is False
             assert "value" not in env_var

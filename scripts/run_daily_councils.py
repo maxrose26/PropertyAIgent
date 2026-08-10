@@ -62,11 +62,27 @@ manually-triggered catch-up run once an operator has reviewed how large
 the current backlog is).
 
     python -m scripts.run_daily_councils [--council CODE ...] [--timeout-seconds N] [--include-ai-stages]
+
+Process exit status (Render Daily Discovery runtime failure hotfix):
+main() now returns a real exit code reflecting overall run health, instead
+of always exiting 0 regardless of how many councils failed - a production
+run that failed all 10 councils was previously still reported by Render as
+"Cron job run finished successfully", since the process fell off the end
+of main() with no explicit exit code at all (Python's default is 0).
+Policy (Product Owner, pilot readiness): ANY council failing marks the
+whole Cron Job run unhealthy - exit 0 only when every attempted council
+succeeded, exit 1 otherwise (whether some or all councils failed). An
+incomplete Greater Manchester refresh needs operator attention regardless
+of how many councils were affected; Render's own monitoring/alerting can
+only reflect that if the process exit code says so. This does not change
+failure isolation - every council is still attempted regardless of
+earlier failures; only the FINAL exit code changes.
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -76,6 +92,29 @@ from sqlalchemy import func, select
 from app.config import load_councils
 from app.db.models import Application, ScrapeRun
 from app.db.session import get_session, init_db
+
+_ERROR_LINE_PATTERN = re.compile(r"^\s*[\w.]*(?:Error|Exception)\s*:.*$", re.MULTILINE)
+
+
+def _summarize_error(text: str) -> str:
+    """Pulls the most informative single line out of a subprocess's
+    captured stdout+stderr for the concise, actionable Render-log line
+    (Render Daily Discovery runtime failure hotfix, "a failed council
+    should emit a concise but actionable error line"). Prefers the LAST
+    Python `SomeError: message`/`SomeException: message` line (a
+    traceback's own final line is always the actual exception - matches
+    even library-raised errors like playwright._impl._errors.Error:...),
+    since some tools (Playwright's own CLI) print extra explanatory text
+    AFTER the real exception line, which a naive "last non-blank line"
+    would pick up instead. Falls back to the last non-blank line if no
+    such pattern is found. Never touches os.environ - only summarizes text
+    the subprocess itself already printed, so this cannot surface a secret
+    that wasn't already in that output."""
+    matches = _ERROR_LINE_PATTERN.findall(text)
+    if matches:
+        return matches[-1].strip()
+    lines = [line for line in text.splitlines() if line.strip()]
+    return lines[-1].strip() if lines else "(no output captured)"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TIMEOUT_SECONDS = 3600  # 1 hour per council - generous; a genuinely stuck run should not block the next council forever
@@ -127,24 +166,29 @@ def run_one_council(
         # to that file.
         command += ["--skip-extraction", "--skip-scheme-summary"]
 
+    return_code = None
     try:
         result = subprocess.run(
             command,
             cwd=PROJECT_ROOT, timeout=timeout_seconds,
             capture_output=True, text=True,
         )
+        return_code = result.returncode
         success = result.returncode == 0
         # Council-level failure isolation lives here: a non-zero exit code
         # is recorded and reported, never re-raised - the loop in main()
         # always proceeds to the next council regardless.
-        tail = "\n".join((result.stdout + result.stderr).splitlines()[-40:])
+        combined_output = result.stdout + result.stderr
+        tail = "\n".join(combined_output.splitlines()[-40:])
     except subprocess.TimeoutExpired as e:
         success = False
+        combined_output = (e.stdout or "") + (e.stderr or "")
         tail = f"Timed out after {timeout_seconds}s. Partial output:\n" + "\n".join(
-            ((e.stdout or "") + (e.stderr or "")).splitlines()[-40:]
+            combined_output.splitlines()[-40:]
         )
     except Exception as e:  # noqa: BLE001 - genuinely must never take the loop down
         success = False
+        combined_output = ""
         tail = f"Orchestrator error managing subprocess: {e}"
 
     applications_after = _application_count(session, council_code)
@@ -158,12 +202,24 @@ def run_one_council(
     run.detail = tail[-4000:]  # bounded - this is operator-facing diagnostic text, not a full log store
     session.commit()
 
-    verb = "OK" if success else "FAILED"
-    print(f"[run-daily-councils] {council_code}: {verb} ({discovered:+d} applications)")
+    if success:
+        print(f"[run-daily-councils] {council_code}: OK ({discovered:+d} applications)")
+    else:
+        # Concise, actionable line for Render's own log viewer (Render
+        # Daily Discovery runtime failure hotfix) - previously only the
+        # DB-stored ScrapeRun.detail carried enough information to diagnose
+        # a failure; an operator watching Render's live logs saw only
+        # "FAILED (+0 applications)" with no indication why. Never prints
+        # os.environ or any secret - only summarizes text the subprocess
+        # itself already printed to stdout/stderr.
+        error_summary = _summarize_error(combined_output or tail)
+        print(f"[run-daily-councils] {council_code}: FAILED")
+        print(f"  return_code={return_code}")
+        print(f"  error={error_summary}")
     return run
 
 
-def main() -> None:
+def main() -> int:
     args = parse_args()
     init_db()
     session = get_session()
@@ -186,6 +242,25 @@ def main() -> None:
     failed = sum(1 for r in results if r.status == "failed")
     print(f"\n[run-daily-councils] Done. {succeeded} succeeded, {failed} failed, {len(council_codes)} attempted.")
 
+    return _exit_code(succeeded=succeeded, attempted=len(council_codes))
+
+
+def _exit_code(*, succeeded: int, attempted: int) -> int:
+    """Exit status policy (Render Daily Discovery runtime failure hotfix -
+    see this module's own docstring, "Process exit status"): every council
+    attempted successfully is the only condition that exits 0 - a partial
+    or total failure both exit 1. `attempted` (not `succeeded + failed`) is
+    the comparison base deliberately: an orchestrator-level bookkeeping
+    error that skipped a council entirely (never reaching run_one_council's
+    own try/except, so never becoming a recorded "failed" ScrapeRun either)
+    is just as unhealthy a run and must not be silently invisible to this
+    policy. Factored out as its own pure function (no DB/session access)
+    so the policy itself is directly unit-testable without touching a real
+    database - main() is the only caller."""
+    if succeeded == attempted:
+        return 0
+    return 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
