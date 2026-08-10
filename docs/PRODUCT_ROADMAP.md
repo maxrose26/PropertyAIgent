@@ -55,7 +55,7 @@ Each capability section below gives its own internal suggested order too, since 
 
 **Implemented functionality:** None.
 
-**Future functionality:** Residential and commercial sales values; Land Registry Price Paid Data; new-build values and premiums; rental evidence; sales rates/absorption; development comparables; land values; build costs and regional cost adjustments.
+**Future functionality:** Residential and commercial sales values; Land Registry Price Paid Data; new-build values and premiums; rental evidence; sales rates/absorption; development comparables; land values; build costs and regional cost adjustments; Ownership Intelligence (registered land/title ownership research — see `docs/PLATFORM_ARCHITECTURE.md` §3 for the full architecture note; blocked on reliable Site/allocation geometry, so deliberately not placed in the implementation order below).
 
 **Dependencies:** Planning Intelligence (what exists nearby to compare against) and Policy Intelligence (what a Site is actually allocated/permitted for, which determines relevant comparables).
 

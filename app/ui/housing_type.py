@@ -60,6 +60,50 @@ HOUSING_TYPE_LABELS = {
     "unknown": "Unknown",
 }
 
+# Sprint 4.5b Product Owner amendment (Part 21) - "Development Type" badge
+# kind per bucket, for app.ui.shell's status_badge (_BADGE_KIND_STYLE holds
+# the actual colour/icon). Kept alongside HOUSING_TYPE_LABELS rather than
+# in shell.py (CLAUDE.md: "keep business logic out of the UI" - this
+# mapping is part of the same classification vocabulary this module
+# already owns, not a UI concern) - shell.py only ever receives the
+# already-resolved kind string, never re-derives it from a raw bucket key.
+HOUSING_TYPE_BADGE_KIND = {
+    "houses": "dev_type_houses",
+    "apartments": "dev_type_apartments",
+    "mixed": "dev_type_mixed",
+    "other": "dev_type_other",
+    "unknown": "dev_type_unknown",
+}
+
+
+def format_affordable_display(units: int | None, percentage: float | None) -> str:
+    """Sprint 4.5b Product Owner amendment (Part 18) - merges the
+    Affordable Units count and Affordable % into one compact commercial-
+    discovery-table string (e.g. "45 (30%)") rather than two separate
+    columns. Used only for the Explore results table/card presentation -
+    the underlying "Affordable Units"/"Affordable %" figures stay two
+    separate columns in `filtered` and in the CSV export
+    (app.ui.pages.0_Explore.build_report_rows), unaffected by this.
+
+    Always returns a plain string, never None - a freshly-built pandas
+    column mixing Python str and None (rather than a column that was
+    int/float-typed with NaN from the start) hits the same Arrow-
+    serialization instability tests/test_arrow_safety.py's
+    arrow_safe_count hotfix already exists to avoid elsewhere in this
+    codebase: confirmed in the browser, a None here rendered as the
+    literal text "None" instead of a blank cell. units/percentage are
+    cast with int()/round() rather than shown with a stray ".0" - both
+    are always whole numbers in practice (a unit count, a percentage),
+    even though the source columns are stored as float64 (pandas' own
+    NaN-safe representation for a column with some missing values)."""
+    if units is None and percentage is None:
+        return "Not stated"
+    if units is None:
+        return f"{round(percentage):,}%"
+    if percentage is None:
+        return f"{round(units):,}"
+    return f"{round(units):,} ({round(percentage):,}%)"
+
 # RGBA outline colours for the map - a distinct hue per bucket, chosen to
 # stay legible against every fill colour PLANNING_STATUS_COLORS uses (fill
 # is the dominant filled circle, this is a 3px ring around it).

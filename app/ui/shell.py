@@ -95,6 +95,35 @@ _BADGE_KIND_STYLE = {
     "plan_examination": {"color": "blue", "icon": "🔵", "label": "Examination"},
     "plan_withdrawn": {"color": "red", "icon": "🛑", "label": "Withdrawn / superseded"},
     "plan_unknown": {"color": "gray", "icon": "❔", "label": "Unknown"},
+    # Sprint 4.5b ("Entity Search + Allocation Card Refinement", Part 2) -
+    # the compact positive replacement for the old card-level "no linked
+    # application" panel; green like "confirmed" since a genuinely linked
+    # Application is exactly that - confirmed, real evidence - never shown
+    # for a fuzzy/suggested match (see build_allocation_card's own
+    # show_linked_application_tag, computed only from a real
+    # linked_application_count).
+    "linked_application": {"color": "green", "icon": "🔗", "label": "Planning application linked"},
+    # Sprint 4.5b Product Owner amendment (Part 21) - Development Type
+    # badges for the Explore mobile card view, built from app.ui.
+    # housing_type.classify_housing_type's existing, already-deterministic
+    # bucketing of the REAL stored development_type/housing_typology
+    # fields (not a new taxonomy - see that module's own docstring).
+    # Deliberately a different colour set from the plan_* kinds above, per
+    # the explicit requirement that "Planning-status colours and
+    # Development-Type colours represent different concepts and must
+    # remain distinguishable" - every one of these still carries its own
+    # visible text label too, never colour alone.
+    "dev_type_houses": {"color": "orange", "icon": "🏠", "label": "Houses"},
+    "dev_type_apartments": {"color": "blue", "icon": "🏢", "label": "Apartments"},
+    "dev_type_mixed": {"color": "violet", "icon": "🏘️", "label": "Mixed (houses & apartments)"},
+    "dev_type_other": {"color": "gray", "icon": "🏗️", "label": "Other/specialist"},
+    # A different icon from plan_unknown's "❔" (even though both
+    # deliberately share the "gray = uncertain" colour language already
+    # established across this design system) - the two badge kinds never
+    # actually appear on the same card (dev_type_* is Explore-only,
+    # plan_* is Allocation Discovery-only), but keeping them visually
+    # distinct removes any ambiguity regardless.
+    "dev_type_unknown": {"color": "gray", "icon": "◻️", "label": "Unknown"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -108,13 +137,6 @@ _CUSTOM_ALERT_STYLE = {
     "review": {"color": "#B7791F", "icon": "⚠", "label": "Review required"},
     "ai": {"color": "#6B4FA0", "icon": "🤖", "label": "AI-generated"},
     "evidence_missing": {"color": "#3B5773", "icon": "📄", "label": "Evidence missing"},
-    # Allocation Discovery (Sprint 4.5a, "Commercial Polish", Part 6) - the
-    # "no linked planning application" commercial signal. Reuses the same
-    # blue already assigned to "Informational/neutral" in the badge palette
-    # above (never a new colour) - a magnifying-glass icon fits "worth
-    # investigating" without implying a data-quality problem (amber/review)
-    # or a value judgement (green/red) the way those other kinds would.
-    "opportunity_signal": {"color": "#3B5773", "icon": "🔍", "label": "Worth investigating"},
 }
 
 
@@ -268,6 +290,23 @@ def inject_global_styles() -> None:
         [class*="st-key-cc-examination-"] { background-color: #EFF5FC !important; border-color: #C9DCF0 !important; }
         [class*="st-key-cc-withdrawn-"] { background-color: #FBEEEE !important; border-color: #EFC3C3 !important; }
         [class*="st-key-cc-no-plan-"] { background-color: #F4F5F7 !important; border-color: #DEE2E7 !important; }
+
+        /* Explore Development Site results (Sprint 4.5b Product Owner
+           amendment, Part 20) - CSS-only table/card switching, never a
+           JavaScript viewport check, timer, or other responsive hack. Both
+           the desktop table (st-key-explore-desktop-table) and the mobile
+           card list (st-key-explore-mobile-cards) are always rendered;
+           only one is ever visible, purely via a standard CSS media query
+           at a single breakpoint - the same "let CSS reflow it" approach
+           already proven by the council-grid rule above, not a new
+           technique. Scoped to these two container keys only, which exist
+           on no other page, so this can't affect anything elsewhere. */
+        @media (max-width: 640px) {
+            [class*="st-key-explore-desktop-table"] { display: none !important; }
+        }
+        @media (min-width: 641px) {
+            [class*="st-key-explore-mobile-cards"] { display: none !important; }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -1137,8 +1176,12 @@ def allocation_card(card: dict, *, key: str) -> None:
         # 3. Capacity - a natural sentence fragment, not a bare field/value pair.
         st.markdown(f"**{_escape(card['capacity']['display'])}**")
 
-        # 4. Planning status
+        # 4. Planning status - the linked-application tag (Sprint 4.5b,
+        # Part 2) sits in the same badge row as plan/review status, only
+        # when a real linked Application relationship exists.
         badges = [(card["plan_status_chip_kind"], card["plan_status_label"]), (card["review_status_badge_kind"], card["review_status_label"])]
+        if card.get("show_linked_application_tag"):
+            badges.append(("linked_application", card["linked_application_tag_label"]))
         status_badge_row(badges)
         if card["is_multi_authority"]:
             joint_plan_badge()
@@ -1154,13 +1197,11 @@ def allocation_card(card: dict, *, key: str) -> None:
         else:
             st.caption("🖼 No confirmed or suggested visual evidence yet.")
 
-        if card.get("show_no_application_panel"):
-            render_alert(
-                "opportunity_signal", card["no_application_panel_message"],
-                title=card["no_application_panel_title"], key=f"alloc-no-app-{key}",
-            )
-        else:
-            st.caption(card["matched_summary"], help=card["matched_summary_help"])
+        # Sprint 4.5b, Part 1 - the old "no linked planning application"
+        # panel is gone from the card entirely (moved to Allocation Detail,
+        # Part 3); this plain caption is the only card-level statement of
+        # match/link status now, regardless of whether a link exists.
+        st.caption(card["matched_summary"], help=card["matched_summary_help"])
         if card.get("build_status_label"):
             st.caption(card["build_status_label"])
         if card.get("delivery_note"):
@@ -1191,6 +1232,58 @@ def allocation_card(card: dict, *, key: str) -> None:
         source_link = card.get("plan_page_url") or card.get("source_document_url")
         if source_link:
             st.caption(f"[Open source document →]({source_link})")
+
+
+def entity_search_result_row(result, *, key: str) -> None:
+    """One Entity Search hit (Sprint 4.5b, Part 8/9) - `result` is an
+    app.reporting.entity_search.SearchResult, accessed by attribute only
+    (never imported - this module stays free of app.* imports by design,
+    see its own docstring). Renders identically regardless of entity_type
+    except for the destination label/link - the two entity types are never
+    visually merged into one ambiguous row shape, and matched_entity_label
+    (Part 8's "Linked to allocation JPA 8" / "Linked planning Site"
+    indicator) is only ever shown when the caller already found a real
+    matched_site_id relationship - never inferred here."""
+    with st.container(border=True, key=key):
+        st.markdown(f"**{_escape(result.title)}**")
+        if result.subtitle:
+            st.caption(_escape(result.subtitle))
+        meta_bits = [b for b in (result.status, result.capacity_or_units) if b]
+        if meta_bits:
+            st.caption(" · ".join(_escape(str(b)) for b in meta_bits))
+        if result.matched_entity_label:
+            st.caption(f"🔗 {_escape(result.matched_entity_label)}")
+        label = "Open Allocation →" if result.entity_type == "allocation" else "Open Site →"
+        st.page_link(result.destination_page, label=label, query_params=result.destination_params)
+
+
+def entity_search_results_panel(results, *, key_prefix: str) -> None:
+    """`results` is an app.reporting.entity_search.EntitySearchResults -
+    grouped, never-merged sections (Part 8), each entity type in its own
+    labelled subsection so a user can never mistake an Allocation result
+    for a Development Site result or vice versa.
+
+    "Development Sites" is the Sprint 4.5b Product Owner amendment's
+    customer-facing rename of the entity_type="planning_site" group (Part
+    2) - the underlying Site/Application domain model and internal names
+    (entity_type value, results.planning_sites attribute,
+    search_planning_site_entities) are deliberately unchanged, since this
+    is a terminology change, not a domain-model rewrite."""
+    if results.is_empty:
+        empty_state(
+            "No matches found",
+            f"No Development Sites or Allocations matched \"{results.query}\" - try a shorter search term.",
+            icon="🔍", show_home_link=False,
+        )
+        return
+    if results.allocations:
+        st.markdown(f"###### 🗺️ Allocations ({len(results.allocations)})")
+        for i, result in enumerate(results.allocations):
+            entity_search_result_row(result, key=f"{key_prefix}-alloc-{i}-{result.entity_id}")
+    if results.planning_sites:
+        st.markdown(f"###### 📍 Development Sites ({len(results.planning_sites)})")
+        for i, result in enumerate(results.planning_sites):
+            entity_search_result_row(result, key=f"{key_prefix}-site-{i}-{result.entity_id}")
 
 
 def ai_status_summary_view(ai_summary: dict) -> None:

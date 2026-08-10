@@ -337,12 +337,19 @@ def _why_it_matters_reasons(card: dict) -> list[str]:
     return reasons
 
 
-# --- "No linked planning application" commercial signal (Part 6) ------------
+# --- "No linked planning application" commercial signal --------------------
 #
-# Deliberately its own, separately-labelled panel rather than folded into
-# the why-it-matters bullet list above - Part 6 frames this as "one of the
-# platform's strongest commercial signals" and asks for a highlighted
-# treatment, not a plain caption line easily missed among several others.
+# Sprint 4.5b ("Entity Search + Allocation Card Refinement", Part 1/2)
+# removed this signal from the gallery card - the original Sprint 4.5a
+# "highlighted panel on every card" framing made every unmatched allocation
+# (the majority of the gallery) show the same repeated block, which read as
+# visual noise rather than a strong signal. The card now shows nothing
+# negative at all when there is no link (the existing "No Linked
+# Application" discovery category is the way to find these allocations);
+# a positive, compact tag appears instead ONLY where a link genuinely
+# exists (see LINKED_APPLICATION_TAG_LABEL / allocation_card's badge row).
+# This constant pair is now Detail-state-only wording (Part 3: "Keep this
+# detail-level wording rather than putting it on every gallery card").
 
 NO_LINKED_APPLICATION_PANEL_TITLE = "No linked planning application currently identified"
 NO_LINKED_APPLICATION_PANEL_MESSAGE = (
@@ -350,6 +357,110 @@ NO_LINKED_APPLICATION_PANEL_MESSAGE = (
     "investigation to determine whether an application exists or whether the allocation remains at a "
     "pre-application stage."
 )
+
+# Part 3's own, more concise detail-state wording - deliberately distinct
+# from the panel text above (still used as the "no development identified"
+# evidence-gap signal below Part 3's linked-application section) rather
+# than reusing it, per that Part's explicit wording.
+ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE = (
+    "No planning application is currently linked to this allocation in PropertyAIgent."
+)
+ALLOCATION_DETAIL_NO_APPLICATION_NOTE = "An application may exist but not yet have been matched."
+
+# Part 2 - the compact positive tag, shown in the card's badge row only
+# when linked_application_count > 0 (never inferred - a linked Application
+# only exists here once a Site is genuinely matched, see
+# build_allocation_discovery's own batched Application lookup, which never
+# guesses a link).
+LINKED_APPLICATION_TAG_LABEL = "Planning application linked"
+
+
+def has_trusted_linked_application(card: dict) -> bool:
+    """THE ONE canonical definition of "a sufficiently trusted linked
+    Planning Application exists" (Sprint 4.5b Product Owner amendment,
+    Part 5: "There must be one canonical definition of trusted linked
+    planning application... used wherever the product means a confirmed/
+    trusted Application relationship"). Every one of the following reads
+    this single function rather than re-deriving the same boolean:
+    show_linked_application_tag (the gallery badge), apply_filters's
+    application_linkage filter, CATEGORY_DEFINITIONS's "No Linked
+    Application" category, build_matching_attributes's
+    has_linked_application field, and build_summary_metrics's
+    no_linked_application KPI. app.reporting.entity_search's cross-link
+    labels also call this (not duplicated there either).
+
+    linked_application_count alone isn't enough - if the allocation's OWN
+    match to that Site is itself still needs_confirmation (an unreviewed,
+    possibly-wrong suggestion - see ALLOCATION_REVIEW_STATUS_META), a
+    confident "linked" claim would overstate what's actually been
+    confirmed, even though the underlying Application row is perfectly
+    real. "auto_applied" is trusted - that review state already means the
+    platform's own deterministic matching pipeline applied it without
+    flagging ambiguity, the same trust level card["matched"] and every
+    other confident card element already extends to an auto_applied match.
+
+    Before this fix, apply_filters/CATEGORY_DEFINITIONS/build_matching_
+    attributes/build_summary_metrics each independently checked only
+    `linked_application_count > 0`, disagreeing with the badge's own
+    (correct) needs_confirmation exclusion - an allocation could pass a
+    "Linked" filter while showing no badge at all. This function is the
+    fix: one definition, one place, every caller reads it."""
+    return card["linked_application_count"] > 0 and card["review_status"] != "needs_confirmation"
+
+
+def has_trusted_site_match(card: dict) -> bool:
+    """A DELIBERATELY SEPARATE canonical definition from
+    has_trusted_linked_application above (Sprint 4.5b Product Owner
+    amendment, Part 8: "Audit the distinction between Matched Site and
+    Planning Application linked. These are not necessarily equivalent.").
+    This one answers "is this allocation's own match to a Site itself
+    trustworthy" - true whenever a Site is matched at all AND that match
+    isn't still needs_confirmation, regardless of whether any Application
+    has been filed on that Site yet (a freshly-matched Site with zero
+    Applications is still a genuine, trustworthy Site match). Used only
+    for the "Linked planning Site" / "Linked to allocation X" cross-link
+    labels in app.reporting.entity_search (Part 13: "Do not present
+    needs_confirmation/fuzzy relationships as confirmed") - never for the
+    Application-linkage badge/filter/KPI above, which read
+    has_trusted_linked_application instead. card["matched"] itself (Site
+    genuinely matched, regardless of review confidence) remains its own,
+    unchanged, third concept - see build_summary_metrics's
+    matched_to_sites KPI, deliberately left reading card["matched"]."""
+    return card["matched"] and card["review_status"] != "needs_confirmation"
+
+
+def build_linked_application_summaries(linked_applications: list, matched_site: Site | None) -> list[dict]:
+    """Part 3 - one dict per linked Application, never picking one and
+    hiding the rest. `units` prefers the AI-reconciled SchemeIntelligence
+    figure (the same total_units_final every other Application-facing view
+    in this codebase trusts - see app.ui.common.aggregate_scheme_fields's
+    own docstring for why) and falls back to the portal listing's own
+    estimated_unit_count only when no reconciled figure exists yet -
+    never a fresh estimate invented here. Build/commencement status is
+    deliberately NOT duplicated per-application: it's a Site-level signal
+    (app.pipeline.lapse_tracking.compute_lapse_status already reasons
+    across every linked Application together, see build_allocation_card's
+    own call site) - inventing a second, per-Application version of that
+    same judgement here would risk disagreeing with it."""
+    site_address = matched_site.display_address if matched_site else None
+    summaries = []
+    for app in linked_applications:
+        si = getattr(app, "scheme_intelligence", None)
+        units = None
+        if si is not None and si.total_units_final:
+            units = si.total_units_final
+        elif app.estimated_unit_count:
+            units = app.estimated_unit_count
+        summaries.append({
+            "id": app.id,
+            "reference": app.reference,
+            "site_address": site_address or app.address,
+            "status": app.status,
+            "decision": app.decision,
+            "units": units,
+            "summary_url": app.summary_url,
+        })
+    return summaries
 
 
 def _no_development_identified(card: dict) -> bool:
@@ -522,9 +633,20 @@ def build_allocation_card(
     card["why_it_matters_reasons"] = _why_it_matters_reasons(card)
     card["why_it_matters"] = card["why_it_matters_reasons"][0]
     card["investigate_next"] = _investigate_next(card)
+    # Sprint 4.5b, Part 1/2 - show_no_application_panel/its title+message
+    # are kept for the "no development identified" evidence-gap panel a
+    # future caller may still want, but allocation_card() itself no longer
+    # renders them (see LINKED_APPLICATION_TAG_LABEL / show_linked_
+    # application_tag below for the card-level replacement, and
+    # ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE for the detail-state one).
     card["show_no_application_panel"] = show_no_application_panel(card)
     card["no_application_panel_title"] = NO_LINKED_APPLICATION_PANEL_TITLE
     card["no_application_panel_message"] = NO_LINKED_APPLICATION_PANEL_MESSAGE
+    card["show_linked_application_tag"] = has_trusted_linked_application(card)
+    card["linked_application_tag_label"] = LINKED_APPLICATION_TAG_LABEL
+    card["linked_applications"] = build_linked_application_summaries(linked_applications, matched_site)
+    card["detail_no_application_message"] = ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE
+    card["detail_no_application_note"] = ALLOCATION_DETAIL_NO_APPLICATION_NOTE
     card["matching_attributes"] = build_matching_attributes(card)
     return card
 
@@ -555,7 +677,11 @@ def build_matching_attributes(card: dict) -> dict:
         "planning_status_bucket": card["plan_status_bucket"],
         "planning_status": card["plan_status"],
         "build_status": card["build_status"],
-        "has_linked_application": card["linked_application_count"] > 0,
+        # Canonical trusted definition (Sprint 4.5b Product Owner
+        # amendment, Part 5) - the same has_trusted_linked_application a
+        # future matching feature would need "linked/no linked Planning
+        # Application" to mean the same thing everywhere else it appears.
+        "has_linked_application": has_trusted_linked_application(card),
         "linked_application_count": card["linked_application_count"],
         "matched_site_id": card["matched_site_id"],
         "visual_evidence_status": card["visual_status"],
@@ -692,8 +818,18 @@ def build_summary_metrics(cards: list[dict]) -> dict:
         "adopted_allocations": sum(1 for c in countable if c["plan_status_bucket"] == "adopted"),
         "emerging_allocations": sum(1 for c in countable if c["plan_status_bucket"] == "emerging"),
         "with_visual_evidence": sum(1 for c in countable if c["visual_status"] != "none" or c["visual_fallback"] is not None),
+        # "Allocation matched to a PropertyAIgent Site" - a genuinely
+        # different claim from "has a trusted linked Planning Application"
+        # (Sprint 4.5b Product Owner amendment, Part 8) - intentionally
+        # NOT changed to has_trusted_linked_application; card["matched"]
+        # already means exactly what this KPI's name says.
         "matched_to_sites": sum(1 for c in countable if c["matched"]),
-        "no_linked_application": sum(1 for c in countable if c["linked_application_count"] == 0),
+        # Canonical trusted definition (Part 5/22) - "Without Linked
+        # Applications" is a customer-facing claim about trusted Planning
+        # Application relationships, so it must agree with the badge/filter/
+        # category above, not the raw linked_application_count this used
+        # to read before the fix.
+        "no_linked_application": sum(1 for c in countable if not has_trusted_linked_application(c)),
         "needs_review": sum(1 for c in countable if _needs_review(c)),
         # Only a real total when at least one allocation has a known
         # capacity - an empty list summed to 0 would misrepresent "we
@@ -793,11 +929,17 @@ def apply_filters(cards: list[dict], filters: dict) -> list[dict]:
     elif matched_filter == "unmatched":
         result = [c for c in result if not c["matched"]]
 
+    # Sprint 4.5b Product Owner amendment (Part 5/7) - the correctness fix:
+    # this used to check raw linked_application_count, which disagreed with
+    # the badge's own needs_confirmation exclusion (see
+    # has_trusted_linked_application's own docstring for the full story).
+    # Both branches now read the one canonical definition, so this filter
+    # can never disagree with what the badge shows.
     application_filter = filters.get("application_linkage")
     if application_filter == "linked":
-        result = [c for c in result if c["linked_application_count"] > 0]
+        result = [c for c in result if has_trusted_linked_application(c)]
     elif application_filter == "not_linked":
-        result = [c for c in result if c["linked_application_count"] == 0]
+        result = [c for c in result if not has_trusted_linked_application(c)]
 
     visual_filter = filters.get("visual_evidence")
     if visual_filter == "confirmed":
@@ -839,12 +981,19 @@ def _has_map(card: dict) -> bool:
     return card["visual_status"] != "none" or card["visual_fallback"] is not None
 
 
+# "No Linked Application" reads has_trusted_linked_application (Sprint
+# 4.5b Product Owner amendment, Part 5/6) - so this category always
+# contains exactly the allocations NOT showing the badge, including a
+# needs_confirmation match with a real Application row. That is Part 6's
+# own definition of the negative state: "No sufficiently trusted planning
+# application relationship is currently recorded" - never "no Application
+# exists in reality" (see linked_application_help's wording).
 CATEGORY_DEFINITIONS: tuple[tuple[str, str, object], ...] = (
     ("all", "All Allocations", lambda c: True),
     ("adopted", "Adopted", lambda c: c["plan_status_bucket"] == "adopted"),
     ("emerging", "Emerging", lambda c: c["plan_status_bucket"] == "emerging"),
     ("with_maps", "With Maps", _has_map),
-    ("no_linked_application", "No Linked Application", lambda c: c["linked_application_count"] == 0),
+    ("no_linked_application", "No Linked Application", lambda c: not has_trusted_linked_application(c)),
     ("not_commenced", "Undeveloped / Not Commenced", _not_commenced),
     ("major_housing", "Major Housing Allocations", lambda c: c["major_housing"]),
     ("needs_review", "Needs Review", _needs_review),
