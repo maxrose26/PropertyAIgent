@@ -1173,7 +1173,34 @@ def main() -> None:
         print(f"Backfill mode: {len(month_ranges)} months ({month_ranges[0][0]} -> {month_ranges[-1][1]})")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=args.headless)
+        # Render Daily Discovery memory audit - two conservative, widely-
+        # documented Playwright/Chromium flags for headless server/
+        # container use, neither of which affects what a planning portal
+        # actually renders (static HTML + PDF documents, no canvas/WebGL/
+        # GPU-compositing dependency):
+        #   --disable-dev-shm-usage - Chromium normally uses /dev/shm for
+        #     inter-process shared memory; many containers (including,
+        #     potentially, Render's Cron Job containers - not directly
+        #     observable from here) default /dev/shm to a small size (64MB
+        #     is Docker's own historical default), which causes crashes,
+        #     not just extra memory use, once exceeded. This flag makes
+        #     Chromium fall back to disk-backed temp storage instead - a
+        #     stability safeguard against a DIFFERENT failure mode than the
+        #     512Mi OOM this audit investigated, not a memory reduction by
+        #     itself.
+        #   --disable-gpu - headless Chromium has no display to composite
+        #     onto; explicitly disabling GPU avoids spinning up a GPU
+        #     process at all (one fewer process in the tree - confirmed via
+        #     this audit's own scripts/diagnose_browser_memory.py, which
+        #     measured 3-4 separate chrome-headless-shell child processes
+        #     for a single blank page even before this flag).
+        # Deliberately NOT adding --no-sandbox: it weakens Chromium's
+        # security sandbox against exactly the kind of untrusted third-
+        # party web content (council planning portals) this pipeline
+        # renders, and does not reduce memory usage - there is no
+        # memory-motivated reason to accept that security cost, and no
+        # evidence (no sandbox-setup error observed) that it's needed.
+        browser = p.chromium.launch(headless=args.headless, args=["--disable-dev-shm-usage", "--disable-gpu"])
         # Playwright's default headless fingerprint (empty/automation-flagged
         # UA) gets outright WAF-blocked by some councils' portals - confirmed
         # a real case: Trafford returns "The URL you requested has been
