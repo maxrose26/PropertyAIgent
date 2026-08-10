@@ -138,12 +138,28 @@ def _fake_completed_process(returncode: int, stdout: str = "", stderr: str = "")
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
+def _fake_run_council_subprocess(text: str = "", returncode: int = 0):
+    """Render Daily Discovery memory instrumentation: _run_council_subprocess
+    now streams output line-by-line via an on_line callback and returns a
+    plain int exit code, instead of buffering everything into a
+    CompletedProcess - this reproduces that streaming contract for tests
+    that only care about run_one_council's own behaviour (see
+    tests/test_render_daily_discovery_memory_audit.py for tests of
+    _run_council_subprocess's own internals against real subprocesses)."""
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        if on_line is not None:
+            for line in text.splitlines():
+                on_line(line)
+        return returncode
+    return _fake
+
+
 def test_run_one_council_prints_concise_actionable_error_line_on_failure(session, capsys):
     from scripts.run_daily_councils import run_one_council
 
     with patch(
-        "scripts.run_daily_councils.subprocess.run",
-        return_value=_fake_completed_process(1, stderr=REAL_PRODUCTION_TRACEBACK),
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess(REAL_PRODUCTION_TRACEBACK, returncode=1),
     ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
@@ -160,7 +176,10 @@ def test_run_one_council_success_path_does_not_print_error_lines(session, capsys
     session.add(Application(council_code="testcouncil", reference="APP/1"))
     session.commit()
 
-    with patch("scripts.run_daily_councils.subprocess.run", return_value=_fake_completed_process(0, stdout="Done.")):
+    with patch(
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess("Done.", returncode=0),
+    ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert run.status == "success"
@@ -227,11 +246,14 @@ def test_one_council_failure_does_not_prevent_the_next_council_being_attempted(s
     session.commit()
 
     with patch(
-        "scripts.run_daily_councils.subprocess.run",
-        return_value=_fake_completed_process(1, stderr=REAL_PRODUCTION_TRACEBACK),
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess(REAL_PRODUCTION_TRACEBACK, returncode=1),
     ):
         run1 = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
-    with patch("scripts.run_daily_councils.subprocess.run", return_value=_fake_completed_process(0, stdout="Done.")):
+    with patch(
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess("Done.", returncode=0),
+    ):
         run2 = run_one_council(session, "thirdcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert run1.status == "failed"
@@ -246,8 +268,8 @@ def test_failed_run_cannot_be_classified_as_fresh(session):
     from scripts.run_daily_councils import run_one_council
 
     with patch(
-        "scripts.run_daily_councils.subprocess.run",
-        return_value=_fake_completed_process(1, stderr=REAL_PRODUCTION_TRACEBACK),
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess(REAL_PRODUCTION_TRACEBACK, returncode=1),
     ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
@@ -275,11 +297,14 @@ def test_successful_council_still_recorded_as_successful_in_a_mixed_run(session)
     ))
     session.commit()
 
-    with patch("scripts.run_daily_councils.subprocess.run", return_value=_fake_completed_process(0, stdout="Done.")):
+    with patch(
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess("Done.", returncode=0),
+    ):
         good_run = run_one_council(session, "thirdcouncil", timeout_seconds=60, triggered_by="manual")
     with patch(
-        "scripts.run_daily_councils.subprocess.run",
-        return_value=_fake_completed_process(1, stderr=REAL_PRODUCTION_TRACEBACK),
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess(REAL_PRODUCTION_TRACEBACK, returncode=1),
     ):
         bad_run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
@@ -301,11 +326,13 @@ def test_run_daily_councils_still_defaults_to_skipping_ai_stages(session):
 
     captured_commands = []
 
-    def fake_run(command, **kwargs):
+    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
         captured_commands.append(command)
-        return _fake_completed_process(0, stdout="Done.")
+        if on_line is not None:
+            on_line("Done.")
+        return 0
 
-    with patch("scripts.run_daily_councils.subprocess.run", side_effect=fake_run):
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=fake_run):
         run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert "--skip-extraction" in captured_commands[0]

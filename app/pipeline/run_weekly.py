@@ -48,6 +48,7 @@ from sqlalchemy.orm import Session
 from app.config import CouncilConfig, get_council
 from app.db.models import Application, ApplicationCompany, Council, Document, SchemeIntelligence, Site
 from app.db.session import get_session, init_db
+from app.diagnostics.memory import log_memory
 from app.enrichment.contact_pipeline import enrich_company, upsert_company_from_enrichment
 from app.ui.common import aggregate_scheme_fields
 from app.enrichment.epc_lookup import NOMINATIM_MIN_INTERVAL_SECONDS, check_build_status, geocode_address, geocode_postcode
@@ -1159,12 +1160,14 @@ def _resolve_month_ranges(args: argparse.Namespace) -> list[tuple[str, str]]:
 
 def main() -> None:
     args = parse_args()
+    log_memory("process.start", council=args.council)
     load_dotenv(override=True)  # this project's .env always wins over stray shell-exported vars
 
     init_db()
     session = get_session()
     council = get_council(args.council)
     ensure_council_row(session, council)
+    log_memory("bootstrap.after", council=council.code)
 
     month_ranges = _resolve_month_ranges(args)
     batch_id = f"{council.code}_{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
@@ -1173,6 +1176,7 @@ def main() -> None:
         print(f"Backfill mode: {len(month_ranges)} months ({month_ranges[0][0]} -> {month_ranges[-1][1]})")
 
     with sync_playwright() as p:
+        log_memory("playwright.started", council=council.code)
         # Render Daily Discovery memory audit - two conservative, widely-
         # documented Playwright/Chromium flags for headless server/
         # container use, neither of which affects what a planning portal
@@ -1201,6 +1205,7 @@ def main() -> None:
         # memory-motivated reason to accept that security cost, and no
         # evidence (no sandbox-setup error observed) that it's needed.
         browser = p.chromium.launch(headless=args.headless, args=["--disable-dev-shm-usage", "--disable-gpu"])
+        log_memory("chromium.launched", council=council.code)
         # Playwright's default headless fingerprint (empty/automation-flagged
         # UA) gets outright WAF-blocked by some councils' portals - confirmed
         # a real case: Trafford returns "The URL you requested has been
@@ -1215,8 +1220,10 @@ def main() -> None:
             viewport={"width": 1280, "height": 900},
         )
         page = context.new_page()
+        log_memory("context_page.created", council=council.code)
 
         if not args.skip_scrape:
+            log_memory("stage_scrape.before", council=council.code)
             for i, (date_from, date_to) in enumerate(month_ranges):
                 if i > 0:
                     time.sleep(MONTH_COOLDOWN_SECONDS)  # courtesy pause between months on a backfill
@@ -1229,30 +1236,43 @@ def main() -> None:
                     # since applications already saved are untouched (upsert, not replace).
                     print(f"\n[scrape] FAILED for {date_from} -> {date_to}: {e}")
                     print("[scrape] continuing to next month...")
+            log_memory("stage_scrape.after", council=council.code)
 
         if not args.skip_parent_lookup:
+            log_memory("stage_fetch_missing_parents.before", council=council.code)
             # Runs after every month's scrape (so any newly-found reserved
             # matters filing is included) but before site-linking, so a
             # freshly-fetched parent is in the DB in time for the SAME run's
             # parent_reference site-linking tier to pick it up.
             stage_fetch_missing_parents(session, page, council)
+            log_memory("stage_fetch_missing_parents.after", council=council.code)
 
         if not args.skip_site_link:
+            log_memory("stage_link_sites.before", council=council.code)
             stage_link_sites(session, council)
+            log_memory("stage_link_sites.after", council=council.code)
 
         if not args.skip_related_applications:
+            log_memory("stage_fetch_related_applications.before", council=council.code)
             # After stage_link_sites, not before - needs a parent's site_id
             # already set (site_link_method == "parent_reference") to know
             # what to search for and where to attach anything it finds.
             stage_fetch_related_applications(session, page, council)
+            log_memory("stage_fetch_related_applications.after", council=council.code)
 
         if not args.skip_confirm_units:
+            log_memory("stage_confirm_units.before", council=council.code)
             stage_confirm_units(session, page, council)
+            log_memory("stage_confirm_units.after", council=council.code)
 
         if not args.skip_documents:
+            log_memory("stage_documents.before", council=council.code)
             stage_documents(session, page, council)
+            log_memory("stage_documents.after", council=council.code)
 
+        log_memory("browser_close.before", council=council.code)
         browser.close()
+        log_memory("browser_close.after", council=council.code)
 
     if not args.skip_extraction:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -1262,10 +1282,14 @@ def main() -> None:
         stage_extraction(session, client, council)
 
     if not args.skip_geocode:
+        log_memory("stage_geocode_sites.before", council=council.code)
         stage_geocode_sites(session, council)
+        log_memory("stage_geocode_sites.after", council=council.code)
 
     if not args.skip_build_status:
+        log_memory("stage_check_build_status.before", council=council.code)
         stage_check_build_status(session, council, os.getenv("EPC_API_KEY"))
+        log_memory("stage_check_build_status.after", council=council.code)
 
     if not args.skip_scheme_summary:
         api_key = os.getenv("OPENAI_API_KEY")
@@ -1284,6 +1308,7 @@ def main() -> None:
             openai_client=OpenAI(api_key=openai_key) if openai_key else None,
         )
 
+    log_memory("process.exit", council=council.code)
     print("\nDone.")
 
 
