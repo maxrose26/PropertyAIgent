@@ -51,10 +51,11 @@ from app.ui.common import (
     pick_representative_application,
     render_scheme_detail,
 )
+from app.reporting.entity_search import search_entities
 from app.reporting.pdf_report import compute_aggregate_stats, generate_narrative, render_pdf
 from app.ui.housing_type import HOUSING_TYPE_COLORS, HOUSING_TYPE_LABELS, classify_housing_type, housing_type_note
 from app.ui.map_selection import resolve_selected_site_id
-from app.ui.shell import page_header
+from app.ui.shell import entity_search_results_panel, page_header
 from app.ui.site_headline import build_site_headline, clean_tooltip_text, format_site_tooltip
 
 council_regions = {code: cfg.region for code, cfg in bootstrap().items()}
@@ -375,6 +376,70 @@ if nl_filters and nl_filters.query_type == "aggregate" and nl_filters.aggregate_
         # this ranking, instead of leaving them showing every site.
         filtered = filtered[filtered[answer.group_by_column].isin(answer.ranked[answer.group_by_column])]
         st.caption(f"Showing the {len(filtered)} scheme(s) behind this ranking below.")
+    st.divider()
+
+# --- Entity Search (Sprint 4.5b, "Entity Search + Allocation Card
+# Refinement", Part 4/5/10) - a second, deterministic search box, kept
+# visibly separate from the AI-enhanced natural-language one above (Part
+# 10: "clearly distinguish it from deterministic entity search"; absence
+# of OPENAI_API_KEY never disables this). All business logic lives in
+# app.reporting.entity_search - this page only collects scope/query/
+# filter inputs and renders the returned view model (CLAUDE.md: "keep
+# business logic out of the UI"). --------------------------------------
+
+st.markdown("##### 🔎 Search Planning Sites & Allocations")
+st.caption(
+    "Deterministic search by address, Application reference, allocation name, policy reference or council - "
+    "never uses AI, and works with no OpenAI key configured."
+)
+search_scope_label = st.radio(
+    "Search scope", ["All", "Planning Sites", "Allocations"], horizontal=True,
+    label_visibility="collapsed", key="entity-search-scope",
+)
+entity_query = st.text_input(
+    "Search Planning Sites & Allocations", key="entity-search-query", label_visibility="collapsed",
+    placeholder='Search by address, reference, allocation name or policy reference (e.g. "JPA 8", "HOM 2.1")...',
+)
+
+# Allocation-specific filters (Part 12) - reuses Allocation Discovery's own
+# filter vocabulary, revealed only once a scope that actually searches
+# allocations is selected, so "All" never exposes a confusing union of
+# every filter from both entity types at once.
+allocation_search_filters: dict = {"councils": councils or None}
+if search_scope_label in ("All", "Allocations"):
+    with st.expander("Allocation filters"):
+        alloc_filter_cols = st.columns(2)
+        with alloc_filter_cols[0]:
+            alloc_status_filter = st.multiselect(
+                "Plan status", ["adopted", "emerging", "other"], default=[],
+                format_func=lambda b: {"adopted": "Adopted", "emerging": "Emerging", "other": "Other / uncertain"}[b],
+                key="entity-search-alloc-status",
+            )
+            alloc_linked_filter = st.selectbox(
+                "Linked Application", ["Any", "Linked", "Not linked"], index=0, key="entity-search-alloc-linked",
+            )
+        with alloc_filter_cols[1]:
+            alloc_use_filter = st.multiselect(
+                "Intended use", ["residential", "employment", "mixed use"], default=[],
+                format_func=lambda u: {"residential": "Residential", "employment": "Employment", "mixed use": "Mixed use"}[u],
+                key="entity-search-alloc-use",
+            )
+        allocation_search_filters.update({
+            "plan_status_buckets": alloc_status_filter or None,
+            "intended_uses": alloc_use_filter or None,
+            "application_linkage": {"Linked": "linked", "Not linked": "not_linked"}.get(alloc_linked_filter),
+        })
+
+if entity_query.strip():
+    _scope_key = {"All": "all", "Planning Sites": "planning_sites", "Allocations": "allocations"}[search_scope_label]
+    # Planning Sites scope reuses whatever the sidebar Council/housing-type/
+    # unit filters above already narrowed `filtered` to (Part 12: "retain
+    # existing Explore filters") - never a second, parallel filter pipeline.
+    entity_results = search_entities(
+        session, entity_query, scope=_scope_key, allocation_filters=allocation_search_filters,
+        allowed_site_ids=set(filtered["site_id"]),
+    )
+    entity_search_results_panel(entity_results, key_prefix="entity-search")
     st.divider()
 
 st.subheader(f"{len(filtered)} sites")

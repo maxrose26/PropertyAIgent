@@ -95,6 +95,14 @@ _BADGE_KIND_STYLE = {
     "plan_examination": {"color": "blue", "icon": "🔵", "label": "Examination"},
     "plan_withdrawn": {"color": "red", "icon": "🛑", "label": "Withdrawn / superseded"},
     "plan_unknown": {"color": "gray", "icon": "❔", "label": "Unknown"},
+    # Sprint 4.5b ("Entity Search + Allocation Card Refinement", Part 2) -
+    # the compact positive replacement for the old card-level "no linked
+    # application" panel; green like "confirmed" since a genuinely linked
+    # Application is exactly that - confirmed, real evidence - never shown
+    # for a fuzzy/suggested match (see build_allocation_card's own
+    # show_linked_application_tag, computed only from a real
+    # linked_application_count).
+    "linked_application": {"color": "green", "icon": "🔗", "label": "Planning application linked"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -108,13 +116,6 @@ _CUSTOM_ALERT_STYLE = {
     "review": {"color": "#B7791F", "icon": "⚠", "label": "Review required"},
     "ai": {"color": "#6B4FA0", "icon": "🤖", "label": "AI-generated"},
     "evidence_missing": {"color": "#3B5773", "icon": "📄", "label": "Evidence missing"},
-    # Allocation Discovery (Sprint 4.5a, "Commercial Polish", Part 6) - the
-    # "no linked planning application" commercial signal. Reuses the same
-    # blue already assigned to "Informational/neutral" in the badge palette
-    # above (never a new colour) - a magnifying-glass icon fits "worth
-    # investigating" without implying a data-quality problem (amber/review)
-    # or a value judgement (green/red) the way those other kinds would.
-    "opportunity_signal": {"color": "#3B5773", "icon": "🔍", "label": "Worth investigating"},
 }
 
 
@@ -1137,8 +1138,12 @@ def allocation_card(card: dict, *, key: str) -> None:
         # 3. Capacity - a natural sentence fragment, not a bare field/value pair.
         st.markdown(f"**{_escape(card['capacity']['display'])}**")
 
-        # 4. Planning status
+        # 4. Planning status - the linked-application tag (Sprint 4.5b,
+        # Part 2) sits in the same badge row as plan/review status, only
+        # when a real linked Application relationship exists.
         badges = [(card["plan_status_chip_kind"], card["plan_status_label"]), (card["review_status_badge_kind"], card["review_status_label"])]
+        if card.get("show_linked_application_tag"):
+            badges.append(("linked_application", card["linked_application_tag_label"]))
         status_badge_row(badges)
         if card["is_multi_authority"]:
             joint_plan_badge()
@@ -1154,13 +1159,11 @@ def allocation_card(card: dict, *, key: str) -> None:
         else:
             st.caption("🖼 No confirmed or suggested visual evidence yet.")
 
-        if card.get("show_no_application_panel"):
-            render_alert(
-                "opportunity_signal", card["no_application_panel_message"],
-                title=card["no_application_panel_title"], key=f"alloc-no-app-{key}",
-            )
-        else:
-            st.caption(card["matched_summary"], help=card["matched_summary_help"])
+        # Sprint 4.5b, Part 1 - the old "no linked planning application"
+        # panel is gone from the card entirely (moved to Allocation Detail,
+        # Part 3); this plain caption is the only card-level statement of
+        # match/link status now, regardless of whether a link exists.
+        st.caption(card["matched_summary"], help=card["matched_summary_help"])
         if card.get("build_status_label"):
             st.caption(card["build_status_label"])
         if card.get("delivery_note"):
@@ -1191,6 +1194,51 @@ def allocation_card(card: dict, *, key: str) -> None:
         source_link = card.get("plan_page_url") or card.get("source_document_url")
         if source_link:
             st.caption(f"[Open source document →]({source_link})")
+
+
+def entity_search_result_row(result, *, key: str) -> None:
+    """One Entity Search hit (Sprint 4.5b, Part 8/9) - `result` is an
+    app.reporting.entity_search.SearchResult, accessed by attribute only
+    (never imported - this module stays free of app.* imports by design,
+    see its own docstring). Renders identically regardless of entity_type
+    except for the destination label/link - the two entity types are never
+    visually merged into one ambiguous row shape, and matched_entity_label
+    (Part 8's "Linked to allocation JPA 8" / "Linked planning Site"
+    indicator) is only ever shown when the caller already found a real
+    matched_site_id relationship - never inferred here."""
+    with st.container(border=True, key=key):
+        st.markdown(f"**{_escape(result.title)}**")
+        if result.subtitle:
+            st.caption(_escape(result.subtitle))
+        meta_bits = [b for b in (result.status, result.capacity_or_units) if b]
+        if meta_bits:
+            st.caption(" · ".join(_escape(str(b)) for b in meta_bits))
+        if result.matched_entity_label:
+            st.caption(f"🔗 {_escape(result.matched_entity_label)}")
+        label = "Open Allocation →" if result.entity_type == "allocation" else "Open Site →"
+        st.page_link(result.destination_page, label=label, query_params=result.destination_params)
+
+
+def entity_search_results_panel(results, *, key_prefix: str) -> None:
+    """`results` is an app.reporting.entity_search.EntitySearchResults -
+    grouped, never-merged sections (Part 8), each entity type in its own
+    labelled subsection so a user can never mistake an Allocation result
+    for a Planning Site result or vice versa."""
+    if results.is_empty:
+        empty_state(
+            "No matches found",
+            f"No Planning Sites or Allocations matched \"{results.query}\" - try a shorter search term.",
+            icon="🔍", show_home_link=False,
+        )
+        return
+    if results.allocations:
+        st.markdown(f"###### 🗺️ Allocations ({len(results.allocations)})")
+        for i, result in enumerate(results.allocations):
+            entity_search_result_row(result, key=f"{key_prefix}-alloc-{i}-{result.entity_id}")
+    if results.planning_sites:
+        st.markdown(f"###### 📍 Planning Sites ({len(results.planning_sites)})")
+        for i, result in enumerate(results.planning_sites):
+            entity_search_result_row(result, key=f"{key_prefix}-site-{i}-{result.entity_id}")
 
 
 def ai_status_summary_view(ai_summary: dict) -> None:

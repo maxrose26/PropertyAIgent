@@ -200,6 +200,28 @@ Examples:
 - Market Absorption
 - Land Sales Comparables
 - Demand Indicators
+- Ownership Intelligence (future - see below)
+
+### Future: Ownership Intelligence
+
+Recorded here by `005-entity-search-allocation-refinement.md` as a future specialist module within Market Intelligence, not yet implemented and not yet scheduled.
+
+**Purpose**
+
+- Identify registered land/title ownership.
+- Relate titles to Sites and Local Plan allocations.
+- Support land assembly and acquisition research.
+- Connect corporate owners to Companies House intelligence where relevant (via the existing `Organisation` domain object - see `004-core-domain-model.md`).
+
+**Important dependency**
+
+Reliable spatial/title matching. As of this note, some allocations carry a point coordinate (`LocalPlanSite.latitude`/`longitude`), but allocation/Site polygon geometry is not available platform-wide. A point coordinate alone is not sufficient to identify ownership safely - a point can fall inside the wrong title's boundary near any parcel edge, and PropertyAIgent must never present a guessed title as confirmed ownership evidence.
+
+**Future implementation shape**
+
+Allocation/Site geometry → HM Land Registry title polygon intersection → title identification → proprietor evidence → ownership intelligence.
+
+Each arrow above is a genuine, separate piece of work (true boundary geometry does not exist yet; HMLR integration does not exist yet; proprietor-evidence-to-Organisation matching does not exist yet) - this note exists so that work has an agreed home before it is built, not so that it looks closer to done than it is. This is not a ninth top-level platform capability - it is a sub-module of Market Intelligence, enriching the existing `Site`/`Policy` domain objects, per `004-core-domain-model.md`'s "Future Expansion" principle.
 
 ---
 

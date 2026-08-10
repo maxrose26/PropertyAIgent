@@ -43,7 +43,6 @@ from app.ui.shell import (
     evidence_gap_panel,
     joint_plan_badge,
     page_header,
-    render_alert,
     section_header,
     stat_tile,
     status_badge_row,
@@ -165,15 +164,13 @@ def _render_detail(view: dict, allocation_id: int) -> None:
             "boundary geometry for any allocation."
         )
 
-    # 5. Matched Sites and Applications
+    # 5. Matched Site and Applications (Sprint 4.5b, Part 3) - every linked
+    # Application is listed individually, never one picked and the rest
+    # hidden; the Site match itself (which can exist with zero linked
+    # Applications - an early-stage match, not yet a live filing) is shown
+    # separately from that list.
     section_header("Matched Site and Applications", icon="🔗")
-    if card.get("show_no_application_panel"):
-        render_alert(
-            "opportunity_signal", card["no_application_panel_message"],
-            title=card["no_application_panel_title"], key=f"alloc-detail-no-app-{allocation_id}",
-        )
-    else:
-        st.caption(card["matched_summary"], help=card["matched_summary_help"])
+    st.caption(card["matched_summary"], help=card["matched_summary_help"])
     if card["matched"]:
         if card["matched_site_address"]:
             st.write(f"**Matched Site:** {card['matched_site_address']}")
@@ -183,11 +180,30 @@ def _render_detail(view: dict, allocation_id: int) -> None:
             "pages/1_Scheme_Detail.py", label="Open Site Profile →",
             query_params={"site_id": str(card["matched_site_id"])},
         )
+
+    if card["linked_applications"]:
+        for linked_app in card["linked_applications"]:
+            with st.container(border=True, key=f"alloc-detail-app-{allocation_id}-{linked_app['id']}"):
+                st.markdown(f"**{linked_app['reference']}**")
+                if linked_app["site_address"]:
+                    st.caption(linked_app["site_address"])
+                status_bits = [b for b in (linked_app["status"], linked_app["decision"]) if b]
+                if status_bits:
+                    st.write(" · ".join(status_bits))
+                if linked_app["units"] is not None:
+                    st.caption(f"{linked_app['units']:,} units")
+                if card["build_status_label"]:
+                    st.caption(f"Build status: {card['build_status_label']}")
+                if linked_app["summary_url"]:
+                    st.markdown(f"[View on planning portal]({linked_app['summary_url']})")
     else:
-        st.caption(
-            "Open Council Intelligence or Explore to check whether an Application exists for this location "
-            "under a different address or reference."
-        )
+        st.caption(card["detail_no_application_message"])
+        st.caption(f"*{card['detail_no_application_note']}*")
+        if not card["matched"]:
+            st.caption(
+                "Open Council Intelligence or Explore to check whether an Application exists for this location "
+                "under a different address or reference."
+            )
 
     # 6. Progression / build evidence
     section_header("Progression and build evidence", icon="🏗️")

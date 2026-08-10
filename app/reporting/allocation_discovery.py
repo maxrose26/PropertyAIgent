@@ -337,12 +337,19 @@ def _why_it_matters_reasons(card: dict) -> list[str]:
     return reasons
 
 
-# --- "No linked planning application" commercial signal (Part 6) ------------
+# --- "No linked planning application" commercial signal --------------------
 #
-# Deliberately its own, separately-labelled panel rather than folded into
-# the why-it-matters bullet list above - Part 6 frames this as "one of the
-# platform's strongest commercial signals" and asks for a highlighted
-# treatment, not a plain caption line easily missed among several others.
+# Sprint 4.5b ("Entity Search + Allocation Card Refinement", Part 1/2)
+# removed this signal from the gallery card - the original Sprint 4.5a
+# "highlighted panel on every card" framing made every unmatched allocation
+# (the majority of the gallery) show the same repeated block, which read as
+# visual noise rather than a strong signal. The card now shows nothing
+# negative at all when there is no link (the existing "No Linked
+# Application" discovery category is the way to find these allocations);
+# a positive, compact tag appears instead ONLY where a link genuinely
+# exists (see LINKED_APPLICATION_TAG_LABEL / allocation_card's badge row).
+# This constant pair is now Detail-state-only wording (Part 3: "Keep this
+# detail-level wording rather than putting it on every gallery card").
 
 NO_LINKED_APPLICATION_PANEL_TITLE = "No linked planning application currently identified"
 NO_LINKED_APPLICATION_PANEL_MESSAGE = (
@@ -350,6 +357,70 @@ NO_LINKED_APPLICATION_PANEL_MESSAGE = (
     "investigation to determine whether an application exists or whether the allocation remains at a "
     "pre-application stage."
 )
+
+# Part 3's own, more concise detail-state wording - deliberately distinct
+# from the panel text above (still used as the "no development identified"
+# evidence-gap signal below Part 3's linked-application section) rather
+# than reusing it, per that Part's explicit wording.
+ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE = (
+    "No planning application is currently linked to this allocation in PropertyAIgent."
+)
+ALLOCATION_DETAIL_NO_APPLICATION_NOTE = "An application may exist but not yet have been matched."
+
+# Part 2 - the compact positive tag, shown in the card's badge row only
+# when linked_application_count > 0 (never inferred - a linked Application
+# only exists here once a Site is genuinely matched, see
+# build_allocation_discovery's own batched Application lookup, which never
+# guesses a link).
+LINKED_APPLICATION_TAG_LABEL = "Planning application linked"
+
+
+def show_linked_application_tag(card: dict) -> bool:
+    """Part 2's "no fuzzy suggestion should be presented as confirmed":
+    linked_application_count alone isn't enough - if the allocation's OWN
+    match to that Site is itself still needs_confirmation (an unreviewed,
+    possibly-wrong suggestion - see ALLOCATION_REVIEW_STATUS_META), a
+    confident green "linked" tag would overstate what's actually been
+    confirmed, even though the underlying Application row is perfectly
+    real. "auto_applied" is not excluded here - that review state already
+    means the platform's own deterministic matching pipeline applied it
+    without flagging ambiguity, the same trust level card["matched"] and
+    every other card element already extends to an auto_applied match."""
+    return card["linked_application_count"] > 0 and card["review_status"] != "needs_confirmation"
+
+
+def build_linked_application_summaries(linked_applications: list, matched_site: Site | None) -> list[dict]:
+    """Part 3 - one dict per linked Application, never picking one and
+    hiding the rest. `units` prefers the AI-reconciled SchemeIntelligence
+    figure (the same total_units_final every other Application-facing view
+    in this codebase trusts - see app.ui.common.aggregate_scheme_fields's
+    own docstring for why) and falls back to the portal listing's own
+    estimated_unit_count only when no reconciled figure exists yet -
+    never a fresh estimate invented here. Build/commencement status is
+    deliberately NOT duplicated per-application: it's a Site-level signal
+    (app.pipeline.lapse_tracking.compute_lapse_status already reasons
+    across every linked Application together, see build_allocation_card's
+    own call site) - inventing a second, per-Application version of that
+    same judgement here would risk disagreeing with it."""
+    site_address = matched_site.display_address if matched_site else None
+    summaries = []
+    for app in linked_applications:
+        si = getattr(app, "scheme_intelligence", None)
+        units = None
+        if si is not None and si.total_units_final:
+            units = si.total_units_final
+        elif app.estimated_unit_count:
+            units = app.estimated_unit_count
+        summaries.append({
+            "id": app.id,
+            "reference": app.reference,
+            "site_address": site_address or app.address,
+            "status": app.status,
+            "decision": app.decision,
+            "units": units,
+            "summary_url": app.summary_url,
+        })
+    return summaries
 
 
 def _no_development_identified(card: dict) -> bool:
@@ -522,9 +593,20 @@ def build_allocation_card(
     card["why_it_matters_reasons"] = _why_it_matters_reasons(card)
     card["why_it_matters"] = card["why_it_matters_reasons"][0]
     card["investigate_next"] = _investigate_next(card)
+    # Sprint 4.5b, Part 1/2 - show_no_application_panel/its title+message
+    # are kept for the "no development identified" evidence-gap panel a
+    # future caller may still want, but allocation_card() itself no longer
+    # renders them (see LINKED_APPLICATION_TAG_LABEL / show_linked_
+    # application_tag below for the card-level replacement, and
+    # ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE for the detail-state one).
     card["show_no_application_panel"] = show_no_application_panel(card)
     card["no_application_panel_title"] = NO_LINKED_APPLICATION_PANEL_TITLE
     card["no_application_panel_message"] = NO_LINKED_APPLICATION_PANEL_MESSAGE
+    card["show_linked_application_tag"] = show_linked_application_tag(card)
+    card["linked_application_tag_label"] = LINKED_APPLICATION_TAG_LABEL
+    card["linked_applications"] = build_linked_application_summaries(linked_applications, matched_site)
+    card["detail_no_application_message"] = ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE
+    card["detail_no_application_note"] = ALLOCATION_DETAIL_NO_APPLICATION_NOTE
     card["matching_attributes"] = build_matching_attributes(card)
     return card
 
