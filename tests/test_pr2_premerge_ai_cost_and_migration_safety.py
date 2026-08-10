@@ -293,10 +293,17 @@ def test_render_yaml_does_not_declare_a_web_service():
 def test_render_yaml_only_requires_database_url():
     """The corrected minimal requirement - OPENAI_API_KEY/EPC_API_KEY are
     genuinely not needed by the default scheduled invocation and must not
-    be declared as required secrets the job doesn't actually need."""
+    be declared as required secrets the job doesn't actually need.
+
+    Updated by the Render Daily Discovery runtime failure hotfix:
+    PLAYWRIGHT_BROWSERS_PATH is a legitimate addition - not a secret this
+    job doesn't need, but a plain Playwright configuration constant (see
+    render.yaml's own "BUILD/RUNTIME" header comment) required for the
+    browser Daily Discovery already unconditionally depends on to actually
+    be found at run time, not just at build time."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     env_var_keys = {e["key"] for e in config["services"][0].get("envVars", [])}
-    assert env_var_keys == {"DATABASE_URL"}
+    assert env_var_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH"}
 
 
 def test_render_yaml_start_command_matches_the_orchestrator_default_behaviour():

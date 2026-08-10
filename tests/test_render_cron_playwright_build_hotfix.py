@@ -141,11 +141,16 @@ def test_run_intelligence_processing_module_never_launches_a_browser():
 
 
 def test_daily_discovery_schedule_and_start_command_unchanged():
+    """Updated by the Render Daily Discovery runtime failure hotfix:
+    PLAYWRIGHT_BROWSERS_PATH is a legitimate, documented addition (see
+    tests/test_render_daily_discovery_runtime_failure_hotfix.py) -
+    schedule and start command remain exactly as this test always
+    asserted."""
     discovery = _service("propertyaigent-daily-scrape")
     assert discovery["schedule"] == "0 5 * * *"
     assert discovery["startCommand"] == "python -m scripts.run_daily_councils"
     env_keys = {e["key"] for e in discovery.get("envVars", [])}
-    assert env_keys == {"DATABASE_URL"}
+    assert env_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH"}
 
 
 def test_intelligence_processing_schedule_and_start_command_unchanged():
@@ -166,9 +171,15 @@ def test_render_yaml_still_declares_exactly_two_cron_jobs_no_web_service():
 
 
 def test_render_yaml_no_service_commits_an_actual_secret_value():
+    """PLAYWRIGHT_BROWSERS_PATH=0 (Render Daily Discovery runtime failure
+    hotfix) is the one deliberate, documented exception - a plain
+    Playwright configuration constant, not a secret."""
     config = yaml.safe_load(RENDER_YAML_TEXT)
     for service in config["services"]:
         for env_var in service.get("envVars", []):
+            if env_var["key"] == "PLAYWRIGHT_BROWSERS_PATH":
+                assert env_var["value"] == "0"
+                continue
             assert env_var.get("sync") is False
             assert "value" not in env_var
 

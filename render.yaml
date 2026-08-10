@@ -40,7 +40,11 @@
 # (Pilot Readiness PR-2 pre-merge + final pre-merge architecture checks,
 # "Render Blueprint Safety" / "Render Architecture"):
 #   Daily Discovery (propertyaigent-daily-scrape):
-#     DATABASE_URL    REQUIRED. The pipeline cannot run at all without it.
+#     DATABASE_URL              REQUIRED. The pipeline cannot run at all
+#                                without it.
+#     PLAYWRIGHT_BROWSERS_PATH  Set to "0" (see "BUILD/RUNTIME" note below)
+#                                - not a secret, a plain Playwright config
+#                                constant, safe to commit directly.
 #     OPENAI_API_KEY  NOT required. scripts/run_daily_councils.py passes
 #                     --skip-extraction --skip-scheme-summary on every
 #                     subprocess invocation unless started with
@@ -54,10 +58,27 @@
 #                     crash) - improves build-status accuracy if set, but
 #                     the daily discovery/document job runs correctly
 #                     without it.
+#   Intelligence Processing (propertyaigent-intelligence-processing):
+#     DATABASE_URL    REQUIRED, same reason as above.
+#     OPENAI_API_KEY  REQUIRED. This job's entire purpose is calling
+#                     run_weekly.py's stage_extraction/stage_generate_
+#                     scheme_summaries, both of which call the OpenAI API -
+#                     see scripts/run_intelligence_processing.py's own
+#                     docstring for the one exception (a run with zero
+#                     outstanding work never reads this variable at all,
+#                     but the Cron Job's own environment must still have it
+#                     available for every run that DOES find work).
+#     EPC_API_KEY     NOT required. This job never calls
+#                     stage_check_build_status or anything else that
+#                     touches EPC data.
+# No secret's actual value is ever declared below (sync: false everywhere
+# a real secret is required) - requiring a secret a job does not genuinely
+# need is itself a safety risk (unnecessary exposure, unnecessary operator
+# setup friction).
 #
-# BUILD (Render Cron Job Playwright build hotfix - "Switching to root user
-# to install dependencies... su: Authentication failure" observed on the
-# first real Blueprint sync):
+# BUILD/RUNTIME (Render Cron Job Playwright build hotfix - "Switching to
+# root user to install dependencies... su: Authentication failure" observed
+# on the first real Blueprint sync):
 #   Daily Discovery's build previously ran
 #     playwright install --with-deps chromium
 #   `--with-deps` doesn't just download the Chromium binary - it ALSO
@@ -72,13 +93,48 @@
 #   `python -m scripts.verify_browser_runtime` (see that script's own
 #   docstring) so a still-missing OS shared library turns into an
 #   unambiguous BUILD failure right away, rather than a cryptic scrape
-#   failure discovered only at the next 05:00 UTC scheduled run. Every
-#   council (idox, idox_anite, arcus doc_system alike) is scraped through
-#   the one shared Playwright Chromium session run_weekly.py's own main()
-#   opens - Playwright is required unconditionally for Daily Discovery,
-#   for all 10 councils, not just some.
+#   failure discovered only at the next 05:00 UTC scheduled run.
+#
+#   SECOND hotfix (Render Daily Discovery runtime failure, all 10 councils
+#   failed identically after the build-hotfix build itself succeeded):
+#   read-only inspection of the resulting ScrapeRun rows' own `detail` text
+#   showed every single failure was the exact same
+#     playwright._impl._errors.Error: BrowserType.launch: Executable
+#     doesn't exist at /opt/render/.cache/ms-playwright/
+#     chromium_headless_shell-<rev>/chrome-headless-shell-linux64/
+#     chrome-headless-shell
+#   - i.e. the browser build's own build-time canary passed (the binary
+#   WAS present in that default cache directory during the build
+#   container), but had vanished by the time the Cron Job's own scheduled
+#   run actually executed run_weekly.py's `p.chromium.launch(headless=True)`
+#   - Render Cron Jobs do not guarantee that a home-directory cache
+#   (`~/.cache/ms-playwright`, outside the project's own dependency tree)
+#   written during build persists into a later scheduled run's container.
+#   Fixed by setting PLAYWRIGHT_BROWSERS_PATH=0 (Playwright's own
+#   documented mechanism for exactly this "browsers vanish between build
+#   and run in ephemeral CI/PaaS environments" class of problem) - this
+#   makes `playwright install chromium` download the browser INSIDE the
+#   playwright package's own installed directory
+#   (.venv/lib/.../playwright/driver/package/.local-browsers/), which is
+#   part of the same dependency tree `pip install -r requirements.txt`
+#   already manages and is therefore guaranteed to be present for every
+#   run, not a separate cache that may or may not survive between build
+#   and run. Verified locally: with this variable set, `playwright install
+#   chromium` downloads into the project's own .venv tree, and
+#   verify_browser_runtime.py's canary still launches and closes Chromium
+#   successfully from there.
+#
+#   Every council (idox, idox_anite, arcus doc_system alike) is scraped
+#   through the one shared Playwright Chromium session run_weekly.py's own
+#   main() opens - Playwright is required unconditionally for Daily
+#   Discovery, for all 10 councils, not just some, so PLAYWRIGHT_BROWSERS_
+#   PATH must be set for this Cron Job's own run environment (not just its
+#   build), since Playwright reads this variable at BOTH install time and
+#   launch time to agree on where to look.
+#
 #   Intelligence Processing's own buildCommand deliberately has NO
-#   playwright install step at all (not even without --with-deps) -
+#   playwright install step at all (not even without --with-deps), and
+#   does not need PLAYWRIGHT_BROWSERS_PATH either -
 #   scripts/run_intelligence_processing.py never launches a browser (it
 #   only calls run_weekly.py's stage_extraction/stage_generate_scheme_
 #   summaries, neither of which touches Playwright); importing app.
@@ -86,30 +142,15 @@
 #   module level, which `pip install -r requirements.txt` alone already
 #   satisfies - only actually LAUNCHING a browser needs the binary
 #   download step, and this job never does that.
+#
 #   If Render's base image is ever found to be missing a Chromium shared
-#   library even after this fix (verify_browser_runtime.py's own failure
-#   message will say so explicitly in the build log), the next escalation
-#   is a Docker-based Cron Job runtime using the official Playwright image
-#   (mcr.microsoft.com/playwright/python), which ships Chromium with every
-#   OS dependency already baked into the image - not attempted here since
-#   there is no current evidence it's needed, and it is meaningfully more
-#   infrastructure than this fix required.
-#   Intelligence Processing (propertyaigent-intelligence-processing):
-#     DATABASE_URL    REQUIRED, same reason as above.
-#     OPENAI_API_KEY  REQUIRED. This job's entire purpose is calling
-#                     run_weekly.py's stage_extraction/stage_generate_
-#                     scheme_summaries, both of which call the OpenAI API -
-#                     see scripts/run_intelligence_processing.py's own
-#                     docstring for the one exception (a run with zero
-#                     outstanding work never reads this variable at all,
-#                     but the Cron Job's own environment must still have it
-#                     available for every run that DOES find work).
-#     EPC_API_KEY     NOT required. This job never calls
-#                     stage_check_build_status or anything else that
-#                     touches EPC data.
-# No secret's actual value is ever declared below (sync: false everywhere)
-# - requiring a secret a job does not genuinely need is itself a safety
-# risk (unnecessary exposure, unnecessary operator setup friction).
+#   library even after these fixes (verify_browser_runtime.py's own
+#   failure message will say so explicitly in the build log), the next
+#   escalation is a Docker-based Cron Job runtime using the official
+#   Playwright image (mcr.microsoft.com/playwright/python), which ships
+#   Chromium with every OS dependency already baked into the image - not
+#   attempted here since there is no current evidence it's needed, and it
+#   is meaningfully more infrastructure than these fixes required.
 
 services:
   - type: cron
@@ -131,6 +172,14 @@ services:
       # Blueprint needs to exist but must never contain.
       - key: DATABASE_URL
         sync: false
+      # NOT a secret - a literal Playwright configuration constant, safe
+      # to commit directly (value:, not sync: false). See the "BUILD/
+      # RUNTIME" header comment above ("Render Daily Discovery runtime
+      # failure") for the full diagnosis - without this, the browser
+      # installed during build is not guaranteed to still be present when
+      # the Cron Job's own scheduled run actually launches it.
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
 
   - type: cron
     name: propertyaigent-intelligence-processing
