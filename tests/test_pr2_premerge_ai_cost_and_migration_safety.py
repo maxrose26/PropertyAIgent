@@ -44,9 +44,11 @@ def test_daily_orchestrator_defaults_to_skipping_ai_stages():
 
     captured_commands = []
 
-    def fake_run(command, **kwargs):
+    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
         captured_commands.append(command)
-        return subprocess.CompletedProcess(args=command, returncode=0, stdout="Done.", stderr="")
+        if on_line is not None:
+            on_line("Done.")
+        return 0
 
     from sqlalchemy import create_engine as _ce
     from sqlalchemy.orm import sessionmaker as _sm
@@ -59,7 +61,7 @@ def test_daily_orchestrator_defaults_to_skipping_ai_stages():
                     date_field_mode="received", doc_system="idox"))
     db.commit()
 
-    with patch("scripts.run_daily_councils.subprocess.run", side_effect=fake_run):
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=fake_run):
         run_one_council(db, "testcouncil", timeout_seconds=60, triggered_by="scheduled")
 
     assert len(captured_commands) == 1
@@ -72,9 +74,11 @@ def test_daily_orchestrator_include_ai_stages_flag_omits_the_skip_flags():
 
     captured_commands = []
 
-    def fake_run(command, **kwargs):
+    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
         captured_commands.append(command)
-        return subprocess.CompletedProcess(args=command, returncode=0, stdout="Done.", stderr="")
+        if on_line is not None:
+            on_line("Done.")
+        return 0
 
     from sqlalchemy import create_engine as _ce
     from sqlalchemy.orm import sessionmaker as _sm
@@ -87,7 +91,7 @@ def test_daily_orchestrator_include_ai_stages_flag_omits_the_skip_flags():
                     date_field_mode="received", doc_system="idox"))
     db.commit()
 
-    with patch("scripts.run_daily_councils.subprocess.run", side_effect=fake_run):
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=fake_run):
         run_one_council(db, "testcouncil", timeout_seconds=60, triggered_by="manual", include_ai_stages=True)
 
     assert "--skip-extraction" not in captured_commands[0]

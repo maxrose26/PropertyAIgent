@@ -172,13 +172,41 @@ def _fake_completed_process(returncode: int, stdout: str = "", stderr: str = "")
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
+def _fake_run_council_subprocess(lines=(), returncode=0):
+    """Render Daily Discovery memory instrumentation: _run_council_subprocess
+    now streams output line-by-line via an on_line callback and returns a
+    plain int exit code, instead of buffering everything into a
+    CompletedProcess - this reproduces that streaming contract for tests
+    that only care about run_one_council's own behaviour, not
+    _run_council_subprocess's internals (see
+    tests/test_render_daily_discovery_memory_audit.py for those)."""
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        if on_line is not None:
+            for line in lines:
+                on_line(line)
+        return returncode
+    return _fake
+
+
+def _fake_run_council_subprocess_timeout(lines=()):
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        if on_line is not None:
+            for line in lines:
+                on_line(line)
+        raise subprocess.TimeoutExpired(command, timeout_seconds)
+    return _fake
+
+
 def test_run_one_council_records_success(session):
     from scripts.run_daily_councils import run_one_council
 
     session.add(Application(council_code="testcouncil", reference="APP/1"))
     session.commit()
 
-    with patch("scripts.run_daily_councils.subprocess.run", return_value=_fake_completed_process(0, stdout="Done.")):
+    with patch(
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess(["Done."], returncode=0),
+    ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert run.status == "success"
@@ -195,8 +223,8 @@ def test_run_one_council_records_failure_without_raising(session):
     from scripts.run_daily_councils import run_one_council
 
     with patch(
-        "scripts.run_daily_councils.subprocess.run",
-        return_value=_fake_completed_process(1, stderr="Traceback: portal unreachable"),
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess(["Traceback: portal unreachable"], returncode=1),
     ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="scheduled")
 
@@ -208,8 +236,8 @@ def test_run_one_council_records_timeout_without_raising(session):
     from scripts.run_daily_councils import run_one_council
 
     with patch(
-        "scripts.run_daily_councils.subprocess.run",
-        side_effect=subprocess.TimeoutExpired(cmd=["python"], timeout=60),
+        "scripts.run_daily_councils._run_council_subprocess",
+        side_effect=_fake_run_council_subprocess_timeout(),
     ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="scheduled")
 
@@ -230,10 +258,10 @@ def test_one_council_failure_does_not_prevent_the_next_council_from_running(sess
     session.commit()
 
     call_results = iter([
-        _fake_completed_process(1, stderr="council 1 crashed"),
-        _fake_completed_process(0, stdout="council 2 fine"),
+        _fake_run_council_subprocess(["council 1 crashed"], returncode=1),
+        _fake_run_council_subprocess(["council 2 fine"], returncode=0),
     ])
-    with patch("scripts.run_daily_councils.subprocess.run", side_effect=lambda *a, **k: next(call_results)):
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=lambda *a, **k: next(call_results)(*a, **k)):
         run1 = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="scheduled")
         run2 = run_one_council(session, "thirdcouncil", timeout_seconds=60, triggered_by="scheduled")
 

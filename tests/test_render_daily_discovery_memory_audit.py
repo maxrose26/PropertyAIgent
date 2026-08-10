@@ -31,8 +31,13 @@ stages, no schema/matching changes) regressed.
 from __future__ import annotations
 
 import subprocess
+import sys
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import psutil
+import pytest
 
 from app.db.models import Council
 
@@ -76,100 +81,130 @@ def test_run_weekly_still_launches_headless_chromium_only_once():
 
 
 # --- Process-group-isolated subprocess timeout handling ---------------------
+#
+# Render Daily Discovery memory instrumentation: _run_council_subprocess was
+# redesigned from a single subprocess.run(..., capture_output=True) call
+# into a STREAMING design (each line handed to an on_line callback as it
+# arrives, not buffered until the child exits) - reconstructing the
+# timeline of the real 2Gi production OOM found the in-flight council's
+# ScrapeRun.detail was entirely empty, because the old design only ever
+# wrote it from the fully-buffered output AFTER subprocess.run() returned,
+# which never happened once the orchestrator itself was killed. These
+# tests exercise the new _kill_process_tree helper directly (pure logic,
+# no real process needed) and _run_council_subprocess itself against real,
+# tiny, fast subprocesses (more robust than deep-mocking Popen/threading
+# internals, and this is exactly the kind of small controlled local test
+# this audit's own "Controlled Local Testing" section asks for).
 
 
-def test_run_council_subprocess_posix_kills_whole_process_group_on_timeout():
-    """The exact fix: on POSIX, a timeout must kill the CHILD'S PROCESS
-    GROUP (every Playwright-driver/Chromium descendant), not just the one
-    tracked PID - proven here via mocks, since this Windows dev machine
-    cannot exercise a real POSIX process group."""
-    from scripts.run_daily_councils import _run_council_subprocess
+def test_kill_process_tree_posix_kills_the_whole_process_group():
+    from scripts.run_daily_councils import _kill_process_tree
 
     fake_process = MagicMock()
     fake_process.pid = 4242
-    fake_process.communicate.side_effect = [
-        subprocess.TimeoutExpired(cmd=["x"], timeout=1),
-        ("partial stdout", "partial stderr"),
-    ]
 
     with patch("scripts.run_daily_councils.os.name", "posix"), \
-         patch("scripts.run_daily_councils.subprocess.Popen", return_value=fake_process) as mock_popen, \
          patch("scripts.run_daily_councils.os.getpgid", return_value=9999, create=True) as mock_getpgid, \
          patch("scripts.run_daily_councils.os.killpg", create=True) as mock_killpg:
-        try:
-            _run_council_subprocess(["python", "-m", "x"], cwd=REPO_ROOT, timeout_seconds=1)
-            assert False, "expected TimeoutExpired to propagate"
-        except subprocess.TimeoutExpired as e:
-            assert e.stdout == "partial stdout"
-            assert e.stderr == "partial stderr"
+        _kill_process_tree(fake_process)
 
-    # start_new_session=True is what makes the child its own process-group
-    # leader in the first place - the fix does nothing without this.
-    assert mock_popen.call_args.kwargs.get("start_new_session") is True
     mock_getpgid.assert_called_once_with(4242)
     # 9 == SIGKILL's POSIX-standard value - see the source's own comment on
     # why this is a portable literal rather than signal.SIGKILL.
     mock_killpg.assert_called_once_with(9999, 9)
+    fake_process.kill.assert_not_called()
 
 
-def test_run_council_subprocess_posix_success_path_returns_completed_process():
-    from scripts.run_daily_councils import _run_council_subprocess
+def test_kill_process_tree_non_posix_kills_just_the_tracked_process():
+    """Windows (this repo's own local dev environment) has no process-group
+    model - must not attempt os.killpg there, just kill the one tracked
+    Popen object, unchanged from the prior hotfix's own behaviour."""
+    from scripts.run_daily_councils import _kill_process_tree
 
     fake_process = MagicMock()
-    fake_process.pid = 4242
-    fake_process.returncode = 0
-    fake_process.communicate.return_value = ("all good", "")
-
-    with patch("scripts.run_daily_councils.os.name", "posix"), \
-         patch("scripts.run_daily_councils.subprocess.Popen", return_value=fake_process):
-        result = _run_council_subprocess(["python", "-m", "x"], cwd=REPO_ROOT, timeout_seconds=60)
-
-    assert result.returncode == 0
-    assert result.stdout == "all good"
-
-
-def test_run_council_subprocess_non_posix_falls_back_to_plain_subprocess_run():
-    """Windows (this repo's own local dev environment) has no equivalent
-    process-group model - must not attempt os.killpg there, just delegate
-    to the pre-existing subprocess.run() behaviour unchanged."""
-    from scripts.run_daily_councils import _run_council_subprocess
 
     with patch("scripts.run_daily_councils.os.name", "nt"), \
-         patch(
-             "scripts.run_daily_councils.subprocess.run",
-             return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr=""),
-         ) as mock_run:
-        result = _run_council_subprocess(["python", "-m", "x"], cwd=REPO_ROOT, timeout_seconds=60)
-
-    assert result.returncode == 0
-    mock_run.assert_called_once()
-
-
-def test_run_council_subprocess_never_calls_killpg_on_non_posix():
-    from scripts.run_daily_councils import _run_council_subprocess
-
-    with patch("scripts.run_daily_councils.os.name", "nt"), \
-         patch("scripts.run_daily_councils.subprocess.run",
-               return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")), \
          patch("scripts.run_daily_councils.os.killpg", create=True) as mock_killpg:
-        _run_council_subprocess(["python", "-m", "x"], cwd=REPO_ROOT, timeout_seconds=60)
+        _kill_process_tree(fake_process)
 
+    fake_process.kill.assert_called_once()
     mock_killpg.assert_not_called()
+
+
+def test_run_council_subprocess_streams_each_line_via_callback():
+    """Real subprocess, not a mock - proves lines actually arrive one at a
+    time rather than only being visible after the child exits."""
+    from scripts.run_daily_councils import _run_council_subprocess
+
+    lines = []
+    rc = _run_council_subprocess(
+        [sys.executable, "-u", "-c", "print('line1'); print('line2')"],
+        cwd=REPO_ROOT, timeout_seconds=15, on_line=lines.append,
+    )
+    assert rc == 0
+    assert lines == ["line1", "line2"]
+
+
+def test_run_council_subprocess_raises_timeout_and_kills_the_hung_process():
+    """Real subprocess that sleeps past its timeout - proves the process is
+    actually killed (test completes quickly, not after the full sleep) and
+    that whatever it printed BEFORE hanging was still streamed through."""
+    from scripts.run_daily_councils import _run_council_subprocess
+
+    lines = []
+    start = time.monotonic()
+    with pytest.raises(subprocess.TimeoutExpired):
+        _run_council_subprocess(
+            [sys.executable, "-u", "-c", "import time; print('before-hang'); time.sleep(30)"],
+            cwd=REPO_ROOT, timeout_seconds=1, on_line=lines.append,
+        )
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 15  # actually killed - did not wait out the full 30s sleep
+    assert lines == ["before-hang"]
+
+
+def test_run_council_subprocess_leaves_no_orphaned_descendants_after_normal_exit():
+    """Process-tree/orphan validation (Part 9) - a child that itself spawns
+    a grandchild (standing in for run_weekly.py spawning Playwright's
+    driver, which spawns Chromium) must have NO live descendants once
+    _run_council_subprocess returns normally - real evidence, not an
+    assumption, that normal-path cleanup reaches every level of the tree,
+    not just the one directly-tracked child."""
+    from scripts.run_daily_councils import _run_council_subprocess
+
+    script = (
+        "import subprocess, sys; "
+        "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(0.3)']); "
+        "print('grandchild_pid=' + str(p.pid)); "
+        "p.wait()"
+    )
+    lines = []
+    rc = _run_council_subprocess(
+        [sys.executable, "-u", "-c", script], cwd=REPO_ROOT, timeout_seconds=15, on_line=lines.append,
+    )
+    assert rc == 0
+
+    grandchild_pid = int(next(line for line in lines if line.startswith("grandchild_pid=")).split("=")[1])
+    time.sleep(0.5)  # give the OS a moment past the grandchild's own 0.3s sleep
+    assert not psutil.pid_exists(grandchild_pid)
 
 
 # --- run_one_council still wired through the new helper, behaviour intact --
 
 
 def test_run_one_council_still_uses_run_council_subprocess(session):
-    """Confirms the wiring - run_one_council calls the new process-group-
-    aware helper, not raw subprocess.run directly, without changing its
-    own success/failure/ScrapeRun contract."""
+    """Confirms the wiring - run_one_council calls the new streaming
+    helper, not raw subprocess.run directly, without changing its own
+    success/failure/ScrapeRun contract."""
     from scripts.run_daily_councils import run_one_council
 
-    with patch(
-        "scripts.run_daily_councils._run_council_subprocess",
-        return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="Done.", stderr=""),
-    ) as mock_helper:
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        if on_line is not None:
+            on_line("Done.")
+        return 0
+
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_subprocess) as mock_helper:
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert run.status == "success"
@@ -179,10 +214,12 @@ def test_run_one_council_still_uses_run_council_subprocess(session):
 def test_run_one_council_records_timeout_from_the_new_helper_without_raising(session):
     from scripts.run_daily_councils import run_one_council
 
-    with patch(
-        "scripts.run_daily_councils._run_council_subprocess",
-        side_effect=subprocess.TimeoutExpired(cmd=["x"], timeout=60, output="partial", stderr="stuck"),
-    ):
+    def _fake_timeout(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        if on_line is not None:
+            on_line("stuck mid-stage")
+        raise subprocess.TimeoutExpired(command, timeout_seconds)
+
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_timeout):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert run.status == "failed"
@@ -198,15 +235,17 @@ def test_one_council_timeout_does_not_prevent_the_next_council_being_attempted(s
     ))
     session.commit()
 
-    with patch(
-        "scripts.run_daily_councils._run_council_subprocess",
-        side_effect=subprocess.TimeoutExpired(cmd=["x"], timeout=60, output="", stderr=""),
-    ):
+    def _fake_timeout(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        raise subprocess.TimeoutExpired(command, timeout_seconds)
+
+    def _fake_success(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        if on_line is not None:
+            on_line("Done.")
+        return 0
+
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_timeout):
         run1 = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
-    with patch(
-        "scripts.run_daily_councils._run_council_subprocess",
-        return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="Done.", stderr=""),
-    ):
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_success):
         run2 = run_one_council(session, "thirdcouncil", timeout_seconds=60, triggered_by="manual")
 
     assert run1.status == "failed"

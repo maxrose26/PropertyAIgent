@@ -86,6 +86,8 @@ import os
 import re
 import subprocess
 import sys
+import threading
+from collections import deque
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -93,6 +95,15 @@ from sqlalchemy import func, select
 from app.config import load_councils
 from app.db.models import Application, ScrapeRun
 from app.db.session import get_session, init_db
+from app.diagnostics.memory import log_memory
+
+# Bounded ring buffer size for one council's streamed output - generous
+# relative to a normal run's real line counts (the earlier production
+# incident's own successful councils logged roughly 15-70 lines each; see
+# this module's own docstring, "Streamed, bounded subprocess output") -
+# while still guaranteeing the buffer itself can never grow unbounded
+# regardless of how verbose a pathological run becomes.
+_OUTPUT_TAIL_MAX_LINES = 200
 
 _ERROR_LINE_PATTERN = re.compile(r"^\s*[\w.]*(?:Error|Exception)\s*:.*$", re.MULTILINE)
 
@@ -148,63 +159,95 @@ def _application_count(session, council_code: str) -> int:
     ).scalar()
 
 
-def _run_council_subprocess(command: list[str], *, cwd: Path, timeout_seconds: int) -> subprocess.CompletedProcess:
-    """subprocess.run(..., timeout=...) equivalent, except on timeout it
-    kills the CHILD'S WHOLE PROCESS GROUP, not just the one PID it tracks
-    (Render Daily Discovery memory audit - "check for resource leaks",
-    subprocess timeout handling).
-
-    run_weekly.py opens its own Playwright driver process, which in turn
-    launches its own Chromium process tree (browser + GPU/renderer/utility
-    processes - confirmed via scripts/diagnose_browser_memory.py: 4-5
-    processes for one page). On the NORMAL exit path this is fully
-    self-cleaning (`browser.close()`, and even an uncaught Python
-    exception still runs `with sync_playwright()`'s own teardown - both
-    verified locally). But `subprocess.run(..., timeout=N)`'s own timeout
-    handling calls `Popen.kill()`, which sends SIGKILL to ONLY the one
-    tracked child PID (run_weekly.py's own Python interpreter) - a
-    SIGKILL'd process gets no chance to run any cleanup code at all, and
-    on POSIX, killing a parent does NOT automatically kill its own
-    children (they're simply re-parented, not terminated). A council that
-    genuinely hangs long enough to hit the (generous, 3600s default)
-    per-council timeout could therefore leave an entire orphaned
-    Playwright-driver-plus-Chromium process tree running inside the SAME
-    container for the rest of the Cron Job's lifetime, compounding with
-    every subsequent council's own fresh browser launch - a plausible
-    contributor to the observed 512Mi OOM once enough councils have run.
-
-    Fixed on POSIX by starting the child in its own new session/process
-    group (`start_new_session=True`, equivalent to calling setsid() before
-    exec) and, on timeout, killing that WHOLE process group
-    (os.killpg(.... SIGKILL)) rather than only the one PID - guarantees
-    the Playwright driver and every Chromium descendant die with it.
-    Windows has no equivalent process-group model (production - Render -
-    is Linux; this repo's local dev happens to run on Windows), so this
-    falls back to plain subprocess.run()'s existing behaviour there,
-    unchanged from before this audit."""
-    if os.name != "posix":
-        return subprocess.run(command, cwd=cwd, timeout=timeout_seconds, capture_output=True, text=True)
-
-    process = subprocess.Popen(
-        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
-    )
-    try:
-        stdout, stderr = process.communicate(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired:
+def _kill_process_tree(process: subprocess.Popen) -> None:
+    """Kills the WHOLE process group a child was started in (POSIX), not
+    just the one tracked PID - see _run_council_subprocess's own docstring
+    for why this matters (an orphaned Playwright-driver-plus-Chromium tree
+    otherwise). Windows has no process-group equivalent; falls back to
+    killing just the tracked PID there (production/Render is POSIX; this
+    repo's own local dev happens to run on Windows)."""
+    if os.name == "posix":
         try:
             # 9 == SIGKILL's POSIX-standard value, used as a portable literal
             # rather than signal.SIGKILL - the `signal` module's Windows
-            # build has no SIGKILL attribute at all (this branch never
-            # actually runs on Windows in production - os.name is always
-            # "posix" here - but referencing the named constant directly
-            # would break even importing this module cleanly under test on
-            # this repo's own Windows dev environment).
+            # build has no SIGKILL attribute at all, which would break even
+            # importing this module cleanly under test on this repo's own
+            # Windows dev environment (this branch never actually runs on
+            # Windows in production - os.name is always "posix" there).
             os.killpg(os.getpgid(process.pid), 9)
         except ProcessLookupError:
             pass  # already gone between the timeout firing and us getting here - fine
-        stdout, stderr = process.communicate()  # reap the now-dead process, collect whatever partial output exists
-        raise subprocess.TimeoutExpired(command, timeout_seconds, output=stdout, stderr=stderr)
-    return subprocess.CompletedProcess(args=command, returncode=process.returncode, stdout=stdout, stderr=stderr)
+    else:
+        process.kill()
+
+
+def _run_council_subprocess(
+    command: list[str], *, cwd: Path, timeout_seconds: int, on_line=None, council_code: str | None = None,
+) -> int:
+    """Runs one council's subprocess with STREAMED, bounded output instead
+    of subprocess.run(..., capture_output=True)'s "buffer everything, only
+    look at it once the child exits" model (Render Daily Discovery memory
+    instrumentation & architecture diagnosis).
+
+    Two production failures (Starter/512Mi, then Standard/2Gi) both ended
+    in a container-level OOM kill of the WHOLE process tree, including the
+    orchestrator itself. Reconstructing the timeline afterwards from
+    ScrapeRun rows found the council that was actually running at the
+    moment of death had NO detail recorded at all (status stuck at
+    "running", detail=None) - because the old design only ever wrote
+    ScrapeRun.detail from the fully-buffered captured output AFTER
+    subprocess.run() returned, which never happened once the orchestrator
+    itself was killed. Whatever that council had already printed was
+    sitting entirely inside a Python string buffer nobody had looked at
+    yet - genuinely lost, not just hard to find.
+
+    Fixed by streaming: each line the child prints is read and handed to
+    `on_line` (the caller's own responsibility - run_one_council both
+    re-prints it to THIS process's own stdout, which Render's log capture
+    receives continuously and independently of whether this process is
+    later OOM-killed, AND appends it to a small bounded ring buffer for
+    ScrapeRun.detail) as it arrives, not buffered until the end. This also
+    directly answers Part 5's "does capture_output pose a real memory
+    risk": yes, unbounded buffering of a real (not blank-page) council's
+    full output is a genuine, if secondary, contributor - streaming with a
+    bounded ring buffer caps it regardless of how verbose a run becomes.
+
+    Kills the child's WHOLE PROCESS GROUP on timeout (POSIX), not just the
+    one tracked PID - unchanged reasoning from the prior hotfix, just
+    factored into _kill_process_tree so the streaming redesign didn't need
+    to duplicate it. Returns the child's own exit code; raises
+    subprocess.TimeoutExpired (no output/stderr payload - the caller
+    already received every line via on_line as it streamed) on timeout."""
+    stdout_kwargs = {"start_new_session": True} if os.name == "posix" else {}
+    process = subprocess.Popen(
+        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, **stdout_kwargs,
+    )
+    # "Immediately after council subprocess starts" (Render Daily Discovery
+    # memory instrumentation orchestrator boundary) - measures the CHILD's
+    # own OS-level footprint by pid from the parent's side, distinct from
+    # run_weekly.py's own self-measurement of the SAME process from inside.
+    log_memory("council.subprocess_started", council=council_code, pid=process.pid)
+
+    timed_out = threading.Event()
+
+    def _on_timeout() -> None:
+        timed_out.set()
+        _kill_process_tree(process)
+
+    timer = threading.Timer(timeout_seconds, _on_timeout)
+    timer.start()
+    try:
+        assert process.stdout is not None
+        for line in process.stdout:
+            if on_line is not None:
+                on_line(line.rstrip("\n"))
+        process.wait()
+    finally:
+        timer.cancel()
+
+    if timed_out.is_set():
+        raise subprocess.TimeoutExpired(command, timeout_seconds)
+    return process.returncode
 
 
 def run_one_council(
@@ -217,8 +260,20 @@ def run_one_council(
     session.commit()
 
     print(f"\n[run-daily-councils] {council_code}: starting (ScrapeRun id={run.id})")
+    log_memory("council.before", council=council_code)
 
-    command = [sys.executable, "-m", "app.pipeline.run_weekly", "--council", council_code]
+    # -u (unbuffered stdout/stderr) is required for the streaming design
+    # below to actually stream in real time - without it, CPython
+    # block-buffers stdout whenever it isn't connected to a real terminal
+    # (i.e. always, when piped from a subprocess), so a child's print()
+    # calls could sit unflushed in ITS OWN internal buffer for a long time
+    # rather than reaching this parent process line-by-line as issued -
+    # confirmed locally: a child that printed then slept produced NO
+    # output on the parent's side until the buffer was force-flushed by
+    # the child exiting. Without -u, the whole point of streaming (Render's
+    # live log capture seeing progress in real time, and surviving even if
+    # THIS process is later OOM-killed) would be silently defeated.
+    command = [sys.executable, "-u", "-m", "app.pipeline.run_weekly", "--council", council_code]
     if not include_ai_stages:
         # See this module's own docstring ("AI cost safety") - the daily
         # schedule is deterministic discovery/documents only by default;
@@ -226,27 +281,38 @@ def run_one_council(
         # to that file.
         command += ["--skip-extraction", "--skip-scheme-summary"]
 
+    # Bounded ring buffer, not the full captured output (Render Daily
+    # Discovery memory instrumentation - see _run_council_subprocess's own
+    # docstring). Each line is ALSO re-printed to this process's own
+    # stdout as it streams in, prefixed with the council code, so Render's
+    # own log capture receives it live and independently of whether this
+    # orchestrator process later dies before ever reaching the code below
+    # that would otherwise be the only thing writing it anywhere.
+    tail_lines: deque[str] = deque(maxlen=_OUTPUT_TAIL_MAX_LINES)
+
+    def _on_line(line: str) -> None:
+        print(f"[{council_code}] {line}")
+        tail_lines.append(line)
+
     return_code = None
     try:
-        result = _run_council_subprocess(command, cwd=PROJECT_ROOT, timeout_seconds=timeout_seconds)
-        return_code = result.returncode
-        success = result.returncode == 0
+        return_code = _run_council_subprocess(
+            command, cwd=PROJECT_ROOT, timeout_seconds=timeout_seconds, on_line=_on_line, council_code=council_code,
+        )
+        success = return_code == 0
         # Council-level failure isolation lives here: a non-zero exit code
         # is recorded and reported, never re-raised - the loop in main()
         # always proceeds to the next council regardless.
-        combined_output = result.stdout + result.stderr
-        tail = "\n".join(combined_output.splitlines()[-40:])
-    except subprocess.TimeoutExpired as e:
+    except subprocess.TimeoutExpired:
         success = False
-        combined_output = (e.stdout or "") + (e.stderr or "")
-        tail = f"Timed out after {timeout_seconds}s. Partial output:\n" + "\n".join(
-            combined_output.splitlines()[-40:]
-        )
+        tail_lines.append(f"Timed out after {timeout_seconds}s.")
     except Exception as e:  # noqa: BLE001 - genuinely must never take the loop down
         success = False
-        combined_output = ""
-        tail = f"Orchestrator error managing subprocess: {e}"
+        tail_lines.append(f"Orchestrator error managing subprocess: {e}")
 
+    log_memory("council.after", council=council_code)
+
+    combined_output = "\n".join(tail_lines)
     applications_after = _application_count(session, council_code)
     discovered = applications_after - applications_before
 
@@ -255,7 +321,7 @@ def run_one_council(
     run.applications_before = applications_before
     run.applications_after = applications_after
     run.applications_discovered = discovered
-    run.detail = tail[-4000:]  # bounded - this is operator-facing diagnostic text, not a full log store
+    run.detail = combined_output[-4000:]  # bounded twice over - a bounded LINE ring buffer, then a bounded CHAR tail
     session.commit()
 
     if success:
@@ -268,7 +334,7 @@ def run_one_council(
         # "FAILED (+0 applications)" with no indication why. Never prints
         # os.environ or any secret - only summarizes text the subprocess
         # itself already printed to stdout/stderr.
-        error_summary = _summarize_error(combined_output or tail)
+        error_summary = _summarize_error(combined_output)
         print(f"[run-daily-councils] {council_code}: FAILED")
         print(f"  return_code={return_code}")
         print(f"  error={error_summary}")
