@@ -75,25 +75,57 @@ def process_tree_rss_mib(pid: int | None = None) -> tuple[float, float]:
     return self_rss / MiB, children_rss / MiB
 
 
+# Any single identifier value longer than this is truncated (Render Daily
+# Discovery Salford document-stage memory diagnosis, Part 3: "keep
+# identifiers concise" / "do not print full document content") - a
+# document/application title is a public planning-portal listing value, not
+# a secret, but a [mem] line must stay a one-line, glanceable diagnostic,
+# not a dumping ground for arbitrary portal-supplied text.
+_EXTRA_VALUE_MAX_CHARS = 80
+
+
 def log_memory(
     stage: str,
     *,
     council: str | None = None,
     pid: int | None = None,
+    extra: dict[str, object] | None = None,
     warn_threshold_mib: float = DEFAULT_WARNING_THRESHOLD_MIB,
 ) -> None:
-    """Prints one concise structured [mem] line for the given stage
-    boundary, plus a [mem-warning] line if the process-tree total crosses
+    """Prints one concise structured [mem] line for the given stage/
+    checkpoint, plus a [mem-warning] line if the process-tree total crosses
     warn_threshold_mib. Never raises - any failure to measure is silently
     swallowed rather than breaking the actual scraping pipeline this is
     observing (diagnostics must never become a new source of production
     failures). Contains no secrets - only a stage label, an optional
-    council code (already public - a council code, not a credential), and
-    memory figures."""
+    council code, optional short identifying context (e.g. an application
+    reference or document name/size - see `extra`), and memory figures.
+
+    `extra` (Render Daily Discovery Salford document-stage memory
+    diagnosis, Part 3): optional short key=value identifiers appended to
+    the line, for finer-grained checkpoints than a whole pipeline stage -
+    e.g. log_memory("documents.download.after", council="salford",
+    extra={"application": "PA/2026/0642", "document": "Plan.pdf", "size_kib": 340}).
+    Each value is stringified and truncated to _EXTRA_VALUE_MAX_CHARS -
+    never the full extracted text or any document content, just enough to
+    identify WHICH item was being processed. Reuses the exact same [mem]/
+    [mem-warning] prefix as every other call, so the existing orchestrator-
+    side persisted-checkpoint logic (scripts.run_daily_councils, matching on
+    that prefix) picks these up automatically - no separate persistence
+    path was needed."""
     try:
         self_mib, children_mib = process_tree_rss_mib(pid)
         total_mib = self_mib + children_mib
         council_part = f"council={council} " if council else ""
+        extra_part = ""
+        if extra:
+            pairs = []
+            for key, value in extra.items():
+                text = str(value).replace("\n", " ").replace("\r", " ")
+                if len(text) > _EXTRA_VALUE_MAX_CHARS:
+                    text = text[:_EXTRA_VALUE_MAX_CHARS] + "..."
+                pairs.append(f"{key}={text}")
+            extra_part = " ".join(pairs) + " "
         # flush=True (Render Daily Discovery missing-runtime-logs diagnosis,
         # "Do not rely on only one fragile buffering assumption"): this is
         # called from BOTH the orchestrator and each run_weekly.py council
@@ -102,15 +134,15 @@ def log_memory(
         # level, but a diagnostic print that survives a hard OOM SIGKILL
         # should not also depend on that external configuration staying
         # correct forever - flush explicitly here too, redundantly but
-        # cheaply (one syscall per stage boundary, not per line of a busy
-        # loop).
+        # cheaply (one syscall per checkpoint, not per line of a busy loop).
         print(
-            f"[mem] {council_part}stage={stage} self={self_mib:.0f}MiB children={children_mib:.0f}MiB total={total_mib:.0f}MiB",
+            f"[mem] {council_part}stage={stage} {extra_part}"
+            f"self={self_mib:.0f}MiB children={children_mib:.0f}MiB total={total_mib:.0f}MiB",
             flush=True,
         )
         if total_mib > warn_threshold_mib:
             print(
-                f"[mem-warning] {council_part}stage={stage} total={total_mib:.0f}MiB "
+                f"[mem-warning] {council_part}stage={stage} {extra_part}total={total_mib:.0f}MiB "
                 f"exceeds {warn_threshold_mib:.0f}MiB warning threshold",
                 flush=True,
             )

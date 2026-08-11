@@ -754,6 +754,30 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
     for application in pending:
         if not application.summary_url:
             continue
+        # documents.application.before/after (Render Daily Discovery Salford
+        # document-stage memory diagnosis, Part 3) - stage-level [mem]
+        # boundaries were too coarse to tell WHICH of the 20 applications
+        # Salford was processing when Render OOM-killed the container;
+        # ScrapeRun.detail's own last checkpoint before that crash was still
+        # stage_documents.before, an entire 20-application loop with zero
+        # visibility inside it. These finer-grained checkpoints (reusing the
+        # exact same [mem]/[mem-warning] prefix, so the existing orchestrator
+        # persisted-checkpoint logic in scripts.run_daily_councils picks them
+        # up with no further changes) let the NEXT production run pinpoint
+        # the exact application/document in flight at time of death.
+        # identity_map size (Render Daily Discovery Salford document-stage
+        # memory diagnosis, Part 10): this Session is the same single,
+        # long-lived one used for the whole council run (expire_on_commit=
+        # False - see app.db.session), so nothing about stage_documents
+        # itself makes it expire or release objects. Recording its size
+        # alongside self MiB at each application boundary is enough to see,
+        # from the next production run, whether self RSS growth (if any)
+        # actually tracks identity-map growth (ORM retention) or not -
+        # without a broader session-lifecycle change.
+        log_memory(
+            "documents.application.before", council=council.code,
+            extra={"application": application.reference, "identity_map": len(session.identity_map)},
+        )
         dest_dir = document_dir(council.code, application.reference)
         try:
             rows = discover_documents(page, requests_session, council, application.summary_url, dest_dir)
@@ -775,8 +799,11 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
                 skipped += 1
                 continue
 
+            doc_identifier = {"application": application.reference, "document": row.document_name}
+
             local_path = row.local_path
             if local_path is None and row.source_url:
+                log_memory("documents.download.before", council=council.code, extra=doc_identifier)
                 try:
                     local_path = download_document(
                         council.code, application.reference, row.document_name, row.source_url,
@@ -785,8 +812,21 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
                 except Exception as e:
                     print(f"  [documents] download failed for {row.document_name}: {e}")
                     continue
+                finally:
+                    # Downloaded/skipped file size, when known - directly
+                    # answers Part 8's "quantify actual file sizes" for
+                    # future runs, since Document has no size column today.
+                    size_extra = dict(doc_identifier)
+                    if local_path is not None:
+                        try:
+                            size_extra["size_kib"] = round(local_path.stat().st_size / 1024)
+                        except OSError:
+                            pass
+                    log_memory("documents.download.after", council=council.code, extra=size_extra)
 
+            log_memory("documents.extract.before", council=council.code, extra=doc_identifier)
             text = extract_document_text(local_path) if local_path else ""
+            log_memory("documents.extract.after", council=council.code, extra=doc_identifier)
 
             if uninformative_name:
                 # Name gave no signal (confirmed real case: Manchester's
@@ -794,7 +834,9 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
                 # "name" for most uploads - "805570.pdf") - now that it's
                 # downloaded anyway to check, look at what the document
                 # itself actually opens with instead of discarding it.
+                log_memory("documents.classify.before", council=council.code, extra=doc_identifier)
                 doc_type = sniff_document_type_from_text(text)
+                log_memory("documents.classify.after", council=council.code, extra=doc_identifier)
                 if doc_type not in USEFUL_DOC_TYPES:
                     skipped += 1
                     continue
@@ -816,6 +858,10 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
         processed += 1
         print(f"  [documents] {application.reference}: {len(rows) - skipped} documents downloaded, "
               f"{skipped} skipped (not a useful document type), {sniffed} classified by content (name was uninformative)")
+        log_memory(
+            "documents.application.after", council=council.code,
+            extra={"application": application.reference, "identity_map": len(session.identity_map)},
+        )
 
     return processed
 
