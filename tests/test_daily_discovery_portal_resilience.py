@@ -20,6 +20,18 @@ This file covers the fixes: extended retry/backoff/pacing (Parts 1-3),
 and the new AcquisitionHealth-based SUCCESS/PARTIAL/FAILED classification
 (Parts 4-7), using mocks/fakes throughout - no real council portal is ever
 contacted.
+
+Amended (Pre-Merge Health Classification Amendment): PARTIAL's own
+threshold changed from "the whole supporting stage totally failed" to
+"any single attempted core operation exhausted its retry budget and
+ultimately failed" - the original threshold let 49 of 50 document-
+discovery failures still classify SUCCESS, which conflicted with
+"SUCCESS must not imply known completeness where core planning-data
+acquisition actually failed". A transient error that recovers within its
+own retry budget (429/ConnectTimeout/navigation timeout -> retry ->
+success) is still NOT a failure - see the "transient recovery" tests
+below, which exercise the REAL retry mechanism (real requests.Session.get
+sequencing, not just AcquisitionHealth in isolation) to prove that.
 """
 from __future__ import annotations
 
@@ -352,19 +364,207 @@ def test_non_material_stage_activity_never_recorded_does_not_downgrade():
     assert health.classify() == "success"
 
 
-def test_isolated_non_material_failure_stays_success():
-    """A handful of failures among many successes stays SUCCESS under the
-    approved conservative (total-failure-only) rule - by design, not
-    oversight (see AcquisitionHealth.classify's own docstring)."""
+def test_one_document_discovery_failure_out_of_fifty_is_partial():
+    """Pre-merge health classification amendment - ANY unresolved core
+    acquisition failure is enough for PARTIAL, not just total failure of
+    the whole stage. This is the exact case the amendment exists to fix:
+    49 of 50 succeeding (1 failure) previously still classified SUCCESS,
+    which conflicted with "SUCCESS must not imply known completeness
+    where core planning-data acquisition actually failed"."""
     health = AcquisitionHealth()
     health.record_primary_scrape_attempt()
     health.record_primary_scrape_completed()
-    for _ in range(47):
+    for _ in range(49):
         health.record_document_discovery(succeeded=True)
     health.record_document_discovery(succeeded=False)
-    health.record_document_discovery(succeeded=False)
-    health.record_document_discovery(succeeded=False)
 
+    assert health.classify() == "partial"
+
+
+def test_one_parent_lookup_failure_out_of_many_is_partial():
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    for _ in range(20):
+        health.record_parent_lookup(succeeded=True)
+    health.record_parent_lookup(succeeded=False)
+
+    assert health.classify() == "partial"
+
+
+def test_multiple_transient_errors_that_all_recover_is_success():
+    """A run where document discovery/parent lookup/navigation all hit
+    transient errors at SOME point, but every one of them succeeded
+    within its own retry budget - no unresolved failures were ever
+    recorded (record_*(succeeded=False) is only ever called in
+    run_weekly.py's own except blocks, which only run AFTER retries are
+    exhausted - see app.scrapers.idox_portal.get_with_retry/
+    _goto_with_retry), so classify() sees zero failures despite the
+    underlying transient noise."""
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    # Every one of these represents an operation that internally hit
+    # (and recovered from) a 429/ConnectTimeout/navigation timeout -
+    # only the FINAL outcome is ever recorded here.
+    for _ in range(10):
+        health.record_document_discovery(succeeded=True)
+    for _ in range(5):
+        health.record_parent_lookup(succeeded=True)
+
+    assert health.classify() == "success"
+
+
+def test_zero_unresolved_core_failures_is_success():
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    health.record_document_discovery(succeeded=True)
+    health.record_parent_lookup(succeeded=True)
+
+    assert health.classify() == "success"
+
+
+# --- END-TO-END transient-recovery integration tests ------------------
+# These exercise the REAL retry mechanism (actual requests.Session.get
+# sequencing through the real stage_documents/get_idox_documents/
+# get_with_retry call chain), not just AcquisitionHealth in isolation -
+# direct proof that a recovered transient failure never reaches
+# record_document_discovery(succeeded=False) in the first place.
+
+
+def _sequenced_session_get(monkeypatch, items):
+    """Makes every requests.Session().get(...) call (regardless of which
+    Session instance) return/raise the next item in `items`, in order."""
+    it = iter(items)
+
+    def _get(self, *args, **kwargs):
+        item = next(it)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    monkeypatch.setattr(requests.Session, "get", _get)
+
+
+def _stockport_setup(session):
+    from app.config import CouncilConfig
+    from app.db.models import Application, Council
+
+    session.add(Council(code="stockport", name="Stockport", base_url="https://example.invalid",
+                         date_field_mode="validated", doc_system="idox"))
+    session.add(Application(
+        council_code="stockport", reference="APP/1",
+        summary_url="https://example.invalid/applicationDetails.do?activeTab=summary&keyVal=X",
+    ))
+    session.commit()
+    return CouncilConfig(
+        code="stockport", name="stockport", base_url="https://example.invalid",
+        date_field_mode="validated", doc_system="idox", anite_base_url=None,
+        unit_threshold=10, region=None, country=None,
+    )
+
+
+def test_429_then_success_via_real_stage_documents_records_success(session, monkeypatch, tmp_path):
+    """Item 3: 429 -> retry -> success, exercised through the real
+    stage_documents/get_idox_documents/get_with_retry chain, must record
+    a SUCCESS, not a failure - and classify() as "success" overall."""
+    from app.pipeline.acquisition_health import AcquisitionHealth
+    from app.pipeline.run_weekly import stage_documents
+
+    monkeypatch.setattr("app.extraction.pdf_text.DATA_DIR", tmp_path)
+    monkeypatch.setattr("app.scrapers.idox_portal.time.sleep", lambda s: None)
+    monkeypatch.setattr("app.pipeline.run_weekly.time.sleep", lambda s: None)  # skip the new pacing delay in-test
+    _sequenced_session_get(monkeypatch, [
+        _FakeResponse(status_code=429),
+        _FakeResponse(status_code=200, text="<html><body><table></table></body></html>"),
+    ])
+
+    council = _stockport_setup(session)
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+
+    stage_documents(session, page=MagicMock(), council=council, health=health)
+
+    assert health.documents_applications_failed == 0
+    assert health.documents_applications_succeeded == 1
+    assert health.classify() == "success"
+
+
+def test_connect_timeout_then_success_via_real_stage_documents_records_success(session, monkeypatch, tmp_path):
+    """Item 4: ConnectTimeout -> retry -> success, exercised end-to-end -
+    the confirmed Trafford failure MODE, but recovered this time."""
+    from app.pipeline.acquisition_health import AcquisitionHealth
+    from app.pipeline.run_weekly import stage_documents
+
+    monkeypatch.setattr("app.extraction.pdf_text.DATA_DIR", tmp_path)
+    monkeypatch.setattr("app.scrapers.idox_portal.time.sleep", lambda s: None)
+    monkeypatch.setattr("app.pipeline.run_weekly.time.sleep", lambda s: None)
+    _sequenced_session_get(monkeypatch, [
+        requests.exceptions.ConnectTimeout("connect timeout"),
+        _FakeResponse(status_code=200, text="<html><body><table></table></body></html>"),
+    ])
+
+    council = _stockport_setup(session)
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+
+    stage_documents(session, page=MagicMock(), council=council, health=health)
+
+    assert health.documents_applications_failed == 0
+    assert health.documents_applications_succeeded == 1
+    assert health.classify() == "success"
+
+
+def test_navigation_timeout_then_success_records_successful_parent_lookup(session, monkeypatch):
+    """Item 5: a parent-lookup call that internally retried a Playwright
+    navigation timeout and recovered (already proven at the _goto_with_
+    retry level - see test_goto_navigation_timeout_then_success) is, from
+    stage_fetch_missing_parents' own point of view, indistinguishable
+    from one that succeeded immediately: it returns without raising, so
+    record_parent_lookup(succeeded=True) fires. Confirms that call-site
+    contract directly."""
+    from app.config import CouncilConfig
+    from app.db.models import Application, Council
+    from app.pipeline.acquisition_health import AcquisitionHealth
+    from app.pipeline.run_weekly import stage_fetch_missing_parents
+
+    session.add(Council(code="trafford", name="Trafford", base_url="https://example.invalid",
+                         date_field_mode="received", doc_system="idox"))
+    session.add(Application(
+        council_code="trafford", reference="RES/1",
+        proposal="Reserved matters application pursuant to outline planning permission OUT/999",
+    ))
+    session.commit()
+    council = CouncilConfig(
+        code="trafford", name="trafford", base_url="https://example.invalid",
+        date_field_mode="received", doc_system="idox", anite_base_url=None,
+        unit_threshold=10, region=None, country=None,
+    )
+
+    from app.scrapers.idox_portal import ScrapedApplication
+
+    fake_result = ScrapedApplication(
+        reference="OUT/999", fields={"Proposal": "Outline permission for 5 dwellings"},
+        summary_url="https://example.invalid/applicationDetails.do?activeTab=summary&keyVal=Y",
+        further_info_url="https://example.invalid/applicationDetails.do?activeTab=details&keyVal=Y",
+        keyval="Y", estimated_unit_count=None, application_category="reserved_matters",
+        opportunity_classification="Confirmed", qualifies=True,
+    )
+
+    # Stands in for a call that internally hit-and-recovered-from a
+    # Playwright navigation timeout via _goto_with_retry - what matters
+    # here is only that it returns normally (does not raise).
+    with patch("app.pipeline.run_weekly.fetch_application_by_reference_idox", return_value=fake_result):
+        health = AcquisitionHealth()
+        health.record_primary_scrape_attempt()
+        health.record_primary_scrape_completed()
+        stage_fetch_missing_parents(session, page=MagicMock(), council=council, health=health)
+
+    assert health.parents_failed == 0
+    assert health.parents_succeeded == 1
     assert health.classify() == "success"
 
 

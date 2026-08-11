@@ -75,9 +75,9 @@ class AcquisitionHealth:
             self.documents_applications_failed += 1
 
     def classify(self) -> str:
-        """Returns "success" | "partial" | "failed" - the approved policy
-        (Render Daily Discovery Portal Resilience & Truthful Run Health,
-        Part 5):
+        """Returns "success" | "partial" | "failed" - approved policy,
+        amended (Render Daily Discovery Portal Resilience & Truthful Run
+        Health, "Pre-Merge Health Classification Amendment"):
 
         FAILED - the primary/current-period scrape was attempted but did
         not complete (this is the Trafford scenario: a silently swallowed
@@ -85,29 +85,42 @@ class AcquisitionHealth:
         successful zero-application day - see PARTIAL/SUCCESS below for
         why that distinction is preserved).
 
-        PARTIAL - the primary scrape completed, but a supporting
-        acquisition stage (parent lookup or document discovery) was
-        attempted at least once and had a 100% failure rate this run.
+        PARTIAL - the primary scrape completed, but ONE OR MORE attempted
+        CORE supporting acquisition operations (parent lookup, document
+        discovery) exhausted their retry budget and ultimately failed.
+        Any single unresolved failure is enough - this is deliberately
+        NOT a "100% failure of the whole stage" rule (the original design
+        here, replaced by this amendment: 49 of 50 document-discovery
+        failures previously still classified SUCCESS, which conflicts
+        with "SUCCESS must not imply known completeness where core
+        planning-data acquisition actually failed"). A transient error
+        that succeeds within its own retry budget - see get_with_retry/
+        _goto_with_retry in app.scrapers.idox_portal - is NOT a failure
+        by the time it reaches here: record_parent_lookup/
+        record_document_discovery are only ever called with
+        succeeded=False in run_weekly.py's own except blocks, which only
+        run AFTER that retry budget is already exhausted (429 -> retry ->
+        success, ConnectTimeout -> retry -> success, and a Playwright
+        navigation timeout -> retry -> success are therefore already
+        excluded, unchanged - this amendment only lowers classify()'s own
+        threshold, not what counts as a recorded failure in the first
+        place).
 
-        SUCCESS - the primary scrape completed and no supporting stage
-        totally failed.
+        SUCCESS - the primary scrape completed and every attempted core
+        supporting acquisition operation ultimately succeeded (i.e. zero
+        unresolved failures recorded).
 
-        Deliberately conservative and count-based, NOT a percentage/ratio
-        threshold - no production evidence yet justifies picking a
-        specific percentage (the approved design explicitly said not to
-        invent one). "Clearly material" here means TOTAL failure of an
-        attempted stage; anything short of that (e.g. 3 of 50 document
-        discoveries failing) stays SUCCESS for now, by design, pending
-        real-run calibration - this may under-flag a partially-degraded
-        run, and that tradeoff is intentional, not an oversight."""
+        Still deliberately NOT a percentage/ratio threshold - no
+        production evidence yet justifies picking one (unchanged
+        rationale from the original design, reaffirmed by this
+        amendment). The conservative direction has simply flipped from
+        "only total failure counts" to "any known unresolved failure
+        counts", to avoid the false-SUCCESS risk the original threshold
+        allowed."""
         if self.primary_scrape_attempted and not self.primary_scrape_completed:
             return "failed"
 
-        parents_totally_failed = self.parents_attempted > 0 and self.parents_succeeded == 0
-        documents_totally_failed = (
-            self.documents_applications_attempted > 0 and self.documents_applications_succeeded == 0
-        )
-        if parents_totally_failed or documents_totally_failed:
+        if self.parents_failed > 0 or self.documents_applications_failed > 0:
             return "partial"
 
         return "success"
