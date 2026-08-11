@@ -34,15 +34,17 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import time
 from collections import Counter
+from dataclasses import dataclass
 
 import requests
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from playwright.sync_api import sync_playwright
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig, get_council
@@ -62,7 +64,15 @@ from app.extraction.pdf_text import (
     sniff_document_type_from_text,
     standardise_document_type,
 )
-from app.extraction.run_extraction import run_extraction_for_application
+from app.extraction.run_extraction import (
+    OUTCOME_AI_ERROR,
+    OUTCOME_ERROR,
+    OUTCOME_INVALID_OUTPUT,
+    OUTCOME_NO_USABLE_TEXT,
+    OUTCOME_SUCCESS,
+    has_usable_document_text,
+    run_extraction_for_application,
+)
 from app.pipeline.acquisition_health import AcquisitionHealth
 from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
@@ -92,6 +102,44 @@ UNIT_GATE_PASSED = or_(
     Application.unit_confirmation_status.is_(None),
     Application.unit_confirmation_status == "confirmed_qualifying",
 )
+
+# AI Processing Reliability & Backlog Throughput: a genuine (retryable) AI/
+# API failure re-enters the backlog on a LATER scheduled run, not the same
+# one - this cooldown just stops back-to-back manually-triggered runs (or a
+# future higher-cadence schedule) from immediately re-attempting the exact
+# same failure. Deliberately short: Intelligence Processing runs once a day
+# (see render.yaml), so anything under 24h never delays a legitimate next-
+# day retry, it only prevents same-window thrashing.
+EXTRACTION_RETRY_COOLDOWN_HOURS = 6
+
+# Bounded candidate-scan multiplier (Part 5) - a run targeting `limit`
+# genuine extraction attempts is allowed to INSPECT up to limit * this many
+# candidates (classifying no-usable-text ones along the way) before giving
+# up for this run, so one run can never scan the whole backlog table just
+# because a long run of permanently-unextractable applications sits at the
+# front of the deterministic order.
+EXTRACTION_CANDIDATE_SCAN_MULTIPLIER = 5
+
+
+def _extraction_eligibility_clause(now: dt.datetime):
+    """Shared by count_pending_extraction and stage_extraction (kept in
+    sync deliberately, same discipline as UNIT_GATE_PASSED) - true for an
+    Application that has never had an extraction attempt recorded, OR whose
+    last attempt was a genuine (retryable) failure outside its cooldown.
+    OUTCOME_NO_USABLE_TEXT is excluded unconditionally - see Application.
+    extraction_last_outcome's own field comment for why that's not a
+    permanent blacklist, just outside this query's current eligibility."""
+    cutoff = now - dt.timedelta(hours=EXTRACTION_RETRY_COOLDOWN_HOURS)
+    return or_(
+        Application.extraction_last_outcome.is_(None),
+        and_(
+            Application.extraction_last_outcome != OUTCOME_NO_USABLE_TEXT,
+            or_(
+                Application.extraction_last_attempted_at.is_(None),
+                Application.extraction_last_attempted_at <= cutoff,
+            ),
+        ),
+    )
 
 MONTH_COOLDOWN_SECONDS = 10  # pause between months on a multi-month backfill, some portals rate-limit hard
 
@@ -955,12 +1003,21 @@ def count_pending_extraction(session: Session, council_code: str) -> int:
     Safety" / "Bounded AI Workload") to size the backlog and decide
     whether an OpenAI client needs to be created at all, without running
     the extraction pipeline itself - if this changes, keep stage_
-    extraction's own WHERE clause in sync."""
+    extraction's own WHERE clause in sync.
+
+    AI Processing Reliability & Backlog Throughput: also excludes
+    Applications currently outside _extraction_eligibility_clause (a
+    permanently no_usable_text application, or a genuinely-failed one still
+    inside its retry cooldown) - this is now a true "would stage_extraction
+    actually attempt this" count, not just "does it lack scheme_
+    intelligence"."""
+    now = dt.datetime.now(dt.timezone.utc)
     return session.execute(
         select(func.count(Application.id)).where(
             Application.council_code == council_code,
             Application.scheme_intelligence == None,  # noqa: E711
             UNIT_GATE_PASSED,
+            _extraction_eligibility_clause(now),
         )
     ).scalar()
 
@@ -988,46 +1045,139 @@ def count_pending_summaries(session: Session, council_code: str) -> int:
     return count
 
 
-def stage_extraction(session: Session, client: OpenAI, council: CouncilConfig, *, limit: int | None = None) -> int:
-    """limit caps how many of the pending applications this call actually
-    processes (used by scripts.run_intelligence_processing's bounded
-    workload - Pilot Readiness PR-2 final pre-merge amendment, "Bounded AI
-    Workload"). Defaults to None (unbounded) - run_weekly.py's own
-    unconditional call below is unaffected by this amendment; it always
-    processes every pending application for the one council it runs
-    against, exactly as before."""
-    pending = session.execute(
-        select(Application).where(
+@dataclass
+class ExtractionStageResult:
+    """Return shape for stage_extraction (AI Processing Reliability &
+    Backlog Throughput) - replaces the previous plain `int` (successful-
+    extraction count) with the full outcome breakdown scripts.
+    run_intelligence_processing needs for truthful IntelligenceRun
+    counters. `succeeded` is the direct equivalent of the old return value
+    for the two other callers that only ever wanted a count."""
+
+    candidates_inspected: int = 0
+    attempted: int = 0
+    succeeded: int = 0
+    no_usable_text: int = 0
+    failed: int = 0
+
+
+def stage_extraction(
+    session: Session, client: OpenAI, council: CouncilConfig, *, limit: int | None = None,
+) -> ExtractionStageResult:
+    """limit caps how many GENUINE extraction attempts (an application with
+    usable document text, where an LLM call sequence is actually started)
+    this call makes this run (used by scripts.run_intelligence_processing's
+    bounded workload). Defaults to None (unbounded) - run_weekly.py's own
+    unconditional call below is unaffected; it still processes every
+    eligible application for the one council it runs against.
+
+    Candidates are inspected in deterministic order (newest-discovered
+    first, id as a stable tie-break - Part 6: "the most recently discovered
+    planning opportunities are more commercially valuable than arbitrary
+    insertion order"), and classified into one of OUTCOME_SUCCESS/
+    OUTCOME_NO_USABLE_TEXT/OUTCOME_AI_ERROR/OUTCOME_INVALID_OUTPUT/
+    OUTCOME_ERROR (see app.extraction.run_extraction). Only OUTCOME_
+    NO_USABLE_TEXT is classified WITHOUT calling the LLM at all (has_
+    usable_document_text is a local, free check) - so it never counts
+    against `limit`, and is persisted on the Application (extraction_
+    last_outcome) so it stops re-entering the backlog daily forever (see
+    _extraction_eligibility_clause) without being permanently blacklisted.
+    A genuine failure (AI_ERROR/INVALID_OUTPUT/ERROR) DOES count as a
+    genuine attempt against `limit` (an LLM call was actually made, or a
+    real bug was hit), and remains retryable after its cooldown.
+
+    Bounded when `limit` is set: inspects at most
+    limit * EXTRACTION_CANDIDATE_SCAN_MULTIPLIER candidates looking for
+    `limit` genuine attempts, so a long run of permanently-unextractable
+    applications at the front of the order can't turn one run into a full
+    backlog scan."""
+    now = dt.datetime.now(dt.timezone.utc)
+    query = (
+        select(Application)
+        .where(
             Application.council_code == council.code,
             Application.scheme_intelligence == None,  # noqa: E711
             UNIT_GATE_PASSED,
+            _extraction_eligibility_clause(now),
         )
-    ).scalars().all()
-    total_pending = len(pending)
+        .order_by(Application.first_seen_at.desc(), Application.id.desc())
+    )
     if limit is not None:
-        pending = pending[:limit]
-    print(f"\n[extraction] {total_pending} applications need AI extraction"
-          + (f" ({len(pending)} this run, limit={limit})" if limit is not None else ""))
+        query = query.limit(limit * EXTRACTION_CANDIDATE_SCAN_MULTIPLIER)
+    candidates = session.execute(query).scalars().all()
 
-    processed = 0
-    for application in pending:
+    print(f"\n[extraction] {len(candidates)} candidate(s) eligible for AI extraction"
+          + (f" (targeting {limit} genuine attempt(s) this run)" if limit is not None else ""))
+
+    result = ExtractionStageResult()
+    for application in candidates:
+        if limit is not None and result.attempted >= limit:
+            break
+        result.candidates_inspected += 1
+
+        if not has_usable_document_text(application):
+            application.extraction_last_outcome = OUTCOME_NO_USABLE_TEXT
+            application.extraction_last_attempted_at = now
+            application.extraction_attempt_count += 1
+            session.commit()
+            result.no_usable_text += 1
+            print(f"  [extraction] {application.reference}: no usable document text, skipped (not billed)")
+            continue
+
         try:
             fields = run_extraction_for_application(client, application)
+        except OpenAIError as e:
+            outcome = OUTCOME_AI_ERROR
+            print(f"  [extraction] {application.reference}: AI/API error - {e}")
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            outcome = OUTCOME_INVALID_OUTPUT
+            print(f"  [extraction] {application.reference}: malformed AI output - {e}")
         except Exception as e:
-            print(f"  [extraction] error on {application.reference}: {e}")
+            outcome = OUTCOME_ERROR
+            print(f"  [extraction] {application.reference}: unexpected error - {e}")
+        else:
+            outcome = OUTCOME_SUCCESS if fields else OUTCOME_NO_USABLE_TEXT
+
+        if outcome == OUTCOME_NO_USABLE_TEXT:
+            # run_extraction_for_application's own internal check agreed
+            # with has_usable_document_text above at inspection time but
+            # found nothing extractable once it looked deeper (e.g. every
+            # candidate document's cleaned text was empty, after cleaning) -
+            # no LLM call happened, so this never counted against `limit`
+            # and is handled identically to the earlier free check above.
+            application.extraction_last_outcome = OUTCOME_NO_USABLE_TEXT
+            application.extraction_last_attempted_at = now
+            application.extraction_attempt_count += 1
+            session.commit()
+            result.no_usable_text += 1
+            print(f"  [extraction] {application.reference}: no usable document text, skipped (not billed)")
             continue
 
-        if not fields:
-            print(f"  [extraction] {application.reference}: no usable document text, skipped")
-            continue
+        # Every other outcome (SUCCESS, or a genuine failure) means an LLM
+        # call sequence was actually started - this is what `limit` bounds.
+        result.attempted += 1
+        if outcome == OUTCOME_SUCCESS:
+            session.add(SchemeIntelligence(application_id=application.id, **fields))
+            # Success is unambiguous going forward (scheme_intelligence now
+            # exists, which is what _extraction_eligibility_clause and
+            # count_pending_extraction actually key off) - clearing these
+            # just keeps the Application row from showing a stale failure
+            # reason after it's since succeeded.
+            application.extraction_last_outcome = None
+            application.extraction_last_attempted_at = now
+            application.extraction_attempt_count += 1
+            session.commit()
+            result.succeeded += 1
+            print(f"  [extraction] {application.reference}: total_units={fields.get('total_units_final')} "
+                  f"affordable={fields.get('affordable_units_final')} developer={fields.get('developer')}")
+        else:
+            application.extraction_last_outcome = outcome
+            application.extraction_last_attempted_at = now
+            application.extraction_attempt_count += 1
+            session.commit()
+            result.failed += 1
 
-        session.add(SchemeIntelligence(application_id=application.id, **fields))
-        session.commit()
-        processed += 1
-        print(f"  [extraction] {application.reference}: total_units={fields.get('total_units_final')} "
-              f"affordable={fields.get('affordable_units_final')} developer={fields.get('developer')}")
-
-    return processed
+    return result
 
 
 def stage_geocode_sites(session: Session, council: CouncilConfig) -> int:
@@ -1161,7 +1311,18 @@ def stage_generate_scheme_summaries(
         if summarised_at and latest_seen:
             if summarised_at.replace(tzinfo=None) >= latest_seen.replace(tzinfo=None):
                 continue  # nothing new since the last summary
-        candidates.append((site, apps))
+        candidates.append((site, apps, latest_seen))
+
+    # Deterministic ordering (AI Processing Reliability & Backlog
+    # Throughput, Part 6): most-recently-changed site first (latest_seen,
+    # the same signal that made it a candidate at all), id as a stable
+    # tie-break - previously undefined (DB natural order). Naive-vs-aware
+    # normalised the same way as the regen check just above.
+    candidates.sort(
+        key=lambda c: (c[2].replace(tzinfo=None) if c[2] else dt.datetime.min, c[0].id),
+        reverse=True,
+    )
+    candidates = [(site, apps) for site, apps, _latest_seen in candidates]
 
     total_candidates = len(candidates)
     if limit is not None:

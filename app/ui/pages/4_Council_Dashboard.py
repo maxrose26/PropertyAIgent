@@ -32,6 +32,7 @@ from app.pipeline.freshness import FRESH, STALE, WARNING
 from app.policy.council_dashboard import build_council_dashboard
 from app.policy.coverage import build_coverage_inventory
 from app.policy.plan_evidence_view import build_plan_evidence_view
+from app.reporting.intelligence_health import build_intelligence_health_summary
 from app.reporting.local_plan_summary import generate_local_plan_summary, is_summary_stale
 from app.reporting.scraper_health import build_scraper_health_summary
 from app.ui.common import bootstrap, credits_sidebar, get_db
@@ -92,6 +93,49 @@ st.caption(
     "\"No run evidence\" means this council has never had a recorded scraper attempt from the production "
     "orchestrator (scripts/run_daily_councils.py) - distinct from Stale, which means a run happened but is now old."
 )
+st.divider()
+
+# AI Processing Reliability & Backlog Throughput - minimum operator
+# visibility for the bounded Intelligence Processing job (scripts.
+# run_intelligence_processing), which previously had no UI anywhere (the
+# prior audit's own finding). One row, not a per-council table -
+# IntelligenceRun processes every selected council in a single bounded run.
+st.markdown("### 🧠 Intelligence Processing Health")
+_INTELLIGENCE_STATUS_ICON = {"success": "✅", "partial": "⚠️", "failed": "❌", "running": "⏳"}
+intelligence_summary = build_intelligence_health_summary(session)
+if intelligence_summary is None:
+    st.caption("No Intelligence Processing run recorded yet.")
+else:
+    status = intelligence_summary["status"]
+    started_label = (
+        intelligence_summary["started_at"].strftime("%d %b %Y %H:%M")
+        if intelligence_summary["started_at"] else "—"
+    )
+    st.markdown(
+        f"**{_INTELLIGENCE_STATUS_ICON.get(status, '❔')} {status.upper()}** &nbsp;·&nbsp; "
+        f"last run started {started_label} ({intelligence_summary['triggered_by']})"
+    )
+    intelligence_table_rows = [{
+        "Extraction candidates inspected": intelligence_summary["extractions_candidates_inspected"],
+        "Extraction attempted": intelligence_summary["extractions_attempted"],
+        "Extraction succeeded": intelligence_summary["extractions_succeeded"],
+        "Extraction no usable text": intelligence_summary["extractions_no_usable_text"],
+        "Extraction failed": intelligence_summary["extractions_failed"],
+        "Extraction backlog remaining": intelligence_summary["applications_backlog_remaining"],
+        "Summaries attempted": intelligence_summary["summaries_attempted"],
+        "Summaries succeeded": intelligence_summary["summaries_succeeded"],
+        "Summaries failed": intelligence_summary["summaries_failed"],
+        "Summary backlog remaining": intelligence_summary["sites_backlog_remaining"],
+    }]
+    st.dataframe(pd.DataFrame(intelligence_table_rows), use_container_width=True, hide_index=True)
+    if intelligence_summary["detail"]:
+        st.caption(intelligence_summary["detail"])
+    st.caption(
+        "\"No usable text\" applications do not count as an AI failure and do not re-run daily forever - "
+        "see Application.extraction_last_outcome. PARTIAL means the run completed but at least one genuine "
+        "extraction or summary failure occurred; FAILED means the job itself could not run at all "
+        "(e.g. a missing API key with outstanding work)."
+    )
 st.divider()
 
 rows = build_council_dashboard(session)

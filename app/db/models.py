@@ -1077,6 +1077,24 @@ class Application(Base):
     site_link_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)  # only meaningful for suggested_fuzzy
     suggested_site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)  # candidate site awaiting Confirm/Reject when method=suggested_fuzzy
 
+    # Extraction attempt state (AI Processing Reliability & Backlog
+    # Throughput) - exists purely so a permanently-unextractable Application
+    # (no usable document text - a scanned PDF, say) doesn't re-enter the
+    # bounded daily extraction backlog forever, while a genuine, transient
+    # AI/API failure still does, after a short cooldown. NULL/0 means "never
+    # attempted, or already has scheme_intelligence" - scheme_intelligence
+    # itself remains the sole SUCCESS signal (see stage_extraction), these
+    # fields are only ever consulted for applications that don't have one
+    # yet. Deliberately NOT a permanent blacklist: nothing here prevents a
+    # future process (a document actually changing, a manual refresh, the
+    # next evidence-freshness architecture) from clearing
+    # extraction_last_outcome and re-opening the application - see
+    # app.extraction.run_extraction's OUTCOME_* constants for the exact
+    # values written here.
+    extraction_last_outcome: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    extraction_last_attempted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    extraction_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])
@@ -1627,16 +1645,33 @@ class IntelligenceRun(Base):
     started_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # running | success | failed - no "partial" here (unlike ScrapeRun):
-    # an individual application/site failing is recorded in the counters
-    # below and never fails the whole run (Part 5: "one failed extraction
-    # does not corrupt remaining work") - "failed" is reserved for the job
-    # itself erroring out before completing its planned work.
+    # running | success | partial | failed (AI Processing Reliability &
+    # Backlog Throughput - was unconditionally "success" whenever the run
+    # reached its own end, even with most planned extractions failing; now
+    # mirrors ScrapeRun/AcquisitionHealth's own "any known unresolved
+    # failure counts" policy - see process_intelligence_backlog's
+    # _classify_run_status for the exact rule). "failed" is still reserved
+    # for the job itself not meaningfully running at all (missing API key
+    # with outstanding work, or a top-level crash) - one item failing still
+    # never aborts the rest of the run (Part 5: "one failed extraction does
+    # not corrupt remaining work"), it now just means the run is reported
+    # "partial" rather than a misleading "success".
     status: Mapped[str] = mapped_column(String(20), default="running")
 
     # Extraction (Application -> SchemeIntelligence) counters.
+    # candidates_inspected: every row the bounded candidate-scan looked at
+    # this run (including ones classified no_usable_text below) - always
+    # >= extractions_attempted, bounded by the scan cap (see stage_
+    # extraction's own docstring), never a full-table scan.
+    extractions_candidates_inspected: Mapped[int] = mapped_column(Integer, default=0)
+    # attempted/succeeded/failed only ever count GENUINE attempts - i.e. an
+    # application that had usable document text and an LLM call sequence
+    # was actually started. no_usable_text is its own bucket, deliberately
+    # excluded from both attempted and failed - it is not an AI failure,
+    # see app.extraction.run_extraction.OUTCOME_NO_USABLE_TEXT.
     extractions_attempted: Mapped[int] = mapped_column(Integer, default=0)
     extractions_succeeded: Mapped[int] = mapped_column(Integer, default=0)
+    extractions_no_usable_text: Mapped[int] = mapped_column(Integer, default=0)
     extractions_failed: Mapped[int] = mapped_column(Integer, default=0)
 
     # Scheme-summary (Site.status_summary) counters.
