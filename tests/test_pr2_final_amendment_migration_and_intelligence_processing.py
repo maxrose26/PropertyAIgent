@@ -224,12 +224,25 @@ def test_add_allocation_match_review_columns_delegates_to_migrate_schema():
 # --- Part 2: bounded, backlog-aware Intelligence Processing -----------------
 
 
-def _make_application(session, council_code: str, reference: str, *, extracted: bool = False):
-    from app.db.models import SchemeIntelligence
+def _make_application(session, council_code: str, reference: str, *, extracted: bool = False, with_usable_text: bool = True):
+    """with_usable_text=True (the default) attaches a Document with
+    text_extracted=True - AI Processing Reliability & Backlog Throughput's
+    has_usable_document_text() gate means stage_extraction now skips
+    (classifies OUTCOME_NO_USABLE_TEXT) any Application with no such
+    Document BEFORE ever calling run_extraction_for_application, so tests
+    exercising a genuine extraction attempt need one present. Pass
+    with_usable_text=False to instead test the no-usable-text path."""
+    from app.db.models import Document, SchemeIntelligence
 
     application = Application(council_code=council_code, reference=reference)
     session.add(application)
     session.commit()
+    if with_usable_text and not extracted:
+        session.add(Document(
+            application_id=application.id, doc_type="planning_statement",
+            text_extracted=True, extracted_text="Planning statement text for " + reference,
+        ))
+        session.commit()
     if extracted:
         session.add(SchemeIntelligence(application_id=application.id, total_units_final=10))
         session.commit()
@@ -322,7 +335,13 @@ def test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_wor
     assert run.extractions_attempted == 2
     assert run.extractions_succeeded == 1
     assert run.extractions_failed == 1
-    assert run.status == "success"  # one item failing never fails the whole run
+    # One item failing still never CORRUPTS the rest of the run (APP/OK
+    # still succeeded, counters are accurate) - but AI Processing
+    # Reliability & Backlog Throughput's truthful-status policy means the
+    # run itself is now reported "partial", not a misleading "success"
+    # (mirrors AcquisitionHealth's own "any known unresolved failure
+    # counts" rule - see scripts.run_intelligence_processing._classify_run_status).
+    assert run.status == "partial"
 
 
 def test_process_intelligence_backlog_workload_is_bounded_not_unlimited(session):

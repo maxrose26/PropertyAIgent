@@ -73,7 +73,44 @@ from app.pipeline.run_weekly import (
 )
 
 DEFAULT_MAX_EXTRACTIONS_PER_RUN = 20
-DEFAULT_MAX_SUMMARIES_PER_RUN = 20
+# Raised from 20 -> 40 (AI Processing Reliability & Backlog Throughput,
+# Part 11) - extraction stays at 20 (its reliability was the actual problem
+# this task fixes), but summary generation has separate evidence
+# supporting a higher default: one summary is exactly one bounded LLM call
+# (stage_generate_scheme_summaries), failure isolation already existed
+# (one site's generate_scheme_summary error is caught and skipped, per-site,
+# unchanged by this task), and the one real production IntelligenceRun to
+# date succeeded 20/20 (100%) with no error, no timeout, and no memory
+# concern observed, against a live ~188-site backlog that would otherwise
+# take ~10 daily runs to clear at the old limit. 40 (the lower end of the
+# Product Owner's own suggested 40-50 range) roughly halves that, without
+# raising cadence or introducing any new cost-control mechanism - each
+# summary call costs the same as it always did, there are just more of
+# them in one bounded run.
+DEFAULT_MAX_SUMMARIES_PER_RUN = 40
+
+
+def _classify_run_status(*, extractions_failed: int, summaries_failed: int) -> str:
+    """success | partial - mirrors AcquisitionHealth.classify()'s own "any
+    known unresolved failure counts" policy (see app.pipeline.
+    acquisition_health, Render Daily Discovery Portal Resilience & Truthful
+    Run Health), applied to Intelligence Processing for the first time (AI
+    Processing Reliability & Backlog Throughput). Previously run.status was
+    unconditionally "success" whenever the run reached this point, even
+    with most planned extractions failing (a real production run: 17/20
+    failed, still reported "success").
+
+    "failed" is never returned by this function - that outcome is reserved
+    for the job itself not meaningfully running at all (missing
+    OPENAI_API_KEY with outstanding work - the early-exit above, which
+    returns before this is ever called). OUTCOME_NO_USABLE_TEXT items are
+    never counted in extractions_failed (see stage_extraction) - they are
+    not an AI failure, so a run made up entirely of no-usable-text items is
+    still "success", per this task's own policy: "NO_USABLE_TEXT items do
+    not count as AI failure if correctly classified/skipped"."""
+    if extractions_failed > 0 or summaries_failed > 0:
+        return "partial"
+    return "success"
 
 
 def _int_env(name: str, default: int) -> int:
@@ -141,7 +178,8 @@ def process_intelligence_backlog(
     extractions_planned = min(max_extractions, total_extraction_backlog)
     summaries_planned = min(max_summaries, total_summary_backlog)
 
-    extractions_attempted = extractions_succeeded = extractions_failed = 0
+    extractions_candidates_inspected = 0
+    extractions_attempted = extractions_succeeded = extractions_no_usable_text = extractions_failed = 0
     summaries_attempted = summaries_succeeded = summaries_failed = 0
 
     if extractions_planned == 0 and summaries_planned == 0:
@@ -165,12 +203,20 @@ def process_intelligence_backlog(
             council = councils[code]
 
             if remaining_extractions > 0 and extraction_backlog[code] > 0:
-                planned_this_council = min(remaining_extractions, extraction_backlog[code])
-                succeeded = stage_extraction(session, client, council, limit=remaining_extractions)
-                extractions_attempted += planned_this_council
-                extractions_succeeded += succeeded
-                extractions_failed += max(planned_this_council - succeeded, 0)
-                remaining_extractions -= planned_this_council
+                # stage_extraction's own bounded candidate-scan (Part 5) may
+                # inspect more than `limit` rows (skipping no-usable-text
+                # ones for free) but never makes more than `limit` GENUINE
+                # attempts - result.attempted is therefore the true amount
+                # of this council's share of remaining_extractions actually
+                # spent, which may be less than planned if the scan cap was
+                # exhausted first.
+                stage_result = stage_extraction(session, client, council, limit=remaining_extractions)
+                extractions_candidates_inspected += stage_result.candidates_inspected
+                extractions_attempted += stage_result.attempted
+                extractions_succeeded += stage_result.succeeded
+                extractions_no_usable_text += stage_result.no_usable_text
+                extractions_failed += stage_result.failed
+                remaining_extractions -= stage_result.attempted
 
             if remaining_summaries > 0 and summary_backlog[code] > 0:
                 planned_this_council = min(remaining_summaries, summary_backlog[code])
@@ -181,7 +227,8 @@ def process_intelligence_backlog(
                 remaining_summaries -= planned_this_council
 
         detail = (
-            f"Extractions: {extractions_succeeded}/{extractions_attempted} succeeded. "
+            f"Extractions: {extractions_succeeded}/{extractions_attempted} succeeded "
+            f"({extractions_no_usable_text} no usable text, {extractions_candidates_inspected} candidate(s) inspected). "
             f"Summaries: {summaries_succeeded}/{summaries_attempted} succeeded."
         )
 
@@ -190,10 +237,12 @@ def process_intelligence_backlog(
     applications_backlog_remaining = sum(count_pending_extraction(session, code) for code in council_codes)
     sites_backlog_remaining = sum(count_pending_summaries(session, code) for code in council_codes)
 
-    run.status = "success"
+    run.status = _classify_run_status(extractions_failed=extractions_failed, summaries_failed=summaries_failed)
     run.finished_at = dt.datetime.now(dt.timezone.utc)
+    run.extractions_candidates_inspected = extractions_candidates_inspected
     run.extractions_attempted = extractions_attempted
     run.extractions_succeeded = extractions_succeeded
+    run.extractions_no_usable_text = extractions_no_usable_text
     run.extractions_failed = extractions_failed
     run.summaries_attempted = summaries_attempted
     run.summaries_succeeded = summaries_succeeded

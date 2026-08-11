@@ -181,8 +181,9 @@ def main():
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
             client = OpenAI(api_key=api_key)
-            n_extracted = stage_extraction(session, client, council)
-            print(f"[extraction] {n_extracted} schemes extracted")
+            extraction_result = stage_extraction(session, client, council)
+            print(f"[extraction] {extraction_result.succeeded} schemes extracted "
+                  f"({extraction_result.no_usable_text} no usable text, {extraction_result.failed} failed)")
         else:
             print("[extraction] skipped - OPENAI_API_KEY not set")
 

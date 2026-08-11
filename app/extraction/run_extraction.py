@@ -18,8 +18,31 @@ from app.extraction.housing_mix import extract_housing_mix
 from app.extraction.pdf_text import build_broad_sample_text, build_combined_priority_text
 from app.extraction.reconcile import reconcile_scheme
 
+# Deterministic extraction outcome taxonomy (AI Processing Reliability &
+# Backlog Throughput) - the smallest set of buckets that distinguishes
+# "nothing to extract from" (not a failure, never billed) from a genuine
+# AI/API failure (retryable) from a malformed response (retryable) from an
+# unexpected bug (retryable) - see stage_extraction in app.pipeline.
+# run_weekly, the only caller that classifies against these.
+OUTCOME_SUCCESS = "success"
+OUTCOME_NO_USABLE_TEXT = "no_usable_text"
+OUTCOME_AI_ERROR = "ai_error"
+OUTCOME_INVALID_OUTPUT = "invalid_output"
+OUTCOME_ERROR = "error"
 
 _NULL_LIKE_STRINGS = {"null", "none", "n/a", "na"}
+
+
+def has_usable_document_text(application: Application) -> bool:
+    """True if run_extraction_for_application has anything to actually
+    extract from - i.e. at least one Document with text_extracted=True and
+    non-empty extracted_text. Factored out of run_extraction_for_application
+    (which still starts with this exact check, unchanged) so stage_extraction
+    can classify OUTCOME_NO_USABLE_TEXT BEFORE spending a bounded-workload
+    "genuine attempt" slot on an application with nothing to send an LLM at
+    all - no OpenAI call happens either way, this only changes what a
+    candidate-scan counts as an attempt."""
+    return any(d.text_extracted and d.extracted_text for d in application.documents)
 
 
 def _sanitise_null_like_strings(data: dict) -> dict:
