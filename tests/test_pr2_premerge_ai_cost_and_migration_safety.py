@@ -304,10 +304,14 @@ def test_render_yaml_only_requires_database_url():
     job doesn't need, but a plain Playwright configuration constant (see
     render.yaml's own "BUILD/RUNTIME" header comment) required for the
     browser Daily Discovery already unconditionally depends on to actually
-    be found at run time, not just at build time."""
+    be found at run time, not just at build time.
+
+    Updated again by the Render Daily Discovery missing-runtime-logs
+    diagnosis: PYTHONUNBUFFERED is the same kind of legitimate, non-secret
+    addition (belt-and-braces alongside startCommand's own -u flag)."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     env_var_keys = {e["key"] for e in config["services"][0].get("envVars", [])}
-    assert env_var_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH"}
+    assert env_var_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH", "PYTHONUNBUFFERED"}
 
 
 def test_render_yaml_start_command_matches_the_orchestrator_default_behaviour():

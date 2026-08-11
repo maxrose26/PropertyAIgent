@@ -427,11 +427,15 @@ def test_render_yaml_daily_discovery_still_does_not_require_openai_key():
     """Updated by the Render Daily Discovery runtime failure hotfix:
     PLAYWRIGHT_BROWSERS_PATH is a legitimate addition (a non-secret
     Playwright config constant - see render.yaml's own "BUILD/RUNTIME"
-    header) - OPENAI_API_KEY is still correctly absent."""
+    header) - OPENAI_API_KEY is still correctly absent.
+
+    Updated again by the Render Daily Discovery missing-runtime-logs
+    diagnosis: PYTHONUNBUFFERED is the same kind of legitimate, non-secret
+    addition (belt-and-braces alongside startCommand's own -u flag)."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     discovery = next(s for s in config["services"] if s["name"] == "propertyaigent-daily-scrape")
     env_var_keys = {e["key"] for e in discovery.get("envVars", [])}
-    assert env_var_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH"}
+    assert env_var_keys == {"DATABASE_URL", "PLAYWRIGHT_BROWSERS_PATH", "PYTHONUNBUFFERED"}
 
 
 def test_render_yaml_intelligence_processing_requires_database_and_openai():
@@ -458,13 +462,15 @@ def test_render_yaml_no_service_commits_an_actual_secret_value():
     """Every genuinely SECRET env var must be sync: false (operator-set in
     the Render dashboard) - none may carry a literal `value:` in this
     file. PLAYWRIGHT_BROWSERS_PATH=0 (Render Daily Discovery runtime
-    failure hotfix) is the one deliberate, documented exception - a plain
-    Playwright configuration constant, not a secret."""
+    failure hotfix) and PYTHONUNBUFFERED=1 (Render Daily Discovery
+    missing-runtime-logs diagnosis) are the deliberate, documented
+    exceptions - plain configuration constants, not secrets."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
+    KNOWN_NON_SECRET_LITERALS = {"PLAYWRIGHT_BROWSERS_PATH": "0", "PYTHONUNBUFFERED": "1"}
     for service in config["services"]:
         for env_var in service.get("envVars", []):
-            if env_var["key"] == "PLAYWRIGHT_BROWSERS_PATH":
-                assert env_var["value"] == "0"
+            if env_var["key"] in KNOWN_NON_SECRET_LITERALS:
+                assert env_var["value"] == KNOWN_NON_SECRET_LITERALS[env_var["key"]]
                 continue
             assert env_var.get("sync") is False
             assert "value" not in env_var

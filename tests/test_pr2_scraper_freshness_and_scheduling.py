@@ -303,16 +303,23 @@ def test_render_yaml_does_not_contain_secret_values():
     directly). This test still asserts every OTHER declared variable
     remains sync: false with no committed value, and separately asserts
     the one literal-value variable that does exist is exactly the expected
-    non-secret constant - not a blanket exemption."""
+    non-secret constant - not a blanket exemption.
+
+    Updated again by the Render Daily Discovery missing-runtime-logs
+    diagnosis: PYTHONUNBUFFERED=1 is the same kind of deliberate, documented
+    exception - a plain interpreter configuration constant (belt-and-braces
+    alongside startCommand's own -u flag), not a secret."""
     render_yaml_path = REPO_ROOT / "render.yaml"
     text = render_yaml_path.read_text(encoding="utf-8")
     config = yaml.safe_load(text)
-    KNOWN_NON_SECRET_LITERALS = {"PLAYWRIGHT_BROWSERS_PATH"}
+    KNOWN_NON_SECRET_LITERALS = {
+        "PLAYWRIGHT_BROWSERS_PATH": "0",
+        "PYTHONUNBUFFERED": "1",
+    }
     for service in config["services"]:
         for env_var in service.get("envVars", []):
             if env_var["key"] in KNOWN_NON_SECRET_LITERALS:
-                assert env_var["key"] == "PLAYWRIGHT_BROWSERS_PATH"
-                assert env_var["value"] == "0"
+                assert env_var["value"] == KNOWN_NON_SECRET_LITERALS[env_var["key"]]
                 continue
             assert env_var.get("sync") is False or "value" not in env_var
 
