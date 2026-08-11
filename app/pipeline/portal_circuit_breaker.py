@@ -91,6 +91,13 @@ class CouncilPortalCircuitBreaker:
     threshold: int = PORTAL_CIRCUIT_FAILURE_THRESHOLD
     consecutive_host_failures: int = 0
     open_reason: str | None = None
+    # The stage name (as passed to record_failure) whose 3rd consecutive
+    # failure actually opened the circuit - the structured state
+    # AcquisitionHealth's own record_portal_unavailable(stage) needs for
+    # its diagnostic reason (Hotfix second pre-merge amendment, "Circuit
+    # Breaker Must Affect Run Health"), without either object depending
+    # on the other's internals.
+    opened_stage: str | None = None
     _open: bool = False
 
     @property
@@ -135,6 +142,7 @@ class CouncilPortalCircuitBreaker:
         if self.consecutive_host_failures >= self.threshold:
             self._open = True
             self.open_reason = "portal_unavailable"
-            print(f"[circuit] council={self.council_code} OPEN reason={self.open_reason}")
+            self.opened_stage = stage
+            print(f"[circuit] council={self.council_code} OPEN reason={self.open_reason} stage={stage}")
             return True
         return False

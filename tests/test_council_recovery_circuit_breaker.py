@@ -197,12 +197,14 @@ def test_fresh_breaker_instances_are_independent():
 
 
 def test_primary_scrape_blocked_by_circuit_is_failed():
-    """Mirrors main()'s own new branch exactly: if breaker.is_open before
-    stage_scrape is attempted, record_primary_scrape_completed() is never
-    called - only record_primary_scrape_attempt() is - and classify()
-    must report FAILED, per Section 10's own definition ('primary...
-    discovery could not meaningfully complete because the portal circuit
-    opened')."""
+    """Mirrors main()'s own logic exactly, including the second pre-merge
+    amendment's central health.record_portal_unavailable() call: if
+    breaker.is_open before stage_scrape is attempted,
+    record_primary_scrape_completed() is never called - only
+    record_primary_scrape_attempt() is - and classify() must report
+    FAILED even though the circuit-open central call also fires (FAILED
+    takes priority over the portal_circuit_opened PARTIAL path - see
+    classify()'s own docstring)."""
     health = AcquisitionHealth()
     breaker = CouncilPortalCircuitBreaker(council_code="trafford")
     for _ in range(PORTAL_CIRCUIT_FAILURE_THRESHOLD):
@@ -214,7 +216,11 @@ def test_primary_scrape_blocked_by_circuit_is_failed():
     else:
         health.record_primary_scrape_completed()
 
+    if breaker.is_open:  # main()'s own central call, mirrored here
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+
     assert health.classify() == "failed"
+    assert health.portal_circuit_opened is True  # the signal WAS recorded - just outranked by FAILED
 
 
 def test_supporting_only_outage_after_successful_primary_scrape_is_partial(session):
@@ -565,15 +571,16 @@ def test_once_open_stage_fetch_related_applications_makes_no_calls(session):
     mock_search.assert_not_called()
 
 
-def test_health_classification_unaffected_by_new_breaker_wiring(session):
-    """stage_fetch_related_applications/stage_confirm_units have never
-    recorded AcquisitionHealth (unchanged by this amendment - only
-    stage_fetch_missing_parents/stage_documents do, exactly as before).
-    A circuit-opening failure entirely within stage_confirm_units
-    therefore does not, on its own, flip classify() away from SUCCESS -
-    documented here as the known, pre-existing boundary of what
-    AcquisitionHealth tracks (see this amendment's own report, "known
-    limitations"), not something this amendment silently changed."""
+def test_health_classification_fixed_by_second_amendment(session):
+    """SUPERSEDES the first amendment's own known-limitation test (a
+    circuit opening entirely within stage_confirm_units previously left
+    classify() at "success" - exactly the gap the second pre-merge
+    amendment, "Circuit Breaker Must Affect Run Health", closes). Mirrors
+    main()'s new central call: once breaker.is_open, health.
+    record_portal_unavailable(stage) is invoked once, and classify() now
+    correctly reports PARTIAL even though stage_confirm_units itself
+    never recorded a parents_failed/documents_applications_failed
+    count."""
     health = AcquisitionHealth()
     health.record_primary_scrape_attempt()
     health.record_primary_scrape_completed()
@@ -585,4 +592,179 @@ def test_health_classification_unaffected_by_new_breaker_wiring(session):
         stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
 
     assert breaker.is_open is True
+    if breaker.is_open:  # main()'s own central call, mirrored here
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+
+    assert health.classify() == "partial"  # fixed - no longer "success"
+    assert health.portal_circuit_opened_stage == "confirm-units"
+    # The pre-existing counters this stage has never recorded are
+    # correctly still zero - the fix did not double-count anything.
+    assert health.documents_applications_failed == 0
+    assert health.parents_failed == 0
+
+
+# --- H: Circuit Breaker Must Affect Run Health (second pre-merge amendment) --
+
+
+def test_circuit_open_in_related_applications_after_primary_scrape_is_partial(session):
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+
+    for i in range(3):
+        _add_related_applications_anchor(session, reference=f"ANCHOR/{i}")
+    with patch("app.pipeline.run_weekly.search_related_applications", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_fetch_related_applications(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.is_open is True
+    assert breaker.opened_stage == "related-applications"
+
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+    assert health.classify() == "partial"
+
+
+def test_circuit_open_in_confirm_units_after_primary_scrape_is_partial(session):
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+
+    for i in range(3):
+        _add_application(session, reference=f"CONFIRM/{i}")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.is_open is True
+    assert breaker.opened_stage == "confirm-units"
+
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+    assert health.classify() == "partial"
+
+
+def test_circuit_open_in_documents_after_primary_scrape_is_still_partial(session):
+    """Item 3: the pre-existing stage_documents -> PARTIAL path (already
+    true via documents_applications_failed) remains unchanged - now also
+    independently confirmed via the portal_circuit_opened signal, not
+    just the failure counter."""
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+
+    for i in range(3):
+        _add_application(session, reference=f"DOC/{i}")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_documents(session, MagicMock(), _council_config(), health=health, breaker=breaker)
+    assert breaker.is_open is True
+    assert breaker.opened_stage == "documents"
+    assert health.documents_applications_failed == 3  # the pre-existing counter still works
+
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+    assert health.classify() == "partial"
+
+
+def test_circuit_never_opens_all_supporting_work_succeeds_is_success(session):
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+
+    _add_application(session, reference="CONFIRM/1")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[]):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+
+    assert breaker.is_open is False
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
     assert health.classify() == "success"
+
+
+def test_one_transient_failure_that_recovers_is_success(session):
+    """A single host failure followed by a real success (well under
+    threshold, and reset to 0) leaves no unresolved failure of any kind -
+    still SUCCESS."""
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+
+    for i in range(2):
+        _add_application(session, reference=f"CONFIRM/{i}")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=[requests.exceptions.ConnectTimeout(), []]):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+
+    assert breaker.is_open is False
+    assert breaker.consecutive_host_failures == 0  # reset by the second, successful call
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+    assert health.classify() == "success"
+
+
+def test_429_does_not_create_portal_unavailable_health(session):
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+
+    for i in range(5):
+        _add_application(session, reference=f"CONFIRM/{i}")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.HTTPError("429 Client Error")):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+
+    assert breaker.is_open is False
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+    assert health.portal_circuit_opened is False
+    assert health.classify() == "success"
+
+
+def test_existing_parent_and_document_failures_classify_exactly_as_before():
+    """Regression guard: the pre-existing PARTIAL path (an unresolved
+    parents_failed/documents_applications_failed count, with the circuit
+    never opening at all) is completely unaffected by this amendment -
+    portal_circuit_opened stays False throughout."""
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    health.record_parent_lookup(succeeded=False)
+
+    assert health.portal_circuit_opened is False
+    assert health.classify() == "partial"
+
+    health2 = AcquisitionHealth()
+    health2.record_primary_scrape_attempt()
+    health2.record_primary_scrape_completed()
+    health2.record_document_discovery(succeeded=False)
+
+    assert health2.portal_circuit_opened is False
+    assert health2.classify() == "partial"
+
+
+def test_run_daily_councils_cannot_print_ok_for_aborted_circuit_run(session, capsys):
+    """Item 9: end-to-end through the REAL AcquisitionHealth.summary_line()
+    output (now including the fixed classify() + the new portal_circuit_*
+    fields), streamed through run_one_council exactly as
+    scripts.run_daily_councils would receive it in production - must
+    print PARTIAL, never OK."""
+    from scripts.run_daily_councils import run_one_council
+
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+    health.record_portal_unavailable(stage="related-applications")
+    real_line = health.summary_line()
+    assert real_line.startswith("[run-health] status=partial")  # confirms the fix actually changed the printed line
+
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        on_line(real_line)
+        return 0
+
+    with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_subprocess):
+        run = run_one_council(session, "trafford", timeout_seconds=60, triggered_by="scheduled")
+
+    assert run.status == "partial"
+    out = capsys.readouterr().out
+    assert "trafford: PARTIAL" in out
+    assert "trafford: OK" not in out

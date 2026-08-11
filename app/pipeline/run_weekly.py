@@ -2052,6 +2052,21 @@ def main() -> None:
             openai_client=OpenAI(api_key=openai_key) if openai_key else None,
         )
 
+    # Circuit breaker -> health integration (Hotfix second pre-merge
+    # amendment, "Circuit Breaker Must Affect Run Health") - the ONE
+    # central call site, deliberately not scattered across every
+    # individual stage's own breaker.record_failure() call (each of
+    # those already handles the circuit's OWN bookkeeping). breaker.
+    # is_open never becomes False again once True, so checking it here -
+    # right before the final summary is computed - correctly reflects
+    # whether the circuit was ever open at ANY point during this run,
+    # regardless of which of the four supporting network stages tripped
+    # it (including stage_fetch_related_applications/stage_confirm_units,
+    # neither of which has ever recorded a health.record_* pass/fail
+    # count of its own).
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
+
     # [run-health] (Render Daily Discovery Portal Resilience & Truthful
     # Run Health, Part 4) - ONE deterministic, machine-parseable summary
     # line, printed unconditionally at the very end of a run that reached
