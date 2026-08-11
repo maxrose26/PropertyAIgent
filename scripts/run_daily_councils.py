@@ -259,7 +259,7 @@ def run_one_council(
     session.add(run)
     session.commit()
 
-    print(f"\n[run-daily-councils] {council_code}: starting (ScrapeRun id={run.id})")
+    print(f"\n[run-daily-councils] {council_code}: starting (ScrapeRun id={run.id})", flush=True)
     log_memory("council.before", council=council_code)
 
     # -u (unbuffered stdout/stderr) is required for the streaming design
@@ -291,8 +291,42 @@ def run_one_council(
     tail_lines: deque[str] = deque(maxlen=_OUTPUT_TAIL_MAX_LINES)
 
     def _on_line(line: str) -> None:
-        print(f"[{council_code}] {line}")
+        # flush=True (Render Daily Discovery missing-runtime-logs diagnosis,
+        # "Do not rely on only one fragile buffering assumption") - this
+        # process is now launched with -u and PYTHONUNBUFFERED=1 (see
+        # render.yaml), but a live-streamed line surviving an OOM SIGKILL
+        # is important enough not to depend on external configuration
+        # alone staying correct.
+        print(f"[{council_code}] {line}", flush=True)
         tail_lines.append(line)
+        if line.startswith("[mem]") or line.startswith("[mem-warning]"):
+            # Persisted memory checkpoint (Render Daily Discovery missing-
+            # runtime-logs diagnosis, Part 7): Render's live log stream has
+            # now proven unreliable enough - by definition a container OOM
+            # kill gives Python no chance to flush anything on the way out
+            # - that a checkpoint must also survive independently of logs
+            # entirely. The end-of-run write below (run.detail =
+            # combined_output[-4000:]) is not enough on its own either: it
+            # only executes once _run_council_subprocess RETURNS, and a
+            # container-level OOM (the observed failure mode - distinct
+            # from one council's own subprocess merely timing out) kills
+            # the ORCHESTRATOR itself mid-council, so that write never
+            # happens. Confirmed directly, not hypothetically: reconstructing
+            # the 3 most recent production OOM runs found the in-flight
+            # council's own ScrapeRun.detail entirely None every time -
+            # exactly this gap, with nothing recoverable after the fact.
+            # Fixed by committing the LATEST [mem]/[mem-warning] line as it
+            # arrives, reusing the existing column rather than adding a new
+            # one (no schema change needed) - overwritten by the final
+            # combined_output tail below on any normal completion or
+            # recorded failure; this only matters for the OOM case, where
+            # that final write never lands. Bounded and cheap: one short
+            # line, one commit, only at the small number of explicit stage
+            # boundaries a council run passes through (roughly 15-20 over
+            # several minutes) - not per application, per document, or per
+            # raw subprocess output line.
+            run.detail = line[:4000]
+            session.commit()
 
     return_code = None
     try:
@@ -325,7 +359,7 @@ def run_one_council(
     session.commit()
 
     if success:
-        print(f"[run-daily-councils] {council_code}: OK ({discovered:+d} applications)")
+        print(f"[run-daily-councils] {council_code}: OK ({discovered:+d} applications)", flush=True)
     else:
         # Concise, actionable line for Render's own log viewer (Render
         # Daily Discovery runtime failure hotfix) - previously only the
@@ -335,19 +369,29 @@ def run_one_council(
         # os.environ or any secret - only summarizes text the subprocess
         # itself already printed to stdout/stderr.
         error_summary = _summarize_error(combined_output)
-        print(f"[run-daily-councils] {council_code}: FAILED")
-        print(f"  return_code={return_code}")
-        print(f"  error={error_summary}")
+        print(f"[run-daily-councils] {council_code}: FAILED", flush=True)
+        print(f"  return_code={return_code}", flush=True)
+        print(f"  error={error_summary}", flush=True)
     return run
 
 
 def main() -> int:
     args = parse_args()
+    # "[mem] orchestrator.start" (Render Daily Discovery missing-runtime-
+    # logs diagnosis, Part 6) - deliberately BEFORE init_db()/the council
+    # loop, so this line exists even if something in bootstrap itself
+    # consumes substantial memory before the first council subprocess is
+    # ever spawned. Proves, on the next production run, whether the parent
+    # process itself is genuinely emitting/flushing output from the very
+    # first line - if this is still missing from Render's log viewer next
+    # time, the buffering fix below did not work and the investigation
+    # must continue from here, not from some later stage.
+    log_memory("orchestrator.start")
     init_db()
     session = get_session()
 
     council_codes = args.councils or sorted(load_councils().keys())
-    print(f"[run-daily-councils] {len(council_codes)} council(s) to run: {', '.join(council_codes)}")
+    print(f"[run-daily-councils] {len(council_codes)} council(s) to run: {', '.join(council_codes)}", flush=True)
 
     results = []
     for council_code in council_codes:
@@ -358,11 +402,14 @@ def main() -> int:
             )
             results.append(run)
         except Exception as e:  # noqa: BLE001 - one council's bookkeeping failure must not stop the rest
-            print(f"[run-daily-councils] {council_code}: orchestrator-level error, continuing: {e}")
+            print(f"[run-daily-councils] {council_code}: orchestrator-level error, continuing: {e}", flush=True)
 
     succeeded = sum(1 for r in results if r.status == "success")
     failed = sum(1 for r in results if r.status == "failed")
-    print(f"\n[run-daily-councils] Done. {succeeded} succeeded, {failed} failed, {len(council_codes)} attempted.")
+    print(
+        f"\n[run-daily-councils] Done. {succeeded} succeeded, {failed} failed, {len(council_codes)} attempted.",
+        flush=True,
+    )
 
     return _exit_code(succeeded=succeeded, attempted=len(council_codes))
 

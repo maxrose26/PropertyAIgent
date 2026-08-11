@@ -156,14 +156,41 @@ services:
   - type: cron
     name: propertyaigent-daily-scrape
     runtime: python
-    plan: starter
+    # Render Daily Discovery missing-runtime-logs diagnosis: this was found
+    # declaring "starter" (512Mi) here despite production having genuinely
+    # run on Standard/2Gi for weeks - a real Blueprint/dashboard config-
+    # drift defect, not a typo. Any future "Sync Blueprint" would have
+    # silently reverted the live service back to 512Mi, which - given this
+    # job's own real Chromium/multi-council memory footprint - would make
+    # an OOM kill MORE likely, not less. Declared explicitly here so a sync
+    # can no longer regress the effective plan; see
+    # tests/test_render_discovery_missing_runtime_logs.py for the
+    # regression guard.
+    plan: standard
     # Once a day. Render cron schedules are UTC - 05:00 UTC is before the
     # UK working day starts, matching this platform's existing
     # scripts/register_weekly_task.ps1 local-dev precedent of running
     # overnight/early morning rather than during business hours.
     schedule: "0 5 * * *"
     buildCommand: "pip install -r requirements.txt && playwright install chromium && python -m scripts.verify_browser_runtime"
-    startCommand: "python -m scripts.run_daily_councils"
+    # -u (unbuffered stdout/stderr) - Render Daily Discovery missing-
+    # runtime-logs diagnosis: the CHILD run_weekly.py subprocess was
+    # already launched with -u (see scripts/run_daily_councils.py), but
+    # this PARENT process itself was not. Two consecutive real 2Gi OOM
+    # production runs showed ZERO [mem] lines, zero streamed council
+    # output, and zero "starting"/"OK"/"FAILED" lines in Render's log
+    # viewer between "Running python -m scripts.run_daily_councils" and
+    # the OOM kill - confirmed root cause: CPython block-buffers stdout
+    # whenever it is not attached to a real terminal (i.e. always, when
+    # Render captures a Cron Job's output via a pipe), so every print()
+    # this PARENT process itself made was sitting unflushed in ITS OWN
+    # stdout buffer, and a SIGKILL from the OOM killer gives Python no
+    # chance to flush it on the way out - the buffer, and everything in
+    # it, is simply gone. -u fixes this at the interpreter level. Not
+    # relied on alone - see PYTHONUNBUFFERED below and this module's own
+    # flush=True on every critical print, so the fix does not depend on
+    # only one buffering assumption holding.
+    startCommand: "python -u -m scripts.run_daily_councils"
     envVars:
       # Value is set in the Render dashboard, never committed here -
       # sync: false means "this variable is required but Render will not
@@ -180,6 +207,13 @@ services:
       # the Cron Job's own scheduled run actually launches it.
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: "0"
+      # NOT a secret - belt-and-braces alongside startCommand's own -u
+      # flag (Render Daily Discovery missing-runtime-logs diagnosis, "Do
+      # not rely on only one fragile buffering assumption") - guarantees
+      # unbuffered stdout/stderr even if a future manual dashboard change
+      # ever overrides startCommand and drops the -u flag.
+      - key: PYTHONUNBUFFERED
+        value: "1"
 
   - type: cron
     name: propertyaigent-intelligence-processing

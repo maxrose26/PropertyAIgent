@@ -94,11 +94,25 @@ def log_memory(
         self_mib, children_mib = process_tree_rss_mib(pid)
         total_mib = self_mib + children_mib
         council_part = f"council={council} " if council else ""
-        print(f"[mem] {council_part}stage={stage} self={self_mib:.0f}MiB children={children_mib:.0f}MiB total={total_mib:.0f}MiB")
+        # flush=True (Render Daily Discovery missing-runtime-logs diagnosis,
+        # "Do not rely on only one fragile buffering assumption"): this is
+        # called from BOTH the orchestrator and each run_weekly.py council
+        # subprocess. The orchestrator's own launch command and
+        # PYTHONUNBUFFERED already fix the buffering issue at the process
+        # level, but a diagnostic print that survives a hard OOM SIGKILL
+        # should not also depend on that external configuration staying
+        # correct forever - flush explicitly here too, redundantly but
+        # cheaply (one syscall per stage boundary, not per line of a busy
+        # loop).
+        print(
+            f"[mem] {council_part}stage={stage} self={self_mib:.0f}MiB children={children_mib:.0f}MiB total={total_mib:.0f}MiB",
+            flush=True,
+        )
         if total_mib > warn_threshold_mib:
             print(
                 f"[mem-warning] {council_part}stage={stage} total={total_mib:.0f}MiB "
-                f"exceeds {warn_threshold_mib:.0f}MiB warning threshold"
+                f"exceeds {warn_threshold_mib:.0f}MiB warning threshold",
+                flush=True,
             )
     except Exception:  # noqa: BLE001 - a diagnostic must never take the real pipeline down with it
         pass
