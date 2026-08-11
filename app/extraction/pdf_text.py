@@ -125,6 +125,22 @@ def document_dir(council_code: str, reference: str) -> Path:
     return folder
 
 
+# Bounded chunk size for streamed downloads - just large enough to be
+# efficient, small enough that "how much of one file is in memory at once"
+# is never a meaningful contributor to process-tree RSS.
+DOWNLOAD_CHUNK_SIZE = 256 * 1024  # 256KB
+
+# A DEFENSIVE ceiling, distinct from MAX_EXTRACTABLE_FILE_SIZE below (which
+# governs whether a downloaded file is worth text-EXTRACTING, not whether
+# it's downloaded at all - the file itself is still kept as evidence per
+# this project's own principle of never losing source information, even
+# when it's too large to extract). Protects only against a single
+# pathological/misbehaving response (a mislabeled non-PDF asset, a server
+# that never closes the connection) - comfortably above any genuine
+# planning document confirmed seen in production.
+MAX_DOWNLOAD_FILE_SIZE = 200 * 1024 * 1024  # 200MB
+
+
 def download_document(
     council_code: str, reference: str, document_name: str, source_url: str,
     session: requests.Session | None = None, referer: str | None = None,
@@ -160,9 +176,41 @@ def download_document(
     # handshake omits its intermediate certificate (see ssl_fix's module
     # docstring). A no-op for any normally-configured host.
     verify = get_verify_bundle_for_host(urlparse(source_url).hostname)
-    response = getter(source_url, headers=headers, timeout=60, verify=verify)
-    response.raise_for_status()
-    dest.write_bytes(response.content)
+    # stream=True (Render Daily Discovery Salford document-stage memory
+    # diagnosis, Part 8): previously a plain non-streaming GET, which
+    # requests fully buffers the ENTIRE response body into response.content
+    # before this function gets any chance to look at its size - a single
+    # large real-world planning document (confirmed production cases:
+    # multi-hundred-MB Design & Access Statements with embedded drawings)
+    # would sit ENTIRELY in RAM here, regardless of the separate 15MB
+    # MAX_EXTRACTABLE_FILE_SIZE cap below, which only ever gets consulted
+    # AFTER this function already returns - too late to prevent the spike.
+    # Streaming + writing straight to disk in bounded chunks means at most
+    # one DOWNLOAD_CHUNK_SIZE's worth of one document is ever held in memory
+    # at a time, independent of how large the real file turns out to be.
+    response = getter(source_url, headers=headers, timeout=60, verify=verify, stream=True)
+    try:
+        response.raise_for_status()
+        downloaded = 0
+        tmp_dest = dest.with_name(dest.name + ".part")
+        try:
+            with tmp_dest.open("wb") as f:
+                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                    if not chunk:
+                        continue
+                    downloaded += len(chunk)
+                    if downloaded > MAX_DOWNLOAD_FILE_SIZE:
+                        raise ValueError(
+                            f"{source_url} exceeded {MAX_DOWNLOAD_FILE_SIZE} bytes while "
+                            "downloading - aborted to protect process memory"
+                        )
+                    f.write(chunk)
+            tmp_dest.replace(dest)
+        except BaseException:
+            tmp_dest.unlink(missing_ok=True)
+            raise
+    finally:
+        response.close()
     return dest
 
 
