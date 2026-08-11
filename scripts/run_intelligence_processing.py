@@ -165,72 +165,134 @@ def process_intelligence_backlog(
     session.add(run)
     session.commit()
 
-    # Read-only backlog sizing BEFORE deciding whether an OpenAI client is
-    # needed at all this run - see this module's own docstring ("Backlog-
-    # aware, cost-safe by construction").
-    extraction_backlog = {code: count_pending_extraction(session, code) for code in council_codes}
-    summary_backlog = {code: count_pending_summaries(session, code) for code in council_codes}
-    total_extraction_backlog = sum(extraction_backlog.values())
-    total_summary_backlog = sum(summary_backlog.values())
-    print(f"[intelligence-processing] backlog: {total_extraction_backlog} application(s) awaiting extraction, "
-          f"{total_summary_backlog} site(s) awaiting a summary")
-
-    extractions_planned = min(max_extractions, total_extraction_backlog)
-    summaries_planned = min(max_summaries, total_summary_backlog)
-
     extractions_candidates_inspected = 0
     extractions_attempted = extractions_succeeded = extractions_no_usable_text = extractions_failed = 0
     summaries_attempted = summaries_succeeded = summaries_failed = 0
 
-    if extractions_planned == 0 and summaries_planned == 0:
-        print("[intelligence-processing] no outstanding work within this run's limits - nothing to do, "
-              "OPENAI_API_KEY was never read.")
-        detail = "No outstanding work this run."
-    else:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            run.status = "failed"
-            run.finished_at = dt.datetime.now(dt.timezone.utc)
-            run.detail = "OPENAI_API_KEY not set in .env - outstanding work exists but could not be processed."
-            session.commit()
-            raise RuntimeError("OPENAI_API_KEY not set in .env")
-        client = client_factory(api_key)
+    try:
+        # Read-only backlog sizing BEFORE deciding whether an OpenAI client
+        # is needed at all this run - see this module's own docstring
+        # ("Backlog-aware, cost-safe by construction"). Inside the guard
+        # below (AI Processing Reliability & Backlog Throughput,
+        # pre-deployment safety hotfix) - a read failure here is just as
+        # capable of leaving `run` (already committed as status="running"
+        # above) stuck in that non-terminal state forever as a failure
+        # later in the loop.
+        extraction_backlog = {code: count_pending_extraction(session, code) for code in council_codes}
+        summary_backlog = {code: count_pending_summaries(session, code) for code in council_codes}
+        total_extraction_backlog = sum(extraction_backlog.values())
+        total_summary_backlog = sum(summary_backlog.values())
+        print(f"[intelligence-processing] backlog: {total_extraction_backlog} application(s) awaiting extraction, "
+              f"{total_summary_backlog} site(s) awaiting a summary")
 
-        remaining_extractions = extractions_planned
-        remaining_summaries = summaries_planned
+        extractions_planned = min(max_extractions, total_extraction_backlog)
+        summaries_planned = min(max_summaries, total_summary_backlog)
 
-        for code in council_codes:
-            council = councils[code]
+        if extractions_planned == 0 and summaries_planned == 0:
+            print("[intelligence-processing] no outstanding work within this run's limits - nothing to do, "
+                  "OPENAI_API_KEY was never read.")
+            detail = "No outstanding work this run."
+        else:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                # Already-correct, specific terminal handling (unchanged by
+                # this hotfix) - sets its own FAILED status/detail/
+                # finished_at and raises before reaching the generic
+                # except below. run.status is already "failed" by the time
+                # that except runs, so its own guard (see below) leaves
+                # this exact message and status alone.
+                run.status = "failed"
+                run.finished_at = dt.datetime.now(dt.timezone.utc)
+                run.detail = "OPENAI_API_KEY not set in .env - outstanding work exists but could not be processed."
+                session.commit()
+                raise RuntimeError("OPENAI_API_KEY not set in .env")
+            client = client_factory(api_key)
 
-            if remaining_extractions > 0 and extraction_backlog[code] > 0:
-                # stage_extraction's own bounded candidate-scan (Part 5) may
-                # inspect more than `limit` rows (skipping no-usable-text
-                # ones for free) but never makes more than `limit` GENUINE
-                # attempts - result.attempted is therefore the true amount
-                # of this council's share of remaining_extractions actually
-                # spent, which may be less than planned if the scan cap was
-                # exhausted first.
-                stage_result = stage_extraction(session, client, council, limit=remaining_extractions)
-                extractions_candidates_inspected += stage_result.candidates_inspected
-                extractions_attempted += stage_result.attempted
-                extractions_succeeded += stage_result.succeeded
-                extractions_no_usable_text += stage_result.no_usable_text
-                extractions_failed += stage_result.failed
-                remaining_extractions -= stage_result.attempted
+            remaining_extractions = extractions_planned
+            remaining_summaries = summaries_planned
 
-            if remaining_summaries > 0 and summary_backlog[code] > 0:
-                planned_this_council = min(remaining_summaries, summary_backlog[code])
-                generated = stage_generate_scheme_summaries(session, client, council, limit=remaining_summaries)
-                summaries_attempted += planned_this_council
-                summaries_succeeded += generated
-                summaries_failed += max(planned_this_council - generated, 0)
-                remaining_summaries -= planned_this_council
+            for code in council_codes:
+                council = councils[code]
 
-        detail = (
-            f"Extractions: {extractions_succeeded}/{extractions_attempted} succeeded "
-            f"({extractions_no_usable_text} no usable text, {extractions_candidates_inspected} candidate(s) inspected). "
-            f"Summaries: {summaries_succeeded}/{summaries_attempted} succeeded."
-        )
+                if remaining_extractions > 0 and extraction_backlog[code] > 0:
+                    # stage_extraction's own bounded candidate-scan (Part 5) may
+                    # inspect more than `limit` rows (skipping no-usable-text
+                    # ones for free) but never makes more than `limit` GENUINE
+                    # attempts - result.attempted is therefore the true amount
+                    # of this council's share of remaining_extractions actually
+                    # spent, which may be less than planned if the scan cap was
+                    # exhausted first.
+                    stage_result = stage_extraction(session, client, council, limit=remaining_extractions)
+                    extractions_candidates_inspected += stage_result.candidates_inspected
+                    extractions_attempted += stage_result.attempted
+                    extractions_succeeded += stage_result.succeeded
+                    extractions_no_usable_text += stage_result.no_usable_text
+                    extractions_failed += stage_result.failed
+                    remaining_extractions -= stage_result.attempted
+
+                if remaining_summaries > 0 and summary_backlog[code] > 0:
+                    planned_this_council = min(remaining_summaries, summary_backlog[code])
+                    generated = stage_generate_scheme_summaries(session, client, council, limit=remaining_summaries)
+                    summaries_attempted += planned_this_council
+                    summaries_succeeded += generated
+                    summaries_failed += max(planned_this_council - generated, 0)
+                    remaining_summaries -= planned_this_council
+
+            detail = (
+                f"Extractions: {extractions_succeeded}/{extractions_attempted} succeeded "
+                f"({extractions_no_usable_text} no usable text, {extractions_candidates_inspected} candidate(s) inspected). "
+                f"Summaries: {summaries_succeeded}/{summaries_attempted} succeeded."
+            )
+    except Exception:
+        # Run-level catastrophic failure (AI Processing Reliability &
+        # Backlog Throughput pre-deployment safety hotfix) - distinct from
+        # the per-item failures already isolated INSIDE stage_extraction/
+        # stage_generate_scheme_summaries (an individual application/site
+        # failing is caught and classified there; it never raises past
+        # this point). Reaching here means something broke the RUN itself -
+        # a backlog-count read failing, client_factory raising, a DB write
+        # failure mid-loop, an unexpected bug in council iteration - and
+        # without this, `run` would sit at status="running" forever,
+        # looking neither successful nor honestly failed.
+        #
+        # `run.status != "failed"` skips the missing-API-key case above,
+        # which already set its own specific status/detail/finished_at
+        # before raising - this must never overwrite that more specific
+        # message with the generic one below.
+        if run.status != "failed":
+            # Best-effort persist a terminal FAILED state (never PARTIAL -
+            # PARTIAL is reserved for isolated item-level failures where the
+            # overall job still ran to completion) using only the counters
+            # already accumulated in local variables (safe - no further DB
+            # reads).
+            try:
+                run.status = "failed"
+                run.finished_at = dt.datetime.now(dt.timezone.utc)
+                run.extractions_candidates_inspected = extractions_candidates_inspected
+                run.extractions_attempted = extractions_attempted
+                run.extractions_succeeded = extractions_succeeded
+                run.extractions_no_usable_text = extractions_no_usable_text
+                run.extractions_failed = extractions_failed
+                run.summaries_attempted = summaries_attempted
+                run.summaries_succeeded = summaries_succeeded
+                run.summaries_failed = summaries_failed
+                run.detail = "Run-level failure - processing did not complete. See process logs for the original error."
+                session.commit()
+            except Exception:
+                # The database itself is unavailable/failing even for this
+                # best-effort terminal-state write - persistence may
+                # genuinely be impossible here (Case C). Deliberately
+                # swallow ONLY this secondary persistence failure, never the
+                # original one below - Render's non-zero process exit is
+                # the fallback operational signal in that scenario, exactly
+                # as it already is when the run row can't even be created
+                # in the first place (Case A).
+                pass
+        # Re-raise the ORIGINAL exception UNCHANGED (whether it's the
+        # already-handled missing-API-key RuntimeError or a genuinely new
+        # catastrophic failure) so Render still observes a non-zero-exit
+        # failed job either way - never masked, never swallowed.
+        raise
 
     # Re-count backlog AFTER the run - what's genuinely still outstanding,
     # for the next run (or an operator) to see.

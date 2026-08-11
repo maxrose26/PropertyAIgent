@@ -1118,7 +1118,18 @@ def stage_extraction(
         if not has_usable_document_text(application):
             application.extraction_last_outcome = OUTCOME_NO_USABLE_TEXT
             application.extraction_last_attempted_at = now
-            application.extraction_attempt_count += 1
+            # Null-safe (AI Processing Reliability & Backlog Throughput,
+            # pre-deployment safety hotfix): a pre-existing production
+            # Application row migrated via the additive ALTER TABLE ADD
+            # COLUMN mechanism (see app.db.session._add_missing_columns)
+            # receives SQL NULL here, not the ORM's own default=0 - that
+            # default only applies to rows INSERTed through the ORM after
+            # the column existed. A bare `+= 1` on such a row raises
+            # TypeError. The migration itself now backfills existing NULLs
+            # to 0 (see migrate_schema), but this stays defensive
+            # independently of that backfill ever having run - same
+            # reasoning at every extraction_attempt_count write below.
+            application.extraction_attempt_count = (application.extraction_attempt_count or 0) + 1
             session.commit()
             result.no_usable_text += 1
             print(f"  [extraction] {application.reference}: no usable document text, skipped (not billed)")
@@ -1147,7 +1158,7 @@ def stage_extraction(
             # and is handled identically to the earlier free check above.
             application.extraction_last_outcome = OUTCOME_NO_USABLE_TEXT
             application.extraction_last_attempted_at = now
-            application.extraction_attempt_count += 1
+            application.extraction_attempt_count = (application.extraction_attempt_count or 0) + 1  # null-safe - see above
             session.commit()
             result.no_usable_text += 1
             print(f"  [extraction] {application.reference}: no usable document text, skipped (not billed)")
@@ -1165,7 +1176,7 @@ def stage_extraction(
             # reason after it's since succeeded.
             application.extraction_last_outcome = None
             application.extraction_last_attempted_at = now
-            application.extraction_attempt_count += 1
+            application.extraction_attempt_count = (application.extraction_attempt_count or 0) + 1  # null-safe - see above
             session.commit()
             result.succeeded += 1
             print(f"  [extraction] {application.reference}: total_units={fields.get('total_units_final')} "
@@ -1173,7 +1184,7 @@ def stage_extraction(
         else:
             application.extraction_last_outcome = outcome
             application.extraction_last_attempted_at = now
-            application.extraction_attempt_count += 1
+            application.extraction_attempt_count = (application.extraction_attempt_count or 0) + 1  # null-safe - see above
             session.commit()
             result.failed += 1
 
