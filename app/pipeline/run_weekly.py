@@ -105,43 +105,54 @@ UNIT_GATE_PASSED = or_(
 )
 
 # Document-discovery eligibility (Evidence Completeness Foundation, PR A;
-# corrected pre-merge, "Partial Initial Document Acquisition Recovery") -
-# replaces the old bare ~Application.documents.any() (which conflated "has
-# stored documents" with "discovery has actually run", and permanently
-# excluded an application from ever being re-checked the moment even one
-# Document row existed, however partial).
+# "Partial Initial Document Acquisition Recovery", then "Legacy Document-
+# State Truthfulness") - replaces the old bare ~Application.documents.any()
+# (which conflated "has stored documents" with "discovery has actually
+# run", and permanently excluded an application from ever being re-checked
+# the moment even one Document row existed, however partial).
 #
-# This is now simply documents_last_checked_at IS NULL - deliberately NOT
-# combined with ~Application.documents.any() the way an earlier version of
-# this PR did. That combination was reconsidered and removed for a
-# specific reason: this amendment requires a genuinely-incomplete NEW
-# acquisition (one intended document downloaded successfully, another
-# still failed) to remain routinely eligible for recovery on the very
-# next Daily Discovery run - see Application.documents_last_checked_at's
-# own field comment and discover_and_store_documents_for_application's
-# acquisition_complete tracking. An `~Application.documents.any()` clause
-# would defeat that outright: the moment the FIRST document of a partial
-# acquisition succeeds and is persisted, that clause becomes false, and
-# this query would silently stop selecting the application again FOREVER
-# - even though documents_last_checked_at correctly stayed NULL to signal
-# "still incomplete, please retry". That is a materially worse bug than
-# the legacy-rollout gap the old clause existed to solve, since it would
-# make automatic recovery structurally impossible for any application
-# whose acquisition ever partially succeeds - not just an edge case.
+# Two independent conditions, both required:
 #
-# The legacy-rollout problem the old clause solved is instead now solved
-# at the DATA level, not the query level: app.db.session.
-# _backfill_documents_last_checked_at repairs every pre-existing
-# Application that already has Document rows to a real, honest
-# documents_last_checked_at (the MAX downloaded_at across its own
-# documents - never "now"), as part of the standard migrate_schema()
-# step. A zero-document legacy row is correctly left NULL and remains
-# eligible, exactly as before this PR. See that function's own docstring
-# for the full reasoning, including why this backfill is safe (no legacy
-# row has a "partial acquisition" state to recover in the first place -
-# the OLD ~Application.documents.any() gate already made every legacy
-# row's document set as complete as it would ever become).
-DOCUMENT_DISCOVERY_ELIGIBLE = Application.documents_last_checked_at.is_(None)
+# 1. documents_last_checked_at IS NULL - deliberately NOT combined with
+#    ~Application.documents.any() the way an earlier version of this PR
+#    did. That combination was reconsidered and removed for a specific
+#    reason: a genuinely-incomplete NEW acquisition (one intended document
+#    downloaded successfully, another still failed) must remain routinely
+#    eligible for recovery on the very next Daily Discovery run - see
+#    Application.documents_last_checked_at's own field comment and
+#    discover_and_store_documents_for_application's acquisition_complete
+#    tracking. An `~Application.documents.any()` clause would defeat that
+#    outright: the moment the FIRST document of a partial acquisition
+#    succeeds and is persisted, that clause becomes false, and this query
+#    would silently stop selecting the application again FOREVER - even
+#    though documents_last_checked_at correctly stayed NULL to signal
+#    "still incomplete, please retry".
+#
+# 2. documents_legacy_unverified is NOT True - the actual legacy-rollout
+#    safeguard (second pre-merge amendment). Every pre-existing Application
+#    that already had Document rows before this PR's migration ran is
+#    marked True by app.db.session._backfill_documents_legacy_unverified
+#    and is excluded here, regardless of its (always-NULL) documents_
+#    last_checked_at - this is what actually prevents the ~708 legacy
+#    documented applications from being bulk re-queued the first time this
+#    runs against production, WITHOUT resurrecting "has any document =
+#    complete" as documents_last_checked_at's own meaning (an earlier
+#    version of this migration inferred documents_last_checked_at itself
+#    from MAX(Document.downloaded_at) - rejected in review, since a
+#    Document row only proves "something downloaded once", never "the
+#    intended acquisition pass completed"; see that field's own comment).
+#    .isnot(True) rather than .is_(False) deliberately treats SQL NULL the
+#    same as False here - every legacy row is explicitly backfilled to
+#    True or False (never left NULL), and any NEW row's default is False,
+#    but this reads correctly either way. The flag is cleared (set False)
+#    the first time a targeted, fully-successful
+#    discover_and_store_documents_for_application call completes for that
+#    application - see that function's own comment - permanently moving
+#    the row into normal, non-legacy state.
+DOCUMENT_DISCOVERY_ELIGIBLE = and_(
+    Application.documents_last_checked_at.is_(None),
+    Application.documents_legacy_unverified.isnot(True),
+)
 
 # AI Processing Reliability & Backlog Throughput: a genuine (retryable) AI/
 # API failure re-enters the backlog on a LATER scheduled run, not the same
@@ -862,6 +873,15 @@ def discover_and_store_documents_for_application(
     acquisition_complete tracking below, and Application.
     documents_last_checked_at's own field comment for the exact rule.
 
+    This is also THE transition point for a legacy-marked application
+    (Application.documents_legacy_unverified, "Legacy Document-State
+    Truthfulness" amendment): a fully-successful pass here clears that
+    marker in the same commit it stamps documents_last_checked_at,
+    permanently moving the row into normal, non-legacy state - a future
+    material-change trigger, 90-day fallback, or manual refresh only has
+    to call this function directly (as any targeted rediscovery already
+    would); it needs no special-case handling for a legacy row.
+
     Deliberately does NOT handle request pacing (time.sleep) or Playwright
     page recycling - those are stage_documents' own per-run resource-
     management concerns (page in particular gets reassigned by
@@ -1081,6 +1101,18 @@ def discover_and_store_documents_for_application(
     # is a larger change than this PR's own scope.
     if acquisition_complete:
         application.documents_last_checked_at = dt.datetime.now(dt.timezone.utc)
+        # Legacy Document-State Truthfulness (PR A, second pre-merge
+        # amendment) - a genuine, fully-successful pass is exactly the
+        # "explicitly, individually rechecked" event that transitions a
+        # legacy-marked application into normal state (see
+        # Application.documents_legacy_unverified's own comment). Cleared
+        # unconditionally here rather than guarded behind "if it was set"
+        # - a no-op assignment for an application that was never legacy
+        # (already False) is harmless, and this is the ONE place that
+        # ever needs to know "this row is now verified", so a single
+        # unconditional clear is simpler than threading that knowledge
+        # through from the caller.
+        application.documents_legacy_unverified = False
 
     session.commit()
     print(f"  [documents] {application.reference}: {len(rows) - skipped - duplicates_skipped - failed_downloads} documents downloaded, "

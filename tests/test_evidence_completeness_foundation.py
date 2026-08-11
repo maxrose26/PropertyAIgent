@@ -607,21 +607,13 @@ def test_migration_is_idempotent_for_documents_last_checked_at():
     assert second_added == []
 
 
-def test_legacy_row_with_existing_documents_is_not_requeued_for_discovery():
-    """The central rollout-safety property (Section 9), exercised against
-    the REAL migration path rather than the in-memory `session` fixture.
-
-    Pre-merge amendment note: this safety no longer lives in the
-    DOCUMENT_DISCOVERY_ELIGIBLE query (the ~Application.documents.any()
-    clause was removed - see that constant's own comment in run_weekly.py
-    for why keeping it would make the amendment's own recovery requirement
-    structurally impossible). It now lives in migrate_schema's backfill
-    (_backfill_documents_last_checked_at, app/db/session.py): a legacy row
-    that already has Document rows is stamped with its latest document's
-    real downloaded_at the moment the new column is added, so it never
-    presents as NULL/eligible in the first place. This test proves that
-    end-to-end through the real migration function, not by asserting on
-    the query in isolation."""
+def _migrate_legacy_fixture(applications_with_documents: list[str], applications_without: list[str]):
+    """Shared real-migration fixture builder for this section: an old-
+    schema `applications` table (no documents_last_checked_at/
+    documents_legacy_unverified columns at all) with some references
+    carrying Document rows and some not, then the real migrate_schema()
+    applied on top - exactly the production rollout moment. Returns a
+    bound Session ready to query/exercise stage_documents against."""
     from app.db.session import migrate_schema
 
     engine = create_engine("sqlite:///:memory:", future=True)
@@ -632,24 +624,51 @@ def test_legacy_row_with_existing_documents_is_not_requeued_for_discovery():
     with Session() as _setup_session:
         _setup_session.add(Council(code='testcouncil', name='Test', base_url='https://example.invalid', date_field_mode='received', doc_system='idox'))
         _setup_session.commit()
+
+    all_refs = applications_with_documents + applications_without
     with engine.begin() as conn:
         conn.execute(
             Table("applications", old_metadata).insert(),
-            [{"id": 1, "council_code": "testcouncil", "reference": "APP/LEGACY/1"}],
+            [{"id": i + 1, "council_code": "testcouncil", "reference": ref} for i, ref in enumerate(all_refs)],
         )
-        conn.execute(
-            Document.__table__.insert(),
-            [{"application_id": 1, "doc_type": "planning_statement", "downloaded_at": downloaded_at}],
-        )
+        if applications_with_documents:
+            conn.execute(
+                Document.__table__.insert(),
+                [
+                    {"application_id": i + 1, "doc_type": "application_form", "downloaded_at": downloaded_at}
+                    for i in range(len(applications_with_documents))
+                ],
+            )
 
     migrate_schema(engine)
 
     Session = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    with Session() as migrated_session:
+    migrated_session = Session()
+    for application in migrated_session.query(Application).order_by(Application.id).all():
+        application.summary_url = f"https://example.invalid/{application.reference}"
+    migrated_session.commit()
+    return migrated_session
+
+
+def test_legacy_row_with_existing_documents_is_not_requeued_for_discovery():
+    """Section 11, item 1+2 (Legacy Document-State Truthfulness amendment).
+    Exercised against the REAL migration path, not the in-memory `session`
+    fixture.
+
+    documents_last_checked_at must stay truthfully NULL for a legacy
+    documented row - a Document row only ever proves "something downloaded
+    once", never "a complete intended acquisition pass finished" (an
+    earlier version of this migration inferred MAX(downloaded_at) into
+    this field - rejected in review for exactly that reason). Rollout
+    safety instead comes from documents_legacy_unverified, which
+    DOCUMENT_DISCOVERY_ELIGIBLE (app.pipeline.run_weekly) excludes on -
+    proven here end-to-end through the real migrate_schema() function,
+    not by asserting on the query in isolation."""
+    migrated_session = _migrate_legacy_fixture(["APP/LEGACY/1"], [])
+    with migrated_session:
         application = migrated_session.get(Application, 1)
-        assert application.documents_last_checked_at is not None  # backfilled, not NULL
-        application.summary_url = "https://example.invalid/APP/LEGACY/1"
-        migrated_session.commit()
+        assert application.documents_last_checked_at is None  # truthfully NULL, never inferred
+        assert application.documents_legacy_unverified is True  # the actual rollout-safety signal
 
         with patch("app.pipeline.run_weekly.discover_documents") as mock_discover:
             stage_documents(migrated_session, page=MagicMock(), council=_council_config("testcouncil"))
@@ -657,54 +676,50 @@ def test_legacy_row_with_existing_documents_is_not_requeued_for_discovery():
 
 
 def test_legacy_row_with_zero_documents_remains_eligible(session):
-    """A legacy application that genuinely has zero stored documents
-    (documents_last_checked_at also NULL) is exactly today's eligibility
-    set - it should remain eligible, unchanged."""
-    _add_application(session, reference="APP/LEGACY/2")
+    """Section 11, item 3: a legacy application that genuinely has zero
+    stored documents (documents_last_checked_at AND documents_legacy_
+    unverified both falsy) is exactly today's eligibility set - it should
+    remain eligible for its first-ever discovery attempt, unchanged."""
+    application = _add_application(session, reference="APP/LEGACY/2")
+    assert application.documents_legacy_unverified is False
     with patch("app.pipeline.run_weekly.discover_documents", return_value=[]) as mock_discover:
         stage_documents(session, page=MagicMock(), council=_council_config("testcouncil"))
     mock_discover.assert_called_once()
 
 
+def test_legacy_row_with_zero_documents_retains_initial_discovery_path_through_real_migration():
+    """Section 11, item 3, exercised through the real migration path
+    alongside a documented sibling - the zero-document legacy row must be
+    explicitly marked documents_legacy_unverified=False (not left NULL),
+    and must be the one row still selected."""
+    migrated_session = _migrate_legacy_fixture(["APP/LEGACY/DOCUMENTED"], ["APP/LEGACY/ZERO"])
+    with migrated_session:
+        zero_doc_app = migrated_session.query(Application).filter_by(reference="APP/LEGACY/ZERO").one()
+        assert zero_doc_app.documents_legacy_unverified is False
+        assert zero_doc_app.documents_last_checked_at is None
+
+        with patch("app.pipeline.run_weekly.discover_documents", return_value=[]) as mock_discover:
+            stage_documents(migrated_session, page=MagicMock(), council=_council_config("testcouncil"))
+        mock_discover.assert_called_once()
+        assert mock_discover.call_args.args[3] == zero_doc_app.summary_url
+
+
 def test_first_run_after_migration_does_not_document_scrape_whole_corpus():
-    """Simulates the production rollout moment through the REAL migration
-    path (see the previous test's docstring for why this must exercise
-    migrate_schema/_backfill_documents_last_checked_at rather than the
-    in-memory `session` fixture post-amendment): a mix of legacy
-    applications (some with documents, some without), migrated from the
-    old schema in one pass. Only the genuinely never-documented ones must
-    be selected on the first run afterwards."""
-    from app.db.session import migrate_schema
-
-    engine = create_engine("sqlite:///:memory:", future=True)
-    old_metadata = _build_old_applications_table(engine)
-    Base.metadata.create_all(engine, tables=[Council.__table__, Document.__table__])
-    downloaded_at = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
-    Session = sessionmaker(bind=engine, future=True)
-    with Session() as _setup_session:
-        _setup_session.add(Council(code='testcouncil', name='Test', base_url='https://example.invalid', date_field_mode='received', doc_system='idox'))
-        _setup_session.commit()
-    with engine.begin() as conn:
-        conn.execute(
-            Table("applications", old_metadata).insert(),
-            [{"id": i + 1, "council_code": "testcouncil", "reference": f"APP/DOCUMENTED/{i}"} for i in range(5)]
-            + [{"id": i + 6, "council_code": "testcouncil", "reference": f"APP/NEW/{i}"} for i in range(3)],
-        )
-        conn.execute(
-            Document.__table__.insert(),
-            [{"application_id": i + 1, "doc_type": "application_form", "downloaded_at": downloaded_at} for i in range(5)],
-        )
-
-    migrate_schema(engine)
-
-    Session = sessionmaker(bind=engine, future=True, expire_on_commit=False)
-    with Session() as migrated_session:
+    """Section 11, items 2+11: simulates the production rollout moment
+    through the REAL migration path - a mix of legacy applications (some
+    with documents, some without), migrated from the old schema in one
+    pass. Only the genuinely never-documented ones must be selected on
+    the first Daily Discovery run afterwards - no portal-stampede
+    condition for the ~708-application-sized documented set."""
+    documented_refs = [f"APP/DOCUMENTED/{i}" for i in range(5)]
+    new_refs = [f"APP/NEW/{i}" for i in range(3)]
+    migrated_session = _migrate_legacy_fixture(documented_refs, new_refs)
+    with migrated_session:
         applications = migrated_session.query(Application).order_by(Application.id).all()
-        for application in applications:
-            application.summary_url = f"https://example.invalid/{application.reference}"
-        migrated_session.commit()
-        already_documented = applications[:5]
-        never_documented = applications[5:]
+        already_documented = [a for a in applications if a.reference in documented_refs]
+        never_documented = [a for a in applications if a.reference in new_refs]
+        assert all(a.documents_legacy_unverified is True for a in already_documented)
+        assert all(a.documents_legacy_unverified is False for a in never_documented)
 
         with patch("app.pipeline.run_weekly.discover_documents", return_value=[]) as mock_discover:
             stage_documents(migrated_session, page=MagicMock(), council=_council_config("testcouncil"))
@@ -717,16 +732,16 @@ def test_first_run_after_migration_does_not_document_scrape_whole_corpus():
             assert app.summary_url not in called_refs
 
 
-def test_backfill_sets_max_downloaded_at_not_now_and_is_idempotent():
-    """Dedicated test of _backfill_documents_last_checked_at itself (not
-    just its observable effect on eligibility, covered above): the exact
-    stamped value must be the real MAX(Document.downloaded_at) for that
-    application - never "now" (forbidden per the original PR A task, since
-    that would falsely claim a check just happened) - rows with zero
-    documents must be left NULL/untouched, and re-running it must change
-    nothing (idempotent, matching the existing _backfill_extraction_attempt_count
-    convention this function follows)."""
-    from app.db.session import _backfill_documents_last_checked_at, migrate_schema
+def test_backfill_marks_legacy_flag_not_timestamp_and_is_idempotent():
+    """Dedicated test of _backfill_documents_legacy_unverified itself
+    (Section 11, item 10): documents_last_checked_at must NEVER be
+    touched by this backfill (stays NULL for every legacy row, documented
+    or not) - only documents_legacy_unverified is set, True for a row
+    with >=1 Document, False for a row with zero, and re-running it must
+    change nothing (idempotent, matching the existing
+    _backfill_extraction_attempt_count convention this function
+    follows)."""
+    from app.db.session import _backfill_documents_legacy_unverified, migrate_schema
 
     engine = create_engine("sqlite:///:memory:", future=True)
     old_metadata = _build_old_applications_table(engine)
@@ -753,27 +768,66 @@ def test_backfill_sets_max_downloaded_at_not_now_and_is_idempotent():
             ],
         )
 
-    migrate_schema(engine)  # adds the column AND runs the backfill once
+    migrate_schema(engine)  # adds both columns AND runs the backfill once
 
     with engine.connect() as conn:
         multi_row = conn.execute(text(
-            "SELECT documents_last_checked_at FROM applications WHERE reference = 'APP/MULTI/1'"
+            "SELECT documents_last_checked_at, documents_legacy_unverified FROM applications WHERE reference = 'APP/MULTI/1'"
         )).fetchone()
         zero_row = conn.execute(text(
-            "SELECT documents_last_checked_at FROM applications WHERE reference = 'APP/ZERO/1'"
+            "SELECT documents_last_checked_at, documents_legacy_unverified FROM applications WHERE reference = 'APP/ZERO/1'"
         )).fetchone()
 
-    assert str(newest.date()) in str(multi_row.documents_last_checked_at)  # the LATEST of the two, not the first
-    assert zero_row.documents_last_checked_at is None  # zero-document row untouched
+    assert multi_row.documents_last_checked_at is None  # never inferred from downloaded_at
+    assert bool(multi_row.documents_legacy_unverified) is True
+    assert zero_row.documents_last_checked_at is None
+    assert bool(zero_row.documents_legacy_unverified) is False  # explicitly False, not left NULL
 
-    second_pass_updated = _backfill_documents_last_checked_at(engine)
+    second_pass_updated = _backfill_documents_legacy_unverified(engine)
     assert second_pass_updated == 0  # idempotent - nothing left to backfill
 
     with engine.connect() as conn:
         multi_row_again = conn.execute(text(
-            "SELECT documents_last_checked_at FROM applications WHERE reference = 'APP/MULTI/1'"
+            "SELECT documents_legacy_unverified FROM applications WHERE reference = 'APP/MULTI/1'"
         )).fetchone()
-    assert multi_row_again.documents_last_checked_at == multi_row.documents_last_checked_at  # unchanged
+    assert bool(multi_row_again.documents_legacy_unverified) is True  # unchanged
+
+
+def test_legacy_application_transitions_via_explicit_targeted_rediscovery(session):
+    """Section 11, items 8+9 - the required future transition path: legacy
+    existing documents / completeness unknown -> a targeted call to
+    discover_and_store_documents_for_application (standing in here for a
+    future PR B material-change trigger, 90-day fallback, or manual
+    refresh, none of which are implemented by this amendment - only made
+    possible by it) -> a successful full pass -> documents_last_checked_at
+    gets a genuine timestamp AND documents_legacy_unverified is cleared,
+    moving the row permanently into normal, non-legacy state."""
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+    import requests
+
+    application = _add_application(session, reference="APP/LEGACY/TRANSITION")
+    _add_document(session, application, "planning_statement", source_url="https://example.invalid/existing.pdf")
+    application.documents_legacy_unverified = True  # simulates a post-migration legacy-marked row
+    session.commit()
+    assert application.documents_last_checked_at is None
+
+    new_row = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/decision.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[new_row]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/decision.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="decision_notice"), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests.Session(), _council_config("testcouncil"), application,
+        )
+
+    assert application.documents_last_checked_at is not None  # genuine timestamp, item 9
+    assert application.documents_legacy_unverified is False  # marker cleared, item 8
+    # DOCUMENT_DISCOVERY_ELIGIBLE now excludes it purely via the timestamp,
+    # exactly like any other normal (non-legacy) application.
+    with patch("app.pipeline.run_weekly.discover_documents") as mock_discover:
+        stage_documents(session, page=MagicMock(), council=_council_config("testcouncil"))
+    mock_discover.assert_not_called()
 
 
 # --- F: regression / scope guards --------------------------------------------

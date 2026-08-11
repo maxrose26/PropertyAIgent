@@ -156,55 +156,56 @@ def _backfill_extraction_attempt_count(engine) -> int:
         return result.rowcount if result.rowcount is not None else 0
 
 
-def _backfill_documents_last_checked_at(engine) -> int:
-    """Evidence Completeness Foundation (PR A), pre-merge amendment
-    "Partial Initial Document Acquisition Recovery" - repairs the one
-    remaining legacy-rollout gap the amendment's corrected eligibility
-    logic creates.
+def _backfill_documents_legacy_unverified(engine) -> int:
+    """Evidence Completeness Foundation (PR A), SECOND pre-merge amendment
+    "Legacy Document-State Truthfulness" - the sole rollout-safety
+    mechanism for pre-existing Application rows, replacing an earlier
+    version of this function that backfilled documents_last_checked_at
+    itself to MAX(Document.downloaded_at). That was rejected in Product
+    Owner review: a Document row only ever proves "one document was
+    downloaded once", never "a complete intended acquisition pass
+    finished" (documents_last_checked_at's own approved definition, see
+    that field's comment on Application) - some legacy applications may
+    have had other intended documents that failed or were never even
+    discovered, with no reliable record either way. Stamping ANY value
+    into documents_last_checked_at for those rows would misrepresent
+    unknown completeness as a genuine completed check - recreating the
+    old "has any document = complete" bug via migration instead of code.
 
-    stage_documents' eligibility is now simply `documents_last_checked_at
-    IS NULL` (see app.pipeline.run_weekly.DOCUMENT_DISCOVERY_ELIGIBLE's own
-    comment for why the earlier design's extra `~Application.documents.
-    any()` legacy-compatibility clause had to be removed: it would also
-    have permanently blocked ROUTINE recovery of a genuinely-incomplete
-    NEW acquisition the moment even one of its documents succeeded and was
-    persisted - defeating this very amendment's purpose). Without some
-    other legacy-rollout safeguard, every pre-existing production
-    Application that already has Document rows (708 of 756 qualifying
-    applications, per the PR A audit) would become eligible for document
-    discovery again the first time this runs against production - exactly
-    the uncontrolled full-corpus re-scrape PR A was built to avoid.
+    So this backfill NEVER touches documents_last_checked_at at all - it
+    stays NULL for every legacy row, truthfully. Instead it sets the
+    narrowly-scoped documents_legacy_unverified marker (see that field's
+    own comment on Application) to True for every pre-existing Application
+    that already has >=1 Document row, and to False for every pre-existing
+    Application with zero Document rows - both explicitly, so no row is
+    left in an ambiguous NULL state for this column either.
+    DOCUMENT_DISCOVERY_ELIGIBLE (app.pipeline.run_weekly) excludes any row
+    where this marker is True, which is what actually prevents the ~708
+    pre-existing documented applications from being bulk re-queued for
+    document discovery the first time this runs against production - NOT
+    any inferred value in documents_last_checked_at itself. A zero-document
+    legacy row is marked False (not legacy-unverified) and so remains
+    eligible for its first-ever discovery attempt, exactly as before PR A
+    existed.
 
-    Deliberately NOT "now" (explicitly forbidden - a legacy row was not
-    just checked, and "now" would additionally imply completeness this
-    migration cannot actually verify). Instead, backfills to the MAX
-    downloaded_at across that application's own existing Document rows -
-    a real, honest, already-true fact ("the last time document activity
-    genuinely happened for this application"), not an invented value.
-    This is a correct - not merely convenient - value for every row it
-    touches: under the PRE-amendment system, `~Application.documents.
-    any()` alone already permanently excluded any application the moment
-    it had one document, complete or not, so no legacy row's document set
-    is any less "final" than this backfill implies - there is no partial-
-    acquisition state to recover for legacy rows specifically, only for
-    NEW acquisitions made under this amended code going forward.
-
-    Applications with ZERO documents are correctly left untouched (NULL) -
-    they remain eligible for their first-ever discovery attempt, exactly
-    as before this field existed.
-
-    Idempotent: only rows where the column IS NULL are touched, so a
-    database that's already fully repaired matches zero rows and is a
-    no-op. Uses the same raw-SQL, dialect-agnostic style as the rest of
-    this module - no new migration framework."""
+    This marker is only ever cleared later by a genuine, successful,
+    explicitly-targeted discover_and_store_documents_for_application call
+    (see that function's own comment) - never re-set to True afterwards,
+    and never touched again by this backfill (idempotent: only rows where
+    the column IS NULL are affected, so a database that's already been
+    marked matches zero rows on a second run - including any row a
+    targeted recheck has since moved to False, since False is not NULL).
+    Uses the same raw-SQL, dialect-agnostic style as the rest of this
+    module - no new migration framework, and no new workflow-state
+    machine: a single boolean, scoped to exactly this one rollout-safety
+    question."""
     with engine.begin() as conn:
         result = conn.execute(text("""
             UPDATE "applications"
-            SET "documents_last_checked_at" = (
-                SELECT MAX("downloaded_at") FROM "documents" WHERE "documents"."application_id" = "applications"."id"
+            SET "documents_legacy_unverified" = EXISTS (
+                SELECT 1 FROM "documents" WHERE "documents"."application_id" = "applications"."id"
             )
-            WHERE "documents_last_checked_at" IS NULL
-              AND EXISTS (SELECT 1 FROM "documents" WHERE "documents"."application_id" = "applications"."id")
+            WHERE "documents_legacy_unverified" IS NULL
         """))
         return result.rowcount if result.rowcount is not None else 0
 
@@ -240,10 +241,11 @@ def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
         print(f"[migrate-schema] backfilled {backfilled} existing applications.extraction_attempt_count "
               f"row(s) from NULL to 0")
 
-    docs_backfilled = _backfill_documents_last_checked_at(engine)
-    if docs_backfilled:
-        print(f"[migrate-schema] backfilled {docs_backfilled} existing applications.documents_last_checked_at "
-              f"row(s) from NULL to their latest document's downloaded_at")
+    legacy_marked = _backfill_documents_legacy_unverified(engine)
+    if legacy_marked:
+        print(f"[migrate-schema] marked {legacy_marked} existing applications.documents_legacy_unverified "
+              f"row(s) True (has documents) or False (no documents) - documents_last_checked_at itself "
+              f"is never inferred and remains NULL for every legacy row")
 
     return missing_tables, added_columns
 
@@ -283,7 +285,7 @@ def init_db() -> None:
         Base.metadata.create_all(engine)
         _add_missing_columns(engine)
         _backfill_extraction_attempt_count(engine)
-        _backfill_documents_last_checked_at(engine)
+        _backfill_documents_legacy_unverified(engine)
         return
 
     missing_tables, missing_columns = verify_schema(engine)
