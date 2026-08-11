@@ -41,6 +41,7 @@ from playwright.sync_api import Page
 
 from app.config import CouncilConfig
 from app.extraction.pdf_text import USEFUL_DOC_TYPES, sanitise_filename, standardise_document_type
+from app.scrapers.idox_portal import get_with_retry
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
@@ -101,10 +102,17 @@ def _find_document_links(soup: BeautifulSoup, base_url: str, referer: str) -> li
 
 
 def get_idox_documents(session: requests.Session, summary_url: str) -> list[CollectedDocument]:
-    """Direct-listing councils: activeTab=documents on the main portal."""
+    """Direct-listing councils: activeTab=documents on the main portal.
+
+    get_with_retry (Render Daily Discovery Portal Resilience & Truthful
+    Run Health, Part 1) - this was previously a bare session.get() with no
+    429/connection-error retry at all, despite that helper already
+    existing and already being proven against this exact portal (see its
+    own docstring) - confirmed real production cause of repeated Stockport
+    HTTP 429s specifically on this "applicationDetails...activeTab=
+    documents" endpoint."""
     docs_url = summary_url.replace("activeTab=summary", "activeTab=documents")
-    response = session.get(docs_url, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, docs_url, timeout=30)
     soup = BeautifulSoup(response.text, "html.parser")
     return _find_document_links(soup, docs_url, referer=docs_url)
 

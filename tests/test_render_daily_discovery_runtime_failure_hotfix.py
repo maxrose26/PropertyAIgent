@@ -192,21 +192,41 @@ def test_run_one_council_success_path_does_not_print_error_lines(session, capsys
 
 
 def test_exit_code_all_succeeded_is_zero():
+    """Updated by Render Daily Discovery Portal Resilience & Truthful Run
+    Health: _exit_code's own keyword renamed succeeded -> healthy."""
     from scripts.run_daily_councils import _exit_code
 
-    assert _exit_code(succeeded=10, attempted=10) == 0
+    assert _exit_code(healthy=10, attempted=10) == 0
 
 
-def test_exit_code_partial_failure_is_nonzero():
+def test_exit_code_some_councils_unhealthy_is_nonzero():
+    """Renamed from test_exit_code_partial_failure_is_nonzero (Render
+    Daily Discovery Portal Resilience & Truthful Run Health) - "partial"
+    is now an actual ScrapeRun.status value with its own specific meaning
+    (a council whose primary scrape succeeded but a supporting stage
+    totally failed - see app.pipeline.acquisition_health), which counts
+    as HEALTHY for this exit-code policy, not unhealthy. This test is
+    about the unrelated, unchanged case: some councils genuinely FAILED."""
     from scripts.run_daily_councils import _exit_code
 
-    assert _exit_code(succeeded=9, attempted=10) != 0
+    assert _exit_code(healthy=9, attempted=10) != 0
 
 
 def test_exit_code_total_failure_is_nonzero():
     from scripts.run_daily_councils import _exit_code
 
-    assert _exit_code(succeeded=0, attempted=10) != 0
+    assert _exit_code(healthy=0, attempted=10) != 0
+
+
+def test_exit_code_partial_status_counts_as_healthy():
+    """New (Render Daily Discovery Portal Resilience & Truthful Run
+    Health, Part 7): "partial" must still allow an overall exit 0 -
+    explicit product requirement ("PARTIAL: should still count as a
+    successful Render Cron execution / exit 0")."""
+    from scripts.run_daily_councils import _exit_code
+
+    # 7 success + 3 partial = 10 healthy, matching all 10 attempted.
+    assert _exit_code(healthy=7 + 3, attempted=10) == 0
 
 
 def test_exit_code_orchestrator_level_skip_also_counts_as_unhealthy():
@@ -218,10 +238,10 @@ def test_exit_code_orchestrator_level_skip_also_counts_as_unhealthy():
     result set."""
     from scripts.run_daily_councils import _exit_code
 
-    # 9 councils actually got recorded and all 9 succeeded, but 10 were
+    # 9 councils actually got recorded and all 9 healthy, but 10 were
     # meant to be attempted - the 10th vanished into an orchestrator-level
     # exception and was never appended to results at all.
-    assert _exit_code(succeeded=9, attempted=10) != 0
+    assert _exit_code(healthy=9, attempted=10) != 0
 
 
 def test_main_calls_sys_exit_with_the_real_exit_code():
