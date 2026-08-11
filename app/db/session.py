@@ -122,6 +122,40 @@ def _add_missing_columns(engine) -> list[tuple[str, str]]:
     return missing_columns
 
 
+def _backfill_extraction_attempt_count(engine) -> int:
+    """AI Processing Reliability & Backlog Throughput pre-deployment safety
+    hotfix - applications.extraction_attempt_count is declared NOT NULL
+    with a Python-side ORM default=0, but _add_missing_columns' own bare
+    ALTER TABLE ADD COLUMN (deliberately no NOT NULL/DEFAULT clause - see
+    that function's own docstring) leaves every EXISTING row with SQL NULL,
+    not 0, the instant this column is first added to a table that already
+    has data - confirmed directly: a fresh production row would raise
+    TypeError the first time app.pipeline.run_weekly.stage_extraction tried
+    `application.extraction_attempt_count += 1` on it. That call site is
+    now null-safe independently of this backfill (see stage_extraction's
+    own `(application.extraction_attempt_count or 0) + 1`) - but a real 0
+    is still the correct, honest value for a row that has genuinely never
+    had an extraction attempt recorded, so this repairs it explicitly
+    rather than leaving it permanently NULL in the data itself.
+
+    Idempotent and safe to call on every migrate_schema() invocation, not
+    just the one that adds the column: only rows where the column IS NULL
+    are touched, so a database that's already fully repaired matches zero
+    rows and is a no-op. Scoped to this one column only - not a general
+    "backfill every nullable-with-Python-default column" mechanism, since
+    no other such column in this project is ever incremented in place the
+    way this one is (the actual root cause of the original bug); introducing
+    a generic mechanism for a problem no other column actually has would be
+    unnecessary schema/migration complexity. Uses the same raw-SQL,
+    dialect-agnostic style as _add_missing_columns - no new migration
+    framework."""
+    with engine.begin() as conn:
+        result = conn.execute(
+            text('UPDATE "applications" SET "extraction_attempt_count" = 0 WHERE "extraction_attempt_count" IS NULL')
+        )
+        return result.rowcount if result.rowcount is not None else 0
+
+
 def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
     """The EXPLICIT, operator-invoked production migration step (Pilot
     Readiness PR-2 final pre-merge amendment, "Implement The Smallest
@@ -147,6 +181,12 @@ def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
         print(f"[migrate-schema] created table {table_name}")
 
     added_columns = _add_missing_columns(engine)  # already logs each one as it goes
+
+    backfilled = _backfill_extraction_attempt_count(engine)
+    if backfilled:
+        print(f"[migrate-schema] backfilled {backfilled} existing applications.extraction_attempt_count "
+              f"row(s) from NULL to 0")
+
     return missing_tables, added_columns
 
 
@@ -184,6 +224,7 @@ def init_db() -> None:
     if engine.dialect.name == "sqlite":
         Base.metadata.create_all(engine)
         _add_missing_columns(engine)
+        _backfill_extraction_attempt_count(engine)
         return
 
     missing_tables, missing_columns = verify_schema(engine)
