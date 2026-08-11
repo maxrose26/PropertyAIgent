@@ -1095,6 +1095,85 @@ class Application(Base):
     extraction_last_attempted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     extraction_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Document discovery state (Evidence Completeness Foundation, PR A;
+    # amended pre-merge, "Partial Initial Document Acquisition Recovery") -
+    # records the most recent time Property AIgent successfully COMPLETED
+    # the intended document-discovery/acquisition pass for this
+    # application, independently of how many (if any) useful documents
+    # that pass produced. NULL means "never successfully completed" -
+    # deliberately distinct from the old ~Application.documents.any()
+    # signal (see stage_documents), which conflated "has stored documents"
+    # with "discovery has run", and distinct from evidence sufficiency
+    # (see app.pipeline.evidence.is_evidence_sufficient) - an application
+    # can be genuinely checked and still be evidence-insufficient, and
+    # must NOT be re-checked daily merely because it's insufficient (that
+    # is a future PR's job - material-change detection, the 90-day
+    # fallback, or manual refresh - not routine Daily Discovery).
+    #
+    # This does NOT merely mean "the portal listing endpoint returned
+    # successfully" - a listing can succeed while one or more of the
+    # documents it identified as intended-to-download still fails to
+    # download (a broken/timed-out portal file, say). In that case this
+    # field is deliberately left un-advanced, so the application remains
+    # eligible for the very next Daily Discovery run to retry ONLY the
+    # still-missing document(s) - already-successful documents are
+    # recognised by identity (see app.pipeline.evidence.
+    # document_identity_key) and never re-downloaded. See
+    # discover_and_store_documents_for_application's own
+    # acquisition_complete tracking for the exact rule, including its one
+    # known limitation (idox_anite/Bury councils cannot currently surface
+    # an individual per-document download failure to that function at
+    # all, since get_anite_documents silently drops a failed row instead
+    # of returning it - a pre-existing architectural gap, not introduced
+    # by this amendment, left for a later operational-recovery PR).
+    #
+    # Legacy rows (every Application that existed before this field was
+    # added) are deliberately left NULL FOREVER by migration - never
+    # backfilled to "now", and, since the second pre-merge amendment
+    # ("Legacy Document-State Truthfulness"), never inferred from
+    # historical Document.downloaded_at values either. An earlier version
+    # of this migration backfilled legacy rows to MAX(downloaded_at)
+    # across their existing Document rows - that was rejected in review:
+    # under the pre-PR-A architecture, a Document row only ever proves
+    # "one document was downloaded once", never "a complete intended
+    # acquisition pass finished" (this field's own approved definition,
+    # above) - some legacy applications may have had other intended
+    # documents that failed or were never even discovered, with no
+    # reliable record of that either way. Stamping ANY value here for
+    # those rows would misrepresent unknown completeness as a genuine
+    # completed check. See documents_legacy_unverified, immediately below,
+    # for how rollout safety (not re-queuing ~708 legacy documented
+    # applications for routine Daily Discovery the moment this migrates)
+    # is achieved WITHOUT touching this field's own truthful meaning.
+    documents_last_checked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Legacy document-state rollout marker (PR A, second pre-merge
+    # amendment, "Legacy Document-State Truthfulness") - a narrowly-scoped
+    # ROLLOUT-SAFETY flag only, deliberately NOT a general workflow-state
+    # field. True means: this Application already had >=1 Document row
+    # before this amendment's migration ran, and there is no genuine
+    # evidence a completed acquisition pass ever happened under
+    # documents_last_checked_at's real semantic - completeness is UNKNOWN
+    # (neither "recently checked" nor "definitely never checked"). False
+    # means either a genuinely new application (nothing to prove either
+    # way) or a legacy application that has SINCE been explicitly,
+    # successfully rechecked - discover_and_store_documents_for_application
+    # clears this flag the moment it stamps a genuine
+    # documents_last_checked_at (see that function's own comment),
+    # permanently moving the row into normal, non-legacy state; the flag
+    # is never set back to True afterwards.
+    #
+    # app.pipeline.run_weekly.DOCUMENT_DISCOVERY_ELIGIBLE excludes any row
+    # where this is True, so legacy documented applications are never
+    # picked up by ROUTINE Daily Discovery after rollout - only by an
+    # explicit, individually-targeted recheck (a future PR B material-
+    # change trigger, 90-day fallback, or manual refresh calling
+    # discover_and_store_documents_for_application directly - none of
+    # which are implemented by this amendment, only made possible by it).
+    # See app.db.session._backfill_documents_legacy_unverified for the
+    # migration that sets this for existing rows.
+    documents_legacy_unverified: Mapped[bool] = mapped_column(Boolean, default=False)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])
