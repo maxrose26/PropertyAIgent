@@ -63,6 +63,7 @@ from app.extraction.pdf_text import (
     standardise_document_type,
 )
 from app.extraction.run_extraction import run_extraction_for_application
+from app.pipeline.acquisition_health import AcquisitionHealth
 from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
     compute_lapse_status,
@@ -251,7 +252,7 @@ def _upsert_scraped_application(
     return existing
 
 
-def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig) -> int:
+def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig, health: AcquisitionHealth | None = None) -> int:
     """Reserved matters applications routinely cite a parent outline/full
     permission that predates our scraping window and was never scraped in
     its own right (confirmed real case: Wigan's North Leigh 1491-dwelling
@@ -328,7 +329,17 @@ def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig) 
                     result = fetch_application_by_reference_idox(page, requests_session, council, parent_ref)
             except Exception as e:
                 print(f"    error fetching parent {parent_ref}: {e}")
+                # A genuine acquisition failure (Render Daily Discovery
+                # Portal Resilience & Truthful Run Health, Part 4) -
+                # distinct from "not found on the portal" just below,
+                # which is a legitimate, successfully-completed lookup
+                # that happened to find nothing, not a resilience failure.
+                if health is not None:
+                    health.record_parent_lookup(succeeded=False)
                 continue
+
+            if health is not None:
+                health.record_parent_lookup(succeeded=True)
 
             if not result or not result.reference:
                 print(f"    parent {parent_ref} not found on the portal")
@@ -739,7 +750,7 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
     return confirmed_qualifying
 
 
-def stage_documents(session: Session, page, council: CouncilConfig) -> int:
+def stage_documents(session: Session, page, council: CouncilConfig, health: AcquisitionHealth | None = None) -> int:
     pending = session.execute(
         select(Application).where(
             Application.council_code == council.code, ~Application.documents.any(), UNIT_GATE_PASSED
@@ -784,7 +795,16 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
             rows = discover_documents(page, requests_session, council, application.summary_url, dest_dir)
         except Exception as e:
             print(f"  [documents] error discovering docs for {application.reference}: {e}")
+            # Render Daily Discovery Portal Resilience & Truthful Run
+            # Health, Part 4 - recorded per APPLICATION (not per document),
+            # matching the approved "documents.applications attempted/
+            # succeeded/failed" framing.
+            if health is not None:
+                health.record_document_discovery(succeeded=False)
             continue
+
+        if health is not None:
+            health.record_document_discovery(succeeded=True)
 
         skipped = 0
         sniffed = 0
@@ -872,6 +892,22 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
             extra={"application": application.reference, "identity_map": len(session.identity_map)},
             breakdown=True,
         )
+
+        # Request pacing (Render Daily Discovery Portal Resilience &
+        # Truthful Run Health, Part 1): every OTHER stage that talks to
+        # Idox (scrape_month, stage_fetch_related_applications,
+        # fetch_application_by_reference) already sleeps
+        # council.request_delay_seconds between requests - this stage
+        # never did, despite calling discover_documents/download_document
+        # per application with no delay at all. Confirmed real production
+        # cause of repeated Stockport HTTP 429s (bumped to 2.5s for
+        # Stockport specifically after an earlier incident on the
+        # application-detail endpoint - see idox_portal.py's own
+        # REQUEST_DELAY_SECONDS comment - but this stage's own document
+        # endpoint was never given the same treatment). Reuses the
+        # existing per-council configuration value rather than inventing
+        # a new one.
+        time.sleep(council.request_delay_seconds)
 
         # Page recycling (Render Daily Discovery Salford CHILD-PROCESS
         # memory diagnosis, Part 8): a local reproduction (repeated same-
@@ -1254,6 +1290,14 @@ def main() -> None:
     log_memory("process.start", council=args.council)
     load_dotenv(override=True)  # this project's .env always wins over stray shell-exported vars
 
+    # Render Daily Discovery Portal Resilience & Truthful Run Health - one
+    # AcquisitionHealth instance for this council's whole run, printed as a
+    # single [run-health] summary line at the very end (see this function's
+    # own final lines) for scripts.run_daily_councils to classify
+    # ScrapeRun.status as success/partial/failed. See app.pipeline.
+    # acquisition_health's own module docstring for the full rationale.
+    health = AcquisitionHealth()
+
     init_db()
     session = get_session()
     council = get_council(args.council)
@@ -1318,8 +1362,23 @@ def main() -> None:
             for i, (date_from, date_to) in enumerate(month_ranges):
                 if i > 0:
                     time.sleep(MONTH_COOLDOWN_SECONDS)  # courtesy pause between months on a backfill
+                # Primary/current-period scrape tracking (Render Daily
+                # Discovery Portal Resilience & Truthful Run Health, Part
+                # 5) - deliberately only the FIRST month range: Daily
+                # Discovery's own default is exactly one month (today's
+                # period), and that is specifically what "is this
+                # council's data fresh" depends on. Any additional
+                # backfill months (i > 0, a manual/operator invocation
+                # only) are supplementary - their own failures are already
+                # handled by the existing per-month try/except below and
+                # must not affect this run's SUCCESS/PARTIAL/FAILED
+                # classification, which is about TODAY's acquisition.
+                if i == 0:
+                    health.record_primary_scrape_attempt()
                 try:
                     stage_scrape(session, page, council, date_from, date_to, batch_id)
+                    if i == 0:
+                        health.record_primary_scrape_completed()
                 except Exception as e:
                     # A single month failing (e.g. the portal rate-limits or blocks us
                     # mid-run) shouldn't lose every other month in a multi-year backfill -
@@ -1335,7 +1394,7 @@ def main() -> None:
             # matters filing is included) but before site-linking, so a
             # freshly-fetched parent is in the DB in time for the SAME run's
             # parent_reference site-linking tier to pick it up.
-            stage_fetch_missing_parents(session, page, council)
+            stage_fetch_missing_parents(session, page, council, health=health)
             log_memory("stage_fetch_missing_parents.after", council=council.code)
 
         if not args.skip_site_link:
@@ -1358,7 +1417,7 @@ def main() -> None:
 
         if not args.skip_documents:
             log_memory("stage_documents.before", council=council.code)
-            stage_documents(session, page, council)
+            stage_documents(session, page, council, health=health)
             log_memory("stage_documents.after", council=council.code)
 
         log_memory("browser_close.before", council=council.code)
@@ -1399,6 +1458,20 @@ def main() -> None:
             openai_client=OpenAI(api_key=openai_key) if openai_key else None,
         )
 
+    # [run-health] (Render Daily Discovery Portal Resilience & Truthful
+    # Run Health, Part 4) - ONE deterministic, machine-parseable summary
+    # line, printed unconditionally at the very end of a run that reached
+    # this point without crashing. scripts.run_daily_councils parses this
+    # by its "[run-health]" prefix and `status=` field to classify
+    # ScrapeRun.status as success/partial/failed - see
+    # app.pipeline.acquisition_health's own module docstring for why a
+    # subprocess reaching a clean exit is not, on its own, sufficient
+    # evidence that the underlying scrape/document acquisition materially
+    # succeeded (the confirmed Trafford scenario this exists to catch).
+    # flush=True for the same reason as every other critical print in this
+    # codebase since the missing-runtime-logs diagnosis - do not rely on
+    # external buffering configuration alone staying correct.
+    print(health.summary_line(), flush=True)
     log_memory("process.exit", council=council.code)
     print("\nDone.")
 

@@ -305,8 +305,13 @@ def test_run_daily_councils_still_never_imports_openai():
 
 
 def test_exit_code_policy_unchanged_by_this_audit():
+    """Updated by Render Daily Discovery Portal Resilience & Truthful Run
+    Health: _exit_code's own keyword renamed succeeded -> healthy (now
+    covers "success" OR "partial" ScrapeRun statuses - see that module's
+    own docstring) - the underlying ALL-OR-NOTHING policy this audit's own
+    prior work established is otherwise unchanged."""
     from scripts.run_daily_councils import _exit_code
 
-    assert _exit_code(succeeded=10, attempted=10) == 0
-    assert _exit_code(succeeded=9, attempted=10) == 1
-    assert _exit_code(succeeded=0, attempted=10) == 1
+    assert _exit_code(healthy=10, attempted=10) == 0
+    assert _exit_code(healthy=9, attempted=10) == 1
+    assert _exit_code(healthy=0, attempted=10) == 1

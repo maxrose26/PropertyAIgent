@@ -17,6 +17,7 @@ import pdfplumber
 import requests
 
 from app.db.session import DATA_DIR
+from app.scrapers.idox_portal import get_with_retry
 from app.scrapers.ssl_fix import get_verify_bundle_for_host
 
 HEADERS = {"User-Agent": "Mozilla/5.0"}
@@ -168,8 +169,13 @@ def download_document(
     # Some Idox instances (Oldham confirmed) 404 a direct file request unless
     # it carries both a Referer AND the session cookies from having visited
     # the document listing page first - a standalone requests.get() with only
-    # the Referer header still 404s. Reuse the caller's session when given.
-    getter = session.get if session is not None else requests.get
+    # the Referer header still 404s. Reuse the caller's session when given -
+    # get_with_retry itself requires a real Session (not the bare requests.get
+    # module function), so a one-off Session stands in when the caller didn't
+    # supply one; this changes nothing about the actual request beyond gaining
+    # retry behaviour, since a fresh Session has no meaningful state of its
+    # own to preserve here.
+    retry_session = session if session is not None else requests.Session()
     # verify=<bundle> rather than requests' default - confirmed a real case
     # (Manchester's Arcus portal) where every single document download
     # failed with SSLCertVerificationError because the server's own TLS
@@ -188,9 +194,18 @@ def download_document(
     # Streaming + writing straight to disk in bounded chunks means at most
     # one DOWNLOAD_CHUNK_SIZE's worth of one document is ever held in memory
     # at a time, independent of how large the real file turns out to be.
-    response = getter(source_url, headers=headers, timeout=60, verify=verify, stream=True)
+    #
+    # get_with_retry (Render Daily Discovery Portal Resilience & Truthful
+    # Run Health, Part 1) - previously called the getter directly with no
+    # 429/connection-error retry at all. get_with_retry never touches
+    # response.content/.text internally (only .status_code/.headers), so
+    # it was already safe to use with stream=True once plumbed through -
+    # everything below (chunked writes, the 200MB ceiling, .part rename)
+    # is completely unchanged; only the initial connection attempt is now
+    # retried, and response.raise_for_status() already happened inside
+    # get_with_retry, so it isn't repeated here.
+    response = get_with_retry(retry_session, source_url, timeout=60, stream=True, headers=headers, verify=verify)
     try:
-        response.raise_for_status()
         downloaded = 0
         tmp_dest = dest.with_name(dest.name + ".part")
         try:

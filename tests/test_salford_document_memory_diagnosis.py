@@ -34,6 +34,7 @@ from unittest.mock import MagicMock, patch
 
 import psutil
 import pytest
+import requests
 
 from app.config import CouncilConfig
 from app.db.models import Application, Council, Document, ScrapeRun
@@ -58,16 +59,28 @@ def _council_config(code: str, doc_system: str = "arcus") -> CouncilConfig:
 class _FakeResponse:
     """Stands in for requests.Response with stream=True - .content is a
     trap: accessing it fails the test, since the whole point of the fix is
-    that nothing in download_document may touch the fully-buffered body."""
+    that nothing in download_document may touch the fully-buffered body.
 
-    def __init__(self, chunks: list[bytes], status_ok: bool = True):
+    status_code (Render Daily Discovery Portal Resilience & Truthful Run
+    Health): download_document now routes through get_with_retry, which
+    inspects response.status_code directly (to detect 429) before ever
+    calling raise_for_status() - a fake response needs a plausible status
+    code for that check to run at all."""
+
+    def __init__(self, chunks: list[bytes], status_ok: bool = True, status_code: int = 200):
         self._chunks = chunks
         self._status_ok = status_ok
+        self.status_code = status_code if status_ok else (status_code if status_code != 200 else 500)
+        self.headers = {}
         self.closed = False
 
     def raise_for_status(self):
         if not self._status_ok:
-            raise Exception("simulated HTTP error")
+            # A real requests.exceptions.HTTPError - matches what
+            # get_with_retry's own except clause actually catches, so
+            # this fake exercises the real cleanup path, not a
+            # coincidentally-similar one.
+            raise requests.exceptions.HTTPError("simulated HTTP error")
 
     def iter_content(self, chunk_size):
         yield from self._chunks

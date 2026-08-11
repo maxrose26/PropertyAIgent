@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 from playwright.sync_api import Page
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from app.config import CouncilConfig
 from app.scrapers.unit_filter import is_administrative_application_type, qualify
@@ -24,6 +25,32 @@ WAIT_SECONDS = 1.0
 REQUEST_DELAY_SECONDS = 0.4  # bumped from 0.25 after Stockport started 429'ing partway through a run
 MAX_RETRIES = 4
 BACKOFF_BASE_SECONDS = 5.0
+
+# Render Daily Discovery Portal Resilience & Truthful Run Health: a
+# production run found Trafford failing with requests/urllib3
+# ConnectTimeout/ConnectionError on document-discovery requests (a genuine
+# connection-establishment failure, distinct from a 429 response - no
+# response is ever received to check the status code of), with ZERO
+# retry - get_with_retry's own retry loop previously only wrapped the
+# status-code check, not the session.get() call itself, so a connection
+# failure propagated immediately. Same MAX_RETRIES budget as the existing
+# 429 path (kept single-budgeted rather than doubled, so one flaky
+# document doesn't consume 2x the retry allowance); backoff kept distinct
+# from BACKOFF_BASE_SECONDS since a connection failure and a portal-
+# reported rate limit are different signals that don't need the same
+# constant, even though they currently happen to use a similar shape.
+CONNECTION_ERROR_BACKOFF_SECONDS = 3.0
+
+# Bounded retry around a Playwright page.goto() navigation timeout only
+# (Render Daily Discovery Portal Resilience & Truthful Run Health, Part
+# 3) - Trafford confirmed "Page.goto: Timeout 30000ms exceeded" with zero
+# retry previously, on both the current-period search and parent-by-
+# reference lookup. Deliberately small - this is resilience against a
+# single transient slow moment, not a substitute for a healthy portal;
+# the existing 30s per-navigation timeout and networkidle wait condition
+# are UNCHANGED here (see _goto_with_retry's own docstring for why).
+GOTO_MAX_ATTEMPTS = 3
+GOTO_RETRY_BACKOFF_SECONDS = 2.0
 
 RATE_LIMIT_PHRASES = [
     "too many requests",
@@ -52,24 +79,84 @@ def is_rate_limited(html_text: str) -> bool:
     return any(phrase in lowered for phrase in RATE_LIMIT_PHRASES)
 
 
-def get_with_retry(session: requests.Session, url: str, timeout: int = 30) -> requests.Response:
+def get_with_retry(
+    session: requests.Session, url: str, timeout: int = 30, *, stream: bool = False, **kwargs,
+) -> requests.Response:
     """Some Idox instances (Stockport confirmed) start returning HTTP 429
     after a burst of requests, even at a modest request rate - retry with
     backoff (honouring Retry-After if the server sends one) rather than
     dropping the application entirely, which was silently losing hundreds
-    of candidates on a single portal that just needed to be asked to slow down."""
+    of candidates on a single portal that just needed to be asked to slow down.
+
+    Also retries a genuine connection-level failure (ConnectTimeout/
+    ConnectionError - confirmed real, unretried Trafford production
+    behaviour: "Max retries exceeded... Connection timed out") with its
+    own separate backoff - a different failure class from a 429 response
+    (no response is ever received here to inspect), bounded by the same
+    MAX_RETRIES budget.
+
+    `stream`/`**kwargs` (Render Daily Discovery Portal Resilience &
+    Truthful Run Health, Part 1): passed straight through to session.get()
+    so this same retry logic can wrap a STREAMED download too, without
+    ever buffering the response body itself - this function only ever
+    inspects response.status_code/.headers, never .content/.text, so it
+    was already safe to use with stream=True once plumbed through. Does
+    NOT change app.extraction.pdf_text.download_document's own chunked-
+    write/200MB-ceiling/.part-file behaviour - only wraps the initial
+    connection attempt that function already made directly."""
     last_error: Exception | None = None
     for attempt in range(MAX_RETRIES):
-        response = session.get(url, timeout=timeout)
+        try:
+            response = session.get(url, timeout=timeout, stream=stream, **kwargs)
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
+            last_error = e
+            time.sleep(CONNECTION_ERROR_BACKOFF_SECONDS * (attempt + 1))
+            continue
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             wait = float(retry_after) if retry_after and retry_after.isdigit() else BACKOFF_BASE_SECONDS * (attempt + 1)
+            # Release the connection before retrying - especially
+            # important when stream=True, where the body was never read
+            # and the underlying socket would otherwise sit open.
+            response.close()
             time.sleep(wait)
             last_error = requests.exceptions.HTTPError(f"429 after {attempt + 1} attempts: {url}")
             continue
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError:
+            # An obviously-permanent HTTP failure (404, 500, ...) - not
+            # retried (Part 2: "do not retry obviously permanent HTTP
+            # failures indiscriminately"), but the connection must still
+            # be released before this propagates, same as the 429 and
+            # retry-exhaustion paths - especially important when
+            # stream=True, where the body was never read.
+            response.close()
+            raise
         return response
     raise last_error or requests.exceptions.HTTPError(f"Failed after {MAX_RETRIES} attempts: {url}")
+
+
+def _goto_with_retry(page: Page, url: str, *, timeout: int = 30000) -> None:
+    """Bounded retry around one Playwright navigation, for a transient
+    TimeoutError only (Render Daily Discovery Portal Resilience &
+    Truthful Run Health, Part 3). Deliberately does NOT change the 30s
+    timeout value or the networkidle wait condition itself - this is a
+    resilience fix (retry the same navigation a couple more times), not a
+    navigation redesign; if GOTO_MAX_ATTEMPTS retries at the SAME timeout
+    still can't get through, that's real evidence for a future, separate
+    decision about the timeout/wait condition, not something to silently
+    paper over here by e.g. quietly lowering the wait condition."""
+    last_error: Exception | None = None
+    for attempt in range(GOTO_MAX_ATTEMPTS):
+        try:
+            page.goto(url, wait_until="networkidle", timeout=timeout)
+            return
+        except PlaywrightTimeoutError as e:
+            last_error = e
+            if attempt < GOTO_MAX_ATTEMPTS - 1:
+                time.sleep(GOTO_RETRY_BACKOFF_SECONDS * (attempt + 1))
+    raise last_error
 
 
 def keyval_from_url(url: str) -> str | None:
@@ -94,7 +181,7 @@ def collect_result_links(page: Page, council: CouncilConfig, date_from: str, dat
     all results, returning every applicationDetails.do summary URL found."""
     links: set[str] = set()
 
-    page.goto(council.search_url, wait_until="networkidle", timeout=30000)
+    _goto_with_retry(page, council.search_url)
     page.fill(f'input[name="{council.date_start_field}"]', date_from)
     page.fill(f'input[name="{council.date_end_field}"]', date_to)
     page.click('input[value="Search"]')
@@ -203,7 +290,7 @@ def fetch_application_by_reference(
     confirmed qualifying scheme just cited it, and an outline permission's
     own wording ("Outline application (all matters reserved)") can
     legitimately have no unit count or REVIEW_KEYWORDS hit of its own."""
-    page.goto(council.search_url, wait_until="networkidle", timeout=30000)
+    _goto_with_retry(page, council.search_url)
     page.fill('input[name="searchCriteria.reference"]', reference)
     page.click('input[value="Search"]')
     page.wait_for_load_state("networkidle", timeout=30000)
@@ -281,7 +368,7 @@ def search_related_applications(page: Page, council: CouncilConfig, query: str) 
     used everywhere else against this portal, and expect to sometimes
     need to back off further)."""
     simple_search_url = f"{council.base_url}/search.do?action=simple&searchType=Application"
-    page.goto(simple_search_url, wait_until="networkidle", timeout=30000)
+    _goto_with_retry(page, simple_search_url)
     page.fill('input[name="searchCriteria.simpleSearchString"]', query)
     page.click('input[type="submit"]')
     page.wait_for_load_state("networkidle", timeout=30000)

@@ -128,6 +128,20 @@ def _summarize_error(text: str) -> str:
     lines = [line for line in text.splitlines() if line.strip()]
     return lines[-1].strip() if lines else "(no output captured)"
 
+
+# Render Daily Discovery Portal Resilience & Truthful Run Health, Part 4:
+# matches app.pipeline.run_weekly's own [run-health] summary line (see
+# app.pipeline.acquisition_health's own docstring) - deliberately a
+# narrow, anchored pattern on a fixed "status=" field, never scraping
+# arbitrary human-readable log text for classification.
+_RUN_HEALTH_STATUS_RE = re.compile(r"^\[run-health\] status=(success|partial|failed)\b")
+
+
+def _parse_run_health_status(line: str) -> str | None:
+    match = _RUN_HEALTH_STATUS_RE.match(line)
+    return match.group(1) if match else None
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TIMEOUT_SECONDS = 3600  # 1 hour per council - generous; a genuinely stuck run should not block the next council forever
 
@@ -289,6 +303,14 @@ def run_one_council(
     # orchestrator process later dies before ever reaching the code below
     # that would otherwise be the only thing writing it anywhere.
     tail_lines: deque[str] = deque(maxlen=_OUTPUT_TAIL_MAX_LINES)
+    # Render Daily Discovery Portal Resilience & Truthful Run Health, Part
+    # 4/5 - the council subprocess's own materiality assessment (success/
+    # partial/failed), captured from its [run-health] line as it streams.
+    # A plain dict (not a bare local) because _on_line is a nested closure
+    # that needs to WRITE this, not just read it. None until/unless that
+    # line is actually seen - see the classification logic below this
+    # subprocess call for what happens if it never is.
+    run_health: dict[str, str | None] = {"status": None}
 
     def _on_line(line: str) -> None:
         # flush=True (Render Daily Discovery missing-runtime-logs diagnosis,
@@ -327,22 +349,55 @@ def run_one_council(
             # raw subprocess output line.
             run.detail = line[:4000]
             session.commit()
+        else:
+            # Render Daily Discovery Portal Resilience & Truthful Run
+            # Health, Part 4 - captured the same way as [mem] lines
+            # above, but classification is read at the end (not
+            # committed live) since it's only meaningful once the whole
+            # run has actually finished; the [mem] checkpoint above
+            # already covers OOM-survival for the "what was happening"
+            # question.
+            status = _parse_run_health_status(line)
+            if status is not None:
+                run_health["status"] = status
 
     return_code = None
     try:
         return_code = _run_council_subprocess(
             command, cwd=PROJECT_ROOT, timeout_seconds=timeout_seconds, on_line=_on_line, council_code=council_code,
         )
-        success = return_code == 0
+        crashed = return_code != 0
         # Council-level failure isolation lives here: a non-zero exit code
         # is recorded and reported, never re-raised - the loop in main()
         # always proceeds to the next council regardless.
     except subprocess.TimeoutExpired:
-        success = False
+        crashed = True
         tail_lines.append(f"Timed out after {timeout_seconds}s.")
     except Exception as e:  # noqa: BLE001 - genuinely must never take the loop down
-        success = False
+        crashed = True
         tail_lines.append(f"Orchestrator error managing subprocess: {e}")
+
+    # Status classification (Render Daily Discovery Portal Resilience &
+    # Truthful Run Health, Part 4/5/7): a crashed/timed-out/non-zero-exit
+    # subprocess is ALWAYS "failed" - unchanged from before, and takes
+    # priority over anything the subprocess may have printed, since a
+    # crash can happen at any point (including mid-print) and its own
+    # exit signal is the more reliable one. Otherwise (a clean exit),
+    # trust the subprocess's OWN materiality assessment from its
+    # [run-health] line - "success"/"partial"/"failed" are the only
+    # values it ever emits (see app.pipeline.acquisition_health) - and
+    # this is exactly how the confirmed Trafford scenario (current-period
+    # scrape silently timed out, exception swallowed internally, clean
+    # exit 0) is now correctly classified "failed" instead of "success"
+    # despite the process itself not crashing. Falls back to "success"
+    # only if that line was somehow never seen at all (e.g. an
+    # older/unexpected code path) - preserves the previous default rather
+    # than inventing a new failure mode for a case with no evidence
+    # either way.
+    if crashed:
+        run.status = "failed"
+    else:
+        run.status = run_health["status"] or "success"
 
     log_memory("council.after", council=council_code)
 
@@ -351,15 +406,33 @@ def run_one_council(
     discovered = applications_after - applications_before
 
     run.finished_at = dt.datetime.now(dt.timezone.utc)
-    run.status = "success" if success else "failed"
+    # run.status already set above (Part 4/5/7) - success/partial/failed,
+    # not the old binary success/failed.
     run.applications_before = applications_before
     run.applications_after = applications_after
     run.applications_discovered = discovered
     run.detail = combined_output[-4000:]  # bounded twice over - a bounded LINE ring buffer, then a bounded CHAR tail
     session.commit()
 
-    if success:
+    # Render Daily Discovery Portal Resilience & Truthful Run Health, Part
+    # 4/5/7 - reported from run.status, NOT the earlier crash-only
+    # `success` boolean: a clean exit (success=True in the old sense) with
+    # a materially failed primary scrape (the confirmed Trafford scenario)
+    # must NOT print "OK" - that was exactly the misleading behaviour this
+    # work exists to fix, and printing from the old boolean here would
+    # have silently reintroduced it even after the DB-side fix above.
+    if run.status == "success":
         print(f"[run-daily-councils] {council_code}: OK ({discovered:+d} applications)", flush=True)
+    elif run.status == "partial":
+        # Still a materially useful run (primary scrape completed) - not
+        # printed as FAILED, and does not affect the overall Cron exit
+        # code (Part 7), but visibly distinct from a clean OK so an
+        # operator scanning Render's log viewer doesn't miss it.
+        print(
+            f"[run-daily-councils] {council_code}: PARTIAL ({discovered:+d} applications) "
+            "- some supporting acquisition failed, see ScrapeRun.detail",
+            flush=True,
+        )
     else:
         # Concise, actionable line for Render's own log viewer (Render
         # Daily Discovery runtime failure hotfix) - previously only the
@@ -404,29 +477,43 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001 - one council's bookkeeping failure must not stop the rest
             print(f"[run-daily-councils] {council_code}: orchestrator-level error, continuing: {e}", flush=True)
 
-    succeeded = sum(1 for r in results if r.status == "success")
-    failed = sum(1 for r in results if r.status == "failed")
+    # Render Daily Discovery Portal Resilience & Truthful Run Health, Part
+    # 7 - three-way breakdown, PARTIAL never collapsed back into either
+    # bucket in this human-readable summary (explicit product requirement:
+    # "Do not collapse PARTIAL back into SUCCESS").
+    success_count = sum(1 for r in results if r.status == "success")
+    partial_count = sum(1 for r in results if r.status == "partial")
+    failed_count = sum(1 for r in results if r.status == "failed")
     print(
-        f"\n[run-daily-councils] Done. {succeeded} succeeded, {failed} failed, {len(council_codes)} attempted.",
+        f"\n[run-daily-councils] Done. {success_count} success, {partial_count} partial, "
+        f"{failed_count} failed, {len(council_codes)} attempted.",
         flush=True,
     )
 
-    return _exit_code(succeeded=succeeded, attempted=len(council_codes))
+    return _exit_code(healthy=success_count + partial_count, attempted=len(council_codes))
 
 
-def _exit_code(*, succeeded: int, attempted: int) -> int:
-    """Exit status policy (Render Daily Discovery runtime failure hotfix -
-    see this module's own docstring, "Process exit status"): every council
-    attempted successfully is the only condition that exits 0 - a partial
-    or total failure both exit 1. `attempted` (not `succeeded + failed`) is
-    the comparison base deliberately: an orchestrator-level bookkeeping
-    error that skipped a council entirely (never reaching run_one_council's
-    own try/except, so never becoming a recorded "failed" ScrapeRun either)
-    is just as unhealthy a run and must not be silently invisible to this
-    policy. Factored out as its own pure function (no DB/session access)
-    so the policy itself is directly unit-testable without touching a real
-    database - main() is the only caller."""
-    if succeeded == attempted:
+def _exit_code(*, healthy: int, attempted: int) -> int:
+    """Exit status policy (Render Daily Discovery runtime failure hotfix,
+    updated by Portal Resilience & Truthful Run Health Part 7): every
+    council attempted must be either "success" or "partial" for a 0 exit -
+    "partial" counts as HEALTHY for Render's own Cron exit-code purposes
+    (approved policy: "PARTIAL: should still count as a successful Render
+    Cron execution / exit 0... Render infrastructure health and Property
+    AIgent data-quality health are separate concepts" - the [run-health]-
+    derived ScrapeRun.status already carries the truthful distinction;
+    this exit code is only about "did the Cron Job itself need operator
+    attention"). Only a genuinely FAILED council (subprocess crash/
+    timeout/non-zero exit, OR a materially failed primary scrape) trips
+    the overall exit code. `attempted` (not healthy + explicitly-failed)
+    is still the comparison base deliberately: an orchestrator-level
+    bookkeeping error that skipped a council entirely (never reaching
+    run_one_council's own try/except, so never becoming a recorded
+    ScrapeRun at all) is just as unhealthy a run and must not be silently
+    invisible to this policy. Factored out as its own pure function (no
+    DB/session access) so the policy itself is directly unit-testable
+    without touching a real database - main() is the only caller."""
+    if healthy == attempted:
         return 0
     return 1
 
