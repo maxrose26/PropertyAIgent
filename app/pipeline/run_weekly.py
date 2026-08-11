@@ -74,6 +74,7 @@ from app.extraction.run_extraction import (
     run_extraction_for_application,
 )
 from app.pipeline.acquisition_health import AcquisitionHealth
+from app.pipeline.evidence import document_identity_key, is_evidence_sufficient
 from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
     compute_lapse_status,
@@ -101,6 +102,37 @@ from app.scrapers.unit_filter import classify_application_category, extract_unit
 UNIT_GATE_PASSED = or_(
     Application.unit_confirmation_status.is_(None),
     Application.unit_confirmation_status == "confirmed_qualifying",
+)
+
+# Document-discovery eligibility (Evidence Completeness Foundation, PR A) -
+# replaces the old bare ~Application.documents.any() (which conflated "has
+# stored documents" with "discovery has actually run", and permanently
+# excluded an application from ever being re-checked the moment even one
+# Document row existed, however partial). documents_last_checked_at IS NULL
+# is the correct, forward-looking signal on its own - but every Application
+# that existed before this field was added also has it NULL (deliberately
+# never backfilled, see the field's own comment in app.db.models), so IS
+# NULL alone would make every one of those already-documented applications
+# eligible again the first time this runs against production - exactly the
+# uncontrolled full-corpus re-scrape this PR must avoid.
+#
+# ~Application.documents.any() is therefore kept as a second, legacy-
+# compatibility condition: an application that already has at least one
+# stored Document is treated as "already checked" for rollout purposes,
+# identically to its behaviour before this PR, even though the precise
+# WHEN is unknown for those rows. Only a genuinely never-touched
+# application (no timestamp AND no documents at all) is eligible - which,
+# for every row that exists today, is exactly the same set ~Application.
+# documents.any() alone already selected, so this is a behaviourally
+# neutral migration for existing data. Going forward, once ANY application
+# (new or legacy) gets a successful listing check, documents_last_checked_at
+# is set regardless of outcome - including a listing that found zero useful
+# documents, which today gets re-attempted every single day forever (see
+# stage_documents' own docstring) - so this is a strict improvement, not
+# just a neutral one, for that specific case.
+DOCUMENT_DISCOVERY_ELIGIBLE = and_(
+    Application.documents_last_checked_at.is_(None),
+    ~Application.documents.any(),
 )
 
 # AI Processing Reliability & Backlog Throughput: a genuine (retryable) AI/
@@ -798,148 +830,243 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
     return confirmed_qualifying
 
 
+def discover_and_store_documents_for_application(
+    session: Session, page, requests_session: requests.Session, council: CouncilConfig,
+    application: Application, health: AcquisitionHealth | None = None,
+) -> bool:
+    """The actual per-application document-discovery-and-store logic,
+    factored out of stage_documents' loop (Evidence Completeness
+    Foundation, PR A, Section 13) so a future PR (material-change-
+    triggered targeted rediscovery, the 90-day fallback, manual refresh)
+    can invoke it directly for ONE specific Application - bypassing
+    stage_documents' own bulk DOCUMENT_DISCOVERY_ELIGIBLE query entirely,
+    rather than needing that query to somehow re-select an application it
+    was deliberately designed to permanently exclude once documented (see
+    that constant's own comment). Returns True if a reliable document
+    listing was obtained this call, regardless of how many (if any) useful
+    documents it contained - see Application.documents_last_checked_at's
+    own field comment for why that, not "has any Document row", is the
+    definition of a completed check.
+
+    Deliberately does NOT handle request pacing (time.sleep) or Playwright
+    page recycling - those are stage_documents' own per-run resource-
+    management concerns (page in particular gets reassigned by
+    stage_documents between calls), not per-application discovery logic,
+    and a future single-application caller (a manual refresh handling one
+    application in isolation, say) may reasonably want different pacing
+    behaviour of its own."""
+    if not application.summary_url:
+        return False
+    # documents.application.before/after (Render Daily Discovery Salford
+    # document-stage memory diagnosis, Part 3) - stage-level [mem]
+    # boundaries were too coarse to tell WHICH of the 20 applications
+    # Salford was processing when Render OOM-killed the container;
+    # ScrapeRun.detail's own last checkpoint before that crash was still
+    # stage_documents.before, an entire 20-application loop with zero
+    # visibility inside it. These finer-grained checkpoints (reusing the
+    # exact same [mem]/[mem-warning] prefix, so the existing orchestrator
+    # persisted-checkpoint logic in scripts.run_daily_councils picks them
+    # up with no further changes) let the NEXT production run pinpoint
+    # the exact application/document in flight at time of death.
+    # identity_map size (Render Daily Discovery Salford document-stage
+    # memory diagnosis, Part 10): this Session is the same single,
+    # long-lived one used for the whole council run (expire_on_commit=
+    # False - see app.db.session), so nothing about stage_documents
+    # itself makes it expire or release objects. Recording its size
+    # alongside self MiB at each application boundary is enough to see,
+    # from the next production run, whether self RSS growth (if any)
+    # actually tracks identity-map growth (ORM retention) or not -
+    # without a broader session-lifecycle change.
+    log_memory(
+        "documents.application.before", council=council.code,
+        extra={"application": application.reference, "identity_map": len(session.identity_map)},
+        breakdown=True,
+    )
+    dest_dir = document_dir(council.code, application.reference)
+    try:
+        rows = discover_documents(page, requests_session, council, application.summary_url, dest_dir)
+    except Exception as e:
+        print(f"  [documents] error discovering docs for {application.reference}: {e}")
+        # Render Daily Discovery Portal Resilience & Truthful Run
+        # Health, Part 4 - recorded per APPLICATION (not per document),
+        # matching the approved "documents.applications attempted/
+        # succeeded/failed" framing.
+        if health is not None:
+            health.record_document_discovery(succeeded=False)
+        # documents_last_checked_at deliberately NOT advanced (Evidence
+        # Completeness Foundation, PR A) - the listing request itself
+        # failed, so we never obtained a reliable document listing for
+        # this application at all. It remains eligible (DOCUMENT_
+        # DISCOVERY_ELIGIBLE) for the very next run to retry, exactly as
+        # a failed attempt has always behaved - only a genuinely
+        # completed check advances this field.
+        return False
+
+    if health is not None:
+        health.record_document_discovery(succeeded=True)
+
+    # A reliable listing WAS obtained, regardless of what it contains
+    # (zero useful documents included) or whether individual downloads
+    # below succeed - this is the "meaningful completed document-
+    # listing check" PR A's own product rules require. Set once per
+    # application, before the per-row loop, so it's included in the
+    # same session.commit() as any Document rows this pass adds.
+    application.documents_last_checked_at = dt.datetime.now(dt.timezone.utc)
+
+    # Document identity (Evidence Completeness Foundation, PR A, Part 4)
+    # - the set of documents this application already has, by the same
+    # source_url-else-document_name key used to decide whether a newly
+    # listed row is genuinely new. Queried fresh via application_id
+    # (NOT application.documents, the lazy-loaded ORM relationship) -
+    # this session uses expire_on_commit=False (see app.db.session), so a
+    # cached application.documents collection from an EARLIER access
+    # within the same session (e.g. a previous call to this same function
+    # for this same Application, which is exactly what a future targeted
+    # rediscovery does - confirmed as a real bug during PR A's own test
+    # development, not a hypothetical) would silently miss every Document
+    # that call already inserted, defeating the whole point of this
+    # dedup check. A fresh query has no such staleness window. Computed
+    # once per application (not per row) - updated in-place by this
+    # loop's own inserts below, so it stays correct across a single call's
+    # own rows without a second query per row.
+    existing_identities = {
+        document_identity_key(source_url, document_name)
+        for source_url, document_name in session.execute(
+            select(Document.source_url, Document.document_name).where(Document.application_id == application.id)
+        ).all()
+    }
+
+    skipped = 0
+    sniffed = 0
+    duplicates_skipped = 0
+    for row in rows:
+        # Classify from the listing metadata (already fetched, no extra
+        # request) BEFORE downloading - site plans, CAD drawings, ecology/
+        # drainage/transport reports etc. are never read by extraction
+        # (see build_combined_priority_text), so there's no reason to
+        # fetch and text-extract them at all.
+        doc_type = standardise_document_type(row.document_name, row.doc_type_raw)
+        uninformative_name = doc_type == "other" and name_is_uninformative(row.document_name)
+        if doc_type not in USEFUL_DOC_TYPES and not uninformative_name:
+            skipped += 1
+            continue
+
+        identity = document_identity_key(row.source_url, row.document_name)
+        if identity in existing_identities:
+            # Already have this exact document (by source_url, or by
+            # document_name where no source_url exists - Bury/Anite) -
+            # this only fires today if the SAME listing lists the same
+            # row twice in one pass (an application only ever reaches
+            # this loop once per stage_documents run currently, per
+            # DOCUMENT_DISCOVERY_ELIGIBLE), but is what makes a FUTURE
+            # targeted rediscovery (PR B) of an already-documented
+            # application safe against duplicate rows.
+            duplicates_skipped += 1
+            continue
+
+        doc_identifier = {"application": application.reference, "document": row.document_name}
+
+        local_path = row.local_path
+        if local_path is None and row.source_url:
+            log_memory("documents.download.before", council=council.code, extra=doc_identifier, breakdown=True)
+            try:
+                local_path = download_document(
+                    council.code, application.reference, row.document_name, row.source_url,
+                    session=requests_session, referer=row.referer,
+                )
+            except Exception as e:
+                print(f"  [documents] download failed for {row.document_name}: {e}")
+                continue
+            finally:
+                # Downloaded/skipped file size, when known - directly
+                # answers Part 8's "quantify actual file sizes" for
+                # future runs, since Document has no size column today.
+                size_extra = dict(doc_identifier)
+                if local_path is not None:
+                    try:
+                        size_extra["size_kib"] = round(local_path.stat().st_size / 1024)
+                    except OSError:
+                        pass
+                log_memory("documents.download.after", council=council.code, extra=size_extra, breakdown=True)
+
+        # breakdown=True (Render Daily Discovery Salford CHILD-PROCESS
+        # memory diagnosis) - extraction is the one operation that
+        # itself spawns a NEW descendant (the isolated multiprocessing
+        # worker), so extract.before/after is exactly where a worker
+        # that fails to fully exit/get reaped, or a Chromium process
+        # that grows during this window, would first become visible as
+        # a specific process class rather than an undifferentiated
+        # "children" number.
+        log_memory("documents.extract.before", council=council.code, extra=doc_identifier, breakdown=True)
+        text = extract_document_text(local_path) if local_path else ""
+        log_memory("documents.extract.after", council=council.code, extra=doc_identifier, breakdown=True)
+
+        if uninformative_name:
+            # Name gave no signal (confirmed real case: Manchester's
+            # Arcus portal stores the council's own document ID as the
+            # "name" for most uploads - "805570.pdf") - now that it's
+            # downloaded anyway to check, look at what the document
+            # itself actually opens with instead of discarding it.
+            log_memory("documents.classify.before", council=council.code, extra=doc_identifier, breakdown=True)
+            doc_type = sniff_document_type_from_text(text)
+            log_memory("documents.classify.after", council=council.code, extra=doc_identifier, breakdown=True)
+            if doc_type not in USEFUL_DOC_TYPES:
+                skipped += 1
+                continue
+            sniffed += 1
+
+        session.add(
+            Document(
+                application_id=application.id,
+                doc_type=doc_type,
+                document_name=row.document_name,
+                source_url=row.source_url,
+                local_path=str(local_path) if local_path else None,
+                text_extracted=bool(text),
+                extracted_text=clean_document_text(text) if text else None,
+                downloaded_at=dt.datetime.now(dt.timezone.utc),
+            )
+        )
+        existing_identities.add(identity)
+    session.commit()
+    print(f"  [documents] {application.reference}: {len(rows) - skipped - duplicates_skipped} documents downloaded, "
+          f"{skipped} skipped (not a useful document type), {sniffed} classified by content (name was uninformative), "
+          f"{duplicates_skipped} already known (skipped as duplicates)")
+    log_memory(
+        "documents.application.after", council=council.code,
+        extra={"application": application.reference, "identity_map": len(session.identity_map)},
+        breakdown=True,
+    )
+    return True
+
+
 def stage_documents(session: Session, page, council: CouncilConfig, health: AcquisitionHealth | None = None) -> int:
+    total_qualifying = session.execute(
+        select(func.count(Application.id)).where(Application.council_code == council.code, UNIT_GATE_PASSED)
+    ).scalar()
     pending = session.execute(
         select(Application).where(
-            Application.council_code == council.code, ~Application.documents.any(), UNIT_GATE_PASSED
+            Application.council_code == council.code, UNIT_GATE_PASSED, DOCUMENT_DISCOVERY_ELIGIBLE
         )
     ).scalars().all()
-    print(f"\n[documents] {len(pending)} applications need document download")
+    print(f"\n[documents] {len(pending)} applications need document discovery "
+          f"({total_qualifying - len(pending)} already checked or not yet qualifying, skipped)")
 
     requests_session = requests.Session()
     requests_session.headers.update(HEADERS)
 
     processed = 0
+    listings_failed = 0
     for application in pending:
         if not application.summary_url:
             continue
-        # documents.application.before/after (Render Daily Discovery Salford
-        # document-stage memory diagnosis, Part 3) - stage-level [mem]
-        # boundaries were too coarse to tell WHICH of the 20 applications
-        # Salford was processing when Render OOM-killed the container;
-        # ScrapeRun.detail's own last checkpoint before that crash was still
-        # stage_documents.before, an entire 20-application loop with zero
-        # visibility inside it. These finer-grained checkpoints (reusing the
-        # exact same [mem]/[mem-warning] prefix, so the existing orchestrator
-        # persisted-checkpoint logic in scripts.run_daily_councils picks them
-        # up with no further changes) let the NEXT production run pinpoint
-        # the exact application/document in flight at time of death.
-        # identity_map size (Render Daily Discovery Salford document-stage
-        # memory diagnosis, Part 10): this Session is the same single,
-        # long-lived one used for the whole council run (expire_on_commit=
-        # False - see app.db.session), so nothing about stage_documents
-        # itself makes it expire or release objects. Recording its size
-        # alongside self MiB at each application boundary is enough to see,
-        # from the next production run, whether self RSS growth (if any)
-        # actually tracks identity-map growth (ORM retention) or not -
-        # without a broader session-lifecycle change.
-        log_memory(
-            "documents.application.before", council=council.code,
-            extra={"application": application.reference, "identity_map": len(session.identity_map)},
-            breakdown=True,
+        succeeded = discover_and_store_documents_for_application(
+            session, page, requests_session, council, application, health
         )
-        dest_dir = document_dir(council.code, application.reference)
-        try:
-            rows = discover_documents(page, requests_session, council, application.summary_url, dest_dir)
-        except Exception as e:
-            print(f"  [documents] error discovering docs for {application.reference}: {e}")
-            # Render Daily Discovery Portal Resilience & Truthful Run
-            # Health, Part 4 - recorded per APPLICATION (not per document),
-            # matching the approved "documents.applications attempted/
-            # succeeded/failed" framing.
-            if health is not None:
-                health.record_document_discovery(succeeded=False)
-            continue
-
-        if health is not None:
-            health.record_document_discovery(succeeded=True)
-
-        skipped = 0
-        sniffed = 0
-        for row in rows:
-            # Classify from the listing metadata (already fetched, no extra
-            # request) BEFORE downloading - site plans, CAD drawings, ecology/
-            # drainage/transport reports etc. are never read by extraction
-            # (see build_combined_priority_text), so there's no reason to
-            # fetch and text-extract them at all.
-            doc_type = standardise_document_type(row.document_name, row.doc_type_raw)
-            uninformative_name = doc_type == "other" and name_is_uninformative(row.document_name)
-            if doc_type not in USEFUL_DOC_TYPES and not uninformative_name:
-                skipped += 1
-                continue
-
-            doc_identifier = {"application": application.reference, "document": row.document_name}
-
-            local_path = row.local_path
-            if local_path is None and row.source_url:
-                log_memory("documents.download.before", council=council.code, extra=doc_identifier, breakdown=True)
-                try:
-                    local_path = download_document(
-                        council.code, application.reference, row.document_name, row.source_url,
-                        session=requests_session, referer=row.referer,
-                    )
-                except Exception as e:
-                    print(f"  [documents] download failed for {row.document_name}: {e}")
-                    continue
-                finally:
-                    # Downloaded/skipped file size, when known - directly
-                    # answers Part 8's "quantify actual file sizes" for
-                    # future runs, since Document has no size column today.
-                    size_extra = dict(doc_identifier)
-                    if local_path is not None:
-                        try:
-                            size_extra["size_kib"] = round(local_path.stat().st_size / 1024)
-                        except OSError:
-                            pass
-                    log_memory("documents.download.after", council=council.code, extra=size_extra, breakdown=True)
-
-            # breakdown=True (Render Daily Discovery Salford CHILD-PROCESS
-            # memory diagnosis) - extraction is the one operation that
-            # itself spawns a NEW descendant (the isolated multiprocessing
-            # worker), so extract.before/after is exactly where a worker
-            # that fails to fully exit/get reaped, or a Chromium process
-            # that grows during this window, would first become visible as
-            # a specific process class rather than an undifferentiated
-            # "children" number.
-            log_memory("documents.extract.before", council=council.code, extra=doc_identifier, breakdown=True)
-            text = extract_document_text(local_path) if local_path else ""
-            log_memory("documents.extract.after", council=council.code, extra=doc_identifier, breakdown=True)
-
-            if uninformative_name:
-                # Name gave no signal (confirmed real case: Manchester's
-                # Arcus portal stores the council's own document ID as the
-                # "name" for most uploads - "805570.pdf") - now that it's
-                # downloaded anyway to check, look at what the document
-                # itself actually opens with instead of discarding it.
-                log_memory("documents.classify.before", council=council.code, extra=doc_identifier, breakdown=True)
-                doc_type = sniff_document_type_from_text(text)
-                log_memory("documents.classify.after", council=council.code, extra=doc_identifier, breakdown=True)
-                if doc_type not in USEFUL_DOC_TYPES:
-                    skipped += 1
-                    continue
-                sniffed += 1
-
-            session.add(
-                Document(
-                    application_id=application.id,
-                    doc_type=doc_type,
-                    document_name=row.document_name,
-                    source_url=row.source_url,
-                    local_path=str(local_path) if local_path else None,
-                    text_extracted=bool(text),
-                    extracted_text=clean_document_text(text) if text else None,
-                    downloaded_at=dt.datetime.now(dt.timezone.utc),
-                )
-            )
-        session.commit()
-        processed += 1
-        print(f"  [documents] {application.reference}: {len(rows) - skipped} documents downloaded, "
-              f"{skipped} skipped (not a useful document type), {sniffed} classified by content (name was uninformative)")
-        log_memory(
-            "documents.application.after", council=council.code,
-            extra={"application": application.reference, "identity_map": len(session.identity_map)},
-            breakdown=True,
-        )
+        if succeeded:
+            processed += 1
+        else:
+            listings_failed += 1
 
         # Request pacing (Render Daily Discovery Portal Resilience &
         # Truthful Run Health, Part 1): every OTHER stage that talks to
@@ -991,6 +1118,23 @@ def stage_documents(session: Session, page, council: CouncilConfig, health: Acqu
             # document run - fall back to the existing (possibly now
             # slightly larger) page and keep going.
             print(f"  [documents] page recycle failed, continuing with existing page: {e}")
+
+    # Evidence-sufficiency snapshot (Evidence Completeness Foundation, PR A,
+    # Part 10) - a lightweight, once-per-run summary of the council's WHOLE
+    # qualifying corpus (not just this run's candidates), using the one
+    # canonical is_evidence_sufficient() helper - never a second, subtly
+    # different count. Deliberately run-level only, not per-application
+    # logging, per this PR's own "do not create noisy per-item logging"
+    # instruction.
+    all_qualifying = session.execute(
+        select(Application).where(Application.council_code == council.code, UNIT_GATE_PASSED)
+    ).scalars().all()
+    sufficient_count = sum(1 for a in all_qualifying if is_evidence_sufficient(a))
+    print(f"\n[documents] {council.code} summary: {len(pending)} needed initial discovery, "
+          f"{processed} listing(s) succeeded, {listings_failed} listing(s) failed, "
+          f"{total_qualifying - len(pending)} already checked (skipped) - "
+          f"evidence sufficient: {sufficient_count}/{len(all_qualifying)}, "
+          f"insufficient: {len(all_qualifying) - sufficient_count}/{len(all_qualifying)}")
 
     return processed
 

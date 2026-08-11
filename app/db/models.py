@@ -1095,6 +1095,31 @@ class Application(Base):
     extraction_last_attempted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     extraction_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Document discovery state (Evidence Completeness Foundation, PR A) -
+    # records WHEN this application's document LISTING was last
+    # successfully obtained from the council portal, independently of how
+    # many (if any) useful documents that listing produced. NULL means
+    # "never successfully checked" - deliberately distinct from the old
+    # ~Application.documents.any() signal (see stage_documents), which
+    # conflated "has stored documents" with "discovery has run", and
+    # distinct from evidence sufficiency (see app.pipeline.evidence.
+    # is_evidence_sufficient) - an application can be genuinely checked and
+    # still be evidence-insufficient, and must NOT be re-checked daily
+    # merely because it's insufficient (that is a future PR's job -
+    # material-change detection, the 90-day fallback, or manual refresh -
+    # not routine Daily Discovery). Only ever set when discover_documents()
+    # itself completed without raising - a portal/listing request failure
+    # never advances this, so a failed attempt remains eligible for the
+    # very next run to retry, exactly as before this field existed.
+    #
+    # Legacy rows (every Application that existed before this field was
+    # added) are deliberately left NULL, never backfilled to "now" - see
+    # stage_documents' own eligibility query for how that NULL is combined
+    # with existing Document presence so this doesn't cause every
+    # already-documented application to be re-queued for discovery the
+    # first time this runs against production.
+    documents_last_checked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])
