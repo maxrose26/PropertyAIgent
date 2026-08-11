@@ -73,11 +73,22 @@ def test_run_weekly_chromium_launch_does_not_disable_the_sandbox():
 
 def test_run_weekly_still_launches_headless_chromium_only_once():
     """Confirms the flag addition didn't accidentally introduce a second
-    browser/context/page - still exactly one of each per council run."""
+    browser/context - still exactly one of each per council run.
+
+    Updated by the Render Daily Discovery Salford CHILD-PROCESS memory
+    diagnosis: .new_page() now has TWO call sites, deliberately - the
+    original startup page, plus one inside stage_documents that recycles
+    the page between applications (a real local reproduction found
+    Chromium's own renderer process RSS grows on repeated same-page
+    navigation; closing and recreating the Page keeps it flat - see
+    tests/test_salford_child_process_memory_diagnosis.py). Both call
+    sites still create pages on the SAME single BrowserContext - the
+    assertion below locks in "still exactly one context", not "still
+    exactly one page ever created"."""
     source = (REPO_ROOT / "app" / "pipeline" / "run_weekly.py").read_text(encoding="utf-8")
     assert source.count("p.chromium.launch(") == 1
     assert source.count(".new_context(") == 1
-    assert source.count(".new_page()") == 1
+    assert source.count(".new_page()") == 2
 
 
 # --- Process-group-isolated subprocess timeout handling ---------------------

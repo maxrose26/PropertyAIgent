@@ -777,6 +777,7 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
         log_memory(
             "documents.application.before", council=council.code,
             extra={"application": application.reference, "identity_map": len(session.identity_map)},
+            breakdown=True,
         )
         dest_dir = document_dir(council.code, application.reference)
         try:
@@ -803,7 +804,7 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
 
             local_path = row.local_path
             if local_path is None and row.source_url:
-                log_memory("documents.download.before", council=council.code, extra=doc_identifier)
+                log_memory("documents.download.before", council=council.code, extra=doc_identifier, breakdown=True)
                 try:
                     local_path = download_document(
                         council.code, application.reference, row.document_name, row.source_url,
@@ -822,11 +823,19 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
                             size_extra["size_kib"] = round(local_path.stat().st_size / 1024)
                         except OSError:
                             pass
-                    log_memory("documents.download.after", council=council.code, extra=size_extra)
+                    log_memory("documents.download.after", council=council.code, extra=size_extra, breakdown=True)
 
-            log_memory("documents.extract.before", council=council.code, extra=doc_identifier)
+            # breakdown=True (Render Daily Discovery Salford CHILD-PROCESS
+            # memory diagnosis) - extraction is the one operation that
+            # itself spawns a NEW descendant (the isolated multiprocessing
+            # worker), so extract.before/after is exactly where a worker
+            # that fails to fully exit/get reaped, or a Chromium process
+            # that grows during this window, would first become visible as
+            # a specific process class rather than an undifferentiated
+            # "children" number.
+            log_memory("documents.extract.before", council=council.code, extra=doc_identifier, breakdown=True)
             text = extract_document_text(local_path) if local_path else ""
-            log_memory("documents.extract.after", council=council.code, extra=doc_identifier)
+            log_memory("documents.extract.after", council=council.code, extra=doc_identifier, breakdown=True)
 
             if uninformative_name:
                 # Name gave no signal (confirmed real case: Manchester's
@@ -834,9 +843,9 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
                 # "name" for most uploads - "805570.pdf") - now that it's
                 # downloaded anyway to check, look at what the document
                 # itself actually opens with instead of discarding it.
-                log_memory("documents.classify.before", council=council.code, extra=doc_identifier)
+                log_memory("documents.classify.before", council=council.code, extra=doc_identifier, breakdown=True)
                 doc_type = sniff_document_type_from_text(text)
-                log_memory("documents.classify.after", council=council.code, extra=doc_identifier)
+                log_memory("documents.classify.after", council=council.code, extra=doc_identifier, breakdown=True)
                 if doc_type not in USEFUL_DOC_TYPES:
                     skipped += 1
                     continue
@@ -861,7 +870,43 @@ def stage_documents(session: Session, page, council: CouncilConfig) -> int:
         log_memory(
             "documents.application.after", council=council.code,
             extra={"application": application.reference, "identity_map": len(session.identity_map)},
+            breakdown=True,
         )
+
+        # Page recycling (Render Daily Discovery Salford CHILD-PROCESS
+        # memory diagnosis, Part 8): a local reproduction (repeated same-
+        # page navigations) found Chromium's own RENDERER process RSS
+        # grows monotonically with each navigation on a long-lived page
+        # (49->80MiB over 6 lightweight synthetic pages - the same shape,
+        # not a one-off spike, as the real production growth seen here:
+        # Salford's own children RSS climbed steadily application-by-
+        # application, never in one jump). page.goto("about:blank") between
+        # navigations did NOT meaningfully help (same growth trajectory) -
+        # but fully closing and recreating the Page WITHIN THE SAME
+        # BrowserContext kept renderer RSS essentially flat across repeated
+        # navigations (58->58->58->60->58->58MiB), with the SAME single
+        # browser-main/gpu/utility/renderer processes throughout (no new
+        # processes spawned or left behind). Safe here: every council this
+        # project scrapes is a public, unauthenticated planning portal (
+        # Arcus/Salford confirmed - see arcus_portal.py's own module
+        # docstring, "no session/cookie requirement"; Idox and Anite/Bury
+        # equally have no login flow), and cookies/session state live on
+        # the BrowserContext, not the Page, so recreating just the Page
+        # cannot lose anything a later stage or application needs. Scoped
+        # to stage_documents only, applied once per application (matching
+        # the granularity already instrumented above) - the one stage this
+        # diagnosis evidenced accumulation in, and, per this function's own
+        # caller, the LAST stage to use `page` before browser.close(), so
+        # nothing downstream depends on this exact Page object surviving.
+        try:
+            new_page = page.context.new_page()
+            page.close()
+            page = new_page
+        except Exception as e:
+            # Never let a recycling failure abort the whole council's
+            # document run - fall back to the existing (possibly now
+            # slightly larger) page and keep going.
+            print(f"  [documents] page recycle failed, continuing with existing page: {e}")
 
     return processed
 
