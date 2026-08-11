@@ -26,7 +26,7 @@ import requests
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from app.config import CouncilConfig
-from app.db.models import Application, Document
+from app.db.models import Application, Document, Site
 from app.pipeline.acquisition_health import AcquisitionHealth
 from app.pipeline.portal_circuit_breaker import (
     PORTAL_CIRCUIT_FAILURE_THRESHOLD,
@@ -36,8 +36,10 @@ from app.pipeline.portal_circuit_breaker import (
 from app.pipeline.run_weekly import (
     DOCUMENT_DISCOVERY_ELIGIBLE,
     discover_and_store_documents_for_application,
+    stage_confirm_units,
     stage_documents,
     stage_fetch_missing_parents,
+    stage_fetch_related_applications,
 )
 
 
@@ -413,3 +415,174 @@ def test_document_discovery_eligible_query_unaffected_by_breaker_wiring(session)
     }
     assert "APP/NEW" in eligible
     assert "APP/LEGACY" not in eligible
+
+
+# --- F: complete circuit-breaker coverage (pre-merge amendment) --------------
+#
+# stage_fetch_related_applications and stage_confirm_units now feed the SAME
+# council-scoped breaker as stage_fetch_missing_parents/stage_documents (see
+# Section A/C/D above) - these tests prove cross-stage accumulation, cross-
+# stage success-reset, standalone opening within each of the two newly-wired
+# stages, and that a 429/HTTPError in either still never counts.
+
+
+def _add_related_applications_anchor(session, *, reference: str, disqualify: bool = True) -> Application:
+    """A Site with one granted anchor Application - exactly what
+    stage_fetch_related_applications' own eligibility (an anchor with no
+    site_link_method=='parent_reference' sibling falls back to the
+    earliest granted application on its site) requires to attempt a
+    portal search at all. disqualify=True (the default) excludes it from
+    stage_confirm_units/stage_documents' OWN pending sets in the same
+    test, so cross-stage tests can isolate exactly one candidate per
+    stage."""
+    anchor = _add_application(session, reference=reference)
+    anchor.decision = "Granted"
+    anchor.application_received = "01/01/2020"
+    if disqualify:
+        anchor.unit_confirmation_status = "confirmed_disqualified"
+    site = Site(council_code="testcouncil", canonical_address=f"1 Test St {reference}", display_address=f"1 Test St {reference}")
+    session.add(site)
+    session.flush()
+    anchor.site_id = site.id
+    session.commit()
+    return anchor
+
+
+def test_cross_stage_accumulation_opens_circuit_at_three(session):
+    """related-applications failure (1/3) -> confirm-units failure (2/3)
+    -> documents failure (3/3) -> OPEN, even though three DIFFERENT
+    stage functions produced them - they share one breaker instance."""
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    _add_related_applications_anchor(session, reference="ANCHOR/1")
+
+    with patch("app.pipeline.run_weekly.search_related_applications", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_fetch_related_applications(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 1
+    assert breaker.is_open is False
+
+    confirm_app = _add_application(session, reference="CONFIRM/1")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 2
+    assert breaker.is_open is False
+    confirm_app.unit_confirmation_status = "confirmed_disqualified"  # exclude from stage_documents' own pending set below
+    session.commit()
+
+    _add_application(session, reference="DOC/1")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_documents(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 3
+    assert breaker.is_open is True
+
+
+def test_success_in_one_stage_resets_sequence_across_stages(session):
+    """Product Owner's own worked example: related-applications timeout
+    (1/3) -> confirm-units SUCCESSFUL portal interaction (resets to 0)
+    -> documents timeout, documents timeout (2/3) -> must NOT open."""
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    _add_related_applications_anchor(session, reference="ANCHOR/1")
+
+    with patch("app.pipeline.run_weekly.search_related_applications", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_fetch_related_applications(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 1
+
+    confirm_app = _add_application(session, reference="CONFIRM/1")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[]):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 0  # reset by the successful listing
+    confirm_app.unit_confirmation_status = "confirmed_disqualified"
+    session.commit()
+
+    for i in range(2):
+        _add_application(session, reference=f"DOC/{i}")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_documents(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 2
+    assert breaker.is_open is False
+
+
+def test_three_failures_within_related_applications_alone_opens_circuit(session):
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    for i in range(3):
+        _add_related_applications_anchor(session, reference=f"ANCHOR/{i}")
+
+    with patch("app.pipeline.run_weekly.search_related_applications", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_fetch_related_applications(session, MagicMock(), _council_config(), breaker=breaker)
+
+    assert breaker.is_open is True
+    assert breaker.consecutive_host_failures == 3
+
+
+def test_three_failures_within_confirm_units_alone_opens_circuit(session):
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    for i in range(3):
+        _add_application(session, reference=f"CONFIRM/{i}")
+
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+
+    assert breaker.is_open is True
+    assert breaker.consecutive_host_failures == 3
+
+
+def test_http_429_in_related_applications_and_confirm_units_does_not_increment_breaker(session):
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    _add_related_applications_anchor(session, reference="ANCHOR/1")
+
+    with patch("app.pipeline.run_weekly.search_related_applications", side_effect=requests.exceptions.HTTPError("429 Client Error")):
+        stage_fetch_related_applications(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 0
+    assert breaker.is_open is False
+
+    _add_application(session, reference="CONFIRM/1")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.HTTPError("429 Client Error")):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+    assert breaker.consecutive_host_failures == 0
+    assert breaker.is_open is False
+
+
+def test_once_open_stage_confirm_units_makes_no_calls(session):
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    for _ in range(PORTAL_CIRCUIT_FAILURE_THRESHOLD):
+        breaker.record_failure(requests.exceptions.ConnectTimeout(), stage="documents")
+    assert breaker.is_open is True
+
+    _add_application(session, reference="CONFIRM/1")
+    with patch("app.pipeline.run_weekly.discover_documents") as mock_discover:
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+    mock_discover.assert_not_called()
+
+
+def test_once_open_stage_fetch_related_applications_makes_no_calls(session):
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    for _ in range(PORTAL_CIRCUIT_FAILURE_THRESHOLD):
+        breaker.record_failure(requests.exceptions.ConnectTimeout(), stage="documents")
+    assert breaker.is_open is True
+
+    _add_related_applications_anchor(session, reference="ANCHOR/1", disqualify=False)
+    with patch("app.pipeline.run_weekly.search_related_applications") as mock_search:
+        stage_fetch_related_applications(session, MagicMock(), _council_config(), breaker=breaker)
+    mock_search.assert_not_called()
+
+
+def test_health_classification_unaffected_by_new_breaker_wiring(session):
+    """stage_fetch_related_applications/stage_confirm_units have never
+    recorded AcquisitionHealth (unchanged by this amendment - only
+    stage_fetch_missing_parents/stage_documents do, exactly as before).
+    A circuit-opening failure entirely within stage_confirm_units
+    therefore does not, on its own, flip classify() away from SUCCESS -
+    documented here as the known, pre-existing boundary of what
+    AcquisitionHealth tracks (see this amendment's own report, "known
+    limitations"), not something this amendment silently changed."""
+    health = AcquisitionHealth()
+    health.record_primary_scrape_attempt()
+    health.record_primary_scrape_completed()
+
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    for i in range(3):
+        _add_application(session, reference=f"CONFIRM/{i}")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout()):
+        stage_confirm_units(session, MagicMock(), _council_config(), breaker=breaker)
+
+    assert breaker.is_open is True
+    assert health.classify() == "success"

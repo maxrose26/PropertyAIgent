@@ -523,7 +523,9 @@ def stage_fetch_missing_parents(
     return fetched
 
 
-def stage_fetch_related_applications(session: Session, page, council: CouncilConfig) -> int:
+def stage_fetch_related_applications(
+    session: Session, page, council: CouncilConfig, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
     """Search the portal for every application that names a given reference
     by number (see app.scrapers.idox_portal.search_related_applications),
     for every site's most senior granted application - not just citation-
@@ -607,6 +609,13 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
 
     if council.doc_system == "arcus":
         for parent in to_search:
+            # Circuit breaker (Hotfix pre-merge amendment: Complete
+            # Circuit-Breaker Coverage) - same council-scoped breaker as
+            # every other supporting network stage.
+            if breaker is not None and breaker.is_open:
+                print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+                break
+
             try:
                 rows = search_related_applications_arcus(page, council, parent.reference)
             except Exception as e:
@@ -614,13 +623,21 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
                 # transient portal error should be retried next run, not
                 # suppressed for 30 days like a genuine "found nothing new".
                 print(f"  [related-applications] error searching for {parent.reference}: {e}")
+                if breaker is not None:
+                    breaker.record_failure(e, stage="related-applications")
                 continue
+            if breaker is not None:
+                breaker.record_success()
 
             parent.related_search_checked_at = dt.datetime.now(dt.timezone.utc)
             session.commit()
 
             new_this_parent = 0
             for row in rows:
+                if breaker is not None and breaker.is_open:
+                    print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+                    break
+
                 reference = row.get("reference")
                 if not reference:
                     continue
@@ -644,7 +661,12 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
                     result = fetch_application_detail_arcus(page, row, unit_threshold=council.unit_threshold, force_qualify=True)
                 except Exception as e:
                     print(f"    error fetching {reference}: {e}")
+                    if breaker is not None:
+                        breaker.record_failure(e, stage="related-applications")
                     continue
+                else:
+                    if breaker is not None:
+                        breaker.record_success()
 
                 proposal = result.fields.get("Proposal", "")
                 category = classify_application_category(proposal)
@@ -673,11 +695,19 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
     requests_session.headers.update(HEADERS)
 
     for parent in to_search:
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+            break
+
         try:
             summary_urls = search_related_applications(page, council, parent.reference)
         except Exception as e:
             print(f"  [related-applications] error searching for {parent.reference}: {e}")
+            if breaker is not None:
+                breaker.record_failure(e, stage="related-applications")
             continue
+        if breaker is not None:
+            breaker.record_success()
         time.sleep(council.request_delay_seconds)
 
         parent.related_search_checked_at = dt.datetime.now(dt.timezone.utc)
@@ -685,6 +715,10 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
 
         new_this_parent = 0
         for summary_url in summary_urls:
+            if breaker is not None and breaker.is_open:
+                print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+                break
+
             keyval = keyval_from_url(summary_url)
             existing = session.execute(
                 select(Application).where(Application.council_code == council.code, Application.keyval == keyval)
@@ -698,7 +732,12 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
                 )
             except Exception as e:
                 print(f"    error fetching {summary_url}: {e}")
+                if breaker is not None:
+                    breaker.record_failure(e, stage="related-applications")
                 continue
+            else:
+                if breaker is not None:
+                    breaker.record_success()
 
             proposal = result.fields.get("Proposal", "")
             category = classify_application_category(proposal)
@@ -769,7 +808,9 @@ def _pick_confirmed_unit_count(text: str, threshold: int) -> int | None:
     return top_value if top_count > runner_up_count else None
 
 
-def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
+def stage_confirm_units(
+    session: Session, page, council: CouncilConfig, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
     """Cheap confirmation gate for applications that only qualified via a
     REVIEW_KEYWORDS guess in the proposal text (no unit count stated
     anywhere, e.g. "erection of a residential development... access from
@@ -803,6 +844,16 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
 
     confirmed_qualifying = 0
     for application in pending:
+        # Circuit breaker (Hotfix pre-merge amendment: Complete Circuit-
+        # Breaker Coverage) - checked once per application, before its
+        # network call(s). Shares the SAME council-scoped breaker as the
+        # other supporting network stages - a Trafford-style outage first
+        # observed in stage_fetch_related_applications, say, still opens
+        # this stage's circuit too, since they're all the same object.
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=confirm-units")
+            break
+
         if not application.summary_url:
             continue
 
@@ -811,7 +862,11 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
             rows = discover_documents(page, requests_session, council, application.summary_url, dest_dir)
         except Exception as e:
             print(f"  [confirm-units] error discovering docs for {application.reference}: {e}")
+            if breaker is not None:
+                breaker.record_failure(e, stage="confirm-units")
             continue
+        if breaker is not None:
+            breaker.record_success()
 
         by_type = {}
         for row in rows:
@@ -838,7 +893,12 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
                 text = extract_document_text(local_path) if local_path else ""
             except Exception as e:
                 print(f"  [confirm-units] download/extract failed for {row.document_name}: {e}")
+                if breaker is not None:
+                    breaker.record_failure(e, stage="confirm-units")
                 continue
+            else:
+                if breaker is not None:
+                    breaker.record_success()
             # Unlike the fuzzy REVIEW_KEYWORDS bucket (low stakes - just
             # means "download everything and let the LLM stages sort it
             # out"), a wrong call here either wrongly excludes a real scheme
@@ -1935,7 +1995,7 @@ def main() -> None:
                 # After stage_link_sites, not before - needs a parent's site_id
                 # already set (site_link_method == "parent_reference") to know
                 # what to search for and where to attach anything it finds.
-                stage_fetch_related_applications(session, page, council)
+                stage_fetch_related_applications(session, page, council, breaker=breaker)
                 log_memory("stage_fetch_related_applications.after", council=council.code)
 
         if not args.skip_confirm_units:
@@ -1943,7 +2003,7 @@ def main() -> None:
                 print(f"[circuit] council={council.code} skipping stage_confirm_units - circuit open")
             else:
                 log_memory("stage_confirm_units.before", council=council.code)
-                stage_confirm_units(session, page, council)
+                stage_confirm_units(session, page, council, breaker=breaker)
                 log_memory("stage_confirm_units.after", council=council.code)
 
         if not args.skip_documents:
