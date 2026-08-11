@@ -44,11 +44,42 @@ class AcquisitionHealth:
     documents_applications_succeeded: int = 0
     documents_applications_failed: int = 0
 
+    # Hotfix second pre-merge amendment ("Circuit Breaker Must Affect Run
+    # Health") - a narrowly-scoped, independent classification input: was
+    # this council's app.pipeline.portal_circuit_breaker.
+    # CouncilPortalCircuitBreaker ever open by the end of this run, and if
+    # so, which stage's 3rd consecutive host-level failure opened it.
+    # Deliberately NOT folded into parents_failed/documents_applications_
+    # failed - those counters mean "this many attempted operations
+    # ultimately failed", a different, already-correct fact that must not
+    # be inflated just to force a status. This is its own independent
+    # signal: "supporting network acquisition was deliberately ABORTED
+    # because the portal circuit opened", which can be true even for
+    # stages (stage_fetch_related_applications, stage_confirm_units) that
+    # have never recorded a pass/fail count here at all - see classify()'s
+    # own docstring for why a circuit-open must still guarantee at least
+    # PARTIAL regardless of which stage tripped it.
+    portal_circuit_opened: bool = False
+    portal_circuit_opened_stage: str | None = None
+
     def record_primary_scrape_attempt(self) -> None:
         self.primary_scrape_attempted = True
 
     def record_primary_scrape_completed(self) -> None:
         self.primary_scrape_completed = True
+
+    def record_portal_unavailable(self, stage: str) -> None:
+        """The ONE central call site for this (app.pipeline.run_weekly.
+        main(), once, right before the final [run-health] line is
+        printed - checking breaker.is_open at that point already reflects
+        the circuit's final state for the whole run, since it never
+        closes again once open) - deliberately not scattered across every
+        individual stage's own except block, which already has its own
+        breaker.record_failure() call for the circuit's OWN bookkeeping;
+        this is a single, separate integration point translating that
+        into health's third status axis."""
+        self.portal_circuit_opened = True
+        self.portal_circuit_opened_stage = stage
 
     def record_parent_lookup(self, *, succeeded: bool) -> None:
         self.parents_attempted += 1
@@ -76,21 +107,38 @@ class AcquisitionHealth:
 
     def classify(self) -> str:
         """Returns "success" | "partial" | "failed" - approved policy,
-        amended (Render Daily Discovery Portal Resilience & Truthful Run
-        Health, "Pre-Merge Health Classification Amendment"):
+        amended twice (Render Daily Discovery Portal Resilience & Truthful
+        Run Health, "Pre-Merge Health Classification Amendment"; Hotfix
+        second pre-merge amendment, "Circuit Breaker Must Affect Run
+        Health"):
 
         FAILED - the primary/current-period scrape was attempted but did
         not complete (this is the Trafford scenario: a silently swallowed
         Playwright timeout must never look identical to a genuine,
         successful zero-application day - see PARTIAL/SUCCESS below for
-        why that distinction is preserved).
+        why that distinction is preserved). Includes the case where the
+        portal circuit was already open before the primary scrape was
+        even attempted (app.pipeline.run_weekly.main() then never calls
+        record_primary_scrape_completed() for it) - "could not
+        meaningfully complete because the portal circuit opened" is still
+        exactly this same condition, not a separate one.
 
-        PARTIAL - the primary scrape completed, but ONE OR MORE attempted
-        CORE supporting acquisition operations (parent lookup, document
-        discovery) exhausted their retry budget and ultimately failed.
-        Any single unresolved failure is enough - this is deliberately
-        NOT a "100% failure of the whole stage" rule (the original design
-        here, replaced by this amendment: 49 of 50 document-discovery
+        PARTIAL - the primary scrape completed, but EITHER (a) one or
+        more attempted CORE supporting acquisition operations (parent
+        lookup, document discovery) exhausted their retry budget and
+        ultimately failed, OR (b) the portal circuit opened at any point
+        during supporting acquisition (record_portal_unavailable was
+        called) - a council whose remaining supporting network work was
+        deliberately ABORTED because the portal was unavailable must
+        never report SUCCESS, even if that abort happened entirely inside
+        a stage (stage_fetch_related_applications, stage_confirm_units)
+        that has never itself recorded a parents_failed/documents_
+        applications_failed count. These two conditions are independent -
+        (b) never inflates the (a) counters, and (a) is unaffected by
+        whether the circuit ever opened. Any single unresolved failure
+        (whichever condition) is enough - this is deliberately NOT a
+        "100% failure of the whole stage" rule (the original design here,
+        replaced by an earlier amendment: 49 of 50 document-discovery
         failures previously still classified SUCCESS, which conflicts
         with "SUCCESS must not imply known completeness where core
         planning-data acquisition actually failed"). A transient error
@@ -102,25 +150,23 @@ class AcquisitionHealth:
         run AFTER that retry budget is already exhausted (429 -> retry ->
         success, ConnectTimeout -> retry -> success, and a Playwright
         navigation timeout -> retry -> success are therefore already
-        excluded, unchanged - this amendment only lowers classify()'s own
-        threshold, not what counts as a recorded failure in the first
-        place).
+        excluded, unchanged).
 
-        SUCCESS - the primary scrape completed and every attempted core
-        supporting acquisition operation ultimately succeeded (i.e. zero
-        unresolved failures recorded).
+        SUCCESS - the primary scrape completed, every attempted core
+        supporting acquisition operation ultimately succeeded (zero
+        unresolved failures recorded), AND the portal circuit never
+        opened.
 
         Still deliberately NOT a percentage/ratio threshold - no
-        production evidence yet justifies picking one (unchanged
-        rationale from the original design, reaffirmed by this
-        amendment). The conservative direction has simply flipped from
-        "only total failure counts" to "any known unresolved failure
-        counts", to avoid the false-SUCCESS risk the original threshold
-        allowed."""
+        production evidence yet justifies picking one. The conservative
+        direction has simply flipped from "only total failure counts" to
+        "any known unresolved failure counts OR a deliberate portal-
+        outage abort", to avoid the false-SUCCESS risk a narrower rule
+        would allow."""
         if self.primary_scrape_attempted and not self.primary_scrape_completed:
             return "failed"
 
-        if self.parents_failed > 0 or self.documents_applications_failed > 0:
+        if self.parents_failed > 0 or self.documents_applications_failed > 0 or self.portal_circuit_opened:
             return "partial"
 
         return "success"
@@ -129,7 +175,13 @@ class AcquisitionHealth:
         """One deterministic, single-line, machine-parseable summary -
         scripts.run_daily_councils parses this by its "[run-health]"
         prefix and `status=` field, never by scraping arbitrary
-        human-readable log text (Part 4's explicit requirement)."""
+        human-readable log text (Part 4's explicit requirement). The two
+        portal_circuit_* fields are appended at the end, after every
+        pre-existing field - the stable status=/existing-field contract
+        that parser depends on is unchanged, this is purely additive
+        diagnostic detail (never a secret or a raw URL - just the stage
+        name already passed to CouncilPortalCircuitBreaker.record_failure
+        elsewhere in this same run's own [circuit] log lines)."""
         return (
             f"[run-health] status={self.classify()} "
             f"primary_scrape_attempted={int(self.primary_scrape_attempted)} "
@@ -139,5 +191,7 @@ class AcquisitionHealth:
             f"parents_failed={self.parents_failed} "
             f"documents_applications_attempted={self.documents_applications_attempted} "
             f"documents_applications_succeeded={self.documents_applications_succeeded} "
-            f"documents_applications_failed={self.documents_applications_failed}"
+            f"documents_applications_failed={self.documents_applications_failed} "
+            f"portal_circuit_opened={int(self.portal_circuit_opened)} "
+            f"portal_circuit_opened_stage={self.portal_circuit_opened_stage or 'none'}"
         )

@@ -44,7 +44,7 @@ import requests
 from dotenv import load_dotenv
 from openai import OpenAI, OpenAIError
 from playwright.sync_api import sync_playwright
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig, get_council
@@ -75,6 +75,7 @@ from app.extraction.run_extraction import (
 )
 from app.pipeline.acquisition_health import AcquisitionHealth
 from app.pipeline.evidence import document_identity_key, is_evidence_sufficient
+from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker
 from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
     compute_lapse_status,
@@ -351,7 +352,10 @@ def _upsert_scraped_application(
     return existing
 
 
-def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig, health: AcquisitionHealth | None = None) -> int:
+def stage_fetch_missing_parents(
+    session: Session, page, council: CouncilConfig,
+    health: AcquisitionHealth | None = None, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
     """Reserved matters applications routinely cite a parent outline/full
     permission that predates our scraping window and was never scraped in
     its own right (confirmed real case: Wigan's North Leigh 1491-dwelling
@@ -411,6 +415,19 @@ def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig, 
 
     fetched = 0
     for application in candidates:
+        # Circuit breaker (Hotfix: Recovery-First Council Processing +
+        # Portal Circuit Breaker) - checked once per candidate, BEFORE
+        # attempting its network call. Once open, no further parent
+        # lookups are attempted for the rest of this council's run - the
+        # remaining candidates are simply skipped this run, exactly like
+        # any other unresolved parent citation (they stay eligible for
+        # the next Daily Discovery run, which starts with a fresh
+        # breaker). Printed once, not per skipped candidate, to avoid
+        # noisy per-item logging.
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=parent-lookup")
+            break
+
         parent_ref = extract_parent_reference(application.proposal or "")
         if not parent_ref:
             continue
@@ -435,10 +452,14 @@ def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig, 
                 # that happened to find nothing, not a resilience failure.
                 if health is not None:
                     health.record_parent_lookup(succeeded=False)
+                if breaker is not None:
+                    breaker.record_failure(e, stage="parent-lookup")
                 continue
 
             if health is not None:
                 health.record_parent_lookup(succeeded=True)
+            if breaker is not None:
+                breaker.record_success()
 
             if not result or not result.reference:
                 print(f"    parent {parent_ref} not found on the portal")
@@ -502,7 +523,9 @@ def stage_fetch_missing_parents(session: Session, page, council: CouncilConfig, 
     return fetched
 
 
-def stage_fetch_related_applications(session: Session, page, council: CouncilConfig) -> int:
+def stage_fetch_related_applications(
+    session: Session, page, council: CouncilConfig, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
     """Search the portal for every application that names a given reference
     by number (see app.scrapers.idox_portal.search_related_applications),
     for every site's most senior granted application - not just citation-
@@ -586,6 +609,13 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
 
     if council.doc_system == "arcus":
         for parent in to_search:
+            # Circuit breaker (Hotfix pre-merge amendment: Complete
+            # Circuit-Breaker Coverage) - same council-scoped breaker as
+            # every other supporting network stage.
+            if breaker is not None and breaker.is_open:
+                print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+                break
+
             try:
                 rows = search_related_applications_arcus(page, council, parent.reference)
             except Exception as e:
@@ -593,13 +623,21 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
                 # transient portal error should be retried next run, not
                 # suppressed for 30 days like a genuine "found nothing new".
                 print(f"  [related-applications] error searching for {parent.reference}: {e}")
+                if breaker is not None:
+                    breaker.record_failure(e, stage="related-applications")
                 continue
+            if breaker is not None:
+                breaker.record_success()
 
             parent.related_search_checked_at = dt.datetime.now(dt.timezone.utc)
             session.commit()
 
             new_this_parent = 0
             for row in rows:
+                if breaker is not None and breaker.is_open:
+                    print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+                    break
+
                 reference = row.get("reference")
                 if not reference:
                     continue
@@ -623,7 +661,12 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
                     result = fetch_application_detail_arcus(page, row, unit_threshold=council.unit_threshold, force_qualify=True)
                 except Exception as e:
                     print(f"    error fetching {reference}: {e}")
+                    if breaker is not None:
+                        breaker.record_failure(e, stage="related-applications")
                     continue
+                else:
+                    if breaker is not None:
+                        breaker.record_success()
 
                 proposal = result.fields.get("Proposal", "")
                 category = classify_application_category(proposal)
@@ -652,11 +695,19 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
     requests_session.headers.update(HEADERS)
 
     for parent in to_search:
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+            break
+
         try:
             summary_urls = search_related_applications(page, council, parent.reference)
         except Exception as e:
             print(f"  [related-applications] error searching for {parent.reference}: {e}")
+            if breaker is not None:
+                breaker.record_failure(e, stage="related-applications")
             continue
+        if breaker is not None:
+            breaker.record_success()
         time.sleep(council.request_delay_seconds)
 
         parent.related_search_checked_at = dt.datetime.now(dt.timezone.utc)
@@ -664,6 +715,10 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
 
         new_this_parent = 0
         for summary_url in summary_urls:
+            if breaker is not None and breaker.is_open:
+                print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=related-applications")
+                break
+
             keyval = keyval_from_url(summary_url)
             existing = session.execute(
                 select(Application).where(Application.council_code == council.code, Application.keyval == keyval)
@@ -677,7 +732,12 @@ def stage_fetch_related_applications(session: Session, page, council: CouncilCon
                 )
             except Exception as e:
                 print(f"    error fetching {summary_url}: {e}")
+                if breaker is not None:
+                    breaker.record_failure(e, stage="related-applications")
                 continue
+            else:
+                if breaker is not None:
+                    breaker.record_success()
 
             proposal = result.fields.get("Proposal", "")
             category = classify_application_category(proposal)
@@ -748,7 +808,9 @@ def _pick_confirmed_unit_count(text: str, threshold: int) -> int | None:
     return top_value if top_count > runner_up_count else None
 
 
-def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
+def stage_confirm_units(
+    session: Session, page, council: CouncilConfig, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
     """Cheap confirmation gate for applications that only qualified via a
     REVIEW_KEYWORDS guess in the proposal text (no unit count stated
     anywhere, e.g. "erection of a residential development... access from
@@ -782,6 +844,16 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
 
     confirmed_qualifying = 0
     for application in pending:
+        # Circuit breaker (Hotfix pre-merge amendment: Complete Circuit-
+        # Breaker Coverage) - checked once per application, before its
+        # network call(s). Shares the SAME council-scoped breaker as the
+        # other supporting network stages - a Trafford-style outage first
+        # observed in stage_fetch_related_applications, say, still opens
+        # this stage's circuit too, since they're all the same object.
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=confirm-units")
+            break
+
         if not application.summary_url:
             continue
 
@@ -790,7 +862,11 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
             rows = discover_documents(page, requests_session, council, application.summary_url, dest_dir)
         except Exception as e:
             print(f"  [confirm-units] error discovering docs for {application.reference}: {e}")
+            if breaker is not None:
+                breaker.record_failure(e, stage="confirm-units")
             continue
+        if breaker is not None:
+            breaker.record_success()
 
         by_type = {}
         for row in rows:
@@ -817,7 +893,12 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
                 text = extract_document_text(local_path) if local_path else ""
             except Exception as e:
                 print(f"  [confirm-units] download/extract failed for {row.document_name}: {e}")
+                if breaker is not None:
+                    breaker.record_failure(e, stage="confirm-units")
                 continue
+            else:
+                if breaker is not None:
+                    breaker.record_success()
             # Unlike the fuzzy REVIEW_KEYWORDS bucket (low stakes - just
             # means "download everything and let the LLM stages sort it
             # out"), a wrong call here either wrongly excludes a real scheme
@@ -852,6 +933,7 @@ def stage_confirm_units(session: Session, page, council: CouncilConfig) -> int:
 def discover_and_store_documents_for_application(
     session: Session, page, requests_session: requests.Session, council: CouncilConfig,
     application: Application, health: AcquisitionHealth | None = None,
+    breaker: CouncilPortalCircuitBreaker | None = None,
 ) -> bool:
     """The actual per-application document-discovery-and-store logic,
     factored out of stage_documents' loop (Evidence Completeness
@@ -927,6 +1009,13 @@ def discover_and_store_documents_for_application(
         # succeeded/failed" framing.
         if health is not None:
             health.record_document_discovery(succeeded=False)
+        # Circuit breaker (Hotfix: Recovery-First Council Processing +
+        # Portal Circuit Breaker) - a host-level failure here (portal
+        # unreachable) counts toward the council-scoped consecutive
+        # count; an HTTP 429/404 or any other error does not (see
+        # is_portal_host_failure's own docstring).
+        if breaker is not None:
+            breaker.record_failure(e, stage="documents")
         # documents_last_checked_at deliberately NOT advanced (Evidence
         # Completeness Foundation, PR A) - the listing request itself
         # failed, so we never obtained a reliable document listing for
@@ -938,6 +1027,8 @@ def discover_and_store_documents_for_application(
 
     if health is not None:
         health.record_document_discovery(succeeded=True)
+    if breaker is not None:
+        breaker.record_success()
 
     # Document identity (Evidence Completeness Foundation, PR A, Part 4)
     # - the set of documents this application already has, by the same
@@ -976,6 +1067,17 @@ def discover_and_store_documents_for_application(
     # pass completed".
     acquisition_complete = True
     for row in rows:
+        # Circuit breaker - a download earlier in THIS SAME application's
+        # row list may have just tripped the circuit; stop attempting
+        # further downloads for this application too, not just future
+        # applications (Section 9A: "stop further network calls...where
+        # practical"). The remaining rows are simply not attempted this
+        # pass - acquisition_complete is already False by this point
+        # (the failure that opened the circuit set it), so this
+        # application correctly stays eligible for the next run.
+        if breaker is not None and breaker.is_open:
+            break
+
         # Classify from the listing metadata (already fetched, no extra
         # request) BEFORE downloading - site plans, CAD drawings, ecology/
         # drainage/transport reports etc. are never read by extraction
@@ -1024,7 +1126,16 @@ def discover_and_store_documents_for_application(
                 # alone), and only retries this still-missing document.
                 failed_downloads += 1
                 acquisition_complete = False
+                # Circuit breaker - a download failure is a genuine
+                # portal round-trip, same as the listing call above; only
+                # a host-level failure (see is_portal_host_failure) counts
+                # toward the council-scoped consecutive count.
+                if breaker is not None:
+                    breaker.record_failure(e, stage="documents")
                 continue
+            else:
+                if breaker is not None:
+                    breaker.record_success()
             finally:
                 # Downloaded/skipped file size, when known - directly
                 # answers Part 8's "quantify actual file sizes" for
@@ -1127,14 +1238,38 @@ def discover_and_store_documents_for_application(
     return True
 
 
-def stage_documents(session: Session, page, council: CouncilConfig, health: AcquisitionHealth | None = None) -> int:
+def stage_documents(
+    session: Session, page, council: CouncilConfig,
+    health: AcquisitionHealth | None = None, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
     total_qualifying = session.execute(
         select(func.count(Application.id)).where(Application.council_code == council.code, UNIT_GATE_PASSED)
     ).scalar()
+    # Recovery-first ordering (Hotfix: Recovery-First Council Processing +
+    # Portal Circuit Breaker, Section 4) - within this already-small,
+    # already-bounded eligible set (DOCUMENT_DISCOVERY_ELIGIBLE excludes
+    # both fully-checked AND legacy-unverified applications - see that
+    # constant's own comment), applications that already have >=1
+    # Document row are RECOVERY work under PR A's own partial-acquisition-
+    # recovery semantics (a previous pass got partway through before
+    # documents_last_checked_at IS NULL again for some other reason - see
+    # discover_and_store_documents_for_application's acquisition_complete
+    # tracking) - processed before brand-new, zero-document applications.
+    # This gives an early portal-health probe from applications we
+    # already have real prior engagement with, so a still-broken portal
+    # trips the circuit breaker (below) before this run has spent time on
+    # the (usually larger) batch of routine new-application work - the
+    # Product Owner's own stated objective ("discover Trafford is still
+    # broken early, not after 20+ minutes of routine processing"),
+    # achieved via a query-level ORDER BY on EXISTING PR A state, not a
+    # new state model or a rewrite of this stage's own architecture. Uses
+    # existing_documents (an EXISTS subquery), not len(application.
+    # documents), to avoid triggering the lazy relationship per row.
+    existing_documents = exists(select(Document.id).where(Document.application_id == Application.id))
     pending = session.execute(
         select(Application).where(
             Application.council_code == council.code, UNIT_GATE_PASSED, DOCUMENT_DISCOVERY_ELIGIBLE
-        )
+        ).order_by(existing_documents.desc(), Application.id.asc())
     ).scalars().all()
     print(f"\n[documents] {len(pending)} applications need document discovery "
           f"({total_qualifying - len(pending)} already checked or not yet qualifying, skipped)")
@@ -1145,10 +1280,24 @@ def stage_documents(session: Session, page, council: CouncilConfig, health: Acqu
     processed = 0
     listings_failed = 0
     for application in pending:
+        # Circuit breaker (Hotfix: Recovery-First Council Processing +
+        # Portal Circuit Breaker) - checked once per application, before
+        # attempting its network call(s). Once open, no further
+        # applications are attempted for the rest of this council's
+        # document-discovery run - each remaining application's
+        # documents_last_checked_at simply stays whatever it already was
+        # (NULL for a never-completed one), so it remains eligible for
+        # the next Daily Discovery run's own fresh-breaker attempt.
+        # Printed once (not per skipped application) to avoid noisy
+        # per-item logging.
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=documents")
+            break
+
         if not application.summary_url:
             continue
         succeeded = discover_and_store_documents_for_application(
-            session, page, requests_session, council, application, health
+            session, page, requests_session, council, application, health, breaker,
         )
         if succeeded:
             processed += 1
@@ -1707,6 +1856,16 @@ def main() -> None:
     ensure_council_row(session, council)
     log_memory("bootstrap.after", council=council.code)
 
+    # Hotfix: Recovery-First Council Processing + Portal Circuit Breaker -
+    # one CouncilPortalCircuitBreaker for this council's whole run, same
+    # lifetime as `health` above (created fresh here, discarded when this
+    # process exits). Resets automatically on the next Daily Discovery run
+    # because each council is its own subprocess (scripts.
+    # run_daily_councils) - no cross-run persistence, no separate
+    # scheduler. See app.pipeline.portal_circuit_breaker's own module
+    # docstring.
+    breaker = CouncilPortalCircuitBreaker(council_code=council.code)
+
     month_ranges = _resolve_month_ranges(args)
     batch_id = f"{council.code}_{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
@@ -1778,17 +1937,35 @@ def main() -> None:
                 # classification, which is about TODAY's acquisition.
                 if i == 0:
                     health.record_primary_scrape_attempt()
-                try:
-                    stage_scrape(session, page, council, date_from, date_to, batch_id)
-                    if i == 0:
-                        health.record_primary_scrape_completed()
-                except Exception as e:
-                    # A single month failing (e.g. the portal rate-limits or blocks us
-                    # mid-run) shouldn't lose every other month in a multi-year backfill -
-                    # log it and keep going. Re-running later will pick up this month
-                    # since applications already saved are untouched (upsert, not replace).
-                    print(f"\n[scrape] FAILED for {date_from} -> {date_to}: {e}")
-                    print("[scrape] continuing to next month...")
+                # Circuit breaker - defensive/consistency guard, not a path
+                # a normal single-month Daily Discovery run can reach
+                # today (the circuit starts closed and stage_scrape is
+                # always the FIRST network call of the run), but real for
+                # a multi-month backfill invocation where an earlier
+                # month's connection failures already opened it: skipping
+                # a later month here, rather than attempting a scrape the
+                # circuit has already decided is futile, keeps
+                # health.record_primary_scrape_completed() correctly
+                # un-called for i==0 if THAT month is the one skipped -
+                # classify() then correctly reports FAILED (Section 10:
+                # "primary...discovery could not meaningfully complete
+                # because the portal circuit opened"), never a false
+                # SUCCESS from a scrape that was never actually attempted.
+                if breaker.is_open:
+                    print(f"[circuit] council={council.code} skipping stage_scrape for {date_from}->{date_to} - circuit open")
+                else:
+                    try:
+                        stage_scrape(session, page, council, date_from, date_to, batch_id)
+                        if i == 0:
+                            health.record_primary_scrape_completed()
+                    except Exception as e:
+                        # A single month failing (e.g. the portal rate-limits or blocks us
+                        # mid-run) shouldn't lose every other month in a multi-year backfill -
+                        # log it and keep going. Re-running later will pick up this month
+                        # since applications already saved are untouched (upsert, not replace).
+                        print(f"\n[scrape] FAILED for {date_from} -> {date_to}: {e}")
+                        print("[scrape] continuing to next month...")
+                        breaker.record_failure(e, stage="scrape")
             log_memory("stage_scrape.after", council=council.code)
 
         if not args.skip_parent_lookup:
@@ -1797,31 +1974,45 @@ def main() -> None:
             # matters filing is included) but before site-linking, so a
             # freshly-fetched parent is in the DB in time for the SAME run's
             # parent_reference site-linking tier to pick it up.
-            stage_fetch_missing_parents(session, page, council, health=health)
+            stage_fetch_missing_parents(session, page, council, health=health, breaker=breaker)
             log_memory("stage_fetch_missing_parents.after", council=council.code)
 
         if not args.skip_site_link:
+            # DB-only - no portal network call, so this always runs
+            # regardless of circuit state (Section 9E: "continue any
+            # purely local/database-only stage... if clearly useful and
+            # safe" - consolidating already-persisted applications is
+            # exactly that).
             log_memory("stage_link_sites.before", council=council.code)
             stage_link_sites(session, council)
             log_memory("stage_link_sites.after", council=council.code)
 
         if not args.skip_related_applications:
-            log_memory("stage_fetch_related_applications.before", council=council.code)
-            # After stage_link_sites, not before - needs a parent's site_id
-            # already set (site_link_method == "parent_reference") to know
-            # what to search for and where to attach anything it finds.
-            stage_fetch_related_applications(session, page, council)
-            log_memory("stage_fetch_related_applications.after", council=council.code)
+            if breaker.is_open:
+                print(f"[circuit] council={council.code} skipping stage_fetch_related_applications - circuit open")
+            else:
+                log_memory("stage_fetch_related_applications.before", council=council.code)
+                # After stage_link_sites, not before - needs a parent's site_id
+                # already set (site_link_method == "parent_reference") to know
+                # what to search for and where to attach anything it finds.
+                stage_fetch_related_applications(session, page, council, breaker=breaker)
+                log_memory("stage_fetch_related_applications.after", council=council.code)
 
         if not args.skip_confirm_units:
-            log_memory("stage_confirm_units.before", council=council.code)
-            stage_confirm_units(session, page, council)
-            log_memory("stage_confirm_units.after", council=council.code)
+            if breaker.is_open:
+                print(f"[circuit] council={council.code} skipping stage_confirm_units - circuit open")
+            else:
+                log_memory("stage_confirm_units.before", council=council.code)
+                stage_confirm_units(session, page, council, breaker=breaker)
+                log_memory("stage_confirm_units.after", council=council.code)
 
         if not args.skip_documents:
-            log_memory("stage_documents.before", council=council.code)
-            stage_documents(session, page, council, health=health)
-            log_memory("stage_documents.after", council=council.code)
+            if breaker.is_open:
+                print(f"[circuit] council={council.code} skipping stage_documents - circuit open")
+            else:
+                log_memory("stage_documents.before", council=council.code)
+                stage_documents(session, page, council, health=health, breaker=breaker)
+                log_memory("stage_documents.after", council=council.code)
 
         log_memory("browser_close.before", council=council.code)
         browser.close()
@@ -1860,6 +2051,21 @@ def main() -> None:
             os.getenv("SERPAPI_KEY"), os.getenv("APOLLO_API_KEY"), os.getenv("HUNTER_API_KEY"),
             openai_client=OpenAI(api_key=openai_key) if openai_key else None,
         )
+
+    # Circuit breaker -> health integration (Hotfix second pre-merge
+    # amendment, "Circuit Breaker Must Affect Run Health") - the ONE
+    # central call site, deliberately not scattered across every
+    # individual stage's own breaker.record_failure() call (each of
+    # those already handles the circuit's OWN bookkeeping). breaker.
+    # is_open never becomes False again once True, so checking it here -
+    # right before the final summary is computed - correctly reflects
+    # whether the circuit was ever open at ANY point during this run,
+    # regardless of which of the four supporting network stages tripped
+    # it (including stage_fetch_related_applications/stage_confirm_units,
+    # neither of which has ever recorded a health.record_* pass/fail
+    # count of its own).
+    if breaker.is_open:
+        health.record_portal_unavailable(stage=breaker.opened_stage or "unknown")
 
     # [run-health] (Render Daily Discovery Portal Resilience & Truthful
     # Run Health, Part 4) - ONE deterministic, machine-parseable summary
