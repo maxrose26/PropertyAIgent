@@ -75,6 +75,108 @@ def process_tree_rss_mib(pid: int | None = None) -> tuple[float, float]:
     return self_rss / MiB, children_rss / MiB
 
 
+# Coarse process classes (Render Daily Discovery Salford child-process
+# memory diagnosis, Part 3): "children RSS" as measured above sums EVERY
+# descendant indiscriminately - Playwright's own Node driver process, the
+# entire Chromium multi-process tree (browser main + any renderer/utility/
+# GPU/zygote/crashpad-handler processes it spawns), AND any
+# multiprocessing-spawned PDF/DOCX extraction worker - so a rising
+# "children" figure alone cannot say WHICH of those is actually growing.
+# Classified by process name + full command line (more reliable than name
+# alone - Chromium's own sub-process ROLE is only visible via its
+# --type=... command-line flag, and a plain "chrome"/"headless_shell" name
+# match doesn't distinguish the browser-main process from a renderer).
+_CHROME_NAME_HINTS = ("chrome", "chromium", "headless_shell")
+
+
+def _classify_descendant(proc: "psutil.Process") -> str:  # noqa: F821 - psutil only imported if available
+    """Returns one of: chromium-browser-main, chromium-renderer,
+    chromium-gpu, chromium-utility, chromium-zygote, chromium-crashpad,
+    chromium-other, playwright-node, python-extraction-worker, other.
+    Never raises - a descendant that exits or becomes inaccessible mid-
+    classification (permission, already gone) is classified as "other"
+    rather than blowing up the whole checkpoint."""
+    try:
+        name = (proc.name() or "").lower()
+    except Exception:  # noqa: BLE001 - psutil.NoSuchProcess/AccessDenied/ZombieProcess, or platform quirks
+        return "other"
+    try:
+        cmdline = " ".join(proc.cmdline()).lower()
+    except Exception:  # noqa: BLE001
+        cmdline = ""
+
+    if any(hint in name for hint in _CHROME_NAME_HINTS) or any(hint in cmdline for hint in _CHROME_NAME_HINTS):
+        if "--type=renderer" in cmdline:
+            return "chromium-renderer"
+        if "--type=gpu-process" in cmdline:
+            return "chromium-gpu"
+        if "--type=utility" in cmdline:
+            return "chromium-utility"
+        if "--type=zygote" in cmdline:
+            return "chromium-zygote"
+        if "--type=crashpad-handler" in cmdline:
+            return "chromium-crashpad"
+        if "--type=" in cmdline:
+            return "chromium-other"
+        return "chromium-browser-main"  # the one Chromium process with no --type= flag
+
+    if "node" in name and ("playwright" in cmdline or "driver" in cmdline):
+        return "playwright-node"
+
+    # Our own multiprocessing.get_context("spawn") extraction workers
+    # (app.extraction.pdf_text) re-exec the SAME Python interpreter with a
+    # multiprocessing bootstrap command line - distinguishable from an
+    # unrelated Python process by that bootstrap marker, not just "is
+    # python.exe running".
+    if "python" in name and "multiprocessing.spawn" in cmdline:
+        return "python-extraction-worker"
+
+    return "other"
+
+
+# The 4 buckets always reported in a breakdown line (Part 3's own example
+# format), aggregating the finer chromium-* sub-classes above into one
+# "chromium" figure for a glanceable line while _classify_descendant's own
+# finer distinction remains available to anything calling it directly
+# (e.g. tests, or a future deeper dive).
+_CHROMIUM_CLASSES = (
+    "chromium-browser-main", "chromium-renderer", "chromium-gpu",
+    "chromium-utility", "chromium-zygote", "chromium-crashpad", "chromium-other",
+)
+
+
+def process_tree_breakdown(pid: int | None = None) -> tuple[float, dict[str, float], dict[str, int]]:
+    """Returns (self_rss_mib, {class: rss_mib}, {class: count}) - the same
+    descendant enumeration as process_tree_rss_mib, but bucketed by
+    _classify_descendant instead of summed into one "children" figure.
+    Returns (0.0, {}, {}) - never raises - under the same conditions
+    process_tree_rss_mib does."""
+    if not _PSUTIL_AVAILABLE:
+        return 0.0, {}, {}
+    try:
+        root = psutil.Process(pid) if pid is not None else psutil.Process()
+        self_rss = root.memory_info().rss
+    except psutil.NoSuchProcess:
+        return 0.0, {}, {}
+
+    mib_by_class: dict[str, float] = {}
+    count_by_class: dict[str, int] = {}
+    try:
+        children = root.children(recursive=True)
+    except psutil.NoSuchProcess:
+        children = []
+    for child in children:
+        try:
+            rss = child.memory_info().rss
+        except Exception:  # noqa: BLE001 - exited/inaccessible between listing and measuring
+            continue
+        cls = _classify_descendant(child)
+        mib_by_class[cls] = mib_by_class.get(cls, 0.0) + rss / MiB
+        count_by_class[cls] = count_by_class.get(cls, 0) + 1
+
+    return self_rss / MiB, mib_by_class, count_by_class
+
+
 # Any single identifier value longer than this is truncated (Render Daily
 # Discovery Salford document-stage memory diagnosis, Part 3: "keep
 # identifiers concise" / "do not print full document content") - a
@@ -90,6 +192,7 @@ def log_memory(
     council: str | None = None,
     pid: int | None = None,
     extra: dict[str, object] | None = None,
+    breakdown: bool = False,
     warn_threshold_mib: float = DEFAULT_WARNING_THRESHOLD_MIB,
 ) -> None:
     """Prints one concise structured [mem] line for the given stage/
@@ -112,10 +215,18 @@ def log_memory(
     [mem-warning] prefix as every other call, so the existing orchestrator-
     side persisted-checkpoint logic (scripts.run_daily_councils, matching on
     that prefix) picks these up automatically - no separate persistence
-    path was needed."""
+    path was needed.
+
+    `breakdown` (Render Daily Discovery Salford CHILD-PROCESS memory
+    diagnosis): when True, replaces the single "children=NMiB" figure with
+    process_tree_breakdown's per-class figures (playwright/chromium/
+    extraction/other, each with a process count) plus total descendant/
+    Chromium/extraction-worker counts - answering "which class of
+    descendant is actually growing", not just "children grew". Off by
+    default (extra cmdline() calls per descendant have a real, if small,
+    cost) - only worth paying at the per-document checkpoints where the
+    question actually matters, not at every coarse pipeline-stage boundary."""
     try:
-        self_mib, children_mib = process_tree_rss_mib(pid)
-        total_mib = self_mib + children_mib
         council_part = f"council={council} " if council else ""
         extra_part = ""
         if extra:
@@ -126,6 +237,29 @@ def log_memory(
                     text = text[:_EXTRA_VALUE_MAX_CHARS] + "..."
                 pairs.append(f"{key}={text}")
             extra_part = " ".join(pairs) + " "
+
+        if breakdown:
+            self_mib, mib_by_class, count_by_class = process_tree_breakdown(pid)
+            playwright_mib = mib_by_class.get("playwright-node", 0.0)
+            chromium_mib = sum(mib_by_class.get(c, 0.0) for c in _CHROMIUM_CLASSES)
+            extraction_mib = mib_by_class.get("python-extraction-worker", 0.0)
+            other_mib = mib_by_class.get("other", 0.0)
+            total_mib = self_mib + playwright_mib + chromium_mib + extraction_mib + other_mib
+            chromium_count = sum(count_by_class.get(c, 0) for c in _CHROMIUM_CLASSES)
+            extraction_count = count_by_class.get("python-extraction-worker", 0)
+            descendant_count = sum(count_by_class.values())
+            body = (
+                f"self={self_mib:.0f}MiB playwright={playwright_mib:.0f}MiB "
+                f"chromium={chromium_mib:.0f}MiB extraction={extraction_mib:.0f}MiB "
+                f"other={other_mib:.0f}MiB total={total_mib:.0f}MiB "
+                f"descendants={descendant_count} chromium_count={chromium_count} "
+                f"extraction_count={extraction_count}"
+            )
+        else:
+            self_mib, children_mib = process_tree_rss_mib(pid)
+            total_mib = self_mib + children_mib
+            body = f"self={self_mib:.0f}MiB children={children_mib:.0f}MiB total={total_mib:.0f}MiB"
+
         # flush=True (Render Daily Discovery missing-runtime-logs diagnosis,
         # "Do not rely on only one fragile buffering assumption"): this is
         # called from BOTH the orchestrator and each run_weekly.py council
@@ -135,11 +269,7 @@ def log_memory(
         # should not also depend on that external configuration staying
         # correct forever - flush explicitly here too, redundantly but
         # cheaply (one syscall per checkpoint, not per line of a busy loop).
-        print(
-            f"[mem] {council_part}stage={stage} {extra_part}"
-            f"self={self_mib:.0f}MiB children={children_mib:.0f}MiB total={total_mib:.0f}MiB",
-            flush=True,
-        )
+        print(f"[mem] {council_part}stage={stage} {extra_part}{body}", flush=True)
         if total_mib > warn_threshold_mib:
             print(
                 f"[mem-warning] {council_part}stage={stage} {extra_part}total={total_mib:.0f}MiB "

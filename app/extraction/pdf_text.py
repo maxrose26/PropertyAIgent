@@ -294,10 +294,20 @@ def extract_document_text(path: Path) -> str:
     if kind not in ("pdf", "docx"):
         return ""  # legacy .doc, images, CAD drawings etc. - not text-extractable here
 
+    from app.diagnostics.memory import log_memory  # local import - avoids a diagnostics<->extraction import cycle
+
     ctx = multiprocessing.get_context("spawn")
     result_queue = ctx.Queue()
     process = ctx.Process(target=_extract_in_subprocess, args=(str(path), kind, result_queue))
     process.start()
+    # documents.extract.worker_started/finished (Render Daily Discovery
+    # Salford CHILD-PROCESS memory diagnosis, Part 5) - this function is
+    # generic (called by both stage_confirm_units and stage_documents), so
+    # no council context is available here; the per-document
+    # documents.extract.before/after checkpoints in stage_documents itself
+    # already carry council/application/document, and can be cross-
+    # referenced against this worker's own PID.
+    log_memory("documents.extract.worker_started", extra={"pid": process.pid})
     # Read from the queue BEFORE joining, not after - confirmed a real
     # deadlock: multiprocessing.Queue.put() hands off to a background feeder
     # thread that writes through an OS pipe with limited buffer capacity: a
@@ -317,8 +327,41 @@ def extract_document_text(path: Path) -> str:
         process.join(timeout=5)
         if process.is_alive():
             process.kill()
+            # A real gap, found and fixed here (Render Daily Discovery
+            # Salford CHILD-PROCESS memory diagnosis, Part 5): kill() alone
+            # does NOT reap the process - without a join() afterward, a
+            # worker that ignored SIGTERM long enough to need SIGKILL was
+            # left as an un-joined process-table entry, never reclaimed by
+            # this function again (multiprocessing.Process objects are not
+            # auto-reaped by Python's own garbage collector).
+            process.join(timeout=5)
     else:
         process.join(timeout=5)
+
+    # Captured BEFORE process.close() below - a closed Process object
+    # raises ValueError on any further attribute access, .pid/.exitcode
+    # included.
+    worker_pid = process.pid
+    worker_exitcode = process.exitcode
+
+    # process.close() (Part 5: "process.close() is called if appropriate")
+    # - explicitly releases the Process object's own OS-level resources
+    # once we're sure it has exited, rather than relying on this local
+    # variable eventually being garbage collected. Raises ValueError if
+    # still somehow alive despite the join()s above (should not happen,
+    # but must not take the whole extraction pipeline down with it if it
+    # ever does).
+    try:
+        process.close()
+    except ValueError:
+        pass
+    # Explicit Queue cleanup (Part 6: "verify queue.close(); queue.
+    # join_thread(); no feeder thread remains") - deterministically shuts
+    # down the queue's own background feeder thread and releases its
+    # underlying OS pipe, rather than relying on garbage collection.
+    result_queue.close()
+    result_queue.join_thread()
+    log_memory("documents.extract.worker_finished", extra={"pid": worker_pid, "exitcode": worker_exitcode})
     return text
 
 
