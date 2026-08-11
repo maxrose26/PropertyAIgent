@@ -156,6 +156,59 @@ def _backfill_extraction_attempt_count(engine) -> int:
         return result.rowcount if result.rowcount is not None else 0
 
 
+def _backfill_documents_last_checked_at(engine) -> int:
+    """Evidence Completeness Foundation (PR A), pre-merge amendment
+    "Partial Initial Document Acquisition Recovery" - repairs the one
+    remaining legacy-rollout gap the amendment's corrected eligibility
+    logic creates.
+
+    stage_documents' eligibility is now simply `documents_last_checked_at
+    IS NULL` (see app.pipeline.run_weekly.DOCUMENT_DISCOVERY_ELIGIBLE's own
+    comment for why the earlier design's extra `~Application.documents.
+    any()` legacy-compatibility clause had to be removed: it would also
+    have permanently blocked ROUTINE recovery of a genuinely-incomplete
+    NEW acquisition the moment even one of its documents succeeded and was
+    persisted - defeating this very amendment's purpose). Without some
+    other legacy-rollout safeguard, every pre-existing production
+    Application that already has Document rows (708 of 756 qualifying
+    applications, per the PR A audit) would become eligible for document
+    discovery again the first time this runs against production - exactly
+    the uncontrolled full-corpus re-scrape PR A was built to avoid.
+
+    Deliberately NOT "now" (explicitly forbidden - a legacy row was not
+    just checked, and "now" would additionally imply completeness this
+    migration cannot actually verify). Instead, backfills to the MAX
+    downloaded_at across that application's own existing Document rows -
+    a real, honest, already-true fact ("the last time document activity
+    genuinely happened for this application"), not an invented value.
+    This is a correct - not merely convenient - value for every row it
+    touches: under the PRE-amendment system, `~Application.documents.
+    any()` alone already permanently excluded any application the moment
+    it had one document, complete or not, so no legacy row's document set
+    is any less "final" than this backfill implies - there is no partial-
+    acquisition state to recover for legacy rows specifically, only for
+    NEW acquisitions made under this amended code going forward.
+
+    Applications with ZERO documents are correctly left untouched (NULL) -
+    they remain eligible for their first-ever discovery attempt, exactly
+    as before this field existed.
+
+    Idempotent: only rows where the column IS NULL are touched, so a
+    database that's already fully repaired matches zero rows and is a
+    no-op. Uses the same raw-SQL, dialect-agnostic style as the rest of
+    this module - no new migration framework."""
+    with engine.begin() as conn:
+        result = conn.execute(text("""
+            UPDATE "applications"
+            SET "documents_last_checked_at" = (
+                SELECT MAX("downloaded_at") FROM "documents" WHERE "documents"."application_id" = "applications"."id"
+            )
+            WHERE "documents_last_checked_at" IS NULL
+              AND EXISTS (SELECT 1 FROM "documents" WHERE "documents"."application_id" = "applications"."id")
+        """))
+        return result.rowcount if result.rowcount is not None else 0
+
+
 def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
     """The EXPLICIT, operator-invoked production migration step (Pilot
     Readiness PR-2 final pre-merge amendment, "Implement The Smallest
@@ -186,6 +239,11 @@ def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
     if backfilled:
         print(f"[migrate-schema] backfilled {backfilled} existing applications.extraction_attempt_count "
               f"row(s) from NULL to 0")
+
+    docs_backfilled = _backfill_documents_last_checked_at(engine)
+    if docs_backfilled:
+        print(f"[migrate-schema] backfilled {docs_backfilled} existing applications.documents_last_checked_at "
+              f"row(s) from NULL to their latest document's downloaded_at")
 
     return missing_tables, added_columns
 
@@ -225,6 +283,7 @@ def init_db() -> None:
         Base.metadata.create_all(engine)
         _add_missing_columns(engine)
         _backfill_extraction_attempt_count(engine)
+        _backfill_documents_last_checked_at(engine)
         return
 
     missing_tables, missing_columns = verify_schema(engine)

@@ -1095,22 +1095,37 @@ class Application(Base):
     extraction_last_attempted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     extraction_attempt_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    # Document discovery state (Evidence Completeness Foundation, PR A) -
-    # records WHEN this application's document LISTING was last
-    # successfully obtained from the council portal, independently of how
-    # many (if any) useful documents that listing produced. NULL means
-    # "never successfully checked" - deliberately distinct from the old
-    # ~Application.documents.any() signal (see stage_documents), which
-    # conflated "has stored documents" with "discovery has run", and
-    # distinct from evidence sufficiency (see app.pipeline.evidence.
-    # is_evidence_sufficient) - an application can be genuinely checked and
-    # still be evidence-insufficient, and must NOT be re-checked daily
-    # merely because it's insufficient (that is a future PR's job -
-    # material-change detection, the 90-day fallback, or manual refresh -
-    # not routine Daily Discovery). Only ever set when discover_documents()
-    # itself completed without raising - a portal/listing request failure
-    # never advances this, so a failed attempt remains eligible for the
-    # very next run to retry, exactly as before this field existed.
+    # Document discovery state (Evidence Completeness Foundation, PR A;
+    # amended pre-merge, "Partial Initial Document Acquisition Recovery") -
+    # records the most recent time Property AIgent successfully COMPLETED
+    # the intended document-discovery/acquisition pass for this
+    # application, independently of how many (if any) useful documents
+    # that pass produced. NULL means "never successfully completed" -
+    # deliberately distinct from the old ~Application.documents.any()
+    # signal (see stage_documents), which conflated "has stored documents"
+    # with "discovery has run", and distinct from evidence sufficiency
+    # (see app.pipeline.evidence.is_evidence_sufficient) - an application
+    # can be genuinely checked and still be evidence-insufficient, and
+    # must NOT be re-checked daily merely because it's insufficient (that
+    # is a future PR's job - material-change detection, the 90-day
+    # fallback, or manual refresh - not routine Daily Discovery).
+    #
+    # This does NOT merely mean "the portal listing endpoint returned
+    # successfully" - a listing can succeed while one or more of the
+    # documents it identified as intended-to-download still fails to
+    # download (a broken/timed-out portal file, say). In that case this
+    # field is deliberately left un-advanced, so the application remains
+    # eligible for the very next Daily Discovery run to retry ONLY the
+    # still-missing document(s) - already-successful documents are
+    # recognised by identity (see app.pipeline.evidence.
+    # document_identity_key) and never re-downloaded. See
+    # discover_and_store_documents_for_application's own
+    # acquisition_complete tracking for the exact rule, including its one
+    # known limitation (idox_anite/Bury councils cannot currently surface
+    # an individual per-document download failure to that function at
+    # all, since get_anite_documents silently drops a failed row instead
+    # of returning it - a pre-existing architectural gap, not introduced
+    # by this amendment, left for a later operational-recovery PR).
     #
     # Legacy rows (every Application that existed before this field was
     # added) are deliberately left NULL, never backfilled to "now" - see

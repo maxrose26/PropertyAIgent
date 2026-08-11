@@ -104,36 +104,44 @@ UNIT_GATE_PASSED = or_(
     Application.unit_confirmation_status == "confirmed_qualifying",
 )
 
-# Document-discovery eligibility (Evidence Completeness Foundation, PR A) -
+# Document-discovery eligibility (Evidence Completeness Foundation, PR A;
+# corrected pre-merge, "Partial Initial Document Acquisition Recovery") -
 # replaces the old bare ~Application.documents.any() (which conflated "has
 # stored documents" with "discovery has actually run", and permanently
 # excluded an application from ever being re-checked the moment even one
-# Document row existed, however partial). documents_last_checked_at IS NULL
-# is the correct, forward-looking signal on its own - but every Application
-# that existed before this field was added also has it NULL (deliberately
-# never backfilled, see the field's own comment in app.db.models), so IS
-# NULL alone would make every one of those already-documented applications
-# eligible again the first time this runs against production - exactly the
-# uncontrolled full-corpus re-scrape this PR must avoid.
+# Document row existed, however partial).
 #
-# ~Application.documents.any() is therefore kept as a second, legacy-
-# compatibility condition: an application that already has at least one
-# stored Document is treated as "already checked" for rollout purposes,
-# identically to its behaviour before this PR, even though the precise
-# WHEN is unknown for those rows. Only a genuinely never-touched
-# application (no timestamp AND no documents at all) is eligible - which,
-# for every row that exists today, is exactly the same set ~Application.
-# documents.any() alone already selected, so this is a behaviourally
-# neutral migration for existing data. Going forward, once ANY application
-# (new or legacy) gets a successful listing check, documents_last_checked_at
-# is set regardless of outcome - including a listing that found zero useful
-# documents, which today gets re-attempted every single day forever (see
-# stage_documents' own docstring) - so this is a strict improvement, not
-# just a neutral one, for that specific case.
-DOCUMENT_DISCOVERY_ELIGIBLE = and_(
-    Application.documents_last_checked_at.is_(None),
-    ~Application.documents.any(),
-)
+# This is now simply documents_last_checked_at IS NULL - deliberately NOT
+# combined with ~Application.documents.any() the way an earlier version of
+# this PR did. That combination was reconsidered and removed for a
+# specific reason: this amendment requires a genuinely-incomplete NEW
+# acquisition (one intended document downloaded successfully, another
+# still failed) to remain routinely eligible for recovery on the very
+# next Daily Discovery run - see Application.documents_last_checked_at's
+# own field comment and discover_and_store_documents_for_application's
+# acquisition_complete tracking. An `~Application.documents.any()` clause
+# would defeat that outright: the moment the FIRST document of a partial
+# acquisition succeeds and is persisted, that clause becomes false, and
+# this query would silently stop selecting the application again FOREVER
+# - even though documents_last_checked_at correctly stayed NULL to signal
+# "still incomplete, please retry". That is a materially worse bug than
+# the legacy-rollout gap the old clause existed to solve, since it would
+# make automatic recovery structurally impossible for any application
+# whose acquisition ever partially succeeds - not just an edge case.
+#
+# The legacy-rollout problem the old clause solved is instead now solved
+# at the DATA level, not the query level: app.db.session.
+# _backfill_documents_last_checked_at repairs every pre-existing
+# Application that already has Document rows to a real, honest
+# documents_last_checked_at (the MAX downloaded_at across its own
+# documents - never "now"), as part of the standard migrate_schema()
+# step. A zero-document legacy row is correctly left NULL and remains
+# eligible, exactly as before this PR. See that function's own docstring
+# for the full reasoning, including why this backfill is safe (no legacy
+# row has a "partial acquisition" state to recover in the first place -
+# the OLD ~Application.documents.any() gate already made every legacy
+# row's document set as complete as it would ever become).
+DOCUMENT_DISCOVERY_ELIGIBLE = Application.documents_last_checked_at.is_(None)
 
 # AI Processing Reliability & Backlog Throughput: a genuine (retryable) AI/
 # API failure re-enters the backlog on a LATER scheduled run, not the same
@@ -843,10 +851,16 @@ def discover_and_store_documents_for_application(
     rather than needing that query to somehow re-select an application it
     was deliberately designed to permanently exclude once documented (see
     that constant's own comment). Returns True if a reliable document
-    listing was obtained this call, regardless of how many (if any) useful
-    documents it contained - see Application.documents_last_checked_at's
-    own field comment for why that, not "has any Document row", is the
-    definition of a completed check.
+    LISTING was obtained this call (used by stage_documents purely to
+    distinguish "listing failed" from "listing succeeded" for its own
+    run-level counters) - this is NOT the same thing as whether
+    Application.documents_last_checked_at was actually advanced (PR A
+    pre-merge amendment, "Partial Initial Document Acquisition Recovery"):
+    a listing can succeed while one or more of the documents it identified
+    as intended-to-download still fails to download, in which case the
+    timestamp is deliberately withheld - see this function's own
+    acquisition_complete tracking below, and Application.
+    documents_last_checked_at's own field comment for the exact rule.
 
     Deliberately does NOT handle request pacing (time.sleep) or Playwright
     page recycling - those are stage_documents' own per-run resource-
@@ -905,14 +919,6 @@ def discover_and_store_documents_for_application(
     if health is not None:
         health.record_document_discovery(succeeded=True)
 
-    # A reliable listing WAS obtained, regardless of what it contains
-    # (zero useful documents included) or whether individual downloads
-    # below succeed - this is the "meaningful completed document-
-    # listing check" PR A's own product rules require. Set once per
-    # application, before the per-row loop, so it's included in the
-    # same session.commit() as any Document rows this pass adds.
-    application.documents_last_checked_at = dt.datetime.now(dt.timezone.utc)
-
     # Document identity (Evidence Completeness Foundation, PR A, Part 4)
     # - the set of documents this application already has, by the same
     # source_url-else-document_name key used to decide whether a newly
@@ -939,6 +945,16 @@ def discover_and_store_documents_for_application(
     skipped = 0
     sniffed = 0
     duplicates_skipped = 0
+    failed_downloads = 0
+    # Partial Initial Document Acquisition Recovery (PR A pre-merge
+    # amendment) - tracks whether every document this pass INTENDED to
+    # download (i.e. reached the actual download attempt below, not one
+    # excluded by the existing not-useful/duplicate rules) actually
+    # succeeded. Only True at the end means documents_last_checked_at may
+    # be stamped - see the field's own comment for why "the listing
+    # request returned" is not the same claim as "the intended acquisition
+    # pass completed".
+    acquisition_complete = True
     for row in rows:
         # Classify from the listing metadata (already fetched, no extra
         # request) BEFORE downloading - site plans, CAD drawings, ecology/
@@ -976,6 +992,18 @@ def discover_and_store_documents_for_application(
                 )
             except Exception as e:
                 print(f"  [documents] download failed for {row.document_name}: {e}")
+                # This row was an INTENDED document (useful, or content-
+                # worth-sniffing, and not already known) whose download
+                # genuinely failed - the acquisition pass is therefore
+                # incomplete, and documents_last_checked_at must not be
+                # stamped this call (Partial Initial Document Acquisition
+                # Recovery). The application remains eligible - the next
+                # Daily Discovery run re-lists, correctly re-derives
+                # existing_identities (now including everything that DID
+                # succeed, which stage_documents' bulk query then leaves
+                # alone), and only retries this still-missing document.
+                failed_downloads += 1
+                acquisition_complete = False
                 continue
             finally:
                 # Downloaded/skipped file size, when known - directly
@@ -1028,10 +1056,37 @@ def discover_and_store_documents_for_application(
             )
         )
         existing_identities.add(identity)
+
+    # Only stamp completion if every INTENDED document this pass attempted
+    # to download actually succeeded (Partial Initial Document Acquisition
+    # Recovery) - a listing that succeeded but left one or more downloads
+    # failed is deliberately left un-stamped, so DOCUMENT_DISCOVERY_
+    # ELIGIBLE still selects this application on the next Daily Discovery
+    # run to retry exactly the still-missing document(s), not the whole
+    # set (existing_identities/the dedup check above already prevents
+    # re-downloading anything that succeeded this pass or an earlier one).
+    #
+    # KNOWN LIMITATION (deliberately not solved in this PR - see its own
+    # report): for idox_anite (Bury) councils, document discovery and
+    # download happen fused together inside get_anite_documents(), which
+    # silently drops a row entirely on a failed click-to-download (see
+    # that function's own except-continue) rather than ever returning it
+    # here - this function therefore has NO way to observe an Anite
+    # per-document download failure at all, so acquisition_complete can
+    # never be set to False for that portal type specifically, regardless
+    # of whether a document was actually missed. This is a pre-existing
+    # architectural gap in how Anite discovery is structured, not
+    # introduced by this amendment - fully closing it would require
+    # get_anite_documents to report failed rows back to its caller, which
+    # is a larger change than this PR's own scope.
+    if acquisition_complete:
+        application.documents_last_checked_at = dt.datetime.now(dt.timezone.utc)
+
     session.commit()
-    print(f"  [documents] {application.reference}: {len(rows) - skipped - duplicates_skipped} documents downloaded, "
+    print(f"  [documents] {application.reference}: {len(rows) - skipped - duplicates_skipped - failed_downloads} documents downloaded, "
           f"{skipped} skipped (not a useful document type), {sniffed} classified by content (name was uninformative), "
-          f"{duplicates_skipped} already known (skipped as duplicates)")
+          f"{duplicates_skipped} already known (skipped as duplicates), {failed_downloads} download(s) failed"
+          + ("" if acquisition_complete else " - acquisition incomplete, remains eligible for recovery"))
     log_memory(
         "documents.application.after", council=council.code,
         extra={"application": application.reference, "identity_map": len(session.identity_map)},

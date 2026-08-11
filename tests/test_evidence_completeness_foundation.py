@@ -206,6 +206,42 @@ def test_two_qualifying_core_documents_sufficient(session):
     assert is_evidence_sufficient(application) is True
 
 
+def test_decision_notice_plus_officer_report_also_sufficient(session):
+    """Explicit second combination from the amendment's own examples -
+    the rule is about DISTINCT categories, not any one specific pair."""
+    application = _add_application(session, reference="APP/1")
+    _add_document(session, application, "decision_notice", source_url="https://example.invalid/1.pdf")
+    _add_document(session, application, "officer_report", source_url="https://example.invalid/2.pdf")
+    assert is_evidence_sufficient(application) is True
+
+
+def test_two_documents_from_the_same_core_category_alone_insufficient(session):
+    """Amendment Section 5's explicit clarification: two Planning
+    Statements only does NOT satisfy the two-DISTINCT-core-category route
+    - only one distinct category (planning_statement) is represented,
+    regardless of how many documents carry it. Only 2 useful documents
+    total, so the >=3-unique-document route doesn't apply either."""
+    application = _add_application(session, reference="APP/1")
+    _add_document(session, application, "planning_statement", source_url="https://example.invalid/1.pdf")
+    _add_document(session, application, "planning_statement", source_url="https://example.invalid/2.pdf")
+    core_categories_present = {d.doc_type for d in deduped_useful_documents(application)} & CORE_DOCUMENT_TYPES
+    assert core_categories_present == {"planning_statement"}  # one distinct category, not two
+    assert is_evidence_sufficient(application) is False
+
+
+def test_two_documents_same_core_category_plus_a_third_useful_document_is_sufficient(session):
+    """The amendment's own worked example: two Planning Statements alone
+    are insufficient, but MAY still satisfy the >=3-unique-useful-document
+    route if a third, genuinely distinct useful document exists - the two
+    routes are independent, and this one doesn't require category
+    diversity at all."""
+    application = _add_application(session, reference="APP/1")
+    _add_document(session, application, "planning_statement", source_url="https://example.invalid/1.pdf")
+    _add_document(session, application, "planning_statement", source_url="https://example.invalid/2.pdf")
+    _add_document(session, application, "application_form", source_url="https://example.invalid/3.pdf")
+    assert is_evidence_sufficient(application) is True
+
+
 def test_irrelevant_documents_do_not_contribute(session):
     application = _add_application(session, reference="APP/1")
     _add_document(session, application, "other", source_url="https://example.invalid/1.pdf")
@@ -246,10 +282,10 @@ def test_rediscovering_existing_document_does_not_duplicate_it(session):
     inserted again when the same listing row appears again. Uses
     discover_and_store_documents_for_application directly (Section 13's
     requirement: a future caller must be able to invoke document discovery
-    for one specific Application WITHOUT relying on ~Application.
-    documents.any() to somehow re-select it - which it structurally
-    cannot, once DOCUMENT_DISCOVERY_ELIGIBLE has excluded it for having a
-    document at all)."""
+    for one specific Application at will, independent of stage_documents'
+    own bulk DOCUMENT_DISCOVERY_ELIGIBLE query, which by this point in the
+    test would correctly no longer select this application at all, since
+    it already completed successfully)."""
     import requests
     from app.pipeline.run_weekly import discover_and_store_documents_for_application
 
@@ -294,6 +330,212 @@ def test_document_identity_key_prefers_source_url_falls_back_to_name():
     assert document_identity_key("https://x/1.pdf", "Doc.pdf") == ("url", "https://x/1.pdf")
     assert document_identity_key(None, "Doc.pdf") == ("name", "Doc.pdf")
     assert document_identity_key("", "Doc.pdf") == ("name", "Doc.pdf")
+
+
+# --- D2: Partial Initial Document Acquisition Recovery (pre-merge amendment) -
+
+
+def test_listing_success_all_intended_downloads_succeed_advances_timestamp(session):
+    import requests
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row_a = _fake_row("Planning Statement.pdf", source_url="https://example.invalid/a.pdf")
+    row_b = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/b.pdf")
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_a, row_b]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/a.pdf"), Path("/tmp/b.pdf")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests.Session(), _council_config("testcouncil"), application,
+        )
+
+    assert application.documents_last_checked_at is not None
+    assert session.query(Document).filter_by(application_id=application.id).count() == 2
+
+
+def test_listing_success_already_known_documents_only_advances_timestamp(session):
+    """A recovery-style call where the listing returns only documents
+    already persisted (nothing new, nothing missing) - a fully complete
+    acquisition, even though every row is a duplicate skip rather than a
+    fresh download."""
+    import requests
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row = _fake_row("Planning Statement.pdf", source_url="https://example.invalid/ps.pdf")
+    requests_session = requests.Session()
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/a.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="planning_statement"), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+    first_stamp = application.documents_last_checked_at
+    assert first_stamp is not None
+
+    # Force a second pass (a future PR B would trigger this on demand) -
+    # the listing returns the SAME already-known row only.
+    application.documents_last_checked_at = None
+    session.commit()
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document") as mock_download:
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+    mock_download.assert_not_called()  # already known - never re-downloaded
+    assert application.documents_last_checked_at is not None  # still a completed pass
+    assert session.query(Document).filter_by(application_id=application.id).count() == 1  # not duplicated
+
+
+def test_one_intended_download_failure_leaves_timestamp_null(session):
+    """The amendment's central case: listing succeeds, one of two intended
+    documents fails to download - the acquisition pass is incomplete, so
+    documents_last_checked_at must NOT be stamped."""
+    import requests
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row_ok = _fake_row("Planning Statement.pdf", source_url="https://example.invalid/ok.pdf")
+    row_fails = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/broken.pdf")
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/ok.pdf"), RuntimeError("connection reset")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        succeeded = discover_and_store_documents_for_application(
+            session, MagicMock(), requests.Session(), _council_config("testcouncil"), application,
+        )
+
+    assert succeeded is True  # the LISTING itself succeeded (distinct claim - see item 6)
+    assert application.documents_last_checked_at is None  # but the pass did not complete
+    docs = session.query(Document).filter_by(application_id=application.id).all()
+    assert len(docs) == 1  # only the successful one was persisted
+    assert docs[0].doc_type == "planning_statement"
+
+
+def test_recovery_run_skips_persisted_and_downloads_missing_document(session):
+    """After a partial failure, a subsequent call (the "recovery run") for
+    the SAME application must not re-download the document that already
+    succeeded, and must retry the one that previously failed."""
+    import requests
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row_ok = _fake_row("Planning Statement.pdf", source_url="https://example.invalid/ok.pdf")
+    row_fails = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/broken.pdf")
+    requests_session = requests.Session()
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/ok.pdf"), RuntimeError("boom")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+    assert application.documents_last_checked_at is None
+    assert session.query(Document).filter_by(application_id=application.id).count() == 1
+
+    # Recovery run: the routine DOCUMENT_DISCOVERY_ELIGIBLE query would
+    # now correctly re-select this application (documents_last_checked_at
+    # IS NULL - no ~Application.documents.any() clause blocking it, per
+    # this amendment's own fix) - simulated here via a direct call.
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document") as mock_download, \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        mock_download.return_value = Path("/tmp/broken-recovered.pdf")
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+
+    mock_download.assert_called_once()  # only the missing document, not the already-successful one
+    called_url = mock_download.call_args.args[3] if len(mock_download.call_args.args) > 3 else mock_download.call_args.kwargs.get("source_url")
+    docs = session.query(Document).filter_by(application_id=application.id).all()
+    assert len(docs) == 2
+    assert {d.doc_type for d in docs} == {"planning_statement", "decision_notice"}
+
+
+def test_successful_recovery_stamps_timestamp(session):
+    import requests
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row_ok = _fake_row("Planning Statement.pdf", source_url="https://example.invalid/ok.pdf")
+    row_fails = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/broken.pdf")
+    requests_session = requests.Session()
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/ok.pdf"), RuntimeError("boom")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+    assert application.documents_last_checked_at is None
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/recovered.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+
+    assert application.documents_last_checked_at is not None  # now complete - stamped
+
+
+def test_repeated_recovery_does_not_duplicate_documents(session):
+    """Three calls in sequence: partial failure, successful recovery,
+    then a THIRD call (e.g. a future manual refresh) with the same
+    listing - none of the already-persisted documents must ever
+    duplicate."""
+    import requests
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row_ok = _fake_row("Planning Statement.pdf", source_url="https://example.invalid/ok.pdf")
+    row_fails = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/broken.pdf")
+    requests_session = requests.Session()
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/ok.pdf"), RuntimeError("boom")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/recovered.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+    assert session.query(Document).filter_by(application_id=application.id).count() == 2
+
+    application.documents_last_checked_at = None  # simulate a future manual refresh re-opening it
+    session.commit()
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document") as mock_download:
+        discover_and_store_documents_for_application(
+            session, MagicMock(), requests_session, _council_config("testcouncil"), application,
+        )
+    mock_download.assert_not_called()  # both already known - nothing to download
+    assert session.query(Document).filter_by(application_id=application.id).count() == 2  # still 2, not 4
 
 
 # --- E: legacy / migration ----------------------------------------------------
@@ -365,20 +607,53 @@ def test_migration_is_idempotent_for_documents_last_checked_at():
     assert second_added == []
 
 
-def test_legacy_row_with_existing_documents_is_not_requeued_for_discovery(session):
-    """The central rollout-safety property (Section 9): a legacy
-    Application that already has stored Document rows (from before PR A
-    existed) but a NULL documents_last_checked_at (since the field is new)
-    must NOT be treated as eligible for document discovery - reproducing
-    today's ~Application.documents.any() behaviour for existing data, not
-    an uncontrolled full-corpus re-scrape."""
-    application = _add_application(session, reference="APP/LEGACY/1")
-    _add_document(session, application, "planning_statement", source_url="https://example.invalid/1.pdf")
-    assert application.documents_last_checked_at is None  # never backfilled
+def test_legacy_row_with_existing_documents_is_not_requeued_for_discovery():
+    """The central rollout-safety property (Section 9), exercised against
+    the REAL migration path rather than the in-memory `session` fixture.
 
-    with patch("app.pipeline.run_weekly.discover_documents") as mock_discover:
-        stage_documents(session, page=MagicMock(), council=_council_config("testcouncil"))
-    mock_discover.assert_not_called()
+    Pre-merge amendment note: this safety no longer lives in the
+    DOCUMENT_DISCOVERY_ELIGIBLE query (the ~Application.documents.any()
+    clause was removed - see that constant's own comment in run_weekly.py
+    for why keeping it would make the amendment's own recovery requirement
+    structurally impossible). It now lives in migrate_schema's backfill
+    (_backfill_documents_last_checked_at, app/db/session.py): a legacy row
+    that already has Document rows is stamped with its latest document's
+    real downloaded_at the moment the new column is added, so it never
+    presents as NULL/eligible in the first place. This test proves that
+    end-to-end through the real migration function, not by asserting on
+    the query in isolation."""
+    from app.db.session import migrate_schema
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    old_metadata = _build_old_applications_table(engine)
+    Base.metadata.create_all(engine, tables=[Council.__table__, Document.__table__])
+    downloaded_at = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
+    Session = sessionmaker(bind=engine, future=True)
+    with Session() as _setup_session:
+        _setup_session.add(Council(code='testcouncil', name='Test', base_url='https://example.invalid', date_field_mode='received', doc_system='idox'))
+        _setup_session.commit()
+    with engine.begin() as conn:
+        conn.execute(
+            Table("applications", old_metadata).insert(),
+            [{"id": 1, "council_code": "testcouncil", "reference": "APP/LEGACY/1"}],
+        )
+        conn.execute(
+            Document.__table__.insert(),
+            [{"application_id": 1, "doc_type": "planning_statement", "downloaded_at": downloaded_at}],
+        )
+
+    migrate_schema(engine)
+
+    Session = sessionmaker(bind=engine, future=True, expire_on_commit=False)
+    with Session() as migrated_session:
+        application = migrated_session.get(Application, 1)
+        assert application.documents_last_checked_at is not None  # backfilled, not NULL
+        application.summary_url = "https://example.invalid/APP/LEGACY/1"
+        migrated_session.commit()
+
+        with patch("app.pipeline.run_weekly.discover_documents") as mock_discover:
+            stage_documents(migrated_session, page=MagicMock(), council=_council_config("testcouncil"))
+        mock_discover.assert_not_called()
 
 
 def test_legacy_row_with_zero_documents_remains_eligible(session):
@@ -391,27 +666,114 @@ def test_legacy_row_with_zero_documents_remains_eligible(session):
     mock_discover.assert_called_once()
 
 
-def test_first_run_after_migration_does_not_document_scrape_whole_corpus(session):
-    """Simulates the production rollout moment: a mix of legacy
-    applications (some with documents, some without) all having
-    documents_last_checked_at NULL. Only the genuinely-undocumented ones
-    must be selected."""
-    already_documented = []
-    for i in range(5):
-        app = _add_application(session, reference=f"APP/DOCUMENTED/{i}")
-        _add_document(session, app, "application_form", source_url=f"https://example.invalid/{i}.pdf")
-        already_documented.append(app)
-    never_documented = [_add_application(session, reference=f"APP/NEW/{i}") for i in range(3)]
+def test_first_run_after_migration_does_not_document_scrape_whole_corpus():
+    """Simulates the production rollout moment through the REAL migration
+    path (see the previous test's docstring for why this must exercise
+    migrate_schema/_backfill_documents_last_checked_at rather than the
+    in-memory `session` fixture post-amendment): a mix of legacy
+    applications (some with documents, some without), migrated from the
+    old schema in one pass. Only the genuinely never-documented ones must
+    be selected on the first run afterwards."""
+    from app.db.session import migrate_schema
 
-    with patch("app.pipeline.run_weekly.discover_documents", return_value=[]) as mock_discover:
-        stage_documents(session, page=MagicMock(), council=_council_config("testcouncil"))
+    engine = create_engine("sqlite:///:memory:", future=True)
+    old_metadata = _build_old_applications_table(engine)
+    Base.metadata.create_all(engine, tables=[Council.__table__, Document.__table__])
+    downloaded_at = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
+    Session = sessionmaker(bind=engine, future=True)
+    with Session() as _setup_session:
+        _setup_session.add(Council(code='testcouncil', name='Test', base_url='https://example.invalid', date_field_mode='received', doc_system='idox'))
+        _setup_session.commit()
+    with engine.begin() as conn:
+        conn.execute(
+            Table("applications", old_metadata).insert(),
+            [{"id": i + 1, "council_code": "testcouncil", "reference": f"APP/DOCUMENTED/{i}"} for i in range(5)]
+            + [{"id": i + 6, "council_code": "testcouncil", "reference": f"APP/NEW/{i}"} for i in range(3)],
+        )
+        conn.execute(
+            Document.__table__.insert(),
+            [{"application_id": i + 1, "doc_type": "application_form", "downloaded_at": downloaded_at} for i in range(5)],
+        )
 
-    assert mock_discover.call_count == 3  # only the 3 never-documented ones
-    called_refs = {c.args[3] for c in mock_discover.call_args_list}  # summary_url positional arg
-    for app in never_documented:
-        assert app.summary_url in called_refs
-    for app in already_documented:
-        assert app.summary_url not in called_refs
+    migrate_schema(engine)
+
+    Session = sessionmaker(bind=engine, future=True, expire_on_commit=False)
+    with Session() as migrated_session:
+        applications = migrated_session.query(Application).order_by(Application.id).all()
+        for application in applications:
+            application.summary_url = f"https://example.invalid/{application.reference}"
+        migrated_session.commit()
+        already_documented = applications[:5]
+        never_documented = applications[5:]
+
+        with patch("app.pipeline.run_weekly.discover_documents", return_value=[]) as mock_discover:
+            stage_documents(migrated_session, page=MagicMock(), council=_council_config("testcouncil"))
+
+        assert mock_discover.call_count == 3  # only the 3 never-documented ones
+        called_refs = {c.args[3] for c in mock_discover.call_args_list}  # summary_url positional arg
+        for app in never_documented:
+            assert app.summary_url in called_refs
+        for app in already_documented:
+            assert app.summary_url not in called_refs
+
+
+def test_backfill_sets_max_downloaded_at_not_now_and_is_idempotent():
+    """Dedicated test of _backfill_documents_last_checked_at itself (not
+    just its observable effect on eligibility, covered above): the exact
+    stamped value must be the real MAX(Document.downloaded_at) for that
+    application - never "now" (forbidden per the original PR A task, since
+    that would falsely claim a check just happened) - rows with zero
+    documents must be left NULL/untouched, and re-running it must change
+    nothing (idempotent, matching the existing _backfill_extraction_attempt_count
+    convention this function follows)."""
+    from app.db.session import _backfill_documents_last_checked_at, migrate_schema
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    old_metadata = _build_old_applications_table(engine)
+    Base.metadata.create_all(engine, tables=[Council.__table__, Document.__table__])
+    older = dt.datetime(2023, 6, 1, tzinfo=dt.timezone.utc)
+    newest = dt.datetime(2024, 3, 15, tzinfo=dt.timezone.utc)
+    Session = sessionmaker(bind=engine, future=True)
+    with Session() as _setup_session:
+        _setup_session.add(Council(code='testcouncil', name='Test', base_url='https://example.invalid', date_field_mode='received', doc_system='idox'))
+        _setup_session.commit()
+    with engine.begin() as conn:
+        conn.execute(
+            Table("applications", old_metadata).insert(),
+            [
+                {"id": 1, "council_code": "testcouncil", "reference": "APP/MULTI/1"},  # 2 documents
+                {"id": 2, "council_code": "testcouncil", "reference": "APP/ZERO/1"},  # 0 documents
+            ],
+        )
+        conn.execute(
+            Document.__table__.insert(),
+            [
+                {"application_id": 1, "doc_type": "planning_statement", "downloaded_at": older},
+                {"application_id": 1, "doc_type": "decision_notice", "downloaded_at": newest},
+            ],
+        )
+
+    migrate_schema(engine)  # adds the column AND runs the backfill once
+
+    with engine.connect() as conn:
+        multi_row = conn.execute(text(
+            "SELECT documents_last_checked_at FROM applications WHERE reference = 'APP/MULTI/1'"
+        )).fetchone()
+        zero_row = conn.execute(text(
+            "SELECT documents_last_checked_at FROM applications WHERE reference = 'APP/ZERO/1'"
+        )).fetchone()
+
+    assert str(newest.date()) in str(multi_row.documents_last_checked_at)  # the LATEST of the two, not the first
+    assert zero_row.documents_last_checked_at is None  # zero-document row untouched
+
+    second_pass_updated = _backfill_documents_last_checked_at(engine)
+    assert second_pass_updated == 0  # idempotent - nothing left to backfill
+
+    with engine.connect() as conn:
+        multi_row_again = conn.execute(text(
+            "SELECT documents_last_checked_at FROM applications WHERE reference = 'APP/MULTI/1'"
+        )).fetchone()
+    assert multi_row_again.documents_last_checked_at == multi_row.documents_last_checked_at  # unchanged
 
 
 # --- F: regression / scope guards --------------------------------------------
