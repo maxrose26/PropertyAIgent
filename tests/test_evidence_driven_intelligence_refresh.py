@@ -1853,6 +1853,34 @@ def test_planning_statement_alone_cannot_establish_legally_secured():
     assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
 
 
+def test_decision_notice_mentioning_affordable_housing_only_cannot_establish_legally_secured():
+    # Final pre-merge amendment, Section 1's own worked FAIL example -
+    # merely mentioning affordable housing (even in an authoritative-typed
+    # document) is not the same as that document securing it.
+    documents = [_doc("decision_notice", "The affordable housing offer is described in the submitted Affordable Housing Statement.")]
+    new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": True}
+    guarded = guard_legally_secured_requires_authoritative_content(None, new_fields_raw, documents)
+    assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
+
+
+def test_decision_notice_saying_affordable_provision_is_proposed_cannot_establish_legally_secured():
+    documents = [_doc("decision_notice", "The affordable housing provision is proposed to be delivered in accordance with the planning statement.")]
+    new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": True}
+    guarded = guard_legally_secured_requires_authoritative_content(None, new_fields_raw, documents)
+    assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
+
+
+def test_s106_merely_referencing_affordable_document_cannot_establish_legally_secured():
+    # Deliberately does not itself impose/secure anything - just points at
+    # a different document. A bare "S106"/"section 106" mention is NOT
+    # itself treated as obligation language (see _LEGAL_OBLIGATION_
+    # LANGUAGE_PATTERNS's own docstring for why).
+    documents = [_doc("s106", "The S106 Agreement makes reference to the submitted Affordable Housing Statement, which describes the affordable housing offer.")]
+    new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": True}
+    guarded = guard_legally_secured_requires_authoritative_content(None, new_fields_raw, documents)
+    assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
+
+
 def test_executed_s106_with_affordable_content_still_allowed_legally_secured():
     documents = [_doc("s106", "This executed S106 Agreement legally secures 35% affordable housing.")]
     new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": True}
@@ -1862,12 +1890,35 @@ def test_executed_s106_with_affordable_content_still_allowed_legally_secured():
 
 def test_decision_notice_explicitly_securing_provision_still_allowed_legally_secured():
     # A Decision Notice CAN by itself justify legally_secured when its own
-    # text genuinely discusses the affordable housing obligation - the fix
-    # is about CONTENT, not banning decision_notice as a qualifying type.
-    documents = [_doc("decision_notice", "Notice of Approval. Condition 12 requires the affordable housing scheme (40% affordable) to be implemented in full prior to occupation.")]
+    # text genuinely IMPOSES the affordable housing obligation (not merely
+    # mentions it) - the fix is about CONTENT, not banning decision_notice
+    # as a qualifying type.
+    documents = [_doc("decision_notice", "Notice of Approval. Condition 12 requires that 40% affordable housing shall be provided and secured prior to occupation.")]
     new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": True}
     guarded = guard_legally_secured_requires_authoritative_content(None, new_fields_raw, documents)
     assert guarded["affordable_housing_status"] == LEGALLY_SECURED_STATUS
+
+
+def test_mixed_security_still_blocks_whole_total_after_positive_evidence_amendment(session):
+    # Reconfirms item 7 of the final pre-merge amendment: this amendment
+    # only ADDS a minimum content requirement for a first-time claim - it
+    # does not replace or weaken guard_mixed_legal_security_position's own
+    # control over partial-S106/non-S106 positions.
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=10.2, affordable_units_final=15, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Completed S106 secures the base 10% affordable housing requirement.")
+    _add_document(session, app, "viability_affordable_housing", "An additional 40% non-s106 affordable homes are proposed, bringing the total to 50%, equating to 73 properties.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=50.0, affordable_units=73,
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=False,
+        affordable_housing_notes="The S106 secures the base 10%; a further 40% non-S106 provision brings the total to 50% / 73 homes.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_housing_status == MIXED_SECURITY_FALLBACK_STATUS
+    assert app.scheme_intelligence.affordable_housing_status != LEGALLY_SECURED_STATUS
+    assert app.scheme_intelligence.affordable_percentage_final == 50.0
 
 
 def test_positive_evidence_guard_does_not_reopen_mixed_security_composition():

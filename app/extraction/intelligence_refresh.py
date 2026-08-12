@@ -383,10 +383,47 @@ def guard_mixed_legal_security_position(new_fields_raw: dict, evidence_text: str
 # new persisted field.
 _AFFORDABLE_CONTENT_PATTERN = re.compile(r"afford", re.IGNORECASE)
 
+# Live batch hotfix final pre-merge amendment ("Merely Mentioning Affordable
+# Housing Is Not Legal Security") - the ORIGINAL content check above only
+# proved an authoritative document DISCUSSES affordable housing at all,
+# which is not the same as that document actually SECURING/IMPOSING the
+# current provision. Product Owner's own worked example: "The affordable
+# housing offer is described in the submitted Affordable Housing
+# Statement." mentions affordable housing but secures nothing - a
+# decision_notice or s106 could just as easily contain a purely
+# descriptive/referential sentence like that. A small, bounded scan for
+# genuine obligation/security LANGUAGE (same style/precision level as
+# _MIXED_SECURITY_SIGNAL_PATTERNS - not a legal-document parser),
+# deliberately NOT including a bare "section 106"/"s106" mention on its
+# own (that would be almost circular for a document whose doc_type is
+# already "s106", and is exactly the kind of document-identity-only
+# reasoning this whole guard exists to avoid) - the document must contain
+# language that actually COMMITS to something, not merely name-check the
+# legal mechanism.
+_LEGAL_OBLIGATION_LANGUAGE_PATTERNS = [
+    re.compile(r"secur(?:e|ed|es|ing)\b", re.IGNORECASE),
+    re.compile(r"planning\s+obligation", re.IGNORECASE),
+    re.compile(r"covenant", re.IGNORECASE),
+    re.compile(r"obligat(?:ed|ion)", re.IGNORECASE),
+    re.compile(r"required\s+to\s+provide", re.IGNORECASE),
+    re.compile(r"shall\s+(?:be\s+)?provid", re.IGNORECASE),
+    re.compile(r"condition\s+requiring", re.IGNORECASE),
+]
 
-def _authoritative_document_discusses_affordable_housing(documents: list[Document]) -> bool:
+
+def _document_text_contains_legal_obligation_language(text: str) -> bool:
+    return any(pattern.search(text or "") for pattern in _LEGAL_OBLIGATION_LANGUAGE_PATTERNS)
+
+
+def _authoritative_document_establishes_legal_security(documents: list[Document]) -> bool:
+    """Requires BOTH, on the SAME document: (A) it discusses affordable
+    housing at all, AND (B) it contains genuine obligation/security
+    language - not merely that an authoritative-typed document exists, and
+    not merely that it mentions affordable housing somewhere."""
     return any(
-        d.doc_type in _LEGALLY_AUTHORITATIVE_DOC_TYPES and _AFFORDABLE_CONTENT_PATTERN.search(d.extracted_text or "")
+        d.doc_type in _LEGALLY_AUTHORITATIVE_DOC_TYPES
+        and _AFFORDABLE_CONTENT_PATTERN.search(d.extracted_text or "")
+        and _document_text_contains_legal_obligation_language(d.extracted_text or "")
         for d in documents
     )
 
@@ -414,7 +451,7 @@ def guard_legally_secured_requires_authoritative_content(existing_intelligence, 
     )
     if already_secured:
         return new_fields_raw
-    if _authoritative_document_discusses_affordable_housing(documents):
+    if _authoritative_document_establishes_legal_security(documents):
         return new_fields_raw
 
     guarded = dict(new_fields_raw)
