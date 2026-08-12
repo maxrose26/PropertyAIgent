@@ -1174,6 +1174,45 @@ class Application(Base):
     # migration that sets this for existing rows.
     documents_legacy_unverified: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # PR B1 ("Material Application-State Detection + Persisted Refresh
+    # Signal") - the smallest persisted signal for PR B's overall
+    # intelligence-freshness architecture, deliberately four flat columns
+    # rather than a new event-log table (same established pattern as
+    # extraction_last_outcome/extraction_last_attempted_at/
+    # extraction_attempt_count above - a conceptually similar "does this
+    # need reprocessing" signal already solved this way in this codebase).
+    #
+    # evidence_refresh_required means EXACTLY "a targeted evidence check
+    # should eventually happen for this application" - it does NOT mean
+    # "AI is stale" (that determination belongs to a later PR, once B2
+    # actually knows whether the evidence itself changed) and it does NOT
+    # mean "documents are known to be missing" (that is PR A's own,
+    # separate documents_last_checked_at/documents_legacy_unverified
+    # concern, untouched by this field). B1 only ever SETS this to True
+    # (via app.pipeline.material_change.detect_material_application_change
+    # finding a genuine change) - it never clears it; consuming/resetting
+    # the signal once a refresh actually happens is a later PR's job
+    # entirely, not implemented here.
+    evidence_refresh_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Comma-joined app.pipeline.material_change reason code(s) (e.g.
+    # "decision_granted", or "decision_granted,unit_count_changed" if
+    # more than one fired in the same pass) - deterministic reason codes,
+    # not free text, per PR B's own "prefer deterministic reason codes"
+    # instruction. Overwritten (not appended to) on each newly-detected
+    # change - this is not an event log, just "why is the signal
+    # currently set", so the latest genuine reason is always what's
+    # stored; see this module's own migration notes for why no historical
+    # change-event table was introduced for this.
+    evidence_refresh_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Trigger provenance (PR B design, Part I) - B1 only ever writes
+    # "material_change" here. Deliberately a plain string, not an enum
+    # column, so a future PR can add "periodic_staleness"/"manual"/
+    # "system_recovery" values without a schema change - this field
+    # exists specifically so those future triggers can share the SAME
+    # persisted signal rather than each inventing their own.
+    evidence_refresh_trigger: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    evidence_refresh_requested_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])
