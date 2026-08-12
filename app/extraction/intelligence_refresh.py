@@ -124,7 +124,17 @@ def refresh_depth_for_reasons(reasons: list[str] | tuple[str, ...]) -> str:
 # related but not identical questions (e.g. a focused refusal refresh reads
 # s106 too, since a refusal can still turn on an unresolved S106 position).
 _DOC_TYPES_BY_DEPTH = {
-    DEPTH_BROAD: frozenset({"decision_notice", "officer_report", "s106", "planning_statement", "design_access"}),
+    # B3 live-validation amendment (Defect C) - a dedicated Affordable
+    # Housing / Viability Statement (doc_type=viability_affordable_housing)
+    # is exactly the kind of evidence a BROAD refresh should read; confirmed
+    # by the first live Oldham sample, whose real "AFFORDABLE HOUSING
+    # STATEMENT" document was silently skipped because this set didn't
+    # include its category. Deliberately NOT added to any focused depth
+    # below - Part 11 of the amendment: only BROAD is mandated.
+    DEPTH_BROAD: frozenset({
+        "decision_notice", "officer_report", "s106", "planning_statement", "design_access",
+        "viability_affordable_housing",
+    }),
     DEPTH_FOCUSED_REFUSAL: frozenset({"decision_notice", "officer_report", "s106"}),
     DEPTH_FOCUSED_WITHDRAWAL: frozenset({"decision_notice", "officer_report"}),
     DEPTH_RECOMMENDATION: frozenset({"officer_report", "s106"}),
@@ -151,6 +161,12 @@ _EVIDENCE_AUTHORITY_RANK = {
     "officer_report": 2,
     "planning_statement": 1,
     "design_access": 1,
+    # Same tier as planning_statement/design_access - applicant/consultant-
+    # authored, not a legal instrument or the council's own determination,
+    # so it must never outrank officer_report/s106/decision_notice; but it
+    # still needs a real (non-zero) rank so it isn't starved to always-last
+    # at the MAX_REFRESH_CONTEXT_CHARS truncation boundary.
+    "viability_affordable_housing": 1,
 }
 
 # Matches app.extraction.pdf_text.MAX_TOTAL_CHARS - the same bound the
@@ -370,10 +386,29 @@ useless and actively harmful to a commercial user:
   recommendation. If a recommendation exists but its direction is not
   stated, use "unclear". If no recommendation evidence exists at all,
   leave it as the currently recorded value (null if none).
-- A "recommended for approval/refusal" is NEVER the same as a formal
-  Granted/Refused decision. formal_decision_outstanding must be true unless
-  the evidence text itself contains a formal Decision Notice or equivalent
-  confirmed outcome.
+- formal_decision_outstanding means ONLY whether a formal planning decision
+  itself has yet to be issued/evidenced. It does NOT mean, and must never be
+  set true or false based on, whether S106 has been executed, whether
+  conditions remain outstanding, or whether the scheme is ready to
+  implement - those are separate facts, represented elsewhere (affordable_
+  housing_status/notes), never folded into this field.
+  - If the evidence text itself contains a formal Decision Notice, Notice of
+    Approval of Planning Permission, Notice of Refusal, or an equivalent
+    formal determination document, set formal_decision_outstanding=false -
+    even if the portal headline status above still says "Awaiting decision",
+    even if the decision wording says "Granted, subject to legal agreement",
+    and even if S106 execution is not evidenced anywhere. A formal decision
+    having been issued and a legal agreement having been executed are two
+    different facts; do not conflate them or let one imply the other.
+  - If the only evidence is a recommendation (an officer/committee report
+    recommending approval or refusal, with no formal Decision Notice/Notice
+    of Approval/Notice of Refusal present), set formal_decision_outstanding=
+    true - a recommendation is never itself a formal decision, however
+    confident or final it reads.
+  - If no evidence text contains a formal decision document and none
+    contains a recommendation either, do not guess - leave formal_decision_
+    outstanding as the currently recorded value above (null if none was
+    ever recorded).
 - Never invent refusal_reasons or withdrawal_reason. If the evidence does
   not state a reason, leave the field null - do not guess a plausible one.
 - Affordable housing: never describe a proposed or officer-recommended
@@ -403,6 +438,17 @@ useless and actively harmful to a commercial user:
   observation, and never invent a "previous position" that the CURRENTLY
   RECORDED POSITION above does not actually show - if that position has no
   evidenced prior percentage/units/tenure/status, do not claim one existed.
+- AFFORDABLE UNIT RECONCILIATION: if the affordable unit total is known
+  (either from this pass's new evidence or the CURRENTLY RECORDED POSITION
+  above) and affordable_housing_notes gives a specific unit/tenure
+  breakdown, that breakdown must either (a) sum to the full known total, or
+  (b) explicitly say the breakdown is partial and does not account for the
+  full total - e.g. "60 affordable homes are proposed. The evidence
+  identifies 21 social/affordable-rent houses and 21 shared-ownership
+  houses; the available evidence in this refresh does not clearly allocate
+  the remaining 18 affordable homes by tenure." Never state a partial
+  breakdown in a way a reader would take as the complete picture, and never
+  invent the missing units/tenures just to make the arithmetic reconcile.
 - EVIDENCE AUTHORITY: the NEW EVIDENCE TEXT below is ordered from highest to
   lowest legal/evidential authority - an executed S106, Deed of Variation,
   Unilateral Undertaking, or Decision Notice outranks an officer/committee
@@ -483,7 +529,17 @@ def refresh_intelligence_for_application(
             from app.pipeline.phase_tracking import build_phase_breakdown
             from app.ui.common import aggregate_scheme_fields
 
-            merged = aggregate_scheme_fields(applications)
+            # `new_fields` is a free variable resolved from the enclosing
+            # refresh_intelligence_for_application scope at CALL time, not
+            # definition time - by the time this closure actually runs (see
+            # the `generate_summary(site, site.applications)` call below),
+            # new_fields already holds this pass's prospective replacement
+            # values, so the Site Summary can see them WITHOUT the real
+            # `application.scheme_intelligence` ORM object being mutated
+            # yet (Defect A / live-validation amendment Part 2-4) - atomicity
+            # is preserved because this is a transient dict passed alongside
+            # the still-untouched real applications, never a write to them.
+            merged = aggregate_scheme_fields(applications, prospective_overrides={application.id: new_fields})
             lapse = compute_lapse_status(applications, site)
             phase_breakdown = build_phase_breakdown(applications)
             return _default_generate_summary(client, site, applications, merged, lapse, phase_breakdown)

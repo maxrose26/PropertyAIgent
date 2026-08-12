@@ -226,23 +226,49 @@ def pick_representative_application(applications: list[Application]) -> Applicat
     return max(applications, key=sort_key, default=None)
 
 
-def aggregate_scheme_fields(applications: list[Application]) -> dict:
+def aggregate_scheme_fields(
+    applications: list[Application], *, prospective_overrides: dict[int, dict] | None = None,
+) -> dict:
     """First non-null value per field, scanning applications in the same
-    priority order as pick_representative_application."""
-    with_scheme = [a for a in applications if a.scheme_intelligence]
+    priority order as pick_representative_application.
+
+    prospective_overrides: optional {application_id: {field: value}}, used
+    only by B3's atomic-replacement Site Summary regeneration (see app.
+    extraction.intelligence_refresh.refresh_intelligence_for_application) to
+    preview a not-yet-committed SchemeIntelligence replacement for ONE
+    application without mutating the real ORM object before all fallible
+    refresh steps have succeeded - the live app.scheme_intelligence relation
+    for every OTHER application is read completely unchanged. Every existing
+    caller omits this and gets identical behaviour to before this parameter
+    existed."""
+    def _override(app: Application) -> dict | None:
+        return prospective_overrides.get(app.id) if prospective_overrides else None
+
+    with_scheme = [a for a in applications if a.scheme_intelligence or _override(a)]
     ordered = sorted(
         with_scheme,
-        key=lambda a: (a.scheme_intelligence.core_intelligence_complete, parse_portal_date(a.application_received)),
+        key=lambda a: (
+            bool(a.scheme_intelligence and a.scheme_intelligence.core_intelligence_complete),
+            parse_portal_date(a.application_received),
+        ),
         reverse=True,
     )
     merged = {field: None for field in MERGED_SCHEME_FIELDS}
     for field in MERGED_SCHEME_FIELDS:
         for app in ordered:
-            value = getattr(app.scheme_intelligence, field)
+            override = _override(app)
+            if override is not None and field in override:
+                value = override[field]
+            elif app.scheme_intelligence:
+                value = getattr(app.scheme_intelligence, field)
+            else:
+                value = None
             if value not in (None, ""):
                 merged[field] = value
                 break
-    merged["core_intelligence_complete"] = any(a.scheme_intelligence.core_intelligence_complete for a in ordered)
+    merged["core_intelligence_complete"] = any(
+        a.scheme_intelligence.core_intelligence_complete for a in ordered if a.scheme_intelligence
+    )
 
     # Fallback: if no linked application's AI extraction ever determined a
     # total unit count (either extraction hasn't run yet - no useful

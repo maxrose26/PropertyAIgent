@@ -1208,3 +1208,421 @@ def test_successful_replacement_commits_notes_status_summary_and_watermark_toget
     assert app.scheme_intelligence.affordable_housing_notes == "Reduced from 35% to 20%, now secured."
     assert site.status_summary == "Fresh summary"
     assert app.intelligence_evidence_processed_at == now
+
+
+# ==============================================================================
+# B3 LIVE VALIDATION AMENDMENT: Site Summary prospective state + formal
+# decision semantics + broad affordable evidence
+#
+# The first controlled live sample (Oldham FUL/354904/25) exposed three
+# narrow defects, fixed here:
+#   A. Site Summary was generated from STALE pre-refresh intelligence.
+#   B. formal_decision_outstanding conflated "no formal decision issued"
+#      with "S106 not executed / conditions outstanding".
+#   C. DEPTH_BROAD omitted viability_affordable_housing evidence.
+# Plus an affordable-unit-reconciliation prompt strengthening.
+# ==============================================================================
+
+# --- Defect A: prospective Site Summary state --------------------------------
+
+
+def test_default_summary_receives_prospective_new_intelligence_values(session, monkeypatch):
+    captured = {}
+
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        captured["merged"] = dict(merged)
+        return "New summary reflecting the fresh affordable housing position."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, site_id=site.id)
+    _add_scheme_intelligence(session, app, affordable_housing_notes="Old notes, no affordable detail.")
+    _add_document(session, app, "decision_notice", "Granted, 40% affordable housing secured.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=40.0, affordable_housing_status="agreed",
+        affordable_housing_notes="40% affordable housing is now agreed.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app)  # generate_summary=None -> default path
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert captured["merged"]["affordable_housing_notes"] == "40% affordable housing is now agreed."
+    assert captured["merged"]["affordable_housing_status"] == "agreed"
+
+
+def test_default_summary_receives_prospective_planning_outcome_fields(session, monkeypatch):
+    captured = {}
+
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        captured["merged"] = dict(merged)
+        return "New summary."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED, site_id=site.id)
+    _add_scheme_intelligence(session, app, recommendation_direction=None)
+    _add_document(session, app, "decision_notice", "The application is refused due to overdevelopment.")
+
+    client = _client_returning(_base_refresh_response(
+        recommendation_direction="refusal", formal_decision_outstanding=False,
+        refusal_reasons="Overdevelopment.",
+    ))
+    refresh_intelligence_for_application(session, client, app)
+
+    assert captured["merged"]["recommendation_direction"] == "refusal"
+    assert captured["merged"]["formal_decision_outstanding"] is False
+    assert captured["merged"]["refusal_reasons"] == "Overdevelopment."
+
+
+def test_real_orm_scheme_intelligence_not_mutated_before_summary_call(session, monkeypatch):
+    observed = {}
+
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        observed["live_pct_during_call"] = applications[0].scheme_intelligence.affordable_percentage_final
+        return "New summary."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, site_id=site.id)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted, 40% affordable housing secured.")
+
+    client = _client_returning(_base_refresh_response(affordable_percentage=40.0, affordable_housing_status="agreed"))
+    refresh_intelligence_for_application(session, client, app)
+
+    assert observed["live_pct_during_call"] == 20.0  # still old at the moment the summary call happens
+    assert app.scheme_intelligence.affordable_percentage_final == 40.0  # mutated only after both steps succeed
+
+
+def test_default_summary_failure_preserves_old_intelligence_and_site_summary(session, monkeypatch):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        raise RuntimeError("summary generation failed")
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, site_id=site.id)
+    site.status_summary = "Old summary"
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted, 40% affordable housing secured.")
+    session.commit()
+
+    client = _client_returning(_base_refresh_response(affordable_percentage=99.0))
+    outcome = refresh_intelligence_for_application(session, client, app)
+
+    assert outcome.outcome == OUTCOME_ERROR
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert site.status_summary == "Old summary"
+
+
+def test_default_successful_path_commits_intelligence_summary_watermark_together(session, monkeypatch):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        return "Fresh summary mentioning 40% affordable housing."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    now = dt.datetime.now(dt.timezone.utc)
+    app = _add_application(
+        session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED,
+        site_id=site.id, material_evidence_changed_at=now,
+    )
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted, 40% affordable housing secured.")
+
+    client = _client_returning(_base_refresh_response(affordable_percentage=40.0, affordable_housing_status="agreed"))
+    outcome = refresh_intelligence_for_application(session, client, app)
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.affordable_percentage_final == 40.0
+    assert site.status_summary == "Fresh summary mentioning 40% affordable housing."
+    assert app.intelligence_evidence_processed_at == now
+
+
+def test_aggregate_scheme_fields_default_prospective_overrides_backward_compatible(session):
+    from app.ui.common import aggregate_scheme_fields
+
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+
+    merged_positional = aggregate_scheme_fields([app])
+    merged_explicit_none = aggregate_scheme_fields([app], prospective_overrides=None)
+    assert merged_positional == merged_explicit_none
+    assert merged_positional["affordable_percentage_final"] == 20.0
+
+
+def test_aggregate_scheme_fields_prospective_override_applies_only_to_target_application(session):
+    from app.ui.common import aggregate_scheme_fields
+
+    app1 = _add_application(session, reference="APP/1", application_received="Mon 01 Jan 2025")
+    app2 = _add_application(session, reference="APP/2", application_received="Mon 01 Jan 2024")
+    _add_scheme_intelligence(session, app1, affordable_percentage_final=20.0, core_intelligence_complete=True)
+    _add_scheme_intelligence(session, app2, affordable_percentage_final=99.0, core_intelligence_complete=True)
+
+    merged = aggregate_scheme_fields([app1, app2], prospective_overrides={app1.id: {"affordable_percentage_final": 40.0}})
+
+    assert merged["affordable_percentage_final"] == 40.0  # app1's prospective value, not its real 20.0
+    assert app2.scheme_intelligence.affordable_percentage_final == 99.0  # sibling's live value untouched
+
+
+def test_aggregate_scheme_fields_prospective_override_works_with_no_existing_intelligence(session):
+    from app.ui.common import aggregate_scheme_fields
+
+    app = _add_application(session, reference="APP/1")  # no SchemeIntelligence row at all yet
+    merged = aggregate_scheme_fields([app], prospective_overrides={app.id: {"affordable_housing_status": "agreed"}})
+    assert merged["affordable_housing_status"] == "agreed"
+
+
+# --- Defect B: formal_decision_outstanding semantics --------------------------
+
+
+def test_prompt_defines_formal_decision_outstanding_separately_from_s106_and_conditions():
+    prompt = build_refresh_prompt(
+        MagicMock(reference="APP/1", address="1 Test St", status="Awaiting decision", decision=None),
+        DEPTH_BROAD, None, "evidence text",
+    )
+    assert "S106 has been" in prompt
+    assert "conditions remain outstanding" in prompt
+    assert "ready to" in prompt and "implement" in prompt
+
+
+def test_prompt_instructs_decision_notice_sets_outstanding_false_despite_awaiting_status():
+    prompt = build_refresh_prompt(
+        MagicMock(reference="APP/1", address="1 Test St", status="Awaiting decision", decision="Granted, subject to legal agreement"),
+        DEPTH_BROAD, None, "NOTICE OF APPROVAL OF PLANNING PERMISSION",
+    )
+    assert "formal_decision_outstanding=false" in prompt
+    assert "Awaiting decision" in prompt
+    assert "Granted, subject to legal agreement" in prompt
+    assert "S106 execution is not evidenced" in prompt
+
+
+def test_prompt_instructs_recommendation_alone_leaves_decision_outstanding_true():
+    prompt = build_refresh_prompt(
+        MagicMock(reference="APP/1", address="1 Test St", status="Awaiting decision", decision=None),
+        DEPTH_RECOMMENDATION, None, "Officers recommend approval subject to conditions.",
+    )
+    assert "recommendation is never itself a formal decision" in prompt
+
+
+def test_formal_decision_false_with_decision_notice_does_not_imply_legal_security(session):
+    app = _add_application(
+        session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED,
+        status="Awaiting decision", decision="Granted, subject to legal agreement",
+    )
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "NOTICE OF APPROVAL OF PLANNING PERMISSION. Conditions attached.")
+
+    client = _client_returning(_base_refresh_response(formal_decision_outstanding=False, affordable_housing_status="proposed"))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.formal_decision_outstanding is False
+    assert app.scheme_intelligence.affordable_housing_status == "proposed"
+    assert app.scheme_intelligence.affordable_housing_status != LEGALLY_SECURED_STATUS
+
+
+def test_decision_outcome_unknown_with_no_formal_evidence_not_guessed(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_OUTCOME_UNKNOWN, status="Decided")
+    _add_scheme_intelligence(session, app, formal_decision_outstanding=None)
+    _add_document(session, app, "officer_report", "Status shows Decided but no formal outcome document is available.")
+
+    client = _client_returning(_base_refresh_response(formal_decision_outstanding=None))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.formal_decision_outstanding is None  # left as recorded, not guessed
+
+
+def test_formal_refusal_notice_sets_decision_not_outstanding(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED, decision="Refused")
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "NOTICE OF REFUSAL OF PLANNING PERMISSION.")
+
+    client = _client_returning(_base_refresh_response(formal_decision_outstanding=False, refusal_reasons="Overdevelopment."))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.formal_decision_outstanding is False
+
+
+def test_s106_absence_does_not_by_itself_set_decision_outstanding(session):
+    # Decision Notice present but no s106 document at all this pass - the
+    # formal decision itself is still evidenced, so formal_decision_
+    # outstanding must be allowed False purely on the Decision Notice's own
+    # presence, independent of S106 evidence availability.
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "NOTICE OF APPROVAL OF PLANNING PERMISSION.")
+
+    client = _client_returning(_base_refresh_response(formal_decision_outstanding=False))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.formal_decision_outstanding is False
+
+
+# --- Defect C: broad refresh includes dedicated affordable evidence ----------
+
+
+def test_depth_broad_includes_viability_affordable_housing():
+    assert "viability_affordable_housing" in _DOC_TYPES_BY_DEPTH[DEPTH_BROAD]
+
+
+def test_viability_affordable_housing_document_selected_at_broad_depth(session):
+    app = _add_application(session, reference="APP/1")
+    _add_document(session, app, "viability_affordable_housing", "Affordable Housing Statement: 40% affordable, tenure split 60/40.")
+    docs = select_refresh_evidence_documents([app], DEPTH_BROAD)
+    assert any(d.doc_type == "viability_affordable_housing" for d in docs)
+
+
+def test_focused_refusal_depth_does_not_include_viability_affordable_housing():
+    assert "viability_affordable_housing" not in _DOC_TYPES_BY_DEPTH[DEPTH_FOCUSED_REFUSAL]
+
+
+def test_focused_withdrawal_depth_does_not_include_viability_affordable_housing():
+    assert "viability_affordable_housing" not in _DOC_TYPES_BY_DEPTH[DEPTH_FOCUSED_WITHDRAWAL]
+
+
+def test_other_depths_do_not_include_viability_affordable_housing():
+    for depth in (DEPTH_RECOMMENDATION, DEPTH_DECISION_RESOLUTION, DEPTH_UNIT_CHANGE):
+        assert "viability_affordable_housing" not in _DOC_TYPES_BY_DEPTH[depth]
+
+
+def test_broad_refresh_with_viability_document_still_respects_context_cap(session):
+    from app.extraction.intelligence_refresh import MAX_REFRESH_CONTEXT_CHARS
+    from app.extraction.pdf_text import build_combined_priority_text
+
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted. " * 20000)
+    _add_document(session, app, "viability_affordable_housing", "Affordable statement. " * 20000)
+
+    docs = select_refresh_evidence_documents([app], DEPTH_BROAD)
+    doc_tuples = [(d.doc_type, d.document_name or "", d.extracted_text or "") for d in docs]
+    evidence_text = build_combined_priority_text(doc_tuples, max_total_chars=MAX_REFRESH_CONTEXT_CHARS)
+    # build_combined_priority_text appends a fixed "[COMBINED TEXT TRUNCATED]"
+    # marker AFTER slicing to the remaining budget (pre-existing, shared
+    # extraction-pipeline behaviour - see app.extraction.pdf_text - not
+    # reopened by this amendment), so the true bound is the cap plus that
+    # marker's own length, not an exact cap.
+    assert len(evidence_text) <= MAX_REFRESH_CONTEXT_CHARS + len("\n[COMBINED TEXT TRUNCATED]")
+    assert "[COMBINED TEXT TRUNCATED]" in evidence_text  # confirms the cap was actually hit, not skipped
+
+
+def test_viability_affordable_housing_alone_cannot_downgrade_legally_secured_position(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=None)
+    _add_scheme_intelligence(
+        session, app, affordable_percentage_final=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="Secured at 20% via executed S106.",
+    )
+    _add_document(session, app, "viability_affordable_housing", "Updated Affordable Housing Statement now proposes 35%.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=35.0, affordable_housing_status="proposed",
+        affordable_housing_notes="Now proposing 35%.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0  # guarded, unchanged
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+
+
+# --- Affordable unit reconciliation -------------------------------------------
+
+
+def test_prompt_instructs_unit_breakdown_reconciliation_or_explicit_partial_flag():
+    prompt = build_refresh_prompt(
+        MagicMock(reference="APP/1", address="1 Test St", status="Awaiting decision", decision=None),
+        DEPTH_BROAD, None, "evidence text",
+    )
+    assert "AFFORDABLE UNIT RECONCILIATION" in prompt
+    assert "does not account for" in prompt
+
+
+def test_reconciled_unit_breakdown_accepted_unchanged(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_units_final=60)
+    _add_document(session, app, "decision_notice", "60 affordable homes: 30 social rent, 30 shared ownership.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_units=60,
+        affordable_housing_notes="60 affordable homes are secured: 30 social rent and 30 shared ownership.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_units_final == 60
+    assert "30 social rent" in app.scheme_intelligence.affordable_housing_notes
+
+
+def test_partial_unit_breakdown_explicitly_flagged_as_partial(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_units_final=60)
+    _add_document(session, app, "viability_affordable_housing", "21 social/affordable rent, 21 shared ownership; remainder not specified.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_units=60,
+        affordable_housing_notes=(
+            "60 affordable homes are proposed. The evidence identifies 21 "
+            "social/affordable-rent houses and 21 shared-ownership houses; "
+            "the available evidence in this refresh does not clearly "
+            "allocate the remaining 18 affordable homes by tenure."
+        ),
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_units_final == 60
+    assert "does not clearly allocate" in app.scheme_intelligence.affordable_housing_notes
+    assert "18" in app.scheme_intelligence.affordable_housing_notes
+
+
+def test_missing_unit_breakdown_does_not_fabricate_tenure_detail(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_units_final=60, affordable_tenure_split_final=None)
+    _add_document(session, app, "decision_notice", "60 affordable homes secured, tenure mix not specified.")
+
+    client = _client_returning(_base_refresh_response(affordable_units=60, affordable_tenure_split=None))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_tenure_split_final is None
+
+
+def test_structured_units_total_not_derived_from_partial_narrative(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_units_final=60)
+    _add_document(session, app, "viability_affordable_housing", "21 social rent, 21 shared ownership identified.")
+
+    # LLM doesn't return a new affordable_units figure (None) - the
+    # structured total must stay authoritative at 60, never silently
+    # recomputed as 21+21=42 from the partial narrative breakdown.
+    client = _client_returning(_base_refresh_response(
+        affordable_units=None,
+        affordable_housing_notes="21 social rent and 21 shared ownership identified; remaining units not allocated by tenure.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_units_final == 60
+
+
+def test_site_summary_prompt_relays_partial_breakdown_notes_verbatim():
+    site, apps = _site_and_apps()
+    merged = _merged(
+        affordable_housing_status="agreed", affordable_units_final=60,
+        affordable_housing_notes=(
+            "60 affordable homes are proposed. The evidence identifies 21 "
+            "social/affordable-rent houses and 21 shared-ownership houses; "
+            "the available evidence in this refresh does not clearly "
+            "allocate the remaining 18 affordable homes by tenure."
+        ),
+    )
+    prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
+    assert "does not clearly allocate the remaining 18" in prompt
