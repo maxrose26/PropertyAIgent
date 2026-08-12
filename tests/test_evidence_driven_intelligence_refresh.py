@@ -2088,3 +2088,77 @@ def test_successful_refresh_commits_mixed_security_and_refusal_fields_together(s
     assert app.scheme_intelligence.affordable_housing_status == MIXED_SECURITY_FALLBACK_STATUS
     assert site.status_summary == "Fresh summary"
     assert app.intelligence_evidence_processed_at == now
+
+
+# ==============================================================================
+# FINAL PRE-MERGE AMENDMENT (historical rebuild): extra_fields same-transaction
+# seam
+#
+# A small, generic, opt-in mechanism letting a caller (e.g. app.extraction.
+# historical_rebuild) persist its OWN completion marker in the exact same
+# commit as the SchemeIntelligence/Site Summary/watermark replacement -
+# never used by normal B3 processing itself (always omitted, defaults to
+# None).
+# ==============================================================================
+
+
+def test_extra_fields_applied_on_successful_refresh(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+
+    client = _client_returning(_base_refresh_response())
+    outcome = refresh_intelligence_for_application(
+        session, client, app, generate_summary=_summary_stub(),
+        extra_fields={"intelligence_rebuild_version": "b3_v1"},
+    )
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.intelligence_rebuild_version == "b3_v1"
+
+
+def test_extra_fields_not_applied_on_ai_error(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+
+    client = MagicMock()
+    client.responses.create.side_effect = OpenAIError("api down")
+    outcome = refresh_intelligence_for_application(
+        session, client, app, generate_summary=_summary_stub(),
+        extra_fields={"intelligence_rebuild_version": "b3_v1"},
+    )
+
+    assert outcome.outcome == OUTCOME_AI_ERROR
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+
+
+def test_extra_fields_not_applied_on_summary_failure(session):
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, site_id=site.id)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+
+    client = _client_returning(_base_refresh_response())
+    outcome = refresh_intelligence_for_application(
+        session, client, app, generate_summary=_summary_stub(raise_error=True),
+        extra_fields={"intelligence_rebuild_version": "b3_v1"},
+    )
+
+    assert outcome.outcome == OUTCOME_ERROR
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+
+
+def test_extra_fields_defaults_to_none_and_is_a_no_op(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+
+    client = _client_returning(_base_refresh_response())
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+    assert app.scheme_intelligence.intelligence_rebuilt_at is None

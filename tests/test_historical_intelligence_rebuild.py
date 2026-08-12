@@ -743,3 +743,253 @@ def test_rebuild_marker_covered_by_generic_add_missing_columns_no_new_backfill()
     source = py_inspect.getsource(db_session_module)
     for name in ("intelligence_rebuild_version", "intelligence_rebuilt_at"):
         assert f"_backfill_{name}" not in source
+
+
+# ==============================================================================
+# FINAL PRE-MERGE AMENDMENT: rebuild-marker atomicity + explicit progress
+# ==============================================================================
+
+# --- Issue A: rebuild-marker transaction atomicity ------------------------------
+
+
+def test_atomic_rebuild_commits_intelligence_summary_and_marker_together(session, monkeypatch):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        return "Rebuilt summary."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", site_id=site.id)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted, 40% affordable housing secured.")
+    client = _client_returning(_base_refresh_response(affordable_percentage=40.0, affordable_housing_status="agreed"))
+
+    run_historical_rebuild(session, client, dry_run=False)
+
+    assert app.scheme_intelligence.affordable_percentage_final == 40.0
+    assert site.status_summary == "Rebuilt summary."
+    assert app.scheme_intelligence.intelligence_rebuild_version == REBUILD_VERSION
+    assert app.scheme_intelligence.intelligence_rebuilt_at is not None
+
+
+def test_site_summary_failure_leaves_marker_null_alongside_old_intelligence(session, monkeypatch):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        raise RuntimeError("summary generation failed")
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", site_id=site.id)
+    site.status_summary = "Old summary"
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted.")
+    session.commit()
+
+    client = _client_returning(_base_refresh_response(affordable_percentage=99.0))
+    summary = run_historical_rebuild(session, client, dry_run=False)
+
+    assert summary.error == 1
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert site.status_summary == "Old summary"
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+    assert app.scheme_intelligence.intelligence_rebuilt_at is None
+
+
+def test_invalid_ai_output_does_not_mark_rebuilt(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted.")
+    client = MagicMock()
+    client.responses.create.return_value = MagicMock(output_text="{not valid json")
+
+    summary = run_historical_rebuild(session, client, dry_run=False)
+
+    assert summary.invalid_output == 1
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+
+
+def test_ai_error_does_not_mark_rebuilt(session):
+    from openai import OpenAIError
+
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted.")
+    client = MagicMock()
+    client.responses.create.side_effect = OpenAIError("api down")
+
+    summary = run_historical_rebuild(session, client, dry_run=False)
+
+    assert summary.ai_error == 1
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+
+
+def test_db_commit_failure_does_not_leave_false_rebuild_marker(session, monkeypatch):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0)
+    _add_document(session, app, "decision_notice", "Granted.")
+    client = _client_returning(_base_refresh_response(affordable_percentage=99.0))
+
+    real_commit = session.commit
+    call_count = {"n": 0}
+
+    def flaky_commit():
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise Exception("simulated DB failure")
+        real_commit()
+
+    monkeypatch.setattr(session, "commit", flaky_commit)
+
+    summary = run_historical_rebuild(session, client, dry_run=False)
+
+    assert summary.error == 1
+    assert summary.results[0].rebuilt is False
+    # session.rollback() (called by our own defensive handler) reverts the
+    # in-memory ORM state back to what was actually persisted - never a
+    # false "rebuilt" marker despite the setattr calls having run in memory
+    # before the failed commit.
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+
+
+def test_one_candidate_db_failure_does_not_block_next_candidate(session, monkeypatch):
+    app_fail = _add_application(session, reference="APP/FAIL", last_seen_at=dt.datetime.now(dt.timezone.utc))
+    app_ok = _add_application(session, reference="APP/OK", last_seen_at=dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1))
+    _add_scheme_intelligence(session, app_fail)
+    _add_scheme_intelligence(session, app_ok)
+    _add_document(session, app_fail, "decision_notice", "Granted.")
+    _add_document(session, app_ok, "decision_notice", "Granted.")
+    client = _client_returning(_base_refresh_response())
+
+    real_commit = session.commit
+    call_count = {"n": 0}
+
+    def flaky_commit():
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise Exception("simulated DB failure")
+        real_commit()
+
+    monkeypatch.setattr(session, "commit", flaky_commit)
+
+    summary = run_historical_rebuild(session, client, dry_run=False)
+
+    assert summary.error == 1
+    assert summary.success == 1
+    assert app_fail.scheme_intelligence.intelligence_rebuild_version is None
+    assert app_ok.scheme_intelligence.intelligence_rebuild_version == REBUILD_VERSION
+
+
+# --- Issue A: normal B3 unaffected ----------------------------------------------
+
+
+def test_normal_b3_refresh_never_sets_historical_rebuild_markers(session):
+    from app.pipeline.material_change import REASON_DECISION_GRANTED
+
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+    client = _client_returning(_base_refresh_response())
+
+    from app.extraction.intelligence_refresh import refresh_intelligence_for_application
+
+    outcome = refresh_intelligence_for_application(
+        session, client, app, generate_summary=lambda site, applications: "Summary text.",
+    )
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+    assert app.scheme_intelligence.intelligence_rebuilt_at is None
+
+
+# --- Issue B: explicit rebuild progress ------------------------------------------
+
+
+def test_progress_reports_global_corpus_and_already_rebuilt(session):
+    app1 = _add_application(session, reference="APP/1")
+    app2 = _add_application(session, reference="APP/2")
+    _add_scheme_intelligence(session, app1, intelligence_rebuild_version=REBUILD_VERSION)
+    _add_scheme_intelligence(session, app2)
+
+    summary = run_historical_rebuild(session, None, dry_run=True)
+
+    assert summary.total_historical_corpus == 2
+    assert summary.already_rebuilt_before == 1
+    assert summary.remaining_before == 1
+
+
+def test_already_rebuilt_row_excluded_from_batch_but_counted_in_progress(session):
+    app1 = _add_application(session, reference="APP/1")
+    app2 = _add_application(session, reference="APP/2")
+    _add_scheme_intelligence(session, app1, intelligence_rebuild_version=REBUILD_VERSION)
+    _add_scheme_intelligence(session, app2)
+
+    summary = run_historical_rebuild(session, None, dry_run=True)
+
+    assert summary.selected == 1  # only app2 - app1 already rebuilt
+    assert summary.already_rebuilt_before == 1  # app1 still counted in progress
+
+
+def test_older_rebuild_version_counted_as_remaining_for_new_version(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app, intelligence_rebuild_version="b3_v0")
+
+    summary = run_historical_rebuild(session, None, dry_run=True, rebuild_version="b3_v1")
+
+    assert summary.already_rebuilt_before == 0
+    assert summary.remaining_before == 1
+
+
+def test_filter_scoped_progress_differs_from_global(session):
+    app_a = _add_application(session, reference="APP/A", council_code="stockport")
+    app_b = _add_application(session, reference="APP/B", council_code="trafford")
+    _add_scheme_intelligence(session, app_a)
+    _add_scheme_intelligence(session, app_b, intelligence_rebuild_version=REBUILD_VERSION)
+
+    summary = run_historical_rebuild(session, None, dry_run=True, council="stockport")
+
+    assert summary.total_historical_corpus == 2  # global - both applications
+    assert summary.already_rebuilt_before == 1  # global - app_b
+    assert summary.scope_total == 1  # scoped to stockport only - app_a
+    assert summary.scope_already_rebuilt_before == 0  # app_a not rebuilt
+
+
+def test_dry_run_progress_before_equals_after(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+
+    summary = run_historical_rebuild(session, None, dry_run=True)
+
+    assert summary.already_rebuilt_after == summary.already_rebuilt_before
+    assert summary.remaining_after == summary.remaining_before
+    assert summary.scope_already_rebuilt_after == summary.scope_already_rebuilt_before
+    assert summary.scope_remaining_after == summary.scope_remaining_before
+
+
+def test_live_batch_progress_before_and_after_reflect_new_rebuilds(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+    client = _client_returning(_base_refresh_response())
+
+    summary = run_historical_rebuild(session, client, dry_run=False)
+
+    assert summary.already_rebuilt_before == 0
+    assert summary.already_rebuilt_after == 1
+    assert summary.remaining_before == 1
+    assert summary.remaining_after == 0
+
+
+def test_no_extra_openai_calls_from_progress_queries(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    client = MagicMock()
+
+    run_historical_rebuild(session, client, dry_run=True)
+
+    client.responses.create.assert_not_called()

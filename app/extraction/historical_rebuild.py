@@ -187,17 +187,54 @@ def select_historical_rebuild_candidates(
     return list(session.execute(stmt).scalars().all())
 
 
-def count_remaining_backlog(
-    session: Session, *, rebuild_version: str = REBUILD_VERSION, council: str | None = None,
-) -> int:
+def _scoped_corpus_count_stmt(*, council: str | None, application_id: int | None, site_id: int | None):
     stmt = (
         select(func.count(func.distinct(Application.id)))
         .select_from(Application)
         .join(SchemeIntelligence, SchemeIntelligence.application_id == Application.id)
-        .where(_not_yet_rebuilt_clause(rebuild_version))
     )
     if council:
         stmt = stmt.where(Application.council_code == council)
+    if application_id:
+        stmt = stmt.where(Application.id == application_id)
+    if site_id:
+        stmt = stmt.where(Application.site_id == site_id)
+    return stmt
+
+
+def count_total_corpus(
+    session: Session, *, council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+) -> int:
+    """Total historical candidate universe (every Application with an
+    existing SchemeIntelligence row) matching the given scope filters -
+    regardless of rebuild status. council=application_id=site_id=None
+    (the default) is the GLOBAL corpus size (Part 8: report both global
+    and current-scope progress where practical)."""
+    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id)
+    return session.execute(stmt).scalar() or 0
+
+
+def count_already_rebuilt(
+    session: Session, *, rebuild_version: str = REBUILD_VERSION,
+    council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+) -> int:
+    """Version-aware (Part 7): only rows whose intelligence_rebuild_version
+    EXACTLY equals `rebuild_version` count as rebuilt for it - an older
+    version (or any other value) counts as NOT rebuilt for THIS version,
+    same as select_historical_rebuild_candidates's own eligibility check."""
+    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id).where(
+        SchemeIntelligence.intelligence_rebuild_version == rebuild_version
+    )
+    return session.execute(stmt).scalar() or 0
+
+
+def count_remaining_backlog(
+    session: Session, *, rebuild_version: str = REBUILD_VERSION,
+    council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+) -> int:
+    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id).where(
+        _not_yet_rebuilt_clause(rebuild_version)
+    )
     return session.execute(stmt).scalar() or 0
 
 
@@ -261,6 +298,28 @@ class RebuildCandidateResult:
 class HistoricalRebuildRunSummary:
     dry_run: bool
     rebuild_version: str
+
+    # GLOBAL progress (Part 8) - ignores any --council/--application-id/
+    # --site-id filter this invocation used. Cheap (one extra count query
+    # each) and gives the operator the whole-corpus picture regardless of
+    # how narrowly this particular invocation was scoped.
+    total_historical_corpus: int = 0
+    already_rebuilt_before: int = 0
+    remaining_before: int = 0
+    already_rebuilt_after: int = 0
+    remaining_after: int = 0
+
+    # CURRENT-SCOPE progress (Part 8) - same council/application_id/site_id
+    # filters as this invocation, but BEFORE the --limit is applied (i.e.
+    # the full eligible-under-this-scope universe, not just this batch).
+    # Identical to the GLOBAL figures above when no filter was given.
+    scope_total: int = 0
+    scope_already_rebuilt_before: int = 0
+    scope_remaining_before: int = 0
+    scope_already_rebuilt_after: int = 0
+    scope_remaining_after: int = 0
+
+    # THIS BATCH
     candidates_inspected: int = 0
     selected: int = 0
     attempted: int = 0
@@ -270,14 +329,12 @@ class HistoricalRebuildRunSummary:
     ai_error: int = 0
     invalid_output: int = 0
     error: int = 0
-    skipped_already_rebuilt: int = 0
     tenure_mismatch_warnings: int = 0
     complex_site_warnings: int = 0
     estimated_llm_calls: int = 0
     council_distribution: dict[str, int] = field(default_factory=dict)
     dry_run_snapshots: list[CandidateEvidenceSnapshot] = field(default_factory=list)
     results: list[RebuildCandidateResult] = field(default_factory=list)
-    remaining_estimated_backlog: int = 0
 
 
 def _process_one_candidate(
@@ -286,19 +343,49 @@ def _process_one_candidate(
     """One candidate, one refresh_intelligence_for_application call - the
     ENTIRE B3 atomic-replacement/evidence-selection/guard/prompt stack
     applies exactly as it does for normal scheduled B3 processing (Part 4).
-    On success, the rebuild-completion marker is written as a small,
-    separate follow-up commit (Part 23) - refresh_intelligence_for_
-    application's own atomic commit already guarantees the structured
-    intelligence AND Site Summary succeeded before this point; this
-    function never has to (and never does) touch either of those fields
-    itself. A crash in the narrow window between the two commits would
-    leave a genuinely-refreshed row not yet marked rebuilt - the only
-    consequence is that row remains a candidate on the NEXT run (one extra
-    possible LLM call on retry, never corrupted or lost data); see this
-    module's own docstring / the implementation report for why extending
-    refresh_intelligence_for_application itself to close that window was
-    deliberately avoided (Part 4: do not reopen approved B3 architecture)."""
-    outcome_obj = refresh_intelligence_for_application(session, client, application)
+
+    TRUE SAME-TRANSACTION ATOMICITY (final pre-merge amendment, Issue A):
+    the rebuild-completion marker is passed in via refresh_intelligence_
+    for_application's own `extra_fields` parameter, so it is applied to
+    the SAME `existing_intelligence` ORM object, in the SAME in-memory
+    mutation block, committed by the SAME session.commit() call as the
+    structured intelligence and Site Summary replacement - there is no
+    second commit and no crash window between "intelligence rebuilt" and
+    "marker recorded" (see refresh_intelligence_for_application's own
+    docstring for the exact mechanism and why it never affects normal B3,
+    which never passes extra_fields). On ANY non-SUCCESS outcome,
+    extra_fields is never even constructed, let alone applied - the
+    function returns before reaching that point in the sequence, exactly
+    like every other field it sets.
+
+    Defensive per-candidate isolation (Part 5 Issue E): refresh_
+    intelligence_for_application's own OUTCOME_* taxonomy already
+    classifies every AI/validation failure mode it recognises; this
+    try/except exists ONLY for an infrastructure-level failure the reused
+    function doesn't itself catch (e.g. the final session.commit() itself
+    raising - a DB connectivity failure, not an AI failure). session.
+    rollback() discards any partial in-memory ORM state SQLAlchemy may
+    have flushed before the failure, so this candidate's row reverts to
+    its true last-committed values and the NEXT candidate in this batch
+    starts from a clean session - one candidate's infrastructure failure
+    still never blocks or corrupts another's result, matching this
+    module's own "failure isolation" guarantee for every failure type,
+    not only the AI-classified ones. This is new orchestration code local
+    to the historical rebuild runner, not a change to B3 architecture."""
+    try:
+        outcome_obj = refresh_intelligence_for_application(
+            session, client, application,
+            extra_fields={
+                "intelligence_rebuild_version": rebuild_version,
+                "intelligence_rebuilt_at": dt.datetime.now(dt.timezone.utc),
+            },
+        )
+    except Exception:
+        session.rollback()
+        return RebuildCandidateResult(
+            application_id=application.id, reference=application.reference, council_code=application.council_code,
+            outcome=OUTCOME_ERROR,
+        )
     result = RebuildCandidateResult(
         application_id=application.id, reference=application.reference, council_code=application.council_code,
         outcome=outcome_obj.outcome,
@@ -306,8 +393,10 @@ def _process_one_candidate(
     if outcome_obj.outcome != OUTCOME_SUCCESS:
         # NO_USABLE_TEXT / AI_ERROR / INVALID_OUTPUT / ERROR - old
         # intelligence already guaranteed untouched by refresh_
-        # intelligence_for_application's own atomicity. Never marked
-        # rebuilt (Part 23); remains eligible on the next run (Part 24).
+        # intelligence_for_application's own atomicity, and extra_fields
+        # was never applied (it lives in the SAME commit as the
+        # structured fields, which never happens on a failure path).
+        # Never marked rebuilt (Part 23); remains eligible next run.
         return result
 
     intel = application.scheme_intelligence
@@ -318,11 +407,9 @@ def _process_one_candidate(
 
     # QA warnings are non-blocking (Part 23's own explicit recommendation)
     # - the refresh output is still safe and still counts as successfully
-    # rebuilt; they are surfaced for operator review, never silently
-    # dropped and never a reason to withhold the completion marker.
-    intel.intelligence_rebuild_version = rebuild_version
-    intel.intelligence_rebuilt_at = dt.datetime.now(dt.timezone.utc)
-    session.commit()
+    # rebuilt (the completion marker was ALREADY committed as part of the
+    # single successful transaction above); warnings are only surfaced
+    # for operator review, never a reason to withhold it after the fact.
     result.rebuilt = True
     return result
 
@@ -386,6 +473,21 @@ def run_historical_rebuild(
         candidates_inspected=len(candidates), selected=len(candidates),
     )
 
+    # Progress BEFORE this batch (Part 6/8/10) - global (unfiltered) and
+    # current-scope (same filters as this invocation, before --limit).
+    # An already-rebuilt row is correctly EXCLUDED from `candidates` above
+    # but still counted here - progress reporting and candidate selection
+    # are deliberately separate concerns.
+    summary.total_historical_corpus = count_total_corpus(session)
+    summary.already_rebuilt_before = count_already_rebuilt(session, rebuild_version=rebuild_version)
+    summary.remaining_before = summary.total_historical_corpus - summary.already_rebuilt_before
+
+    summary.scope_total = count_total_corpus(session, council=council, application_id=application_id, site_id=site_id)
+    summary.scope_already_rebuilt_before = count_already_rebuilt(
+        session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+    )
+    summary.scope_remaining_before = summary.scope_total - summary.scope_already_rebuilt_before
+
     for application in candidates:
         summary.council_distribution[application.council_code] = (
             summary.council_distribution.get(application.council_code, 0) + 1
@@ -402,5 +504,21 @@ def run_historical_rebuild(
         summary.results.append(result)
         _tally(summary, result)
 
-    summary.remaining_estimated_backlog = count_remaining_backlog(session, rebuild_version=rebuild_version, council=council)
+    # Progress AFTER this batch (Part 10) - for a dry run nothing changed,
+    # so these deliberately equal the "before" values rather than issuing
+    # redundant queries; for a live batch they're recomputed fresh so a
+    # repeated operator invocation can see the backlog actually shrinking.
+    if dry_run:
+        summary.already_rebuilt_after = summary.already_rebuilt_before
+        summary.remaining_after = summary.remaining_before
+        summary.scope_already_rebuilt_after = summary.scope_already_rebuilt_before
+        summary.scope_remaining_after = summary.scope_remaining_before
+    else:
+        summary.already_rebuilt_after = count_already_rebuilt(session, rebuild_version=rebuild_version)
+        summary.remaining_after = summary.total_historical_corpus - summary.already_rebuilt_after
+        summary.scope_already_rebuilt_after = count_already_rebuilt(
+            session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+        )
+        summary.scope_remaining_after = summary.scope_total - summary.scope_already_rebuilt_after
+
     return summary

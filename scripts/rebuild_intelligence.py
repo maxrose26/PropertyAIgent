@@ -80,6 +80,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def _print_report(summary: HistoricalRebuildRunSummary) -> None:
     mode = "DRY RUN" if summary.dry_run else "LIVE BATCH"
     print(f"[rebuild-intelligence] mode={mode} rebuild_version={summary.rebuild_version!r}")
+
+    print(
+        f"[rebuild-intelligence] GLOBAL corpus={summary.total_historical_corpus} "
+        f"already_rebuilt={summary.already_rebuilt_before} remaining={summary.remaining_before}"
+    )
+    print(
+        f"[rebuild-intelligence] SCOPE (this invocation's filters) total={summary.scope_total} "
+        f"already_rebuilt={summary.scope_already_rebuilt_before} remaining={summary.scope_remaining_before}"
+    )
     print(f"[rebuild-intelligence] candidates_inspected={summary.candidates_inspected} selected={summary.selected}")
 
     if summary.dry_run:
@@ -93,9 +102,10 @@ def _print_report(summary: HistoricalRebuildRunSummary) -> None:
                 f"site_id={snapshot.site_id} depth={snapshot.depth} usable_docs={snapshot.usable_document_count} "
                 f"prior_version={snapshot.prior_rebuild_version!r} expected_calls={snapshot.expected_llm_calls}"
             )
+        print("[rebuild-intelligence] No database writes. No OpenAI calls.")
     else:
         print(
-            f"[rebuild-intelligence] attempted={summary.attempted} success={summary.success} "
+            f"[rebuild-intelligence] THIS BATCH attempted={summary.attempted} success={summary.success} "
             f"success_with_warning={summary.success_with_warning} no_usable_text={summary.no_usable_text} "
             f"ai_error={summary.ai_error} invalid_output={summary.invalid_output} error={summary.error}"
         )
@@ -106,9 +116,16 @@ def _print_report(summary: HistoricalRebuildRunSummary) -> None:
         for result in summary.results:
             if result.qa_warnings:
                 print(f"  ! app={result.application_id} ref={result.reference!r} warnings={result.qa_warnings}")
+        print(
+            f"[rebuild-intelligence] AFTER BATCH GLOBAL rebuilt={summary.already_rebuilt_after} "
+            f"remaining={summary.remaining_after}"
+        )
+        print(
+            f"[rebuild-intelligence] AFTER BATCH SCOPE rebuilt={summary.scope_already_rebuilt_after} "
+            f"remaining={summary.scope_remaining_after}"
+        )
 
     print(f"[rebuild-intelligence] council_distribution={summary.council_distribution}")
-    print(f"[rebuild-intelligence] remaining_estimated_backlog={summary.remaining_estimated_backlog}")
 
 
 def main(argv: list[str] | None = None) -> int:
