@@ -50,11 +50,12 @@ import datetime as dt
 from dataclasses import dataclass, field
 
 from openai import OpenAI
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Application, SchemeIntelligence, Site
+from app.db.models import Application, Document, SchemeIntelligence, Site
 from app.extraction.intelligence_refresh import (
+    broad_refresh_evidence_categories,
     refresh_depth_for_reasons,
     refresh_intelligence_for_application,
     select_refresh_evidence_documents,
@@ -148,6 +149,43 @@ def _not_yet_rebuilt_clause(rebuild_version: str):
     )
 
 
+def _has_usable_evidence_clause():
+    """Candidate-eligibility amendment (Issue: NO_USABLE_TEXT candidate
+    exclusion) - an EXISTS check for at least one of THIS application's
+    OWN documents in B3's actual BROAD-refresh category set
+    (broad_refresh_evidence_categories(), the same canonical source
+    select_refresh_evidence_documents itself reads for DEPTH_BROAD - no
+    separate/duplicated taxonomy), with the SAME truthy usable-text
+    definition select_refresh_evidence_documents itself applies
+    (`document.text_extracted and document.extracted_text` - i.e.
+    text_extracted is true AND extracted_text is neither NULL nor empty).
+
+    Deliberately APPLICATION-scoped, not family-scoped: the actual refresh
+    call resolves the bounded application FAMILY (resolve_application_
+    family) and can occasionally find usable evidence on a sibling
+    application even when this one has none of its own - this filter
+    cannot see that. That is an accepted, intentional trade-off (this
+    query is "an optimisation/operator-semantic improvement, not a
+    replacement for runtime safety" - see refresh_intelligence_for_
+    application's own OUTCOME_NO_USABLE_TEXT handling, which remains the
+    authoritative, family-aware check and is completely unchanged). The
+    only consequence of a rare family-evidence false negative here is that
+    application isn't auto-selected into a bounded batch as eagerly as it
+    could be - never a lost or incorrect result, and it remains fully
+    reachable via an explicit --application-id run, which applies this
+    same filter for consistency (Part 10 of the task)."""
+    categories = broad_refresh_evidence_categories()
+    return exists(
+        select(Document.id).where(
+            Document.application_id == Application.id,
+            Document.doc_type.in_(categories),
+            Document.text_extracted.is_(True),
+            Document.extracted_text.isnot(None),
+            Document.extracted_text != "",
+        )
+    )
+
+
 def select_historical_rebuild_candidates(
     session: Session, *,
     rebuild_version: str = REBUILD_VERSION,
@@ -156,26 +194,26 @@ def select_historical_rebuild_candidates(
     site_id: int | None = None,
     limit: int = DEFAULT_BATCH_LIMIT,
 ) -> list[Application]:
-    """The historical candidate universe (Part 6): every Application with
-    an EXISTING SchemeIntelligence row (the rebuild's whole purpose is to
+    """The historical candidate universe: every Application with an
+    EXISTING SchemeIntelligence row (the rebuild's whole purpose is to
     regenerate already-extracted intelligence to the new standard, not to
     perform first-ever extraction - that remains stage_extraction's job,
     untouched) whose SchemeIntelligence has not already been rebuilt at
-    `rebuild_version`. Evidence sufficiency is NOT pre-filtered here - a
-    row with no usable evidence is still a valid candidate that will
-    correctly resolve to OUTCOME_NO_USABLE_TEXT (old intelligence
-    preserved, no OpenAI call - Part 7) inside refresh_intelligence_for_
-    application itself; excluding it here would just duplicate that
-    function's own, already-correct check.
+    `rebuild_version`, AND which currently has at least one usable B3-
+    relevant document of its own (_has_usable_evidence_clause - live,
+    query-derived state, never a persisted "no evidence" status; if useful
+    evidence is added later, the row automatically becomes selectable on
+    the very next invocation with no code/data change needed here).
 
-    Deterministic ordering (Part 12): Application.last_seen_at DESC (most
-    recently confirmed-still-live schemes first - the ones most likely to
-    still be commercially relevant), then Application.id ASC as a stable
-    tie-break. Not a commercial scoring model."""
+    Deterministic ordering: Application.last_seen_at DESC (most recently
+    confirmed-still-live schemes first - the ones most likely to still be
+    commercially relevant), then Application.id ASC as a stable tie-break.
+    Not a commercial scoring model."""
     stmt = (
         select(Application)
         .join(SchemeIntelligence, SchemeIntelligence.application_id == Application.id)
         .where(_not_yet_rebuilt_clause(rebuild_version))
+        .where(_has_usable_evidence_clause())
     )
     if council:
         stmt = stmt.where(Application.council_code == council)
@@ -207,10 +245,26 @@ def count_total_corpus(
 ) -> int:
     """Total historical candidate universe (every Application with an
     existing SchemeIntelligence row) matching the given scope filters -
-    regardless of rebuild status. council=application_id=site_id=None
-    (the default) is the GLOBAL corpus size (Part 8: report both global
-    and current-scope progress where practical)."""
+    regardless of rebuild status AND regardless of current evidence
+    sufficiency (includes both currently_rebuildable and blocked_no_
+    usable_evidence rows - Part 6: report the whole corpus, not just the
+    processable subset). council=application_id=site_id=None (the
+    default) is the GLOBAL corpus size."""
     stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id)
+    return session.execute(stmt).scalar() or 0
+
+
+def count_currently_rebuildable(
+    session: Session, *, council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+) -> int:
+    """Rows with usable B3-relevant evidence right now, REGARDLESS of
+    rebuild-version status (deliberately not "not yet rebuilt" - this
+    answers "could this row be processed at all", a separate question
+    from "has it already been"). blocked_no_usable_evidence = total -
+    this."""
+    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id).where(
+        _has_usable_evidence_clause()
+    )
     return session.execute(stmt).scalar() or 0
 
 
@@ -218,22 +272,33 @@ def count_already_rebuilt(
     session: Session, *, rebuild_version: str = REBUILD_VERSION,
     council: str | None = None, application_id: int | None = None, site_id: int | None = None,
 ) -> int:
-    """Version-aware (Part 7): only rows whose intelligence_rebuild_version
+    """Version-aware (Part 9): only rows whose intelligence_rebuild_version
     EXACTLY equals `rebuild_version` count as rebuilt for it - an older
     version (or any other value) counts as NOT rebuilt for THIS version,
-    same as select_historical_rebuild_candidates's own eligibility check."""
+    same as select_historical_rebuild_candidates's own eligibility check.
+    Deliberately NOT filtered by current evidence sufficiency - "already
+    rebuilt" is a historical fact about a past successful pass,
+    independent of whether that row's evidence still exists/is still
+    usable today."""
     stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id).where(
         SchemeIntelligence.intelligence_rebuild_version == rebuild_version
     )
     return session.execute(stmt).scalar() or 0
 
 
-def count_remaining_backlog(
+def count_remaining_rebuildable(
     session: Session, *, rebuild_version: str = REBUILD_VERSION,
     council: str | None = None, application_id: int | None = None, site_id: int | None = None,
 ) -> int:
-    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id).where(
-        _not_yet_rebuilt_clause(rebuild_version)
+    """Genuinely processable backlog: not yet rebuilt at this version AND
+    currently has usable evidence. Deliberately distinct from `total -
+    already_rebuilt`, which would wrongly include the evidence-blocked
+    rows (Part 6: "avoid ambiguous use of just remaining if it would imply
+    the evidence-blocked rows are processable")."""
+    stmt = (
+        _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id)
+        .where(_not_yet_rebuilt_clause(rebuild_version))
+        .where(_has_usable_evidence_clause())
     )
     return session.execute(stmt).scalar() or 0
 
@@ -299,25 +364,31 @@ class HistoricalRebuildRunSummary:
     dry_run: bool
     rebuild_version: str
 
-    # GLOBAL progress (Part 8) - ignores any --council/--application-id/
-    # --site-id filter this invocation used. Cheap (one extra count query
-    # each) and gives the operator the whole-corpus picture regardless of
-    # how narrowly this particular invocation was scoped.
+    # GLOBAL progress - ignores any --council/--application-id/--site-id
+    # filter this invocation used. Cheap (a handful of extra count queries)
+    # and gives the operator the whole-corpus picture regardless of how
+    # narrowly this particular invocation was scoped. `remaining_
+    # rebuildable` deliberately excludes the evidence-blocked rows - it is
+    # never ambiguous about whether they're processable (they aren't).
     total_historical_corpus: int = 0
+    currently_rebuildable: int = 0
+    blocked_no_usable_evidence: int = 0
     already_rebuilt_before: int = 0
-    remaining_before: int = 0
+    remaining_rebuildable_before: int = 0
     already_rebuilt_after: int = 0
-    remaining_after: int = 0
+    remaining_rebuildable_after: int = 0
 
-    # CURRENT-SCOPE progress (Part 8) - same council/application_id/site_id
-    # filters as this invocation, but BEFORE the --limit is applied (i.e.
-    # the full eligible-under-this-scope universe, not just this batch).
+    # CURRENT-SCOPE progress - same council/application_id/site_id filters
+    # as this invocation, but BEFORE the --limit is applied (i.e. the full
+    # eligible-under-this-scope universe, not just this batch's selection).
     # Identical to the GLOBAL figures above when no filter was given.
-    scope_total: int = 0
+    scope_total_historical: int = 0
+    scope_currently_rebuildable: int = 0
+    scope_blocked_no_usable_evidence: int = 0
     scope_already_rebuilt_before: int = 0
-    scope_remaining_before: int = 0
+    scope_remaining_rebuildable_before: int = 0
     scope_already_rebuilt_after: int = 0
-    scope_remaining_after: int = 0
+    scope_remaining_rebuildable_after: int = 0
 
     # THIS BATCH
     candidates_inspected: int = 0
@@ -473,20 +544,30 @@ def run_historical_rebuild(
         candidates_inspected=len(candidates), selected=len(candidates),
     )
 
-    # Progress BEFORE this batch (Part 6/8/10) - global (unfiltered) and
-    # current-scope (same filters as this invocation, before --limit).
-    # An already-rebuilt row is correctly EXCLUDED from `candidates` above
-    # but still counted here - progress reporting and candidate selection
-    # are deliberately separate concerns.
+    # Progress BEFORE this batch - global (unfiltered) and current-scope
+    # (same filters as this invocation, before --limit). An already-
+    # rebuilt or evidence-blocked row is correctly EXCLUDED from
+    # `candidates` above but still counted here - progress reporting and
+    # candidate selection are deliberately separate concerns.
     summary.total_historical_corpus = count_total_corpus(session)
+    summary.currently_rebuildable = count_currently_rebuildable(session)
+    summary.blocked_no_usable_evidence = summary.total_historical_corpus - summary.currently_rebuildable
     summary.already_rebuilt_before = count_already_rebuilt(session, rebuild_version=rebuild_version)
-    summary.remaining_before = summary.total_historical_corpus - summary.already_rebuilt_before
+    summary.remaining_rebuildable_before = count_remaining_rebuildable(session, rebuild_version=rebuild_version)
 
-    summary.scope_total = count_total_corpus(session, council=council, application_id=application_id, site_id=site_id)
+    summary.scope_total_historical = count_total_corpus(
+        session, council=council, application_id=application_id, site_id=site_id,
+    )
+    summary.scope_currently_rebuildable = count_currently_rebuildable(
+        session, council=council, application_id=application_id, site_id=site_id,
+    )
+    summary.scope_blocked_no_usable_evidence = summary.scope_total_historical - summary.scope_currently_rebuildable
     summary.scope_already_rebuilt_before = count_already_rebuilt(
         session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
     )
-    summary.scope_remaining_before = summary.scope_total - summary.scope_already_rebuilt_before
+    summary.scope_remaining_rebuildable_before = count_remaining_rebuildable(
+        session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+    )
 
     for application in candidates:
         summary.council_distribution[application.council_code] = (
@@ -504,21 +585,26 @@ def run_historical_rebuild(
         summary.results.append(result)
         _tally(summary, result)
 
-    # Progress AFTER this batch (Part 10) - for a dry run nothing changed,
-    # so these deliberately equal the "before" values rather than issuing
-    # redundant queries; for a live batch they're recomputed fresh so a
-    # repeated operator invocation can see the backlog actually shrinking.
+    # Progress AFTER this batch - for a dry run nothing changed, so these
+    # deliberately equal the "before" values rather than issuing redundant
+    # queries; for a live batch they're recomputed fresh so a repeated
+    # operator invocation can see the backlog actually shrinking. Newly-
+    # arrived evidence on a previously-blocked row (Part 8's own example)
+    # would also be reflected here automatically, since these are all live
+    # queries, never cached/derived from the batch's own in-memory state.
     if dry_run:
         summary.already_rebuilt_after = summary.already_rebuilt_before
-        summary.remaining_after = summary.remaining_before
+        summary.remaining_rebuildable_after = summary.remaining_rebuildable_before
         summary.scope_already_rebuilt_after = summary.scope_already_rebuilt_before
-        summary.scope_remaining_after = summary.scope_remaining_before
+        summary.scope_remaining_rebuildable_after = summary.scope_remaining_rebuildable_before
     else:
         summary.already_rebuilt_after = count_already_rebuilt(session, rebuild_version=rebuild_version)
-        summary.remaining_after = summary.total_historical_corpus - summary.already_rebuilt_after
+        summary.remaining_rebuildable_after = count_remaining_rebuildable(session, rebuild_version=rebuild_version)
         summary.scope_already_rebuilt_after = count_already_rebuilt(
             session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
         )
-        summary.scope_remaining_after = summary.scope_total - summary.scope_already_rebuilt_after
+        summary.scope_remaining_rebuildable_after = count_remaining_rebuildable(
+            session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+        )
 
     return summary

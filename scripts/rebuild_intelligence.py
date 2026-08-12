@@ -83,19 +83,21 @@ def _print_report(summary: HistoricalRebuildRunSummary) -> None:
 
     print(
         f"[rebuild-intelligence] GLOBAL corpus={summary.total_historical_corpus} "
-        f"already_rebuilt={summary.already_rebuilt_before} remaining={summary.remaining_before}"
+        f"currently_rebuildable={summary.currently_rebuildable} "
+        f"blocked_no_usable_evidence={summary.blocked_no_usable_evidence} "
+        f"already_rebuilt={summary.already_rebuilt_before} remaining_rebuildable={summary.remaining_rebuildable_before}"
     )
     print(
-        f"[rebuild-intelligence] SCOPE (this invocation's filters) total={summary.scope_total} "
-        f"already_rebuilt={summary.scope_already_rebuilt_before} remaining={summary.scope_remaining_before}"
+        f"[rebuild-intelligence] SCOPE (this invocation's filters) total={summary.scope_total_historical} "
+        f"currently_rebuildable={summary.scope_currently_rebuildable} "
+        f"blocked_no_usable_evidence={summary.scope_blocked_no_usable_evidence} "
+        f"already_rebuilt={summary.scope_already_rebuilt_before} "
+        f"remaining_rebuildable={summary.scope_remaining_rebuildable_before}"
     )
     print(f"[rebuild-intelligence] candidates_inspected={summary.candidates_inspected} selected={summary.selected}")
 
     if summary.dry_run:
         print(f"[rebuild-intelligence] estimated_llm_calls={summary.estimated_llm_calls}")
-        with_evidence = sum(1 for s in summary.dry_run_snapshots if s.has_usable_evidence)
-        without_evidence = summary.selected - with_evidence
-        print(f"[rebuild-intelligence] with_usable_evidence={with_evidence} without_usable_evidence={without_evidence}")
         for snapshot in summary.dry_run_snapshots:
             print(
                 f"  - app={snapshot.application_id} ref={snapshot.reference!r} council={snapshot.council_code} "
@@ -118,11 +120,11 @@ def _print_report(summary: HistoricalRebuildRunSummary) -> None:
                 print(f"  ! app={result.application_id} ref={result.reference!r} warnings={result.qa_warnings}")
         print(
             f"[rebuild-intelligence] AFTER BATCH GLOBAL rebuilt={summary.already_rebuilt_after} "
-            f"remaining={summary.remaining_after}"
+            f"remaining_rebuildable={summary.remaining_rebuildable_after}"
         )
         print(
             f"[rebuild-intelligence] AFTER BATCH SCOPE rebuilt={summary.scope_already_rebuilt_after} "
-            f"remaining={summary.scope_remaining_after}"
+            f"remaining_rebuildable={summary.scope_remaining_rebuildable_after}"
         )
 
     print(f"[rebuild-intelligence] council_distribution={summary.council_distribution}")

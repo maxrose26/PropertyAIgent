@@ -144,6 +144,20 @@ _DOC_TYPES_BY_DEPTH = {
 }
 
 
+def broad_refresh_evidence_categories() -> frozenset[str]:
+    """Public accessor for DEPTH_BROAD's own target document-type set
+    above - exists so an external caller (app.extraction.historical_
+    rebuild's candidate-eligibility filter) can align its own evidence-
+    sufficiency check with B3's actual BROAD-refresh category set without
+    duplicating the list and risking taxonomy drift if it's ever changed
+    here. Returns the SAME frozenset object select_refresh_evidence_
+    documents itself uses for DEPTH_BROAD - never a copy, never a
+    redefinition. Historical rebuild always resolves to BROAD depth (its
+    own module docstring explains why), so this is the correct - and
+    only - category set to reuse."""
+    return _DOC_TYPES_BY_DEPTH[DEPTH_BROAD]
+
+
 # --- Evidence authority + input selection (PR B3 spec, Parts 14, 26) --------
 
 # Simple, explicit ranking, not a document-relationship graph (Part 14:

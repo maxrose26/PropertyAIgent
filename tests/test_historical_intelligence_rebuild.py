@@ -35,7 +35,7 @@ from app.extraction.historical_rebuild import (
     run_historical_rebuild,
     select_historical_rebuild_candidates,
 )
-from app.extraction.intelligence_refresh import LEGALLY_SECURED_STATUS
+from app.extraction.intelligence_refresh import LEGALLY_SECURED_STATUS, broad_refresh_evidence_categories
 from app.extraction.run_extraction import (
     OUTCOME_AI_ERROR,
     OUTCOME_NO_USABLE_TEXT,
@@ -122,12 +122,14 @@ def _summary_client(text: str = "Rebuilt status note.") -> MagicMock:
 def test_existing_scheme_intelligence_row_is_eligible(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Some evidence.")
     candidates = select_historical_rebuild_candidates(session)
     assert app.id in {a.id for a in candidates}
 
 
 def test_application_without_scheme_intelligence_excluded(session):
     app = _add_application(session, reference="APP/1")
+    _add_document(session, app, "decision_notice", "Some evidence.")
     candidates = select_historical_rebuild_candidates(session)
     assert app.id not in {a.id for a in candidates}
 
@@ -135,6 +137,7 @@ def test_application_without_scheme_intelligence_excluded(session):
 def test_already_rebuilt_current_version_excluded(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app, intelligence_rebuild_version=REBUILD_VERSION)
+    _add_document(session, app, "decision_notice", "Some evidence.")
     candidates = select_historical_rebuild_candidates(session, rebuild_version=REBUILD_VERSION)
     assert app.id not in {a.id for a in candidates}
 
@@ -142,6 +145,7 @@ def test_already_rebuilt_current_version_excluded(session):
 def test_older_rebuild_version_eligible_for_newer_version(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app, intelligence_rebuild_version="b3_v0")
+    _add_document(session, app, "decision_notice", "Some evidence.")
     candidates = select_historical_rebuild_candidates(session, rebuild_version="b3_v1")
     assert app.id in {a.id for a in candidates}
 
@@ -149,6 +153,7 @@ def test_older_rebuild_version_eligible_for_newer_version(session):
 def test_null_rebuild_version_still_eligible(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app, intelligence_rebuild_version=None)
+    _add_document(session, app, "decision_notice", "Some evidence.")
     candidates = select_historical_rebuild_candidates(session, rebuild_version=REBUILD_VERSION)
     assert app.id in {a.id for a in candidates}
 
@@ -158,6 +163,8 @@ def test_council_filter_works(session):
     app_b = _add_application(session, reference="APP/B", council_code="trafford")
     _add_scheme_intelligence(session, app_a)
     _add_scheme_intelligence(session, app_b)
+    _add_document(session, app_a, "decision_notice", "Evidence.")
+    _add_document(session, app_b, "decision_notice", "Evidence.")
     candidates = select_historical_rebuild_candidates(session, council="stockport")
     ids = {a.id for a in candidates}
     assert app_a.id in ids
@@ -169,6 +176,8 @@ def test_application_id_filter_works(session):
     app_b = _add_application(session, reference="APP/B")
     _add_scheme_intelligence(session, app_a)
     _add_scheme_intelligence(session, app_b)
+    _add_document(session, app_a, "decision_notice", "Evidence.")
+    _add_document(session, app_b, "decision_notice", "Evidence.")
     candidates = select_historical_rebuild_candidates(session, application_id=app_a.id)
     ids = {a.id for a in candidates}
     assert ids == {app_a.id}
@@ -182,6 +191,8 @@ def test_site_id_filter_works(session):
     app_b = _add_application(session, reference="APP/B")
     _add_scheme_intelligence(session, app_a)
     _add_scheme_intelligence(session, app_b)
+    _add_document(session, app_a, "decision_notice", "Evidence.")
+    _add_document(session, app_b, "decision_notice", "Evidence.")
     candidates = select_historical_rebuild_candidates(session, site_id=site.id)
     ids = {a.id for a in candidates}
     assert ids == {app_a.id}
@@ -191,6 +202,7 @@ def test_limit_enforced(session):
     for i in range(5):
         app = _add_application(session, reference=f"APP/{i}")
         _add_scheme_intelligence(session, app)
+        _add_document(session, app, "decision_notice", "Evidence.")
     candidates = select_historical_rebuild_candidates(session, limit=2)
     assert len(candidates) == 2
 
@@ -201,8 +213,115 @@ def test_deterministic_ordering_by_last_seen_then_id(session):
     newer = _add_application(session, reference="APP/NEWER", last_seen_at=now)
     _add_scheme_intelligence(session, older)
     _add_scheme_intelligence(session, newer)
+    _add_document(session, older, "decision_notice", "Evidence.")
+    _add_document(session, newer, "decision_notice", "Evidence.")
     candidates = select_historical_rebuild_candidates(session)
     assert [a.id for a in candidates] == [newer.id, older.id]
+
+
+# --- Candidate evidence-eligibility (this amendment, items 1-9) ----------------
+
+
+def test_row_with_usable_b3_evidence_is_eligible(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
+    candidates = select_historical_rebuild_candidates(session)
+    assert app.id in {a.id for a in candidates}
+
+
+def test_row_with_no_usable_evidence_is_excluded(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)  # no documents at all
+    candidates = select_historical_rebuild_candidates(session)
+    assert app.id not in {a.id for a in candidates}
+
+
+def test_null_extracted_text_does_not_qualify(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    doc = Document(
+        application_id=app.id, doc_type="decision_notice", document_name="d.pdf",
+        source_url="https://example.invalid/d.pdf", text_extracted=True, extracted_text=None,
+    )
+    session.add(doc)
+    session.commit()
+    candidates = select_historical_rebuild_candidates(session)
+    assert app.id not in {a.id for a in candidates}
+
+
+def test_empty_extracted_text_does_not_qualify(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    doc = Document(
+        application_id=app.id, doc_type="decision_notice", document_name="d.pdf",
+        source_url="https://example.invalid/d.pdf", text_extracted=True, extracted_text="",
+    )
+    session.add(doc)
+    session.commit()
+    candidates = select_historical_rebuild_candidates(session)
+    assert app.id not in {a.id for a in candidates}
+
+
+def test_irrelevant_category_does_not_qualify(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "other", "Some unrelated document text.")
+    candidates = select_historical_rebuild_candidates(session)
+    assert app.id not in {a.id for a in candidates}
+
+
+def test_evidence_category_set_matches_b3_broad_depth():
+    from app.extraction.intelligence_refresh import DEPTH_BROAD, _DOC_TYPES_BY_DEPTH
+
+    assert broad_refresh_evidence_categories() == _DOC_TYPES_BY_DEPTH[DEPTH_BROAD]
+
+
+def test_excluded_no_evidence_row_does_not_consume_batch_limit(session):
+    app_no_evidence = _add_application(session, reference="APP/NO_EVIDENCE", last_seen_at=dt.datetime.now(dt.timezone.utc))
+    app_with_evidence = _add_application(
+        session, reference="APP/WITH_EVIDENCE", last_seen_at=dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1),
+    )
+    _add_scheme_intelligence(session, app_no_evidence)
+    _add_scheme_intelligence(session, app_with_evidence)
+    _add_document(session, app_with_evidence, "decision_notice", "Granted.")
+
+    candidates = select_historical_rebuild_candidates(session, limit=1)
+
+    assert [a.id for a in candidates] == [app_with_evidence.id]
+
+
+def test_no_evidence_row_receives_no_openai_call(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    client = MagicMock()
+
+    run_historical_rebuild(session, client, dry_run=False)
+
+    client.responses.create.assert_not_called()
+
+
+def test_no_evidence_row_is_not_falsely_marked_rebuilt(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+    client = MagicMock()
+
+    run_historical_rebuild(session, client, dry_run=False)
+
+    assert app.scheme_intelligence.intelligence_rebuild_version is None
+
+
+def test_row_automatically_becomes_eligible_after_evidence_added(session):
+    app = _add_application(session, reference="APP/1")
+    _add_scheme_intelligence(session, app)
+
+    candidates_before = select_historical_rebuild_candidates(session)
+    assert app.id not in {a.id for a in candidates_before}
+
+    _add_document(session, app, "decision_notice", "Granted.")
+
+    candidates_after = select_historical_rebuild_candidates(session)
+    assert app.id in {a.id for a in candidates_after}
 
 
 # --- Dry run (38: items 11-16) --------------------------------------------------
@@ -235,6 +354,7 @@ def test_dry_run_performs_zero_openai_calls(session):
 def test_dry_run_can_omit_client_entirely(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Evidence.")
     summary = run_historical_rebuild(session, None, dry_run=True)
     assert summary.selected == 1
 
@@ -242,6 +362,7 @@ def test_dry_run_can_omit_client_entirely(session):
 def test_dry_run_reports_selected_candidates(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Evidence.")
     summary = run_historical_rebuild(session, None, dry_run=True)
     assert summary.candidates_inspected == 1
     assert summary.selected == 1
@@ -259,13 +380,20 @@ def test_dry_run_reports_evidence_counts(session):
     assert snapshot.has_usable_evidence is True
 
 
-def test_dry_run_reports_no_usable_evidence_correctly(session):
-    app = _add_application(session, reference="APP/1")
-    _add_scheme_intelligence(session, app)  # no documents at all
+def test_dry_run_excludes_no_usable_evidence_rows_and_reports_blocked(session):
+    app_blocked = _add_application(session, reference="APP/BLOCKED")
+    app_ok = _add_application(session, reference="APP/OK")
+    _add_scheme_intelligence(session, app_blocked)  # no documents at all
+    _add_scheme_intelligence(session, app_ok)
+    _add_document(session, app_ok, "decision_notice", "Evidence.")
+
     summary = run_historical_rebuild(session, None, dry_run=True)
-    snapshot = summary.dry_run_snapshots[0]
-    assert snapshot.usable_document_count == 0
-    assert snapshot.has_usable_evidence is False
+
+    selected_ids = {s.application_id for s in summary.dry_run_snapshots}
+    assert app_ok.id in selected_ids
+    assert app_blocked.id not in selected_ids
+    assert summary.currently_rebuildable == 1
+    assert summary.blocked_no_usable_evidence == 1
 
 
 def test_dry_run_estimates_llm_call_count(session):
@@ -276,6 +404,8 @@ def test_dry_run_estimates_llm_call_count(session):
     app_without_site = _add_application(session, reference="APP/B")
     _add_scheme_intelligence(session, app_with_site)
     _add_scheme_intelligence(session, app_without_site)
+    _add_document(session, app_with_site, "decision_notice", "Evidence.")
+    _add_document(session, app_without_site, "decision_notice", "Evidence.")
 
     summary = run_historical_rebuild(session, None, dry_run=True)
 
@@ -289,6 +419,7 @@ def test_dry_run_respects_filters_and_limit(session):
     for i in range(5):
         app = _add_application(session, reference=f"APP/{i}", council_code="stockport" if i < 2 else "trafford")
         _add_scheme_intelligence(session, app)
+        _add_document(session, app, "decision_notice", "Evidence.")
     summary = run_historical_rebuild(session, None, dry_run=True, council="stockport", limit=1)
     assert summary.selected == 1
     assert summary.dry_run_snapshots[0].council_code == "stockport"
@@ -703,6 +834,7 @@ def test_large_batch_override_works(session):
     for i in range(3):
         app = _add_application(session, reference=f"APP/{i}")
         _add_scheme_intelligence(session, app)
+        _add_document(session, app, "decision_notice", "Granted.")
     summary = run_historical_rebuild(
         session, None, dry_run=True, limit=MAX_BATCH_LIMIT_WITHOUT_OVERRIDE + 1, allow_large_batch=True,
     )
@@ -915,12 +1047,13 @@ def test_progress_reports_global_corpus_and_already_rebuilt(session):
     app2 = _add_application(session, reference="APP/2")
     _add_scheme_intelligence(session, app1, intelligence_rebuild_version=REBUILD_VERSION)
     _add_scheme_intelligence(session, app2)
+    _add_document(session, app2, "decision_notice", "Granted.")
 
     summary = run_historical_rebuild(session, None, dry_run=True)
 
     assert summary.total_historical_corpus == 2
     assert summary.already_rebuilt_before == 1
-    assert summary.remaining_before == 1
+    assert summary.remaining_rebuildable_before == 1
 
 
 def test_already_rebuilt_row_excluded_from_batch_but_counted_in_progress(session):
@@ -928,6 +1061,7 @@ def test_already_rebuilt_row_excluded_from_batch_but_counted_in_progress(session
     app2 = _add_application(session, reference="APP/2")
     _add_scheme_intelligence(session, app1, intelligence_rebuild_version=REBUILD_VERSION)
     _add_scheme_intelligence(session, app2)
+    _add_document(session, app2, "decision_notice", "Granted.")
 
     summary = run_historical_rebuild(session, None, dry_run=True)
 
@@ -938,11 +1072,12 @@ def test_already_rebuilt_row_excluded_from_batch_but_counted_in_progress(session
 def test_older_rebuild_version_counted_as_remaining_for_new_version(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app, intelligence_rebuild_version="b3_v0")
+    _add_document(session, app, "decision_notice", "Granted.")
 
     summary = run_historical_rebuild(session, None, dry_run=True, rebuild_version="b3_v1")
 
     assert summary.already_rebuilt_before == 0
-    assert summary.remaining_before == 1
+    assert summary.remaining_rebuildable_before == 1
 
 
 def test_filter_scoped_progress_differs_from_global(session):
@@ -955,20 +1090,21 @@ def test_filter_scoped_progress_differs_from_global(session):
 
     assert summary.total_historical_corpus == 2  # global - both applications
     assert summary.already_rebuilt_before == 1  # global - app_b
-    assert summary.scope_total == 1  # scoped to stockport only - app_a
+    assert summary.scope_total_historical == 1  # scoped to stockport only - app_a
     assert summary.scope_already_rebuilt_before == 0  # app_a not rebuilt
 
 
 def test_dry_run_progress_before_equals_after(session):
     app = _add_application(session, reference="APP/1")
     _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted.")
 
     summary = run_historical_rebuild(session, None, dry_run=True)
 
     assert summary.already_rebuilt_after == summary.already_rebuilt_before
-    assert summary.remaining_after == summary.remaining_before
+    assert summary.remaining_rebuildable_after == summary.remaining_rebuildable_before
     assert summary.scope_already_rebuilt_after == summary.scope_already_rebuilt_before
-    assert summary.scope_remaining_after == summary.scope_remaining_before
+    assert summary.scope_remaining_rebuildable_after == summary.scope_remaining_rebuildable_before
 
 
 def test_live_batch_progress_before_and_after_reflect_new_rebuilds(session):
@@ -981,8 +1117,27 @@ def test_live_batch_progress_before_and_after_reflect_new_rebuilds(session):
 
     assert summary.already_rebuilt_before == 0
     assert summary.already_rebuilt_after == 1
-    assert summary.remaining_before == 1
-    assert summary.remaining_after == 0
+    assert summary.remaining_rebuildable_before == 1
+    assert summary.remaining_rebuildable_after == 0
+
+
+def test_progress_distinguishes_blocked_from_rebuildable(session):
+    app_blocked = _add_application(session, reference="APP/BLOCKED")
+    app_rebuildable = _add_application(session, reference="APP/REBUILDABLE")
+    app_rebuilt = _add_application(session, reference="APP/REBUILT")
+    _add_scheme_intelligence(session, app_blocked)  # no documents
+    _add_scheme_intelligence(session, app_rebuildable)
+    _add_scheme_intelligence(session, app_rebuilt, intelligence_rebuild_version=REBUILD_VERSION)
+    _add_document(session, app_rebuildable, "decision_notice", "Granted.")
+    _add_document(session, app_rebuilt, "decision_notice", "Granted.")
+
+    summary = run_historical_rebuild(session, None, dry_run=True)
+
+    assert summary.total_historical_corpus == 3
+    assert summary.currently_rebuildable == 2  # app_rebuildable + app_rebuilt
+    assert summary.blocked_no_usable_evidence == 1  # app_blocked
+    assert summary.already_rebuilt_before == 1  # app_rebuilt
+    assert summary.remaining_rebuildable_before == 1  # app_rebuildable only
 
 
 def test_no_extra_openai_calls_from_progress_queries(session):
