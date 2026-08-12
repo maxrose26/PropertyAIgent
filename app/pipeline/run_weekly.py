@@ -1937,6 +1937,111 @@ def stage_generate_scheme_summaries(
     return generated
 
 
+# PR B3 (Evidence-Driven AI Intelligence Refresh) - eligibility for an
+# EXISTING SchemeIntelligence row to be refreshed, entirely separate from
+# _extraction_eligibility_clause above (which only ever selects Applications
+# with NO SchemeIntelligence yet - see stage_extraction's own WHERE clause).
+# Deliberately does NOT reference evidence_refresh_required at all (PR B3
+# spec, Part 6: "Do NOT use evidence_refresh_required as B3 eligibility" -
+# that flag means "B2 should check the portal", a question B2 has already
+# fully answered by the time material_evidence_changed_at is set). True
+# exactly when B2 has confirmed genuinely new material evidence that this
+# Application's live intelligence has not yet incorporated.
+INTELLIGENCE_REFRESH_ELIGIBLE = and_(
+    Application.scheme_intelligence != None,  # noqa: E711 - a refresh, not a first-ever extraction
+    Application.material_evidence_changed_at.isnot(None),
+    or_(
+        Application.intelligence_evidence_processed_at.is_(None),
+        Application.intelligence_evidence_processed_at < Application.material_evidence_changed_at,
+    ),
+)
+
+
+def count_pending_intelligence_refresh(session: Session, council_code: str) -> int:
+    """Read-only count of exactly what stage_intelligence_refresh() below
+    would attempt - same WHERE clause, kept deliberately right next to it
+    (same discipline as count_pending_extraction/count_pending_summaries
+    above)."""
+    return session.execute(
+        select(func.count(Application.id)).where(
+            Application.council_code == council_code, INTELLIGENCE_REFRESH_ELIGIBLE,
+        )
+    ).scalar()
+
+
+@dataclass
+class IntelligenceRefreshStageResult:
+    candidates_inspected: int = 0
+    attempted: int = 0
+    succeeded: int = 0
+    no_usable_text: int = 0
+    failed: int = 0
+
+
+def stage_intelligence_refresh(
+    session: Session, client: OpenAI, council: CouncilConfig, *, limit: int | None = None,
+) -> IntelligenceRefreshStageResult:
+    """PR B3 - consumes B2's material_evidence_changed_at handoff for
+    Applications that already have a live SchemeIntelligence row. Belongs
+    inside Intelligence Processing (this file, alongside stage_extraction/
+    stage_generate_scheme_summaries), NEVER Daily Discovery - Daily
+    Discovery remains entirely AI-free (PR B3 spec, Part 29); only this
+    file's own AI stages ever construct/use an OpenAI client.
+
+    Deterministic ordering: newest material_evidence_changed_at first (the
+    same "most commercially valuable first" principle stage_extraction
+    already applies to first_seen_at), id as a stable tie-break - a
+    material refresh candidate is commercially important, but bounded by
+    `limit` so it can never starve stage_extraction's own brand-new-scheme
+    backlog within one Intelligence Processing run (see scripts.
+    run_intelligence_processing's own separate, independent cap for this
+    stage).
+
+    Each candidate is processed via app.extraction.intelligence_refresh.
+    refresh_intelligence_for_application, which handles its own atomic
+    replacement/commit - this loop only counts outcomes, exactly mirroring
+    stage_extraction's own OUTCOME_* handling (no second AI failure
+    taxonomy - PR B3 spec, Part 28)."""
+    from app.extraction.intelligence_refresh import refresh_intelligence_for_application
+
+    query = (
+        select(Application)
+        .where(Application.council_code == council.code, INTELLIGENCE_REFRESH_ELIGIBLE)
+        .order_by(Application.material_evidence_changed_at.desc(), Application.id.asc())
+    )
+    if limit is not None:
+        query = query.limit(limit * EXTRACTION_CANDIDATE_SCAN_MULTIPLIER)
+    candidates = session.execute(query).scalars().all()
+
+    print(f"\n[intelligence-refresh] {len(candidates)} candidate(s) eligible for evidence-driven refresh"
+          + (f" (targeting {limit} genuine attempt(s) this run)" if limit is not None else ""))
+
+    result = IntelligenceRefreshStageResult()
+    for application in candidates:
+        if limit is not None and result.attempted >= limit:
+            break
+        result.candidates_inspected += 1
+
+        outcome = refresh_intelligence_for_application(session, client, application)
+        if outcome.outcome == OUTCOME_NO_USABLE_TEXT:
+            # No LLM call happened (no readable evidence text for this
+            # depth's target categories) - never counts against `limit`,
+            # mirrors stage_extraction's own free NO_USABLE_TEXT check.
+            result.no_usable_text += 1
+            print(f"  [intelligence-refresh] {application.reference}: no usable evidence text this pass, skipped (not billed)")
+            continue
+
+        result.attempted += 1
+        if outcome.outcome == OUTCOME_SUCCESS:
+            result.succeeded += 1
+        else:
+            result.failed += 1
+            print(f"  [intelligence-refresh] {application.reference}: outcome={outcome.outcome} - "
+                  f"previous intelligence/summary preserved, remains retryable")
+
+    return result
+
+
 def parse_uk_date(value: str | None) -> dt.date | None:
     if not value:
         return None
