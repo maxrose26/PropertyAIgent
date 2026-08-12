@@ -75,6 +75,12 @@ from app.extraction.run_extraction import (
 )
 from app.pipeline.acquisition_health import AcquisitionHealth
 from app.pipeline.evidence import document_identity_key, is_evidence_sufficient
+from app.pipeline.material_change import (
+    TRIGGER_MATERIAL_CHANGE,
+    ApplicationState,
+    MaterialChangeStats,
+    detect_material_application_change,
+)
 from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker
 from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
@@ -299,6 +305,11 @@ def stage_scrape(session: Session, page, council: CouncilConfig, date_from: str,
           f"{len(progress_signals)} progress-signal filings for known sites, "
           f"{len(watchlist)} screening/scoping opinions saved to watchlist")
 
+    # PR B1 - one instance for this whole month's scrape, printed as a
+    # single summary line below (never per-application - see this
+    # module's own "[material-change] council=... summary" convention,
+    # matching stage_documents' equivalent end-of-run summary print).
+    material_change_stats = MaterialChangeStats()
     for app in qualifying + progress_signals + watchlist:
         if app in progress_signals:
             status = "progress_signal_only"
@@ -306,22 +317,45 @@ def stage_scrape(session: Session, page, council: CouncilConfig, date_from: str,
             status = "watchlist_only"
         else:
             status = None
-        _upsert_scraped_application(session, council, app, batch_id, unit_confirmation_status=status)
+        _upsert_scraped_application(
+            session, council, app, batch_id, unit_confirmation_status=status,
+            material_change_stats=material_change_stats,
+        )
 
     session.commit()
+    if material_change_stats.compared:
+        print(material_change_stats.summary_line(council.code))
     return len(qualifying)
 
 
 def _upsert_scraped_application(
     session: Session, council: CouncilConfig, app, batch_id: str | None, unit_confirmation_status: str | None = None,
+    material_change_stats: MaterialChangeStats | None = None,
 ) -> Application:
     """Shared by stage_scrape and stage_fetch_missing_parents - both end up
     writing the same shape of scraper result (idox_portal/arcus_portal's
     ScrapedApplication) into an applications row, just discovered via a
-    different search (date-range vs a single targeted reference lookup)."""
+    different search (date-range vs a single targeted reference lookup).
+
+    PR B1 ("Material Application-State Detection + Persisted Refresh
+    Signal") - an application that ALREADY existed before this call has
+    its decision/status/unit-count state snapshotted BEFORE the FIELD_MAP
+    mutation loop below overwrites `existing` in place (this session uses
+    expire_on_commit=False - `existing` is the same Python object
+    throughout, mutated directly, not replaced; there is no later point
+    at which the OLD values would still be recoverable). A genuinely NEW
+    application (existing was None) is never compared at all (Part G: "a
+    newly discovered application is NOT an existing material change") -
+    it already goes through initial evidence acquisition -> Intelligence
+    Processing via the normal new-application path, with nothing here to
+    compare it against."""
     existing = session.execute(
         select(Application).where(Application.council_code == council.code, Application.reference == app.reference)
     ).scalar_one_or_none()
+
+    old_state = None if existing is None else ApplicationState(
+        status=existing.status, decision=existing.decision, estimated_unit_count=existing.estimated_unit_count,
+    )
 
     if existing is None:
         existing = Application(council_code=council.code, reference=app.reference)
@@ -349,6 +383,31 @@ def _upsert_scraped_application(
         # Portal proposal text already gave a confident unit count - no need
         # for the confirm-units gate below.
         existing.unit_confirmation_status = "confirmed_qualifying"
+
+    if old_state is not None:
+        new_state = ApplicationState(
+            status=existing.status, decision=existing.decision, estimated_unit_count=existing.estimated_unit_count,
+        )
+        result = detect_material_application_change(old_state, new_state)
+        if material_change_stats is not None:
+            material_change_stats.record(result)
+        if result.changed:
+            # B1 only ever SETS this signal - it never clears it, and
+            # never touches AI/evidence state itself (see this field's
+            # own comment on Application: "does NOT mean AI is stale").
+            existing.evidence_refresh_required = True
+            existing.evidence_refresh_reason = ",".join(result.reasons)
+            existing.evidence_refresh_trigger = TRIGGER_MATERIAL_CHANGE
+            existing.evidence_refresh_requested_at = dt.datetime.now(dt.timezone.utc)
+            print(
+                f"[material-change] council={council.code} application={existing.reference} "
+                f"reason={','.join(result.reasons)} "
+                f"old_planning_state={result.old_planning_state} new_planning_state={result.new_planning_state} "
+                f"old_status={old_state.status!r} new_status={new_state.status!r} "
+                f"old_decision={old_state.decision!r} new_decision={new_state.decision!r} "
+                f"old_units={old_state.estimated_unit_count} new_units={new_state.estimated_unit_count}"
+            )
+
     return existing
 
 

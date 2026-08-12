@@ -210,6 +210,39 @@ def _backfill_documents_legacy_unverified(engine) -> int:
         return result.rowcount if result.rowcount is not None else 0
 
 
+def _backfill_evidence_refresh_required(engine) -> int:
+    """PR B1 ("Material Application-State Detection + Persisted Refresh
+    Signal") - same NOT-NULL-with-Python-default gap _backfill_
+    extraction_attempt_count already exists to repair (_add_missing_
+    columns' own bare ALTER TABLE ADD COLUMN leaves every EXISTING row
+    with SQL NULL, not the model's Python-side default=False, the moment
+    this column is first added to a table that already has data).
+
+    Deliberately sets False, never True - a legacy row (there are
+    approximately 1,387 pre-existing Application rows in production)
+    genuinely has no material-change signal to report: this migration
+    only ever ADDS the column, it never runs
+    detect_material_application_change against anything, so there is no
+    "old vs new" comparison for any legacy row to have produced a
+    change from in the first place. Explicitly does NOT touch
+    evidence_refresh_reason/evidence_refresh_trigger/
+    evidence_refresh_requested_at at all - those stay NULL for every
+    legacy row, truthfully (no reason to fabricate for a signal that was
+    never set), matching the same "additive, never invents a value"
+    principle _backfill_documents_legacy_unverified already established
+    for documents_last_checked_at.
+
+    Idempotent: only rows where the column IS NULL are touched, so a
+    database that's already fully repaired matches zero rows and is a
+    no-op - identical convention to every other backfill in this
+    module."""
+    with engine.begin() as conn:
+        result = conn.execute(
+            text('UPDATE "applications" SET "evidence_refresh_required" = FALSE WHERE "evidence_refresh_required" IS NULL')
+        )
+        return result.rowcount if result.rowcount is not None else 0
+
+
 def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
     """The EXPLICIT, operator-invoked production migration step (Pilot
     Readiness PR-2 final pre-merge amendment, "Implement The Smallest
@@ -246,6 +279,11 @@ def migrate_schema(engine) -> tuple[list[str], list[tuple[str, str]]]:
         print(f"[migrate-schema] marked {legacy_marked} existing applications.documents_legacy_unverified "
               f"row(s) True (has documents) or False (no documents) - documents_last_checked_at itself "
               f"is never inferred and remains NULL for every legacy row")
+
+    refresh_backfilled = _backfill_evidence_refresh_required(engine)
+    if refresh_backfilled:
+        print(f"[migrate-schema] backfilled {refresh_backfilled} existing applications.evidence_refresh_required "
+              f"row(s) from NULL to False - no historical row is marked as having a material change")
 
     return missing_tables, added_columns
 
@@ -286,6 +324,7 @@ def init_db() -> None:
         _add_missing_columns(engine)
         _backfill_extraction_attempt_count(engine)
         _backfill_documents_legacy_unverified(engine)
+        _backfill_evidence_refresh_required(engine)
         return
 
     missing_tables, missing_columns = verify_schema(engine)
