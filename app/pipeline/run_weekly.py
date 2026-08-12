@@ -989,12 +989,42 @@ def stage_confirm_units(
     return confirmed_qualifying
 
 
+@dataclass
+class DocumentAcquisitionResult:
+    """PR B2 pre-merge amendment ("Explicit Acquisition Completion
+    Contract") - the explicit result of ONE discover_and_store_documents_
+    for_application call, replacing the plain bool that call used to
+    return. Deliberately minimal - three fields, not a general event log:
+
+    listing_succeeded - the portal/document-register listing request
+    itself succeeded (equivalent to the old True/False return value).
+    False means no reliable listing was obtained at all (host failure,
+    parsing error, or no summary_url) - nothing below was even attempted.
+
+    acquisition_complete - every document THIS call intended to download
+    (i.e. reached the actual download attempt, not one excluded by the
+    not-useful/duplicate rules) actually succeeded. Exactly the same
+    condition that gates whether Application.documents_last_checked_at is
+    stamped below - see that field's own comment. Only meaningful when
+    listing_succeeded is True; False whenever listing_succeeded is False.
+
+    new_document_count - how many genuinely new Document rows this call
+    itself inserted (already scoped to whatever target_doc_types this call
+    was given, if any - callers therefore never need to re-derive this via
+    a separate before/after query, which is exactly the "too indirect"
+    problem this amendment removes from app.pipeline.evidence_refresh)."""
+
+    listing_succeeded: bool
+    acquisition_complete: bool
+    new_document_count: int = 0
+
+
 def discover_and_store_documents_for_application(
     session: Session, page, requests_session: requests.Session, council: CouncilConfig,
     application: Application, health: AcquisitionHealth | None = None,
     breaker: CouncilPortalCircuitBreaker | None = None,
     target_doc_types: frozenset[str] | None = None,
-) -> bool:
+) -> DocumentAcquisitionResult:
     """The actual per-application document-discovery-and-store logic,
     factored out of stage_documents' loop (Evidence Completeness
     Foundation, PR A, Section 13) so a future PR (material-change-
@@ -1003,17 +1033,18 @@ def discover_and_store_documents_for_application(
     stage_documents' own bulk DOCUMENT_DISCOVERY_ELIGIBLE query entirely,
     rather than needing that query to somehow re-select an application it
     was deliberately designed to permanently exclude once documented (see
-    that constant's own comment). Returns True if a reliable document
-    LISTING was obtained this call (used by stage_documents purely to
-    distinguish "listing failed" from "listing succeeded" for its own
-    run-level counters) - this is NOT the same thing as whether
-    Application.documents_last_checked_at was actually advanced (PR A
-    pre-merge amendment, "Partial Initial Document Acquisition Recovery"):
-    a listing can succeed while one or more of the documents it identified
-    as intended-to-download still fails to download, in which case the
-    timestamp is deliberately withheld - see this function's own
-    acquisition_complete tracking below, and Application.
-    documents_last_checked_at's own field comment for the exact rule.
+    that constant's own comment). Returns a DocumentAcquisitionResult (see
+    that dataclass's own docstring) - PR B2's pre-merge amendment replaced
+    the original plain bool return with this explicit contract specifically
+    so a caller (app.pipeline.evidence_refresh) never has to infer
+    completion indirectly from whether Application.documents_last_checked_at
+    moved. result.listing_succeeded is NOT the same claim as result.
+    acquisition_complete: a listing can succeed while one or more of the
+    documents it identified as intended-to-download still fails to
+    download, in which case documents_last_checked_at is deliberately
+    withheld - see this function's own acquisition_complete tracking
+    below, and Application.documents_last_checked_at's own field comment
+    for the exact rule.
 
     This is also THE transition point for a legacy-marked application
     (Application.documents_legacy_unverified, "Legacy Document-State
@@ -1042,7 +1073,7 @@ def discover_and_store_documents_for_application(
     refused refresh does not download an unrelated design_access drawing
     just because it happens to appear in the same listing."""
     if not application.summary_url:
-        return False
+        return DocumentAcquisitionResult(listing_succeeded=False, acquisition_complete=False)
     useful_types = target_doc_types if target_doc_types is not None else USEFUL_DOC_TYPES
     # documents.application.before/after (Render Daily Discovery Salford
     # document-stage memory diagnosis, Part 3) - stage-level [mem]
@@ -1094,7 +1125,7 @@ def discover_and_store_documents_for_application(
         # DISCOVERY_ELIGIBLE) for the very next run to retry, exactly as
         # a failed attempt has always behaved - only a genuinely
         # completed check advances this field.
-        return False
+        return DocumentAcquisitionResult(listing_succeeded=False, acquisition_complete=False)
 
     if health is not None:
         health.record_document_discovery(succeeded=True)
@@ -1296,8 +1327,9 @@ def discover_and_store_documents_for_application(
         # through from the caller.
         application.documents_legacy_unverified = False
 
+    new_document_count = len(rows) - skipped - duplicates_skipped - failed_downloads
     session.commit()
-    print(f"  [documents] {application.reference}: {len(rows) - skipped - duplicates_skipped - failed_downloads} documents downloaded, "
+    print(f"  [documents] {application.reference}: {new_document_count} documents downloaded, "
           f"{skipped} skipped (not a useful document type), {sniffed} classified by content (name was uninformative), "
           f"{duplicates_skipped} already known (skipped as duplicates), {failed_downloads} download(s) failed"
           + ("" if acquisition_complete else " - acquisition incomplete, remains eligible for recovery"))
@@ -1306,7 +1338,9 @@ def discover_and_store_documents_for_application(
         extra={"application": application.reference, "identity_map": len(session.identity_map)},
         breakdown=True,
     )
-    return True
+    return DocumentAcquisitionResult(
+        listing_succeeded=True, acquisition_complete=acquisition_complete, new_document_count=new_document_count,
+    )
 
 
 def stage_documents(
@@ -1367,10 +1401,10 @@ def stage_documents(
 
         if not application.summary_url:
             continue
-        succeeded = discover_and_store_documents_for_application(
+        acquisition_result = discover_and_store_documents_for_application(
             session, page, requests_session, council, application, health, breaker,
         )
-        if succeeded:
+        if acquisition_result.listing_succeeded:
             processed += 1
         else:
             listings_failed += 1

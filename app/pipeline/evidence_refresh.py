@@ -34,8 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig
-from app.db.models import Application, Document
-from app.pipeline.evidence import document_identity_key
+from app.db.models import Application
 from app.pipeline.material_change import (
     REASON_DECISION_GRANTED,
     REASON_DECISION_OUTCOME_UNKNOWN,
@@ -267,9 +266,23 @@ def _refresh_one_application(
     """Runs the targeted, filtered rediscovery for ONE Application in the
     family and returns (outcome, new_document_count) - one of the four
     OUTCOME_* values, minus family aggregation (see refresh_material_
-    evidence for how per-application results combine), plus exactly how
-    many genuinely new documents (by app.pipeline.evidence.document_
-    identity_key, restricted to target_doc_types) this call itself stored.
+    evidence for how per-application results combine).
+
+    PR B2 pre-merge amendment ("Explicit Acquisition Completion Contract")
+    - reads discover_and_store_documents_for_application's own explicit
+    DocumentAcquisitionResult directly (listing_succeeded/acquisition_
+    complete/new_document_count) rather than reverse-engineering completion
+    from whether Application.documents_last_checked_at moved. That timestamp
+    proxy - the original implementation - is deliberately gone: it was an
+    indirect signal for foundational refresh infrastructure, and the
+    acquisition function itself already knows the true answer (see that
+    function's own docstring for exactly what changed and why). new_
+    document_count also comes directly from that same result - it is
+    already scoped to target_doc_types (the function only ever persists a
+    Document whose classified type is in whatever useful_types it was
+    given), so no separate before/after identity-set diff is needed here
+    any more either.
+
     Imported lazily from app.pipeline.run_weekly to avoid a circular import
     (run_weekly itself imports this module's ROUTING/target_doc_types_for_
     reasons for its own stage_evidence_refresh)."""
@@ -285,55 +298,36 @@ def _refresh_one_application(
         # never blocks the rest of the family's real result.
         return OUTCOME_CHECKED_NO_NEW_EVIDENCE, 0
 
-    before_identities = {
-        document_identity_key(source_url, document_name)
-        for source_url, document_name in session.execute(
-            select(Document.source_url, Document.document_name)
-            .where(Document.application_id == target.id, Document.doc_type.in_(target_doc_types))
-        ).all()
-    }
-    before_checked_at = target.documents_last_checked_at
-
-    listing_ok = discover_and_store_documents_for_application(
+    acquisition_result = discover_and_store_documents_for_application(
         session, page, requests_session, council, target,
         health=None, breaker=breaker, target_doc_types=target_doc_types,
     )
-    if not listing_ok:
+
+    if not acquisition_result.listing_succeeded:
         # discover_and_store_documents_for_application's own except block
         # already covers every failure mode (host-down, parsing error, ...)
-        # under one broad catch and returns False - from here, "the listing
-        # could not be reliably obtained" is exactly PORTAL_UNAVAILABLE
-        # (Part 10: "portal unavailable -> UNKNOWN/failed check, not 'no
-        # change'"), the smallest taxonomy that keeps the request retryable.
+        # under one broad catch and returns listing_succeeded=False - from
+        # here, "the listing could not be reliably obtained" is exactly
+        # PORTAL_UNAVAILABLE (Part 10: "portal unavailable -> UNKNOWN/
+        # failed check, not 'no change'"), the smallest taxonomy that keeps
+        # the request retryable.
         return OUTCOME_PORTAL_UNAVAILABLE, 0
 
-    after_identities = {
-        document_identity_key(source_url, document_name)
-        for source_url, document_name in session.execute(
-            select(Document.source_url, Document.document_name)
-            .where(Document.application_id == target.id, Document.doc_type.in_(target_doc_types))
-        ).all()
-    }
-    new_count = len(after_identities - before_identities)
+    if not acquisition_result.acquisition_complete:
+        # A document that DID succeed before a later one failed this same
+        # pass is still counted in new_document_count (Part 5 of the
+        # amendment: "DO NOT lose it") - only the OUTCOME here is
+        # conservative, not the persisted evidence itself.
+        return OUTCOME_ACQUISITION_INCOMPLETE, acquisition_result.new_document_count
 
-    # acquisition_complete proxy (Part 11/26 tests): discover_and_store_
-    # documents_for_application only ever (re)stamps documents_last_checked_at
-    # when its OWN acquisition_complete was True - see that function's tail.
-    # An unchanged timestamp after a successful listing therefore means one
-    # or more intended downloads failed this pass, without needing to widen
-    # that function's own return contract. Checked AFTER computing new_count
-    # (not before) so any document that DID succeed before the failing one
-    # is still counted - Part 11 does not say an incomplete acquisition
-    # found nothing, only that the request must stay retryable regardless.
-    if target.documents_last_checked_at == before_checked_at:
-        return OUTCOME_ACQUISITION_INCOMPLETE, new_count
-
+    new_count = acquisition_result.new_document_count
     return (OUTCOME_NEW_MATERIAL_EVIDENCE if new_count > 0 else OUTCOME_CHECKED_NO_NEW_EVIDENCE), new_count
 
 
 def refresh_material_evidence(
     session: Session, page, requests_session: requests.Session, council: CouncilConfig,
     application: Application, *, trigger: str, reason: str | None,
+    target_categories: frozenset[str] | None = None,
     breaker: CouncilPortalCircuitBreaker | None = None,
 ) -> RefreshOutcome:
     """The ONE generic targeted-evidence-refresh entry point (PR B2 spec,
@@ -342,6 +336,24 @@ def refresh_material_evidence(
     (manual "Find latest S106", periodic staleness, system recovery) are
     expected to call this exact same function with their own trigger/reason,
     not a parallel implementation. Only the B1 caller is wired up in this PR.
+
+    target_categories (PR B2 pre-merge amendment B, "Trigger-Agnostic S106
+    Refresh") - an explicit override for which document categories to
+    target, bypassing reason -> ROUTING entirely when given. B1's own
+    caller never passes this (None, the default), so decision_granted
+    continues to automatically include s106 exactly as before - this
+    amendment does NOT broaden B1's own routing. It exists so a FUTURE
+    caller (manual "Find latest S106", S106-outstanding monitoring) can
+    request `{"s106"}` directly regardless of the Application's current
+    decision/status - nothing in this function, resolve_application_
+    family(), or discover_and_store_documents_for_application ever
+    inspects Application.decision/status to decide whether a requested
+    category is permitted; classification is purely by the LISTED
+    document's own type (see app.extraction.pdf_text.
+    standardise_document_type), never by the target Application's
+    planning state. Confirmed by test_awaiting_decision_application_
+    with_explicit_s106_target_is_not_gated_by_status and its Granted
+    counterpart. No caller for this parameter is wired up in this PR.
 
     `application` must be the ONE Application whose own evidence_refresh_
     required/reason/trigger/requested_at fields this call is answering for
@@ -378,8 +390,11 @@ def refresh_material_evidence(
     cleared here (a later B3 owns clearing/updating it once it has actually
     acted on it)."""
     family = resolve_application_family(session, application)
-    reasons = reasons_from_stored_field(reason)
-    target_doc_types = target_doc_types_for_reasons(reasons)
+    if target_categories is not None:
+        target_doc_types = frozenset(target_categories)
+    else:
+        reasons = reasons_from_stored_field(reason)
+        target_doc_types = target_doc_types_for_reasons(reasons)
 
     per_application_outcomes: list[str] = []
     total_new_documents = 0

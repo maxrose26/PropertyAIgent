@@ -515,3 +515,203 @@ def test_evidence_refresh_module_never_imports_openai():
     assert "import openai" not in source.lower()
     assert "openai" not in sys.modules.get(module.__name__).__dict__
     assert not hasattr(module, "SchemeIntelligence")  # never even imports the model it must not touch
+
+
+# ==============================================================================
+# PR B2 pre-merge amendment: Explicit Acquisition Completion Contract +
+# Trigger-Agnostic S106 Refresh
+# ==============================================================================
+
+# --- 1-6: explicit acquisition contract --------------------------------------
+
+
+def test_fully_successful_acquisition_returns_explicit_completed_state(session):
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/d.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/fake.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="decision_notice"), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        result = discover_and_store_documents_for_application(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+        )
+    assert result.listing_succeeded is True
+    assert result.acquisition_complete is True
+    assert result.new_document_count == 1
+    assert application.documents_last_checked_at is not None  # PR A semantics unchanged (item 4)
+
+
+def test_partial_acquisition_returns_explicit_incomplete_state(session):
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    application = _add_application(session, reference="APP/1")
+    row_ok = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/ok.pdf")
+    row_fails = _fake_row("Officer Report.pdf", source_url="https://example.invalid/broken.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/ok.pdf"), RuntimeError("boom")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["decision_notice", "officer_report"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        result = discover_and_store_documents_for_application(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+        )
+    assert result.listing_succeeded is True
+    assert result.acquisition_complete is False
+    assert result.new_document_count == 1  # the one that DID succeed, not lost (item 8)
+    assert application.documents_last_checked_at is None  # PR A semantics unchanged (item 5)
+
+
+def test_b2_no_longer_infers_completion_from_documents_last_checked_at():
+    """Structural proof (item 3): the indirect timestamp-movement proxy this
+    amendment removes must not reappear in app.pipeline.evidence_refresh -
+    the module now reads DocumentAcquisitionResult.acquisition_complete
+    explicitly instead."""
+    import app.pipeline.evidence_refresh as module
+    source = Path(module.__file__).read_text()
+    assert "before_checked_at" not in source  # the removed proxy variable itself
+    assert ".documents_last_checked_at ==" not in source  # the removed comparison
+    assert "acquisition_result.acquisition_complete" in source  # the explicit replacement
+
+
+def test_existing_stage_documents_caller_remains_compatible(session):
+    """Item 6 - stage_documents (PR A's own bulk caller) still works with
+    the new DocumentAcquisitionResult return type, unmodified in spirit."""
+    from app.pipeline.run_weekly import stage_documents
+
+    _add_application(session, reference="APP/1", evidence_refresh_required=False, evidence_refresh_reason=None, evidence_refresh_trigger=None)
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[]):
+        processed = stage_documents(session, page=MagicMock(), council=_council_config())
+    assert processed == 1
+
+
+# --- 7-12: partial acquisition + B3 handoff (recovery flow) -----------------
+
+
+def test_partial_acquisition_then_successful_recovery_full_flow(session):
+    """One comprehensive scenario covering items 7-12: a targeted refresh
+    where one relevant document succeeds and another fails must report
+    ACQUISITION_INCOMPLETE, keep evidence_refresh_required True, persist the
+    successful document, and NOT create the B3 handoff yet. A later retry
+    that completes cleanly must then dedup the already-persisted document,
+    acquire only the missing one, and finally produce NEW_MATERIAL_EVIDENCE
+    with the B3 handoff."""
+    application = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    row_ok = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/ok.pdf")
+    row_fails = _fake_row("Officer Report.pdf", source_url="https://example.invalid/broken.pdf")
+
+    # Pass 1: partial failure.
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=[Path("/tmp/ok.pdf"), RuntimeError("boom")]), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["decision_notice", "officer_report"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        result_1 = refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+
+    assert result_1.outcome == OUTCOME_ACQUISITION_INCOMPLETE  # item 7
+    docs = session.query(Document).filter_by(application_id=application.id).all()
+    assert len(docs) == 1 and docs[0].doc_type == "decision_notice"  # item 8 - not lost
+    assert application.evidence_refresh_required is True  # item 9
+    assert application.material_evidence_changed_at is None  # item 10 - no B3 handoff yet
+
+    # Pass 2: recovery - the portal is re-listed with BOTH rows again (as a
+    # real re-listing would), the previously-successful one is now a
+    # duplicate by identity, and only the previously-failing one is retried.
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row_ok, row_fails]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/recovered.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["decision_notice", "officer_report"]), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        result_2 = refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+
+    assert result_2.outcome == OUTCOME_NEW_MATERIAL_EVIDENCE  # item 12
+    assert result_2.new_document_count == 1  # item 11 - only the missing one, not re-downloaded
+    docs_after = session.query(Document).filter_by(application_id=application.id).all()
+    assert len(docs_after) == 2  # the recovered pass never duplicated the first document
+    assert application.evidence_refresh_required is False
+    assert application.material_evidence_changed_at is not None  # item 12 - B3 handoff now created
+
+
+# --- 13-14: portal behaviour ---------------------------------------------------
+
+
+def test_portal_unavailable_remains_distinct_from_acquisition_incomplete():
+    assert OUTCOME_PORTAL_UNAVAILABLE != OUTCOME_ACQUISITION_INCOMPLETE
+    assert OUTCOME_PORTAL_UNAVAILABLE not in CLEARING_OUTCOMES
+    assert OUTCOME_ACQUISITION_INCOMPLETE not in CLEARING_OUTCOMES
+
+
+# --- 15-19: generic S106, status-agnostic ------------------------------------
+
+
+def test_awaiting_decision_application_with_explicit_s106_target_is_not_gated_by_status(session):
+    application = _add_application(
+        session, reference="APP/1", status="Awaiting decision", decision=None,
+        evidence_refresh_reason=REASON_RECOMMENDATION_MADE,  # a reason that would NOT normally route to s106
+    )
+    row = _fake_row("S106 Agreement.pdf", source_url="https://example.invalid/s106.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/fake.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="s106"), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        result = refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="manual_s106", reason=None, target_categories=frozenset({"s106"}),
+        )
+    assert result.outcome == OUTCOME_NEW_MATERIAL_EVIDENCE
+    assert session.query(Document).filter_by(application_id=application.id, doc_type="s106").count() == 1
+
+
+def test_granted_application_with_explicit_s106_target_works_identically(session):
+    application = _add_application(
+        session, reference="APP/1", status="Decided", decision="Approve with Conditions",
+        evidence_refresh_reason=REASON_DECISION_GRANTED,
+    )
+    row = _fake_row("S106 Agreement.pdf", source_url="https://example.invalid/s106.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/fake.pdf")), \
+         patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="s106"), \
+         patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+        result = refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="manual_s106", reason=None, target_categories=frozenset({"s106"}),
+        )
+    assert result.outcome == OUTCOME_NEW_MATERIAL_EVIDENCE
+
+
+def test_generic_refresh_never_inspects_application_status_or_decision():
+    """Item 17 - structural proof that neither the generic refresh service
+    nor the acquisition function it calls ever branch on planning status."""
+    import inspect
+
+    import app.pipeline.evidence_refresh as evidence_refresh_module
+    from app.pipeline.run_weekly import discover_and_store_documents_for_application
+
+    for source in (
+        Path(evidence_refresh_module.__file__).read_text(),
+        inspect.getsource(discover_and_store_documents_for_application),
+    ):
+        assert "application.status" not in source
+        assert "application.decision" not in source
+        assert "target.status" not in source
+        assert "target.decision" not in source
+
+
+def test_decision_granted_routing_still_includes_s106_after_amendment():
+    # Item 18 - the amendment must not have narrowed B1's own routing.
+    assert "s106" in target_doc_types_for_reasons([REASON_DECISION_GRANTED])
+
+
+def test_recommendation_made_does_not_automatically_include_s106():
+    # Item 19 - the amendment must not have broadened B1's own routing either.
+    assert "s106" not in target_doc_types_for_reasons([REASON_RECOMMENDATION_MADE])
