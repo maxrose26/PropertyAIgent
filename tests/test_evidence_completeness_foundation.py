@@ -299,10 +299,10 @@ def test_rediscovering_existing_document_does_not_duplicate_it(session):
          patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
          patch("app.pipeline.run_weekly.standardise_document_type", return_value="planning_statement"), \
          patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
-        succeeded = discover_and_store_documents_for_application(
+        result = discover_and_store_documents_for_application(
             session, MagicMock(), requests_session, _council_config("testcouncil"), application,
         )
-    assert succeeded is True
+    assert result.listing_succeeded is True
     assert session.query(Document).filter_by(application_id=application.id).count() == 1
 
     # A future targeted rediscovery calls this function directly for the
@@ -315,10 +315,10 @@ def test_rediscovering_existing_document_does_not_duplicate_it(session):
          patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
          patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
          patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
-        succeeded_2 = discover_and_store_documents_for_application(
+        result_2 = discover_and_store_documents_for_application(
             session, MagicMock(), requests_session, _council_config("testcouncil"), application,
         )
-    assert succeeded_2 is True
+    assert result_2.listing_succeeded is True
 
     docs = session.query(Document).filter_by(application_id=application.id).all()
     assert len(docs) == 2  # the existing one was NOT duplicated
@@ -409,11 +409,13 @@ def test_one_intended_download_failure_leaves_timestamp_null(session):
          patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
          patch("app.pipeline.run_weekly.standardise_document_type", side_effect=["planning_statement", "decision_notice"]), \
          patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
-        succeeded = discover_and_store_documents_for_application(
+        result = discover_and_store_documents_for_application(
             session, MagicMock(), requests.Session(), _council_config("testcouncil"), application,
         )
 
-    assert succeeded is True  # the LISTING itself succeeded (distinct claim - see item 6)
+    assert result.listing_succeeded is True  # the LISTING itself succeeded (distinct claim - see item 6)
+    assert result.acquisition_complete is False  # explicit - PR B2 amendment's own contract
+    assert result.new_document_count == 1  # the one that DID succeed is still counted, not lost
     assert application.documents_last_checked_at is None  # but the pass did not complete
     docs = session.query(Document).filter_by(application_id=application.id).all()
     assert len(docs) == 1  # only the successful one was persisted
