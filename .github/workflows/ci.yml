@@ -1,0 +1,48 @@
+name: PropertyAIgent CI
+
+# Deployment safety infrastructure only (not a general DevOps refactor): the
+# complete pytest suite must run - and pass - in GitHub Actions on every
+# push to master and every PR targeting master, so Render's own "wait for
+# CI to pass before deploying" setting (configured separately, in Render's
+# dashboard, per docs/PLATFORM_ARCHITECTURE.md - NOT this file) has a real
+# status check to gate on. This workflow does not deploy anything itself.
+#
+# No production credentials are declared or required here (DATABASE_URL,
+# OPENAI_API_KEY): the full local-fixture suite runs entirely against an
+# in-memory SQLite database (tests/conftest.py) with every external call
+# (OpenAI, portal HTTP) mocked - confirmed by inspection before this
+# workflow was added. Do not add a production secret to this workflow
+# unless the test suite genuinely comes to require one.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # --with-deps also installs the OS-level shared libraries Chromium
+      # needs (safe here - GitHub's ubuntu-latest runner has full root
+      # access, unlike Render's Cron Job build container; see render.yaml's
+      # own header comment for why Render's build step deliberately omits
+      # --with-deps). Genuinely required: tests/test_salford_child_process_
+      # memory_diagnosis.py::test_page_recycling_keeps_renderer_rss_flat_
+      # across_navigations launches a real headless Chromium instance.
+      - name: Install Playwright Chromium
+        run: playwright install --with-deps chromium
+
+      - name: Run test suite
+        run: python -m pytest
