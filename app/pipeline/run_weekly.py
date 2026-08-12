@@ -402,7 +402,7 @@ def _upsert_scraped_application(
             print(
                 f"[material-change] council={council.code} application={existing.reference} "
                 f"reason={','.join(result.reasons)} "
-                f"old_decision_bucket={result.old_decision_bucket} new_decision_bucket={result.new_decision_bucket} "
+                f"old_planning_state={result.old_planning_state} new_planning_state={result.new_planning_state} "
                 f"old_status={old_state.status!r} new_status={new_state.status!r} "
                 f"old_decision={old_state.decision!r} new_decision={new_state.decision!r} "
                 f"old_units={old_state.estimated_unit_count} new_units={new_state.estimated_unit_count}"

@@ -28,8 +28,12 @@ from app.config import CouncilConfig
 from app.db.models import Application, Base, Council
 from app.pipeline.material_change import (
     REASON_DECISION_GRANTED,
+    REASON_DECISION_OUTCOME_UNKNOWN,
     REASON_DECISION_REFUSED,
     REASON_DECISION_WITHDRAWN,
+    REASON_RECOMMENDATION_MADE,
+    REASON_RECOMMENDED_FOR_APPROVAL,
+    REASON_RECOMMENDED_FOR_REFUSAL,
     REASON_STATUS_TRANSITION,
     REASON_UNIT_COUNT_CHANGED,
     TRIGGER_MATERIAL_CHANGE,
@@ -116,7 +120,143 @@ def test_normalization_prevents_false_changes():
     new = ApplicationState(status="Decided", decision="Granted", estimated_unit_count=100)
     result = detect_material_application_change(old, new)
     assert result.changed is False
-    assert result.old_decision_bucket == result.new_decision_bucket == "granted"
+    assert result.old_planning_state == result.new_planning_state == "granted"
+
+
+def test_awaiting_to_recommended_for_approval_is_material():
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Approve", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_RECOMMENDED_FOR_APPROVAL,)
+    assert result.new_planning_state == "recommended_for_approval"
+
+
+def test_awaiting_to_recommended_for_refusal_is_material():
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Under Consideration", decision="Recommended for Refusal", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_RECOMMENDED_FOR_REFUSAL,)
+    assert result.new_planning_state == "recommended_for_refusal"
+
+
+def test_recommended_for_approval_is_not_granted():
+    """The single most important invariant this amendment introduces -
+    'Officer Recommendation: Approve' contains the substring 'approve',
+    which is_granted_decision's own GRANTED_KEYWORDS would otherwise
+    match. A recommendation must NEVER collapse into a formal decision
+    bucket."""
+    state = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Approve", estimated_unit_count=100)
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    result = detect_material_application_change(old, state)
+    assert result.new_planning_state == "recommended_for_approval"
+    assert result.new_planning_state != "granted"
+
+
+def test_recommended_for_refusal_is_not_refused():
+    state = ApplicationState(status="Under Consideration", decision="Recommended for Refusal", estimated_unit_count=100)
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    result = detect_material_application_change(old, state)
+    assert result.new_planning_state == "recommended_for_refusal"
+    assert result.new_planning_state != "refused"
+
+
+def test_recommended_for_approval_to_granted_is_material():
+    """A distinct progression from the initial 'awaiting -> recommended'
+    event - formal permission has now actually been issued, and this
+    must trigger its own refresh."""
+    old = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Approve", estimated_unit_count=100)
+    new = ApplicationState(status="Decided", decision="Granted", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_DECISION_GRANTED,)
+
+
+def test_recommended_for_refusal_to_refused_is_material():
+    old = ApplicationState(status="Under Consideration", decision="Recommended for Refusal", estimated_unit_count=100)
+    new = ApplicationState(status="Decided", decision="Refuse", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_DECISION_REFUSED,)
+
+
+def test_recommended_for_approval_to_recommended_for_approval_is_unchanged():
+    old = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Approve", estimated_unit_count=100)
+    new = ApplicationState(status="Under Consideration", decision="Recommendation: Approve", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is False  # same normalized state, different raw text
+
+
+def test_recommendation_direction_reversal_is_material():
+    old = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Approve", estimated_unit_count=100)
+    new = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Refuse", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_RECOMMENDED_FOR_REFUSAL,)
+
+
+def test_non_directional_recommendation_made_is_material():
+    """Evidence-grounded default: the one real production example
+    (Manchester, status='Recommendation Made', decision=NULL) states no
+    direction at all - recognised as its own honest, distinct state
+    rather than guessed as approval or refusal."""
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Recommendation Made", decision=None, estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_RECOMMENDATION_MADE,)
+    assert result.new_planning_state == "recommendation_made"
+    assert result.new_planning_state not in ("recommended_for_approval", "recommended_for_refusal")
+
+
+def test_awaiting_to_decided_outcome_unknown_is_material():
+    """Evidence-grounded: Rochdale/Salford real rows (status='Decided'/
+    'Decision Made', decision=NULL) and Bolton real rows (status=
+    'Decided', decision='Determined' - a genuinely non-directional
+    value)."""
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Decided", decision=None, estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is True
+    assert result.reasons == (REASON_DECISION_OUTCOME_UNKNOWN,)
+
+
+def test_decided_determined_is_also_outcome_unknown():
+    """Bolton's real production case: status='Decided', decision=
+    'Determined' - a non-empty decision value that still states no
+    outcome."""
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Decided", decision="Determined", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.new_planning_state == "decision_outcome_unknown"
+
+
+def test_unrelated_administrative_status_does_not_trigger_outcome_unknown():
+    """Regression guard against the broader rule that was considered and
+    REJECTED: Salford's real 'Condition Request determined' rows have
+    status='Closed' (not 'decided'/'decision made') - must NOT be
+    misclassified as a decided-but-unknown planning outcome."""
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Closed", decision="Condition Request determined", estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.new_planning_state == "not_yet_decided"
+    assert result.changed is False
+
+
+def test_decision_outcome_unknown_is_neither_granted_nor_refused():
+    state = ApplicationState(status="Decided", decision="Determined", estimated_unit_count=100)
+    _classified = detect_material_application_change(
+        ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100), state,
+    )
+    assert _classified.new_planning_state not in ("granted", "refused")
+
+
+def test_multiple_reasons_with_recommendation_and_unit_count_stay_deterministic():
+    old = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    new = ApplicationState(status="Under Consideration", decision="Officer Recommendation: Approve", estimated_unit_count=120)
+    result = detect_material_application_change(old, new)
+    assert result.reasons == (REASON_RECOMMENDED_FOR_APPROVAL, REASON_UNIT_COUNT_CHANGED)
 
 
 def test_terminal_decision_correction_is_status_transition():
@@ -129,8 +269,34 @@ def test_terminal_decision_correction_is_status_transition():
     assert result.reasons == (REASON_DECISION_GRANTED,)  # new bucket IS granted - gets its own named reason
 
 
-def test_reverting_to_not_yet_decided_is_status_transition():
+def test_granted_reverting_to_not_yet_decided_is_not_material():
+    """PR B1 amendment ('Planning Recommendations, Decision States &
+    Future AI Summary Behaviour'), Part 4's conservative backwards-
+    transition rule: a TERMINAL state regressing to not_yet_decided is
+    portal noise / a data-quality inconsistency (a field that
+    disappeared or was mis-scraped), not a genuine new planning event -
+    deliberately suppressed, unlike every other transition."""
     old = ApplicationState(status="Decided", decision="Granted", estimated_unit_count=100)
+    new = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is False
+    assert result.old_planning_state == "granted"
+    assert result.new_planning_state == "not_yet_decided"
+
+
+def test_refused_reverting_to_not_yet_decided_is_not_material():
+    old = ApplicationState(status="Decided", decision="Refuse", estimated_unit_count=100)
+    new = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
+    result = detect_material_application_change(old, new)
+    assert result.changed is False
+
+
+def test_non_terminal_reverting_to_not_yet_decided_remains_material():
+    """The suppression carve-out is scoped EXACTLY to TERMINAL_STATES
+    (granted/refused/withdrawn) - a non-terminal state (e.g.
+    recommendation_made) reverting to not_yet_decided is NOT covered by
+    that carve-out and remains a genuine, material status_transition."""
+    old = ApplicationState(status="Recommendation Made", decision=None, estimated_unit_count=100)
     new = ApplicationState(status="Awaiting Decision", decision=None, estimated_unit_count=100)
     result = detect_material_application_change(old, new)
     assert result.changed is True
