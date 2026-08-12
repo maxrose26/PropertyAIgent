@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 from dataclasses import dataclass, field
 
 from openai import OpenAI, OpenAIError
@@ -265,7 +266,119 @@ def guard_legally_secured_position(existing_intelligence, new_fields_raw: dict, 
     guarded["affordable_units"] = existing_intelligence.affordable_units_final
     guarded["affordable_tenure_split"] = existing_intelligence.affordable_tenure_split_final
     guarded["affordable_housing_notes"] = existing_intelligence.affordable_housing_notes
+    # This guard only ever fires when the position was already fully
+    # legally_secured AND this pass's evidence contains no legally-
+    # authoritative document at all (nothing new about security this pass)
+    # - so the reasserted position is by definition still fully secured.
+    # Without this, guard_mixed_legal_security_position below (which reads
+    # this same flag) would immediately undo this guard's own protection.
+    guarded["affordable_provision_fully_legally_secured"] = True
     return guarded
+
+
+# PR B3 pre-historical-rebuild amendment (Defect A: legal-security scope) -
+# guard_legally_secured_position above only protects a DOWNGRADE of an
+# already-secured position by lower-authority evidence. Phase 3's live
+# Trafford 114786/FUL/24 sample exposed the OPPOSITE failure mode: a
+# genuine executed S106 present anywhere in the evidence incorrectly
+# promoted the ENTIRE current affordable total (50% / 73 units) to
+# legally_secured, even though the same evidence explicitly distinguished
+# a legally-secured base (10%, via the S106) from a separately-delivered
+# additional non-S106 component (a further 40%). The mere presence of an
+# authoritative legal document must never, by itself, promote the whole
+# current total - only the portion that document actually secures.
+MIXED_SECURITY_FALLBACK_STATUS = "conditioned"
+
+# Deliberately a small, bounded keyword/phrase scan - not a general legal-
+# reasoning engine - and only a second, independent signal alongside the
+# model's own affordable_provision_fully_legally_secured flag (see
+# REFRESH_SCHEMA/build_refresh_prompt below). Matches the real evidenced
+# phrasing from the Trafford sample ("an additional 40% non-s106
+# affordable homes").
+_MIXED_SECURITY_SIGNAL_PATTERNS = [
+    re.compile(r"non[\s-]?s106", re.IGNORECASE),
+    re.compile(r"outside\s+(?:the|of\s+the)\s+(?:s106|section\s*106)", re.IGNORECASE),
+    re.compile(r"in\s+addition\s+to\s+the\s+(?:s106|section\s*106)", re.IGNORECASE),
+    re.compile(r"additional\s+to\s+the\s+(?:s106|section\s*106)", re.IGNORECASE),
+]
+
+
+def _evidence_indicates_mixed_affordable_security(evidence_text: str) -> bool:
+    text = evidence_text or ""
+    return any(pattern.search(text) for pattern in _MIXED_SECURITY_SIGNAL_PATTERNS)
+
+
+def guard_mixed_legal_security_position(new_fields_raw: dict, evidence_text: str) -> dict:
+    """Deterministic backstop for the mixed-security overclaim (Defect A) -
+    the UPWARD failure mode guard_legally_secured_position's own DOWNWARD
+    guard does not cover. Blocks affordable_housing_status="legally_secured"
+    for the CURRENT TOTAL position unless BOTH: (1) the model itself
+    explicitly asserts affordable_provision_fully_legally_secured=true, AND
+    (2) the evidence text contains no explicit mixed-security signal phrase
+    - a legally-authoritative document merely existing somewhere in the
+    evidence is never, by itself, sufficient (this module's own docstring).
+    Falls back to "conditioned" - the closest fit in the existing
+    AFFORDABLE_HOUSING_STATUSES vocabulary to "partially governed by a
+    legal instrument, not fully" without inventing a new status (the
+    amendment explicitly requires exhausting the existing vocabulary
+    first). Leaves affordable_percentage/affordable_units/affordable_
+    tenure_split/affordable_housing_notes untouched - the current TOTAL
+    position (e.g. 50% / 73 units) may still legitimately stand; only its
+    security LABEL is corrected."""
+    if new_fields_raw.get("affordable_housing_status") != LEGALLY_SECURED_STATUS:
+        return new_fields_raw
+
+    model_says_fully_secured = new_fields_raw.get("affordable_provision_fully_legally_secured") is True
+    evidence_suggests_mixed = _evidence_indicates_mixed_affordable_security(evidence_text)
+
+    if model_says_fully_secured and not evidence_suggests_mixed:
+        return new_fields_raw  # legitimate full-security case - Part 9 requirement
+
+    guarded = dict(new_fields_raw)
+    guarded["affordable_housing_status"] = MIXED_SECURITY_FALLBACK_STATUS
+    return guarded
+
+
+# PR B3 pre-historical-rebuild amendment (Defect B: refusal-reason
+# reliability) - Phase 3's live Stockport DC/060928 sample showed an
+# explicit, correctly-labelled refusal reason near the START of an 8,035-
+# char decision_notice document was missed, despite being well within
+# MAX_REFRESH_CONTEXT_CHARS. Root cause: build_combined_priority_text (the
+# shared, unmodified extraction-pipeline text assembler - not reopened
+# here) orders sections by ITS OWN PRIORITY_ORDER, which places
+# decision_notice AFTER a much larger Planning Statement - the refusal
+# wording isn't lost to truncation, but it is buried behind ~60,000 chars
+# of lower-authority applicant-authored text before the model ever reaches
+# it. Rather than reordering shared machinery other pipelines also depend
+# on, this surfaces a small, clearly-labelled excerpt of the decision
+# notice's own refusal-reason section directly in the refresh prompt, so
+# it reaches the model prominently regardless of where it falls in the
+# combined text.
+_REFUSAL_REASON_PATTERNS = [
+    re.compile(r"reasons?\s+for\s+refusal", re.IGNORECASE),
+    re.compile(r"refused\s+for\s+the\s+following\s+reasons?", re.IGNORECASE),
+    re.compile(r"following\s+reasons?\s*:", re.IGNORECASE),
+]
+
+
+def extract_refusal_reason_excerpt(documents: list[Document], max_chars: int = 2000) -> str | None:
+    """Deterministic surfacing, not parsing, of a formal decision_notice's
+    own refusal-reason section (Part 15 of the amendment: "reliable
+    evidence surfacing, not replacing AI interpretation" - the LLM still
+    produces the final normalized refusal_reasons output, this only makes
+    sure it clearly sees the relevant excerpt). A small, fixed pattern
+    list, not a portal-specific parser; returns None (no behaviour change)
+    if no marker is found in any decision_notice document."""
+    for document in documents:
+        if document.doc_type != "decision_notice":
+            continue
+        text = document.extracted_text or ""
+        for pattern in _REFUSAL_REASON_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                start = match.start()
+                return text[start:start + max_chars].strip()
+    return None
 
 
 # --- Refresh outcome + change detection --------------------------------------
@@ -330,12 +443,18 @@ REFRESH_SCHEMA = {
             "affordable_tenure_split": {"type": ["string", "null"]},
             "affordable_housing_status": {"type": "string", "enum": sorted(AFFORDABLE_HOUSING_STATUSES)},
             "affordable_housing_notes": {"type": ["string", "null"]},
+            # PR B3 pre-historical-rebuild amendment (Defect A) - ephemeral
+            # signal only, consumed by guard_mixed_legal_security_position
+            # below and never persisted as its own SchemeIntelligence
+            # column (Part 4 of the amendment: no new persisted fields).
+            "affordable_provision_fully_legally_secured": {"type": ["boolean", "null"]},
             "planning_position_summary": {"type": "string"},
         },
         "required": [
             "recommendation_direction", "formal_decision_outstanding", "refusal_reasons", "withdrawal_reason",
             "affordable_percentage", "affordable_units", "affordable_tenure_split",
-            "affordable_housing_status", "affordable_housing_notes", "planning_position_summary",
+            "affordable_housing_status", "affordable_housing_notes",
+            "affordable_provision_fully_legally_secured", "planning_position_summary",
         ],
         "additionalProperties": False,
     },
@@ -358,6 +477,7 @@ def _fmt_existing_position(intel) -> str:
 
 def build_refresh_prompt(
     application: Application, depth: str, existing_intelligence, evidence_text: str,
+    refusal_reason_excerpt: str | None = None,
 ) -> str:
     return f"""
 You are updating UK residential planning intelligence for ONE application
@@ -375,7 +495,14 @@ CURRENTLY RECORDED POSITION (do not discard this - only update fields the
 new evidence below actually speaks to; leave anything else exactly as
 recorded):
 {_fmt_existing_position(existing_intelligence)}
-
+{"" if not refusal_reason_excerpt else f'''
+HIGHLIGHTED EXCERPT FROM THE FORMAL DECISION NOTICE (verbatim - this is the
+part of the Decision Notice most likely to state the formal refusal
+reason(s); treat it as strong, authoritative evidence for refusal_reasons,
+but still corroborate it against the full evidence text below rather than
+relying on it alone):
+{refusal_reason_excerpt}
+'''}
 NEW EVIDENCE TEXT (this is the entire basis for any change you make):
 {evidence_text or '(no readable evidence text was available this pass)'}
 
@@ -411,6 +538,19 @@ useless and actively harmful to a commercial user:
     ever recorded).
 - Never invent refusal_reasons or withdrawal_reason. If the evidence does
   not state a reason, leave the field null - do not guess a plausible one.
+- For a formally refused application, refusal_reasons is one of the
+  HIGHEST-VALUE outputs of this whole refresh - never treat it as
+  incidental. Actively look for explicit refusal wording ("Reason for
+  Refusal", "Reasons for Refusal", numbered refusal reasons, or equivalent
+  formal wording) within any Decision Notice text in the evidence below
+  (see also the HIGHLIGHTED EXCERPT above, if present), and populate
+  refusal_reasons with a concise, evidence-grounded summary of the stated
+  reason(s) whenever such wording exists. A short, authoritative Decision
+  Notice must never be overlooked just because a longer Officer Report or
+  Planning Statement also appears in the evidence. Only leave refusal_
+  reasons null if no formal reason wording exists anywhere in the
+  evidence - never infer a reason merely from objections, consultation
+  responses, or general policy commentary.
 - Affordable housing: never describe a proposed or officer-recommended
   position as "legally_secured". Only use affordable_housing_status=
   "legally_secured" if the evidence text is an EXECUTED S106 agreement, a
@@ -418,6 +558,42 @@ useless and actively harmful to a commercial user:
   itself the operative legal instrument - not a proposal, planning
   statement, committee report, or officer report describing what a future
   S106 will contain.
+- MIXED LEGAL SECURITY: affordable_housing_status="legally_secured"
+  describes the CURRENT TOTAL affordable position (affordable_percentage/
+  affordable_units above), not just a portion of it. An executed S106,
+  Deed of Variation, Unilateral Undertaking, or Decision Notice existing
+  SOMEWHERE in the evidence does NOT by itself justify legally_secured for
+  the whole total - only use it if that legal instrument secures the
+  ENTIRE current total position. If the evidence distinguishes a legally-
+  secured base amount from an ADDITIONAL amount delivered outside that
+  legal mechanism (e.g. "non-S106", "outside the S106 agreement", "in
+  addition to the S106 requirement"), the total position is MIXED and must
+  NOT be labelled legally_secured - use "conditioned" instead, and set
+  affordable_provision_fully_legally_secured=false. In that case, explain
+  the split factually in affordable_housing_notes (e.g. "The executed S106
+  secures the base 10% affordable housing requirement. The Affordable
+  Housing Statement identifies a further 40% as non-S106 affordable
+  housing, bringing the overall proposal to 50% / 73 homes."). Do NOT
+  invent exact secured unit counts from arithmetic alone - e.g. do not
+  state "15 homes are legally secured" merely because 10% of 147 is
+  approximately 15, unless the legal instrument itself states that figure;
+  it is sufficient and more accurate to describe the S106 as securing "the
+  10% requirement" while separately stating the overall current total. Set
+  affordable_provision_fully_legally_secured=true ONLY when the evidence
+  shows the ENTIRE current total is secured by the same executed legal
+  instrument with no separate additional non-secured component; never
+  leave it null when affordable_housing_status is legally_secured.
+- TENURE CONSISTENCY: affordable_tenure_split and affordable_housing_notes
+  must describe ONE coherent current tenure position. If this pass's
+  evidence clearly establishes a fuller or updated tenure picture (specific
+  tenure categories/counts), update affordable_tenure_split to match what
+  affordable_housing_notes says - never leave affordable_tenure_split as a
+  stale prior value while affordable_housing_notes describes a different or
+  more detailed tenure breakdown. If evidence is genuinely conflicting or
+  too incomplete to update confidently, say so explicitly in affordable_
+  housing_notes and leave affordable_tenure_split as currently recorded -
+  never present a narrative tenure detail that contradicts the structured
+  field.
 - If the new evidence conflicts with an earlier proposal (e.g. the executed
   S106 secures a different % or tenure split than the applicant originally
   proposed), state that difference explicitly in affordable_housing_notes -
@@ -560,7 +736,11 @@ def refresh_intelligence_for_application(
         return RefreshOutcome(outcome=OUTCOME_NO_USABLE_TEXT, depth=depth)
 
     existing_intelligence = application.scheme_intelligence
-    prompt = build_refresh_prompt(application, depth, existing_intelligence, evidence_text)
+    refusal_reason_excerpt = extract_refusal_reason_excerpt(documents)
+    prompt = build_refresh_prompt(
+        application, depth, existing_intelligence, evidence_text,
+        refusal_reason_excerpt=refusal_reason_excerpt,
+    )
 
     try:
         new_fields_raw = _call_refresh_llm(client, prompt)
@@ -582,6 +762,13 @@ def refresh_intelligence_for_application(
     # evidence; this is the code-level guarantee that holds even if the
     # model doesn't comply.
     new_fields_raw = guard_legally_secured_position(existing_intelligence, new_fields_raw, documents)
+
+    # Deterministic mixed-security backstop (pre-historical-rebuild
+    # amendment, Defect A) - the UPWARD counterpart to the guard above: an
+    # authoritative legal document existing somewhere in the evidence must
+    # never, by itself, promote the entire current affordable total to
+    # legally_secured when the evidence itself describes a mixed position.
+    new_fields_raw = guard_mixed_legal_security_position(new_fields_raw, evidence_text)
 
     # Map the LLM's own field names onto SchemeIntelligence's existing
     # reconciled-field names (affordable_percentage -> affordable_

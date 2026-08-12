@@ -40,10 +40,14 @@ from app.extraction.intelligence_refresh import (
     DEPTH_RECOMMENDATION,
     DEPTH_UNIT_CHANGE,
     LEGALLY_SECURED_STATUS,
+    MIXED_SECURITY_FALLBACK_STATUS,
     REFRESH_SCHEMA,
     _DOC_TYPES_BY_DEPTH,
     build_refresh_prompt,
     detect_affordable_housing_changes,
+    extract_refusal_reason_excerpt,
+    guard_legally_secured_position,
+    guard_mixed_legal_security_position,
     refresh_depth_for_reasons,
     refresh_intelligence_for_application,
     select_refresh_evidence_documents,
@@ -113,6 +117,7 @@ def _base_refresh_response(**overrides) -> dict:
         "affordable_tenure_split": None,
         "affordable_housing_status": "unknown",
         "affordable_housing_notes": None,
+        "affordable_provision_fully_legally_secured": None,
         "planning_position_summary": "The application remains under consideration.",
     }
     payload.update(overrides)
@@ -378,7 +383,9 @@ def test_later_s106_evidence_triggers_refresh_without_new_status_transition(sess
     _add_scheme_intelligence(session, app, affordable_percentage_final=35.0)
     _add_document(session, app, "s106", "The executed S106 secures 35% affordable housing.")
 
-    client = _client_returning(_base_refresh_response(affordable_housing_status=LEGALLY_SECURED_STATUS))
+    client = _client_returning(_base_refresh_response(
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=True,
+    ))
     outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
 
     assert outcome.depth == DEPTH_BROAD
@@ -497,6 +504,7 @@ def test_later_s106_supersedes_earlier_proposal(session):
 
     client = _client_returning(_base_refresh_response(
         affordable_percentage=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
         affordable_housing_notes="The executed S106 secures 35%, down from the applicant's original 40% proposal.",
     ))
     outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
@@ -513,10 +521,14 @@ def test_later_deed_of_variation_updates_s106_derived_intelligence(session):
     _add_scheme_intelligence(session, app, affordable_percentage_final=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS)
     _add_document(session, app, "s106", "Deed of Variation revises the affordable housing provision to 30%.")
 
-    client = _client_returning(_base_refresh_response(affordable_percentage=30.0, affordable_housing_status=LEGALLY_SECURED_STATUS))
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=30.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
+    ))
     outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
 
     assert app.scheme_intelligence.affordable_percentage_final == 30.0
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
     assert "affordable_percentage_changed" in outcome.affordable_housing_changes
 
 
@@ -565,7 +577,7 @@ def test_commuted_sum_represented_where_evidenced(session):
     _add_document(session, app, "s106", "A commuted sum of £500,000 is secured in lieu of on-site affordable housing.")
 
     client = _client_returning(_base_refresh_response(
-        affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=True,
         affordable_housing_notes="A commuted sum of £500,000 is secured in lieu of on-site provision.",
     ))
     refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
@@ -604,7 +616,10 @@ def test_executed_s106_position_represented_as_legally_secured_where_supported(s
     _add_scheme_intelligence(session, app)
     _add_document(session, app, "s106", "This executed S106 Agreement legally secures 35% affordable housing.")
 
-    client = _client_returning(_base_refresh_response(affordable_percentage=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS))
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
+    ))
     refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
 
     assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
@@ -978,6 +993,7 @@ def test_35_percent_proposed_to_20_percent_legally_secured_preserves_movement(se
 
     client = _client_returning(_base_refresh_response(
         affordable_percentage=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
         affordable_housing_notes="Affordable housing reduced from 35% to 20%, now legally secured through the executed S106.",
     ))
     outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
@@ -995,6 +1011,7 @@ def test_35_percent_proposed_to_35_percent_legally_secured_identifies_security_p
 
     client = _client_returning(_base_refresh_response(
         affordable_percentage=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
         affordable_housing_notes="The previously proposed 35% affordable provision is now legally secured through the executed S106.",
     ))
     outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
@@ -1087,10 +1104,14 @@ def test_legally_authoritative_document_can_revise_secured_position(session):
     _add_scheme_intelligence(session, app, affordable_percentage_final=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS)
     _add_document(session, app, "s106", "Deed of Variation revises the secured provision to 15%.")
 
-    client = _client_returning(_base_refresh_response(affordable_percentage=15.0, affordable_housing_status=LEGALLY_SECURED_STATUS))
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=15.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
+    ))
     refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
 
     assert app.scheme_intelligence.affordable_percentage_final == 15.0  # guard did not block a legitimate revision
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
 
 
 def test_unchanged_affordable_position_does_not_fabricate_change_narrative():
@@ -1198,6 +1219,7 @@ def test_successful_replacement_commits_notes_status_summary_and_watermark_toget
 
     client = _client_returning(_base_refresh_response(
         affordable_percentage=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_provision_fully_legally_secured=True,
         affordable_housing_notes="Reduced from 35% to 20%, now secured.",
     ))
     outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub("Fresh summary"))
@@ -1626,3 +1648,443 @@ def test_site_summary_prompt_relays_partial_breakdown_notes_verbatim():
     )
     prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
     assert "does not clearly allocate the remaining 18" in prompt
+
+
+# ==============================================================================
+# B3 PRE-HISTORICAL-REBUILD AMENDMENT: legal-security scope + refusal-reason
+# reliability
+#
+# Phase 3 live validation (Trafford 114786/FUL/24, Stockport DC/060928)
+# found two blocking defects, fixed here:
+#   A. S106 LEGAL-SECURITY SCOPE - a genuine executed S106 anywhere in the
+#      evidence incorrectly promoted the ENTIRE current affordable total to
+#      legally_secured, even where the evidence itself distinguished a
+#      legally-secured base from an additional non-S106 component.
+#   B. REFUSAL-REASON RELIABILITY - an explicit, well-inside-context refusal
+#      reason in a Decision Notice was missed because it was buried behind
+#      a much larger lower-authority Planning Statement in the combined
+#      evidence text.
+# ==============================================================================
+
+# --- Defect A: mixed legal security scope -------------------------------------
+
+
+def test_mixed_s106_and_non_s106_position_not_labelled_legally_secured(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=10.2, affordable_units_final=15, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Completed S106 secures the base 10% affordable housing requirement.")
+    _add_document(session, app, "viability_affordable_housing", (
+        "The applicant proposes to deliver an additional 40% non-s106 affordable homes, "
+        "resulting in 50% affordable housing overall, equating to 73 properties including "
+        "16 social rent and 57 shared ownership."
+    ))
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=50.0, affordable_units=73, affordable_tenure_split="16 social rent, 57 shared ownership",
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=False,
+        affordable_housing_notes=(
+            "The executed S106 secures the base 10% affordable housing requirement. The "
+            "Affordable Housing Statement identifies a further 40% as non-S106 affordable "
+            "housing, bringing the overall proposal to 50% / 73 homes."
+        ),
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.affordable_housing_status != LEGALLY_SECURED_STATUS
+    assert app.scheme_intelligence.affordable_housing_status == MIXED_SECURITY_FALLBACK_STATUS
+
+
+def test_mixed_position_retains_total_current_provision_numbers(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=10.2, affordable_units_final=15)
+    _add_document(session, app, "s106", "Completed S106 secures the base 10% affordable housing requirement.")
+    _add_document(session, app, "viability_affordable_housing", "An additional 40% non-s106 affordable homes are proposed, bringing the total to 50%, equating to 73 properties.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=50.0, affordable_units=73,
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=False,
+        affordable_housing_notes="The S106 secures the base 10%; a further 40% non-S106 provision brings the total to 50% / 73 homes.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    # Part 4/9 of the amendment - the TOTAL current position may still
+    # legitimately be 50%/73 units; only the security LABEL is corrected.
+    assert app.scheme_intelligence.affordable_percentage_final == 50.0
+    assert app.scheme_intelligence.affordable_units_final == 73
+    assert app.scheme_intelligence.affordable_housing_status == MIXED_SECURITY_FALLBACK_STATUS
+
+
+def test_mixed_position_notes_distinguish_secured_base_from_additional(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=10.2, affordable_units_final=15)
+    _add_document(session, app, "s106", "Completed S106 secures the base 10% requirement.")
+    _add_document(session, app, "viability_affordable_housing", "Additional 40% non-s106 affordable homes proposed.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=50.0, affordable_units=73,
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=False,
+        affordable_housing_notes=(
+            "The executed S106 secures the base 10% affordable housing requirement. The "
+            "Affordable Housing Statement identifies a further 40% as non-S106 affordable housing."
+        ),
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    notes = app.scheme_intelligence.affordable_housing_notes
+    assert "10%" in notes and "40%" in notes
+    assert "non-S106" in notes
+
+
+def test_guard_blocks_legally_secured_when_model_flag_not_true():
+    new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": None}
+    guarded = guard_mixed_legal_security_position(new_fields_raw, "some evidence text with no mixed signal")
+    assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
+
+
+def test_guard_blocks_legally_secured_when_evidence_text_signals_mixed_position():
+    # Even if the model itself claims full security, the deterministic
+    # evidence-text scan still blocks it - "do not rely solely on prompt
+    # obedience" (Part 8 of the amendment).
+    new_fields_raw = {"affordable_housing_status": LEGALLY_SECURED_STATUS, "affordable_provision_fully_legally_secured": True}
+    guarded = guard_mixed_legal_security_position(new_fields_raw, "an additional 40% non-s106 affordable homes are proposed")
+    assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
+
+
+def test_fully_secured_position_remains_legally_secured(session):
+    # Part 9 of the amendment - do not overcorrect: a genuinely fully-
+    # secured position must still be allowed to be legally_secured.
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=35.0, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "This executed S106 Agreement legally secures the entire 50% affordable housing provision, comprising 73 homes.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=50.0, affordable_units=73,
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=True,
+        affordable_housing_notes="The executed S106 secures the entire 50% affordable housing provision.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+    assert app.scheme_intelligence.affordable_percentage_final == 50.0
+
+
+def test_existing_downgrade_guard_still_works_after_mixed_security_amendment(session):
+    # Reconfirms guard_legally_secured_position's own downgrade protection
+    # (Part 10, prior amendment) survives this one unmodified.
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=None)
+    _add_scheme_intelligence(
+        session, app, affordable_percentage_final=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="Secured at 20% via executed S106.",
+    )
+    _add_document(session, app, "planning_statement", "A later marketing planning statement claims 35% affordable housing.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=35.0, affordable_housing_status="proposed",
+        affordable_housing_notes="Now proposing 35%.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+
+
+def test_downgrade_guard_output_feeds_correctly_into_mixed_security_guard():
+    # Structural proof the two guards compose correctly - guard_legally_
+    # secured_position's own forced reassertion must not be immediately
+    # undone by guard_mixed_legal_security_position running afterward.
+    existing = MagicMock(
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_percentage_final=20.0,
+        affordable_units_final=30, affordable_tenure_split_final="60/40", affordable_housing_notes="Secured at 20%.",
+    )
+    new_fields_raw = {"affordable_housing_status": "proposed", "affordable_percentage": 35.0}
+    guarded_once = guard_legally_secured_position(existing, new_fields_raw, documents=[])
+    guarded_twice = guard_mixed_legal_security_position(guarded_once, "no mixed-security signal text")
+    assert guarded_twice["affordable_housing_status"] == LEGALLY_SECURED_STATUS
+
+
+def test_mixed_security_fallback_status_is_valid_vocabulary_member():
+    assert MIXED_SECURITY_FALLBACK_STATUS in AFFORDABLE_HOUSING_STATUSES
+
+
+def test_guard_handles_missing_fully_secured_key_safely():
+    guarded = guard_mixed_legal_security_position({"affordable_housing_status": LEGALLY_SECURED_STATUS}, "no signal here")
+    assert guarded["affordable_housing_status"] == MIXED_SECURITY_FALLBACK_STATUS
+
+
+# --- Defect A: affordable tenure consistency -----------------------------------
+
+
+def test_tenure_refreshed_coherently_when_new_evidence_clarifies_mix(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_tenure_split_final="Shared Ownership, Rent to Buy")
+    _add_document(session, app, "viability_affordable_housing", "16 social rent, 57 shared ownership.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_tenure_split="16 social rent, 57 shared ownership",
+        affordable_housing_notes="The tenure mix comprises 16 social rent and 57 shared ownership homes.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_tenure_split_final == "16 social rent, 57 shared ownership"
+    assert "social rent" in app.scheme_intelligence.affordable_housing_notes
+
+
+def test_tenure_and_notes_do_not_contradict_after_successful_pass(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "viability_affordable_housing", "16 social rent, 57 shared ownership.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_tenure_split="16 social rent, 57 shared ownership",
+        affordable_housing_notes="16 social rent and 57 shared ownership homes are proposed.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    tenure = app.scheme_intelligence.affordable_tenure_split_final
+    notes = app.scheme_intelligence.affordable_housing_notes
+    assert "social rent" in tenure and "social rent" in notes
+    assert "shared ownership" in tenure and "shared ownership" in notes
+
+
+def test_conflicting_tenure_evidence_states_uncertainty_not_fabricated_reconciliation(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_tenure_split_final="Shared Ownership, Rent to Buy")
+    _add_document(session, app, "officer_report", "Tenure split reported inconsistently across documents.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_tenure_split=None,
+        affordable_housing_notes="Tenure evidence this pass is conflicting; the previously recorded split is retained pending clarification.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_tenure_split_final == "Shared Ownership, Rent to Buy"
+    assert "conflicting" in app.scheme_intelligence.affordable_housing_notes.lower()
+
+
+def test_default_summary_receives_reconciled_tenure_position(session, monkeypatch):
+    captured = {}
+
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        captured["merged"] = dict(merged)
+        return "Summary reflecting reconciled tenure."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, site_id=site.id)
+    _add_scheme_intelligence(session, app, affordable_tenure_split_final="Shared Ownership, Rent to Buy")
+    _add_document(session, app, "viability_affordable_housing", "16 social rent, 57 shared ownership.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_tenure_split="16 social rent, 57 shared ownership",
+        affordable_housing_notes="16 social rent and 57 shared ownership homes are proposed.",
+    ))
+    refresh_intelligence_for_application(session, client, app)
+
+    assert captured["merged"]["affordable_tenure_split_final"] == "16 social rent, 57 shared ownership"
+
+
+# --- Defect B: refusal-reason reliability --------------------------------------
+
+
+def test_formal_refusal_reasons_populated_when_evidenced(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED, decision="Refuse")
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", (
+        "PLANNING PERMISSION HAS BEEN REFUSED for the following\nreason:\n"
+        "1. Harm to the Green Belt and failure to provide 50% affordable housing."
+    ))
+
+    client = _client_returning(_base_refresh_response(
+        refusal_reasons="Harm to the Green Belt and failure to provide 50% affordable housing.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.refusal_reasons == "Harm to the Green Belt and failure to provide 50% affordable housing."
+
+
+def test_extract_refusal_reason_excerpt_finds_stockport_style_wording(session):
+    app = _add_application(session, reference="APP/1")
+    doc = _add_document(session, app, "decision_notice", (
+        "STOCKPORT METROPOLITAN BOROUGH COUNCIL\nDECISION NOTICE\n...header text...\n"
+        "the Council hereby give notice that PLANNING PERMISSION HAS BEEN REFUSED "
+        "for the carrying out of the development described above, for the following\n"
+        "reason:\n1. Very special circumstances do not exist..."
+    ))
+    excerpt = extract_refusal_reason_excerpt([doc])
+    assert excerpt is not None
+    assert "Very special circumstances" in excerpt
+
+
+def test_extract_refusal_reason_excerpt_ignores_officer_report(session):
+    app = _add_application(session, reference="APP/1")
+    officer_doc = _add_document(
+        session, app, "officer_report", "Officers discuss the reasons for refusal at length in this report.",
+    )
+    excerpt = extract_refusal_reason_excerpt([officer_doc])
+    assert excerpt is None  # only decision_notice documents are scanned
+
+
+def test_multiple_refusal_reasons_represented_concisely(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "REFUSED for the following\nreasons:\n1. Green Belt harm.\n2. Heritage asset harm.\n3. Highways safety.")
+
+    client = _client_returning(_base_refresh_response(
+        refusal_reasons="Green Belt harm, heritage asset harm (Griffin Farmhouse), and highways safety concerns.",
+    ))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    reasons = app.scheme_intelligence.refusal_reasons
+    assert "Green Belt" in reasons and "highways" in reasons.lower()
+
+
+def test_no_refusal_reason_fabricated_when_decision_notice_lacks_explicit_wording(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "The application is refused. No further detail provided in this excerpt.")
+
+    client = _client_returning(_base_refresh_response(refusal_reasons=None))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.refusal_reasons is None
+
+
+def test_objection_text_alone_does_not_trigger_refusal_reason_extraction(session):
+    app = _add_application(session, reference="APP/1")
+    doc = _add_document(session, app, "decision_notice", "Numerous objections were received citing loss of light and parking concerns.")
+    excerpt = extract_refusal_reason_excerpt([doc])
+    assert excerpt is None
+
+
+def test_refresh_prompt_includes_highlighted_refusal_excerpt_when_present(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "planning_statement", "Applicant proposal text. " * 3000)
+    _add_document(session, app, "decision_notice", "REFUSED for the following\nreason:\n1. Green Belt harm and heritage impact.")
+
+    client = _client_returning(_base_refresh_response(refusal_reasons="Green Belt harm and heritage impact."))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    sent_prompt = client.responses.create.call_args.kwargs["input"]
+    assert "HIGHLIGHTED EXCERPT FROM THE FORMAL DECISION NOTICE" in sent_prompt
+    assert "Green Belt harm and heritage impact" in sent_prompt
+
+
+def test_refusal_excerpt_works_in_broad_depth(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "REFUSED for the following\nreason:\n1. Green Belt harm.")
+
+    client = _client_returning(_base_refresh_response(refusal_reasons="Green Belt harm."))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert outcome.depth == DEPTH_BROAD
+    sent_prompt = client.responses.create.call_args.kwargs["input"]
+    assert "HIGHLIGHTED EXCERPT FROM THE FORMAL DECISION NOTICE" in sent_prompt
+
+
+def test_refusal_excerpt_works_in_focused_refusal_depth(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED)
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "REFUSED for the following\nreason:\n1. Green Belt harm.")
+
+    client = _client_returning(_base_refresh_response(refusal_reasons="Green Belt harm."))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert outcome.depth == DEPTH_FOCUSED_REFUSAL
+    sent_prompt = client.responses.create.call_args.kwargs["input"]
+    assert "HIGHLIGHTED EXCERPT FROM THE FORMAL DECISION NOTICE" in sent_prompt
+
+
+def test_default_summary_receives_prospective_refusal_reasons(session, monkeypatch):
+    captured = {}
+
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        captured["merged"] = dict(merged)
+        return "Summary mentioning the refusal reason."
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(
+        session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED, site_id=site.id, decision="Refuse",
+    )
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "REFUSED for the following\nreason:\n1. Green Belt harm and heritage impact.")
+
+    client = _client_returning(_base_refresh_response(refusal_reasons="Green Belt harm and heritage impact."))
+    refresh_intelligence_for_application(session, client, app)
+
+    assert captured["merged"]["refusal_reasons"] == "Green Belt harm and heritage impact."
+
+
+# --- Atomicity reconfirmation ---------------------------------------------------
+
+
+def test_refusal_summary_failure_preserves_old_refusal_reasons_and_summary(session, monkeypatch):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+        raise RuntimeError("summary generation failed")
+
+    monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)
+
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(
+        session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_REFUSED, site_id=site.id, decision="Refuse",
+    )
+    site.status_summary = "Old summary"
+    _add_scheme_intelligence(session, app, refusal_reasons="Old reason preserved.")
+    _add_document(session, app, "decision_notice", "REFUSED for the following\nreason:\n1. New reason text.")
+    session.commit()
+
+    client = _client_returning(_base_refresh_response(refusal_reasons="New reason text."))
+    outcome = refresh_intelligence_for_application(session, client, app)
+
+    assert outcome.outcome == OUTCOME_ERROR
+    assert app.scheme_intelligence.refusal_reasons == "Old reason preserved."
+    assert site.status_summary == "Old summary"
+
+
+def test_successful_refresh_commits_mixed_security_and_refusal_fields_together(session):
+    site = Site(council_code="testcouncil", canonical_address="4 test street", display_address="4 Test Street")
+    session.add(site)
+    session.commit()
+    now = dt.datetime.now(dt.timezone.utc)
+    app = _add_application(
+        session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED,
+        site_id=site.id, material_evidence_changed_at=now,
+    )
+    _add_scheme_intelligence(
+        session, app, affordable_percentage_final=10.2, affordable_units_final=15,
+        affordable_tenure_split_final="Shared Ownership, Rent to Buy",
+    )
+    _add_document(session, app, "s106", "Completed S106 secures the base 10% requirement.")
+    _add_document(session, app, "viability_affordable_housing", (
+        "Additional 40% non-s106 affordable homes proposed, 16 social rent and 57 shared "
+        "ownership, totalling 73 homes / 50%."
+    ))
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=50.0, affordable_units=73, affordable_tenure_split="16 social rent, 57 shared ownership",
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_provision_fully_legally_secured=False,
+        affordable_housing_notes=(
+            "The executed S106 secures the base 10% affordable housing requirement. An "
+            "additional 40% is delivered as non-S106 affordable housing."
+        ),
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub("Fresh summary"))
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.affordable_percentage_final == 50.0
+    assert app.scheme_intelligence.affordable_units_final == 73
+    assert app.scheme_intelligence.affordable_tenure_split_final == "16 social rent, 57 shared ownership"
+    assert app.scheme_intelligence.affordable_housing_status == MIXED_SECURITY_FALLBACK_STATUS
+    assert site.status_summary == "Fresh summary"
+    assert app.intelligence_evidence_processed_at == now
