@@ -993,6 +993,7 @@ def discover_and_store_documents_for_application(
     session: Session, page, requests_session: requests.Session, council: CouncilConfig,
     application: Application, health: AcquisitionHealth | None = None,
     breaker: CouncilPortalCircuitBreaker | None = None,
+    target_doc_types: frozenset[str] | None = None,
 ) -> bool:
     """The actual per-application document-discovery-and-store logic,
     factored out of stage_documents' loop (Evidence Completeness
@@ -1029,9 +1030,20 @@ def discover_and_store_documents_for_application(
     stage_documents between calls), not per-application discovery logic,
     and a future single-application caller (a manual refresh handling one
     application in isolation, say) may reasonably want different pacing
-    behaviour of its own."""
+    behaviour of its own.
+
+    target_doc_types (PR B2, Targeted Evidence Refresh, Part 8) - an
+    optional narrower category set, used in place of the full
+    USEFUL_DOC_TYPES "is this worth keeping" gate below. None (the default,
+    and the only value stage_documents itself ever passes) preserves PR A's
+    exact original behaviour - every useful document type. A targeted
+    refresh call passes the specific categories its material-change reason
+    routes to (see app.pipeline.evidence_refresh), so e.g. a decision_
+    refused refresh does not download an unrelated design_access drawing
+    just because it happens to appear in the same listing."""
     if not application.summary_url:
         return False
+    useful_types = target_doc_types if target_doc_types is not None else USEFUL_DOC_TYPES
     # documents.application.before/after (Render Daily Discovery Salford
     # document-stage memory diagnosis, Part 3) - stage-level [mem]
     # boundaries were too coarse to tell WHICH of the 20 applications
@@ -1144,7 +1156,7 @@ def discover_and_store_documents_for_application(
         # fetch and text-extract them at all.
         doc_type = standardise_document_type(row.document_name, row.doc_type_raw)
         uninformative_name = doc_type == "other" and name_is_uninformative(row.document_name)
-        if doc_type not in USEFUL_DOC_TYPES and not uninformative_name:
+        if doc_type not in useful_types and not uninformative_name:
             skipped += 1
             continue
 
@@ -1228,7 +1240,7 @@ def discover_and_store_documents_for_application(
             log_memory("documents.classify.before", council=council.code, extra=doc_identifier, breakdown=True)
             doc_type = sniff_document_type_from_text(text)
             log_memory("documents.classify.after", council=council.code, extra=doc_identifier, breakdown=True)
-            if doc_type not in USEFUL_DOC_TYPES:
+            if doc_type not in useful_types:
                 skipped += 1
                 continue
             sniffed += 1
@@ -1432,6 +1444,81 @@ def stage_documents(
           f"insufficient: {len(all_qualifying) - sufficient_count}/{len(all_qualifying)}")
 
     return processed
+
+
+def stage_evidence_refresh(
+    session: Session, page, council: CouncilConfig,
+    health: AcquisitionHealth | None = None, breaker: CouncilPortalCircuitBreaker | None = None,
+) -> int:
+    """PR B2 (Targeted Evidence Refresh) - consumes whatever B1 (app.
+    pipeline.material_change, via _upsert_scraped_application above) has
+    already flagged this run: Applications with evidence_refresh_required =
+    True. Runs inside Daily Discovery, right after stage_documents (Part
+    19) - it reuses the exact same page/requests_session/browser context,
+    circuit breaker, and portal-acquisition machinery stage_documents
+    itself already depends on, so a normal material change detected during
+    this morning's stage_scrape has its targeted evidence refreshed before
+    this same run ends, well ahead of the next scheduled Intelligence
+    Processing pass - rather than adding a second network-capable process
+    (and a second circuit breaker/browser context) purely to bridge Daily
+    Discovery and AI processing.
+
+    Bounded (Part 15) via app.pipeline.evidence_refresh.select_refresh_
+    candidates' own EVIDENCE_REFRESH_RUN_LIMIT - never every flagged
+    Application in one run, and never a scan of applications B1 did not
+    itself flag (legacy documented/granted schemes are not re-swept)."""
+    from app.pipeline.evidence_refresh import (
+        CLEARING_OUTCOMES,
+        OUTCOME_ACQUISITION_INCOMPLETE,
+        OUTCOME_CHECKED_NO_NEW_EVIDENCE,
+        OUTCOME_NEW_MATERIAL_EVIDENCE,
+        OUTCOME_PORTAL_UNAVAILABLE,
+        refresh_material_evidence,
+        select_refresh_candidates,
+    )
+
+    candidates = select_refresh_candidates(session, council.code)
+    print(f"\n[evidence-refresh] {council.code}: {len(candidates)} application(s) flagged by B1, processing up to "
+          f"{len(candidates)} this run")
+
+    requests_session = requests.Session()
+    requests_session.headers.update(HEADERS)
+
+    outcome_counts: Counter[str] = Counter()
+    b3_handoffs = 0
+    for application in candidates:
+        if breaker is not None and breaker.is_open:
+            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=evidence_refresh")
+            break
+
+        result = refresh_material_evidence(
+            session, page, requests_session, council, application,
+            trigger=application.evidence_refresh_trigger or "unknown",
+            reason=application.evidence_refresh_reason,
+            breaker=breaker,
+        )
+        outcome_counts[result.outcome] += 1
+        if health is not None:
+            health.record_evidence_refresh(succeeded=result.outcome in CLEARING_OUTCOMES)
+        if result.outcome == OUTCOME_NEW_MATERIAL_EVIDENCE:
+            b3_handoffs += 1
+
+        time.sleep(council.request_delay_seconds)  # same portal courtesy pacing as every other network stage
+
+    remaining = session.execute(
+        select(func.count(Application.id)).where(
+            Application.council_code == council.code, Application.evidence_refresh_required.is_(True)
+        )
+    ).scalar()
+    print(
+        f"[evidence-refresh] {council.code} summary candidates={len(candidates)} attempted={sum(outcome_counts.values())} "
+        f"new_material_evidence={outcome_counts[OUTCOME_NEW_MATERIAL_EVIDENCE]} "
+        f"checked_no_new_evidence={outcome_counts[OUTCOME_CHECKED_NO_NEW_EVIDENCE]} "
+        f"portal_unavailable={outcome_counts[OUTCOME_PORTAL_UNAVAILABLE]} "
+        f"acquisition_incomplete={outcome_counts[OUTCOME_ACQUISITION_INCOMPLETE]} "
+        f"b3_handoff_created={b3_handoffs} remaining={remaining}"
+    )
+    return sum(outcome_counts.values())
 
 
 def count_pending_extraction(session: Session, council_code: str) -> int:
@@ -1868,6 +1955,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-related-applications", action="store_true")
     parser.add_argument("--skip-confirm-units", action="store_true")
     parser.add_argument("--skip-documents", action="store_true")
+    parser.add_argument("--skip-evidence-refresh", action="store_true")
     parser.add_argument("--skip-extraction", action="store_true")
     parser.add_argument("--skip-geocode", action="store_true")
     parser.add_argument("--skip-build-status", action="store_true")
@@ -2072,6 +2160,19 @@ def main() -> None:
                 log_memory("stage_documents.before", council=council.code)
                 stage_documents(session, page, council, health=health, breaker=breaker)
                 log_memory("stage_documents.after", council=council.code)
+
+        if not args.skip_evidence_refresh:
+            if breaker.is_open:
+                print(f"[circuit] council={council.code} skipping stage_evidence_refresh - circuit open")
+            else:
+                # After stage_documents, not before (PR B2 spec, Part 19) -
+                # this same run's own stage_scrape is what B1 (inside
+                # _upsert_scraped_application) may just have flagged, and
+                # this stage still needs the live page/circuit breaker
+                # context stage_documents itself just used.
+                log_memory("stage_evidence_refresh.before", council=council.code)
+                stage_evidence_refresh(session, page, council, health=health, breaker=breaker)
+                log_memory("stage_evidence_refresh.after", council=council.code)
 
         log_memory("browser_close.before", council=council.code)
         browser.close()

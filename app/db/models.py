@@ -1213,6 +1213,35 @@ class Application(Base):
     evidence_refresh_trigger: Mapped[str | None] = mapped_column(String(30), nullable=True)
     evidence_refresh_requested_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # PR B2 (Targeted Evidence Refresh) - the truthful OUTCOME of the most
+    # recent targeted check app.pipeline.evidence_refresh actually
+    # performed in response to evidence_refresh_required, and when it
+    # happened. One of app.pipeline.evidence_refresh's four OUTCOME_*
+    # constants (new_material_evidence | checked_no_new_evidence |
+    # portal_unavailable | acquisition_incomplete). NULL means "no
+    # targeted refresh has ever run for this application" - distinct from
+    # evidence_refresh_required itself, which B2 DOES clear on a
+    # successful check (new evidence found or genuinely none) but
+    # deliberately never on portal_unavailable/acquisition_incomplete, so
+    # the row remains retryable - see evidence_refresh_required's own
+    # comment for why B1's reason/trigger/requested_at fields above are
+    # left untouched either way (an audit trail of what last triggered the
+    # request, not a queue-position marker).
+    evidence_refresh_last_outcome: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    evidence_refresh_last_checked_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The B3 handoff signal (PR B2, Part 13) - set ONLY when a targeted
+    # refresh outcome is new_material_evidence, i.e. genuinely new,
+    # relevant portal evidence was found and stored. Deliberately a
+    # timestamp, not a boolean "intelligence_refresh_required" flag - a
+    # flag B2 itself never clears again would become permanently stuck
+    # True the moment ANY future B3 improvement changes what "consumed"
+    # means, whereas a future B3 can always compare this timestamp against
+    # its own last-processed timestamp to decide staleness, and update/
+    # clear it once it has actually acted on it. B2 never regenerates AI or
+    # touches SchemeIntelligence itself - this field is purely the
+    # truthful record that new evidence exists for B3 to look at.
+    material_evidence_changed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])

@@ -62,6 +62,19 @@ class AcquisitionHealth:
     portal_circuit_opened: bool = False
     portal_circuit_opened_stage: str | None = None
 
+    # PR B2 (Targeted Evidence Refresh), Part 21 - a narrow, independent
+    # signal for evidence-refresh SUPPORTING work only, deliberately NOT
+    # folded into parents_failed/documents_applications_failed (those two
+    # counters mean "primary/document-discovery acquisition failed", a
+    # different, already-correct fact). A council whose primary scrape
+    # completed cleanly but whose evidence-refresh backlog hit a portal_
+    # unavailable/acquisition_incomplete outcome must report PARTIAL, never
+    # FAILED (Part 21: "Primary scrape failure -> existing FAILED semantics
+    # still win") and never a false SUCCESS either.
+    evidence_refresh_attempted: int = 0
+    evidence_refresh_succeeded: int = 0
+    evidence_refresh_failed: int = 0
+
     def record_primary_scrape_attempt(self) -> None:
         self.primary_scrape_attempted = True
 
@@ -104,6 +117,20 @@ class AcquisitionHealth:
             self.documents_applications_succeeded += 1
         else:
             self.documents_applications_failed += 1
+
+    def record_evidence_refresh(self, *, succeeded: bool) -> None:
+        """One call per Application a targeted evidence refresh actually
+        attempted (app.pipeline.evidence_refresh.refresh_material_evidence)
+        - succeeded means the check itself genuinely completed (outcome
+        NEW_MATERIAL_EVIDENCE or CHECKED_NO_NEW_EVIDENCE, whichever way the
+        finding went); PORTAL_UNAVAILABLE/ACQUISITION_INCOMPLETE count as
+        not succeeded here, same "did the acquisition attempt itself
+        resolve" framing as record_document_discovery above."""
+        self.evidence_refresh_attempted += 1
+        if succeeded:
+            self.evidence_refresh_succeeded += 1
+        else:
+            self.evidence_refresh_failed += 1
 
     def classify(self) -> str:
         """Returns "success" | "partial" | "failed" - approved policy,
@@ -166,7 +193,10 @@ class AcquisitionHealth:
         if self.primary_scrape_attempted and not self.primary_scrape_completed:
             return "failed"
 
-        if self.parents_failed > 0 or self.documents_applications_failed > 0 or self.portal_circuit_opened:
+        if (
+            self.parents_failed > 0 or self.documents_applications_failed > 0
+            or self.portal_circuit_opened or self.evidence_refresh_failed > 0
+        ):
             return "partial"
 
         return "success"
@@ -193,5 +223,8 @@ class AcquisitionHealth:
             f"documents_applications_succeeded={self.documents_applications_succeeded} "
             f"documents_applications_failed={self.documents_applications_failed} "
             f"portal_circuit_opened={int(self.portal_circuit_opened)} "
-            f"portal_circuit_opened_stage={self.portal_circuit_opened_stage or 'none'}"
+            f"portal_circuit_opened_stage={self.portal_circuit_opened_stage or 'none'} "
+            f"evidence_refresh_attempted={self.evidence_refresh_attempted} "
+            f"evidence_refresh_succeeded={self.evidence_refresh_succeeded} "
+            f"evidence_refresh_failed={self.evidence_refresh_failed}"
         )
