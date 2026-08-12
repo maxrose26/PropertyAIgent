@@ -187,9 +187,11 @@ covering:
    RECOMMENDATION, never as a formal decision - "officers have recommended
    approval" is correct, "this has been approved"/"granted" is NOT correct
    unless the application's own portal decision above actually says so. If
-   REFUSAL REASONS or a WITHDRAWAL REASON are given, mention them plainly;
-   if evidence exists but no reason is stated anywhere above, don't invent
-   one.
+   REFUSAL REASONS or a WITHDRAWAL REASON are given, mention them plainly
+   but concisely - state the most commercially important reason(s) in your
+   own words, don't reproduce long policy citations or turn this into a
+   refusal notice transcript; if evidence exists but no reason is stated
+   anywhere above, don't invent one.
 8. If an AFFORDABLE HOUSING STATUS is given above, mention it only using
    the exact status/figures given - explicitly distinguish a merely
    "proposed" or "officer_recommended" position from one that is
