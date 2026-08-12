@@ -41,6 +41,7 @@ from app.extraction.run_extraction import (
     OUTCOME_NO_USABLE_TEXT,
     OUTCOME_SUCCESS,
 )
+from app.pipeline.evidence_refresh import resolve_application_family
 from app.pipeline.run_weekly import INTELLIGENCE_REFRESH_ELIGIBLE
 
 
@@ -322,6 +323,266 @@ def test_row_automatically_becomes_eligible_after_evidence_added(session):
 
     candidates_after = select_historical_rebuild_candidates(session)
     assert app.id in {a.id for a in candidates_after}
+
+
+# --- Family-evidence eligibility (final family-evidence amendment) -------------
+# The bounded family this module resolves (resolve_application_family) must be
+# EXACTLY the same one refresh_intelligence_for_application itself resolves -
+# reused directly, not reimplemented. These tests prove eligibility is neither
+# narrower (Cases A/B/C/F) nor broader (Case D) than that real B3 family scope.
+
+
+def test_case_a_direct_evidence_qualifies(session):
+    app = _add_application(session, reference="APP/A")
+    _add_scheme_intelligence(session, app)
+    _add_document(session, app, "decision_notice", "Granted directly.")
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert app.id in {a.id for a in candidates}
+
+
+def test_case_b_parent_evidence_qualifies(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)  # only the child has an existing intelligence row
+    _add_document(session, parent, "decision_notice", "Parent's own decision notice.")
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert child.id in {a.id for a in candidates}
+
+
+def test_case_c_child_evidence_qualifies(session):
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+
+    trigger = _add_application(session, reference="APP/TRIGGER", site_id=site.id)
+    _add_scheme_intelligence(session, trigger)
+    child = _add_application(
+        session, reference="APP/CHILD", site_id=site.id,
+        proposal="Reserved matters pursuant to planning permission APP/TRIGGER",
+    )
+    _add_document(session, child, "decision_notice", "Child's own decision notice.")
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert trigger.id in {a.id for a in candidates}
+
+
+def test_case_d_unrelated_same_site_sibling_does_not_qualify(session):
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+
+    app = _add_application(session, reference="APP/A", site_id=site.id)
+    _add_scheme_intelligence(session, app)
+    # Same site, usable evidence, but does NOT cite `app` as its parent -
+    # resolve_application_family must not include it (confirmed structurally
+    # by test_application_family_does_not_expand_uncontrolled in B2's own
+    # suite - this reconfirms the historical rebuild never broadens that).
+    unrelated = _add_application(session, reference="APP/UNRELATED", site_id=site.id)
+    _add_document(session, unrelated, "decision_notice", "Unrelated scheme's own decision.")
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert app.id not in {a.id for a in candidates}
+
+
+def test_case_e_family_document_with_null_text_does_not_qualify(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+    doc = Document(
+        application_id=parent.id, doc_type="decision_notice", document_name="d.pdf",
+        source_url="https://example.invalid/d.pdf", text_extracted=True, extracted_text=None,
+    )
+    session.add(doc)
+    session.commit()
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert child.id not in {a.id for a in candidates}
+
+
+def test_case_e_family_document_with_empty_text_does_not_qualify(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+    doc = Document(
+        application_id=parent.id, doc_type="decision_notice", document_name="d.pdf",
+        source_url="https://example.invalid/d.pdf", text_extracted=True, extracted_text="",
+    )
+    session.add(doc)
+    session.commit()
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert child.id not in {a.id for a in candidates}
+
+
+def test_family_document_with_irrelevant_category_does_not_qualify(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+    _add_document(session, parent, "other", "Not a B3-relevant category.")
+
+    candidates = select_historical_rebuild_candidates(session)
+
+    assert child.id not in {a.id for a in candidates}
+
+
+def test_case_f_family_evidence_arriving_later_makes_row_eligible(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+
+    candidates_before = select_historical_rebuild_candidates(session)
+    assert child.id not in {a.id for a in candidates_before}
+
+    _add_document(session, parent, "decision_notice", "Parent's decision notice, added later.")
+
+    candidates_after = select_historical_rebuild_candidates(session)
+    assert child.id in {a.id for a in candidates_after}
+
+
+def test_family_resolution_matches_b2s_own_resolve_application_family(session):
+    """Reconfirms this module never reimplements family resolution: for a
+    genuine parent/child pair, resolve_application_family's own result
+    (imported directly, unchanged) is exactly what governs eligibility."""
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    family = resolve_application_family(session, child)
+    assert {a.id for a in family} == {parent.id, child.id}
+
+
+def test_blocked_family_row_does_not_consume_batch_limit(session):
+    now = dt.datetime.now(dt.timezone.utc)
+    blocked = _add_application(session, reference="APP/BLOCKED", last_seen_at=now)
+    _add_scheme_intelligence(session, blocked)  # no family evidence anywhere
+    rebuildable = _add_application(session, reference="APP/REBUILDABLE", last_seen_at=now - dt.timedelta(days=1))
+    _add_scheme_intelligence(session, rebuildable)
+    _add_document(session, rebuildable, "decision_notice", "Granted.")
+
+    candidates = select_historical_rebuild_candidates(session, limit=1)
+
+    assert [a.id for a in candidates] == [rebuildable.id]
+
+
+def test_limit_returns_up_to_n_genuinely_rebuildable_rows(session):
+    now = dt.datetime.now(dt.timezone.utc)
+    for i in range(3):
+        app = _add_application(session, reference=f"APP/BLOCKED/{i}", last_seen_at=now - dt.timedelta(days=i))
+        _add_scheme_intelligence(session, app)  # no evidence anywhere
+    rebuildable_ids = []
+    for i in range(2):
+        app = _add_application(session, reference=f"APP/OK/{i}", last_seen_at=now - dt.timedelta(days=10 + i))
+        _add_scheme_intelligence(session, app)
+        _add_document(session, app, "decision_notice", "Granted.")
+        rebuildable_ids.append(app.id)
+
+    candidates = select_historical_rebuild_candidates(session, limit=2)
+
+    assert {a.id for a in candidates} == set(rebuildable_ids)
+
+
+def test_old_rebuild_version_with_only_family_evidence_is_eligible_for_new_version(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child, intelligence_rebuild_version="b3_v0")
+    _add_document(session, parent, "decision_notice", "Granted.")
+
+    candidates = select_historical_rebuild_candidates(session, rebuild_version="b3_v1")
+
+    assert child.id in {a.id for a in candidates}
+
+
+def test_global_currently_rebuildable_is_family_aware(session):
+    parent = _add_application(session, reference="APP/PARENT/1")
+    child = _add_application(
+        session, reference="APP/CHILD",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+    _add_document(session, parent, "decision_notice", "Granted.")
+
+    summary = run_historical_rebuild(session, None, dry_run=True)
+
+    assert summary.currently_rebuildable == 1
+    assert summary.blocked_no_usable_evidence == 0
+
+
+def test_global_blocked_count_is_family_aware(session):
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/A", site_id=site.id)
+    _add_scheme_intelligence(session, app)
+    unrelated = _add_application(session, reference="APP/UNRELATED", site_id=site.id)
+    _add_document(session, unrelated, "decision_notice", "Unrelated - not a family member.")
+
+    summary = run_historical_rebuild(session, None, dry_run=True)
+
+    assert summary.currently_rebuildable == 0
+    assert summary.blocked_no_usable_evidence == 1
+
+
+def test_scoped_progress_is_family_aware(session):
+    parent = _add_application(session, reference="APP/PARENT/1", council_code="stockport")
+    child = _add_application(
+        session, reference="APP/CHILD", council_code="stockport",
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+    _add_document(session, parent, "decision_notice", "Granted.")
+
+    summary = run_historical_rebuild(session, None, dry_run=True, council="stockport")
+
+    assert summary.scope_currently_rebuildable == 1
+    assert summary.scope_blocked_no_usable_evidence == 0
+
+
+def test_site_filter_scope_does_not_narrow_family_evidence_source(session):
+    """--site-id restricts which Applications become CANDIDATES, not where
+    their family evidence may come from - a parent outside the filtered
+    site must still count."""
+    site = Site(council_code="testcouncil", canonical_address="1 test street", display_address="1 Test Street")
+    session.add(site)
+    session.commit()
+
+    parent = _add_application(session, reference="APP/PARENT/1")  # no site_id at all
+    child = _add_application(
+        session, reference="APP/CHILD", site_id=site.id,
+        proposal="Reserved matters pursuant to planning permission APP/PARENT/1",
+    )
+    _add_scheme_intelligence(session, child)
+    _add_document(session, parent, "decision_notice", "Granted.")
+
+    candidates = select_historical_rebuild_candidates(session, site_id=site.id)
+
+    assert child.id in {a.id for a in candidates}
 
 
 # --- Dry run (38: items 11-16) --------------------------------------------------
