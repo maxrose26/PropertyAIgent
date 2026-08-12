@@ -13,6 +13,14 @@ name: PropertyAIgent CI
 # (OpenAI, portal HTTP) mocked - confirmed by inspection before this
 # workflow was added. Do not add a production secret to this workflow
 # unless the test suite genuinely comes to require one.
+#
+# Python version comes from the repo-root .python-version file (CI/CD
+# Phase 1 pre-merge amendment, "Production Runtime Alignment") - the ONE
+# explicit project pin, also the mechanism Render's own native-runtime
+# Python services read automatically (documented at
+# https://render.com/docs/python-version, "medium priority", applies repo-
+# wide) - so CI and Render read the exact same declared version rather
+# than two independently-hardcoded strings that could silently drift.
 on:
   push:
     branches: [master]
@@ -24,11 +32,11 @@ jobs:
     name: pytest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version-file: ".python-version"
           cache: "pip"
 
       - name: Install dependencies

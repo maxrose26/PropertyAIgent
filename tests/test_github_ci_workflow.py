@@ -80,7 +80,14 @@ def test_ci_workflow_does_not_deploy_anything():
     """This workflow's only job runs tests - it must never itself contain a
     deploy step (curl to a deploy hook, render CLI invocation, etc.). Real
     deployment is Render's own responsibility, triggered separately from
-    outside this repository."""
+    outside this repository.
+
+    Checks the actual deploy-hook/API host and secret-usage patterns, not
+    a bare "render.com" substring - this file's own explanatory comments
+    legitimately cite https://render.com/docs/... documentation URLs to
+    justify design choices (same "mention in prose is fine, only real
+    usage is disallowed" distinction as test_ci_workflow_never_references_
+    a_production_secret above)."""
     text = WORKFLOW_PATH.read_text(encoding="utf-8").lower()
-    for forbidden in ("render.com", "deploy_hook", "render-deploy", "render_api_key"):
+    for forbidden in ("api.render.com", "deploy_hook", "render-deploy", "render_api_key", "render_deploy_hook"):
         assert forbidden not in text
