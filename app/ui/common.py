@@ -75,6 +75,13 @@ MERGED_SCHEME_FIELDS = [
     "registered_provider_status", "external_consultation_source", "affordable_status_note",
     "data_quality_status", "affordable_classification_reason", "affordable_classification_evidence",
     "site_evidence", "entity_relationship_notes",
+    # PR B3 (Evidence-Driven AI Intelligence Refresh) - so app.reporting.
+    # scheme_summary's upgraded prompt can ground recommendation/refusal/
+    # withdrawal/affordable-housing-status facts the same "first non-null
+    # value across this Site's linked applications" way every other field
+    # above already does.
+    "latest_material_event", "recommendation_direction", "formal_decision_outstanding",
+    "refusal_reasons", "withdrawal_reason", "affordable_housing_status", "affordable_housing_notes",
 ]
 
 

@@ -67,10 +67,22 @@ from app.db.models import IntelligenceRun
 from app.db.session import get_session, init_db
 from app.pipeline.run_weekly import (
     count_pending_extraction,
+    count_pending_intelligence_refresh,
     count_pending_summaries,
     stage_extraction,
     stage_generate_scheme_summaries,
+    stage_intelligence_refresh,
 )
+
+# PR B3 (Evidence-Driven AI Intelligence Refresh) - its own small, separate
+# cap (Part 30: "material refresh candidates are commercially important, but
+# new schemes must not starve"). Processed FIRST each run (simple
+# deterministic ordering, not a scoring model) precisely because it is
+# commercially the most time-sensitive work - a material planning event a
+# customer cares about, already portal-confirmed by B2 - but kept small and
+# independent of max_extractions so a large refresh backlog can never
+# consume the whole run's budget and starve brand-new-scheme extraction.
+DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN = 10
 
 DEFAULT_MAX_EXTRACTIONS_PER_RUN = 20
 # Raised from 20 -> 40 (AI Processing Reliability & Backlog Throughput,
@@ -90,7 +102,7 @@ DEFAULT_MAX_EXTRACTIONS_PER_RUN = 20
 DEFAULT_MAX_SUMMARIES_PER_RUN = 40
 
 
-def _classify_run_status(*, extractions_failed: int, summaries_failed: int) -> str:
+def _classify_run_status(*, extractions_failed: int, summaries_failed: int, refresh_failed: int = 0) -> str:
     """success | partial - mirrors AcquisitionHealth.classify()'s own "any
     known unresolved failure counts" policy (see app.pipeline.
     acquisition_health, Render Daily Discovery Portal Resilience & Truthful
@@ -108,7 +120,7 @@ def _classify_run_status(*, extractions_failed: int, summaries_failed: int) -> s
     not an AI failure, so a run made up entirely of no-usable-text items is
     still "success", per this task's own policy: "NO_USABLE_TEXT items do
     not count as AI failure if correctly classified/skipped"."""
-    if extractions_failed > 0 or summaries_failed > 0:
+    if extractions_failed > 0 or summaries_failed > 0 or refresh_failed > 0:
         return "partial"
     return "success"
 
@@ -137,6 +149,11 @@ def parse_args() -> argparse.Namespace:
              f"Default: ${{PROPERTYAIGENT_MAX_SUMMARIES_PER_RUN}} or {DEFAULT_MAX_SUMMARIES_PER_RUN}.",
     )
     parser.add_argument(
+        "--max-intelligence-refresh", type=int, default=None,
+        help=f"Max evidence-driven intelligence refreshes (PR B3) this run, across all councils combined. "
+             f"Default: ${{PROPERTYAIGENT_MAX_INTELLIGENCE_REFRESH_PER_RUN}} or {DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN}.",
+    )
+    parser.add_argument(
         "--triggered-by", default="scheduled", choices=["scheduled", "manual"],
         help="Recorded on the IntelligenceRun row - 'manual' for an operator-triggered catch-up run.",
     )
@@ -150,6 +167,7 @@ def process_intelligence_backlog(
     *,
     max_extractions: int,
     max_summaries: int,
+    max_intelligence_refresh: int = DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN,
     triggered_by: str = "scheduled",
     client_factory: Callable[[str], object] = lambda api_key: OpenAI(api_key=api_key),
 ) -> IntelligenceRun:
@@ -168,6 +186,8 @@ def process_intelligence_backlog(
     extractions_candidates_inspected = 0
     extractions_attempted = extractions_succeeded = extractions_no_usable_text = extractions_failed = 0
     summaries_attempted = summaries_succeeded = summaries_failed = 0
+    refresh_candidates_inspected = 0
+    refresh_attempted = refresh_succeeded = refresh_failed = 0
 
     try:
         # Read-only backlog sizing BEFORE deciding whether an OpenAI client
@@ -180,15 +200,19 @@ def process_intelligence_backlog(
         # later in the loop.
         extraction_backlog = {code: count_pending_extraction(session, code) for code in council_codes}
         summary_backlog = {code: count_pending_summaries(session, code) for code in council_codes}
+        refresh_backlog = {code: count_pending_intelligence_refresh(session, code) for code in council_codes}
         total_extraction_backlog = sum(extraction_backlog.values())
         total_summary_backlog = sum(summary_backlog.values())
+        total_refresh_backlog = sum(refresh_backlog.values())
         print(f"[intelligence-processing] backlog: {total_extraction_backlog} application(s) awaiting extraction, "
-              f"{total_summary_backlog} site(s) awaiting a summary")
+              f"{total_summary_backlog} site(s) awaiting a summary, "
+              f"{total_refresh_backlog} application(s) awaiting evidence-driven intelligence refresh")
 
         extractions_planned = min(max_extractions, total_extraction_backlog)
         summaries_planned = min(max_summaries, total_summary_backlog)
+        refresh_planned = min(max_intelligence_refresh, total_refresh_backlog)
 
-        if extractions_planned == 0 and summaries_planned == 0:
+        if extractions_planned == 0 and summaries_planned == 0 and refresh_planned == 0:
             print("[intelligence-processing] no outstanding work within this run's limits - nothing to do, "
                   "OPENAI_API_KEY was never read.")
             detail = "No outstanding work this run."
@@ -210,9 +234,23 @@ def process_intelligence_backlog(
 
             remaining_extractions = extractions_planned
             remaining_summaries = summaries_planned
+            remaining_refresh = refresh_planned
 
             for code in council_codes:
                 council = councils[code]
+
+                # PR B3 - processed FIRST, before brand-new extraction (Part
+                # 30: simple deterministic ordering, refresh candidates are
+                # commercially time-sensitive) but bounded by its own small,
+                # independent cap so it can never consume max_extractions'
+                # own budget and starve brand-new-scheme processing.
+                if remaining_refresh > 0 and refresh_backlog[code] > 0:
+                    refresh_result = stage_intelligence_refresh(session, client, council, limit=remaining_refresh)
+                    refresh_candidates_inspected += refresh_result.candidates_inspected
+                    refresh_attempted += refresh_result.attempted
+                    refresh_succeeded += refresh_result.succeeded
+                    refresh_failed += refresh_result.failed
+                    remaining_refresh -= refresh_result.attempted
 
                 if remaining_extractions > 0 and extraction_backlog[code] > 0:
                     # stage_extraction's own bounded candidate-scan (Part 5) may
@@ -239,6 +277,8 @@ def process_intelligence_backlog(
                     remaining_summaries -= planned_this_council
 
             detail = (
+                f"Refresh: {refresh_succeeded}/{refresh_attempted} succeeded "
+                f"({refresh_candidates_inspected} candidate(s) inspected). "
                 f"Extractions: {extractions_succeeded}/{extractions_attempted} succeeded "
                 f"({extractions_no_usable_text} no usable text, {extractions_candidates_inspected} candidate(s) inspected). "
                 f"Summaries: {summaries_succeeded}/{summaries_attempted} succeeded."
@@ -276,6 +316,10 @@ def process_intelligence_backlog(
                 run.summaries_attempted = summaries_attempted
                 run.summaries_succeeded = summaries_succeeded
                 run.summaries_failed = summaries_failed
+                run.refresh_candidates_inspected = refresh_candidates_inspected
+                run.refresh_attempted = refresh_attempted
+                run.refresh_succeeded = refresh_succeeded
+                run.refresh_failed = refresh_failed
                 run.detail = "Run-level failure - processing did not complete. See process logs for the original error."
                 session.commit()
             except Exception:
@@ -299,7 +343,9 @@ def process_intelligence_backlog(
     applications_backlog_remaining = sum(count_pending_extraction(session, code) for code in council_codes)
     sites_backlog_remaining = sum(count_pending_summaries(session, code) for code in council_codes)
 
-    run.status = _classify_run_status(extractions_failed=extractions_failed, summaries_failed=summaries_failed)
+    run.status = _classify_run_status(
+        extractions_failed=extractions_failed, summaries_failed=summaries_failed, refresh_failed=refresh_failed,
+    )
     run.finished_at = dt.datetime.now(dt.timezone.utc)
     run.extractions_candidates_inspected = extractions_candidates_inspected
     run.extractions_attempted = extractions_attempted
@@ -309,6 +355,10 @@ def process_intelligence_backlog(
     run.summaries_attempted = summaries_attempted
     run.summaries_succeeded = summaries_succeeded
     run.summaries_failed = summaries_failed
+    run.refresh_candidates_inspected = refresh_candidates_inspected
+    run.refresh_attempted = refresh_attempted
+    run.refresh_succeeded = refresh_succeeded
+    run.refresh_failed = refresh_failed
     run.applications_backlog_remaining = applications_backlog_remaining
     run.sites_backlog_remaining = sites_backlog_remaining
     run.detail = detail
@@ -331,15 +381,20 @@ def main() -> None:
     max_summaries = args.max_summaries if args.max_summaries is not None else _int_env(
         "PROPERTYAIGENT_MAX_SUMMARIES_PER_RUN", DEFAULT_MAX_SUMMARIES_PER_RUN
     )
+    max_intelligence_refresh = args.max_intelligence_refresh if args.max_intelligence_refresh is not None else _int_env(
+        "PROPERTYAIGENT_MAX_INTELLIGENCE_REFRESH_PER_RUN", DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN
+    )
 
     councils = load_councils()
     council_codes = args.councils or sorted(councils.keys())
     print(f"[intelligence-processing] {len(council_codes)} council(s) in scope: {', '.join(council_codes)}")
-    print(f"[intelligence-processing] limits this run: max_extractions={max_extractions}, max_summaries={max_summaries}")
+    print(f"[intelligence-processing] limits this run: max_extractions={max_extractions}, "
+          f"max_summaries={max_summaries}, max_intelligence_refresh={max_intelligence_refresh}")
 
     process_intelligence_backlog(
         session, councils, council_codes,
-        max_extractions=max_extractions, max_summaries=max_summaries, triggered_by=args.triggered_by,
+        max_extractions=max_extractions, max_summaries=max_summaries,
+        max_intelligence_refresh=max_intelligence_refresh, triggered_by=args.triggered_by,
     )
 
 

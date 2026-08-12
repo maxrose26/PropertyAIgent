@@ -1255,6 +1255,27 @@ class Application(Base):
     # truthful record that new evidence exists for B3 to look at.
     material_evidence_changed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # PR B3 (Evidence-Driven AI Intelligence Refresh) - the B3 freshness
+    # watermark: the newest material_evidence_changed_at value that has
+    # already been successfully incorporated into the currently-LIVE
+    # SchemeIntelligence/Site Summary for this application. B3 eligibility
+    # (app.pipeline.run_weekly.INTELLIGENCE_REFRESH_ELIGIBLE) is exactly
+    # "material_evidence_changed_at is set, and is newer than this field (or
+    # this field is still NULL)". Deliberately compared against material_
+    # evidence_changed_at, NOT evidence_refresh_required - B1/B2's own
+    # eligibility flag means "the portal should be checked", a materially
+    # different question from "has the live AI intelligence incorporated
+    # the evidence B2 already confirmed is new" (see this task's own Part 6).
+    # Only ever advanced by a FULLY successful atomic refresh (app.
+    # extraction.intelligence_refresh.refresh_intelligence_for_application) -
+    # stamped to the exact material_evidence_changed_at value just
+    # incorporated (not utcnow()), so a later, still-newer material_
+    # evidence_changed_at (a second material event arriving before this one
+    # was ever processed) is never silently skipped. Left completely
+    # unchanged on any AI/validation/summary failure - see that function's
+    # own docstring for the exact atomic-replacement contract.
+    intelligence_evidence_processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])
@@ -1391,6 +1412,68 @@ class SchemeIntelligence(Base):
     data_quality_status: Mapped[str | None] = mapped_column(Text, nullable=True)
     core_intelligence_complete: Mapped[bool] = mapped_column(Boolean, default=False)
     needs_manual_review: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # --- PR B3 (Evidence-Driven AI Intelligence Refresh) -----------------
+    # Planning-outcome + affordable-housing intelligence that B2's targeted
+    # evidence refresh can surface but the original 3-LLM-call extraction
+    # pipeline above never asked about (recommendation direction, formal
+    # refusal/withdrawal reasoning, and - the explicit Product Owner
+    # requirement this PR adds - affordable housing/tenure treated as
+    # first-class intelligence, not free text buried inside affordable_
+    # classification_reason). All nullable/additive; NULL on every row this
+    # PR's own migration does not touch (no historical value is ever
+    # fabricated - see app.extraction.intelligence_refresh's own module
+    # docstring). Only ever written by app.extraction.intelligence_refresh.
+    # refresh_intelligence_for_application, as part of one atomic
+    # replacement - never partially updated.
+
+    # The B1 material_change reason (see app.pipeline.material_change)
+    # whose evidence this row's CURRENT content reflects - mirrors
+    # Application.evidence_refresh_reason but on the intelligence side:
+    # "why does this intelligence look the way it does", for observability
+    # and future auditing. Comma-joined if more than one reason fired in
+    # the pass that produced this content (same format as B1's own field).
+    latest_material_event: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # approval | refusal | unclear - ONLY ever set from genuine officer/
+    # committee recommendation evidence (Parts 18-19: "never map
+    # recommendation directly to formal determination"). NULL means no
+    # recommendation evidence has been processed for this row yet - not
+    # the same claim as "unclear" (evidence exists but is directionless).
+    recommendation_direction: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # True while a recommendation exists but no separate formal decision
+    # evidence has confirmed the outcome; False once Granted/Refused/
+    # Withdrawn is evidenced; NULL when this row has no B3 refresh content
+    # at all yet (distinct from "known False" - see field comment above).
+    formal_decision_outstanding: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Evidenced refusal reasoning (Part 16) - NULL/empty means no reliable
+    # reason was identified, never fabricated. Free text, matching this
+    # model's own established style for narrated LLM output (e.g.
+    # site_evidence, affordable_classification_reason above).
+    refusal_reasons: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Evidenced withdrawal reasoning (Part 17) - same "never invent" rule.
+    withdrawal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # The affordable-housing SECURITY/AUTHORITY state (Part 12) - a
+    # materially different question from affordable_data_status above
+    # (which only ever means "did we find affordable DATA", e.g.
+    # affordable_percentage_found/insufficient_evidence). One of
+    # app.extraction.intelligence_refresh.AFFORDABLE_HOUSING_STATUSES:
+    # proposed | policy_required | officer_recommended | committee_position
+    # | agreed | conditioned | legally_secured | subject_to_viability_review
+    # | unknown. The one hard commercial rule this field exists to enforce:
+    # Property AIgent must never describe a merely-proposed position as
+    # legally_secured - only an executed S106/operative Deed of Variation
+    # may justify that value (see build_refresh_prompt's own instructions).
+    affordable_housing_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Short evidence-grounded narrative of the CURRENT affordable housing
+    # position, including an explicit description of what changed from the
+    # previous position where evidenced (Part 13) - e.g. "The executed S106
+    # secures 35% affordable housing (Social Rent/Shared Ownership 70/30),
+    # a different split from the applicant's earlier 40% proposal." Free
+    # text, not a second copy of affordable_tenure_split_final - this is
+    # the narrated CHANGE/STATUS story, that field is the raw data value.
+    affordable_housing_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -1838,6 +1921,23 @@ class IntelligenceRun(Base):
     summaries_attempted: Mapped[int] = mapped_column(Integer, default=0)
     summaries_succeeded: Mapped[int] = mapped_column(Integer, default=0)
     summaries_failed: Mapped[int] = mapped_column(Integer, default=0)
+
+    # PR B3 (Evidence-Driven AI Intelligence Refresh) - a THIRD, independent
+    # counter family, distinct from extractions_* (brand-new SchemeIntelligence,
+    # Application.scheme_intelligence IS NULL) and summaries_* (routine
+    # Site-history-grown trigger, unrelated to B2 evidence). refresh_*
+    # counts app.pipeline.run_weekly.stage_intelligence_refresh's own work:
+    # an EXISTING SchemeIntelligence row whose Application.material_
+    # evidence_changed_at is newer than its intelligence_evidence_
+    # processed_at watermark. succeeded means the full atomic replacement
+    # (intelligence + Site Summary + watermark) committed; failed means any
+    # part of it did not, and the previous live intelligence/summary/
+    # watermark were left completely untouched (see app.extraction.
+    # intelligence_refresh's own atomic-replacement contract).
+    refresh_candidates_inspected: Mapped[int] = mapped_column(Integer, default=0)
+    refresh_attempted: Mapped[int] = mapped_column(Integer, default=0)
+    refresh_succeeded: Mapped[int] = mapped_column(Integer, default=0)
+    refresh_failed: Mapped[int] = mapped_column(Integer, default=0)
 
     # Backlog still outstanding AFTER this run - the bounded-workload
     # mechanism's whole point (Part 6/8): a large backlog is deliberately

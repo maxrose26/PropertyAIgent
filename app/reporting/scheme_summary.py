@@ -94,6 +94,33 @@ def build_summary_prompt(
         for a in sorted(applications, key=lambda a: parse_portal_date(a.application_received), reverse=True)
     )
 
+    # PR B3 (Evidence-Driven AI Intelligence Refresh) - planning-outcome and
+    # affordable-housing/tenure facts, when B3 has ever populated them on
+    # any linked application's SchemeIntelligence (merged picks the first
+    # non-null value across applications - see app.ui.common.
+    # aggregate_scheme_fields). Omitted entirely when nothing has ever been
+    # populated (a Site B3 has never touched) - the prompt below is
+    # unchanged from before this PR for exactly that case, so a brand-new
+    # scheme's summary is not degraded by an empty section.
+    intelligence_lines = []
+    if merged.get("recommendation_direction"):
+        outstanding = merged.get("formal_decision_outstanding")
+        outstanding_bit = " (formal decision still outstanding)" if outstanding else ""
+        intelligence_lines.append(f"RECOMMENDATION DIRECTION: {merged['recommendation_direction']}{outstanding_bit}")
+    if merged.get("refusal_reasons"):
+        intelligence_lines.append(f"REFUSAL REASONS (evidenced): {merged['refusal_reasons']}")
+    if merged.get("withdrawal_reason"):
+        intelligence_lines.append(f"WITHDRAWAL REASON (evidenced): {merged['withdrawal_reason']}")
+    if merged.get("affordable_housing_status"):
+        intelligence_lines.append(
+            f"AFFORDABLE HOUSING STATUS: {merged['affordable_housing_status']} "
+            f"({merged.get('affordable_percentage_final')}% / {merged.get('affordable_units_final')} units, "
+            f"tenure: {merged.get('affordable_tenure_split_final') or 'not evidenced'})"
+        )
+    if merged.get("affordable_housing_notes"):
+        intelligence_lines.append(f"AFFORDABLE HOUSING NOTES: {merged['affordable_housing_notes']}")
+    intelligence_block = "\n".join(intelligence_lines)
+
     return f"""
 You are writing an internal status note for a UK residential land/planning
 acquisition professional, synthesising everything currently known about ONE
@@ -115,8 +142,13 @@ exact figures if you state any unit count by status, never derive your own):
 '''}
 ALL {len(applications)} LINKED APPLICATIONS ON THIS SITE (most recent first):
 {app_lines}
-
-Write a short status note (3-5 sentences, plain text, no markdown headers)
+{"" if not intelligence_block else f'''
+PLANNING-OUTCOME / AFFORDABLE HOUSING INTELLIGENCE (evidence-derived - state
+these facts using this exact wording where you mention them, never invent
+or soften them):
+{intelligence_block}
+'''}
+Write a short status note (2-5 sentences, plain text, no markdown headers)
 covering:
 1. Where this scheme currently stands overall - if nothing is granted yet,
    say so plainly and state the actual portal status of its live
@@ -151,6 +183,22 @@ covering:
 6. If no phases were named at all (including single-application sites),
    describe the site as a whole rather than inventing a phase structure
    that isn't there.
+7. If a RECOMMENDATION DIRECTION is given above, state it as a
+   RECOMMENDATION, never as a formal decision - "officers have recommended
+   approval" is correct, "this has been approved"/"granted" is NOT correct
+   unless the application's own portal decision above actually says so. If
+   REFUSAL REASONS or a WITHDRAWAL REASON are given, mention them plainly;
+   if evidence exists but no reason is stated anywhere above, don't invent
+   one.
+8. If an AFFORDABLE HOUSING STATUS is given above, mention it only using
+   the exact status/figures given - explicitly distinguish a merely
+   "proposed" or "officer_recommended" position from one that is
+   "agreed"/"conditioned" from one that is "legally_secured". NEVER
+   describe a proposed or recommended affordable housing position as
+   "secured" or "agreed" - only use those words if the status above is
+   literally agreed/conditioned/legally_secured. If AFFORDABLE HOUSING
+   NOTES describe a change from an earlier position, mention that change
+   factually.
 """
 
 
