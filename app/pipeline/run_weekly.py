@@ -81,7 +81,7 @@ from app.pipeline.material_change import (
     MaterialChangeStats,
     detect_material_application_change,
 )
-from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker
+from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker, is_portal_host_failure
 from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
     compute_lapse_status,
@@ -1012,11 +1012,26 @@ class DocumentAcquisitionResult:
     itself inserted (already scoped to whatever target_doc_types this call
     was given, if any - callers therefore never need to re-derive this via
     a separate before/after query, which is exactly the "too indirect"
-    problem this amendment removes from app.pipeline.evidence_refresh)."""
+    problem this amendment removes from app.pipeline.evidence_refresh).
+
+    portal_unavailable - PR B2 FINAL pre-merge amendment ("Truthful Refresh
+    Timestamp + Portal Failure Classification") - only meaningful when
+    listing_succeeded is False; True iff the listing failure was itself
+    classified as a genuine council-portal/host failure by the ONE existing
+    canonical classifier, app.pipeline.portal_circuit_breaker.
+    is_portal_host_failure (reused here, not duplicated - see that
+    function's own docstring for exactly which exceptions qualify:
+    ConnectTimeout/ConnectionError/Playwright TimeoutError). False for
+    every OTHER reason a listing can fail to be obtained (an HTTP 429/404/
+    other HTTPError, a parsing error, or simply no summary_url ever having
+    existed to query) - none of those are evidence the portal itself is
+    down, so a caller (app.pipeline.evidence_refresh) must not report
+    PORTAL_UNAVAILABLE for them. In-memory only - never persisted."""
 
     listing_succeeded: bool
     acquisition_complete: bool
     new_document_count: int = 0
+    portal_unavailable: bool = False
 
 
 def discover_and_store_documents_for_application(
@@ -1125,7 +1140,9 @@ def discover_and_store_documents_for_application(
         # DISCOVERY_ELIGIBLE) for the very next run to retry, exactly as
         # a failed attempt has always behaved - only a genuinely
         # completed check advances this field.
-        return DocumentAcquisitionResult(listing_succeeded=False, acquisition_complete=False)
+        return DocumentAcquisitionResult(
+            listing_succeeded=False, acquisition_complete=False, portal_unavailable=is_portal_host_failure(e),
+        )
 
     if health is not None:
         health.record_document_discovery(succeeded=True)

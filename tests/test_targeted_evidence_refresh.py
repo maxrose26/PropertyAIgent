@@ -313,13 +313,53 @@ def test_successful_check_nothing_new_returns_checked_no_new_evidence(session):
 
 
 def test_portal_failure_returns_portal_unavailable(session):
+    # A genuine host failure (ConnectionError) - the ONE canonical
+    # classifier, is_portal_host_failure, recognises this as real portal
+    # unavailability (PR B2 FINAL amendment).
+    import requests
+
     application = _add_application(session, reference="APP/1")
-    with patch("app.pipeline.run_weekly.discover_documents", side_effect=RuntimeError("portal unreachable")):
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectionError("connection refused")):
         result = refresh_material_evidence(
             session, MagicMock(), MagicMock(), _council_config(), application,
             trigger="material_change", reason=REASON_DECISION_GRANTED,
         )
     assert result.outcome == OUTCOME_PORTAL_UNAVAILABLE
+
+
+def test_http_429_does_not_automatically_become_portal_unavailable(session):
+    # PR B2 FINAL amendment, item 13 - a real HTTP 429 response was
+    # received (the portal IS up, just rate-limiting), so is_portal_host_
+    # failure correctly does NOT classify it as a host failure.
+    import requests
+
+    application = _add_application(session, reference="APP/1")
+    response = MagicMock(status_code=429)
+    with patch(
+        "app.pipeline.run_weekly.discover_documents",
+        side_effect=requests.exceptions.HTTPError("429 Too Many Requests", response=response),
+    ):
+        result = refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+    assert result.outcome == OUTCOME_ACQUISITION_INCOMPLETE
+    assert application.evidence_refresh_required is True
+
+
+def test_general_http_error_does_not_automatically_become_portal_unavailable(session):
+    # PR B2 FINAL amendment, item 14 - any other HTTPError (404/500/...) is
+    # equally not evidence of a host outage, per is_portal_host_failure's
+    # own canonical classification.
+    import requests
+
+    application = _add_application(session, reference="APP/1")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.HTTPError("500 Server Error")):
+        result = refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+    assert result.outcome == OUTCOME_ACQUISITION_INCOMPLETE
 
 
 def test_download_failure_returns_acquisition_incomplete(session):
@@ -366,8 +406,10 @@ def test_checked_no_new_evidence_clears_flag(session):
 
 
 def test_portal_unavailable_does_not_clear_flag(session):
+    import requests
+
     application = _add_application(session, reference="APP/1")
-    with patch("app.pipeline.run_weekly.discover_documents", side_effect=RuntimeError("boom")):
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout("timed out")):
         refresh_material_evidence(
             session, MagicMock(), MagicMock(), _council_config(), application,
             trigger="material_change", reason=REASON_DECISION_GRANTED,
@@ -391,17 +433,19 @@ def test_acquisition_incomplete_does_not_clear_flag(session):
 
 def test_unexpected_failure_does_not_lose_the_request(session):
     # discover_and_store_documents_for_application's own broad except
-    # catches genuinely any exception raised out of discover_documents,
-    # not just network-shaped ones - from evidence_refresh's own
-    # perspective that is indistinguishable from a portal failure, and
-    # must be equally retryable.
+    # catches genuinely any exception raised out of discover_documents, not
+    # just network-shaped ones. PR B2 FINAL amendment: an exception that is
+    # NOT a recognised host failure (is_portal_host_failure) is now
+    # correctly classified as ACQUISITION_INCOMPLETE, not PORTAL_
+    # UNAVAILABLE - but either way the request must remain retryable, which
+    # is the one thing this test actually locks down.
     application = _add_application(session, reference="APP/1")
     with patch("app.pipeline.run_weekly.discover_documents", side_effect=ValueError("unexpected parsing error")):
         result = refresh_material_evidence(
             session, MagicMock(), MagicMock(), _council_config(), application,
             trigger="material_change", reason=REASON_DECISION_GRANTED,
         )
-    assert result.outcome == OUTCOME_PORTAL_UNAVAILABLE
+    assert result.outcome == OUTCOME_ACQUISITION_INCOMPLETE
     assert application.evidence_refresh_required is True
 
 
@@ -434,8 +478,10 @@ def test_no_new_evidence_does_not_create_b3_handoff(session):
 
 
 def test_portal_failure_does_not_create_b3_handoff(session):
+    import requests
+
     application = _add_application(session, reference="APP/1")
-    with patch("app.pipeline.run_weekly.discover_documents", side_effect=RuntimeError("boom")):
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectionError("boom")):
         refresh_material_evidence(
             session, MagicMock(), MagicMock(), _council_config(), application,
             trigger="material_change", reason=REASON_DECISION_GRANTED,
@@ -715,3 +761,132 @@ def test_decision_granted_routing_still_includes_s106_after_amendment():
 def test_recommendation_made_does_not_automatically_include_s106():
     # Item 19 - the amendment must not have broadened B1's own routing either.
     assert "s106" not in target_doc_types_for_reasons([REASON_RECOMMENDATION_MADE])
+
+
+# ==============================================================================
+# PR B2 FINAL pre-merge amendment: Truthful Refresh Timestamp + Portal
+# Failure Classification
+# ==============================================================================
+
+
+def _successful_refresh(session, application, *, new_evidence: bool):
+    row = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/d.pdf")
+    if new_evidence:
+        with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+             patch("app.pipeline.run_weekly.download_document", return_value=Path("/tmp/fake.pdf")), \
+             patch("app.pipeline.run_weekly.extract_document_text", return_value="text"), \
+             patch("app.pipeline.run_weekly.standardise_document_type", return_value="decision_notice"), \
+             patch.object(Path, "stat", return_value=MagicMock(st_size=1)):
+            return refresh_material_evidence(
+                session, MagicMock(), MagicMock(), _council_config(), application,
+                trigger="material_change", reason=REASON_DECISION_GRANTED,
+            )
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[]):
+        return refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+
+
+def test_new_material_evidence_advances_last_checked_at(session):
+    application = _add_application(session, reference="APP/1")
+    _successful_refresh(session, application, new_evidence=True)
+    assert application.evidence_refresh_last_checked_at is not None
+
+
+def test_checked_no_new_evidence_advances_last_checked_at(session):
+    application = _add_application(session, reference="APP/1")
+    _successful_refresh(session, application, new_evidence=False)
+    assert application.evidence_refresh_last_checked_at is not None
+
+
+def test_portal_unavailable_does_not_advance_last_checked_at(session):
+    import requests
+
+    application = _add_application(session, reference="APP/1")
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectTimeout("timed out")):
+        refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+    assert application.evidence_refresh_last_checked_at is None
+
+
+def test_acquisition_incomplete_does_not_advance_last_checked_at(session):
+    application = _add_application(session, reference="APP/1")
+    row = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/d.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=RuntimeError("boom")), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="decision_notice"):
+        refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+    assert application.evidence_refresh_last_checked_at is None
+
+
+def test_successful_timestamp_survives_later_portal_failure_then_acquisition_incomplete_then_advances_again(session):
+    """The exact T1/T2/T3/T4 sequence from the amendment's own Part 4:
+    a genuinely successful check (T1) must survive a later portal failure
+    (T2) and a later acquisition-incomplete attempt (T3) completely
+    unchanged, then advance again on the next genuinely successful check
+    (T4) - proving future freshness logic can trust this one field to mean
+    "time since we last learned something true", never "time since we last
+    tried"."""
+    import requests
+
+    application = _add_application(session, reference="APP/1")
+
+    # T1: genuinely successful check.
+    _successful_refresh(session, application, new_evidence=False)
+    t1 = application.evidence_refresh_last_checked_at
+    assert t1 is not None
+
+    # B1 re-flags the application for a later material change so it's
+    # eligible for another refresh attempt.
+    application.evidence_refresh_required = True
+    session.commit()
+
+    # T2: portal unavailable.
+    with patch("app.pipeline.run_weekly.discover_documents", side_effect=requests.exceptions.ConnectionError("boom")):
+        refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+    assert application.evidence_refresh_last_checked_at == t1  # unchanged
+
+    # T3: acquisition incomplete.
+    application.evidence_refresh_required = True
+    session.commit()
+    row = _fake_row("Decision Notice.pdf", source_url="https://example.invalid/d.pdf")
+    with patch("app.pipeline.run_weekly.discover_documents", return_value=[row]), \
+         patch("app.pipeline.run_weekly.download_document", side_effect=RuntimeError("boom")), \
+         patch("app.pipeline.run_weekly.standardise_document_type", return_value="decision_notice"):
+        refresh_material_evidence(
+            session, MagicMock(), MagicMock(), _council_config(), application,
+            trigger="material_change", reason=REASON_DECISION_GRANTED,
+        )
+    assert application.evidence_refresh_last_checked_at == t1  # still unchanged
+
+    # T4: genuinely successful check again.
+    application.evidence_refresh_required = True
+    session.commit()
+    _successful_refresh(session, application, new_evidence=False)
+    t4 = application.evidence_refresh_last_checked_at
+    assert t4 is not None
+    assert t4 != t1  # advanced
+
+
+def test_missing_summary_url_returns_acquisition_incomplete(session):
+    # PR B2 FINAL amendment, Case C / items 10-11 - a missing summary_url
+    # is a real acquisition gap, but must NOT be misrepresented as genuine
+    # portal unavailability.
+    application = _add_application(session, reference="APP/1", summary_url=None)
+    result = refresh_material_evidence(
+        session, MagicMock(), MagicMock(), _council_config(), application,
+        trigger="material_change", reason=REASON_DECISION_GRANTED,
+    )
+    assert result.outcome == OUTCOME_ACQUISITION_INCOMPLETE
+    assert result.outcome != OUTCOME_PORTAL_UNAVAILABLE
+    assert application.evidence_refresh_required is True
+    assert application.evidence_refresh_last_checked_at is None

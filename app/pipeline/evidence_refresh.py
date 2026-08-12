@@ -283,20 +283,36 @@ def _refresh_one_application(
     given), so no separate before/after identity-set diff is needed here
     any more either.
 
+    PR B2 FINAL pre-merge amendment ("Truthful Refresh Timestamp + Portal
+    Failure Classification") - PORTAL_UNAVAILABLE is now reserved for a
+    listing failure the ONE existing canonical classifier (app.pipeline.
+    portal_circuit_breaker.is_portal_host_failure, via DocumentAcquisition
+    Result.portal_unavailable) actually recognises as a genuine host
+    failure. Every other reason a targeted check could not be completed
+    reliably - no summary_url to query, an HTTP 429/404/other HTTPError, a
+    parsing error, or a download that failed after a successful listing -
+    is ACQUISITION_INCOMPLETE instead: a real acquisition problem, but not
+    proof the council portal itself is down.
+
     Imported lazily from app.pipeline.run_weekly to avoid a circular import
     (run_weekly itself imports this module's ROUTING/target_doc_types_for_
     reasons for its own stage_evidence_refresh)."""
     from app.pipeline.run_weekly import discover_and_store_documents_for_application
 
     if breaker is not None and breaker.is_open:
+        # The circuit only ever opens on qualifying host failures (see
+        # CouncilPortalCircuitBreaker's own docstring) - an already-open
+        # circuit is itself already-established genuine portal
+        # unavailability, not a separate classification decision.
         return OUTCOME_PORTAL_UNAVAILABLE, 0
 
     if not target.summary_url:
-        # Nothing to check for this specific family member - not a portal
-        # failure, just no known register to query. Treated as a clean,
-        # trivially-complete check contributing zero new documents, so it
-        # never blocks the rest of the family's real result.
-        return OUTCOME_CHECKED_NO_NEW_EVIDENCE, 0
+        # No known register to query for this specific family member - a
+        # real acquisition gap, but NOT evidence the council portal itself
+        # is unavailable (PR B2 FINAL amendment, Case C: "Missing summary_
+        # url MUST NOT produce PORTAL_UNAVAILABLE"). The request stays
+        # retryable in case summary_url is populated by a later pass.
+        return OUTCOME_ACQUISITION_INCOMPLETE, 0
 
     acquisition_result = discover_and_store_documents_for_application(
         session, page, requests_session, council, target,
@@ -304,14 +320,14 @@ def _refresh_one_application(
     )
 
     if not acquisition_result.listing_succeeded:
-        # discover_and_store_documents_for_application's own except block
-        # already covers every failure mode (host-down, parsing error, ...)
-        # under one broad catch and returns listing_succeeded=False - from
-        # here, "the listing could not be reliably obtained" is exactly
-        # PORTAL_UNAVAILABLE (Part 10: "portal unavailable -> UNKNOWN/
-        # failed check, not 'no change'"), the smallest taxonomy that keeps
-        # the request retryable.
-        return OUTCOME_PORTAL_UNAVAILABLE, 0
+        # Only a listing failure the canonical classifier itself recognises
+        # as a genuine host failure is PORTAL_UNAVAILABLE - an HTTP 429/404/
+        # other HTTPError or any other non-host exception is a real but
+        # DIFFERENT kind of acquisition problem (ACQUISITION_INCOMPLETE),
+        # never inferred to mean the portal is down.
+        if acquisition_result.portal_unavailable:
+            return OUTCOME_PORTAL_UNAVAILABLE, 0
+        return OUTCOME_ACQUISITION_INCOMPLETE, 0
 
     if not acquisition_result.acquisition_complete:
         # A document that DID succeed before a later one failed this same
@@ -381,9 +397,22 @@ def refresh_material_evidence(
       - PORTAL_UNAVAILABLE or ACQUISITION_INCOMPLETE: evidence_refresh_
         required stays True, completely unchanged, retryable by the next
         Daily Discovery run's own bounded selection.
-      Either way, evidence_refresh_last_outcome/evidence_refresh_last_
-      checked_at are always stamped - a truthful record that a check was
-      attempted, independent of whether it was allowed to clear the flag.
+      evidence_refresh_last_outcome is ALWAYS stamped either way - a
+      truthful record of the most recent attempt's result, independent of
+      whether it succeeded.
+
+    evidence_refresh_last_checked_at (PR B2 FINAL pre-merge amendment,
+    "Truthful Refresh Timestamp") - advances ONLY on NEW_MATERIAL_EVIDENCE
+    or CHECKED_NO_NEW_EVIDENCE, i.e. only when a targeted check genuinely
+    COMPLETED. It means "the most recent time PropertyAIgent successfully
+    completed the requested targeted evidence check" - never "the most
+    recent attempt", "the most recent time a refresh started", or "the
+    most recent portal failure". A PORTAL_UNAVAILABLE or ACQUISITION_
+    INCOMPLETE outcome leaves it exactly as it already was (unchanged
+    across any number of consecutive failed attempts), so future freshness
+    logic (a 90-day fallback, say) always measures time since the last
+    check that actually told PropertyAIgent something true, never a check
+    that silently learned nothing.
 
     B3 handoff (Part 13): Application.material_evidence_changed_at is
     stamped to now() ONLY on NEW_MATERIAL_EVIDENCE - never fabricated, never
@@ -418,9 +447,14 @@ def refresh_material_evidence(
 
     now = dt.datetime.now(dt.timezone.utc)
     application.evidence_refresh_last_outcome = overall_outcome
-    application.evidence_refresh_last_checked_at = now
     if overall_outcome in CLEARING_OUTCOMES:
         application.evidence_refresh_required = False
+        # PR B2 FINAL amendment - only a genuinely COMPLETED check may
+        # advance this timestamp; a PORTAL_UNAVAILABLE/ACQUISITION_
+        # INCOMPLETE outcome leaves whatever value it already held (None,
+        # or an earlier genuinely-successful check's timestamp) completely
+        # untouched - see this function's own docstring.
+        application.evidence_refresh_last_checked_at = now
     if overall_outcome == OUTCOME_NEW_MATERIAL_EVIDENCE:
         application.material_evidence_changed_at = now
 
