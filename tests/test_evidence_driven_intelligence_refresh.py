@@ -884,3 +884,327 @@ def test_process_intelligence_backlog_records_refresh_counters(session, monkeypa
     assert run.refresh_attempted == 1
     assert run.refresh_succeeded == 1
     assert run.status == "success"
+
+
+# ==============================================================================
+# PR B3 FINAL pre-merge amendment: Schema Reconciliation +
+# Affordable Housing Change Narrative
+# ==============================================================================
+
+# --- Schema reconciliation ----------------------------------------------------
+
+_B3_APPLICATION_FIELDS = frozenset({"intelligence_evidence_processed_at"})
+_B3_SCHEME_INTELLIGENCE_FIELDS = frozenset({
+    "latest_material_event", "recommendation_direction", "formal_decision_outstanding",
+    "refusal_reasons", "withdrawal_reason", "affordable_housing_status", "affordable_housing_notes",
+})
+_B3_INTELLIGENCE_RUN_FIELDS = frozenset({
+    "refresh_candidates_inspected", "refresh_attempted", "refresh_succeeded", "refresh_failed",
+})
+
+
+def test_b3_application_column_count_is_1():
+    assert len(_B3_APPLICATION_FIELDS) == 1
+    for name in _B3_APPLICATION_FIELDS:
+        assert hasattr(Application, name)
+
+
+def test_b3_scheme_intelligence_column_count_is_7():
+    assert len(_B3_SCHEME_INTELLIGENCE_FIELDS) == 7
+    for name in _B3_SCHEME_INTELLIGENCE_FIELDS:
+        assert hasattr(SchemeIntelligence, name)
+
+
+def test_b3_intelligence_run_column_count_is_4():
+    from app.db.models import IntelligenceRun
+    assert len(_B3_INTELLIGENCE_RUN_FIELDS) == 4
+    for name in _B3_INTELLIGENCE_RUN_FIELDS:
+        assert hasattr(IntelligenceRun, name)
+
+
+def test_b3_total_persisted_column_count_is_12():
+    total = len(_B3_APPLICATION_FIELDS) + len(_B3_SCHEME_INTELLIGENCE_FIELDS) + len(_B3_INTELLIGENCE_RUN_FIELDS)
+    assert total == 12  # 1 + 7 + 4 - the previous report's "8" was a plain arithmetic/reporting error
+
+
+def test_b3_columns_are_nullable_or_safely_integer_defaulted():
+    """Every B3 Application/SchemeIntelligence column must be nullable
+    (String/Text/DateTime/Boolean, no server-side default needed); every B3
+    IntelligenceRun column is an Integer with a Python-side default=0 - the
+    same established, already-migration-safe pattern as every other counter
+    on that model (e.g. extractions_attempted)."""
+    from sqlalchemy import inspect as sa_inspect
+
+    from app.db.models import IntelligenceRun
+
+    for model, fields in (
+        (Application, _B3_APPLICATION_FIELDS),
+        (SchemeIntelligence, _B3_SCHEME_INTELLIGENCE_FIELDS),
+    ):
+        mapper = sa_inspect(model)
+        for name in fields:
+            column = mapper.columns[name]
+            assert column.nullable is True, f"{model.__name__}.{name} must be nullable"
+
+    mapper = sa_inspect(IntelligenceRun)
+    for name in _B3_INTELLIGENCE_RUN_FIELDS:
+        column = mapper.columns[name]
+        assert column.nullable is False
+        assert column.default is not None and column.default.arg == 0
+
+
+def test_b3_schema_covered_by_generic_add_missing_columns_no_new_backfill():
+    """Structural proof migration stays additive/safe (Part 3/14 of the
+    amendment) - no new backfill function was introduced for any B3 column;
+    app.db.session._add_missing_columns' existing generic ADD COLUMN
+    mechanism is sufficient (same treatment as B1/B2's own reason/trigger/
+    requested_at/evidence_refresh_last_outcome fields, which also needed no
+    backfill)."""
+    import inspect as py_inspect
+
+    import app.db.session as db_session_module
+    source = py_inspect.getsource(db_session_module)
+    for name in _B3_APPLICATION_FIELDS | _B3_SCHEME_INTELLIGENCE_FIELDS | _B3_INTELLIGENCE_RUN_FIELDS:
+        assert f"_backfill_{name}" not in source
+
+
+# --- Affordable housing change narrative --------------------------------------
+
+
+def test_35_percent_proposed_to_20_percent_legally_secured_preserves_movement(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=35.0, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Executed S106 secures 20% affordable housing.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="Affordable housing reduced from 35% to 20%, now legally secured through the executed S106.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+    assert "35%" in app.scheme_intelligence.affordable_housing_notes and "20%" in app.scheme_intelligence.affordable_housing_notes
+    assert "affordable_percentage_changed" in outcome.affordable_housing_changes
+
+
+def test_35_percent_proposed_to_35_percent_legally_secured_identifies_security_progression(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=35.0, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Executed S106 secures the previously proposed 35% affordable housing.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="The previously proposed 35% affordable provision is now legally secured through the executed S106.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 35.0  # unchanged number
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+    assert "secured" in app.scheme_intelligence.affordable_housing_notes.lower()
+    assert "tenure_split_legally_secured" in outcome.affordable_housing_changes
+    assert "affordable_percentage_changed" not in outcome.affordable_housing_changes  # number itself didn't move
+
+
+def test_tenure_unknown_to_60_40_agreed_identifies_newly_agreed(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_RECOMMENDATION_MADE)
+    _add_scheme_intelligence(session, app, affordable_tenure_split_final=None, affordable_housing_status="proposed")
+    _add_document(session, app, "officer_report", "Officers report the tenure split is now agreed at 60% Social Rent / 40% Shared Ownership.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_tenure_split="60% Social Rent / 40% Shared Ownership", affordable_housing_status="agreed",
+        affordable_housing_notes="The tenure split is now agreed at 60/40, previously unknown.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_tenure_split_final == "60% Social Rent / 40% Shared Ownership"
+    assert "tenure_split_newly_agreed" in outcome.affordable_housing_changes
+
+
+def test_70_30_proposed_to_60_40_legally_secured_retains_material_change(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    _add_scheme_intelligence(session, app, affordable_tenure_split_final="70/30", affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Executed S106 secures a 60/40 tenure split, differing from the applicant's earlier 70/30 proposal.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_tenure_split="60/40", affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="The final secured tenure mix differs from the earlier 70/30 proposal and is now 60/40.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_tenure_split_final == "60/40"
+    assert "70/30" in app.scheme_intelligence.affordable_housing_notes
+    assert "tenure_split_changed" in outcome.affordable_housing_changes
+
+
+def test_20_secured_to_15_via_deed_of_variation_retains_narrative(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=None)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS)
+    _add_document(session, app, "s106", "A later Deed of Variation reduces the secured affordable provision from 20% to 15%.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=15.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="A later Deed of Variation reduces the secured affordable provision from 20% to 15%.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 15.0
+    assert "affordable_percentage_changed" in outcome.affordable_housing_changes
+    assert "20%" in app.scheme_intelligence.affordable_housing_notes and "15%" in app.scheme_intelligence.affordable_housing_notes
+
+
+def test_lower_authority_later_document_does_not_overwrite_secured_position(session):
+    # Part 10's own example: executed S106 already secured 20%; a LATER,
+    # lower-authority document (this pass's own evidence has no s106/
+    # decision_notice at all) claims 35% - must NOT overwrite the secured
+    # position, regardless of what the (mocked, deliberately "wrong") LLM
+    # response says.
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=None)
+    _add_scheme_intelligence(
+        session, app, affordable_percentage_final=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_tenure_split_final="60/40", affordable_housing_notes="Secured at 20% via executed S106.",
+    )
+    _add_document(session, app, "planning_statement", "A later marketing planning statement claims 35% affordable housing.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=35.0, affordable_housing_status="proposed",
+        affordable_housing_notes="Now proposing 35%, up from the previous 20%.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0  # guarded - unchanged
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+    assert app.scheme_intelligence.affordable_tenure_split_final == "60/40"
+    assert app.scheme_intelligence.affordable_housing_notes == "Secured at 20% via executed S106."  # untouched
+    assert "affordable_percentage_changed" not in outcome.affordable_housing_changes
+
+
+def test_legally_authoritative_document_can_revise_secured_position(session):
+    # Sanity counterpart - the guard must NOT block a genuine s106/decision_
+    # notice-backed revision (e.g. a real Deed of Variation), only a
+    # lower-authority one.
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=None)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS)
+    _add_document(session, app, "s106", "Deed of Variation revises the secured provision to 15%.")
+
+    client = _client_returning(_base_refresh_response(affordable_percentage=15.0, affordable_housing_status=LEGALLY_SECURED_STATUS))
+    refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_percentage_final == 15.0  # guard did not block a legitimate revision
+
+
+def test_unchanged_affordable_position_does_not_fabricate_change_narrative():
+    old = MagicMock(affordable_percentage_final=35.0, affordable_units_final=40, affordable_tenure_split_final="70/30", affordable_housing_status="agreed")
+    new_fields = {
+        "affordable_percentage_final": 35.0, "affordable_units_final": 40,
+        "affordable_tenure_split_final": "70/30", "affordable_housing_status": "agreed",
+    }
+    assert detect_affordable_housing_changes(old, new_fields) == []
+
+
+def test_missing_prior_affordable_data_does_not_invent_comparison(session):
+    from app.extraction.intelligence_refresh import _fmt_existing_position
+
+    assert _fmt_existing_position(None) == "(no prior AI intelligence exists for this application yet)"
+
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED)
+    # No SchemeIntelligence row exists at all - a first-ever B3 pass.
+    _add_document(session, app, "decision_notice", "Granted, 35% affordable housing secured.")
+
+    client = _client_returning(_base_refresh_response(affordable_percentage=35.0, affordable_housing_status=LEGALLY_SECURED_STATUS))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub())
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.affordable_percentage_final == 35.0
+    assert outcome.affordable_housing_changes == []  # nothing to compare against - no fabricated "change"
+
+
+def test_notes_replaced_not_appended_across_successive_refreshes(session):
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, material_evidence_changed_at=dt.datetime.now(dt.timezone.utc))
+    _add_scheme_intelligence(session, app, affordable_percentage_final=35.0, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Executed S106 secures 25%.")
+
+    client_1 = _client_returning(_base_refresh_response(
+        affordable_percentage=25.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="Reduced from 35% to 25%, now legally secured.",
+    ))
+    refresh_intelligence_for_application(session, client_1, app, generate_summary=_summary_stub())
+    first_notes = app.scheme_intelligence.affordable_housing_notes
+
+    # Second pass - a Deed of Variation further revises the position. The
+    # new notes must REPLACE the first, not have the first note appended.
+    app.material_evidence_changed_at = dt.datetime.now(dt.timezone.utc)
+    _add_document(session, app, "s106", "Deed of Variation reduces to 20%.")
+    client_2 = _client_returning(_base_refresh_response(
+        affordable_percentage=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="A later Deed of Variation reduces the secured provision from 25% to 20%.",
+    ))
+    refresh_intelligence_for_application(session, client_2, app, generate_summary=_summary_stub())
+
+    assert app.scheme_intelligence.affordable_housing_notes != first_notes
+    assert first_notes not in app.scheme_intelligence.affordable_housing_notes  # not concatenated/appended
+    assert "20%" in app.scheme_intelligence.affordable_housing_notes
+
+
+def test_site_summary_surfaces_material_affordable_change():
+    site, apps = _site_and_apps()
+    merged = _merged(
+        affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_percentage_final=20.0,
+        affordable_housing_notes="Reduced from the earlier 35% proposal to 20%, now legally secured.",
+    )
+    prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
+    assert "Reduced from the earlier 35% proposal to 20%" in prompt
+
+
+def test_site_summary_does_not_surface_comparison_when_no_notes_present():
+    site, apps = _site_and_apps()
+    merged = _merged(affordable_housing_status="agreed", affordable_percentage_final=35.0)  # no notes set
+    prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
+    assert "AFFORDABLE HOUSING NOTES" not in prompt
+
+
+# --- Atomic replacement regression reconfirmation ----------------------------
+
+
+def test_failed_summary_preserves_old_affordable_notes(session):
+    site = Site(council_code="testcouncil", canonical_address="2 test street", display_address="2 Test Street")
+    session.add(site)
+    session.commit()
+    app = _add_application(session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED, site_id=site.id)
+    _add_scheme_intelligence(session, app, affordable_percentage_final=20.0, affordable_housing_notes="Secured at 20%.")
+    _add_document(session, app, "s106", "Deed of Variation reduces to 15%.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=15.0, affordable_housing_notes="Reduced from 20% to 15%.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub(raise_error=True))
+
+    assert outcome.outcome == OUTCOME_ERROR
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert app.scheme_intelligence.affordable_housing_notes == "Secured at 20%."
+
+
+def test_successful_replacement_commits_notes_status_summary_and_watermark_together(session):
+    site = Site(council_code="testcouncil", canonical_address="3 test street", display_address="3 Test Street")
+    session.add(site)
+    session.commit()
+    now = dt.datetime.now(dt.timezone.utc)
+    app = _add_application(
+        session, reference="APP/1", evidence_refresh_reason=REASON_DECISION_GRANTED,
+        site_id=site.id, material_evidence_changed_at=now,
+    )
+    _add_scheme_intelligence(session, app, affordable_percentage_final=35.0, affordable_housing_status="proposed")
+    _add_document(session, app, "s106", "Executed S106 secures 20%.")
+
+    client = _client_returning(_base_refresh_response(
+        affordable_percentage=20.0, affordable_housing_status=LEGALLY_SECURED_STATUS,
+        affordable_housing_notes="Reduced from 35% to 20%, now secured.",
+    ))
+    outcome = refresh_intelligence_for_application(session, client, app, generate_summary=_summary_stub("Fresh summary"))
+
+    assert outcome.outcome == OUTCOME_SUCCESS
+    assert app.scheme_intelligence.affordable_percentage_final == 20.0
+    assert app.scheme_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+    assert app.scheme_intelligence.affordable_housing_notes == "Reduced from 35% to 20%, now secured."
+    assert site.status_summary == "Fresh summary"
+    assert app.intelligence_evidence_processed_at == now

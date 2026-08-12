@@ -207,6 +207,50 @@ AFFORDABLE_HOUSING_STATUSES = frozenset({
 # plus this constant documenting the rule for any future validation logic.
 LEGALLY_SECURED_STATUS = "legally_secured"
 
+# PR B3 FINAL pre-merge amendment ("Schema Reconciliation + Affordable
+# Housing Change Narrative") - the document types capable of legally
+# authorising an affordable housing position (Part 10/20: "a numerical
+# difference alone is not proof the newer value supersedes the older one").
+# Deliberately the same operative-legal-instrument set the prompt's own
+# LEGALLY_SECURED_STATUS rule already names.
+_LEGALLY_AUTHORITATIVE_DOC_TYPES = frozenset({"s106", "decision_notice"})
+
+
+def _evidence_includes_legally_authoritative_document(documents: list[Document]) -> bool:
+    return any(d.doc_type in _LEGALLY_AUTHORITATIVE_DOC_TYPES for d in documents)
+
+
+def guard_legally_secured_position(existing_intelligence, new_fields_raw: dict, documents: list[Document]) -> dict:
+    """Deterministic, code-level safety net for the evidence-authority rule
+    build_refresh_prompt's own instructions already ask the model to follow -
+    not a replacement for those instructions, a backstop against the model
+    getting it wrong. If the CURRENTLY LIVE position is already legally_
+    secured and THIS PASS's own evidence set contains no legally-
+    authoritative document (s106/decision_notice - see _LEGALLY_
+    AUTHORITATIVE_DOC_TYPES), a lower-authority document (an applicant
+    statement, a later marketing document, an officer report...) can never
+    downgrade or contradict it - Part 10's own example: "Executed S106: 20%
+    ... later marketing/planning statement: 35% -> do NOT automatically
+    replace the legally secured 20%." Returns new_fields_raw unchanged if
+    the guard does not apply; otherwise returns a copy with the affordable
+    fields forced back to the existing secured values and affordable_
+    housing_notes left untouched (never describes a downgrade that didn't
+    genuinely happen)."""
+    if existing_intelligence is None or existing_intelligence.affordable_housing_status != LEGALLY_SECURED_STATUS:
+        return new_fields_raw
+    if _evidence_includes_legally_authoritative_document(documents):
+        return new_fields_raw
+    if new_fields_raw.get("affordable_housing_status") == LEGALLY_SECURED_STATUS:
+        return new_fields_raw  # model already correctly preserved it - nothing to guard
+
+    guarded = dict(new_fields_raw)
+    guarded["affordable_housing_status"] = LEGALLY_SECURED_STATUS
+    guarded["affordable_percentage"] = existing_intelligence.affordable_percentage_final
+    guarded["affordable_units"] = existing_intelligence.affordable_units_final
+    guarded["affordable_tenure_split"] = existing_intelligence.affordable_tenure_split_final
+    guarded["affordable_housing_notes"] = existing_intelligence.affordable_housing_notes
+    return guarded
+
 
 # --- Refresh outcome + change detection --------------------------------------
 
@@ -290,6 +334,7 @@ def _fmt_existing_position(intel) -> str:
         f"affordable_percentage={intel.affordable_percentage_final} "
         f"affordable_tenure_split={intel.affordable_tenure_split_final!r} "
         f"affordable_housing_status={intel.affordable_housing_status!r} "
+        f"affordable_housing_notes={intel.affordable_housing_notes!r} "
         f"recommendation_direction={intel.recommendation_direction!r} "
         f"refusal_reasons={intel.refusal_reasons!r} withdrawal_reason={intel.withdrawal_reason!r}"
     )
@@ -347,6 +392,30 @@ useless and actively harmful to a commercial user:
   affordable_housing_status/affordable_housing_notes as the currently
   recorded values (do not blank them out just because this pass's evidence
   happens not to mention them).
+- affordable_housing_notes represents the CURRENT position, not a running
+  transcript: state the current evidenced position plus, only where
+  genuinely material, the single most relevant change from the CURRENTLY
+  RECORDED POSITION above (e.g. "Affordable housing reduced from 35% to
+  20%.", "The tenure split is now agreed at 60/40, previously unknown.",
+  "The previously proposed 35% affordable provision is now legally secured
+  through the executed S106."). Keep it to 1-3 sentences. Never append your
+  new note onto the old one, never build a chronological log of every past
+  observation, and never invent a "previous position" that the CURRENTLY
+  RECORDED POSITION above does not actually show - if that position has no
+  evidenced prior percentage/units/tenure/status, do not claim one existed.
+- EVIDENCE AUTHORITY: the NEW EVIDENCE TEXT below is ordered from highest to
+  lowest legal/evidential authority - an executed S106, Deed of Variation,
+  Unilateral Undertaking, or Decision Notice outranks an officer/committee
+  report, which outranks an applicant's own planning/affordable housing
+  statement. If the CURRENTLY RECORDED POSITION above already shows
+  affordable_housing_status="legally_secured" and the new evidence you were
+  given contains NO executed S106/Deed of Variation/Unilateral Undertaking/
+  Decision Notice text, you MUST leave affordable_percentage/
+  affordable_units/affordable_tenure_split/affordable_housing_status
+  exactly as currently recorded - a lower-authority document (a later
+  marketing statement, an earlier-stage planning statement, etc.) can never
+  downgrade or contradict an already-secured legal position, and must not
+  be described as doing so in affordable_housing_notes either.
 - planning_position_summary: one or two factual sentences stating the
   current planning position given everything above - this feeds directly
   into a commercial Site Summary, so state facts plainly and never imply a
@@ -451,6 +520,13 @@ def refresh_intelligence_for_application(
     if new_fields_raw["affordable_housing_status"] not in AFFORDABLE_HOUSING_STATUSES:
         return RefreshOutcome(outcome=OUTCOME_INVALID_OUTPUT, depth=depth)
 
+    # Deterministic evidence-authority backstop (PR B3 FINAL amendment,
+    # Part 10) - build_refresh_prompt's own instructions already ask the
+    # model to preserve an already-secured position against lower-authority
+    # evidence; this is the code-level guarantee that holds even if the
+    # model doesn't comply.
+    new_fields_raw = guard_legally_secured_position(existing_intelligence, new_fields_raw, documents)
+
     # Map the LLM's own field names onto SchemeIntelligence's existing
     # reconciled-field names (affordable_percentage -> affordable_
     # percentage_final etc.) - reusing those columns rather than adding
@@ -511,6 +587,15 @@ def refresh_intelligence_for_application(
         from app.db.models import SchemeIntelligence
 
         existing_intelligence = SchemeIntelligence(application_id=application.id)
+        # Sets the ORM relationship itself (back_populates="scheme_
+        # intelligence"), not just the raw application_id FK - required so
+        # application.scheme_intelligence reflects the new row immediately
+        # for THIS SAME in-memory application object, without relying on a
+        # later expire/refetch. A plain session.add(...) with only
+        # application_id set would leave application.scheme_intelligence
+        # stale (still None) for the rest of this process/test if that
+        # relationship was already lazily read earlier in this same call.
+        application.scheme_intelligence = existing_intelligence
         session.add(existing_intelligence)
     for key, value in new_fields.items():
         setattr(existing_intelligence, key, value)
