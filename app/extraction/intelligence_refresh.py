@@ -353,6 +353,118 @@ def guard_mixed_legal_security_position(new_fields_raw: dict, evidence_text: str
     return guarded
 
 
+# Live historical-rebuild batch hotfix (Wigan A/20/88859/RMMAJ, application
+# 721) - guard_legally_secured_position above only protects a DOWNGRADE of
+# an ALREADY-secured position; guard_mixed_legal_security_position only
+# catches the NARROWER "partial S106 + additional non-S106 top-up" pattern,
+# via the model's own affordable_provision_fully_legally_secured self-
+# report plus a phrase scan for specific mixed-security wording. Neither
+# guard checks whether a FIRST-TIME legally_secured claim is grounded in
+# any authoritative document's own content at all. In the Wigan case the
+# evidence's decision_notice (a "Form P4 Approval of Reserved Matters")
+# contained ZERO affordable-housing wording anywhere in its text - the
+# entire 63%/161-vs-163-unit/tenure narrative came exclusively from the
+# officer_report and applicant planning_statement, neither of which is a
+# legally-authoritative document type. The model nonetheless self-reported
+# affordable_provision_fully_legally_secured=true and no mixed-security
+# phrase matched, so guard_mixed_legal_security_position let it straight
+# through - proving prompt obedience and the model's own self-report are
+# both insufficient on their own (Product Owner instruction: "Do NOT rely
+# solely on prompt obedience... Do NOT rely solely on the model's
+# affordable_provision_fully_legally_secured self-report").
+#
+# Deliberately NOT "if an S106 or Decision Notice exists, legally_secured
+# is allowed" (the Product Owner's own explicit example of the gap this
+# must NOT reintroduce) - that is exactly document-TYPE-only reasoning.
+# This checks CONTENT: at least one authoritative-typed document's own
+# extracted text must itself discuss affordable housing at all. A small,
+# bounded keyword scan (same style/precision level as _MIXED_SECURITY_
+# SIGNAL_PATTERNS above) - not a legal-language parser, no new AI call, no
+# new persisted field.
+_AFFORDABLE_CONTENT_PATTERN = re.compile(r"afford", re.IGNORECASE)
+
+
+def _authoritative_document_discusses_affordable_housing(documents: list[Document]) -> bool:
+    return any(
+        d.doc_type in _LEGALLY_AUTHORITATIVE_DOC_TYPES and _AFFORDABLE_CONTENT_PATTERN.search(d.extracted_text or "")
+        for d in documents
+    )
+
+
+def guard_legally_secured_requires_authoritative_content(existing_intelligence, new_fields_raw: dict, documents: list[Document]) -> dict:
+    """Deterministic positive-evidence backstop for a FIRST-TIME legally_
+    secured claim (live batch hotfix, Defect: Wigan A/20/88859/RMMAJ). Only
+    applies when the CURRENTLY LIVE position was not already legally_
+    secured - reasserting an existing secured position remains entirely
+    guard_legally_secured_position's own territory (that guard may force
+    affordable_housing_status=legally_secured back onto a pass whose OWN
+    evidence contains no authoritative document at all, precisely to
+    protect against a downgrade attempt - this guard must never re-gate
+    that reassertion and undo it). Falls back to MIXED_SECURITY_FALLBACK_
+    STATUS ("conditioned") - the existing vocabulary, nothing invented -
+    exactly like guard_mixed_legal_security_position's own fallback.
+    Leaves affordable_percentage/affordable_units/affordable_tenure_split/
+    affordable_housing_notes untouched - only the security LABEL is
+    corrected, the same scope discipline as the guard above."""
+    if new_fields_raw.get("affordable_housing_status") != LEGALLY_SECURED_STATUS:
+        return new_fields_raw
+    already_secured = (
+        existing_intelligence is not None
+        and existing_intelligence.affordable_housing_status == LEGALLY_SECURED_STATUS
+    )
+    if already_secured:
+        return new_fields_raw
+    if _authoritative_document_discusses_affordable_housing(documents):
+        return new_fields_raw
+
+    guarded = dict(new_fields_raw)
+    guarded["affordable_housing_status"] = MIXED_SECURITY_FALLBACK_STATUS
+    return guarded
+
+
+# Live historical-rebuild batch hotfix (Stockport DC/091326, application
+# 825) - the model produced affordable_housing_status="conditioned" with
+# affordable_percentage_final=0/affordable_units_final=0, while its OWN
+# affordable_housing_notes correctly stated "no affordable housing units
+# proposed". Root cause (confirmed by reading the actual evidence): the
+# sole usable document was a decision_notice that is itself an internal
+# council email discharging a CONTAMINATION/remediation condition ("LKC
+# Updated Risk Assessment and Remediation Strategy") - entirely unrelated
+# to affordable housing. AFFORDABLE_HOUSING_STATUSES's "conditioned" value
+# has never been defined in the prompt beyond its bare enum name (see
+# build_refresh_prompt's own hotfix addition below for the semantic fix at
+# the source); this is the deterministic backstop for when the model still
+# gets it wrong despite that clarification. Deliberately narrow: fires
+# ONLY on an explicit self-contradiction already present in the model's
+# own notes text, never merely because affordable_percentage/units happen
+# to be 0/None - a genuine affordable-housing condition with zero units
+# DELIVERED so far (obligation exists, nothing built yet) is a legitimate
+# "conditioned" case and must not be silently erased by a blanket
+# quantity-based rule.
+_NO_AFFORDABLE_HOUSING_NOTE_PATTERNS = [
+    re.compile(r"no\s+affordable\s+housing", re.IGNORECASE),
+    re.compile(r"not\s+propos(?:ed|ing)\s+(?:any\s+)?affordable\s+housing", re.IGNORECASE),
+]
+
+
+def _notes_explicitly_deny_affordable_housing(notes: str | None) -> bool:
+    text = notes or ""
+    return any(pattern.search(text) for pattern in _NO_AFFORDABLE_HOUSING_NOTE_PATTERNS)
+
+
+def guard_conditioned_status_requires_an_actual_condition(new_fields_raw: dict) -> dict:
+    """Falls back to the existing 'unknown' status - reusing vocabulary,
+    inventing nothing (AFFORDABLE_HOUSING_STATUSES is not redesigned)."""
+    if new_fields_raw.get("affordable_housing_status") != MIXED_SECURITY_FALLBACK_STATUS:
+        return new_fields_raw
+    if not _notes_explicitly_deny_affordable_housing(new_fields_raw.get("affordable_housing_notes")):
+        return new_fields_raw
+
+    guarded = dict(new_fields_raw)
+    guarded["affordable_housing_status"] = "unknown"
+    return guarded
+
+
 # PR B3 pre-historical-rebuild amendment (Defect B: refusal-reason
 # reliability) - Phase 3's live Stockport DC/060928 sample showed an
 # explicit, correctly-labelled refusal reason near the START of an 8,035-
@@ -572,6 +684,19 @@ useless and actively harmful to a commercial user:
   itself the operative legal instrument - not a proposal, planning
   statement, committee report, or officer report describing what a future
   S106 will contain.
+- "conditioned" MEANS SPECIFICALLY: the CURRENT affordable housing
+  position is governed by a planning condition that itself relates to
+  affordable housing (e.g. a condition requiring an affordable housing
+  scheme to be submitted/approved before occupation). It does NOT mean
+  "this evidence happens to be about discharging some condition" - a
+  Discharge of Conditions notice or email about an UNRELATED matter (e.g.
+  contamination/remediation, drainage, highways, landscaping) must never,
+  by itself, produce affordable_housing_status="conditioned". If the
+  evidence establishes there is NO affordable housing obligation at all
+  (e.g. 0% / 0 units, or the evidence itself says none is proposed or
+  required), use "unknown" - never "conditioned" - and say so plainly in
+  affordable_housing_notes rather than implying an affordable-housing
+  condition that isn't evidenced.
 - MIXED LEGAL SECURITY: affordable_housing_status="legally_secured"
   describes the CURRENT TOTAL affordable position (affordable_percentage/
   affordable_units above), not just a portion of it. An executed S106,
@@ -639,6 +764,20 @@ useless and actively harmful to a commercial user:
   the remaining 18 affordable homes by tenure." Never state a partial
   breakdown in a way a reader would take as the complete picture, and never
   invent the missing units/tenures just to make the arithmetic reconcile.
+- CONFLICTING SOURCE TOTALS: if the evidence itself states TWO DIFFERENT
+  numbers for what is meant to be the SAME total (e.g. one passage says
+  "161 dwellings will be delivered as affordable housing" while a tenure
+  breakdown elsewhere in the same evidence sums to a different number,
+  e.g. 72 + 91 = 163), do not silently pick one figure for the structured
+  affordable_units field while a different figure appears in affordable_
+  housing_notes - that is its own kind of unsupported certainty. Instead:
+  state the discrepancy explicitly in affordable_housing_notes (e.g. "The
+  evidence states both 161 and 163 as the total affordable unit count -
+  reported here as approximately 161-163 pending clarification."), and use
+  whichever figure the evidence most explicitly and directly labels as the
+  TOTAL (not a number merely implied by summing an unrelated breakdown)
+  for the structured affordable_units field. Never resolve the conflict by
+  guessing which source is correct.
 - EVIDENCE AUTHORITY: the NEW EVIDENCE TEXT below is ordered from highest to
   lowest legal/evidential authority - an executed S106, Deed of Variation,
   Unilateral Undertaking, or Decision Notice outranks an officer/committee
@@ -805,6 +944,17 @@ def refresh_intelligence_for_application(
     # never, by itself, promote the entire current affordable total to
     # legally_secured when the evidence itself describes a mixed position.
     new_fields_raw = guard_mixed_legal_security_position(new_fields_raw, evidence_text)
+
+    # Live historical-rebuild batch hotfix (Wigan A/20/88859/RMMAJ) -
+    # positive-evidence backstop for a FIRST-TIME legally_secured claim;
+    # see guard_legally_secured_requires_authoritative_content's own
+    # docstring for why the two guards above did not already catch this.
+    new_fields_raw = guard_legally_secured_requires_authoritative_content(existing_intelligence, new_fields_raw, documents)
+
+    # Live historical-rebuild batch hotfix (Stockport DC/091326) - a
+    # "conditioned" status must not survive when the model's own notes
+    # explicitly say no affordable housing is proposed/required at all.
+    new_fields_raw = guard_conditioned_status_requires_an_actual_condition(new_fields_raw)
 
     # Map the LLM's own field names onto SchemeIntelligence's existing
     # reconciled-field names (affordable_percentage -> affordable_
