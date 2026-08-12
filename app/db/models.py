@@ -1475,6 +1475,21 @@ class SchemeIntelligence(Base):
     # the narrated CHANGE/STATUS story, that field is the raw data value.
     affordable_housing_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Historical B3 rebuild completion marker (app.extraction.
+    # historical_rebuild) - deliberately SEPARATE from Application.
+    # intelligence_evidence_processed_at, which means "the latest
+    # material_evidence_changed_at incorporated into live intelligence" (a
+    # B1/B2/B3 freshness concept). Historical rebuild is not a planning-
+    # change event and must never fabricate that field - see this module's
+    # own docstring for why. intelligence_rebuild_version records which
+    # named B3 standard (e.g. "b3_v1") last successfully regenerated this
+    # row via the historical runner; intelligence_rebuilt_at records when.
+    # Both NULL means never rebuilt. A future B3 standard upgrade bumps the
+    # version string to make every row eligible again, independent of
+    # whether B1/B2 ever fires for it.
+    intelligence_rebuild_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    intelligence_rebuilt_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

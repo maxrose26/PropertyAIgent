@@ -144,6 +144,20 @@ _DOC_TYPES_BY_DEPTH = {
 }
 
 
+def broad_refresh_evidence_categories() -> frozenset[str]:
+    """Public accessor for DEPTH_BROAD's own target document-type set
+    above - exists so an external caller (app.extraction.historical_
+    rebuild's candidate-eligibility filter) can align its own evidence-
+    sufficiency check with B3's actual BROAD-refresh category set without
+    duplicating the list and risking taxonomy drift if it's ever changed
+    here. Returns the SAME frozenset object select_refresh_evidence_
+    documents itself uses for DEPTH_BROAD - never a copy, never a
+    redefinition. Historical rebuild always resolves to BROAD depth (its
+    own module docstring explains why), so this is the correct - and
+    only - category set to reuse."""
+    return _DOC_TYPES_BY_DEPTH[DEPTH_BROAD]
+
+
 # --- Evidence authority + input selection (PR B3 spec, Parts 14, 26) --------
 
 # Simple, explicit ranking, not a document-relationship graph (Part 14:
@@ -658,7 +672,7 @@ def _call_refresh_llm(client: OpenAI, prompt: str) -> dict:
 
 def refresh_intelligence_for_application(
     session, client: OpenAI, application: Application, *,
-    generate_summary=None,
+    generate_summary=None, extra_fields: dict | None = None,
 ) -> RefreshOutcome:
     """The B3 atomic-replacement entry point (PR B3 spec, Part 27) - ONE
     Application whose Application.material_evidence_changed_at is newer
@@ -689,6 +703,28 @@ def refresh_intelligence_for_application(
     generate_scheme_summary via the real OpenAI client if not given);
     returning/raising lets a test simulate summary failure independently of
     the intelligence-refresh LLM call.
+
+    extra_fields: dict | None - opt-in mechanism (B3 pre-historical-rebuild
+    final amendment, Issue A) for a CALLER-SPECIFIC completion marker to be
+    persisted in the exact SAME commit as the SchemeIntelligence/Site
+    Summary/watermark replacement, with no second transaction and no
+    crash window between "intelligence rebuilt" and "marker recorded".
+    This function applies the given key/value pairs to the SAME
+    `existing_intelligence` ORM object as a plain setattr, at the same
+    point in the sequence as its own new_fields assignment (i.e. only
+    after BOTH fallible steps - the LLM call and, if a Site is linked, the
+    Site Summary regeneration - have already succeeded) - never earlier,
+    so a failure anywhere before that point leaves extra_fields completely
+    unapplied, exactly like every other field this function sets. B3
+    itself never passes this (normal scheduled processing always omits
+    it, so it defaults to None and this whole mechanism is a no-op for
+    every existing caller) - it exists solely so a caller like
+    app.extraction.historical_rebuild can atomically record its own
+    intelligence_rebuild_version/intelligence_rebuilt_at without this
+    function needing to know what those fields mean or why they exist.
+    Deliberately generic (not named/typed around "historical rebuild") so
+    this stays a small, caller-agnostic seam rather than a second,
+    rebuild-specific code path inside B3 itself.
 
     Reuses app.extraction.run_extraction's own OUTCOME_* taxonomy - no
     second AI failure system (Part 28). NO_USABLE_TEXT here means no
@@ -842,6 +878,10 @@ def refresh_intelligence_for_application(
         session.add(existing_intelligence)
     for key, value in new_fields.items():
         setattr(existing_intelligence, key, value)
+
+    if extra_fields:
+        for key, value in extra_fields.items():
+            setattr(existing_intelligence, key, value)
 
     if site is not None and generated_summary is not None:
         site.status_summary = generated_summary

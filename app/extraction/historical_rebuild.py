@@ -1,0 +1,689 @@
+"""PROPERTY AIGENT — Historical B3 Intelligence Rebuild Runner.
+
+A one-off, operator-invoked, resumable pathway that regenerates EXISTING
+production SchemeIntelligence rows using the current approved B3 refresh
+standard (app.extraction.intelligence_refresh). This is NOT a planning-
+change event and must never fake B1/B2 trigger state (Application.
+evidence_refresh_required/reason/trigger, material_evidence_changed_at) on
+a historical row merely to make it eligible - see refresh_intelligence_for_
+application's own docstring for why Application.intelligence_evidence_
+processed_at means something specific and different (the latest material_
+evidence_changed_at incorporated into live intelligence) that this module
+must never fabricate.
+
+Reuses refresh_intelligence_for_application(...) UNCHANGED - no parallel
+historical AI extraction engine exists. Every B3 safety property (evidence
+selection, event/depth logic, the legal-security guards, refusal-reason
+highlighting, prospective Site Summary generation, atomic replacement, the
+OUTCOME_* taxonomy) is inherited automatically from that one call. This
+module differs from normal scheduled B3 processing ONLY in:
+  - candidate selection (existing SchemeIntelligence rows not yet rebuilt
+    at the current REBUILD_VERSION, instead of the material_evidence_
+    changed_at-vs-watermark eligibility query app.pipeline.run_weekly.
+    INTELLIGENCE_REFRESH_ELIGIBLE uses);
+  - a separate completion marker (SchemeIntelligence.intelligence_rebuild_
+    version/intelligence_rebuilt_at) tracking "has this row been rebuilt
+    under the current B3 standard", never conflated with the B1/B2/B3
+    freshness watermark;
+  - bounded batch/resume/dry-run control for a large one-off backfill.
+
+Historical rows overwhelmingly predate B1/B2 (Application.evidence_refresh_
+reason is NULL for essentially all of them, confirmed at design time), so
+refresh_depth_for_reasons(()) already defaults to DEPTH_BROAD via existing,
+untouched logic - no new depth-routing system was needed or built here.
+
+QA checks (detect_tenure_narrative_mismatch, is_complex_site) are a
+DETERMINISTIC, bounded, non-blocking layer on top of the reused B3
+outcome - never a hard failure, never a second AI judgement call, and
+never mutate anything the QA check itself flags. They exist because a live
+production sample (Trafford 114786/FUL/24) showed the structured
+affordable_tenure_split_final field can occasionally remain stale even
+when the refreshed narrative is correct, and a separate sample (Stockport
+DC/060928, site 74) showed complex 30-application Sites can produce
+confusing aggregate Site Summaries - both known, out-of-scope-for-this-
+module limitations that the QA layer surfaces for operator review rather
+than silently hiding or attempting to fix.
+"""
+from __future__ import annotations
+
+import datetime as dt
+from dataclasses import dataclass, field
+
+from openai import OpenAI
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.db.models import Application, SchemeIntelligence, Site
+from app.extraction.intelligence_refresh import (
+    DEPTH_BROAD,
+    refresh_depth_for_reasons,
+    refresh_intelligence_for_application,
+    select_refresh_evidence_documents,
+)
+from app.extraction.run_extraction import (
+    OUTCOME_AI_ERROR,
+    OUTCOME_ERROR,
+    OUTCOME_INVALID_OUTPUT,
+    OUTCOME_NO_USABLE_TEXT,
+    OUTCOME_SUCCESS,
+)
+from app.pipeline.evidence_refresh import resolve_application_family
+
+# Named, deterministic version identity - not a timestamp (Part 9 of the
+# task: "do not hard-code a random timestamp as the version identity"). A
+# future B3 standard upgrade bumps this string, making every row eligible
+# for rebuild again regardless of B1/B2 activity.
+REBUILD_VERSION = "b3_v1"
+
+# Bounded batch size (Part 11) - a deliberately conservative default that
+# still lets an operator inspect a meaningful dry-run/live batch without
+# the risk of an accidental full-corpus run. MAX_BATCH_LIMIT_WITHOUT_
+# OVERRIDE makes going beyond that a deliberate, explicit choice (Part 30).
+DEFAULT_BATCH_LIMIT = 25
+MAX_BATCH_LIMIT_WITHOUT_OVERRIDE = 50
+
+# Smallest safe rule (Part 21) - not a scoring model. Confirmed via the
+# live Stockport sample: site 74 has 30 linked applications and produced a
+# genuinely confusing blended Site Summary; ordinary sites in the
+# production corpus have far fewer (the vast majority under 5).
+COMPLEX_SITE_APPLICATION_THRESHOLD = 15
+
+# QA warning labels (Part 22) - reporting-only, never a RefreshOutcome
+# value, never persisted, never gate rebuild-completion marking.
+QA_TENURE_NARRATIVE_MISMATCH = "STRUCTURED_TENURE_NARRATIVE_MISMATCH"
+QA_SITE_SUMMARY_COMPLEX_SITE = "SITE_SUMMARY_COMPLEX_SITE_REVIEW"
+
+# Reporting-only label (Part 22/23) - "SUCCESS_WITH_WARNING" is never a
+# value refresh_intelligence_for_application/RefreshOutcome itself
+# produces; it is this module's own derived label for
+# outcome == OUTCOME_SUCCESS with one or more non-blocking QA warnings.
+OUTCOME_SUCCESS_WITH_WARNING = "success_with_warning"
+
+# Deliberately narrow, bounded keyword list (same style as intelligence_
+# refresh.py's own _MIXED_SECURITY_SIGNAL_PATTERNS) - not an NLP model.
+_TENURE_KEYWORDS = (
+    "social rent", "affordable rent", "shared ownership", "rent to buy",
+    "intermediate", "discounted market rent", "shared equity", "affordable home ownership",
+)
+
+
+def detect_tenure_narrative_mismatch(tenure_split: str | None, notes: str | None) -> bool:
+    """Deterministic, bounded comparison (Part 20) - flags when affordable_
+    housing_notes mentions a tenure category that affordable_tenure_split_
+    final does not, which is exactly the shape of the live-validation
+    defect found on Trafford 114786/FUL/24 (notes correctly said "16 for
+    social rent and 57 for shared ownership"; the structured field stayed
+    at the stale "Shared Ownership, Rent to Buy", never mentioning social
+    rent at all). Deliberately one-directional (notes-has-more-than-field,
+    not the reverse) - a field naming a category the notes don't repeat is
+    not itself suspicious (notes are a short narrative, not required to
+    restate every structured value). Returns False (no warning) whenever
+    either input is missing - nothing to compare."""
+    if not tenure_split or not notes:
+        return False
+    tenure_lower = tenure_split.lower()
+    notes_lower = notes.lower()
+    tenure_terms = {kw for kw in _TENURE_KEYWORDS if kw in tenure_lower}
+    notes_terms = {kw for kw in _TENURE_KEYWORDS if kw in notes_lower}
+    return bool(notes_terms - tenure_terms)
+
+
+def is_complex_site(site: Site | None, *, threshold: int = COMPLEX_SITE_APPLICATION_THRESHOLD) -> bool:
+    """Smallest safe complex-site signal (Part 21) - a simple application
+    count threshold, not an attempt to detect the underlying cause (e.g.
+    the Stockport site-linking peculiarity found live, where an unrelated
+    special-school scheme and a residential development share one Site
+    row). Reports the risk; does not diagnose or fix it."""
+    if site is None:
+        return False
+    return len(site.applications) >= threshold
+
+
+# --- Candidate selection ------------------------------------------------------
+
+
+def _not_yet_rebuilt_clause(rebuild_version: str):
+    return (
+        SchemeIntelligence.intelligence_rebuild_version.is_(None)
+        | (SchemeIntelligence.intelligence_rebuild_version != rebuild_version)
+    )
+
+
+def _family_has_usable_evidence(
+    session: Session, application: Application, *, cache: dict[int, bool] | None = None,
+) -> bool:
+    """Family-evidence-eligibility amendment (Issue: candidate eligibility
+    must not be narrower than what refresh_intelligence_for_application
+    itself would actually inspect) - resolves the SAME bounded application
+    family B3 resolves (resolve_application_family, imported unchanged
+    from app.pipeline.evidence_refresh - the exact function refresh_
+    intelligence_for_application itself calls, and the exact function
+    build_candidate_evidence_snapshot below already reuses for its own
+    dry-run preview) and reuses select_refresh_evidence_documents(family,
+    DEPTH_BROAD) - the exact function/depth B3 itself would call for a
+    historical row (see this module's own top docstring: "Historical rows
+    overwhelmingly predate B1/B2... refresh_depth_for_reasons(()) already
+    defaults to DEPTH_BROAD"). No separate/duplicated family-resolution or
+    usable-text logic exists anywhere in this module - "has usable
+    evidence" is defined as "would select_refresh_evidence_documents
+    return at least one document for this family at BROAD depth", exactly
+    matching what a live refresh_intelligence_for_application call would
+    itself find (its own OUTCOME_NO_USABLE_TEXT check is `if not
+    documents`, precisely mirrored here).
+
+    Deliberately NOT expressible as one SQL EXISTS clause: resolve_
+    application_family performs a proposal-text parent-citation lookup
+    (app.pipeline.site_linking.extract_parent_reference, a Python regex
+    parser) that cannot be pushed into SQL without reimplementing it a
+    second time - a genuine second implementation of "B3 application
+    family" is exactly what this amendment must avoid (Part 4 of the
+    task). `cache`, when supplied, memoises the boolean result per
+    application id for the lifetime of one run_historical_rebuild() call -
+    safe because this module never acquires or mutates Document rows, so
+    a given application's family-evidence membership cannot change
+    between any two calls within one invocation (see run_historical_
+    rebuild's own comment for why this also holds safely across its
+    before/after progress recomputation).
+
+    session.expire(member, ["documents"]) below forces a fresh read of
+    each family member's `.documents` relationship rather than trusting
+    whatever SQLAlchemy's identity map already cached for it earlier in
+    this same session (the test session fixture runs with expire_on_
+    commit=False, so a Document committed after an earlier, unrelated
+    access to this same Application's `.documents` would otherwise stay
+    invisible to this check for the rest of the session - exactly the
+    "usable evidence arrives later" case Part 8/Case F requires to work
+    correctly on the very next invocation, not just a brand-new process).
+    Only runs on a cache miss, so this is at most one extra per-member
+    query per unique application per run_historical_rebuild() call."""
+    if cache is not None and application.id in cache:
+        return cache[application.id]
+    family = resolve_application_family(session, application)
+    for member in family:
+        session.expire(member, ["documents"])
+    result = bool(select_refresh_evidence_documents(family, DEPTH_BROAD))
+    if cache is not None:
+        cache[application.id] = result
+    return result
+
+
+def select_historical_rebuild_candidates(
+    session: Session, *,
+    rebuild_version: str = REBUILD_VERSION,
+    council: str | None = None,
+    application_id: int | None = None,
+    site_id: int | None = None,
+    limit: int = DEFAULT_BATCH_LIMIT,
+    cache: dict[int, bool] | None = None,
+) -> list[Application]:
+    """The historical candidate universe: every Application with an
+    EXISTING SchemeIntelligence row (the rebuild's whole purpose is to
+    regenerate already-extracted intelligence to the new standard, not to
+    perform first-ever extraction - that remains stage_extraction's job,
+    untouched) whose SchemeIntelligence has not already been rebuilt at
+    `rebuild_version`, AND whose bounded B3 application FAMILY currently
+    has at least one usable BROAD-depth document (_family_has_usable_
+    evidence - live, query-derived state, never a persisted "no evidence"
+    status; if useful evidence is added anywhere in the family later, the
+    row automatically becomes selectable on the very next invocation with
+    no code/data change needed here).
+
+    Family-blocked/already-rebuilt rows never consume a batch slot (Part
+    5 of the task): the SQL stage below fetches every not-yet-rebuilt,
+    scope-matching row (unbounded, no LIMIT), in the same deterministic
+    order as before; the Python stage then walks that list and keeps only
+    the first `limit` rows whose family actually has usable evidence -
+    rows it skips along the way are never counted against `limit`.
+
+    Deterministic ordering: Application.last_seen_at DESC (most recently
+    confirmed-still-live schemes first - the ones most likely to still be
+    commercially relevant), then Application.id ASC as a stable tie-break.
+    Not a commercial scoring model."""
+    stmt = (
+        select(Application)
+        .join(SchemeIntelligence, SchemeIntelligence.application_id == Application.id)
+        .where(_not_yet_rebuilt_clause(rebuild_version))
+    )
+    if council:
+        stmt = stmt.where(Application.council_code == council)
+    if application_id:
+        stmt = stmt.where(Application.id == application_id)
+    if site_id:
+        stmt = stmt.where(Application.site_id == site_id)
+    stmt = stmt.order_by(Application.last_seen_at.desc(), Application.id.asc())
+    potential = session.execute(stmt).scalars().all()
+
+    selected: list[Application] = []
+    for application in potential:
+        if len(selected) >= limit:
+            break
+        if _family_has_usable_evidence(session, application, cache=cache):
+            selected.append(application)
+    return selected
+
+
+def _scoped_corpus_count_stmt(*, council: str | None, application_id: int | None, site_id: int | None):
+    stmt = (
+        select(func.count(func.distinct(Application.id)))
+        .select_from(Application)
+        .join(SchemeIntelligence, SchemeIntelligence.application_id == Application.id)
+    )
+    if council:
+        stmt = stmt.where(Application.council_code == council)
+    if application_id:
+        stmt = stmt.where(Application.id == application_id)
+    if site_id:
+        stmt = stmt.where(Application.site_id == site_id)
+    return stmt
+
+
+def _scoped_corpus_rows_stmt(*, council: str | None, application_id: int | None, site_id: int | None):
+    """Same scope filters as _scoped_corpus_count_stmt, but returning the
+    actual Application rows (not a count) - needed wherever a family-
+    aware evidence check must run in Python for each row (count_
+    currently_rebuildable, count_remaining_rebuildable)."""
+    stmt = (
+        select(Application)
+        .join(SchemeIntelligence, SchemeIntelligence.application_id == Application.id)
+    )
+    if council:
+        stmt = stmt.where(Application.council_code == council)
+    if application_id:
+        stmt = stmt.where(Application.id == application_id)
+    if site_id:
+        stmt = stmt.where(Application.site_id == site_id)
+    return stmt
+
+
+def count_total_corpus(
+    session: Session, *, council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+) -> int:
+    """Total historical candidate universe (every Application with an
+    existing SchemeIntelligence row) matching the given scope filters -
+    regardless of rebuild status AND regardless of current evidence
+    sufficiency (includes both currently_rebuildable and blocked_no_
+    usable_evidence rows - Part 6: report the whole corpus, not just the
+    processable subset). council=application_id=site_id=None (the
+    default) is the GLOBAL corpus size. Evidence-agnostic, so this one
+    stays a pure SQL count - no family resolution needed."""
+    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id)
+    return session.execute(stmt).scalar() or 0
+
+
+def count_currently_rebuildable(
+    session: Session, *, council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+    cache: dict[int, bool] | None = None,
+) -> int:
+    """Rows whose bounded B3 family has usable evidence right now,
+    REGARDLESS of rebuild-version status (deliberately not "not yet
+    rebuilt" - this answers "could this row be processed at all", a
+    separate question from "has it already been"). blocked_no_usable_
+    evidence = total - this. Family-aware (see _family_has_usable_
+    evidence), so this fetches the scoped rows and evaluates each in
+    Python rather than a single SQL count."""
+    rows = session.execute(
+        _scoped_corpus_rows_stmt(council=council, application_id=application_id, site_id=site_id)
+    ).scalars().all()
+    return sum(1 for application in rows if _family_has_usable_evidence(session, application, cache=cache))
+
+
+def count_already_rebuilt(
+    session: Session, *, rebuild_version: str = REBUILD_VERSION,
+    council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+) -> int:
+    """Version-aware (Part 9): only rows whose intelligence_rebuild_version
+    EXACTLY equals `rebuild_version` count as rebuilt for it - an older
+    version (or any other value) counts as NOT rebuilt for THIS version,
+    same as select_historical_rebuild_candidates's own eligibility check.
+    Deliberately NOT filtered by current (family) evidence sufficiency -
+    "already rebuilt" is a historical fact about a past successful pass,
+    independent of whether that row's evidence still exists/is still
+    usable today. No family resolution needed - a pure SQL count."""
+    stmt = _scoped_corpus_count_stmt(council=council, application_id=application_id, site_id=site_id).where(
+        SchemeIntelligence.intelligence_rebuild_version == rebuild_version
+    )
+    return session.execute(stmt).scalar() or 0
+
+
+def count_remaining_rebuildable(
+    session: Session, *, rebuild_version: str = REBUILD_VERSION,
+    council: str | None = None, application_id: int | None = None, site_id: int | None = None,
+    cache: dict[int, bool] | None = None,
+) -> int:
+    """Genuinely processable backlog: not yet rebuilt at this version AND
+    the row's bounded B3 family currently has usable evidence.
+    Deliberately distinct from `total - already_rebuilt`, which would
+    wrongly include the evidence-blocked rows (Part 6: "avoid ambiguous
+    use of just remaining if it would imply the evidence-blocked rows are
+    processable")."""
+    rows = session.execute(
+        _scoped_corpus_rows_stmt(council=council, application_id=application_id, site_id=site_id)
+        .where(_not_yet_rebuilt_clause(rebuild_version))
+    ).scalars().all()
+    return sum(1 for application in rows if _family_has_usable_evidence(session, application, cache=cache))
+
+
+@dataclass
+class CandidateEvidenceSnapshot:
+    """Dry-run reporting only (Part 14) - never used to gate whether a
+    candidate is selected (see select_historical_rebuild_candidates's own
+    docstring for why)."""
+    application_id: int
+    reference: str
+    council_code: str
+    site_id: int | None
+    depth: str
+    usable_document_count: int
+    has_usable_evidence: bool
+    expected_llm_calls: int
+    prior_rebuild_version: str | None
+
+
+def build_candidate_evidence_snapshot(session: Session, application: Application) -> CandidateEvidenceSnapshot:
+    """Read-only preview of what a live refresh would do for this
+    candidate - reuses the exact same family-resolution/depth/evidence-
+    selection functions refresh_intelligence_for_application itself calls
+    (Part 4: reuse, don't duplicate), just without calling the LLM."""
+    family = resolve_application_family(session, application)
+    reasons = tuple(part for part in (application.evidence_refresh_reason or "").split(",") if part)
+    depth = refresh_depth_for_reasons(reasons)
+    documents = select_refresh_evidence_documents(family, depth)
+    # 1 refresh call always; +1 Site Summary call only when a Site is
+    # linked (matches refresh_intelligence_for_application's own `if site
+    # is not None` branch).
+    expected_calls = 2 if application.site_id else 1
+    return CandidateEvidenceSnapshot(
+        application_id=application.id, reference=application.reference, council_code=application.council_code,
+        site_id=application.site_id, depth=depth, usable_document_count=len(documents),
+        has_usable_evidence=len(documents) > 0, expected_llm_calls=expected_calls,
+        prior_rebuild_version=(application.scheme_intelligence.intelligence_rebuild_version if application.scheme_intelligence else None),
+    )
+
+
+# --- Live batch orchestration --------------------------------------------------
+
+
+@dataclass
+class RebuildCandidateResult:
+    application_id: int
+    reference: str
+    council_code: str
+    outcome: str  # one of run_extraction's own OUTCOME_* values, reused unchanged
+    qa_warnings: list[str] = field(default_factory=list)
+    rebuilt: bool = False
+
+    @property
+    def display_outcome(self) -> str:
+        if self.outcome == OUTCOME_SUCCESS and self.qa_warnings:
+            return OUTCOME_SUCCESS_WITH_WARNING
+        return self.outcome
+
+
+@dataclass
+class HistoricalRebuildRunSummary:
+    dry_run: bool
+    rebuild_version: str
+
+    # GLOBAL progress - ignores any --council/--application-id/--site-id
+    # filter this invocation used. Cheap (a handful of extra count queries)
+    # and gives the operator the whole-corpus picture regardless of how
+    # narrowly this particular invocation was scoped. `remaining_
+    # rebuildable` deliberately excludes the evidence-blocked rows - it is
+    # never ambiguous about whether they're processable (they aren't).
+    total_historical_corpus: int = 0
+    currently_rebuildable: int = 0
+    blocked_no_usable_evidence: int = 0
+    already_rebuilt_before: int = 0
+    remaining_rebuildable_before: int = 0
+    already_rebuilt_after: int = 0
+    remaining_rebuildable_after: int = 0
+
+    # CURRENT-SCOPE progress - same council/application_id/site_id filters
+    # as this invocation, but BEFORE the --limit is applied (i.e. the full
+    # eligible-under-this-scope universe, not just this batch's selection).
+    # Identical to the GLOBAL figures above when no filter was given.
+    scope_total_historical: int = 0
+    scope_currently_rebuildable: int = 0
+    scope_blocked_no_usable_evidence: int = 0
+    scope_already_rebuilt_before: int = 0
+    scope_remaining_rebuildable_before: int = 0
+    scope_already_rebuilt_after: int = 0
+    scope_remaining_rebuildable_after: int = 0
+
+    # THIS BATCH
+    candidates_inspected: int = 0
+    selected: int = 0
+    attempted: int = 0
+    success: int = 0
+    success_with_warning: int = 0
+    no_usable_text: int = 0
+    ai_error: int = 0
+    invalid_output: int = 0
+    error: int = 0
+    tenure_mismatch_warnings: int = 0
+    complex_site_warnings: int = 0
+    estimated_llm_calls: int = 0
+    council_distribution: dict[str, int] = field(default_factory=dict)
+    dry_run_snapshots: list[CandidateEvidenceSnapshot] = field(default_factory=list)
+    results: list[RebuildCandidateResult] = field(default_factory=list)
+
+
+def _process_one_candidate(
+    session: Session, client: OpenAI, application: Application, *, rebuild_version: str,
+) -> RebuildCandidateResult:
+    """One candidate, one refresh_intelligence_for_application call - the
+    ENTIRE B3 atomic-replacement/evidence-selection/guard/prompt stack
+    applies exactly as it does for normal scheduled B3 processing (Part 4).
+
+    TRUE SAME-TRANSACTION ATOMICITY (final pre-merge amendment, Issue A):
+    the rebuild-completion marker is passed in via refresh_intelligence_
+    for_application's own `extra_fields` parameter, so it is applied to
+    the SAME `existing_intelligence` ORM object, in the SAME in-memory
+    mutation block, committed by the SAME session.commit() call as the
+    structured intelligence and Site Summary replacement - there is no
+    second commit and no crash window between "intelligence rebuilt" and
+    "marker recorded" (see refresh_intelligence_for_application's own
+    docstring for the exact mechanism and why it never affects normal B3,
+    which never passes extra_fields). On ANY non-SUCCESS outcome,
+    extra_fields is never even constructed, let alone applied - the
+    function returns before reaching that point in the sequence, exactly
+    like every other field it sets.
+
+    Defensive per-candidate isolation (Part 5 Issue E): refresh_
+    intelligence_for_application's own OUTCOME_* taxonomy already
+    classifies every AI/validation failure mode it recognises; this
+    try/except exists ONLY for an infrastructure-level failure the reused
+    function doesn't itself catch (e.g. the final session.commit() itself
+    raising - a DB connectivity failure, not an AI failure). session.
+    rollback() discards any partial in-memory ORM state SQLAlchemy may
+    have flushed before the failure, so this candidate's row reverts to
+    its true last-committed values and the NEXT candidate in this batch
+    starts from a clean session - one candidate's infrastructure failure
+    still never blocks or corrupts another's result, matching this
+    module's own "failure isolation" guarantee for every failure type,
+    not only the AI-classified ones. This is new orchestration code local
+    to the historical rebuild runner, not a change to B3 architecture."""
+    try:
+        outcome_obj = refresh_intelligence_for_application(
+            session, client, application,
+            extra_fields={
+                "intelligence_rebuild_version": rebuild_version,
+                "intelligence_rebuilt_at": dt.datetime.now(dt.timezone.utc),
+            },
+        )
+    except Exception:
+        session.rollback()
+        return RebuildCandidateResult(
+            application_id=application.id, reference=application.reference, council_code=application.council_code,
+            outcome=OUTCOME_ERROR,
+        )
+    result = RebuildCandidateResult(
+        application_id=application.id, reference=application.reference, council_code=application.council_code,
+        outcome=outcome_obj.outcome,
+    )
+    if outcome_obj.outcome != OUTCOME_SUCCESS:
+        # NO_USABLE_TEXT / AI_ERROR / INVALID_OUTPUT / ERROR - old
+        # intelligence already guaranteed untouched by refresh_
+        # intelligence_for_application's own atomicity, and extra_fields
+        # was never applied (it lives in the SAME commit as the
+        # structured fields, which never happens on a failure path).
+        # Never marked rebuilt (Part 23); remains eligible next run.
+        return result
+
+    intel = application.scheme_intelligence
+    if detect_tenure_narrative_mismatch(intel.affordable_tenure_split_final, intel.affordable_housing_notes):
+        result.qa_warnings.append(QA_TENURE_NARRATIVE_MISMATCH)
+    if is_complex_site(application.site):
+        result.qa_warnings.append(QA_SITE_SUMMARY_COMPLEX_SITE)
+
+    # QA warnings are non-blocking (Part 23's own explicit recommendation)
+    # - the refresh output is still safe and still counts as successfully
+    # rebuilt (the completion marker was ALREADY committed as part of the
+    # single successful transaction above); warnings are only surfaced
+    # for operator review, never a reason to withhold it after the fact.
+    result.rebuilt = True
+    return result
+
+
+def _tally(summary: HistoricalRebuildRunSummary, result: RebuildCandidateResult) -> None:
+    if result.outcome == OUTCOME_SUCCESS:
+        if result.qa_warnings:
+            summary.success_with_warning += 1
+        else:
+            summary.success += 1
+    elif result.outcome == OUTCOME_NO_USABLE_TEXT:
+        summary.no_usable_text += 1
+    elif result.outcome == OUTCOME_AI_ERROR:
+        summary.ai_error += 1
+    elif result.outcome == OUTCOME_INVALID_OUTPUT:
+        summary.invalid_output += 1
+    elif result.outcome == OUTCOME_ERROR:
+        summary.error += 1
+
+    if QA_TENURE_NARRATIVE_MISMATCH in result.qa_warnings:
+        summary.tenure_mismatch_warnings += 1
+    if QA_SITE_SUMMARY_COMPLEX_SITE in result.qa_warnings:
+        summary.complex_site_warnings += 1
+
+
+def run_historical_rebuild(
+    session: Session, client: OpenAI | None, *,
+    dry_run: bool = True,
+    limit: int = DEFAULT_BATCH_LIMIT,
+    allow_large_batch: bool = False,
+    council: str | None = None,
+    application_id: int | None = None,
+    site_id: int | None = None,
+    rebuild_version: str = REBUILD_VERSION,
+) -> HistoricalRebuildRunSummary:
+    """The one entry point both the CLI and tests call. dry_run=True (the
+    default) performs the full candidate-selection + evidence-preview pass
+    with ZERO database writes and ZERO OpenAI calls (Part 14) - this is
+    mandatory before any first production batch. dry_run=False requires a
+    real `client` and processes candidates SEQUENTIALLY (Part 15: "prefer
+    sequential processing for the first production implementation... do
+    not introduce concurrency unless clearly safe and necessary" - it
+    wasn't judged necessary here), with per-candidate failure isolation -
+    one candidate's AI_ERROR/INVALID_OUTPUT/ERROR never rolls back or
+    blocks any other candidate in the same batch (Part 33)."""
+    if limit > MAX_BATCH_LIMIT_WITHOUT_OVERRIDE and not allow_large_batch:
+        raise ValueError(
+            f"--limit {limit} exceeds the safe default of {MAX_BATCH_LIMIT_WITHOUT_OVERRIDE}; "
+            "pass allow_large_batch=True (--allow-large-batch on the CLI) to proceed deliberately."
+        )
+    if not dry_run and client is None:
+        raise ValueError("client is required for a live (non-dry-run) batch")
+
+    # One family-evidence cache for this ENTIRE invocation (Part 12:
+    # performance). Safe to share across selection, GLOBAL progress, SCOPE
+    # progress, and (for a live batch) the AFTER recomputation too: this
+    # module never acquires or mutates Document rows, so a given
+    # application's bounded-family evidence membership cannot change at
+    # any point during one run_historical_rebuild() call - only its
+    # rebuild-version marker can (via _process_one_candidate below), which
+    # count_already_rebuilt/count_remaining_rebuildable's own "not yet
+    # rebuilt" clause already re-queries fresh every time regardless of
+    # this cache.
+    family_evidence_cache: dict[int, bool] = {}
+
+    candidates = select_historical_rebuild_candidates(
+        session, rebuild_version=rebuild_version, council=council,
+        application_id=application_id, site_id=site_id, limit=limit,
+        cache=family_evidence_cache,
+    )
+
+    summary = HistoricalRebuildRunSummary(
+        dry_run=dry_run, rebuild_version=rebuild_version,
+        candidates_inspected=len(candidates), selected=len(candidates),
+    )
+
+    # Progress BEFORE this batch - global (unfiltered) and current-scope
+    # (same filters as this invocation, before --limit). An already-
+    # rebuilt or evidence-blocked row is correctly EXCLUDED from
+    # `candidates` above but still counted here - progress reporting and
+    # candidate selection are deliberately separate concerns.
+    summary.total_historical_corpus = count_total_corpus(session)
+    summary.currently_rebuildable = count_currently_rebuildable(session, cache=family_evidence_cache)
+    summary.blocked_no_usable_evidence = summary.total_historical_corpus - summary.currently_rebuildable
+    summary.already_rebuilt_before = count_already_rebuilt(session, rebuild_version=rebuild_version)
+    summary.remaining_rebuildable_before = count_remaining_rebuildable(
+        session, rebuild_version=rebuild_version, cache=family_evidence_cache,
+    )
+
+    summary.scope_total_historical = count_total_corpus(
+        session, council=council, application_id=application_id, site_id=site_id,
+    )
+    summary.scope_currently_rebuildable = count_currently_rebuildable(
+        session, council=council, application_id=application_id, site_id=site_id, cache=family_evidence_cache,
+    )
+    summary.scope_blocked_no_usable_evidence = summary.scope_total_historical - summary.scope_currently_rebuildable
+    summary.scope_already_rebuilt_before = count_already_rebuilt(
+        session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+    )
+    summary.scope_remaining_rebuildable_before = count_remaining_rebuildable(
+        session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+        cache=family_evidence_cache,
+    )
+
+    for application in candidates:
+        summary.council_distribution[application.council_code] = (
+            summary.council_distribution.get(application.council_code, 0) + 1
+        )
+
+        if dry_run:
+            snapshot = build_candidate_evidence_snapshot(session, application)
+            summary.dry_run_snapshots.append(snapshot)
+            summary.estimated_llm_calls += snapshot.expected_llm_calls
+            continue
+
+        summary.attempted += 1
+        result = _process_one_candidate(session, client, application, rebuild_version=rebuild_version)
+        summary.results.append(result)
+        _tally(summary, result)
+
+    # Progress AFTER this batch - for a dry run nothing changed, so these
+    # deliberately equal the "before" values rather than issuing redundant
+    # queries; for a live batch they're recomputed fresh so a repeated
+    # operator invocation can see the backlog actually shrinking. Newly-
+    # arrived evidence on a previously-blocked row (Part 8's own example)
+    # would also be reflected here automatically, since these are all live
+    # queries, never cached/derived from the batch's own in-memory state.
+    if dry_run:
+        summary.already_rebuilt_after = summary.already_rebuilt_before
+        summary.remaining_rebuildable_after = summary.remaining_rebuildable_before
+        summary.scope_already_rebuilt_after = summary.scope_already_rebuilt_before
+        summary.scope_remaining_rebuildable_after = summary.scope_remaining_rebuildable_before
+    else:
+        summary.already_rebuilt_after = count_already_rebuilt(session, rebuild_version=rebuild_version)
+        summary.remaining_rebuildable_after = count_remaining_rebuildable(
+            session, rebuild_version=rebuild_version, cache=family_evidence_cache,
+        )
+        summary.scope_already_rebuilt_after = count_already_rebuilt(
+            session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+        )
+        summary.scope_remaining_rebuildable_after = count_remaining_rebuildable(
+            session, rebuild_version=rebuild_version, council=council, application_id=application_id, site_id=site_id,
+            cache=family_evidence_cache,
+        )
+
+    return summary
