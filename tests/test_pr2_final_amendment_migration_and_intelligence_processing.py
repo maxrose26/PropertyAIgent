@@ -471,6 +471,36 @@ def test_render_yaml_historical_rebuild_overnight_calls_the_completion_runner():
     assert day_of_month != "*" and month != "*"
 
 
+def test_render_yaml_historical_rebuild_overnight_schedule_unchanged_by_lifecycle_amendment():
+    """Final Pre-Merge Lifecycle Safety Amendment: confirmed Render's own
+    Blueprint spec requires `schedule` for a cron job with no documented
+    suspend/manual-only field, so the schedule itself must NOT be changed
+    to another arbitrary distant date - only its surrounding documentation
+    changes. Locks the exact value so a future edit can't silently drift
+    it without deliberately updating this test too."""
+    config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
+    overnight = next(s for s in config["services"] if s["name"] == "propertyaigent-historical-rebuild-overnight")
+    assert overnight["schedule"] == "0 3 1 1 *"
+
+
+def test_render_yaml_historical_rebuild_overnight_documents_temporary_lifecycle():
+    """The schedule alone cannot prevent this job from being mistaken for
+    permanent scheduled infrastructure (Render's Blueprint format has no
+    disable/suspend field to enforce that) - the required safety mechanism
+    is documentation, so this locks its presence rather than trusting it
+    survives future edits silently."""
+    text = RENDER_YAML.read_text(encoding="utf-8")
+    start = text.index("propertyaigent-historical-rebuild-overnight")
+    comment_block = text[max(0, start - 5000):start]
+    for marker in (
+        "TEMPORARY ONE-OFF HISTORICAL BACKFILL JOB",
+        "Trigger Run",
+        "MANDATORY POST-REBUILD CLEANUP",
+        "REMOVE this entire service entry from render.yaml",
+    ):
+        assert marker in comment_block, f"missing required lifecycle marker: {marker!r}"
+
+
 def test_render_yaml_daily_discovery_still_does_not_require_openai_key():
     """Updated by the Render Daily Discovery runtime failure hotfix:
     PLAYWRIGHT_BROWSERS_PATH is a legitimate addition (a non-secret

@@ -1,5 +1,15 @@
 """Historical B3 Intelligence Rebuild - Unattended Overnight Runner.
 
+FINITE HISTORICAL BACKFILL/MIGRATION RUNNER - NOT A RECURRING PRODUCTION
+INTELLIGENCE PIPELINE. This module exists to work through the existing,
+bounded historical backlog exactly once (or across a small number of
+manually-triggered runs while that backlog remains) and is expected to be
+retired - along with its render.yaml Cron Job entry - once that backlog
+reaches zero. It is not, and must not become, a scheduled counterpart to
+scripts.run_intelligence_processing (the actual recurring production
+intelligence job) - see render.yaml's own propertyaigent-historical-
+rebuild-overnight entry for the required post-rebuild cleanup step.
+
 Runs the existing, approved historical rebuild logic (app.extraction.
 historical_rebuild.run_historical_rebuild - the SAME function scripts.
 rebuild_intelligence's operator CLI calls) in repeated bounded batches

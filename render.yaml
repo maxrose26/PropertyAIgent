@@ -243,39 +243,65 @@ services:
       # Render dashboard (or --max-extractions/--max-summaries) without
       # needing a Blueprint change first.
 
+  # ==========================================================================
+  # TEMPORARY ONE-OFF HISTORICAL BACKFILL JOB - NOT PERMANENT INFRASTRUCTURE
+  # ==========================================================================
   # Historical B3 Rebuild - Unattended Overnight Runner. A TEMPORARY,
   # separate, operator-triggered one-off job for the remaining ~625-
   # application historical rebuild backlog - deliberately NOT wired into
-  # either of the two schedules above, and deliberately given a schedule
-  # that will not fire on its own (see "schedule" below). A Render Cron Job
-  # is the correct native primitive here (audited against the alternatives:
-  # a Background Worker auto-restarts on exit, which is explicitly
-  # unwanted for a job that must terminate permanently once the backlog is
-  # exhausted; a Web Service must bind to a port, the wrong execution
-  # model entirely) - the SAME primitive already proven for Daily
-  # Discovery/Intelligence Processing above, just triggered manually via
-  # Render's own dashboard "Trigger Run" action instead of on a schedule.
-  # Once triggered, the job runs entirely inside Render using Render's own
-  # DATABASE_URL/OPENAI_API_KEY - it survives a disconnected browser/Shell/
-  # Claude session by construction, since none of those are involved in
-  # its execution once started. See scripts/run_historical_rebuild_to_
+  # either of the two schedules above.
+  #
+  # RENDER CAPABILITY AUDIT (Historical Rebuild Overnight Runner, Final
+  # Pre-Merge Lifecycle Safety Amendment): confirmed against Render's own
+  # published Blueprint YAML reference (render.com/docs/blueprint-spec) and
+  # Cron Job docs (render.com/docs/cronjobs) that `schedule` is a REQUIRED
+  # field for a `type: cron` Blueprint service, specified as a cron
+  # expression - there is no documented `suspend`/`suspended`/`enabled`/
+  # manual-only field for a Blueprint cron job, and no documented way to
+  # define one in render.yaml with automatic scheduling disabled entirely.
+  # The only genuine "run this deliberately, right now" mechanism Render
+  # documents is the dashboard's own "Trigger Run" action, which is exactly
+  # how this job is intended to be run - the schedule below is therefore
+  # NOT the real trigger, only a config-format requirement.
+  #
+  # INTENDED TRIGGER: this job's own "Trigger Run" button in the Render
+  # dashboard, at a time an operator has deliberately chosen - NEVER its
+  # own schedule.
+  #
+  # WHY 03:00 UTC ON 1 JANUARY: technically still a valid RECURRING cron
+  # expression (once a year), but chosen as the lowest-frequency legitimate
+  # value Render's required cron-expression format allows, since no
+  # genuine "disabled"/manual-only value exists. Do not treat this as
+  # equivalent to disabled - it is the safest available approximation, not
+  # a guarantee against ever firing unattended.
+  #
+  # A Render Cron Job is still the correct native primitive here (audited
+  # against the alternatives: a Background Worker auto-restarts on exit,
+  # explicitly unwanted for a job that must terminate permanently once the
+  # backlog is exhausted; a Web Service must bind to a port, the wrong
+  # execution model entirely) - the SAME primitive already proven for
+  # Daily Discovery/Intelligence Processing above. Once triggered, the job
+  # runs entirely inside Render using Render's own DATABASE_URL/
+  # OPENAI_API_KEY - it survives a disconnected browser/Shell/Claude
+  # session by construction, since none of those are involved in its
+  # execution once started. See scripts/run_historical_rebuild_to_
   # completion.py's own docstring for the full batching/stop-condition
   # design; it calls the SAME, unmodified app.extraction.historical_
   # rebuild.run_historical_rebuild() every existing historical rebuild
   # tooling already uses - no second rebuild engine exists.
   #
-  # This entry should be removed once the historical backlog is fully
-  # rebuilt and no further overnight runs are expected.
+  # MANDATORY POST-REBUILD CLEANUP (required operational step, not
+  # optional): once the historical backlog is fully rebuilt AND morning
+  # verification AND Product Owner acceptance have both happened, the next
+  # task must REMOVE this entire service entry from render.yaml, merge that
+  # removal, "Sync Blueprint" in the Render dashboard, and confirm the
+  # propertyaigent-historical-rebuild-overnight service no longer exists in
+  # Render. This entry must never be left in render.yaml indefinitely as if
+  # it were permanent scheduled production infrastructure - it is not.
   - type: cron
     name: propertyaigent-historical-rebuild-overnight
     runtime: python
     plan: starter
-    # 03:00 UTC on 1 January only - chosen so this job effectively never
-    # fires on its own schedule; the actual intended trigger is Render's
-    # own manual "Trigger Run" action in the dashboard, at a time an
-    # operator has deliberately chosen, not this schedule. A cron
-    # expression is still required by Render's config format, so this is
-    # the safest legitimate value rather than an invalid/disabled one.
     schedule: "0 3 1 1 *"
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python -u -m scripts.run_historical_rebuild_to_completion"
