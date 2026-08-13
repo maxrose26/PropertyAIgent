@@ -242,3 +242,52 @@ services:
       # required configuration - an operator can add them later via the
       # Render dashboard (or --max-extractions/--max-summaries) without
       # needing a Blueprint change first.
+
+  # Historical B3 Rebuild - Unattended Overnight Runner. A TEMPORARY,
+  # separate, operator-triggered one-off job for the remaining ~625-
+  # application historical rebuild backlog - deliberately NOT wired into
+  # either of the two schedules above, and deliberately given a schedule
+  # that will not fire on its own (see "schedule" below). A Render Cron Job
+  # is the correct native primitive here (audited against the alternatives:
+  # a Background Worker auto-restarts on exit, which is explicitly
+  # unwanted for a job that must terminate permanently once the backlog is
+  # exhausted; a Web Service must bind to a port, the wrong execution
+  # model entirely) - the SAME primitive already proven for Daily
+  # Discovery/Intelligence Processing above, just triggered manually via
+  # Render's own dashboard "Trigger Run" action instead of on a schedule.
+  # Once triggered, the job runs entirely inside Render using Render's own
+  # DATABASE_URL/OPENAI_API_KEY - it survives a disconnected browser/Shell/
+  # Claude session by construction, since none of those are involved in
+  # its execution once started. See scripts/run_historical_rebuild_to_
+  # completion.py's own docstring for the full batching/stop-condition
+  # design; it calls the SAME, unmodified app.extraction.historical_
+  # rebuild.run_historical_rebuild() every existing historical rebuild
+  # tooling already uses - no second rebuild engine exists.
+  #
+  # This entry should be removed once the historical backlog is fully
+  # rebuilt and no further overnight runs are expected.
+  - type: cron
+    name: propertyaigent-historical-rebuild-overnight
+    runtime: python
+    plan: starter
+    # 03:00 UTC on 1 January only - chosen so this job effectively never
+    # fires on its own schedule; the actual intended trigger is Render's
+    # own manual "Trigger Run" action in the dashboard, at a time an
+    # operator has deliberately chosen, not this schedule. A cron
+    # expression is still required by Render's config format, so this is
+    # the safest legitimate value rather than an invalid/disabled one.
+    schedule: "0 3 1 1 *"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -u -m scripts.run_historical_rebuild_to_completion"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # Same belt-and-braces reasoning as Daily Discovery's own -u flag
+      # above (Render Daily Discovery missing-runtime-logs diagnosis) -
+      # this job's overnight log is the ONLY morning-review artifact if
+      # something goes wrong, so unbuffered output must not depend on a
+      # single fragile assumption.
+      - key: PYTHONUNBUFFERED
+        value: "1"
