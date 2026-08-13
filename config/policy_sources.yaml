@@ -84,3 +84,59 @@ councils:
         title: "Places for Everyone Joint Development Plan (Bury allocations JPA7-9, pages 311-325)"
         plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
         plan_version: "2022-2039"
+
+  salford:
+    # GM Salford + Trafford Regulation 19 Local Plan Allocation Ingestion
+    # task - confirmed via direct primary-source investigation (real
+    # pdfplumber reads against the actual Publication document, not a
+    # research-agent summary) that Salford's own emerging Local Plan
+    # (Part Two: Core Strategy and Allocations, "SLP:CSA") is currently at
+    # Regulation 19 Publication stage (published 31 July 2026, consultation
+    # closes 25 September 2026) and carries its own numbered "Development
+    # allocation N" sites within each neighbourhood policy's Part B
+    # section - genuinely separate from, and NOT a re-designation of, the
+    # 3 existing Places for Everyone allocations already in production for
+    # Salford (Hazelhurst Farm, East of Boothstown, Port Salford
+    # Extension). The plan's own text (p.92) explicitly names Hazelhurst
+    # Farm and East of Boothstown as delivered "through PfE", confirming
+    # they are not among this document's own allocations. THIS IS A
+    # PROPOSED/SUBMISSION-STAGE PLAN, NOT ADOPTED - see
+    # app.policy.status.derive_allocation_status_from_plan_status, which
+    # must map allocations from this source to submitted/proposed
+    # allocation status, never "adopted".
+    sources:
+      - url: "https://www.salford.gov.uk/planning-building-and-regeneration/planning-policies/local-planning-policy/salfords-development-plan/salford-local-plan/part-two-salford-local-plan/publication-local-plan-consultation-august-2026-to-september-2026/"
+        source_type: landing_page
+        title: "Salford Local Plan: Core Strategy and Allocations - Publication (Regulation 19) consultation page"
+        # No plan_name - council-level source, watches for the
+        # consultation/plan stage changing at all.
+
+      - url: "https://www.salford.gov.uk/media/5h2edjxf/01-publication-slp-csa.pdf"
+        source_type: emerging_plan
+        title: "01. Publication Salford Local Plan: Core Strategy and Allocations (SLP:CSA) - development allocations in each neighbourhood's Part B section"
+        plan_name: "Salford Local Plan: Core Strategy and Allocations"
+        plan_version: "Publication July 2026"
+
+  trafford:
+    # Same task as salford (above) - confirmed via direct primary-source
+    # investigation that Trafford's own emerging Local Plan is currently
+    # at Regulation 19 Publication stage (published 6 August 2026,
+    # consultation closes 18 September 2026) and its Chapter 15 "Site
+    # Allocations" carries 21 numbered site allocations (AN1-AN15,
+    # AS1-AS4, AC1-AC2). The plan's own text (para 15.2) explicitly states
+    # these allocations are "in addition to" - not overlapping with - the
+    # two existing Places for Everyone strategic allocations already in
+    # production for Trafford (New Carrington, Timperley Wedge/Davenport
+    # Green). THIS IS A PROPOSED/SUBMISSION-STAGE PLAN, NOT ADOPTED - same
+    # status-mapping requirement as salford, above.
+    sources:
+      - url: "https://www.trafford.gov.uk/planning-and-building-control/planning-policy-and-strategy/new-trafford-local-plan/regulation-19-publication-stage"
+        source_type: landing_page
+        title: "New Trafford Local Plan - Regulation 19 Publication Stage consultation page"
+        # No plan_name - council-level source.
+
+      - url: "https://tcintunestorage01.blob.core.windows.net/tc-drupal-repo/01LPW4SBYCMV73WSZOFJAIBROC2TF7QB7B_Trafford Local Plan 2022-2039 Publication Version (July 2026).pdf"
+        source_type: emerging_plan
+        title: "01. Trafford Local Plan 2022-2039 Publication Version (July 2026) - Chapter 15 Site Allocations, pages 290-455"
+        plan_name: "Trafford Local Plan"
+        plan_version: "Publication Version (July 2026)"
