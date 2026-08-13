@@ -236,7 +236,13 @@ FINAL_TRAFFORD_ALLOCATIONS = [
     {"policy_reference": "AN3", "site_name": "Trafford Waters", "intended_use": "mixed_use",
      "minimum_dwellings": 3000, "indicative_capacity": None, "maximum_capacity": None, "source_page": 325},
     {"policy_reference": "AN4", "site_name": "Pomona", "intended_use": "mixed_use",
-     "minimum_dwellings": 1950, "indicative_capacity": None, "maximum_capacity": 3200, "source_page": 331},
+     "minimum_dwellings": 2050, "indicative_capacity": None, "maximum_capacity": 3200, "source_page": 331},
+    # Corrected from 1,950 (Table 15-1 summary figure) to 2,050: the individual
+    # AN4 policy entry (p.331) states "around 3,200 dwellings with around
+    # 2,050 dwellings in plan period" - the policy text is the more
+    # authoritative source and supersedes the summary table, verified during
+    # the Complete GM Baseline task's full read of all 17 individual Trafford
+    # entries (previously only 5 of 17 had been individually verified).
     {"policy_reference": "AN5", "site_name": "Site of the former Stretford Mall, Chester Road, Stretford", "intended_use": "mixed_use",
      "minimum_dwellings": 750, "indicative_capacity": None, "maximum_capacity": None, "source_page": 336},
     {"policy_reference": "AN6", "site_name": "Land west of Skerton Road, Old Trafford", "intended_use": "residential",
@@ -333,4 +339,4 @@ def test_final_dataset_known_dwelling_capacity_totals():
     assert len(salford_known) == 14  # 15 qualifying minus Allocation 2 (null)
     assert len(trafford_known) == 17  # all 17 have a known figure
     assert sum(salford_known) == 1325
-    assert sum(trafford_known) == 20009
+    assert sum(trafford_known) == 20109  # 20,009 + 100 from the AN4 correction above
