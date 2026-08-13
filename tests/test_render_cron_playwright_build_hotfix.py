@@ -167,13 +167,20 @@ def test_intelligence_processing_schedule_and_start_command_unchanged():
     assert env_keys == {"DATABASE_URL", "OPENAI_API_KEY"}
 
 
-def test_render_yaml_still_declares_exactly_two_cron_jobs_no_web_service():
+def test_render_yaml_still_declares_only_cron_jobs_no_web_service():
+    """Updated by the Historical B3 Rebuild Unattended Overnight Runner task
+    - a third, deliberately temporary, deliberately separate Cron Job
+    (propertyaigent-historical-rebuild-overnight) now exists alongside the
+    original two. Still exactly cron jobs, still no web service."""
     config = yaml.safe_load(RENDER_YAML_TEXT)
     services = config["services"]
-    assert len(services) == 2
+    assert len(services) == 3
     assert all(s["type"] == "cron" for s in services)
     names = {s["name"] for s in services}
-    assert names == {"propertyaigent-daily-scrape", "propertyaigent-intelligence-processing"}
+    assert names == {
+        "propertyaigent-daily-scrape", "propertyaigent-intelligence-processing",
+        "propertyaigent-historical-rebuild-overnight",
+    }
 
 
 def test_render_yaml_no_service_commits_an_actual_secret_value():

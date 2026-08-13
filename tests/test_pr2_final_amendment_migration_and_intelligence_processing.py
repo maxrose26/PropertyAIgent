@@ -433,13 +433,72 @@ def _council_config(code: str):
 # --- Part 3: render.yaml two-Cron-Job architecture --------------------------
 
 
-def test_render_yaml_declares_exactly_two_cron_jobs_no_web_service():
+def test_render_yaml_declares_exactly_three_cron_jobs_no_web_service():
+    """Updated by the Historical B3 Rebuild Unattended Overnight Runner task
+    - adds a third, deliberately temporary, deliberately separate Cron Job
+    (propertyaigent-historical-rebuild-overnight) for the one-off historical
+    backlog. Still exactly cron jobs, still no web service declared here."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     services = config["services"]
-    assert len(services) == 2
+    assert len(services) == 3
     assert all(s["type"] == "cron" for s in services)
     names = {s["name"] for s in services}
-    assert names == {"propertyaigent-daily-scrape", "propertyaigent-intelligence-processing"}
+    assert names == {
+        "propertyaigent-daily-scrape", "propertyaigent-intelligence-processing",
+        "propertyaigent-historical-rebuild-overnight",
+    }
+
+
+def test_render_yaml_historical_rebuild_overnight_requires_database_and_openai():
+    config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
+    overnight = next(s for s in config["services"] if s["name"] == "propertyaigent-historical-rebuild-overnight")
+    env_var_keys = {e["key"] for e in overnight.get("envVars", [])}
+    assert env_var_keys == {"DATABASE_URL", "OPENAI_API_KEY", "PYTHONUNBUFFERED"}
+
+
+def test_render_yaml_historical_rebuild_overnight_calls_the_completion_runner():
+    config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
+    overnight = next(s for s in config["services"] if s["name"] == "propertyaigent-historical-rebuild-overnight")
+    assert "scripts.run_historical_rebuild_to_completion" in overnight["startCommand"]
+    # A valid cron expression is required by Render's config format, but
+    # this job's real trigger is a manual "Trigger Run" - confirmed here by
+    # asserting the schedule fires at most once a year (day-of-month AND
+    # month both pinned to fixed values), not on any recurring cadence that
+    # could fire unattended before an operator has deliberately chosen to.
+    schedule_fields = overnight["schedule"].split()
+    assert len(schedule_fields) == 5
+    day_of_month, month = schedule_fields[2], schedule_fields[3]
+    assert day_of_month != "*" and month != "*"
+
+
+def test_render_yaml_historical_rebuild_overnight_schedule_unchanged_by_lifecycle_amendment():
+    """Final Pre-Merge Lifecycle Safety Amendment: confirmed Render's own
+    Blueprint spec requires `schedule` for a cron job with no documented
+    suspend/manual-only field, so the schedule itself must NOT be changed
+    to another arbitrary distant date - only its surrounding documentation
+    changes. Locks the exact value so a future edit can't silently drift
+    it without deliberately updating this test too."""
+    config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
+    overnight = next(s for s in config["services"] if s["name"] == "propertyaigent-historical-rebuild-overnight")
+    assert overnight["schedule"] == "0 3 1 1 *"
+
+
+def test_render_yaml_historical_rebuild_overnight_documents_temporary_lifecycle():
+    """The schedule alone cannot prevent this job from being mistaken for
+    permanent scheduled infrastructure (Render's Blueprint format has no
+    disable/suspend field to enforce that) - the required safety mechanism
+    is documentation, so this locks its presence rather than trusting it
+    survives future edits silently."""
+    text = RENDER_YAML.read_text(encoding="utf-8")
+    start = text.index("propertyaigent-historical-rebuild-overnight")
+    comment_block = text[max(0, start - 5000):start]
+    for marker in (
+        "TEMPORARY ONE-OFF HISTORICAL BACKFILL JOB",
+        "Trigger Run",
+        "MANDATORY POST-REBUILD CLEANUP",
+        "REMOVE this entire service entry from render.yaml",
+    ):
+        assert marker in comment_block, f"missing required lifecycle marker: {marker!r}"
 
 
 def test_render_yaml_daily_discovery_still_does_not_require_openai_key():
