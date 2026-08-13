@@ -208,7 +208,7 @@ def test_historical_rebuild_markers_remain_untouched(session):
 def test_linked_site_summary_regenerated_via_default_pathway(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["called"] = True
         return "New summary text."
 

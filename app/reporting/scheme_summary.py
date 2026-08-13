@@ -18,6 +18,7 @@ from openai import OpenAI
 from app.db.models import Application, Site
 from app.pipeline.lapse_tracking import BUILD_STATUS_LABELS, LAPSE_STATUS_LABELS, get_expected_decision, parse_portal_date
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, summarize_phase_units
+from app.reporting.affordable_housing_scope import compute_affordable_housing_scope_summary, format_affordable_housing_lines
 
 MODEL = "gpt-4o-mini"
 
@@ -44,6 +45,7 @@ def _fmt_application(app: Application) -> str:
 
 def build_summary_prompt(
     site: Site, applications: list[Application], merged: dict, lapse: dict, phase_breakdown: list[dict],
+    *, prospective_overrides: dict[int, dict] | None = None,
 ) -> str:
     lapse_label = LAPSE_STATUS_LABELS.get(lapse["status"], lapse["status"])
     build_label = BUILD_STATUS_LABELS.get(lapse["build_status"], lapse["build_status"])
@@ -111,14 +113,18 @@ def build_summary_prompt(
         intelligence_lines.append(f"REFUSAL REASONS (evidenced): {merged['refusal_reasons']}")
     if merged.get("withdrawal_reason"):
         intelligence_lines.append(f"WITHDRAWAL REASON (evidenced): {merged['withdrawal_reason']}")
-    if merged.get("affordable_housing_status"):
-        intelligence_lines.append(
-            f"AFFORDABLE HOUSING STATUS: {merged['affordable_housing_status']} "
-            f"({merged.get('affordable_percentage_final')}% / {merged.get('affordable_units_final')} units, "
-            f"tenure: {merged.get('affordable_tenure_split_final') or 'not evidenced'})"
-        )
-    if merged.get("affordable_housing_notes"):
-        intelligence_lines.append(f"AFFORDABLE HOUSING NOTES: {merged['affordable_housing_notes']}")
+
+    # Site Summary affordable-housing scope fix - a scope-aware, coherent
+    # position per whole-site/phase/plot (app.reporting.affordable_housing_
+    # scope), never a single flattened percentage/units tuple first-non-null
+    # scanned across every linked application. Reuses the SAME
+    # prospective_overrides mechanism app.ui.common.aggregate_scheme_fields
+    # already uses for `merged` above, so a not-yet-committed B3 refresh's
+    # prospective affordable-housing values are visible here too.
+    affordable_summary = compute_affordable_housing_scope_summary(
+        applications, prospective_overrides=prospective_overrides,
+    )
+    intelligence_lines.extend(format_affordable_housing_lines(affordable_summary))
     intelligence_block = "\n".join(intelligence_lines)
 
     return f"""
@@ -192,15 +198,28 @@ covering:
    own words, don't reproduce long policy citations or turn this into a
    refusal notice transcript; if evidence exists but no reason is stated
    anywhere above, don't invent one.
-8. If an AFFORDABLE HOUSING STATUS is given above, mention it only using
-   the exact status/figures given - explicitly distinguish a merely
-   "proposed" or "officer_recommended" position from one that is
-   "agreed"/"conditioned" from one that is "legally_secured". NEVER
-   describe a proposed or recommended affordable housing position as
-   "secured" or "agreed" - only use those words if the status above is
-   literally agreed/conditioned/legally_secured. If AFFORDABLE HOUSING
-   NOTES describe a change from an earlier position, mention that change
-   factually.
+8. If any AFFORDABLE HOUSING lines are given above, report them exactly as
+   scoped - a WHOLE SITE line describes the scheme as a whole, a line for a
+   named PHASE or PLOT describes ONLY that phase/plot, and these are NEVER
+   interchangeable or combinable into one figure. Do not add a whole-site
+   percentage to a phase percentage, do not assume a phase's figure applies
+   site-wide, and do not silently drop one scope's figure because another
+   scope's differs - different scopes are not conflicting evidence, they are
+   different facts. If a WHOLE SITE line is qualified as scope-unconfirmed,
+   state the figure but make clear the exact scope is not established and
+   manual review may be needed - do not assert with confidence that it
+   covers the whole site. Mention only using the exact status/figures given -
+   explicitly distinguish a merely "proposed" or "officer_recommended"
+   position from one that is "agreed"/"conditioned" from one that is
+   "legally_secured", and only for the scope that status belongs to - a
+   phase being legally_secured never means the whole site is. NEVER describe
+   a proposed or recommended affordable housing position as "secured" or
+   "agreed". If an AFFORDABLE HOUSING CONFLICT line is given for a scope,
+   report plainly that the position for that scope is unresolved and manual
+   review is recommended - do not pick one of the conflicting figures or
+   average them. If notes accompanying an affordable housing line describe a
+   change from an earlier position, mention that change factually, scoped to
+   the same phase/plot/whole-site it was given for.
 """
 
 
@@ -217,8 +236,9 @@ SUMMARY_SCHEMA = {
 
 def generate_scheme_summary(
     client: OpenAI, site: Site, applications: list[Application], merged: dict, lapse: dict, phase_breakdown: list[dict],
+    *, prospective_overrides: dict[int, dict] | None = None,
 ) -> str:
-    prompt = build_summary_prompt(site, applications, merged, lapse, phase_breakdown)
+    prompt = build_summary_prompt(site, applications, merged, lapse, phase_breakdown, prospective_overrides=prospective_overrides)
     response = client.responses.create(
         model=MODEL, input=prompt,
         text={"format": {"type": "json_schema", "name": SUMMARY_SCHEMA["name"], "schema": SUMMARY_SCHEMA["schema"], "strict": True}},
