@@ -743,9 +743,13 @@ def test_affordable_status_included_only_when_material():
 
 def test_affordable_percentage_included_correctly_when_material():
     site, apps = _site_and_apps()
-    merged = _merged(affordable_housing_status="agreed", affordable_percentage_final=35.0, affordable_units_final=35, affordable_tenure_split_final="70/30")
+    apps[0].scheme_intelligence = SchemeIntelligence(
+        affordable_housing_status="agreed", affordable_percentage_final=35.0,
+        affordable_units_final=35, affordable_tenure_split_final="70/30",
+    )
+    merged = _merged()
     prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
-    assert "AFFORDABLE HOUSING STATUS: agreed" in prompt
+    assert "status agreed" in prompt
     assert "35.0%" in prompt or "35%" in prompt
 
 
@@ -759,9 +763,10 @@ def test_proposed_tenure_not_described_as_secured_in_prompt_instructions():
 
 def test_legally_secured_position_represented_correctly():
     site, apps = _site_and_apps()
-    merged = _merged(affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_percentage_final=35.0)
+    apps[0].scheme_intelligence = SchemeIntelligence(affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_percentage_final=35.0)
+    merged = _merged()
     prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
-    assert "AFFORDABLE HOUSING STATUS: legally_secured" in prompt
+    assert "status legally_secured" in prompt
 
 
 def test_summary_target_length_instruction_is_two_to_five_sentences():
@@ -780,7 +785,10 @@ def test_withdrawal_reason_included_when_evidenced():
 
 def test_affordable_housing_notes_included_when_present():
     site, apps = _site_and_apps()
-    merged = _merged(affordable_housing_status="agreed", affordable_housing_notes="Changed from 40% to 35% following negotiation.")
+    apps[0].scheme_intelligence = SchemeIntelligence(
+        affordable_housing_status="agreed", affordable_housing_notes="Changed from 40% to 35% following negotiation.",
+    )
+    merged = _merged()
     prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
     assert "Changed from 40% to 35%" in prompt
 
@@ -1171,10 +1179,11 @@ def test_notes_replaced_not_appended_across_successive_refreshes(session):
 
 def test_site_summary_surfaces_material_affordable_change():
     site, apps = _site_and_apps()
-    merged = _merged(
+    apps[0].scheme_intelligence = SchemeIntelligence(
         affordable_housing_status=LEGALLY_SECURED_STATUS, affordable_percentage_final=20.0,
         affordable_housing_notes="Reduced from the earlier 35% proposal to 20%, now legally secured.",
     )
+    merged = _merged()
     prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
     assert "Reduced from the earlier 35% proposal to 20%" in prompt
 
@@ -1253,7 +1262,7 @@ def test_successful_replacement_commits_notes_status_summary_and_watermark_toget
 def test_default_summary_receives_prospective_new_intelligence_values(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["merged"] = dict(merged)
         return "New summary reflecting the fresh affordable housing position."
 
@@ -1280,7 +1289,7 @@ def test_default_summary_receives_prospective_new_intelligence_values(session, m
 def test_default_summary_receives_prospective_planning_outcome_fields(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["merged"] = dict(merged)
         return "New summary."
 
@@ -1307,7 +1316,7 @@ def test_default_summary_receives_prospective_planning_outcome_fields(session, m
 def test_real_orm_scheme_intelligence_not_mutated_before_summary_call(session, monkeypatch):
     observed = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         observed["live_pct_during_call"] = applications[0].scheme_intelligence.affordable_percentage_final
         return "New summary."
 
@@ -1328,7 +1337,7 @@ def test_real_orm_scheme_intelligence_not_mutated_before_summary_call(session, m
 
 
 def test_default_summary_failure_preserves_old_intelligence_and_site_summary(session, monkeypatch):
-    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         raise RuntimeError("summary generation failed")
 
     monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)
@@ -1351,7 +1360,7 @@ def test_default_summary_failure_preserves_old_intelligence_and_site_summary(ses
 
 
 def test_default_successful_path_commits_intelligence_summary_watermark_together(session, monkeypatch):
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         return "Fresh summary mentioning 40% affordable housing."
 
     monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
@@ -1639,7 +1648,7 @@ def test_structured_units_total_not_derived_from_partial_narrative(session):
 
 def test_site_summary_prompt_relays_partial_breakdown_notes_verbatim():
     site, apps = _site_and_apps()
-    merged = _merged(
+    apps[0].scheme_intelligence = SchemeIntelligence(
         affordable_housing_status="agreed", affordable_units_final=60,
         affordable_housing_notes=(
             "60 affordable homes are proposed. The evidence identifies 21 "
@@ -1648,6 +1657,7 @@ def test_site_summary_prompt_relays_partial_breakdown_notes_verbatim():
             "allocate the remaining 18 affordable homes by tenure."
         ),
     )
+    merged = _merged()
     prompt = build_summary_prompt(site, apps, merged, {"status": "on_track", "build_status": "not_started"}, [])
     assert "does not clearly allocate the remaining 18" in prompt
 
@@ -2079,7 +2089,7 @@ def test_prompt_defines_conditioned_status_requires_an_affordable_condition():
 def test_corrected_legally_secured_status_flows_into_same_pass_site_summary(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["merged"] = dict(merged)
         return "Fresh summary."
 
@@ -2161,7 +2171,7 @@ def test_conflicting_tenure_evidence_states_uncertainty_not_fabricated_reconcili
 def test_default_summary_receives_reconciled_tenure_position(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["merged"] = dict(merged)
         return "Summary reflecting reconciled tenure."
 
@@ -2299,7 +2309,7 @@ def test_refusal_excerpt_works_in_focused_refusal_depth(session):
 def test_default_summary_receives_prospective_refusal_reasons(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["merged"] = dict(merged)
         return "Summary mentioning the refusal reason."
 
@@ -2324,7 +2334,7 @@ def test_default_summary_receives_prospective_refusal_reasons(session, monkeypat
 
 
 def test_refusal_summary_failure_preserves_old_refusal_reasons_and_summary(session, monkeypatch):
-    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         raise RuntimeError("summary generation failed")
 
     monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)

@@ -930,7 +930,10 @@ def refresh_intelligence_for_application(
             merged = aggregate_scheme_fields(applications, prospective_overrides={application.id: new_fields})
             lapse = compute_lapse_status(applications, site)
             phase_breakdown = build_phase_breakdown(applications)
-            return _default_generate_summary(client, site, applications, merged, lapse, phase_breakdown)
+            return _default_generate_summary(
+                client, site, applications, merged, lapse, phase_breakdown,
+                prospective_overrides={application.id: new_fields},
+            )
 
     family = resolve_application_family(session, application)
     reasons = tuple(

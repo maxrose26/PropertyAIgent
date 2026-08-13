@@ -794,7 +794,7 @@ def test_one_candidate_failure_does_not_affect_previous_success(session):
 
 
 def test_atomic_b3_replacement_preserved_on_summary_failure(session, monkeypatch):
-    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         raise RuntimeError("summary generation failed")
 
     monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)
@@ -993,7 +993,7 @@ def test_no_refusal_reason_fabricated_during_rebuild(session):
 def test_site_summary_prospective_state_still_works_during_rebuild(session, monkeypatch):
     captured = {}
 
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         captured["merged"] = dict(merged)
         return "New summary reflecting the rebuild."
 
@@ -1146,7 +1146,7 @@ def test_rebuild_marker_covered_by_generic_add_missing_columns_no_new_backfill()
 
 
 def test_atomic_rebuild_commits_intelligence_summary_and_marker_together(session, monkeypatch):
-    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def fake_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         return "Rebuilt summary."
 
     monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", fake_generate_scheme_summary)
@@ -1168,7 +1168,7 @@ def test_atomic_rebuild_commits_intelligence_summary_and_marker_together(session
 
 
 def test_site_summary_failure_leaves_marker_null_alongside_old_intelligence(session, monkeypatch):
-    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown):
+    def failing_generate_scheme_summary(client, site, applications, merged, lapse, phase_breakdown, **kwargs):
         raise RuntimeError("summary generation failed")
 
     monkeypatch.setattr("app.reporting.scheme_summary.generate_scheme_summary", failing_generate_scheme_summary)
