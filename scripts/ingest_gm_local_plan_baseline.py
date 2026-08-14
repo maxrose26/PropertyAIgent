@@ -69,6 +69,9 @@ def _print_report(result: dict) -> None:
     print(f"invalid rows: {len(v['invalid_rows'])}")
     for problem in v["invalid_rows"]:
         print(f"  - {problem}")
+    print(f"invalid updates: {len(v['invalid_updates'])}")
+    for problem in v["invalid_updates"]:
+        print(f"  - {problem}")
     print(f"unresolved update targets: {len(v['unresolved_update_targets'])}")
     for target in v["unresolved_update_targets"]:
         print(f"  - {target}")

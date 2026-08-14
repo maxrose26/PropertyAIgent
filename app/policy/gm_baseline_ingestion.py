@@ -39,7 +39,7 @@ import datetime as dt
 import json
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import String, func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_council
@@ -49,6 +49,37 @@ from app.policy.status import ALLOCATION_STATUSES, normalise_plan_status
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_DIR = PROJECT_ROOT / "config" / "gm_local_plan_baseline"
+
+# Derived from SQLAlchemy model metadata (Requirement 5/12) rather than a
+# hand-maintained duplicate table - if a column's declared length ever
+# changes, this map changes with it automatically. This is exactly what a
+# real production run needed and didn't have: the Oldham plan_status
+# overflow (String(50), a 65-char value) was never caught before
+# session.flush() hit the real database's own constraint.
+STRING_COLUMN_LENGTHS: dict[str, int] = {
+    col.name: col.type.length
+    for col in LocalPlanSite.__table__.columns
+    if isinstance(col.type, String) and col.type.length
+}
+
+# manifest field name (in gm_local_plan_new_sites.json) -> the LocalPlanSite
+# column it is actually persisted into, per the row-construction code below.
+# "council" -> council_code and plan_stage -> plan_status (via
+# LocalPlan.raw_status, see _find_or_create_local_plan) are the two
+# non-identity mappings - every other field shares its manifest name with
+# its column name.
+NEW_ROW_FIELD_TO_COLUMN: dict[str, str] = {
+    "council": "council_code",
+    "policy_reference": "policy_reference",
+    "site_name": "site_name",
+    "category": "category",
+    "intended_use": "intended_use",
+    "allocation_status": "allocation_status",
+    "raw_allocation_status": "raw_allocation_status",
+    "plan_name": "plan_name",
+    "source_document_url": "source_document_url",
+    "review_status": "review_status",
+}
 
 # The frozen manifest's own assumptions about production state - encoded
 # here (not re-derived from the manifest files) so a manifest file being
@@ -134,6 +165,81 @@ def validate_new_rows(rows: list[dict]) -> list[str]:
         if key in seen_keys:
             problems.append(f"{label}: duplicate (council, plan_name, policy_reference) within the manifest itself")
         seen_keys.add(key)
+
+        problems.extend(_check_row_string_lengths(row, label))
+
+    return problems
+
+
+def _check_row_string_lengths(row: dict, label: str) -> list[str]:
+    """Checks every manifest field that is persisted as a LocalPlanSite
+    string column against that column's actual declared length. This is
+    what production's real StringDataRightTruncation error should have been
+    caught by during dry-run - it wasn't, because no such check previously
+    existed here."""
+    problems: list[str] = []
+    for manifest_field, column in NEW_ROW_FIELD_TO_COLUMN.items():
+        value = row.get(manifest_field)
+        if not isinstance(value, str):
+            continue
+        limit = STRING_COLUMN_LENGTHS.get(column)
+        if limit and len(value) > limit:
+            problems.append(
+                f"{label}: field {manifest_field!r} (column {column!r}) is {len(value)} chars, "
+                f"exceeds max length {limit} - value={value!r}"
+            )
+
+    # plan_status is never a manifest field directly - it's derived from
+    # plan_stage via LocalPlan.raw_status/status at ingestion time (see
+    # _find_or_create_local_plan), so it needs its own check rather than
+    # being covered by NEW_ROW_FIELD_TO_COLUMN.
+    plan_stage = row.get("plan_stage")
+    if isinstance(plan_stage, str):
+        limit = STRING_COLUMN_LENGTHS.get("plan_status")
+        if limit and len(plan_stage) > limit:
+            problems.append(
+                f"{label}: field 'plan_stage' (column 'plan_status', derived via LocalPlan.raw_status) is "
+                f"{len(plan_stage)} chars, exceeds max length {limit} - value={plan_stage!r}"
+            )
+    return problems
+
+
+def validate_update_rows(updates: list[dict]) -> list[str]:
+    """Validates every proposed update record's target string values against
+    LocalPlanSite model constraints (Requirement 6) before any write is
+    attempted - mirrors _check_row_string_lengths but for the update path,
+    using the same _apply_update field mapping so both paths can never
+    silently diverge. Returns a list of human-readable problems; empty list
+    means all updates are valid. Does not require a resolved target row -
+    the column being written is fully determined by update_type/fields, so
+    this check can run purely against the manifest data itself."""
+    problems: list[str] = []
+
+    for i, update in enumerate(updates):
+        label = f"update {i} ({update.get('council')!r}/{update.get('policy_reference')!r})"
+        update_type = update.get("update_type")
+
+        fields_to_check: dict[str, object] = {}
+        if update_type == "pfe_status_correction":
+            fields_to_check["allocation_status"] = update.get("to_value")
+        elif update_type == "council_reattribution":
+            fields_to_check["council_code"] = update.get("to_value")
+        elif update_type == "capacity_and_use_correction":
+            for field, change in (update.get("fields") or {}).items():
+                fields_to_check[field] = change.get("to") if isinstance(change, dict) else None
+        else:
+            problems.append(f"{label}: unknown update_type {update_type!r}")
+            continue
+
+        for column, value in fields_to_check.items():
+            if not isinstance(value, str):
+                continue
+            limit = STRING_COLUMN_LENGTHS.get(column)
+            if limit and len(value) > limit:
+                problems.append(
+                    f"{label}: target field {column!r} is {len(value)} chars, "
+                    f"exceeds max length {limit} - value={value!r}"
+                )
 
     return problems
 
@@ -236,6 +342,7 @@ def ingest_gm_baseline(session: Session, manifest_dir: Path = MANIFEST_DIR, dry_
 
     baseline = validate_baseline(session)
     row_problems = validate_new_rows(new_rows)
+    update_length_problems = validate_update_rows(updates)
 
     unresolved_updates: list[dict] = []
     resolved_targets: dict[int, LocalPlanSite] = {}
@@ -246,7 +353,12 @@ def ingest_gm_baseline(session: Session, manifest_dir: Path = MANIFEST_DIR, dry_
         else:
             resolved_targets[idx] = target
 
-    ready = baseline["matches"] and not row_problems and not unresolved_updates
+    ready = (
+        baseline["matches"]
+        and not row_problems
+        and not update_length_problems
+        and not unresolved_updates
+    )
 
     result = {
         "dry_run": dry_run,
@@ -270,6 +382,7 @@ def ingest_gm_baseline(session: Session, manifest_dir: Path = MANIFEST_DIR, dry_
         "validation": {
             "baseline_matches": baseline["matches"],
             "invalid_rows": row_problems,
+            "invalid_updates": update_length_problems,
             "unresolved_update_targets": [f"{u['council']}/{u.get('policy_reference')}" for u in unresolved_updates],
             "expected_final_count": EXPECTED_FINAL_COUNT,
         },
@@ -288,6 +401,7 @@ def ingest_gm_baseline(session: Session, manifest_dir: Path = MANIFEST_DIR, dry_
             "GM baseline ingestion aborted before any write - "
             f"baseline_matches={baseline['matches']}, "
             f"invalid_rows={len(row_problems)}, "
+            f"invalid_updates={len(update_length_problems)}, "
             f"unresolved_update_targets={len(unresolved_updates)}"
         )
 
