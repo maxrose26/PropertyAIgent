@@ -1,0 +1,112 @@
+[
+  {
+    "from_council": "bury",
+    "from_ref": null,
+    "from_site": "Elton Reservoir (Bury draft)",
+    "to_council": "bury",
+    "to_ref": "JPA 7",
+    "to_site": "Elton Reservoir (PfE)",
+    "relationship_type": "same_physical_site",
+    "review_status": "needs_review",
+    "evidence": "Same name, same borough, same site"
+  },
+  {
+    "from_council": "bury",
+    "from_ref": null,
+    "from_site": "Seedfield (Bury draft)",
+    "to_council": "bury",
+    "to_ref": "JPA 8",
+    "to_site": "Seedfield (PfE)",
+    "relationship_type": "same_physical_site",
+    "review_status": "needs_review",
+    "evidence": "Same name, same borough, same site"
+  },
+  {
+    "from_council": "bury",
+    "from_ref": null,
+    "from_site": "Walshaw (Bury draft)",
+    "to_council": "bury",
+    "to_ref": "JPA 9",
+    "to_site": "Walshaw (PfE)",
+    "relationship_type": "same_physical_site",
+    "review_status": "needs_review",
+    "evidence": "Same name, same borough, same site"
+  },
+  {
+    "from_council": "bury",
+    "from_ref": "JPA1.2",
+    "from_site": "Northern Gateway (Bury draft)",
+    "to_council": "bury",
+    "to_ref": "JPA 1.2",
+    "to_site": "Simister and Bowlee (Northern Gateway) (PfE)",
+    "relationship_type": "same_physical_site",
+    "review_status": "needs_review",
+    "evidence": "Identical JPA1.2 policy reference used in both Bury's own draft plan and adopted PfE"
+  },
+  {
+    "from_council": "bury",
+    "from_ref": "JPA1.1",
+    "from_site": "Northern Gateway (Bury draft)",
+    "to_council": "rochdale",
+    "to_ref": "JPA 1.1",
+    "to_site": "Heywood / Pilsworth (Northern Gateway) (PfE)",
+    "relationship_type": "same_physical_site",
+    "review_status": "needs_review",
+    "evidence": "Cross-council: Bury's own draft references the same cross-boundary Atom Valley MDZ allocation recorded under Rochdale in production"
+  },
+  {
+    "from_council": "bury",
+    "from_ref": null,
+    "from_site": "Castle Road (Unsworth) (Bury draft)",
+    "to_council": "rochdale",
+    "to_ref": "JPA 1.1",
+    "to_site": "Heywood / Pilsworth (Northern Gateway) (PfE)",
+    "relationship_type": "same_physical_site",
+    "review_status": "needs_review",
+    "evidence": "This task's resolution: Castle Road (Unsworth) is the Bury-side residential component (~200 homes) of the larger cross-boundary JPA1.1 allocation, not a standalone site - adopted plan p.260/264"
+  },
+  {
+    "from_council": "oldham",
+    "from_ref": "HLA2451",
+    "from_site": "Danisher Lane (Oldham legacy UDP)",
+    "to_council": "oldham",
+    "to_ref": "JPA 15",
+    "to_site": "Land to the south of Coal Pit Lane (PfE)",
+    "relationship_type": "implemented_through_joint_plan",
+    "review_status": "needs_review",
+    "evidence": "Oldham's own Publication Plan Appendix 1 (Jan 2026, Table A1-2): 'Allocation H1.2.17 Danisher Lane has been superseded and now forms part of JPA 15 Coal Pit Lane in PfE.'"
+  },
+  {
+    "from_council": "tameside",
+    "from_ref": "H1(4)",
+    "from_site": "Oakwood Mill, Millbrook (Tameside legacy UDP)",
+    "to_council": "tameside",
+    "to_ref": "HSP S2L: Allocation 8",
+    "to_site": "Remainder of UDP Allocation H1(4), Grenville Street, Millbrook (new draft)",
+    "relationship_type": "superseded_by",
+    "review_status": "needs_review",
+    "evidence": "New draft allocation explicitly names itself as the H1(4) remainder"
+  },
+  {
+    "from_council": "tameside",
+    "from_ref": "H1(12)",
+    "from_site": "Hey Farm/Micklehurst, Mossley (Tameside legacy UDP)",
+    "to_council": "tameside",
+    "to_ref": "HSP S2K: Allocation 6",
+    "to_site": "Land at Huddersfield Road, Mossley (new draft)",
+    "relationship_type": "superseded_by",
+    "review_status": "needs_review",
+    "evidence": "New draft allocation's site matches H1(12)'s location and is described as its Phase 2 remainder"
+  },
+  {
+    "from_council": "wigan",
+    "from_ref": "SP3",
+    "from_site": "Northleigh Park (adopted Core Strategy 2013)",
+    "to_council": "wigan",
+    "to_ref": "H3",
+    "to_site": "North Leigh Park (new draft)",
+    "relationship_type": "superseded_by",
+    "review_status": "needs_review",
+    "evidence": "Same site; draft H3 explicitly carries forward the remaining undelivered capacity from adopted Policy SP3 (~1,400 of original ~1,800 remaining, ~200 already delivered)"
+  }
+]
