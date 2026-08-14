@@ -1,0 +1,174 @@
+[
+  {
+    "council": "trafford",
+    "policy_reference": "AN1",
+    "site_name": "Wharfside",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN2",
+    "site_name": "Civic Quarter",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN3",
+    "site_name": "Trafford Waters",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN4",
+    "site_name": "Pomona",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN5",
+    "site_name": "Site of the former Stretford Mall",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN6",
+    "site_name": "Land west of Skerton Road",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN7",
+    "site_name": "499 Chester Road",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN8",
+    "site_name": "88-118 Chorlton Road",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN9",
+    "site_name": "Land on Brixham Road",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN10",
+    "site_name": "Lacy Street",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN11",
+    "site_name": "Empress Mill",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AN12",
+    "site_name": "Land at Thomas Street",
+    "ah_percent": 25,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: North)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AS1",
+    "site_name": "Land at Oakfield Road",
+    "ah_percent": 45,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: South/Altrincham - notably higher)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AS2",
+    "site_name": "Land at New Street",
+    "ah_percent": 45,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: South/Altrincham)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AS3",
+    "site_name": "Land at Moss Lane",
+    "ah_percent": 45,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: South/Altrincham)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AC1",
+    "site_name": "Land at Stanley Square",
+    "ah_percent": 30,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: Central/Sale)"
+  },
+  {
+    "council": "trafford",
+    "policy_reference": "AC2",
+    "site_name": "Land at Sale Lido / Oaklands Drive",
+    "ah_percent": 30,
+    "policy_ref": "Policy R2",
+    "scope": "site-specific (locality pattern: Central/Sale)"
+  },
+  {
+    "council": "salford",
+    "policy_reference": "JPA 24",
+    "site_name": "Land at Hazelhurst Farm",
+    "ah_percent": 50,
+    "ah_wording": "at least 50%",
+    "policy_ref": null,
+    "scope": "site-specific (existing PfE row)"
+  },
+  {
+    "council": "manchester",
+    "policy_reference": null,
+    "site_name": "citywide (Policy H2)",
+    "ah_percent": 30,
+    "ah_wording": "30% major schemes (10+ homes); 80/20 affordable rent/ownership split; 70% of affordable = social rent",
+    "policy_ref": "Policy H2",
+    "scope": "borough-wide, not site-specific"
+  },
+  {
+    "council": "wigan",
+    "policy_reference": null,
+    "site_name": "borough-wide (Policy H2)",
+    "ah_percent": 25,
+    "ah_wording": "25% minimum, 10+ homes",
+    "policy_ref": "Policy H2",
+    "scope": "borough-wide, not site-specific"
+  },
+  {
+    "council": "tameside",
+    "policy_reference": null,
+    "site_name": "borough-wide",
+    "ah_percent": 15,
+    "ah_wording": "15% minimum, rising to 50% on Green Belt sites",
+    "policy_ref": null,
+    "scope": "borough-wide, not site-specific"
+  }
+]

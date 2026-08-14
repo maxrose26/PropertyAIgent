@@ -1,0 +1,32 @@
+[
+  {
+    "council": "bolton",
+    "issue": "Per-site delivery status is ~6 years stale (AMR 2019/20, status as at 1 April 2020) - no newer per-site AMR published by the council. Affects ~55 'allocation, not started' sites plus all 'under construction'/'permitted' sites.",
+    "blocking": false
+  },
+  {
+    "council": "tameside",
+    "issue": "3 of 7 legacy UDP H1 sites have genuinely unconfirmed delivery status after reasonable-effort research: H1(3) Staley Road, H1(18) Micklehurst Road, and the ~34-dwelling remainder of H1(16) Stayley Hall.",
+    "blocking": false
+  },
+  {
+    "council": "wigan",
+    "issue": "Plan-stage status should be rechecked after 27 August 2026, when Cabinet is due to decide how to proceed following the November 2025 withdrawal - could revise site content (particularly the contested 'Bridgewater West' site, not currently in our dataset).",
+    "blocking": false
+  },
+  {
+    "council": "trafford",
+    "issue": "Trafford's own document states '22 allocations' (para 15.2) while its structured schedule (Table 15-1, Table of Contents) shows 21 - exhaustively investigated in a prior task round, no reconciling explanation found. Recorded, non-blocking, no 22nd site fabricated.",
+    "blocking": false
+  },
+  {
+    "council": "rochdale",
+    "issue": "A stale, never-adopted 2018 draft Allocations Plan exists with named sites but was correctly excluded as superseded - flagged in case the Product Owner wants it captured as historical/superseded reference layer regardless.",
+    "blocking": false
+  },
+  {
+    "council": "oldham",
+    "issue": "12 of the 13 legacy saved-UDP sites will lose statutory allocation status when the new Local Plan adopts (targeted Spring 2027), with no successor policy for 7 of them - a housing-supply-risk flag worth monitoring, not a current blocker.",
+    "blocking": false
+  }
+]

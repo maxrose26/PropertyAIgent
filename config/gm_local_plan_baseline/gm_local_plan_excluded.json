@@ -1,0 +1,92 @@
+[
+  {
+    "council": "salford",
+    "site_name": "Boysnope Wharf and Clubhouse (Development allocation 7)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "trafford",
+    "site_name": "AN13 (Land east/west of A5181, Kellogg's Plant)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "trafford",
+    "site_name": "AN14 (Site of SCA Hygiene Products)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "trafford",
+    "site_name": "AN15 (2 Brindley Road)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "trafford",
+    "site_name": "AS4 (Land at Dairyhouse Lane)",
+    "reason": "employment_only (industrial/warehousing)"
+  },
+  {
+    "council": "bolton",
+    "site_name": "JPA 4 Bewshill Farm (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "bolton",
+    "site_name": "JPA 5 Chequerbent North (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "bolton",
+    "site_name": "JPA 6 West of Wingates / M61 Junction 6 (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "rochdale",
+    "site_name": "JPA 2 Stakehill (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "salford",
+    "site_name": "JPA 26 Port Salford Extension (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "tameside",
+    "site_name": "JPA 27 Ashton Moss West (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "wigan",
+    "site_name": "JPA 31 M6 Junction 25 (existing PfE)",
+    "reason": "employment_only"
+  },
+  {
+    "council": "manchester",
+    "site_name": "JP Allocation 3.1 Medipark (existing PfE, pending reattribution from Trafford)",
+    "reason": "employment_only (100% B1 floorspace, no residential component)"
+  },
+  {
+    "council": "stockport",
+    "site_name": "8 legacy UDP HP1.1 sites (H1P/H2P/H5P/H7P/H8P/H9/H10/H11)",
+    "reason": "superseded_2011 - policy HP1.1 explicitly superseded by Core Strategy 17 March 2011; 4 confirmed under construction by 2005, 4 in same completed regeneration cluster"
+  },
+  {
+    "council": "oldham",
+    "site_name": "HLA2451 Danisher Lane",
+    "reason": "plan_lineage_not_standalone - formally merged into adopted PfE allocation JPA15, see relationship manifest"
+  },
+  {
+    "council": "oldham",
+    "site_name": "Oldham emerging Publication Plan (as a new-allocation source)",
+    "reason": "no_new_allocations - Policy H13 Housing Allocations explicitly deleted between Draft and Publication stage, confirmed by direct quote"
+  },
+  {
+    "council": "rochdale",
+    "site_name": "Rochdale own-borough Regulation 18 draft Local Plan (as a new-allocation source)",
+    "reason": "no_new_allocations - housing chapter is thematic policy only, no site schedule, evidenced"
+  },
+  {
+    "council": "rochdale",
+    "site_name": "2018 draft Allocations Plan / Map Book",
+    "reason": "superseded - never progressed past 2018 Reg18 stage, never adopted"
+  }
+]

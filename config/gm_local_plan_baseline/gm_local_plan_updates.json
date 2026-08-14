@@ -1,0 +1,427 @@
+[
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bolton",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 4",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bolton",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 5",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bolton",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 6",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bury",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 1.2",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bury",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 7",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bury",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 8",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "bury",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 9",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 10",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 11",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 12",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 13",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 14",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 15",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "oldham",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 16",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 1.1",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 17",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 18",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 19",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 2",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 20",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 21",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 22",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "rochdale",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 23",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "salford",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 24",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "salford",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 25",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "salford",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 26",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "tameside",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 27",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "tameside",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 28",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "tameside",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 29",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "trafford",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 3.1",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "trafford",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 3.2",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "trafford",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 30",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "wigan",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 31",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "wigan",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 32",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "wigan",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 33",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "pfe_status_correction",
+    "council": "wigan",
+    "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+    "policy_reference": "JPA 34",
+    "field": "allocation_status",
+    "from_value": "submitted_allocation",
+    "to_value": "adopted_allocation",
+    "evidence": "PfE adopted with effect from 21 March 2024; row's own policy_reference cites this specific numbered adopted policy directly",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "council_reattribution",
+    "council": "trafford",
+    "policy_reference": "JPA 3.1",
+    "site_name": "Medipark",
+    "field": "council_code",
+    "from_value": "trafford",
+    "to_value": "manchester",
+    "evidence": "PfE topic paper (10.01.57 JPA3.1 Medipark Allocation Topic Paper, July 2021) locates the site in Wythenshawe, part of Manchester, near Manchester Airport - not Trafford. Adopted plan p.274.",
+    "review_status": "needs_confirmation"
+  },
+  {
+    "update_type": "capacity_and_use_correction",
+    "council": "rochdale",
+    "policy_reference": "JPA 1.1",
+    "site_name": "Heywood / Pilsworth (Northern Gateway)",
+    "fields": {
+      "intended_use": {
+        "from": "employment",
+        "to": "mixed_use"
+      },
+      "minimum_dwellings": {
+        "from": null,
+        "to": 200
+      }
+    },
+    "evidence": "Resolves the Bury 'Castle Road (Unsworth)' completeness question this task existed to answer. Adopted PfE document p.264, para 11.31: 'In addition to the 1,000 homes with planning permission at South Heywood, the allocation is also considered to have the potential to accommodate around 200 further dwellings on land accessed via Castle Road in Unsworth.' Policy text p.260 (part iii) confirms the same ~200-home figure as part of the allocation's own requirements. The already-permissioned 1,000 South Heywood homes are not proposed as this allocation's own capacity (likely already tracked via an existing Application/Site elsewhere) - only the ~200 still-allocation-stage homes are proposed.",
+    "review_status": "needs_confirmation"
+  }
+]
