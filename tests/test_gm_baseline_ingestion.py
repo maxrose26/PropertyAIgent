@@ -24,10 +24,12 @@ from app.policy.gm_baseline_ingestion import (
     EXPECTED_FINAL_COUNT,
     EXPECTED_NEW_COUNT,
     EXPECTED_UPDATE_COUNT,
+    STRING_COLUMN_LENGTHS,
     ingest_gm_baseline,
     load_manifest,
     resolve_update_target,
     validate_new_rows,
+    validate_update_rows,
 )
 
 # ---------------------------------------------------------------------------
@@ -53,6 +55,51 @@ def test_real_manifest_new_rows_pass_model_constraint_validation():
     rows = load_manifest(gbi.NEW_SITES_FILE)
     problems = validate_new_rows(rows)
     assert problems == []
+
+
+def test_real_manifest_updates_pass_model_constraint_validation():
+    updates = load_manifest(gbi.UPDATES_FILE)
+    problems = validate_update_rows(updates)
+    assert problems == []
+
+
+def test_string_column_lengths_derived_from_model_metadata_match_known_schema():
+    # Locks in the exact LocalPlanSite VARCHAR limits this hotfix validates
+    # against - if a future migration changes any of these, this test (not
+    # a silent StringDataRightTruncation in production) is what should
+    # break first.
+    assert STRING_COLUMN_LENGTHS == {
+        "council_code": 50,
+        "policy_reference": 50,
+        "site_name": 300,
+        "intended_use": 200,
+        "category": 300,
+        "allocation_status": 50,
+        "raw_allocation_status": 300,
+        "plan_name": 300,
+        "plan_status": 50,
+        "source_document_url": 500,
+        "confirmed_by": 100,
+        "review_status": 30,
+        "duplicate_classification": 30,
+        "progression_signal": 20,
+    }
+
+
+def test_oldham_plan_status_fix_preserved_all_12_rows_with_shortened_value():
+    # Regression guard for the exact bug that broke the earlier production
+    # attempt: 12 Oldham rows had plan_stage = "Adopted (saved UDP,
+    # expiring at Local Plan adoption ~Spring 2027)" (65 chars), which
+    # overflowed plan_status (String(50)) only after being derived via
+    # LocalPlan.raw_status. The fix must be a semantic shortening, not a
+    # dropped row - still 12 Oldham rows, still recognisably "Adopted
+    # (saved UDP)", never truncated mid-word.
+    rows = load_manifest(gbi.NEW_SITES_FILE)
+    oldham_rows = [r for r in rows if r["council"] == "oldham"]
+    assert len(oldham_rows) == 12
+    stages = {r.get("plan_stage") for r in oldham_rows}
+    assert stages == {"Adopted (saved UDP)"}
+    assert len("Adopted (saved UDP)") <= STRING_COLUMN_LENGTHS["plan_status"]
 
 
 def test_expected_final_count_is_287():
@@ -280,6 +327,133 @@ def test_unresolved_update_target_fails_closed(session, synthetic_manifest_dir, 
         ingest_gm_baseline(session, manifest_dir=synthetic_manifest_dir, dry_run=False)
 
     assert session.execute(select(LocalPlanSite)).scalars().all() == []
+
+
+# ---------------------------------------------------------------------------
+# VARCHAR length validation hotfix - dry-run must catch what production's
+# own StringDataRightTruncation previously caught only at session.flush().
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def synthetic_manifest_dir_with_overlength_new_row(tmp_path):
+    overlength_site_name = "X" * 301  # site_name is String(300)
+    new_sites = [
+        {"council": "bury", "plan_name": "Test Local Plan", "plan_stage": "Regulation 18 draft",
+         "policy_reference": "REF1", "site_name": overlength_site_name, "category": None,
+         "intended_use": "residential", "allocation_status": "draft_allocation",
+         "raw_allocation_status": "Regulation 18", "minimum_dwellings": 50, "indicative_capacity": None,
+         "maximum_capacity": None, "source_document_url": "https://example.invalid/plan.pdf", "source_page": 1,
+         "review_status": "auto_applied"},
+    ]
+    for name, data in (
+        (gbi.NEW_SITES_FILE, new_sites),
+        (gbi.UPDATES_FILE, []),
+        (gbi.MANUAL_REVIEW_FILE, []),
+        (gbi.EXCLUDED_FILE, []),
+    ):
+        (tmp_path / name).write_text(json.dumps(data), encoding="utf-8")
+    return tmp_path
+
+
+@pytest.fixture()
+def synthetic_manifest_dir_with_overlength_update(tmp_path):
+    overlength_status = "Y" * 51  # allocation_status is String(50)
+    updates = [
+        {"update_type": "pfe_status_correction", "council": "bury",
+         "plan_name": "Places for Everyone Joint Development Plan (Bury allocations)",
+         "policy_reference": "JPA 99", "field": "allocation_status",
+         "from_value": "submitted_allocation", "to_value": overlength_status,
+         "evidence": "test fixture", "review_status": "needs_confirmation"},
+    ]
+    for name, data in (
+        (gbi.NEW_SITES_FILE, []),
+        (gbi.UPDATES_FILE, updates),
+        (gbi.MANUAL_REVIEW_FILE, []),
+        (gbi.EXCLUDED_FILE, []),
+    ):
+        (tmp_path / name).write_text(json.dumps(data), encoding="utf-8")
+    return tmp_path
+
+
+def test_validate_new_rows_rejects_overlength_string_field():
+    rows = [{"council": "bury", "plan_name": "Test Plan", "policy_reference": "REF1",
+             "site_name": "X" * 301}]
+    problems = validate_new_rows(rows)
+    assert len(problems) == 1
+    assert "site_name" in problems[0]
+    assert "301" in problems[0]
+    assert "300" in problems[0]
+
+
+def test_validate_new_rows_rejects_overlength_plan_status_derived_from_plan_stage():
+    overlength_stage = "Adopted (saved UDP, expiring at Local Plan adoption ~Spring 2027)"
+    rows = [{"council": "oldham", "plan_name": "Test Plan", "policy_reference": "HLA0029",
+             "site_name": "Ashton Road, Woodhouses", "plan_stage": overlength_stage}]
+    problems = validate_new_rows(rows)
+    assert len(problems) == 1
+    assert "plan_status" in problems[0]
+    assert "plan_stage" in problems[0]
+    assert str(len(overlength_stage)) in problems[0]
+    assert "50" in problems[0]
+
+
+def test_validate_update_rows_rejects_overlength_target_value():
+    updates = [{"update_type": "pfe_status_correction", "council": "bury", "policy_reference": "JPA 99",
+                "to_value": "Y" * 51}]
+    problems = validate_update_rows(updates)
+    assert len(problems) == 1
+    assert "allocation_status" in problems[0]
+    assert "51" in problems[0]
+    assert "50" in problems[0]
+
+
+def test_validate_update_rows_rejects_overlength_capacity_and_use_field():
+    updates = [{"update_type": "capacity_and_use_correction", "council": "bury", "policy_reference": "REF1",
+                "fields": {"intended_use": {"from": "residential", "to": "Z" * 201}}}]
+    problems = validate_update_rows(updates)
+    assert len(problems) == 1
+    assert "intended_use" in problems[0]
+
+
+def test_validate_update_rows_accepts_council_reattribution_within_limit():
+    updates = [{"update_type": "council_reattribution", "council": "bury", "policy_reference": "REF1",
+                "to_value": "manchester"}]
+    assert validate_update_rows(updates) == []
+
+
+def test_synthetic_dry_run_reports_overlength_new_row_as_not_ready(session, synthetic_manifest_dir_with_overlength_new_row):
+    result = ingest_gm_baseline(session, manifest_dir=synthetic_manifest_dir_with_overlength_new_row, dry_run=True)
+    assert result["ready"] is False
+    assert len(result["validation"]["invalid_rows"]) == 1
+    assert "site_name" in result["validation"]["invalid_rows"][0]
+
+
+def test_synthetic_dry_run_reports_overlength_update_as_not_ready(session, synthetic_manifest_dir_with_overlength_update):
+    _seed_pfe_target(session)
+    result = ingest_gm_baseline(session, manifest_dir=synthetic_manifest_dir_with_overlength_update, dry_run=True)
+    assert result["ready"] is False
+    assert len(result["validation"]["invalid_updates"]) == 1
+    assert "allocation_status" in result["validation"]["invalid_updates"][0]
+
+
+def test_production_mode_fails_closed_before_any_write_on_overlength_new_row(session, synthetic_manifest_dir_with_overlength_new_row, monkeypatch):
+    monkeypatch.setattr(gbi, "EXPECTED_BASELINE_COUNT", 0)
+    with pytest.raises(RuntimeError, match="invalid_rows=1"):
+        ingest_gm_baseline(session, manifest_dir=synthetic_manifest_dir_with_overlength_new_row, dry_run=False)
+    assert session.execute(select(LocalPlanSite)).scalars().all() == []
+    assert session.execute(select(LocalPlan)).scalars().all() == []
+
+
+def test_production_mode_fails_closed_before_any_write_on_overlength_update(session, synthetic_manifest_dir_with_overlength_update, monkeypatch):
+    row = _seed_pfe_target(session)
+    monkeypatch.setattr(gbi, "EXPECTED_BASELINE_COUNT", 1)
+    with pytest.raises(RuntimeError, match="invalid_updates=1"):
+        ingest_gm_baseline(session, manifest_dir=synthetic_manifest_dir_with_overlength_update, dry_run=False)
+    # The seeded PfE row must be completely untouched - no partial write.
+    session.refresh(row)
+    assert row.allocation_status == "submitted_allocation"
+    assert len(session.execute(select(LocalPlanSite)).scalars().all()) == 1
 
 
 def test_rollback_on_failure_leaves_no_partial_writes(session, synthetic_manifest_dir, monkeypatch):
