@@ -12,10 +12,12 @@ multi-site safeguard, and the write-mode semantics below).
 Production write mode requires BOTH flags together - --execute alone does
 nothing but print an error (same deliberate-friction pattern as
 scripts.ingest_gm_local_plan_baseline). Only HIGH_CONFIDENCE_CANDIDATE
-allocations are written as an established relationship; REVIEW_CANDIDATE
-allocations are written as an UNCONFIRMED suggestion (review_status=
-needs_confirmation) actionable via the Allocation Match Review UI/
-app.policy.site_match_review; AMBIGUOUS and NO_CANDIDATE are never written:
+allocations are written - an ACCEPTED related-Site relationship, per the
+semantic invariant in app.policy.allocation_site_dry_run_matching's own
+docstring. REVIEW_CANDIDATE, AMBIGUOUS, and NO_CANDIDATE all produce ZERO
+persistence here: a REVIEW_CANDIDATE only ever gets written via a human's
+explicit, revalidated Confirm action in the Allocation Match Review UI
+(app.policy.allocation_site_dry_run_matching.confirm_review_candidate):
 
     python -m scripts.dry_run_gm_allocation_site_matching --execute --confirm YES-WRITE-GM-ALLOCATION-SITE-MATCHES
 """
@@ -77,11 +79,14 @@ def main() -> None:
 
     if production_mode:
         print("[gm-allocation-site-match] PRODUCTION WRITE MODE - this WILL write to the database\n")
+        print("Only HIGH_CONFIDENCE_CANDIDATE allocations are written automatically. REVIEW_CANDIDATE")
+        print("produces zero persistence here - it is only ever written via a human's explicit,")
+        print("revalidated Confirm action in the Allocation Match Review UI.\n")
         write_result = run_controlled_write(session, council_codes=args.council)
         print("=== WRITE RESULT ===")
         print(f"written HIGH_CONFIDENCE_CANDIDATE: {len(write_result['written_high_confidence'])} -> {write_result['written_high_confidence']}")
-        print(f"written REVIEW_CANDIDATE (unconfirmed suggestion): {len(write_result['written_review_candidate'])} -> {write_result['written_review_candidate']}")
         print(f"skipped (production drift): {len(write_result['skipped_drift'])} -> {write_result['skipped_drift']}")
+        print(f"REVIEW_CANDIDATE untouched (zero persistence): {len(write_result['review_candidates_untouched'])}")
         print(f"AMBIGUOUS not written: {len(write_result['ambiguous_not_written'])}")
         print(f"NO_CANDIDATE untouched: {len(write_result['no_candidate_untouched'])}")
         print("\n=== RESULT ===")
