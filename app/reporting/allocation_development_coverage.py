@@ -16,6 +16,22 @@ it to one arbitrary "the" Site the way the pre-Stage-2D card logic in
 app.reporting.allocation_discovery (assess_delivery_scope, still used for
 its own OWN, untouched legacy card fields) necessarily did.
 
+STAGE 3B FINAL PRE-MERGE AMENDMENT ("Disputed-Relationship Coverage
+Safety", Sections 5/6): AllocationSiteRelationship.review_status now
+directly affects coverage arithmetic, not just display. A "rejected"
+relationship is excluded from coverage entirely (not a related Site, not
+counted anywhere - see build_allocation_development_coverage's own
+filter). A "needs_confirmation" relationship that genuinely contributes a
+real capacity number forces development_coverage_classification to
+REVIEW_REQUIRED (DISPUTED_RELATIONSHIP_NOTE) rather than silently folding
+disputed evidence into a confident percentage/residual - the relationship
+row itself is still retained and still counted as related, only the
+DERIVED commercial conclusion is withheld pending human review. See
+compute_development_coverage's own disputed_sites check and
+SiteActivitySummary.relationship_review_status. Deliberately never reads
+LocalPlanSite.review_status for this - that field carries unrelated Local
+Plan content-review meaning (Section 6's own "do not conflate" rule).
+
 SAFE AGGREGATION (Section 4): the platform holds no dedicated "this
 application supersedes that one" relationship - only status/decision
 text and a review-status/extraction-completeness state. Rather than
@@ -150,6 +166,8 @@ OWNERSHIP_CAVEAT = (
 
 MULTI_SITE_REVIEW_NOTE = "Multiple development parcels identified — capacity accounting requires review."
 SINGLE_SITE_REVIEW_NOTE = "Capacity accounting requires review — see linked applications."
+# Stage 3B amendment (Section 5) - exact wording as specified.
+DISPUTED_RELATIONSHIP_NOTE = "One or more Allocation↔Site relationships require evidence review."
 
 
 def _normalise(text: str) -> str:
@@ -192,9 +210,21 @@ class SiteActivitySummary:
     representative_application: Application | None
     capacity_known: bool
     capacity: int | None
+    # Stage 3B amendment (Section 5/6) - the AllocationSiteRelationship
+    # row's OWN review_status that produced this Site as "related" at
+    # all. Deliberately NOT LocalPlanSite.review_status (Section 6:
+    # "do not conflate" - that field carries unrelated Local Plan
+    # content-review meaning, the exact conflation bug Stage 2B's own
+    # amendment already ruled out elsewhere in this codebase). Default
+    # matches AllocationSiteRelationship.review_status's own default, for
+    # any caller not yet passing a real relationship (e.g. existing
+    # tests/callers built before this amendment).
+    relationship_review_status: str = "auto_applied"
 
 
-def summarise_site_activity(site: Site, applications: list[Application]) -> SiteActivitySummary:
+def summarise_site_activity(
+    site: Site, applications: list[Application], *, relationship_review_status: str = "auto_applied",
+) -> SiteActivitySummary:
     """One Site's SAFE capacity contribution - never a sum across every
     application on the Site (outline+reserved matters, amendments,
     duplicates, replacement schemes would all double-count), only the
@@ -218,6 +248,7 @@ def summarise_site_activity(site: Site, applications: list[Application]) -> Site
     return SiteActivitySummary(
         site_id=site.id, site=site, applications=applications,
         representative_application=rep, capacity_known=capacity_known, capacity=capacity,
+        relationship_review_status=relationship_review_status,
     )
 
 
@@ -285,6 +316,28 @@ def compute_development_coverage(
             identified_application_capacity=None, indicative_residual_capacity=None,
             development_coverage_percentage=None, capacity_accounting_status="review_required",
             development_coverage_classification=REVIEW_REQUIRED, note=note, **base_kwargs,
+        )
+
+    # Stage 3B amendment (Section 5) - a Site that genuinely contributes a
+    # real capacity number (capacity_known) but whose underlying
+    # AllocationSiteRelationship has since been flagged needs_confirmation
+    # by contradicting evidence (app.policy.allocation_evidence_scan) must
+    # never silently feed a confident coverage percentage/residual - the
+    # accounting relationship itself is disputed. Never auto-deletes or
+    # ignores the relationship (it is still counted in number_of_related_
+    # sites/site_summaries above); only the DERIVED commercial conclusion
+    # is withheld until a human resolves the dispute. A relationship still
+    # "auto_applied" or "confirmed" is unaffected - only "needs_
+    # confirmation" triggers this (Section 6's review-status semantics).
+    disputed_sites = [
+        s for s in sites_with_activity
+        if s.capacity_known and s.relationship_review_status == "needs_confirmation"
+    ]
+    if disputed_sites:
+        return DevelopmentCoverageResult(
+            identified_application_capacity=None, indicative_residual_capacity=None,
+            development_coverage_percentage=None, capacity_accounting_status="review_required",
+            development_coverage_classification=REVIEW_REQUIRED, note=DISPUTED_RELATIONSHIP_NOTE, **base_kwargs,
         )
 
     identified_application_capacity = sum(s.capacity for s in sites_with_activity if s.capacity is not None)
@@ -507,9 +560,16 @@ def build_allocation_development_coverage(session, allocations: list[LocalPlanSi
 
     result: dict[int, dict] = {}
     for allocation in allocations:
-        rels = rels_by_allocation.get(allocation.id, [])
+        # Stage 3B amendment (Section 6) - a "rejected" relationship must
+        # never contribute to accepted development-coverage accounting at
+        # all: not counted as a related Site, not counted in linked-
+        # application totals, nothing. It is explicitly not a genuine
+        # relationship any more, unlike "needs_confirmation" (still
+        # counted, see compute_development_coverage's own disputed-Site
+        # check above) or "auto_applied"/"confirmed" (both fully usable).
+        rels = [rel for rel in rels_by_allocation.get(allocation.id, []) if rel.review_status != "rejected"]
         site_summaries = [
-            summarise_site_activity(rel.site, apps_by_site.get(rel.site_id, []))
+            summarise_site_activity(rel.site, apps_by_site.get(rel.site_id, []), relationship_review_status=rel.review_status)
             for rel in rels
         ]
 

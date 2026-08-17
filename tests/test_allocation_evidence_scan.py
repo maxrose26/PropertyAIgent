@@ -13,6 +13,8 @@ from app.db.models import AllocationSiteRelationship, Application, Council, Docu
 from app.policy import allocation_evidence_scan as scan_module
 from app.policy.allocation_evidence_scan import (
     ALLOCATION_EVIDENCE_SCAN_RUN_LIMIT,
+    apply_historical_scan_state_backfill,
+    backfill_historical_scan_state,
     scan_council_for_allocation_evidence,
     select_unscanned_documents,
 )
@@ -215,21 +217,84 @@ def test_negative_adjacency_flags_existing_relationship_for_review(session):
 
 
 # ---------------------------------------------------------------------------
-# 7/8. Strong evidence reported (never auto-written) / weak never auto-writes
+# 1/2/3 (amendment). Strong evidence auto-creates through Stage 2D logic /
+# weak evidence never auto-writes
 # ---------------------------------------------------------------------------
 
 
-def test_strong_evidence_never_creates_a_relationship_row(session):
+def test_strong_evidence_auto_creates_relationship_through_stage_2d_logic(session):
+    """Final pre-merge amendment Section 1: strong DOCUMENT_CONFIRMED_SITE-
+    class evidence now auto-creates the AllocationSiteRelationship, via
+    the SAME shared Stage 2D persistence helper - reusing exact provenance
+    semantics (evidence_basis/category/document/application/snippet,
+    unknown_scope, idempotent pair, auto_applied review_status)."""
     _make_council(session, "testcouncil")
-    _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
     site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    doc = _make_document(session, app.id, "planning_statement", "This forms part of allocation HOM 2.30.")
+    session.commit()
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+
+    rels = session.execute(select(AllocationSiteRelationship)).scalars().all()
+    assert len(rels) == 1
+    rel = rels[0]
+    assert rel.allocation_id == allocation.id
+    assert rel.site_id == site.id
+    assert rel.evidence_basis == "document_confirmed_site"
+    assert rel.relationship_type == "unknown_scope"
+    assert rel.review_status == "auto_applied"
+    assert rel.evidence_document_id == doc.id
+    assert rel.evidence_application_id == app.id
+    assert rel.evidence_snippet is not None
+    assert rel.confidence is None  # Stage 2C hits carry no numeric score - never invented
+
+    assert len(report.new_strong_candidates) == 1
+    assert report.new_strong_candidates[0].relationship_id == rel.id
+
+
+def test_duplicate_strong_evidence_is_idempotent(session):
+    """Two documents in the SAME scan naming the same new (allocation,
+    Site) pair must produce exactly one relationship, never two."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_document(session, app.id, "planning_statement", "This forms part of allocation HOM 2.30.")
+    _make_document(session, app.id, "officer_report", "The scheme lies within allocation HOM 2.30.")
+    session.commit()
+
+    scan_council_for_allocation_evidence(session, "testcouncil")
+
+    rels = session.execute(select(AllocationSiteRelationship)).scalars().all()
+    assert len(rels) == 1
+
+
+def test_existing_human_confirmed_relationship_not_weakened_by_new_strong_evidence(session):
+    """A pre-existing, human-confirmed relationship for this exact pair
+    must never be touched (not duplicated, not downgraded, not its
+    provenance overwritten) when new strong evidence for the SAME pair is
+    found - create_relationship_if_absent is a pure no-op here."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    existing = _make_relationship(
+        session, allocation.id, site.id, review_status="confirmed", confidence=99.0,
+        evidence_snippet="original human-confirmed snippet",
+    )
     app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
     _make_document(session, app.id, "planning_statement", "This forms part of allocation HOM 2.30.")
     session.commit()
 
     scan_council_for_allocation_evidence(session, "testcouncil")
 
-    assert session.execute(select(AllocationSiteRelationship)).scalars().all() == []
+    rels = session.execute(select(AllocationSiteRelationship)).scalars().all()
+    assert len(rels) == 1
+    assert rels[0].id == existing.id
+    assert rels[0].review_status == "confirmed"
+    assert rels[0].confidence == 99.0
+    assert rels[0].evidence_snippet == "original human-confirmed snippet"
 
 
 def test_weak_contextual_evidence_never_auto_writes_and_is_reported(session):
@@ -247,9 +312,15 @@ def test_weak_contextual_evidence_never_auto_writes_and_is_reported(session):
     assert session.execute(select(AllocationSiteRelationship)).scalars().all() == []
 
 
-def test_module_makes_no_relationship_creation_writes():
+def test_module_creates_relationships_only_through_the_shared_helper_never_directly():
+    """'Do not create a second direct-write path' - confirmed structurally:
+    this module never constructs AllocationSiteRelationship() itself; the
+    one place that ever happens is app.policy.allocation_site_
+    relationships.create_relationship_if_absent, called (not duplicated)
+    from here."""
     source = inspect.getsource(scan_module)
     assert "AllocationSiteRelationship(" not in source
+    assert "create_relationship_if_absent(" in source
 
 
 # ---------------------------------------------------------------------------
@@ -520,3 +591,198 @@ def test_run_weekly_orchestration_is_thin():
     # A handful of print/report lines only - no query/regex logic of its own.
     assert "select(" not in source
     assert "find_allocation_evidence_for_document(" not in source
+
+
+# ---------------------------------------------------------------------------
+# Final pre-merge amendment Section 7: historical scan-state cutover
+# ---------------------------------------------------------------------------
+
+
+def test_historical_cutover_dry_run_finds_pre_cutoff_documents(session):
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    old_doc = Document(
+        application_id=app.id, doc_type="planning_statement", extracted_text="old text",
+        text_extracted=True, downloaded_at=dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc),
+    )
+    session.add(old_doc)
+    session.commit()
+
+    cutoff = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    plan = backfill_historical_scan_state(session, cutoff=cutoff)
+
+    assert plan["count"] == 1
+    assert old_doc.id in plan["eligible_document_ids"]
+    # Dry run - zero mutations.
+    session.refresh(old_doc)
+    assert old_doc.allocation_evidence_scanned_at is None
+
+
+def test_historical_cutover_excludes_documents_downloaded_after_cutoff(session):
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    cutoff = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    new_doc = Document(
+        application_id=app.id, doc_type="planning_statement", extracted_text="new text",
+        text_extracted=True, downloaded_at=dt.datetime(2026, 6, 15, tzinfo=dt.timezone.utc),
+    )
+    session.add(new_doc)
+    session.commit()
+
+    plan = backfill_historical_scan_state(session, cutoff=cutoff)
+    assert plan["count"] == 0
+
+
+def test_historical_cutover_includes_documents_with_no_downloaded_at(session):
+    """A legacy row with no download timestamp cannot be proven to
+    postdate the cutover - treated as pre-cutover (the safe direction)."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    legacy_doc = Document(
+        application_id=app.id, doc_type="planning_statement", extracted_text="legacy text",
+        text_extracted=True, downloaded_at=None,
+    )
+    session.add(legacy_doc)
+    session.commit()
+
+    plan = backfill_historical_scan_state(session)
+    assert legacy_doc.id in plan["eligible_document_ids"]
+
+
+def test_historical_cutover_apply_marks_documents_scanned(session):
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = Document(
+        application_id=app.id, doc_type="planning_statement", extracted_text="old text",
+        text_extracted=True, downloaded_at=dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc),
+    )
+    session.add(doc)
+    session.commit()
+
+    cutoff = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    result = apply_historical_scan_state_backfill(session, cutoff=cutoff)
+
+    assert result["marked_count"] == 1
+    session.refresh(doc)
+    # SQLite doesn't round-trip tzinfo on DateTime columns - compare the
+    # naive value, which is what matters here (the real Postgres column
+    # is timezone-aware; this is purely a test-fixture storage quirk).
+    assert doc.allocation_evidence_scanned_at.replace(tzinfo=None) == cutoff.replace(tzinfo=None)
+
+
+def test_historical_cutover_apply_is_idempotent(session):
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = Document(
+        application_id=app.id, doc_type="planning_statement", extracted_text="old text",
+        text_extracted=True, downloaded_at=dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc),
+    )
+    session.add(doc)
+    session.commit()
+
+    cutoff = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    first = apply_historical_scan_state_backfill(session, cutoff=cutoff)
+    second = apply_historical_scan_state_backfill(session, cutoff=cutoff)
+
+    assert first["marked_count"] == 1
+    assert second["marked_count"] == 0
+
+
+def test_previously_backfilled_historical_document_not_rescanned_by_normal_run(session):
+    """The whole point of the cutover: after backfill, a normal
+    scan_council_for_allocation_evidence run does NOT touch the
+    already-covered historical corpus."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    historical_doc = Document(
+        application_id=app.id, doc_type="planning_statement",
+        extracted_text="This forms part of allocation HOM 2.30.", text_extracted=True,
+        downloaded_at=dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc),
+    )
+    session.add(historical_doc)
+    session.commit()
+
+    cutoff = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    apply_historical_scan_state_backfill(session, cutoff=cutoff)
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+    assert report.documents_scanned == 0
+    # Confirmed: no relationship was created either - the historical
+    # document was never re-evaluated, exactly as intended (it was
+    # already covered by Stage 2C's own historical pass).
+    assert session.execute(select(AllocationSiteRelationship)).scalars().all() == []
+
+
+def test_genuinely_new_document_after_cutover_still_scanned_normally(session):
+    """A document extracted AFTER the cutover (downloaded_at post-dates
+    it) is never touched by the backfill, and remains eligible for the
+    normal incremental scan."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+
+    cutoff = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+    historical_doc = Document(
+        application_id=app.id, doc_type="planning_statement", extracted_text="old, unrelated text",
+        text_extracted=True, downloaded_at=dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc),
+    )
+    session.add(historical_doc)
+    new_doc = Document(
+        application_id=app.id, doc_type="officer_report",
+        extracted_text="This forms part of allocation HOM 2.30.", text_extracted=True,
+        downloaded_at=dt.datetime(2026, 6, 15, tzinfo=dt.timezone.utc),
+    )
+    session.add(new_doc)
+    session.commit()
+
+    apply_historical_scan_state_backfill(session, cutoff=cutoff)
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+    assert report.documents_scanned == 1
+    rels = session.execute(select(AllocationSiteRelationship)).scalars().all()
+    assert len(rels) == 1
+    assert rels[0].evidence_document_id == new_doc.id
+
+
+def test_historical_cutover_no_openai():
+    source = inspect.getsource(backfill_historical_scan_state) + inspect.getsource(apply_historical_scan_state_backfill)
+    assert "openai" not in source.lower()
+
+
+# ---------------------------------------------------------------------------
+# Section 10/17: a newly auto-created relationship appears in Stage 3A
+# coverage immediately, with no separate refresh/regeneration job.
+# ---------------------------------------------------------------------------
+
+
+def test_new_relationship_reflected_in_stage_3a_coverage_with_no_refresh_job(session):
+    from app.reporting.allocation_development_coverage import PARTIAL_COVERAGE, build_allocation_development_coverage
+
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    allocation.minimum_dwellings = 1000
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_document(session, app.id, "planning_statement", "This forms part of allocation HOM 2.30.")
+    session.commit()
+
+    # Before the scan: no relationship, NO_IDENTIFIED_ACTIVITY.
+    from app.db.models import SchemeIntelligence
+    before = build_allocation_development_coverage(session, [allocation])
+    assert before[allocation.id]["coverage"].number_of_related_sites == 0
+
+    session.add(SchemeIntelligence(application_id=app.id, total_units_final=300, core_intelligence_complete=True))
+    session.commit()
+
+    scan_council_for_allocation_evidence(session, "testcouncil")
+
+    # No refresh/regeneration call of any kind in between - coverage is
+    # simply re-derived on the next read.
+    after = build_allocation_development_coverage(session, [allocation])
+    coverage = after[allocation.id]["coverage"]
+    assert coverage.number_of_related_sites == 1
+    assert coverage.identified_application_capacity == 300
+    assert coverage.development_coverage_classification == PARTIAL_COVERAGE

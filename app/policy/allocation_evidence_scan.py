@@ -14,29 +14,59 @@ ONLY orchestration - which documents to look at, how to batch allocations/
 relationships, and what to do with a hit - never a second evidence
 vocabulary or a second regex.
 
-WHY THIS DOES NOT NEED TO WRITE AllocationSiteRelationship ROWS ITSELF:
-app.policy.allocation_site_relationships.run_relationship_dry_run/
-run_controlled_relationship_write already RE-SCAN every unmatched
-allocation's document evidence FRESH, from the live extracted_text, every
-single time they run - they do not read a cache this module would need to
-populate. So the moment a new document's text is scanned into the
-database, the EXISTING historical/batch mechanism already sees it on its
-next invocation, with zero help needed from this module. This module's
-job is therefore narrower and different: (1) give an operator/report
-visibility into what NEW evidence has appeared without needing to run the
-full batch CLI just to find out, and (2) catch the one case the existing
-batch mechanism structurally CANNOT see - new evidence that CONTRADICTS
-an allocation that ALREADY HAS an accepted relationship (Stage 2D's dry-
-run functions only ever evaluate allocations with matched_site_id IS NULL
-for document evidence; once a relationship exists, nothing re-checks it
-against new incoming documents). See flag_contradicted_relationships
-below for how that gap is closed.
+FINAL PRE-MERGE AMENDMENT ("Automatic Strong-Evidence Linking"): strong
+deterministic evidence (EXPLICIT_REFERENCE / STRONG_CONTEXTUAL_REFERENCE,
+naming a Site the linked Application already has - see Section 2's own
+"Application must already have a Site" requirement, satisfied structurally
+since a hit only ever carries a site_id when application.site_id is
+already set) now AUTO-CREATES the AllocationSiteRelationship row, via
+app.policy.allocation_site_relationships.create_relationship_if_absent -
+the SAME shared, idempotent row-creation helper run_controlled_
+relationship_write's own batch loops use. This is deliberately NOT a
+second direct-write path: it is the one persistence implementation Stage
+2D already owns, called from one more place. evidence_basis is always
+EVIDENCE_BASIS_DOCUMENT_CONFIRMED_SITE here, never "fuzzy_supported_by_
+document" - this module never cross-checks against a Stage 2A fuzzy
+candidate (it evaluates one document against a council's allocations in
+isolation), so it never claims agreement with a fuzzy match it hasn't
+actually looked at; that stronger claim remains the batch dry-run's own,
+which DOES have Stage 2A context.
 
-WRITES THIS MODULE DOES MAKE (both narrow, both reversible, neither
-"creates a relationship"):
+Weak/contextual evidence, Application-only evidence, and negative/
+contradictory evidence are UNCHANGED by this amendment - still never
+auto-linked, still only ever reported (see Sections 4/7 below) or, for
+contradictions, used to flag an EXISTING relationship for review (never
+to create a new one).
+
+WHY THIS MODULE STILL DOES NOT NEED THE FULL BATCH MECHANISM FOR
+EVERYTHING: app.policy.allocation_site_relationships.run_relationship_
+dry_run/run_controlled_relationship_write still independently RE-SCAN
+every unmatched allocation's document evidence FRESH on every invocation
+- for an operator who wants the full picture (including FUZZY_SUPPORTED_
+BY_DOCUMENT's stronger Stage-2A-cross-checked claim, and MULTIPLE_
+DOCUMENT_SUPPORTED_SITES's multi-Site handling), that CLI remains the
+authoritative, unmodified mechanism. This module's own auto-create only
+ever covers the narrower "no fuzzy cross-check needed" DOCUMENT_
+CONFIRMED_SITE case - a real, meaningful subset, not the whole of Stage
+2C's evidence vocabulary - kept forward and incremental rather than
+requiring the full periodic batch just to catch it.
+
+The one case the existing batch mechanism structurally CANNOT see even
+with this amendment: new evidence that CONTRADICTS an allocation that
+ALREADY HAS an accepted relationship (Stage 2D's dry-run functions only
+ever evaluate allocations with matched_site_id IS NULL for document
+evidence; once a relationship exists, nothing re-checks it against new
+incoming documents). See the contradiction-handling block in
+_process_one_document for how that gap is closed.
+
+WRITES THIS MODULE DOES MAKE:
   1. Document.allocation_evidence_scanned_at - bookkeeping only, so the
      same document is never rescanned (Section 3/10 idempotency).
-  2. AllocationSiteRelationship.review_status flipped from its current
+  2. NEW AllocationSiteRelationship rows for strong DOCUMENT_CONFIRMED_
+     SITE-class evidence naming a Site not already related to that
+     allocation - via the shared create_relationship_if_absent helper,
+     idempotent, never a duplicate pair, never a second write path.
+  3. AllocationSiteRelationship.review_status flipped from its current
      value to "needs_confirmation" ONLY when new evidence explicitly
      contradicts that specific accepted relationship (Section 8: "raise a
      review event, do not create silent relationship reversals") - never
@@ -48,16 +78,12 @@ WRITES THIS MODULE DOES MAKE (both narrow, both reversible, neither
      rejected) - the exact field Stage 2D's own model docstring already
      reserved for "whatever future review UI eventually acts on a
      specific relationship row". No new schema for this case.
-     Precedent for an unguarded automatic "flag for review" write:
-     app.pipeline.material_change already sets Application.evidence_
-     refresh_required = True with zero human confirmation - only
-     ACCEPTING new evidence is confirm-phrase-gated in this codebase,
-     never flagging existing state for re-review.
 
 WHAT THIS MODULE NEVER DOES:
-  - create a new AllocationSiteRelationship row (exclusively app.policy.
-    allocation_site_relationships.run_controlled_relationship_write's
-    job, via its own --execute --confirm-gated CLI);
+  - create an AllocationSiteRelationship from WEAK_REFERENCE, NAME_AND_
+    POLICY_CONTEXT, DOCUMENT_REVIEW_REQUIRED, NO_DOCUMENT_EVIDENCE,
+    fuzzy-only, Application-only, or negative/contradictory evidence;
+  - manufacture a Site for Application-only evidence;
   - delete or silently reverse an accepted relationship;
   - call OpenAI or any external service;
   - rescan a document that already has allocation_evidence_scanned_at set;
@@ -69,9 +95,10 @@ WHAT THIS MODULE NEVER DOES:
 """
 from __future__ import annotations
 
+import datetime as dt
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.models import AllocationSiteRelationship, Application, Document, LocalPlanSite, utcnow
@@ -79,6 +106,10 @@ from app.policy.allocation_document_evidence import (
     EXPLICIT_REFERENCE,
     STRONG_CONTEXTUAL_REFERENCE,
     find_allocation_evidence_for_document,
+)
+from app.policy.allocation_site_relationships import (
+    EVIDENCE_BASIS_DOCUMENT_CONFIRMED_SITE,
+    create_relationship_if_absent,
 )
 
 # Bounded per-run limit (Section 11: "do not make routine ingestion
@@ -109,6 +140,7 @@ class NewCandidateHit:
     application_reference: str
     category: str
     snippet: str
+    relationship_id: int | None = None  # set once create_relationship_if_absent succeeds; None only on a same-run race (see module docstring)
 
 
 @dataclass
@@ -202,7 +234,7 @@ def _snippet_for_site(hits, site_id: int | None) -> str:
 
 
 def _process_one_document(
-    document: Document, application: Application, allocations: list[LocalPlanSite],
+    session: Session, document: Document, application: Application, allocations: list[LocalPlanSite],
     relationships_by_allocation: dict[int, list[AllocationSiteRelationship]],
     report: AllocationEvidenceScanReport,
 ) -> None:
@@ -247,16 +279,37 @@ def _process_one_document(
         strong_unlinked = [h for h in strong_hits if h.site_id is None]
         weak_hits = [h for h in positive_hits if h.category not in _STRONG_CATEGORIES]
 
-        # --- Section 6: strong evidence for a Site NOT already accepted ---
-        # Reported only - never persisted here (see module docstring).
+        # --- Section 1/2/3 (amendment): strong evidence for a Site NOT
+        # already accepted AUTO-CREATES the relationship, via the shared
+        # Stage 2D helper - see module docstring for exactly which
+        # evidence class this covers and why (DOCUMENT_CONFIRMED_SITE
+        # only, never a fuzzy/multi-site claim this module has no basis
+        # to make). create_relationship_if_absent does its own LIVE
+        # idempotency check, so a second document in this SAME batch
+        # naming the same new (allocation_id, site_id) pair is still safe
+        # (returns None, not a duplicate/error).
         new_strong_site_ids = {h.site_id for h in strong_linked} - existing_site_ids
         for site_id in new_strong_site_ids:
             best = _best_strong_hit(strong_linked, site_id)
+            created = create_relationship_if_absent(
+                session, allocation_id=allocation_id, site_id=site_id,
+                evidence_basis=EVIDENCE_BASIS_DOCUMENT_CONFIRMED_SITE,
+                evidence_category=best.category, evidence_document_id=document.id,
+                evidence_application_id=application.id, evidence_snippet=best.snippet,
+            )
+            # This allocation now has a real relationship for this Site -
+            # keep the in-memory snapshot honest for the REST of this
+            # SAME batch (a later document for the same allocation must
+            # not attempt the same pair again).
+            if created is not None:
+                relationships_by_allocation.setdefault(allocation_id, []).append(created)
+                existing_site_ids.add(site_id)
             report.new_strong_candidates.append(NewCandidateHit(
                 allocation_id=allocation_id, allocation_reference=allocation.policy_reference,
                 allocation_name=allocation.site_name, site_id=site_id, document_id=document.id,
                 application_id=application.id, application_reference=application.reference,
                 category=best.category, snippet=best.snippet,
+                relationship_id=created.id if created is not None else None,
             ))
 
         # --- Section 6/7: application-only strong evidence (no linked Site) ---
@@ -297,16 +350,22 @@ def scan_council_for_allocation_evidence(
     FAILURE ISOLATION (Section 12): one document's processing error is
     caught, logged into the report, and never aborts the batch or leaves
     that document falsely marked scanned (so it remains eligible for
-    retry next run) - and never corrupts any already-committed row from
-    an earlier document in the same batch, since each document's own
-    writes (scanned_at + any relationship flips found for IT) are
+    retry next run). Any relationship this document was in the middle of
+    creating when it failed is explicitly rolled back (session.rollback())
+    before moving on - a partially-applied write from a failed document
+    must never leak into the next document's processing or be silently
+    committed alongside it. Each SUCCESSFUL document's own writes
+    (scanned_at + any relationship creates/flips found for IT) are
     committed immediately after that document succeeds, before moving to
-    the next.
+    the next - so an earlier document's already-committed work is never
+    at risk from a later document's failure either.
 
     IDEMPOTENT: rerunning immediately afterwards finds zero unscanned
-    documents (this call marks every successfully-processed one) and
-    zero new contradiction flags (a relationship already flagged stays
-    flagged, never double-flagged - see _process_one_document)."""
+    documents (this call marks every successfully-processed one), zero
+    new relationship creates (create_relationship_if_absent is itself
+    idempotent), and zero new contradiction flags (a relationship already
+    flagged stays flagged, never double-flagged - see
+    _process_one_document)."""
     documents = select_unscanned_documents(session, council_code, limit=limit)
     allocations = list(session.execute(
         select(LocalPlanSite).where(LocalPlanSite.council_code == council_code)
@@ -317,8 +376,9 @@ def scan_council_for_allocation_evidence(
 
     for document, application in documents:
         try:
-            _process_one_document(document, application, allocations, relationships_by_allocation, report)
+            _process_one_document(session, document, application, allocations, relationships_by_allocation, report)
         except Exception as exc:  # noqa: BLE001 - deliberate: one bad document must never abort the batch
+            session.rollback()  # discard any partial write this document was in the middle of
             report.documents_failed += 1
             print(f"[allocation-evidence-scan] council={council_code} document_id={document.id} "
                   f"application_id={application.id} FAILED: {exc!r}")
@@ -329,3 +389,87 @@ def scan_council_for_allocation_evidence(
         session.commit()
 
     return report
+
+
+# --- Historical scan-state cutover (Stage 3B final amendment, Section 7) ----
+#
+# The 3,137 documents already processed by Stage 2C's historical evidence
+# scan would otherwise ALL appear "unscanned" the moment Document.
+# allocation_evidence_scanned_at is added - triggering a slow, wasteful,
+# multi-day incremental rescan of the entire historic corpus purely to
+# initialise scan state, which Section 11 of the original Stage 3B task
+# already explicitly ruled out ("if scanning every historical document on
+# every run would be required, that architecture is NOT approved").
+#
+# DESIGN: mark every Document that already existed before a single
+# rollout CUTOFF timestamp as "scanned" (at that cutoff), without
+# re-evaluating its text at all - it was already covered by Stage 2C's
+# own historical pass (scripts/dry_run_gm_allocation_site_relationships.py
+# / app.policy.allocation_site_relationships), which is untouched and
+# remains the historical/manual mechanism (Section 15 of the original
+# task: "do NOT rebuild another historical scanner").
+#
+# SCOPE (deliberately broad, not narrowly re-derived per-council): every
+# Document with usable extracted text, not yet scanned, whose
+# downloaded_at predates the cutoff - OR whose downloaded_at is NULL at
+# all (a legacy row with no download timestamp cannot be PROVEN to
+# postdate the cutover; treating "unknown" as "before cutover" is the
+# safe direction, since the alternative would leave it eligible for
+# routine incremental rescanning forever, silently reintroducing the
+# exact full-corpus cost this backfill exists to avoid). A council with
+# zero LocalPlanSite allocations produces zero evidence hits regardless
+# of scan state (Stage 2C's own search is allocation-driven) - marking
+# its documents scanned too is harmless, not an over-reach requiring a
+# separate per-council eligibility reconstruction this codebase has no
+# reliable way to prove after the fact.
+#
+# WHY A SINGLE CUTOFF PARAMETER, NOT A HARD-CODED DATE: this script is
+# meant to run ONCE, during deployment, between "migrate_schema" and
+# "allow cron jobs to run" (the same established deployment order this
+# codebase already documents - see docs/PLATFORM_ARCHITECTURE.md). The
+# real safety mechanism is OPERATIONAL (no new document can be extracted
+# while cron jobs are paused), not the cutoff value itself - the cutoff
+# defaults to "now" at invocation time purely so the WHERE clause has a
+# concrete, auditable boundary, not because precise timing matters if the
+# operational order above is followed.
+
+
+def backfill_historical_scan_state(session: Session, *, cutoff: dt.datetime | None = None) -> dict:
+    """READ ONLY dry-run - computes exactly what the write-mode backfill
+    below would mark, without mutating anything. `cutoff` defaults to
+    "now" (see module-level design note above). IDEMPOTENT to call
+    repeatedly - always recomputes against live state, never assumes a
+    previous run's result."""
+    cutoff = cutoff or utcnow()
+    candidates = session.execute(
+        select(Document).where(
+            Document.text_extracted.is_(True),
+            Document.extracted_text.is_not(None),
+            Document.allocation_evidence_scanned_at.is_(None),
+            or_(Document.downloaded_at.is_(None), Document.downloaded_at < cutoff),
+        )
+    ).scalars().all()
+    return {"cutoff": cutoff, "eligible_document_ids": [d.id for d in candidates], "count": len(candidates)}
+
+
+def apply_historical_scan_state_backfill(session: Session, *, cutoff: dt.datetime | None = None) -> dict:
+    """PRODUCTION WRITE MODE. Only called with explicit CLI confirmation
+    (scripts/backfill_allocation_evidence_scan_state.py's own --execute/
+    --confirm gate, matching every other Stage 2/3 script's established
+    convention). Recomputes the dry-run FRESH immediately before writing
+    (fail-closed against concurrent state, same discipline as Stage 2D's
+    own run_controlled_relationship_write) and re-checks each individual
+    row live right before marking it - skipping (never erroring) any
+    document a concurrent process already scanned, so this is safe to run
+    any number of times."""
+    plan = backfill_historical_scan_state(session, cutoff=cutoff)
+    cutoff_value = plan["cutoff"]
+    marked = 0
+    for doc_id in plan["eligible_document_ids"]:
+        doc = session.get(Document, doc_id)
+        if doc is None or doc.allocation_evidence_scanned_at is not None:
+            continue
+        doc.allocation_evidence_scanned_at = cutoff_value
+        marked += 1
+    session.commit()
+    return {"cutoff": cutoff_value, "marked_count": marked}

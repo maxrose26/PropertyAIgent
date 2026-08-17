@@ -13,6 +13,7 @@ from app.reporting import allocation_development_coverage as coverage_module
 from app.reporting.allocation_development_coverage import (
     CAPACITY_UNKNOWN,
     CONFIRMED_PHASED,
+    DISPUTED_RELATIONSHIP_NOTE,
     FULLY_ACCOUNTED_FOR,
     INSUFFICIENT_EVIDENCE,
     INVESTIGATE,
@@ -88,8 +89,11 @@ def _make_document(session, application_id: int, doc_type: str, text: str) -> Do
     return doc
 
 
-def _make_relationship(session, allocation_id: int, site_id: int) -> AllocationSiteRelationship:
-    rel = AllocationSiteRelationship(allocation_id=allocation_id, site_id=site_id, evidence_basis="document_confirmed_site")
+def _make_relationship(session, allocation_id: int, site_id: int, **kwargs) -> AllocationSiteRelationship:
+    rel = AllocationSiteRelationship(
+        allocation_id=allocation_id, site_id=site_id,
+        evidence_basis=kwargs.pop("evidence_basis", "document_confirmed_site"), **kwargs,
+    )
     session.add(rel)
     session.flush()
     return rel
@@ -324,6 +328,124 @@ def test_multi_site_review_required_uses_multi_parcel_wording(session):
 
     assert coverage.development_coverage_classification == REVIEW_REQUIRED
     assert "Multiple development parcels" in coverage.note
+
+
+# ---------------------------------------------------------------------------
+# Stage 3B amendment (Section 5/6): disputed/rejected relationship semantics
+# ---------------------------------------------------------------------------
+
+
+def test_disputed_relationship_with_known_capacity_forces_review_required(session):
+    """Section 5: a Site with a REAL known capacity number, but whose
+    accepted relationship has since been flagged needs_confirmation by
+    contradicting evidence, must never silently produce a confident
+    coverage percentage/residual - the underlying accounting relationship
+    is disputed."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Allocation A", minimum_dwellings=1000)
+    site = _make_site(session, "testcouncil", "some site")
+    _make_relationship(session, allocation.id, site.id, review_status="needs_confirmation")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_scheme_intelligence(session, app.id, total_units_final=300)
+    session.commit()
+
+    result = build_allocation_development_coverage(session, [allocation])
+    coverage = result[allocation.id]["coverage"]
+
+    assert coverage.development_coverage_classification == REVIEW_REQUIRED
+    assert coverage.capacity_accounting_status == "review_required"
+    assert coverage.note == DISPUTED_RELATIONSHIP_NOTE
+    assert coverage.identified_application_capacity is None
+    assert coverage.indicative_residual_capacity is None
+    # The relationship itself is still retained/counted as related - never
+    # auto-deleted or hidden, only the derived conclusion is withheld.
+    assert coverage.number_of_related_sites == 1
+
+
+def test_auto_applied_and_confirmed_relationships_are_unaffected_by_disputed_check(session):
+    """Only needs_confirmation triggers the disputed-relationship
+    override - auto_applied and confirmed relationships compute coverage
+    normally."""
+    _make_council(session, "testcouncil")
+    allocation_auto = _make_allocation(session, "testcouncil", "Auto", policy_reference="A1", minimum_dwellings=1000)
+    site_auto = _make_site(session, "testcouncil", "site auto")
+    _make_relationship(session, allocation_auto.id, site_auto.id, review_status="auto_applied")
+    app_auto = _make_application(session, "testcouncil", "APP/AUTO", site_id=site_auto.id)
+    _make_scheme_intelligence(session, app_auto.id, total_units_final=300)
+
+    allocation_confirmed = _make_allocation(session, "testcouncil", "Confirmed", policy_reference="A2", minimum_dwellings=1000)
+    site_confirmed = _make_site(session, "testcouncil", "site confirmed")
+    _make_relationship(session, allocation_confirmed.id, site_confirmed.id, review_status="confirmed")
+    app_confirmed = _make_application(session, "testcouncil", "APP/CONFIRMED", site_id=site_confirmed.id)
+    _make_scheme_intelligence(session, app_confirmed.id, total_units_final=300)
+    session.commit()
+
+    result = build_allocation_development_coverage(session, [allocation_auto, allocation_confirmed])
+
+    assert result[allocation_auto.id]["coverage"].development_coverage_classification == PARTIAL_COVERAGE
+    assert result[allocation_confirmed.id]["coverage"].development_coverage_classification == PARTIAL_COVERAGE
+
+
+def test_rejected_relationship_excluded_from_coverage_entirely(session):
+    """Section 6: 'rejected' must not contribute to accepted relationship
+    development accounting at all - excluded from related-Site counts,
+    not just from the capacity sum."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Allocation A", minimum_dwellings=1000)
+    site = _make_site(session, "testcouncil", "some site")
+    _make_relationship(session, allocation.id, site.id, review_status="rejected")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_scheme_intelligence(session, app.id, total_units_final=300)
+    session.commit()
+
+    result = build_allocation_development_coverage(session, [allocation])
+    coverage = result[allocation.id]["coverage"]
+
+    assert coverage.number_of_related_sites == 0
+    assert coverage.development_coverage_classification == NO_IDENTIFIED_ACTIVITY
+    assert coverage.identified_application_capacity == 0
+
+
+def test_rejected_relationship_alongside_accepted_one_only_counts_the_accepted(session):
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Allocation A", minimum_dwellings=1000)
+    site_rejected = _make_site(session, "testcouncil", "rejected site")
+    site_accepted = _make_site(session, "testcouncil", "accepted site")
+    _make_relationship(session, allocation.id, site_rejected.id, review_status="rejected")
+    _make_relationship(session, allocation.id, site_accepted.id, review_status="auto_applied")
+    app_rejected = _make_application(session, "testcouncil", "APP/REJECTED", site_id=site_rejected.id)
+    _make_scheme_intelligence(session, app_rejected.id, total_units_final=999)
+    app_accepted = _make_application(session, "testcouncil", "APP/ACCEPTED", site_id=site_accepted.id)
+    _make_scheme_intelligence(session, app_accepted.id, total_units_final=100)
+    session.commit()
+
+    result = build_allocation_development_coverage(session, [allocation])
+    coverage = result[allocation.id]["coverage"]
+
+    assert coverage.number_of_related_sites == 1
+    assert coverage.identified_application_capacity == 100  # never the rejected Site's 999
+
+
+def test_local_plan_site_review_status_does_not_affect_relationship_acceptance(session):
+    """Section 6: never conflate LocalPlanSite.review_status with
+    AllocationSiteRelationship.review_status - an allocation whose OWN
+    review_status is 'needs_confirmation' (an unrelated Local Plan
+    content-review concept) must compute coverage exactly as if that
+    field were absent."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Allocation A", minimum_dwellings=1000)
+    allocation.review_status = "needs_confirmation"  # LocalPlanSite's OWN field - unrelated
+    site = _make_site(session, "testcouncil", "some site")
+    _make_relationship(session, allocation.id, site.id, review_status="auto_applied")  # relationship itself is fine
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_scheme_intelligence(session, app.id, total_units_final=300)
+    session.commit()
+
+    result = build_allocation_development_coverage(session, [allocation])
+    coverage = result[allocation.id]["coverage"]
+
+    assert coverage.development_coverage_classification == PARTIAL_COVERAGE  # not REVIEW_REQUIRED
+    assert coverage.identified_application_capacity == 300
 
 
 # ---------------------------------------------------------------------------
