@@ -1,17 +1,28 @@
-"""GM Allocation <-> Site dry-run candidate matching report (Stage 2A, CLI).
+"""GM Allocation <-> Site dry-run candidate matching report (Stage 2A),
+extended with a controlled production write mode (Stage 2B, CLI).
 
-READ ONLY. Makes zero database mutations - never calls session.add/flush/
-commit, never sets matched_site_id/match_confidence/review_status/
-latitude/longitude on anything. See app.policy.allocation_site_dry_run_matching
-for the full design rationale (existing-matcher reuse, reporting-only
-classification, multi-site safeguard).
+Dry-run (the default, no flags needed) is READ ONLY - makes zero database
+mutations. See app.policy.allocation_site_dry_run_matching for the full
+design rationale (existing-matcher reuse, reporting-only classification,
+multi-site safeguard, and the write-mode semantics below).
 
     python -m scripts.dry_run_gm_allocation_site_matching
     python -m scripts.dry_run_gm_allocation_site_matching --council bolton
+
+Production write mode requires BOTH flags together - --execute alone does
+nothing but print an error (same deliberate-friction pattern as
+scripts.ingest_gm_local_plan_baseline). Only HIGH_CONFIDENCE_CANDIDATE
+allocations are written as an established relationship; REVIEW_CANDIDATE
+allocations are written as an UNCONFIRMED suggestion (review_status=
+needs_confirmation) actionable via the Allocation Match Review UI/
+app.policy.site_match_review; AMBIGUOUS and NO_CANDIDATE are never written:
+
+    python -m scripts.dry_run_gm_allocation_site_matching --execute --confirm YES-WRITE-GM-ALLOCATION-SITE-MATCHES
 """
 from __future__ import annotations
 
 import argparse
+import sys
 
 from app.db.session import get_session, init_db
 from app.policy.allocation_site_dry_run_matching import (
@@ -19,15 +30,20 @@ from app.policy.allocation_site_dry_run_matching import (
     HIGH_CONFIDENCE_CANDIDATE,
     NO_CANDIDATE,
     REVIEW_CANDIDATE,
+    run_controlled_write,
     run_dry_run_matching,
     summarize_results,
 )
+
+CONFIRM_PHRASE = "YES-WRITE-GM-ALLOCATION-SITE-MATCHES"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--council", action="append", default=None, help="Restrict to one council code (repeatable). Default: all councils.")
     parser.add_argument("--examples-per-category", type=int, default=10, help="How many result examples to print per classification (default 10).")
+    parser.add_argument("--execute", action="store_true", help="Write HIGH_CONFIDENCE_CANDIDATE/REVIEW_CANDIDATE matches to production. Requires --confirm with the exact phrase below as well.")
+    parser.add_argument("--confirm", default=None, help=f"Must exactly equal '{CONFIRM_PHRASE}' to actually write. Ignored unless --execute is also given.")
     return parser.parse_args()
 
 
@@ -50,8 +66,27 @@ def _print_result(result) -> None:
 
 def main() -> None:
     args = parse_args()
+
+    production_mode = args.execute
+    if production_mode and args.confirm != CONFIRM_PHRASE:
+        print(f"[gm-allocation-site-match] --execute requires --confirm '{CONFIRM_PHRASE}' exactly - refusing to write.", file=sys.stderr)
+        sys.exit(2)
+
     init_db()
     session = get_session()
+
+    if production_mode:
+        print("[gm-allocation-site-match] PRODUCTION WRITE MODE - this WILL write to the database\n")
+        write_result = run_controlled_write(session, council_codes=args.council)
+        print("=== WRITE RESULT ===")
+        print(f"written HIGH_CONFIDENCE_CANDIDATE: {len(write_result['written_high_confidence'])} -> {write_result['written_high_confidence']}")
+        print(f"written REVIEW_CANDIDATE (unconfirmed suggestion): {len(write_result['written_review_candidate'])} -> {write_result['written_review_candidate']}")
+        print(f"skipped (production drift): {len(write_result['skipped_drift'])} -> {write_result['skipped_drift']}")
+        print(f"AMBIGUOUS not written: {len(write_result['ambiguous_not_written'])}")
+        print(f"NO_CANDIDATE untouched: {len(write_result['no_candidate_untouched'])}")
+        print("\n=== RESULT ===")
+        print("PRODUCTION WRITE COMPLETE")
+        return
 
     print("[gm-allocation-site-match] DRY RUN - zero database mutations will be made\n")
     dry_run = run_dry_run_matching(session, council_codes=args.council)

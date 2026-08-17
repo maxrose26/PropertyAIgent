@@ -1,11 +1,21 @@
-"""GM Allocation <-> Site dry-run candidate matching harness (Stage 2A).
+"""GM Allocation <-> Site dry-run candidate matching harness (Stage 2A),
+extended with a controlled production write mode (Stage 2B).
 
-Read-only reporting only. This module never writes anything - no
-session.add/flush/commit anywhere in it, and it never assigns to
+Dry-run (everything before the "Stage 2B" section below) remains read-only
+reporting only and the default. It never writes anything - no
+session.add/flush/commit anywhere in that part, and it never assigns to
 matched_site_id, match_confidence, review_status, latitude, longitude, or
 any other attribute of a LocalPlanSite/Site/Application ORM object. It exists
 to answer "what WOULD the existing allocation matcher decide, at Greater
 Manchester baseline scale, if it were run" - not to decide anything itself.
+
+Stage 2B adds run_controlled_write() - the ONLY function in this module
+that ever mutates the database, and only when a caller (the CLI script,
+behind its own --execute/--confirm gate) invokes it explicitly. A persisted
+matched_site_id means "this Site is evidenced as relating to this
+allocation" - NEVER "this Site accounts for the whole allocation" or any
+capacity/coverage/availability conclusion; see run_controlled_write()'s own
+docstring for the exact write semantics per classification tier.
 
 The actual matching DECISION is entirely delegated to the existing, already-
 tested app.extraction.local_plan.match_to_existing_site() - this module never
@@ -43,7 +53,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import LocalPlanSite, Site
-from app.extraction.local_plan import MATCH_SCORE_THRESHOLD, match_to_existing_site
+# _contradicting_direction is deliberately imported despite its leading
+# underscore: Stage 2B's near-miss reporting is about to become a source of
+# WRITTEN (unconfirmed) suggestions, so it must respect the same direction
+# veto the real matcher applies - reusing the existing helper is the only
+# way to do that without a second, divergent implementation of the veto.
+from app.extraction.local_plan import MATCH_SCORE_THRESHOLD, _contradicting_direction, match_to_existing_site
 from app.pipeline.site_linking import FUZZY_SCORE_THRESHOLD, normalise_address
 from app.ui.common import aggregate_scheme_fields, load_site_applications
 
@@ -124,17 +139,21 @@ def _iterative_matches(site_name: str, candidates: list[Site]) -> list[tuple[Sit
 
 
 def _near_miss_candidates(site_name: str, candidates: list[Site]) -> list[tuple[Site, float]]:
-    """Reporting-only visibility into sub-threshold candidates, computed
-    from the exact same two primitives match_to_existing_site itself uses
-    (normalise_address, rapidfuzz token_set_ratio) - never a second
-    matching decision, purely a transparency aid for Section 6's failure-
-    mode review. Deliberately does not apply the compass-direction veto:
-    the point here is to show what raw text similarity found, not to
-    decide anything - the real matcher's own decision is always reported
-    separately and is always authoritative."""
+    """Sub-threshold candidates, computed from the exact same primitives
+    match_to_existing_site itself uses (normalise_address, rapidfuzz
+    token_set_ratio, compass-direction veto) - never a second matching
+    decision. As of Stage 2B the top near-miss returned here can become a
+    WRITTEN (unconfirmed) REVIEW_CANDIDATE suggestion, so it must honour
+    every safeguard the real matcher applies, including the direction veto
+    - a directionally-contradicting candidate is never suggested, even as
+    an unconfirmed one."""
     normalised = normalise_address(site_name)
     scored = sorted(
-        ((s, fuzz.token_set_ratio(normalised, s.canonical_address)) for s in candidates),
+        (
+            (s, fuzz.token_set_ratio(normalised, s.canonical_address))
+            for s in candidates
+            if not _contradicting_direction(normalised, s.canonical_address)
+        ),
         key=lambda pair: pair[1], reverse=True,
     )
     return scored[:NEAR_MISS_CANDIDATES_TO_SHOW]
@@ -270,3 +289,120 @@ def summarize_results(dry_run: dict) -> dict:
         "by_council": by_council,
         "score_distribution": score_buckets,
     }
+
+
+# ---------------------------------------------------------------------------
+# Stage 2B - controlled production write mode.
+#
+# Dry-run (everything above) remains the default and makes zero mutations.
+# This section is the ONLY part of this module that ever writes anything,
+# and it is never called implicitly - a caller (the CLI script) must invoke
+# run_controlled_write() explicitly, behind its own --execute/--confirm gate.
+#
+# Semantics (Stage 2B Section 2 - "nothing stronger"): a persisted
+# matched_site_id means "this Site is evidenced as relating to this
+# allocation" - never "this Site accounts for the whole allocation" and
+# never any capacity/coverage/availability conclusion. This module computes
+# and writes no such conclusion anywhere.
+# ---------------------------------------------------------------------------
+
+REJECTED_REVIEW_STATUS = "rejected"
+NEEDS_CONFIRMATION_REVIEW_STATUS = "needs_confirmation"
+
+
+def run_controlled_write(session: Session, *, council_codes: list[str] | None = None) -> dict:
+    """PRODUCTION WRITE MODE. Only called with explicit CLI confirmation.
+
+    HIGH_CONFIDENCE_CANDIDATE: writes matched_site_id + match_confidence
+    only. review_status is left completely untouched - this mirrors
+    exactly how app.extraction.local_plan's own existing ingest_local_plan.py
+    pipeline already auto-applies a match at this same >=80 threshold,
+    without any review step. No new status vocabulary is introduced.
+
+    REVIEW_CANDIDATE: writes matched_site_id + match_confidence as an
+    UNCONFIRMED SUGGESTION, with review_status set to the existing
+    "needs_confirmation" value - the model's own documented meaning for
+    exactly this state ("...e.g. after a low-confidence Site match", see
+    LocalPlanSite.review_status's own comment). This makes the allocation
+    actionable via the EXISTING app.policy.site_match_review.
+    confirm_site_match()/reject_site_match() - never calls them itself.
+
+    AMBIGUOUS and NO_CANDIDATE allocations are never written.
+
+    Idempotent and fails closed on drift: recomputes the dry run fresh
+    immediately before writing, and re-checks each allocation's live state
+    right before touching it - matched_site_id already set (by anything,
+    including a previous run of this same function) or review_status
+    already "rejected" means SKIP, never overwrite. A rejected match must
+    stay rejected forever; an already-matched allocation is never revisited.
+    """
+    dry_run = run_dry_run_matching(session, council_codes=council_codes)
+
+    written_high_confidence: list[int] = []
+    written_review_candidate: list[int] = []
+    skipped_drift: list[int] = []
+
+    for result in dry_run["results"]:
+        if result.classification not in (HIGH_CONFIDENCE_CANDIDATE, REVIEW_CANDIDATE):
+            continue
+
+        allocation = session.get(LocalPlanSite, result.allocation_id)
+        if (
+            allocation is None
+            or allocation.matched_site_id is not None
+            or allocation.review_status == REJECTED_REVIEW_STATUS
+        ):
+            skipped_drift.append(result.allocation_id)
+            continue
+
+        if result.classification == HIGH_CONFIDENCE_CANDIDATE:
+            winner = result.candidates[0]
+            allocation.matched_site_id = winner.site_id
+            allocation.match_confidence = winner.score
+            written_high_confidence.append(result.allocation_id)
+        else:
+            winner = result.near_miss_candidates[0]
+            allocation.matched_site_id = winner.site_id
+            allocation.match_confidence = winner.score
+            allocation.review_status = NEEDS_CONFIRMATION_REVIEW_STATUS
+            written_review_candidate.append(result.allocation_id)
+
+    session.commit()
+
+    return {
+        "written_high_confidence": written_high_confidence,
+        "written_review_candidate": written_review_candidate,
+        "skipped_drift": skipped_drift,
+        "ambiguous_not_written": [r.allocation_id for r in dry_run["results"] if r.classification == AMBIGUOUS],
+        "no_candidate_untouched": [r.allocation_id for r in dry_run["results"] if r.classification == NO_CANDIDATE],
+    }
+
+
+def fetch_pending_review_allocations(session: Session, *, council_codes: list[str] | None = None) -> list[LocalPlanSite]:
+    """The actionable REVIEW_CANDIDATE queue for a human-review UI - every
+    LocalPlanSite currently carrying an unconfirmed Site-match suggestion
+    written by run_controlled_write(). Uses the exact same combined filter
+    (review_status == "needs_confirmation" AND matched_site_id IS NOT NULL)
+    that scripts/apply_pr2_allocation_match_review.py already established
+    as this codebase's own convention for "a pending Site-match review",
+    which keeps this query from also picking up allocations whose
+    review_status is "needs_confirmation" for an unrelated CONTENT reason
+    (e.g. an ambiguous plan_status derived by migration) - those never have
+    matched_site_id set at all, so this filter naturally excludes them."""
+    query = select(LocalPlanSite).where(
+        LocalPlanSite.review_status == NEEDS_CONFIRMATION_REVIEW_STATUS,
+        LocalPlanSite.matched_site_id.is_not(None),
+    )
+    if council_codes:
+        query = query.where(LocalPlanSite.council_code.in_(council_codes))
+    return list(session.execute(query).scalars().all())
+
+
+def fetch_ambiguous_allocations(session: Session, *, council_codes: list[str] | None = None) -> list[AllocationMatchResult]:
+    """Live-computed AMBIGUOUS results for display only - Stage 2B Section 4
+    deliberately does not persist candidate alternatives anywhere (no
+    many-to-many table yet), so this is the dry-run harness itself acting
+    as the "generated review dataset", recomputed on demand rather than
+    stored, with zero new permanent data architecture."""
+    dry_run = run_dry_run_matching(session, council_codes=council_codes)
+    return [r for r in dry_run["results"] if r.classification == AMBIGUOUS]

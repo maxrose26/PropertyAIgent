@@ -80,11 +80,23 @@ def test_dry_run_makes_zero_mutations(session):
     assert len(session.execute(select(LocalPlanSite)).scalars().all()) == before_allocation_count
 
 
-def test_dry_run_module_never_calls_session_add_flush_commit():
-    source = inspect.getsource(dry_run_module)
-    assert "session.add(" not in source
-    assert "session.flush()" not in source
-    assert "session.commit()" not in source
+def test_dry_run_functions_never_call_session_add_flush_commit():
+    # Scoped to the dry-run functions specifically, not the whole module -
+    # Stage 2B added run_controlled_write() to this same file, which
+    # legitimately does call session.commit() (see
+    # test_allocation_site_controlled_write.py for its own coverage).
+    for fn in (
+        dry_run_module.run_dry_run_matching,
+        dry_run_module.evaluate_allocation,
+        dry_run_module.summarize_results,
+        dry_run_module._iterative_matches,
+        dry_run_module._near_miss_candidates,
+        dry_run_module._site_candidate,
+    ):
+        source = inspect.getsource(fn)
+        assert "session.add(" not in source
+        assert "session.flush()" not in source
+        assert "session.commit()" not in source
 
 
 # ---------------------------------------------------------------------------
