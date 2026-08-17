@@ -234,10 +234,13 @@ def assess_delivery_scope(minimum_dwellings: int | None, matched_units: int | No
     matched application's total, to answer the genuinely useful acquisition
     question: has this allocation been taken up in full, or does the live
     application only cover part of it (a phase, or a scaled-down scheme),
-    leaving the remainder still available? Confirmed real case: Land At
-    Chester Road, Hazel Grove - allocated 300 dwellings (HOM 2.37), but its
-    only application is for 134 - a live example of a partial delivery
-    worth knowing about, not obvious from either figure shown alone."""
+    leaving capacity not currently accounted for by identified planning
+    activity? Confirmed real case: Land At Chester Road, Hazel Grove -
+    allocated 300 dwellings (HOM 2.37), but its only application is for
+    134 - a live example of a partial delivery worth knowing about, not
+    obvious from either figure shown alone. Never asserts the unaccounted
+    capacity is "available" - absence of identified planning activity is
+    not evidence the land is available (Product Owner rule)."""
     if not minimum_dwellings or not matched_units:
         return {"status": "unknown", "note": "Can't compare - one or both unit counts aren't known."}
 
@@ -251,8 +254,9 @@ def assess_delivery_scope(minimum_dwellings: int | None, matched_units: int | No
         return {
             "status": "partial",
             "note": f"Application ({matched_units} units) covers only {ratio:.0%} of the {minimum_dwellings}-unit "
-                    f"allocation - likely a phase or a scaled-down scheme. The remaining "
-                    f"~{minimum_dwellings - matched_units} units may still be available.",
+                    f"allocation - likely a phase or a scaled-down scheme. Approximately "
+                    f"{minimum_dwellings - matched_units} units of allocation capacity are not currently "
+                    f"accounted for by identified planning activity.",
         }
     return {
         "status": "roughly_matches",

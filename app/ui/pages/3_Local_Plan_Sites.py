@@ -169,13 +169,17 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     # hidden; the Site match itself (which can exist with zero linked
     # Applications - an early-stage match, not yet a live filing) is shown
     # separately from that list.
-    section_header("Matched Site and Applications", icon="🔗")
+    section_header("Related Planning Site and Applications", icon="🔗")
     st.caption(card["matched_summary"], help=card["matched_summary_help"])
     if card["matched"]:
         if card["matched_site_address"]:
-            st.write(f"**Matched Site:** {card['matched_site_address']}")
+            st.write(f"**Related Planning Site:** {card['matched_site_address']}")
         if card["match_confidence"] is not None:
-            st.caption(f"Match confidence: {card['match_confidence']:.0f}%")
+            st.caption(
+                f"Match confidence: {card['match_confidence']:.0f}% - this Site is evidenced as relating to this "
+                "allocation, not confirmed to account for its whole capacity. A large allocation may relate to "
+                "more than one Site or phase."
+            )
         st.page_link(
             "pages/1_Scheme_Detail.py", label="Open Site Profile →",
             query_params={"site_id": str(card["matched_site_id"])},
