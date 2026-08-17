@@ -324,6 +324,142 @@ def test_module_creates_relationships_only_through_the_shared_helper_never_direc
 
 
 # ---------------------------------------------------------------------------
+# Final auto-link evidence threshold amendment: STRONG_CONTEXTUAL_REFERENCE
+# alone is review-only in the unattended forward pipeline - only
+# EXPLICIT_REFERENCE auto-creates. Historical/batch semantics unchanged.
+# ---------------------------------------------------------------------------
+
+
+def test_strong_contextual_reference_alone_does_not_auto_create_relationship(session):
+    """A bare mention of the allocation's reference with no explicit
+    membership phrase nearby (STRONG_CONTEXTUAL_REFERENCE) must NEVER
+    auto-create a relationship in the unattended forward pipeline, even
+    though it is one of Stage 2C's own two 'strong' categories."""
+    _make_council(session, "testcouncil")
+    _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_document(
+        session, app.id, "officer_report",
+        "The trajectory table records progress against allocation HOM 2.30 as due for "
+        "delivery in year three of the plan period, alongside twelve other sites monitored "
+        "across the borough this year.",
+    )
+    session.commit()
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+
+    assert report.new_strong_candidates == []
+    assert session.execute(select(AllocationSiteRelationship)).scalars().all() == []
+
+
+def test_strong_contextual_reference_retained_and_reported_for_review(session):
+    """The same hit is not silently dropped - it is reported into
+    report.weak_evidence, carrying its TRUE category (never downgraded to
+    WEAK_REFERENCE/NAME_AND_POLICY_CONTEXT) and its resolved Site, for
+    later human review or the deliberate batch/historical process."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    doc = _make_document(
+        session, app.id, "officer_report",
+        "The trajectory table records progress against allocation HOM 2.30 as due for "
+        "delivery in year three of the plan period, alongside twelve other sites monitored "
+        "across the borough this year.",
+    )
+    session.commit()
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+
+    assert len(report.weak_evidence) == 1
+    hit = report.weak_evidence[0]
+    assert hit.category == "STRONG_CONTEXTUAL_REFERENCE"
+    assert hit.allocation_id == allocation.id
+    assert hit.site_id == site.id
+    assert hit.document_id == doc.id
+    assert hit.application_id == app.id
+    assert hit.snippet
+
+
+def test_explicit_reference_beats_contextual_for_same_site_same_document(session):
+    """If a document carries BOTH an EXPLICIT_REFERENCE hit and a
+    STRONG_CONTEXTUAL_REFERENCE hit for the same allocation/Site pair, the
+    explicit hit wins and the relationship IS auto-created - the
+    contextual mention alone never suppresses a genuine explicit one."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_document(
+        session, app.id, "planning_statement",
+        "The trajectory table records progress against allocation HOM 2.30 in the annual "
+        "monitoring report. This application forms part of allocation HOM 2.30 and delivers "
+        "the housing identified for the site.",
+    )
+    session.commit()
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+
+    rels = session.execute(select(AllocationSiteRelationship)).scalars().all()
+    assert len(rels) == 1
+    assert rels[0].allocation_id == allocation.id
+    assert rels[0].site_id == site.id
+    assert len(report.new_strong_candidates) == 1
+    assert report.new_strong_candidates[0].category == "EXPLICIT_REFERENCE"
+
+
+def test_repeated_strong_contextual_evidence_never_accumulates_into_auto_create(session):
+    """Two separate documents in the SAME scan, each only carrying
+    STRONG_CONTEXTUAL_REFERENCE evidence for the same new (allocation,
+    Site) pair, must still create ZERO relationships - repetition alone
+    never upgrades contextual evidence into an accepted relationship."""
+    _make_council(session, "testcouncil")
+    _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    site = _make_site(session, "testcouncil", "some site")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_document(
+        session, app.id, "officer_report",
+        "The trajectory table records progress against allocation HOM 2.30 as due for "
+        "delivery in year three of the plan period.",
+    )
+    _make_document(
+        session, app.id, "design_access",
+        "The annual monitoring report references allocation HOM 2.30 in its summary table "
+        "of sites under review this year.",
+    )
+    session.commit()
+
+    report = scan_council_for_allocation_evidence(session, "testcouncil")
+
+    assert session.execute(select(AllocationSiteRelationship)).scalars().all() == []
+    assert report.new_strong_candidates == []
+    assert len(report.weak_evidence) == 2
+    assert all(h.category == "STRONG_CONTEXTUAL_REFERENCE" for h in report.weak_evidence)
+
+
+def test_historical_batch_eligibility_for_strong_contextual_reference_not_weakened():
+    """This amendment concerns ONLY unattended forward automatic
+    persistence (app.policy.allocation_evidence_scan). The deliberate
+    batch/historical mechanism in app.policy.allocation_site_relationships
+    (plan_document_evidence_relationships) must still treat
+    STRONG_CONTEXTUAL_REFERENCE as strong evidence eligible to combine
+    with fuzzy/multi-document/human-review context - confirmed
+    structurally unchanged."""
+    from app.policy import allocation_site_relationships as batch_module
+
+    source = inspect.getsource(batch_module.plan_document_evidence_relationships)
+    assert '"EXPLICIT_REFERENCE", "STRONG_CONTEXTUAL_REFERENCE"' in source
+
+
+def test_auto_create_categories_is_explicit_reference_only():
+    """Structural guard on the amendment itself - the forward pipeline's
+    own auto-create eligibility set must be exactly {EXPLICIT_REFERENCE},
+    never silently widened back to include STRONG_CONTEXTUAL_REFERENCE."""
+    assert scan_module._AUTO_CREATE_CATEGORIES == ("EXPLICIT_REFERENCE",)
+
+
+# ---------------------------------------------------------------------------
 # 9. Multi-Site evidence preserved
 # ---------------------------------------------------------------------------
 

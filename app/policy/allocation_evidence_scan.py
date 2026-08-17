@@ -15,22 +15,43 @@ relationships, and what to do with a hit - never a second evidence
 vocabulary or a second regex.
 
 FINAL PRE-MERGE AMENDMENT ("Automatic Strong-Evidence Linking"): strong
-deterministic evidence (EXPLICIT_REFERENCE / STRONG_CONTEXTUAL_REFERENCE,
-naming a Site the linked Application already has - see Section 2's own
-"Application must already have a Site" requirement, satisfied structurally
-since a hit only ever carries a site_id when application.site_id is
-already set) now AUTO-CREATES the AllocationSiteRelationship row, via
-app.policy.allocation_site_relationships.create_relationship_if_absent -
-the SAME shared, idempotent row-creation helper run_controlled_
-relationship_write's own batch loops use. This is deliberately NOT a
-second direct-write path: it is the one persistence implementation Stage
-2D already owns, called from one more place. evidence_basis is always
-EVIDENCE_BASIS_DOCUMENT_CONFIRMED_SITE here, never "fuzzy_supported_by_
-document" - this module never cross-checks against a Stage 2A fuzzy
-candidate (it evaluates one document against a council's allocations in
-isolation), so it never claims agreement with a fuzzy match it hasn't
-actually looked at; that stronger claim remains the batch dry-run's own,
-which DOES have Stage 2A context.
+deterministic evidence naming a Site the linked Application already has
+(see Section 2's own "Application must already have a Site" requirement,
+satisfied structurally since a hit only ever carries a site_id when
+application.site_id is already set) can AUTO-CREATE the
+AllocationSiteRelationship row, via app.policy.allocation_site_
+relationships.create_relationship_if_absent - the SAME shared, idempotent
+row-creation helper run_controlled_relationship_write's own batch loops
+use. This is deliberately NOT a second direct-write path: it is the one
+persistence implementation Stage 2D already owns, called from one more
+place. evidence_basis is always EVIDENCE_BASIS_DOCUMENT_CONFIRMED_SITE
+here, never "fuzzy_supported_by_document" - this module never cross-checks
+against a Stage 2A fuzzy candidate (it evaluates one document against a
+council's allocations in isolation), so it never claims agreement with a
+fuzzy match it hasn't actually looked at; that stronger claim remains the
+batch dry-run's own, which DOES have Stage 2A context.
+
+FINAL AUTO-LINK EVIDENCE THRESHOLD AMENDMENT (unattended forward
+persistence is stricter than the deliberate historical/batch process):
+only EXPLICIT_REFERENCE evidence ("forms part of allocation...", "within
+allocation...", "the application site is allocated as...", equivalent
+explicit membership/implementation wording - _AUTO_CREATE_CATEGORIES) is
+eligible to auto-create a relationship here. STRONG_CONTEXTUAL_REFERENCE
+alone - a document mentioning an allocation reference in policy/background
+context without proving the application Site is actually within or part
+of it - is NOT auto-create eligible in this unattended forward pipeline,
+even though Stage 2C/2D's own batch/historical vocabulary still treats it
+as "strong" evidence for that deliberate, human-supervised process
+(_STRONG_CATEGORIES, used there and for this module's own weak/strong
+report-bucketing, is unchanged). A STRONG_CONTEXTUAL_REFERENCE hit for a
+site not already related is reported into report.weak_evidence for later
+review/batch investigation, carrying its own true category (never
+downgraded to a WEAK_REFERENCE/NAME_AND_POLICY_CONTEXT label - only its
+automatic persistence eligibility has changed, not its evidentiary
+strength). If a site has BOTH an EXPLICIT_REFERENCE hit and a
+STRONG_CONTEXTUAL_REFERENCE hit in the same document, the explicit hit
+wins and the relationship is auto-created (_best_strong_hit's existing
+EXPLICIT-preferring tie-break).
 
 Weak/contextual evidence, Application-only evidence, and negative/
 contradictory evidence are UNCHANGED by this amendment - still never
@@ -62,10 +83,12 @@ _process_one_document for how that gap is closed.
 WRITES THIS MODULE DOES MAKE:
   1. Document.allocation_evidence_scanned_at - bookkeeping only, so the
      same document is never rescanned (Section 3/10 idempotency).
-  2. NEW AllocationSiteRelationship rows for strong DOCUMENT_CONFIRMED_
-     SITE-class evidence naming a Site not already related to that
-     allocation - via the shared create_relationship_if_absent helper,
-     idempotent, never a duplicate pair, never a second write path.
+  2. NEW AllocationSiteRelationship rows for EXPLICIT_REFERENCE-class
+     evidence naming a Site not already related to that allocation - via
+     the shared create_relationship_if_absent helper, idempotent, never a
+     duplicate pair, never a second write path. STRONG_CONTEXTUAL_
+     REFERENCE alone does NOT trigger a write here (see the threshold
+     amendment above) - it is reported, not persisted.
   3. AllocationSiteRelationship.review_status flipped from its current
      value to "needs_confirmation" ONLY when new evidence explicitly
      contradicts that specific accepted relationship (Section 8: "raise a
@@ -125,8 +148,25 @@ ALLOCATION_EVIDENCE_SCAN_RUN_LIMIT = 200
 # allocation_site_relationships.plan_document_evidence_relationships'
 # own strong_hits filter exactly (EXPLICIT_REFERENCE / STRONG_CONTEXTUAL_
 # REFERENCE), so this module's "new candidate" count always agrees with
-# what the existing controlled-write CLI would actually create.
+# what the existing controlled-write CLI would actually create. Used ONLY
+# for splitting strong from weak/contextual reporting buckets below -
+# NOT the automatic-persistence eligibility test (see
+# _AUTO_CREATE_CATEGORIES for that).
 _STRONG_CATEGORIES = (EXPLICIT_REFERENCE, STRONG_CONTEXTUAL_REFERENCE)
+
+# Final auto-link evidence threshold amendment: the unattended FORWARD
+# pipeline auto-creates a relationship only for EXPLICIT_REFERENCE
+# evidence (genuine membership/implementation wording - "forms part of
+# allocation...", "within allocation...", etc). STRONG_CONTEXTUAL_
+# REFERENCE alone may only mention an allocation reference in policy/
+# background context without proving the Application Site is actually
+# within/part of it, so it is deliberately NOT auto-create eligible here
+# - it remains review-only (report.weak_evidence), unchanged from Stage
+# 2C/2D's own historical/batch process, which may still combine it with
+# fuzzy/multi-document/human-review evidence to reach a stronger
+# conclusion (FUZZY_SUPPORTED_BY_DOCUMENT, MULTIPLE_DOCUMENT_SUPPORTED_
+# SITES) - that batch mechanism is entirely unaffected by this amendment.
+_AUTO_CREATE_CATEGORIES = (EXPLICIT_REFERENCE,)
 
 
 @dataclass
@@ -153,6 +193,13 @@ class WeakEvidenceHit:
     application_reference: str
     category: str
     snippet: str
+    # Populated when the hit already resolved to a Site (e.g. a
+    # STRONG_CONTEXTUAL_REFERENCE hit under the auto-link threshold
+    # amendment below) - None for allocation-only weak hits that never
+    # resolved to any Site. category is always the hit's TRUE evidence
+    # category, never downgraded just because it landed in this
+    # review-only bucket.
+    site_id: int | None = None
 
 
 @dataclass
@@ -279,18 +326,34 @@ def _process_one_document(
         strong_unlinked = [h for h in strong_hits if h.site_id is None]
         weak_hits = [h for h in positive_hits if h.category not in _STRONG_CATEGORIES]
 
-        # --- Section 1/2/3 (amendment): strong evidence for a Site NOT
-        # already accepted AUTO-CREATES the relationship, via the shared
-        # Stage 2D helper - see module docstring for exactly which
-        # evidence class this covers and why (DOCUMENT_CONFIRMED_SITE
-        # only, never a fuzzy/multi-site claim this module has no basis
-        # to make). create_relationship_if_absent does its own LIVE
-        # idempotency check, so a second document in this SAME batch
-        # naming the same new (allocation_id, site_id) pair is still safe
-        # (returns None, not a duplicate/error).
+        # --- Section 1/2/3 (amendment) + Final Auto-Link Evidence
+        # Threshold Amendment: strong evidence for a Site NOT already
+        # accepted is only AUTO-CREATED via the shared Stage 2D helper
+        # when the BEST hit for that site is EXPLICIT_REFERENCE
+        # (_AUTO_CREATE_CATEGORIES) - genuine membership/implementation
+        # wording, never a bare contextual mention. _best_strong_hit
+        # already prefers an EXPLICIT_REFERENCE hit over a
+        # STRONG_CONTEXTUAL_REFERENCE hit for the same site when both
+        # exist, so this check correctly captures "does this site have
+        # ANY explicit evidence in this document". A site whose only
+        # strong evidence is STRONG_CONTEXTUAL_REFERENCE is reported for
+        # review instead - never persisted. create_relationship_if_absent
+        # does its own LIVE idempotency check, so a second document in
+        # this SAME batch naming the same new (allocation_id, site_id)
+        # pair is still safe (returns None, not a duplicate/error).
         new_strong_site_ids = {h.site_id for h in strong_linked} - existing_site_ids
         for site_id in new_strong_site_ids:
             best = _best_strong_hit(strong_linked, site_id)
+            if best.category not in _AUTO_CREATE_CATEGORIES:
+                # STRONG_CONTEXTUAL_REFERENCE alone - review-only, never
+                # auto-persisted. Category preserved faithfully.
+                report.weak_evidence.append(WeakEvidenceHit(
+                    allocation_id=allocation_id, allocation_reference=allocation.policy_reference,
+                    allocation_name=allocation.site_name, document_id=document.id,
+                    application_id=application.id, application_reference=application.reference,
+                    category=best.category, snippet=best.snippet, site_id=site_id,
+                ))
+                continue
             created = create_relationship_if_absent(
                 session, allocation_id=allocation_id, site_id=site_id,
                 evidence_basis=EVIDENCE_BASIS_DOCUMENT_CONFIRMED_SITE,
