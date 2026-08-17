@@ -405,6 +405,111 @@ def find_document_evidence_for_allocation(
     return positive_hits, contradictory_hits
 
 
+def find_allocation_evidence_for_document(
+    document: Document, application: Application, allocations: list[LocalPlanSite],
+) -> dict[int, tuple[list[DocumentEvidenceHit], list[DocumentEvidenceHit]]]:
+    """FORWARD direction (Stage 3A Section 9): given ONE already-extracted
+    Document (with its owning Application) already in hand, check it
+    against a council's LocalPlanSite allocations - the mirror image of
+    find_document_evidence_for_allocation's "one allocation, search many
+    documents" direction above. Returns {allocation_id: (positive_hits,
+    contradictory_hits)}, one entry per allocation in `allocations` that
+    found at least one hit (an allocation with no hits is simply absent
+    from the dict, never present with empty lists).
+
+    REUSES every regex/proximity/classification primitive this module
+    already has (_reference_pattern, distinctive_name_terms, _name_pattern,
+    _classify_occurrence, _has_negative_phrase, _snippet, _doc_weight,
+    _normalise_search_text) - no second matcher, no new evidence
+    vocabulary. Deliberately skips _candidate_documents' SQL ILIKE
+    prefilter entirely: that prefilter exists to avoid scanning every
+    document in a council for one allocation's terms, but here the ONE
+    document's text is already loaded in memory, so prefiltering it
+    against itself would be pure overhead, not a safety mechanism.
+
+    Callers must pre-scope `allocations` to the document's own
+    application.council_code (this function does not query the database
+    itself and takes no Session, mirroring find_document_evidence_for_
+    allocation's own "READ ONLY" discipline by simply doing no I/O at
+    all). READ ONLY - issues no queries, makes no writes.
+
+    Recommended integration point (Stage 3A Section 9 audit finding): a
+    NEW, separate pipeline stage run once per council after stage_documents
+    (mirroring stage_evidence_refresh's own established shape in
+    app.pipeline.run_weekly) - never invoked inline inside
+    discover_and_store_documents_for_application's existing hot loop,
+    which this codebase has already hardened carefully against exactly
+    this kind of added risk (circuit-breaker interaction, OOM-diagnostic
+    checkpoints, acquisition_complete bookkeeping). Any resulting
+    DOCUMENT_CONFIRMED_SITE-eligible evidence should feed the SAME
+    existing human-confirm-phrase-gated app.policy.allocation_site_
+    relationships.run_controlled_relationship_write path - never a new,
+    silent, per-document auto-write, which no other part of this codebase
+    does even for its strongest evidence category."""
+    if not document.extracted_text:
+        return {}
+    text = _normalise_search_text(document.extracted_text)
+    weight = _doc_weight(document.doc_type)
+
+    results: dict[int, tuple[list[DocumentEvidenceHit], list[DocumentEvidenceHit]]] = {}
+
+    for allocation in allocations:
+        if allocation.council_code != application.council_code:
+            continue
+        terms = _search_terms(allocation)
+        if not terms:
+            continue
+
+        ref_pattern = _reference_pattern(allocation.policy_reference) if allocation.policy_reference else None
+        distinctive_name = distinctive_name_terms(allocation.site_name)
+        name_pattern = _name_pattern(distinctive_name) if distinctive_name else None
+
+        positive_hits: list[DocumentEvidenceHit] = []
+        contradictory_hits: list[DocumentEvidenceHit] = []
+
+        for m in (list(ref_pattern.finditer(text)) if ref_pattern else []):
+            if _has_negative_phrase(text, m.start(), m.end()):
+                contradictory_hits.append(DocumentEvidenceHit(
+                    document_id=document.id, document_type=document.doc_type,
+                    application_id=application.id, application_reference=application.reference,
+                    site_id=application.site_id, matched_reference=allocation.policy_reference,
+                    snippet=_snippet(text, m.start(), m.end()), category=CONTRADICTORY_REFERENCE, weight=weight,
+                ))
+                continue
+            _, has_positive = _classify_occurrence(text, m.start(), m.end())
+            category = EXPLICIT_REFERENCE if has_positive else STRONG_CONTEXTUAL_REFERENCE
+            positive_hits.append(DocumentEvidenceHit(
+                document_id=document.id, document_type=document.doc_type,
+                application_id=application.id, application_reference=application.reference,
+                site_id=application.site_id, matched_reference=allocation.policy_reference,
+                snippet=_snippet(text, m.start(), m.end()), category=category, weight=weight,
+            ))
+
+        for m in (list(name_pattern.finditer(text)) if name_pattern else []):
+            if _has_negative_phrase(text, m.start(), m.end()):
+                contradictory_hits.append(DocumentEvidenceHit(
+                    document_id=document.id, document_type=document.doc_type,
+                    application_id=application.id, application_reference=application.reference,
+                    site_id=application.site_id, matched_reference=distinctive_name,
+                    snippet=_snippet(text, m.start(), m.end()), category=CONTRADICTORY_REFERENCE, weight=weight,
+                ))
+                continue
+            window, has_positive = _classify_occurrence(text, m.start(), m.end())
+            has_context = has_positive or any(w in window for w in GENERAL_ALLOCATION_CONTEXT_WORDS)
+            category = NAME_AND_POLICY_CONTEXT if has_context else WEAK_REFERENCE
+            positive_hits.append(DocumentEvidenceHit(
+                document_id=document.id, document_type=document.doc_type,
+                application_id=application.id, application_reference=application.reference,
+                site_id=application.site_id, matched_reference=distinctive_name,
+                snippet=_snippet(text, m.start(), m.end()), category=category, weight=weight,
+            ))
+
+        if positive_hits or contradictory_hits:
+            results[allocation.id] = (positive_hits, contradictory_hits)
+
+    return results
+
+
 def _stage2a_candidate_site_ids(stage2a: AllocationMatchResult | None) -> set[int]:
     """Union of Stage 2A's decided winners (.candidates - populated for
     HIGH_CONFIDENCE_CANDIDATE and AMBIGUOUS) and its REVIEW_CANDIDATE near

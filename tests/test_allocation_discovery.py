@@ -721,3 +721,68 @@ def test_local_plan_sites_page_only_applies_capacity_filter_once_narrowed():
 
     source = Path("app/ui/pages/3_Local_Plan_Sites.py").read_text(encoding="utf-8")
     assert "capacity_range != capacity_full_span" in source
+
+
+# --- Stage 3A wiring: build_allocation_discovery must surface development
+# coverage/phasing/opportunity via AllocationSiteRelationship, additive to
+# the existing matched_site_id-derived card fields. ---------------------------
+
+
+def test_card_has_no_identified_activity_when_no_relationship(session):
+    """A card whose allocation has zero AllocationSiteRelationship rows
+    still gets real Stage 3A intelligence via the full pipeline (never
+    silently None here - that default only applies to a caller of
+    build_allocation_card directly, without development_coverage at
+    all): confidently NO_IDENTIFIED_ACTIVITY, never treated as unknown."""
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id, minimum_dwellings=100)
+    session.commit()
+
+    result = build_allocation_discovery(session)
+    card = next(c for c in result["cards"] if c["id"] == allocation.id)
+
+    assert card["development_coverage"] is not None
+    assert card["development_coverage"].development_coverage_classification == "NO_IDENTIFIED_ACTIVITY"
+    assert card["development_coverage"].number_of_related_sites == 0
+
+
+def test_build_allocation_card_directly_defaults_development_coverage_to_none():
+    """The narrower default: a caller building a card WITHOUT going
+    through build_allocation_discovery at all (e.g. a future standalone
+    caller) gets None, not a fabricated coverage result."""
+    allocation = LocalPlanSite(
+        council_code="testcouncil", policy_reference="REF-1", site_name="Land off Test Road",
+        plan_name="Test Local Plan", plan_status="adopted", minimum_dwellings=100,
+    )
+    card = build_allocation_card(
+        allocation, plan=None, council_name="Test Council", council_codes_on_plan=["testcouncil"],
+        matched_site=None, linked_applications=[], visual_summary={"status": "none", "primary": None, "others": []},
+        visual_fallback=None, council_five_year_supply=None,
+    )
+    assert card["development_coverage"] is None
+    assert card["phasing"] is None
+    assert card["opportunity"] is None
+
+
+def test_card_surfaces_development_coverage_via_allocation_site_relationship(session):
+    from app.db.models import AllocationSiteRelationship, SchemeIntelligence
+
+    plan = _make_local_plan(session, status="adopted")
+    allocation = _make_allocation(session, plan.id, policy_reference="JPA 32", site_name="North of Mosley Common", minimum_dwellings=1100)
+    site = Site(council_code="testcouncil", canonical_address="mosley common south of the guided busway worsley",
+                display_address="Mosley Common")
+    session.add(site)
+    session.commit()
+    session.add(AllocationSiteRelationship(allocation_id=allocation.id, site_id=site.id, evidence_basis="document_confirmed_site"))
+    app = _make_app(session, site.id, reference="A/25/099409/RMMAJ")
+    session.add(SchemeIntelligence(application_id=app.id, total_units_final=244, core_intelligence_complete=True))
+    session.commit()
+
+    result = build_allocation_discovery(session)
+    card = next(c for c in result["cards"] if c["id"] == allocation.id)
+
+    assert card["development_coverage"] is not None
+    assert card["development_coverage"].allocation_capacity == 1100
+    assert card["development_coverage"].identified_application_capacity == 244
+    assert card["development_coverage"].indicative_residual_capacity == 856
+    assert card["opportunity"]["signal"] == "INVESTIGATE"

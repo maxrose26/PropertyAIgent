@@ -24,6 +24,7 @@ from app.policy.allocation_document_evidence import (
     WEAK_REFERENCE,
     derive_recommended_outcome,
     evaluate_allocation_document_evidence,
+    find_allocation_evidence_for_document,
     find_document_evidence_for_allocation,
     is_generic_reference,
 )
@@ -556,6 +557,91 @@ def test_new_carrington_production_evidence_pattern_is_alternative_not_contradic
     assert result.recommended_outcome == DOCUMENT_CONFIRMED_SITE
     assert result.recommended_outcome != DOCUMENT_CONTRADICTS_FUZZY
     assert result.evidenced_site_ids == {document_site.id}
+
+
+def test_forward_reference_finds_evidence_for_matching_allocation(session):
+    """Stage 3A Section 9: the FORWARD direction - given one already-
+    extracted document, check it against a council's allocations, rather
+    than the other way round."""
+    _make_council(session, "testcouncil")
+    allocation_a = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    allocation_b = _make_allocation(session, "testcouncil", "Other Allocation", "HOM 2.31")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = _make_document(session, app.id, "officer_report", "This forms part of allocation HOM 2.30.")
+    session.commit()
+
+    results = find_allocation_evidence_for_document(doc, app, [allocation_a, allocation_b])
+
+    assert allocation_a.id in results
+    assert allocation_b.id not in results
+    positive, contradictory = results[allocation_a.id]
+    assert contradictory == []
+    assert any(h.category == EXPLICIT_REFERENCE for h in positive)
+
+
+def test_forward_reference_scopes_to_matching_council_only(session):
+    _make_council(session, "testcouncil")
+    _make_council(session, "othercouncil")
+    other_council_allocation = _make_allocation(session, "othercouncil", "Sanderling Road", "HOM 2.30")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = _make_document(session, app.id, "officer_report", "This forms part of allocation HOM 2.30.")
+    session.commit()
+
+    results = find_allocation_evidence_for_document(doc, app, [other_council_allocation])
+
+    assert results == {}
+
+
+def test_forward_reference_finds_no_evidence_for_unrelated_document(session):
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = _make_document(session, app.id, "officer_report", "A completely unrelated scheme with no allocation reference.")
+    session.commit()
+
+    results = find_allocation_evidence_for_document(doc, app, [allocation])
+    assert results == {}
+
+
+def test_forward_reference_handles_document_with_no_extracted_text(session):
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = Document(application_id=app.id, doc_type="officer_report", extracted_text=None, text_extracted=False)
+    session.add(doc)
+    session.commit()
+
+    results = find_allocation_evidence_for_document(doc, app, [allocation])
+    assert results == {}
+
+
+def test_forward_reference_reuses_same_evidence_categories_as_reverse_direction(session):
+    """Same document/allocation pair evaluated in both directions must
+    produce the SAME evidence category - confirms genuine reuse of the
+    same underlying regex/proximity primitives, not a second matcher
+    with independent (and possibly diverging) behaviour."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = _make_document(session, app.id, "officer_report", "This forms part of allocation HOM 2.30.")
+    session.commit()
+
+    reverse_positive, _ = find_document_evidence_for_allocation(session, allocation)
+    forward_results = find_allocation_evidence_for_document(doc, app, [allocation])
+    forward_positive, _ = forward_results[allocation.id]
+
+    assert len(reverse_positive) == len(forward_positive) == 1
+    assert reverse_positive[0].category == forward_positive[0].category == EXPLICIT_REFERENCE
+
+
+def test_forward_reference_never_writes_to_database():
+    source = inspect.getsource(find_allocation_evidence_for_document)
+    assert "session.add(" not in source
+    assert "session.flush()" not in source
+    assert "session.commit()" not in source
+    # Takes no Session parameter at all - it does no I/O of its own.
+    sig = inspect.signature(find_allocation_evidence_for_document)
+    assert "session" not in sig.parameters
 
 
 def test_south_of_hyde_production_evidence_pattern_is_alternative_not_contradiction(session):

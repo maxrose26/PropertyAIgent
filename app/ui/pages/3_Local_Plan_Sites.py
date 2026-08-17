@@ -24,6 +24,9 @@ import pandas as pd
 import streamlit as st
 
 from app.reporting.allocation_discovery import (
+    DEVELOPMENT_COVERAGE_LABELS,
+    OPPORTUNITY_DETAIL_LABELS,
+    PHASING_DETAIL_LABELS,
     SORT_OPTIONS,
     apply_filters,
     build_allocation_discovery,
@@ -36,7 +39,8 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_caption,
     total_homes_kpi_label,
 )
-from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db
+from app.reporting.residential_mix import build_residential_mix
+from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db, pick_representative_application
 from app.ui.shell import (
     allocation_card,
     empty_state,
@@ -217,6 +221,99 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         st.caption("No build/commencement evidence available yet for this allocation.")
     if card["delivery_note"]:
         st.caption(card["delivery_note"])
+
+    # 6a. Development Coverage + Phasing + Opportunity (Stage 3A) - built
+    # from AllocationSiteRelationship, never matched_site_id (see
+    # app.reporting.allocation_development_coverage's own module
+    # docstring). An EVIDENCE layer only: never equates "not currently
+    # accounted for by identified planning activity" with land
+    # availability - see the explicit ownership/control caveat in the
+    # Opportunity subsection below.
+    coverage = card.get("development_coverage")
+    if coverage is not None:
+        section_header("Development coverage", icon="📊")
+        cov_cols = st.columns(2)
+        with cov_cols[0]:
+            stat_tile("Allocation capacity", f"{coverage.allocation_capacity:,} homes" if coverage.allocation_capacity is not None else "Not identified")
+            stat_tile("Identified application capacity", f"{coverage.identified_application_capacity:,} homes" if coverage.identified_application_capacity is not None else "Not determined")
+        with cov_cols[1]:
+            if coverage.development_coverage_percentage is not None:
+                stat_tile("Development coverage", f"{coverage.development_coverage_percentage:.0%}")
+            if coverage.indicative_residual_capacity is not None:
+                stat_tile("Indicative residual capacity", f"~{coverage.indicative_residual_capacity:,} homes")
+        st.caption(DEVELOPMENT_COVERAGE_LABELS.get(coverage.development_coverage_classification, coverage.development_coverage_classification))
+        if coverage.note:
+            st.caption(coverage.note)
+        if coverage.indicative_residual_capacity:
+            st.caption(
+                f"Approximately {coverage.indicative_residual_capacity:,} homes of allocation capacity are not "
+                "currently accounted for by identified planning activity."
+            )
+
+        section_header("Planning activity", icon="🏗️")
+        st.caption(
+            f"{coverage.number_of_related_sites} related Site(s) · {coverage.number_of_linked_applications} linked "
+            f"Application(s) · {coverage.number_of_sites_with_planning_activity} with identified activity · "
+            f"{coverage.number_of_sites_without_identified_planning_activity} with none identified yet"
+        )
+        for site_summary in coverage.site_summaries:
+            with st.container(border=True, key=f"alloc-detail-site-{allocation_id}-{site_summary.site_id}"):
+                st.markdown(f"**{site_summary.site.display_address}**")
+                if not site_summary.applications:
+                    st.caption("No planning activity identified for this Site yet.")
+                    continue
+                rep = site_summary.representative_application
+                for app in site_summary.applications:
+                    marker = " (representative)" if rep and app.id == rep.id else ""
+                    status_bits = [b for b in (app.status, app.decision) if b]
+                    line = f"{app.reference}{marker}"
+                    if status_bits:
+                        line += " — " + " · ".join(status_bits)
+                    st.write(line)
+                if site_summary.capacity_known:
+                    st.caption(f"Capacity contribution: {site_summary.capacity:,} homes")
+                else:
+                    st.caption("Capacity contribution not yet determined.")
+
+        section_header("Phasing", icon="🕒")
+        phasing = card.get("phasing")
+        if phasing:
+            st.write(f"**{PHASING_DETAIL_LABELS.get(phasing['classification'], phasing['classification'])}**")
+            for hit in phasing["evidence"]:
+                st.caption(f"\"{hit.phrase}\" — {hit.application_reference} ({hit.document_type})")
+                st.caption(hit.snippet)
+
+        section_header("Residential mix", icon="🏠")
+        st.caption(
+            "Housing mix belongs to the specific application/phase that supplied it - never an implication that "
+            "it represents the whole allocation."
+        )
+        any_mix_shown = False
+        for site_summary in coverage.site_summaries:
+            if not site_summary.applications:
+                continue
+            rep_app = pick_representative_application(site_summary.applications)
+            mix = build_residential_mix(site_summary.site, site_summary.applications, rep_app=rep_app)
+            overview = mix["overview_totals"]
+            if overview["total_homes"] is None and not mix["affordable_headline"]["affordable_units"]:
+                continue
+            any_mix_shown = True
+            st.markdown(f"**{site_summary.site.display_address}** — {rep_app.reference if rep_app else 'n/a'}")
+            if overview["total_homes"] is not None:
+                st.caption(f"{overview['total_homes']:,} homes")
+            if mix["affordable_headline"]["headline_units"]:
+                st.caption(mix["affordable_headline"]["headline_units"])
+            if mix["structured_summary"]:
+                st.caption(mix["structured_summary"])
+        if not any_mix_shown:
+            st.caption("No residential mix intelligence extracted yet for the applications linked to this allocation.")
+
+        section_header("Opportunity", icon="🔎")
+        opportunity = card.get("opportunity")
+        if opportunity:
+            st.markdown(f"**{OPPORTUNITY_DETAIL_LABELS.get(opportunity['signal'], opportunity['signal'])}**")
+            for reason in opportunity["reasons"]:
+                st.caption(f"• {reason}")
 
     # 7. Source evidence and provenance
     section_header("Source evidence", icon="📄")

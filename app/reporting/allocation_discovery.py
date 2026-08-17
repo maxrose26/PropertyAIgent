@@ -36,6 +36,7 @@ from sqlalchemy.orm import selectinload
 from app.db.models import LocalPlan, LocalPlanSite, Site
 from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.lapse_tracking import BUILD_STATUS_LABELS, compute_lapse_status
+from app.reporting.allocation_development_coverage import build_allocation_development_coverage, build_opportunity_signal
 from app.ui.common import load_applications_for_sites
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_allocation_visual_summaries, build_plan_wide_policies_map
@@ -54,6 +55,90 @@ FIVE_YEAR_SUPPLY_WARNING_THRESHOLD = 5.0
 # says "no confirmed start of works yet" (the same signal Site Profile's
 # Opportunity Position already surfaces as "an undeveloped phase") counts.
 _NOT_COMMENCED_LAPSE_STATUSES = {"safe", "approaching", "lapsed"}
+
+
+# --- Stage 3A card-level formatting (pure - reads card["development_
+# coverage"]/["phasing"]/["opportunity"], never re-derives any figure) ------
+
+DEVELOPMENT_COVERAGE_LABELS = {
+    "NO_IDENTIFIED_ACTIVITY": "No identified planning activity",
+    "PARTIAL_COVERAGE": "Partial development coverage",
+    "SUBSTANTIALLY_COVERED": "Substantially covered",
+    "FULLY_ACCOUNTED_FOR": "Fully accounted for",
+    "CAPACITY_UNKNOWN": "Capacity unknown",
+    "REVIEW_REQUIRED": "Capacity accounting requires review",
+}
+
+PHASING_CARD_LABELS = {
+    "CONFIRMED_PHASED": "Confirmed phased development",
+    "POTENTIAL_PHASED": "Potential phased development — investigate",
+}
+
+OPPORTUNITY_CARD_LABELS = {
+    "INVESTIGATE": "Potential opportunity — investigate",
+    "MONITOR": "Monitor",
+    "LOWER_PRIORITY": "Lower priority",
+}
+
+# Full-state labels (every classification, not just the "worth a card
+# caption" subset above) - for the Allocation Detail page's own
+# Development Coverage/Phasing/Opportunity sections.
+PHASING_DETAIL_LABELS = {
+    "CONFIRMED_PHASED": "Confirmed phased development",
+    "POTENTIAL_PHASED": "Potential phased development — investigate",
+    "NO_PHASING_EVIDENCE": "No phasing evidence identified",
+    "PHASING_REVIEW_REQUIRED": "Phasing cannot be assessed until capacity accounting is reviewed",
+}
+
+OPPORTUNITY_DETAIL_LABELS = {
+    "INVESTIGATE": "Investigate",
+    "MONITOR": "Monitor",
+    "LOWER_PRIORITY": "Lower priority",
+    "INSUFFICIENT_EVIDENCE": "Insufficient evidence",
+}
+
+
+def format_development_coverage_summary(card: dict) -> dict | None:
+    """Concise card-level Stage 3A summary - pure formatting of already-
+    computed figures (app.reporting.allocation_development_coverage),
+    never re-derives a number. Returns None when this card has no
+    development-coverage data at all (e.g. a caller building a card
+    outside build_allocation_discovery). Wording never uses "available" -
+    only "identified"/"accounted for"/"indicative residual", per Stage 3A
+    Section 1/6's explicit product rule."""
+    coverage = card.get("development_coverage")
+    if coverage is None:
+        return None
+
+    classification = coverage.development_coverage_classification
+    headline = DEVELOPMENT_COVERAGE_LABELS.get(classification, classification)
+    lines: list[str] = []
+
+    if classification == "REVIEW_REQUIRED":
+        if coverage.note:
+            lines.append(coverage.note)
+        return {"headline": headline, "lines": lines}
+
+    if coverage.allocation_capacity is not None and coverage.identified_application_capacity is not None:
+        lines.append(f"{coverage.identified_application_capacity:,} / ~{coverage.allocation_capacity:,} homes identified")
+    if coverage.development_coverage_percentage is not None:
+        lines.append(f"~{coverage.development_coverage_percentage:.0%} accounted for")
+    if coverage.indicative_residual_capacity:
+        lines.append(f"Indicative residual: ~{coverage.indicative_residual_capacity:,} homes")
+
+    phasing = card.get("phasing")
+    if phasing:
+        phasing_label = PHASING_CARD_LABELS.get(phasing["classification"])
+        if phasing_label:
+            lines.append(phasing_label)
+
+    opportunity = card.get("opportunity")
+    if opportunity:
+        opportunity_label = OPPORTUNITY_CARD_LABELS.get(opportunity["signal"])
+        if opportunity_label:
+            lines.append(opportunity_label)
+
+    return {"headline": headline, "lines": lines}
 
 INTENDED_USE_LABELS = {
     "residential": "Residential",
@@ -531,11 +616,25 @@ def _investigate_next(card: dict) -> str:
 def build_allocation_card(
     allocation: LocalPlanSite, *, plan: LocalPlan | None, council_name: str, council_codes_on_plan: list[str],
     matched_site: Site | None, linked_applications: list, visual_summary: dict, visual_fallback,
-    council_five_year_supply: float | None,
+    council_five_year_supply: float | None, development_coverage: dict | None = None,
 ) -> dict:
     """Pure assembly of one allocation's full card - every input is already
     loaded by build_allocation_discovery's batched queries; this function
-    issues no queries of its own."""
+    issues no queries of its own.
+
+    development_coverage (Stage 3A) is the OPTIONAL {"coverage":
+    DevelopmentCoverageResult, "phasing": dict, "site_summaries": [...]}
+    entry from app.reporting.allocation_development_coverage.
+    build_allocation_development_coverage, keyed by THIS allocation's own
+    id by the caller. Deliberately additive and separate from every
+    matched_site_id-derived field above (matched/matched_site_address/
+    delivery_note/linked_applications) - those remain untouched legacy
+    fields, still authoritative for existing callers; the new "coverage"/
+    "phasing"/"opportunity" card keys below are the Stage 3A many-to-many
+    AllocationSiteRelationship-derived intelligence, additive to the card,
+    never replacing the old fields. None (the default) produces a card
+    with a "coverage"/"phasing"/"opportunity" of None each, for any
+    existing caller/test that doesn't pass it."""
     plan_status = plan.status if plan else (allocation.plan_status or None)
     plan_meta = PLAN_STATUS_META.get(plan_status, PLAN_STATUS_META[None])
     capacity = format_capacity(allocation)
@@ -665,6 +764,26 @@ def build_allocation_card(
     card["detail_no_application_message"] = ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE
     card["detail_no_application_note"] = ALLOCATION_DETAIL_NO_APPLICATION_NOTE
     card["matching_attributes"] = build_matching_attributes(card)
+
+    # Stage 3A - AllocationSiteRelationship-derived development coverage,
+    # phasing and opportunity intelligence. Additive: None for any
+    # allocation this batch didn't compute it for (or any existing test/
+    # caller not yet passing development_coverage at all).
+    if development_coverage is not None:
+        coverage = development_coverage["coverage"]
+        phasing = development_coverage["phasing"]
+        card["development_coverage"] = coverage
+        card["phasing"] = phasing
+        card["opportunity"] = build_opportunity_signal(
+            plan_status_bucket=plan_meta["bucket"], coverage=coverage, phasing=phasing,
+        )
+    else:
+        card["development_coverage"] = None
+        card["phasing"] = None
+        card["opportunity"] = None
+
+    card["development_coverage_summary"] = format_development_coverage_summary(card)
+
     return card
 
 
@@ -721,7 +840,15 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
       3-4. linked Applications, batched via load_applications_for_sites
          (2 queries total);
       5. allocation-scoped VisualEvidence, batched;
-      6. plan-wide Policies Map fallback, batched.
+      6. plan-wide Policies Map fallback, batched;
+      7. Stage 3A development-coverage/phasing intelligence, via
+         app.reporting.allocation_development_coverage.
+         build_allocation_development_coverage's own bounded query batch
+         (AllocationSiteRelationship + Applications + Documents, all
+         batched by that function) - the AUTHORITATIVE Site relationship
+         source for this NEW intelligence, independent of matched_site_id
+         above (which items 2-3 still use for their own, untouched
+         legacy card fields).
     council_five_year_supply is read directly off the already-loaded
     LocalPlan row (LocalPlan.five_year_supply_years) - no extra query.
     Council display names come from app.config.load_councils(), a config
@@ -752,6 +879,8 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
     local_plan_ids = sorted({a.local_plan_id for a in allocations if a.local_plan_id})
     plan_wide_fallbacks = build_plan_wide_policies_map(session, local_plan_ids)
 
+    development_coverage_by_allocation = build_allocation_development_coverage(session, allocations)
+
     cards = []
     for allocation in allocations:
         plan = allocation.local_plan
@@ -772,6 +901,7 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
             visual_summary=visual_summaries.get(allocation.id, {"status": "none", "primary": None, "others": []}),
             visual_fallback=plan_wide_fallbacks.get(allocation.local_plan_id) if allocation.local_plan_id else None,
             council_five_year_supply=plan.five_year_supply_years if plan else None,
+            development_coverage=development_coverage_by_allocation.get(allocation.id),
         )
         cards.append(card)
 

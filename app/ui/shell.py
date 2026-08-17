@@ -1208,6 +1208,18 @@ def allocation_card(card: dict, *, key: str) -> None:
         if card.get("delivery_note"):
             st.caption(card["delivery_note"])
 
+        # 4a. Stage 3A development coverage - concise, evidence-only
+        # signal (never "available land/units"). Already-formatted by
+        # app.reporting.allocation_discovery.build_allocation_card (this
+        # component stays a pure reader of card dict keys, like every
+        # other field above - no app.reporting import here). None when
+        # this card has no relationship data at all.
+        coverage_summary = card.get("development_coverage_summary")
+        if coverage_summary and (coverage_summary["headline"] or coverage_summary["lines"]):
+            st.markdown(f"**{_escape(coverage_summary['headline'])}**")
+            for line in coverage_summary["lines"]:
+                st.caption(_escape(line))
+
         # 5. Why it matters
         st.caption(f"**Why it matters:** {card['why_it_matters']}")
         st.caption(f"**Investigate next:** {card['investigate_next']}")
