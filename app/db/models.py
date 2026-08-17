@@ -799,6 +799,217 @@ class AllocationSiteRelationship(Base):
     evidence_application: Mapped["Application | None"] = relationship(foreign_keys=[evidence_application_id])
 
 
+class ControlRelationship(Base):
+    """Stage 4B ("Ownership & Control Document Intelligence") - an
+    evidence-backed link between a named party (a Company we may already
+    hold, or a raw name we deliberately do NOT force into Company - see
+    entity_type/company_id below) and the Application and/or Site it was
+    found described in relation to, in a specific planning document.
+
+    ARCHITECTURE DECISION (Stage 4B Section 2): this table exists because
+    SchemeIntelligence's existing landowner/site_owner/developer/
+    planning_agent columns are single scalar strings - they cannot hold
+    more than one candidate per role (Certificate B/C/D can name several
+    additional owners), carry no per-claim evidence/confidence/review
+    state independent of the whole SchemeIntelligence row, and have no
+    Site-level scope at all (only Application-level). ApplicationCompany
+    was considered and rejected as an extension target (Stage 4B Section
+    2, Option 2) - it has no evidence/snippet/confidence/review_status
+    columns, no site_id, and a rigid (application_id, company_id, role)
+    unique constraint that cannot represent two competing candidate
+    entities for the same role pending human review; bolting all of this
+    onto it would leave it unrecognisable as the same table its two
+    existing call sites (app.pipeline.run_weekly.stage_enrichment,
+    app.ui.common's "Unlock contacts" button) already rely on. This table
+    is instead a close structural mirror of AllocationSiteRelationship
+    (evidence_basis/evidence_category/confidence/review_status/
+    evidence_document_id/evidence_application_id/evidence_snippet/
+    created_at) - Stage 4B Section 2 judged that reusing this codebase's
+    own already-proven evidence-relationship template is the SMALLEST
+    correct architecture, not a novel one, and therefore additive rather
+    than destabilising: it modifies no existing table, column, or model,
+    and every FK here points AT existing tables, never the reverse.
+
+    SEMANTIC INVARIANT (Stage 4B Section 8, exact wording) - a row here
+    means ONLY: "PropertyAIgent holds evidence that this party had this
+    stated/apparent relationship to this Application/Site in the cited
+    evidence." It does NOT mean current ownership, current development
+    control, whole-allocation control, exclusivity, or land availability.
+    In particular: a row scoped to one Application/Site is NEVER evidence
+    about a wider LocalPlanSite (allocation) it happens to relate to via
+    AllocationSiteRelationship - allocation-level control views must be
+    DERIVED by aggregating rows across an allocation's related Sites at
+    query time, never stored directly here (there is deliberately no
+    allocation_id column). This is the exact mechanism that prevents a
+    developer confirmed for one phase of a multi-phase allocation (e.g.
+    Taylor Wimpey's 244-unit Southern Parcel of the 1,100-unit North of
+    Mosley Common allocation, JPA 32) from ever being silently read as
+    controlling the allocation's full residual capacity.
+
+    ENTITY REPRESENTATION (Stage 4B Section 2A/B/7) - entity_name_raw is
+    always the human-readable name as found in the evidence; company_id
+    is populated ONLY when that name was matched with confidence to an
+    ALREADY-EXISTING Company row (see app.enrichment.control_entities'
+    own conservative resolver) - never used to auto-create a new Company
+    row, and never populated for an ambiguous match. entity_type records
+    what kind of party this evidently is (company | individual |
+    public_body | trust | unknown) precisely so a private individual or
+    a public body is never forced into the Company model, which exists
+    for Companies-House-identifiable corporate entities only.
+
+    CURRENT VS HISTORICAL (Stage 4B Section 9) - deliberately NO
+    "CURRENT_OWNER"-style value exists anywhere in this table's
+    vocabulary. role stays a role (OWNER, DEVELOPER, ...); the
+    POINT-IN-TIME, evidence-class honesty lives in evidence_category
+    (e.g. "S106_DEFINED_OWNER", "CERTIFICATE_A_APPLICANT_OWNER_
+    DECLARATION") - a planning document is only ever proof of what it
+    itself asserted, on the date it was made; it is never proof of
+    present-day registered ownership.
+
+    LAND REGISTRY COMPATIBILITY (Stage 4B Section 16, proved not
+    designed/built) - evidence_document_id is nullable specifically so a
+    future authoritative source with no Document row (HM Land Registry)
+    can still write a row here (evidence_basis="hm_land_registry",
+    confidence="authoritative", title_number populated) without any
+    schema change; title_number is already a plain reusable field for
+    exactly that future evidence, populated today only by deterministic
+    S106 title-number extraction.
+
+    IDEMPOTENCY: no DB-level UniqueConstraint on (entity_name_raw, role,
+    application_id) - a free-text name has no safe case/whitespace-
+    normalised uniqueness boundary at the database level. Idempotency is
+    enforced by the same LIVE re-check pattern this codebase's other
+    evidence-relationship writers already use (see
+    app.enrichment.control_entities.create_control_relationship_if_
+    absent) - callers must go through that helper, never construct this
+    model directly, mirroring create_relationship_if_absent's own "one
+    persistence path" precedent."""
+
+    __tablename__ = "control_relationships"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Scope - at least one of these two is always set (enforced by the
+    # writer helper, not a DB constraint, for the same dialect-portability
+    # reason AllocationSiteRelationship's own invariants are enforced in
+    # Python). site_id is a denormalised copy of Application.site_id at
+    # write time (never independently inferred) purely so "all control
+    # evidence for this Site" can be queried without joining through
+    # every Application - never the OTHER source of truth for scope.
+    application_id: Mapped[int | None] = mapped_column(ForeignKey("applications.id"), nullable=True)
+    site_id: Mapped[int | None] = mapped_column(ForeignKey("sites.id"), nullable=True)
+
+    entity_name_raw: Mapped[str] = mapped_column(String(300))
+    # company | individual | public_body | trust | unknown - see class
+    # docstring's ENTITY REPRESENTATION note.
+    entity_type: Mapped[str] = mapped_column(String(20), default="unknown")
+    # Set ONLY by a conservative, ALREADY-EXISTING-row-only resolver -
+    # never auto-created, never set on an ambiguous match. NULL is the
+    # normal/expected value for the large majority of rows.
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+
+    # OWNER | APPLICANT | DEVELOPER | PROMOTER | AGENT | OPTION_HOLDER |
+    # JV_PARTY | S106_PARTY | MORTGAGEE | ARCHITECT | REGISTERED_PROVIDER
+    # | OTHER | UNKNOWN - bounded vocabulary, see app.enrichment.
+    # control_entities for the exact set this task's own writers use
+    # (a strict subset - OTHER/UNKNOWN are reserved for future callers,
+    # never written by this task's deterministic extractors).
+    role: Mapped[str] = mapped_column(String(30))
+
+    # Coarse mechanism, e.g. "certificate_a_declaration", "s106_defined_
+    # role", "s106_title_number" - mirrors AllocationSiteRelationship.
+    # evidence_basis's own role exactly.
+    evidence_basis: Mapped[str] = mapped_column(String(50))
+    # Finer, POINT-IN-TIME-HONEST evidence class - see class docstring's
+    # CURRENT VS HISTORICAL note. Never a bare role name repeated here.
+    evidence_category: Mapped[str] = mapped_column(String(60))
+    # deterministic_regex | ai_semantic | manual - always deterministic_
+    # regex for every row this task's own writers create; the other two
+    # values are reserved for a future Stage 4C AI pass / human review
+    # UI, never executed or written by this task.
+    extraction_method: Mapped[str] = mapped_column(String(20))
+
+    confidence: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # high | medium | low | authoritative - "authoritative" is reserved
+    # for a future Land Registry-sourced row, never used by this task.
+
+    # Nullable for the same reason as AllocationSiteRelationship's own
+    # evidence_document_id - AND so a future non-Document source (Land
+    # Registry) can still write a row here. Always set for every row this
+    # task's own writers create (every extractor here reads a real
+    # Document).
+    evidence_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
+    evidence_snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # HM Land Registry title number if the evidence names one (today,
+    # only ever from deterministic S106 title-number extraction) - a
+    # plain reusable field, not S106-specific despite today's only writer.
+    title_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # auto_applied | needs_confirmation | confirmed | rejected - the
+    # EXACT SAME bounded vocabulary as AllocationSiteRelationship.
+    # review_status, reused rather than invented. A later contradicting
+    # piece of evidence for the same (application_id, role) pair flips an
+    # EXISTING row to needs_confirmation - see create_control_
+    # relationship_if_absent - never overwritten, never deleted.
+    review_status: Mapped[str] = mapped_column(String(20), default="auto_applied")
+
+    # Stage 4B FINAL AMENDMENT ("Temporal Evidence") - the date/as-of date
+    # ASSOCIATED WITH THE UNDERLYING EVIDENCE ITSELF (e.g. the date an S106
+    # agreement was executed, a Land Registry register's as-of date, or a
+    # planning application's certificate declaration date), where
+    # PropertyAIgent can establish it reliably - deliberately DISTINCT
+    # from created_at below, which only ever records when PropertyAIgent
+    # itself wrote this row, and from Document.downloaded_at, which only
+    # ever records when PropertyAIgent fetched the FILE. Neither of those
+    # is evidence of when the ownership/control relationship existed, and
+    # downloaded_at is NEVER substituted here under any circumstance -
+    # see app.enrichment.control_entities.create_control_relationship_if_
+    # absent's own docstring for the explicit rule.
+    #
+    # NULL is the normal, expected, CORRECT value for every row this
+    # task's own deterministic extractors create - the current schema has
+    # no reliable, specifically-evidence-dated field to draw from yet
+    # (Document carries no date of its own content; Application's
+    # decision_issued_date/application_received/application_validated are
+    # unparsed, portal-scraped strings representing PORTAL/DECISION
+    # metadata, not "the date this specific ownership/control fact was
+    # true" - using one of those here would be a guess dressed up as a
+    # fact, which this field exists specifically to avoid). NULL must
+    # never be treated as "no evidence" - review_status/evidence_snippet/
+    # evidence_document_id remain the source of truth for whether
+    # evidence exists at all; this field only ever narrows WHEN that
+    # evidence is dated, when known.
+    #
+    # Reserved for future sources that CAN reliably supply it without
+    # guessing, e.g.:
+    #   S106-defined owner        -> the agreement's own execution date,
+    #                                 where a future extractor reliably
+    #                                 parses one from the document text
+    #                                 (not attempted in this task).
+    #   HM Land Registry          -> the register's own authoritative
+    #                                 as-of/retrieval date.
+    #   Ownership certificate     -> the relevant application/certificate
+    #                                 declaration date, where reliably
+    #                                 known.
+    # DateTime(timezone=True), matching every other timestamp-shaped field
+    # in this codebase (no plain Date type is used anywhere here) - a
+    # calendar date with no meaningful time-of-day is still represented
+    # this way for consistency; time-of-day is not itself meaningful.
+    evidence_date: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    # Deliberately no back_populates on Application/Site/Company/Document
+    # (mirrors AllocationSiteRelationship's own precedent, above) -
+    # callers query this table directly via app.enrichment.
+    # control_entities rather than through an ORM collection attribute on
+    # any parent class.
+    application: Mapped["Application | None"] = relationship(foreign_keys=[application_id])
+    site: Mapped["Site | None"] = relationship(foreign_keys=[site_id])
+    company: Mapped["Company | None"] = relationship(foreign_keys=[company_id])
+    evidence_document: Mapped["Document | None"] = relationship(foreign_keys=[evidence_document_id])
+
+
 class MonitoredSource(Base):
     """A single URL/document being watched for change - the foundation for
     Part 8 (Sprint 1) / Part 3 (Sprint 2)'s continuous monitoring. Checking
