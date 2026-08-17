@@ -9,12 +9,20 @@ different underlying questions, two different data models, and two
 different confirm/reject functions behind buttons that look identical -
 exactly the kind of confusion this task was warned against.
 
-Two independent sections, BOTH computed live on every page load, never
-queried from persisted "suggestion" rows - a REVIEW_CANDIDATE is never
-written to the database until a human explicitly confirms it (Stage 2B
-amendment's SEMANTIC INVARIANT: matched_site_id populated means
-PropertyAIgent has ACCEPTED the relationship, never "a candidate a human
-might approve later"):
+Three sections, all computed live on every page load, never queried from
+persisted "suggestion" rows - a REVIEW_CANDIDATE is never written to the
+database until a human explicitly confirms it (Stage 2B amendment's
+SEMANTIC INVARIANT, now shared by Stage 2D's AllocationSiteRelationship
+table too: a persisted relationship means PropertyAIgent has ACCEPTED it,
+never "a candidate a human might approve later" and never "this Site
+covers the whole allocation"):
+
+0. Accepted related Sites (Stage 2D) - every current
+   app.db.models.AllocationSiteRelationship row, grouped per allocation,
+   read-only (no confirm/reject flow is built for this table in this
+   task - see app.policy.allocation_site_relationships' own module
+   docstring for why). An allocation with more than one row here has
+   MULTIPLE accepted related Sites - shown as-is, never collapsed to one.
 
 1. Pending review - app.policy.allocation_site_dry_run_matching.
    fetch_pending_review_allocations() re-derives this list from the
@@ -49,6 +57,7 @@ from app.policy.allocation_site_dry_run_matching import (
     fetch_pending_review_allocations,
     reject_review_candidate,
 )
+from app.policy.allocation_site_relationships import fetch_accepted_relationships
 from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import empty_state, page_header, section_header, wide_canvas
 
@@ -69,8 +78,38 @@ page_header(
     icon="🔗",
 )
 
+accepted_relationships = fetch_accepted_relationships(session)
 pending = fetch_pending_review_allocations(session)
 ambiguous = fetch_ambiguous_allocations(session)
+
+accepted_by_allocation: dict[int, list] = {}
+for rel in accepted_relationships:
+    accepted_by_allocation.setdefault(rel.allocation_id, []).append(rel)
+
+section_header(f"Accepted related Sites — {len(accepted_by_allocation)} allocation(s)", icon="✅")
+st.caption(
+    "An accepted relationship means this Site is evidenced as relating to this allocation - never that "
+    "it covers the whole allocation. Read-only here; created via the Stage 2D controlled-write CLI, not "
+    "this page."
+)
+
+if not accepted_by_allocation:
+    empty_state("No accepted relationships yet", "Nothing has been written to the relationship table.", icon="ℹ️")
+else:
+    for allocation_id, rels in accepted_by_allocation.items():
+        allocation = rels[0].allocation
+        multi = " — MULTIPLE RELATED SITES" if len(rels) > 1 else ""
+        st.markdown(
+            f"**{allocation.council_code} / {allocation.policy_reference or '(no reference)'} — "
+            f"{allocation.site_name}**{multi}"
+        )
+        for rel in rels:
+            st.write(
+                f"- Site {rel.site_id}: {rel.site.canonical_address} "
+                f"(basis={rel.evidence_basis}, category={rel.evidence_category or 'n/a'}, "
+                f"confidence={rel.confidence if rel.confidence is not None else 'n/a'})"
+            )
+        st.divider()
 
 section_header(f"Pending review — {len(pending)}", icon="📋")
 
