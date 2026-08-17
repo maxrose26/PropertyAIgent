@@ -92,11 +92,14 @@ def create_control_relationship_if_absent(
       like create_relationship_if_absent's own precedent.
     - An existing row for the SAME (application_id, role) with a
       DIFFERENT entity_name_raw is a genuine competing claim - NEITHER
-      row is deleted or silently preferred. The new row is still created,
-      and every OTHER non-rejected row sharing that (application_id,
-      role) - including the new one - is set to review_status=
-      "needs_confirmation", so a human reviewing this application sees
-      BOTH candidates flagged rather than one silently "winning".
+      row is deleted or silently preferred. The new row is still created
+      as needs_confirmation, and every OTHER non-rejected row sharing
+      that (application_id, role) is ALSO set to needs_confirmation -
+      EXCEPT a row already review_status="confirmed" (Stage 4B.1
+      amendment, "preserve existing stronger/human-confirmed evidence") -
+      a human's own confirmation is never downgraded by a later
+      deterministic re-run; the competing new claim still lands as
+      needs_confirmation so it remains visible against the confirmed one.
     - No existing row for that (application_id, role) at all - a plain
       new row at the given review_status (normally "auto_applied").
 
@@ -141,6 +144,16 @@ def create_control_relationship_if_absent(
 
     if contradiction:
         for other in existing:
+            # Stage 4B.1 amendment ("preserve existing stronger/human-
+            # confirmed evidence"): a row a human has already reviewed
+            # and CONFIRMED is never downgraded back to needs_confirmation
+            # by a later deterministic re-run finding a competing claim -
+            # the new row itself still carries needs_confirmation (below),
+            # so the competing claim remains visible for a human to weigh
+            # against the already-confirmed one, without ever silently
+            # weakening what a human already decided.
+            if other.review_status == "confirmed":
+                continue
             other.review_status = "needs_confirmation"
 
     return rel
