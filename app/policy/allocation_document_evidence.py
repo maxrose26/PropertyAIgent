@@ -439,18 +439,40 @@ def derive_recommended_outcome(
 
     1. Multiple distinct Sites each carry strong (EXPLICIT/STRONG_CONTEXTUAL)
        evidence -> MULTIPLE_DOCUMENT_SUPPORTED_SITES (never forced to one).
-    2. A contradictory hit names Stage 2A's own candidate Site, OR a
-       strong positive hit names a DIFFERENT Site than Stage 2A's
-       candidate(s) -> DOCUMENT_CONTRADICTS_FUZZY.
+    2. A contradictory hit NAMES Stage 2A's own candidate Site
+       -> DOCUMENT_CONTRADICTS_FUZZY.
     3. A strong hit names the SAME Site as a Stage 2A candidate ->
        FUZZY_SUPPORTED_BY_DOCUMENT.
     4. A strong hit names a Site directly (no Stage 2A candidate to
-       compare against) -> DOCUMENT_CONFIRMED_SITE.
+       compare against, OR a DIFFERENT Site than Stage 2A's candidate(s)
+       with no negative evidence about the fuzzy candidate itself) ->
+       DOCUMENT_CONFIRMED_SITE.
     5. A strong hit exists but its Application has no linked Site at all
        -> DOCUMENT_CONFIRMED_APPLICATION_ONLY.
     6. Only weak/contextual positive hits, or an unrelated contradiction
        -> DOCUMENT_REVIEW_REQUIRED.
     7. Nothing found at all -> NO_DOCUMENT_EVIDENCE.
+
+    STAGE 2D EVIDENCE-SEMANTICS AMENDMENT: a contradiction requires genuine
+    NEGATIVE evidence about the fuzzy candidate itself (a
+    CONTRADICTORY_REFERENCE hit - "outside allocation", "adjacent to
+    allocation", etc, see NEGATIVE_RELATIONSHIP_PHRASES - naming that same
+    Site). Strong POSITIVE evidence for a DIFFERENT Site than Stage 2A's
+    candidate is never, by itself, a contradiction - in a many-to-many
+    world (Stage 2D) one allocation can genuinely relate to more than one
+    Site, so "documents confirm Site B" says nothing about whether Site A
+    (the fuzzy candidate) is also related or unrelated. A live production
+    audit of all 4 real DOCUMENT_CONTRADICTS_FUZZY cases under the
+    now-corrected logic (JPA 32, JPA 1.1, JPA 29, JPA 30) found EVERY one
+    had zero contradictory_hits - all four were this exact
+    different-Site-with-no-negation pattern being misclassified as a
+    contradiction. All four now fall through to DOCUMENT_CONFIRMED_SITE
+    below: the document-supported Site is still persisted; the fuzzy
+    candidate is simply left unconfirmed (no relationship created for it
+    from this evidence alone) rather than falsely excluded as
+    "contradicted". Genuine contradictions (an explicit negative phrase
+    naming the fuzzy candidate's own Site) are unaffected and still take
+    priority over everything below.
     """
     stage2a_site_ids = _stage2a_candidate_site_ids(stage2a)
     strong_hits = [h for h in positive_hits if h.category in (EXPLICIT_REFERENCE, STRONG_CONTEXTUAL_REFERENCE)]
@@ -460,10 +482,7 @@ def derive_recommended_outcome(
     if len(strong_site_ids) > 1:
         return MULTIPLE_DOCUMENT_SUPPORTED_SITES
 
-    if stage2a_site_ids and (
-        (contradicted_site_ids & stage2a_site_ids)
-        or (strong_site_ids and not (strong_site_ids & stage2a_site_ids))
-    ):
+    if stage2a_site_ids and (contradicted_site_ids & stage2a_site_ids):
         return DOCUMENT_CONTRADICTS_FUZZY
 
     if strong_site_ids and stage2a_site_ids and strong_site_ids & stage2a_site_ids:

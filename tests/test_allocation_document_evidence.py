@@ -451,3 +451,136 @@ def test_distinctive_name_alone_with_no_context_is_weak_reference(session):
     positive, _ = find_document_evidence_for_allocation(session, allocation)
 
     assert any(h.category == WEAK_REFERENCE for h in positive)
+
+
+# ---------------------------------------------------------------------------
+# Stage 2D evidence-semantics amendment: positive evidence for a DIFFERENT
+# Site must never, by itself, be treated as contradicting a fuzzy
+# candidate - a many-to-many world means "documents confirm Site B" says
+# nothing about whether Site A (the fuzzy guess) is also related or
+# unrelated. Only genuine NEGATIVE language naming the fuzzy candidate's
+# own Site is a real contradiction. This regresses the exact pattern found
+# in all 4 real production DOCUMENT_CONTRADICTS_FUZZY cases audited during
+# the amendment (JPA 32, JPA 1.1, JPA 29, JPA 30) - every one had zero
+# contradictory_hits and was simply strong evidence for a different Site.
+# ---------------------------------------------------------------------------
+
+
+def test_alternative_positive_site_evidence_does_not_contradict_fuzzy_candidate(session):
+    _make_council(session, "testcouncil")
+    fuzzy_site = _make_site(session, "testcouncil", "north of mosley common fuzzy guess")
+    document_site = _make_site(session, "testcouncil", "mosley common south of the guided busway worsley")
+    allocation = _make_allocation(session, "testcouncil", "North of Mosley Common", "JPA 32")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=document_site.id)
+    _make_document(session, app.id, "planning_statement",
+                    "This site is allocated for residential development under policy JPA 32.")
+    session.commit()
+
+    stage2a = _stage2a_high_confidence(allocation.id, fuzzy_site.id, score=100.0)
+    result = evaluate_allocation_document_evidence(session, allocation, stage2a)
+
+    assert result.recommended_outcome == DOCUMENT_CONFIRMED_SITE
+    assert result.recommended_outcome != DOCUMENT_CONTRADICTS_FUZZY
+    assert result.contradiction_flag is False
+    assert result.evidenced_site_ids == {document_site.id}
+
+
+def test_explicit_outside_allocation_language_still_contradicts_named_fuzzy_site(session):
+    # Same scenario as above, EXCEPT the document explicitly negates the
+    # fuzzy candidate's own Site by name - this is the one case that must
+    # still classify as a genuine contradiction.
+    _make_council(session, "testcouncil")
+    fuzzy_site = _make_site(session, "testcouncil", "old grove house vine street")
+    allocation = _make_allocation(session, "testcouncil", "John Street", "HOM 2.1")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=fuzzy_site.id)
+    _make_document(session, app.id, "decision_notice",
+                    "This site is outside allocation HOM 2.1 and is not affected by the Local Plan designation.")
+    session.commit()
+
+    stage2a = _stage2a_high_confidence(allocation.id, fuzzy_site.id)
+    result = evaluate_allocation_document_evidence(session, allocation, stage2a)
+
+    assert result.recommended_outcome == DOCUMENT_CONTRADICTS_FUZZY
+    assert result.contradiction_flag is True
+
+
+def test_adjacent_to_allocation_language_does_not_establish_membership(session):
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "some neighbouring site")
+    allocation = _make_allocation(session, "testcouncil", "Sanderling Road", "HOM 2.30")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=site.id)
+    _make_document(session, app.id, "officer_report",
+                    "The application site is adjacent to allocation HOM 2.30 and is not itself allocated.")
+    session.commit()
+
+    positive, contradictory = find_document_evidence_for_allocation(session, allocation)
+
+    # "adjacent to" is never read as membership - it must never appear in
+    # positive_hits (which would wrongly suggest this Site is IN the
+    # allocation); it is correctly recorded only as a contradictory hit.
+    assert not any(h.site_id == site.id for h in positive)
+    assert any(h.site_id == site.id and h.category == CONTRADICTORY_REFERENCE for h in contradictory)
+
+
+def test_new_carrington_production_evidence_pattern_is_alternative_not_contradiction(session):
+    # Regresses the real JPA 30 New Carrington production case audited
+    # during the Stage 2D amendment: Stage 2A AMBIGUOUS across 3 fuzzy
+    # candidates within the wider strategic allocation; document evidence
+    # (an officer_report, EXPLICIT_REFERENCE) confirms a further, separate
+    # parcel. Zero contradictory hits. A large multi-parcel strategic
+    # allocation must never be collapsed to one "winner" Site, and
+    # confirming one parcel must never exclude the fuzzy candidates as
+    # "contradicted".
+    _make_council(session, "testcouncil")
+    fuzzy_a = _make_site(session, "testcouncil", "new carrington strategic site sale west carrington lane")
+    fuzzy_b = _make_site(session, "testcouncil", "power station manchester road carrington")
+    document_site = _make_site(session, "testcouncil", "warburton lane warburton")
+    allocation = _make_allocation(session, "testcouncil", "New Carrington", "JPA 30")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=document_site.id)
+    _make_document(session, app.id, "officer_report",
+                    "The site is allocated for development under the strategic Places for Everyone (PfE) plan - "
+                    "New Carrington allocation (JPA 30).")
+    session.commit()
+
+    stage2a = AllocationMatchResult(
+        allocation_id=allocation.id, council="testcouncil", policy_reference="JPA 30",
+        allocation_name="New Carrington", allocation_capacity=5000, current_review_status="needs_confirmation",
+        classification="AMBIGUOUS", reason="multiple plausible candidates",
+        candidates=[
+            SiteCandidate(site_id=fuzzy_a.id, site_name="a", score=100.0, total_units=None, application_count=1),
+            SiteCandidate(site_id=fuzzy_b.id, site_name="b", score=83.3, total_units=None, application_count=1),
+        ],
+    )
+    result = evaluate_allocation_document_evidence(session, allocation, stage2a)
+
+    assert result.recommended_outcome == DOCUMENT_CONFIRMED_SITE
+    assert result.recommended_outcome != DOCUMENT_CONTRADICTS_FUZZY
+    assert result.evidenced_site_ids == {document_site.id}
+
+
+def test_south_of_hyde_production_evidence_pattern_is_alternative_not_contradiction(session):
+    # Regresses the real JPA 29 South of Hyde production case: Stage 2A
+    # REVIEW_CANDIDATE (near-miss only, no decided candidate); document
+    # evidence (a planning_statement, STRONG_CONTEXTUAL_REFERENCE) confirms
+    # a Site the fuzzy layer never even surfaced as a near miss. Zero
+    # contradictory hits - must not be excluded as "contradicted".
+    _make_council(session, "testcouncil")
+    near_miss_site = _make_site(session, "testcouncil", "brook fold lane rear of 296 mottram road hyde")
+    document_site = _make_site(session, "testcouncil", "hyde east and west of stockport road hyde")
+    allocation = _make_allocation(session, "testcouncil", "South of Hyde", "JPA 29")
+    app = _make_application(session, "testcouncil", "APP/1", site_id=document_site.id)
+    _make_document(session, app.id, "planning_statement",
+                    "The site is covered by policy JPA 29 - South of Hyde on the policies map.")
+    session.commit()
+
+    stage2a = AllocationMatchResult(
+        allocation_id=allocation.id, council="testcouncil", policy_reference="JPA 29",
+        allocation_name="South of Hyde", allocation_capacity=800, current_review_status="needs_confirmation",
+        classification=REVIEW_CANDIDATE, reason="near miss only",
+        near_miss_candidates=[SiteCandidate(site_id=near_miss_site.id, site_name="near miss", score=70.0, total_units=None, application_count=1)],
+    )
+    result = evaluate_allocation_document_evidence(session, allocation, stage2a)
+
+    assert result.recommended_outcome == DOCUMENT_CONFIRMED_SITE
+    assert result.recommended_outcome != DOCUMENT_CONTRADICTS_FUZZY
+    assert result.evidenced_site_ids == {document_site.id}

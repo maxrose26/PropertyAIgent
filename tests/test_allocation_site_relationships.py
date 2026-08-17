@@ -544,3 +544,58 @@ def test_new_table_is_correctly_additive_and_unique_constrained():
     assert columns == expected
     constraint_names = {c.name for c in AllocationSiteRelationship.__table__.constraints}
     assert "uq_allocation_site_relationship" in constraint_names
+
+
+# ---------------------------------------------------------------------------
+# Stage 2D evidence-semantics amendment: ALTERNATIVE_POSITIVE_SITE_EVIDENCE
+# consequence - a document-confirmed Site DIFFERENT from Stage 2A's fuzzy
+# candidate must still be eligible to persist (it arrives here classified
+# DOCUMENT_CONFIRMED_SITE post-fix, already one of AUTO_ELIGIBLE_OUTCOMES),
+# while the unsupported fuzzy candidate itself must never be invented as a
+# relationship just because it was Stage 2A's guess.
+# ---------------------------------------------------------------------------
+
+
+def test_alternative_positive_evidence_persists_only_the_document_supported_site(session):
+    _make_council(session, "testcouncil")
+    fuzzy_site = _make_site(session, "testcouncil", "fuzzy guess site")
+    document_site = _make_site(session, "testcouncil", "document confirmed site")
+    allocation = _make_allocation(session, "testcouncil", "North of Mosley Common", policy_reference="JPA 32")
+    result = _evidence_result(
+        allocation.id, "testcouncil", "JPA 32", "North of Mosley Common", classification=HIGH_CONFIDENCE_CANDIDATE,
+        positive_hits=[_hit(1, 1, document_site.id, EXPLICIT_REFERENCE)],
+    )
+    # Post-amendment: derive_recommended_outcome no longer classifies this
+    # as DOCUMENT_CONTRADICTS_FUZZY - it falls through to DOCUMENT_CONFIRMED_SITE.
+    result.recommended_outcome = DOCUMENT_CONFIRMED_SITE
+
+    planned, excluded = plan_document_evidence_relationships([result])
+
+    assert len(planned) == 1
+    assert planned[0].site_id == document_site.id
+    # The fuzzy-only candidate is never fabricated into a relationship -
+    # it simply never appears anywhere in the planned set.
+    assert not any(p.site_id == fuzzy_site.id for p in planned)
+    assert all(len(v) == 0 for v in excluded.values())
+
+
+def test_relationship_planning_is_deterministic_across_repeated_calls(session):
+    _make_council(session, "testcouncil")
+    site_a = _make_site(session, "testcouncil", "site a")
+    site_b = _make_site(session, "testcouncil", "site b")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", policy_reference="H3")
+    result = _evidence_result(
+        allocation.id, "testcouncil", "H3", "North Leigh Park", classification=EVIDENCE_AMBIGUOUS,
+        positive_hits=[
+            _hit(1, 1, site_a.id, EXPLICIT_REFERENCE),
+            _hit(2, 2, site_b.id, "STRONG_CONTEXTUAL_REFERENCE"),
+        ],
+    )
+    result.recommended_outcome = MULTIPLE_DOCUMENT_SUPPORTED_SITES
+
+    first_planned, first_excluded = plan_document_evidence_relationships([result])
+    second_planned, second_excluded = plan_document_evidence_relationships([result])
+
+    assert [(p.allocation_id, p.site_id, p.evidence_basis) for p in first_planned] == \
+        [(p.allocation_id, p.site_id, p.evidence_basis) for p in second_planned]
+    assert first_excluded == second_excluded
