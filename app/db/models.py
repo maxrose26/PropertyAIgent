@@ -684,6 +684,121 @@ class AllocationRelationship(Base):
     to_allocation: Mapped["LocalPlanSite | None"] = relationship(foreign_keys=[to_allocation_id])
 
 
+class AllocationSiteRelationship(Base):
+    """Stage 2D ("Many-to-Many Relationship Foundation") - the additive
+    many-to-many join between LocalPlanSite (allocation) and Site that
+    LocalPlanSite.matched_site_id (a single nullable FK) has never been
+    able to represent. This is the exact table that field's own model
+    comment (see matched_site_id, above) already proposed - "a future
+    many-to-many relationship table (allocation_id, site_id,
+    relationship_type: full | partial | phased, confidence)" - and that
+    specifications/003-policy-intelligence-v1.md Sec.5 records as a known
+    V1 limitation, not implemented until now.
+
+    NOT the same table as AllocationRelationship, immediately above -
+    that one links two LocalPlanSite rows to each other (allocation <->
+    allocation, e.g. two plans' rows for the same physical strategic
+    site); this one links a LocalPlanSite to a Site (allocation <->
+    planning site). Confirmed structurally incompatible before this
+    class was added: AllocationRelationship's two FKs both target
+    local_plan_sites.id, neither targets sites.id, so it cannot be
+    repurposed for this relationship without misusing it - a new table
+    was the only correct option, not a schema decision taken lightly.
+
+    SEMANTIC INVARIANT (Stage 2D Section 1) - a row here means ONLY:
+    "this Site is evidenced as relating to this allocation." It does
+    NOT mean the Site covers the whole allocation, consumes all
+    allocation capacity, is the only development on the allocation, or
+    that any capacity is committed or unavailable - none of that is
+    computed or asserted anywhere in this model or the module that
+    writes it (app.policy.allocation_site_relationships).
+
+    matched_site_id COMPATIBILITY (Stage 2D Section 5) - mirrors the
+    LocalPlanCouncil/LocalPlan.council_code precedent (Sprint 3E, "Joint
+    Plan Support") exactly: matched_site_id is kept, unremoved, as a
+    backwards-compatible convenience/primary pointer - every piece of
+    code written before this table existed keeps working unchanged. This
+    table is the authoritative SET of every accepted Site relationship
+    for an allocation (one row per allocation when there's exactly one,
+    many rows for a genuinely multi-Site allocation); matched_site_id is
+    a snapshot of ONE of those Sites (normally whichever was first
+    accepted), never a claim that it is the only or whole-covering one.
+
+    relationship_type is currently ALWAYS "unknown_scope" for every row
+    this table's own writer (Stage 2D) ever creates - deliberately, not
+    an oversight: neither the legacy matched_site_id backfill nor Stage
+    2C's document-evidence categories (EXPLICIT_REFERENCE etc.) ever
+    determine whether a Site covers the WHOLE allocation, one PHASE of
+    it, or just a PARTIAL parcel - they only ever establish that a
+    relationship exists at all. Asserting "whole_site"/"partial"/"phase"
+    without evidence that actually says so would be exactly the kind of
+    unearned inference this platform's product principles rule out. The
+    bounded vocabulary (related | partial | phase | whole_site |
+    unknown_scope) exists for a FUTURE evidence source that can genuinely
+    distinguish scope (e.g. document text saying "Phase 1 of..." or "the
+    whole of allocation X") - not built in this task."""
+
+    __tablename__ = "allocation_site_relationships"
+    __table_args__ = (UniqueConstraint("allocation_id", "site_id", name="uq_allocation_site_relationship"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    allocation_id: Mapped[int] = mapped_column(ForeignKey("local_plan_sites.id"))
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"))
+
+    # related | partial | phase | whole_site | unknown_scope - see class
+    # docstring: every row this table's current writer creates uses
+    # "unknown_scope", since no current evidence source determines scope.
+    relationship_type: Mapped[str] = mapped_column(String(20), default="unknown_scope")
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Why this relationship exists, at the coarse level a human/report
+    # needs first - e.g. "legacy_matched_site_id_backfill",
+    # "document_confirmed_site", "fuzzy_supported_by_document",
+    # "multiple_document_supported_sites". See app.policy.
+    # allocation_site_relationships for the exact bounded vocabulary.
+    evidence_basis: Mapped[str] = mapped_column(String(50))
+    # The specific Stage 2C evidence category (EXPLICIT_REFERENCE,
+    # STRONG_CONTEXTUAL_REFERENCE, ...) for document-sourced rows; null
+    # for the legacy matched_site_id backfill, which predates that
+    # classification entirely.
+    evidence_category: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Provenance FKs, both nullable independently - a legacy backfill row
+    # has neither; a document-evidenced row normally has both. Never a
+    # second copy of the document's own text: evidence_snippet below
+    # reuses the SAME short, already-bounded snippet Stage 2C's own
+    # _snippet() computed, per Section 9's explicit "do not duplicate
+    # entire document text" instruction.
+    evidence_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
+    evidence_application_id: Mapped[int | None] = mapped_column(ForeignKey("applications.id"), nullable=True)
+    evidence_snippet: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # auto_applied | needs_confirmation | confirmed | rejected - same
+    # bounded vocabulary as LocalPlanSite.review_status, reused rather
+    # than invented, for whatever future review UI eventually acts on a
+    # specific relationship row (out of scope for this task - see
+    # app.policy.allocation_site_relationships' own module docstring for
+    # what IS wired up now). confirmed_by/confirmed_at/note fields are
+    # deliberately NOT added here - no confirm/reject flow writes them
+    # yet, and adding unused provenance columns "because a sibling model
+    # has them" is exactly what Stage 2D Section 3 warns against ("do not
+    # blindly use suggested fields... add only what is necessary").
+    review_status: Mapped[str] = mapped_column(String(30), default="auto_applied")
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    # Deliberately no back_populates on LocalPlanSite/Site (mirrors
+    # LocalPlanSite.matched_site's own existing precedent, immediately
+    # below - Site has never had a reverse collection for that FK either)
+    # - callers query this table directly via app.policy.
+    # allocation_site_relationships rather than through an ORM collection
+    # attribute on either parent class, keeping this an additive change
+    # that touches no existing model class body.
+    allocation: Mapped["LocalPlanSite"] = relationship(foreign_keys=[allocation_id])
+    site: Mapped["Site"] = relationship(foreign_keys=[site_id])
+    evidence_document: Mapped["Document | None"] = relationship(foreign_keys=[evidence_document_id])
+    evidence_application: Mapped["Application | None"] = relationship(foreign_keys=[evidence_application_id])
+
+
 class MonitoredSource(Base):
     """A single URL/document being watched for change - the foundation for
     Part 8 (Sprint 1) / Part 3 (Sprint 2)'s continuous monitoring. Checking
