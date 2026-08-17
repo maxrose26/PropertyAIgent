@@ -258,6 +258,51 @@ def run_relationship_dry_run(session: Session) -> RelationshipDryRunReport:
     return report
 
 
+def create_relationship_if_absent(
+    session: Session, *, allocation_id: int, site_id: int, evidence_basis: str,
+    relationship_type: str = "unknown_scope", confidence: float | None = None,
+    evidence_category: str | None = None, evidence_document_id: int | None = None,
+    evidence_application_id: int | None = None, evidence_snippet: str | None = None,
+    review_status: str = "auto_applied",
+) -> AllocationSiteRelationship | None:
+    """Stage 3B amendment ("reuse the existing Stage 2D relationship
+    persistence architecture... do not create a second direct-write
+    path") - the ONE place a new AllocationSiteRelationship row is ever
+    constructed from evidence, shared by run_controlled_relationship_
+    write's own batch loops below (Stage 2D's historical/periodic path)
+    and app.policy.allocation_evidence_scan's per-document forward
+    auto-create path (Stage 3B) - one persistence implementation to keep
+    idempotent and correct, never two independently-maintained ones.
+
+    LIVE re-check immediately before insert, not just a reliance on an
+    earlier-computed dry-run snapshot - fail-closed against a duplicate
+    a DIFFERENT document/call already created earlier in the SAME batch
+    (Stage 3B's forward scan calls this once per document, so two
+    documents in one run naming the same new Site would otherwise both
+    attempt the same pair). Returns None (a pure no-op, never an error)
+    if the (allocation_id, site_id) pair already exists - never
+    duplicates, never overwrites, never touches any field of an existing
+    row (so stronger/human-confirmed provenance already on file is
+    always preserved untouched, per Stage 3B's own amendment Section 3)."""
+    existing = session.execute(
+        select(AllocationSiteRelationship).where(
+            AllocationSiteRelationship.allocation_id == allocation_id,
+            AllocationSiteRelationship.site_id == site_id,
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return None
+    rel = AllocationSiteRelationship(
+        allocation_id=allocation_id, site_id=site_id, evidence_basis=evidence_basis,
+        relationship_type=relationship_type, confidence=confidence, evidence_category=evidence_category,
+        evidence_document_id=evidence_document_id, evidence_application_id=evidence_application_id,
+        evidence_snippet=evidence_snippet, review_status=review_status,
+    )
+    session.add(rel)
+    session.flush()  # populate rel.id immediately - callers (e.g. Stage 3B's own report/logging) rely on it
+    return rel
+
+
 def run_controlled_relationship_write(session: Session) -> dict:
     """PRODUCTION WRITE MODE. Only called with explicit CLI confirmation.
 
@@ -281,12 +326,13 @@ def run_controlled_relationship_write(session: Session) -> dict:
     matched_site_id_set = []
 
     for planned in report.legacy_backfill:
-        session.add(AllocationSiteRelationship(
-            allocation_id=planned.allocation_id, site_id=planned.site_id,
+        created = create_relationship_if_absent(
+            session, allocation_id=planned.allocation_id, site_id=planned.site_id,
             evidence_basis=planned.evidence_basis, relationship_type=planned.relationship_type,
             confidence=planned.confidence, review_status=planned.review_status,
-        ))
-        created_legacy += 1
+        )
+        if created is not None:
+            created_legacy += 1
 
     # Group new document relationships per allocation to detect the
     # "exactly one new relationship" convenience-pointer condition.
@@ -296,15 +342,16 @@ def run_controlled_relationship_write(session: Session) -> dict:
 
     for allocation_id, planned_list in by_allocation.items():
         for planned in planned_list:
-            session.add(AllocationSiteRelationship(
-                allocation_id=planned.allocation_id, site_id=planned.site_id,
+            created = create_relationship_if_absent(
+                session, allocation_id=planned.allocation_id, site_id=planned.site_id,
                 evidence_basis=planned.evidence_basis, relationship_type=planned.relationship_type,
                 confidence=planned.confidence, evidence_category=planned.evidence_category,
                 evidence_document_id=planned.evidence_document_id,
                 evidence_application_id=planned.evidence_application_id,
                 evidence_snippet=planned.evidence_snippet,
-            ))
-            created_document += 1
+            )
+            if created is not None:
+                created_document += 1
 
         if len(planned_list) == 1:
             allocation = session.get(LocalPlanSite, allocation_id)

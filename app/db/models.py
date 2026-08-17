@@ -1419,6 +1419,28 @@ class Document(Base):
 
     downloaded_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Stage 3B ("Forward Allocation-Reference Evidence Scan") scan-state
+    # marker - NULL means "not yet scanned for allocation-reference
+    # evidence". Mirrors Application.documents_last_checked_at's own
+    # established pattern (a plain nullable timestamp, not a boolean) for
+    # the same reason: it records WHEN a check last completed, not just
+    # whether one ever did. Audited before adding this: Document has no
+    # existing timestamp/hash/version field suitable for this (only
+    # downloaded_at, which means something else - when the file was
+    # fetched, not when any downstream processing looked at its text) -
+    # this is the smallest additive field that makes incremental,
+    # idempotent scanning possible. Only ever set by app.policy.
+    # allocation_evidence_scan on successful processing of this document -
+    # left NULL on failure so a failed document remains eligible for retry
+    # on the next run (see that module's own docstring for the full
+    # design). Existing Document rows are effectively immutable once
+    # extracted_text is set (no code path mutates it after the fact - a
+    # material change produces a new Document row, mirroring
+    # MonitoredReport's own "new edition is always a new row" convention)
+    # so a simple NULL-check is sufficient; no content-hash comparison is
+    # needed unless that assumption is later found to be wrong.
+    allocation_evidence_scanned_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     application: Mapped["Application"] = relationship(back_populates="documents")
 
 

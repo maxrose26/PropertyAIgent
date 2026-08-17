@@ -23,6 +23,12 @@ covers the whole allocation"):
    task - see app.policy.allocation_site_relationships' own module
    docstring for why). An allocation with more than one row here has
    MULTIPLE accepted related Sites - shown as-is, never collapsed to one.
+   Stage 3B addition: a row whose review_status the forward evidence scan
+   (app.policy.allocation_evidence_scan) has since flipped to
+   "needs_confirmation" - because NEW document evidence explicitly
+   contradicts it - is flagged with a warning here. The relationship
+   itself is never deleted or altered by that scan (see that module's own
+   docstring); this is purely a visibility signal.
 
 1. Pending review - app.policy.allocation_site_dry_run_matching.
    fetch_pending_review_allocations() re-derives this list from the
@@ -109,6 +115,17 @@ else:
                 f"(basis={rel.evidence_basis}, category={rel.evidence_category or 'n/a'}, "
                 f"confidence={rel.confidence if rel.confidence is not None else 'n/a'})"
             )
+            # Stage 3B - a relationship the forward evidence scan has since
+            # found NEW evidence explicitly contradicting (an explicit
+            # negative/adjacency phrase naming this Site) is flagged here,
+            # never silently deleted or reversed - the original accepted
+            # evidence above is untouched; this is purely an added signal
+            # that a human should re-look at it.
+            if rel.review_status == "needs_confirmation":
+                st.warning(
+                    "⚠ New document evidence has been found that may contradict this relationship - "
+                    "review required.",
+                )
         st.divider()
 
 section_header(f"Pending review — {len(pending)}", icon="📋")

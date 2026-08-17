@@ -1768,6 +1768,48 @@ def stage_extraction(
     return result
 
 
+def stage_allocation_evidence_scan(session: Session, council: CouncilConfig) -> int:
+    """Stage 3B ("Forward Allocation-Reference Evidence Scan") - thin
+    orchestration only (Section 13: "do not place complex logic directly
+    in run_weekly.py"), delegating everything to app.policy.
+    allocation_evidence_scan.scan_council_for_allocation_evidence. Runs
+    after stage_extraction (Section 14's conceptual order: documents
+    discovered/extracted -> normal planning intelligence/evidence
+    processing -> allocation evidence scan), outside the per-council
+    Playwright browser context stage_documents/stage_evidence_refresh use
+    - this stage is pure DB+CPU (no network, no OpenAI, no browser), so it
+    does not need one, exactly like stage_geocode_sites/stage_check_
+    build_status immediately after it.
+
+    Never creates a new AllocationSiteRelationship row and never calls
+    OpenAI or any external service - see that module's own docstring for
+    the full design (why the existing Stage 2D controlled-write CLI
+    remains the only path that actually creates a relationship, and why
+    this stage's own writes are limited to scan-state bookkeeping and
+    flagging an already-accepted relationship for human review when new
+    evidence explicitly contradicts it)."""
+    from app.policy.allocation_evidence_scan import scan_council_for_allocation_evidence
+
+    report = scan_council_for_allocation_evidence(session, council.code)
+    print(
+        f"[allocation-evidence-scan] {council.code}: documents_scanned={report.documents_scanned} "
+        f"documents_failed={report.documents_failed} new_strong_candidates={len(report.new_strong_candidates)} "
+        f"weak_evidence={len(report.weak_evidence)} application_only_evidence={len(report.application_only_evidence)} "
+        f"contradictions_flagged={len(report.contradictions_flagged)}"
+    )
+    if report.new_strong_candidates:
+        print(
+            "[allocation-evidence-scan] new strong candidates found - run "
+            "scripts.dry_run_gm_allocation_site_relationships to review, then --execute --confirm to accept."
+        )
+    if report.contradictions_flagged:
+        print(
+            "[allocation-evidence-scan] existing relationship(s) flagged needs_confirmation by contradicting "
+            "evidence - review in Allocation Match Review."
+        )
+    return report.documents_scanned
+
+
 def stage_geocode_sites(session: Session, council: CouncilConfig) -> int:
     pending = session.execute(
         select(Site).where(Site.council_code == council.code, Site.latitude.is_(None))
@@ -2113,6 +2155,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-documents", action="store_true")
     parser.add_argument("--skip-evidence-refresh", action="store_true")
     parser.add_argument("--skip-extraction", action="store_true")
+    parser.add_argument("--skip-allocation-evidence-scan", action="store_true")
     parser.add_argument("--skip-geocode", action="store_true")
     parser.add_argument("--skip-build-status", action="store_true")
     parser.add_argument("--skip-scheme-summary", action="store_true")
@@ -2340,6 +2383,16 @@ def main() -> None:
             raise RuntimeError("OPENAI_API_KEY not set in .env")
         client = OpenAI(api_key=api_key)
         stage_extraction(session, client, council)
+
+    if not args.skip_allocation_evidence_scan:
+        # Stage 3B - after stage_extraction/stage_evidence_refresh, whose
+        # combined output is exactly the newly-extracted document text
+        # this stage scans (Section 14's conceptual order). Pure DB+CPU,
+        # no browser/network/OpenAI needed - safe outside the per-council
+        # Playwright context, same reasoning as stage_geocode_sites below.
+        log_memory("stage_allocation_evidence_scan.before", council=council.code)
+        stage_allocation_evidence_scan(session, council)
+        log_memory("stage_allocation_evidence_scan.after", council=council.code)
 
     if not args.skip_geocode:
         log_memory("stage_geocode_sites.before", council=council.code)
