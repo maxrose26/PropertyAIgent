@@ -5,6 +5,7 @@ production database.
 """
 from __future__ import annotations
 
+import datetime as dt
 import inspect
 
 from sqlalchemy import select
@@ -574,3 +575,121 @@ def test_historical_evidence_not_labelled_current_ownership(session):
 
     assert rel.evidence_category == "S106_DEFINED_OWNER"
     assert "CURRENT" not in rel.evidence_category
+
+
+# ---------------------------------------------------------------------------
+# Final amendment: temporal evidence - evidence_date is distinct from
+# created_at (when PropertyAIgent wrote the row) and is NEVER derived from
+# Document.downloaded_at (when PropertyAIgent fetched the file).
+# ---------------------------------------------------------------------------
+
+
+def test_created_at_and_evidence_date_are_semantically_distinct(session):
+    """created_at is always set (row-creation timestamp); evidence_date
+    defaults to None and is a completely independent field - setting one
+    must never imply or populate the other."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    session.commit()
+
+    rel = create_control_relationship_if_absent(
+        session, application_id=app.id, entity_name_raw="ABC Developments Limited", role="OWNER",
+        evidence_basis="s106_defined_role", evidence_category="S106_DEFINED_OWNER", extraction_method="deterministic_regex",
+    )
+    session.commit()
+
+    assert rel.created_at is not None
+    assert rel.evidence_date is None
+    assert rel.created_at != rel.evidence_date
+
+
+def test_evidence_date_may_safely_be_null(session):
+    """NULL is the normal, correct value for every row this task's own
+    deterministic extractors create - it must never be treated as an
+    error state or as 'no evidence exists' (review_status/evidence_
+    snippet/evidence_document_id remain the source of truth for that)."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = _make_document(session, app.id, "s106", "some text")
+    session.commit()
+
+    rel = create_control_relationship_if_absent(
+        session, application_id=app.id, entity_name_raw="ABC Developments Limited", role="OWNER",
+        evidence_basis="s106_defined_role", evidence_category="S106_DEFINED_OWNER", extraction_method="deterministic_regex",
+        evidence_document_id=doc.id, evidence_snippet="the Owner is ABC Developments Limited",
+    )
+    session.commit()
+
+    assert rel.evidence_date is None
+    assert rel.evidence_document_id == doc.id  # evidence itself is still fully present
+    assert rel.evidence_snippet
+
+
+def test_downloaded_at_never_substituted_for_evidence_date(session):
+    """Stage 4B's own deterministic extractors/persistence helper must
+    never derive evidence_date from Document.downloaded_at, even when a
+    downloaded_at value is genuinely available on the source document."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1")
+    doc = Document(
+        application_id=app.id, doc_type="s106", extracted_text="some text", text_extracted=True,
+        downloaded_at=dt.datetime(2024, 9, 16, tzinfo=dt.timezone.utc),
+    )
+    session.add(doc)
+    session.commit()
+
+    rel = create_control_relationship_if_absent(
+        session, application_id=app.id, entity_name_raw="ABC Developments Limited", role="OWNER",
+        evidence_basis="s106_defined_role", evidence_category="S106_DEFINED_OWNER", extraction_method="deterministic_regex",
+        evidence_document_id=doc.id,
+    )
+    session.commit()
+
+    assert doc.downloaded_at is not None  # the document genuinely has one
+    assert rel.evidence_date is None  # never copied across
+
+
+def test_create_control_relationship_if_absent_never_derives_evidence_date_from_downloaded_at():
+    """Structural guard: the persistence helper's own CODE (not its
+    docstring, which legitimately explains why it must never do this)
+    never reads Document.downloaded_at at all."""
+    source = inspect.getsource(ce.create_control_relationship_if_absent)
+    # Strip the leading docstring (delimited by the first pair of `"""`)
+    # before checking - only the executable body is checked below.
+    parts = source.split('"""')
+    body_only = parts[-1] if len(parts) >= 3 else source
+    assert ".downloaded_at" not in body_only
+
+
+def test_future_authoritative_evidence_can_carry_an_evidence_date(session):
+    """Proves the field is usable by a FUTURE authoritative source (e.g.
+    HM Land Registry) without any schema change - not executed/called in
+    this task, only demonstrated as a direct persistence call."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "some site")
+    session.commit()
+
+    land_registry_date = dt.datetime(2026, 1, 15, tzinfo=dt.timezone.utc)
+    rel = create_control_relationship_if_absent(
+        session, application_id=None, site_id=site.id, entity_name_raw="ABC Land Ltd",
+        entity_type="company", role="OWNER", evidence_basis="hm_land_registry",
+        evidence_category="HM_LAND_REGISTRY_TITLE", extraction_method="manual",
+        confidence="authoritative", evidence_document_id=None, title_number="GM123456",
+        evidence_date=land_registry_date,
+    )
+    session.commit()
+
+    assert rel.evidence_date == land_registry_date
+    assert rel.evidence_document_id is None  # no Document row needed for this source
+    assert rel.confidence == "authoritative"
+
+
+def test_deterministic_extractors_never_populate_evidence_date():
+    """Structural guard: this task's own extraction module never produces
+    a date value at all (no datetime import, no date parsing) - matching
+    the instruction that no speculative document-text date parsing is
+    attempted in this amendment."""
+    from app.extraction import ownership_control_evidence as oce
+    source = inspect.getsource(oce)
+    assert "evidence_date" not in source
+    assert "import datetime" not in source and "from datetime" not in source

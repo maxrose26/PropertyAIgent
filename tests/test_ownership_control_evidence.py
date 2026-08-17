@@ -221,6 +221,108 @@ def test_s106_no_organisation_suffix_found_reports_nothing():
     assert extract_s106_defined_parties(FakeDocument(3, 100, text)) == []
 
 
+# ---------------------------------------------------------------------------
+# Final amendment: S106 entity-name cleanliness - a legal-entity suffix is
+# always name-terminal in real UK naming, so anything following it within
+# the same candidate (a registered-office/"of <address>" clause) is
+# isolated away rather than persisted as part of the entity name.
+# ---------------------------------------------------------------------------
+
+
+def test_s106_limited_followed_by_address_is_cleaned():
+    text = 'AND (2) Example Developments Limited of 5 High Street, Manchester, M1 1AA (the "Owner").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Example Developments Limited"
+    assert "High Street" not in hits[0].entity_name_raw
+    assert "Manchester" not in hits[0].entity_name_raw
+
+
+def test_s106_ltd_followed_by_address_is_cleaned():
+    text = 'AND (2) Northern Homes Ltd of Unit 4 Business Park, Bolton (the "Developer").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Northern Homes Ltd"
+    assert "Business Park" not in hits[0].entity_name_raw
+
+
+def test_s106_llp_followed_by_address_is_cleaned():
+    text = 'AND (2) Riverside Partners LLP of Riverside House, Salford Quays (the "Owner").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Riverside Partners LLP"
+    assert "Salford Quays" not in hits[0].entity_name_raw
+
+
+def test_s106_plc_followed_by_address_is_cleaned():
+    text = 'AND (4) Lloyds Bank PLC of 25 Gresham Street, London (the "Mortgagee").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Lloyds Bank PLC"
+    assert "Gresham Street" not in hits[0].entity_name_raw
+
+
+def test_s106_council_followed_by_address_is_cleaned():
+    """The real production example found during Stage 4B development:
+    'WIGAN BOROUGH COUNCIL of Town Hall Library Street Wigan WN1 1YN'."""
+    text = 'AND (1) WIGAN BOROUGH COUNCIL of Town Hall Library Street Wigan WN1 1YN and (2) Example Developments Limited (the "Owner").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Example Developments Limited"  # the actually-defined Owner, not the Council recital
+
+
+def test_s106_council_itself_as_the_defined_party_is_cleaned():
+    text = 'AND (2) WIGAN BOROUGH COUNCIL of Town Hall Library Street Wigan WN1 1YN (the "Owner").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "WIGAN BOROUGH COUNCIL"
+    assert "Town Hall" not in hits[0].entity_name_raw
+    assert "WN1" not in hits[0].entity_name_raw
+
+
+def test_s106_means_clause_address_is_also_cleaned():
+    text = '"the Developer" means XYZ Homes Limited of 2 Park Road, Manchester.'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "XYZ Homes Limited"
+    assert "Park Road" not in hits[0].entity_name_raw
+
+
+def test_s106_legitimate_multiword_name_with_no_address_is_unaffected():
+    """A legitimate name with ordinary words and NO trailing address must
+    never be truncated - the cleaning only ever fires on text that
+    actually follows the suffix word within the same candidate."""
+    text = 'AND (2) Trafford Housing Trust Limited (the "Owner").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Trafford Housing Trust Limited"
+
+
+def test_s106_legitimate_name_with_of_before_suffix_is_unaffected():
+    """'of' appearing BEFORE the suffix word, as part of the entity's own
+    name, must never be affected - only text AFTER the suffix is ever
+    isolated away."""
+    text = 'AND (2) Duchy of Lancaster Estates Limited (the "Owner").'
+    hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+    assert len(hits) == 1
+    assert hits[0].entity_name_raw == "Duchy of Lancaster Estates Limited"
+
+
+def test_s106_entity_cleanliness_invariant_no_address_words_in_any_production_style_hit():
+    """Structural invariant check across several realistic shapes at
+    once: nothing persisted ever contains an address-shaped tail."""
+    samples = [
+        'AND (2) Alpha Construction Limited of 1 Foundation Way, Leeds (the "Owner").',
+        'AND (3) Beta Estates LLP of Beta House, York Road (the "Developer").',
+        'AND (4) Gamma Finance PLC of Gamma Tower, Leeds (the "Mortgagee").',
+    ]
+    for text in samples:
+        hits = extract_s106_defined_parties(FakeDocument(3, 100, text))
+        assert len(hits) == 1
+        assert " of " not in hits[0].entity_name_raw
+        assert "," not in hits[0].entity_name_raw
+
+
 def test_s106_empty_document_text_returns_empty_lists():
     assert extract_s106_defined_parties(FakeDocument(3, 100, None)) == []
     assert extract_s106_title_numbers(FakeDocument(3, 100, "")) == []

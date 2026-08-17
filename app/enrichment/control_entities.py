@@ -23,6 +23,8 @@ extracted name, which is a materially worse failure than simply leaving
 company_id null and showing the raw extracted name instead."""
 from __future__ import annotations
 
+import datetime as dt
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -78,6 +80,7 @@ def create_control_relationship_if_absent(
     entity_type: str = "unknown", company_id: int | None = None,
     confidence: str | None = None, evidence_document_id: int | None = None,
     evidence_snippet: str | None = None, title_number: str | None = None,
+    evidence_date: dt.datetime | None = None,
     review_status: str = "auto_applied",
 ) -> ControlRelationship | None:
     """The ONE shared row-creation path for this table (see module
@@ -95,7 +98,20 @@ def create_control_relationship_if_absent(
       "needs_confirmation", so a human reviewing this application sees
       BOTH candidates flagged rather than one silently "winning".
     - No existing row for that (application_id, role) at all - a plain
-      new row at the given review_status (normally "auto_applied")."""
+      new row at the given review_status (normally "auto_applied").
+
+    evidence_date (Stage 4B final amendment, "Temporal Evidence") - the
+    as-of date of the underlying EVIDENCE, never PropertyAIgent's own
+    created_at/downloaded_at. Defaults to None (NULL) and MUST stay None
+    for every call site in this task's own deterministic extractors - no
+    reliable evidence-dated field exists in the current schema to draw
+    one from yet (see ControlRelationship.evidence_date's own docstring
+    for the full reasoning and the future sources this field is reserved
+    for). This parameter exists so a FUTURE caller (a document-date
+    parser, HM Land Registry, a reliably-dated certificate extractor) can
+    supply one without any change to this helper - it is deliberately
+    NEVER derived here from evidence_document_id/Document.downloaded_at
+    or any other field this function already has access to."""
     existing = session.execute(
         select(ControlRelationship).where(
             ControlRelationship.application_id == application_id,
@@ -118,7 +134,7 @@ def create_control_relationship_if_absent(
         role=role, evidence_basis=evidence_basis, evidence_category=evidence_category,
         extraction_method=extraction_method, confidence=confidence,
         evidence_document_id=evidence_document_id, evidence_snippet=evidence_snippet,
-        title_number=title_number, review_status=effective_review_status,
+        title_number=title_number, evidence_date=evidence_date, review_status=effective_review_status,
     )
     session.add(rel)
     session.flush()

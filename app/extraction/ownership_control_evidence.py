@@ -228,6 +228,32 @@ _TITLE_NUMBER_RE = re.compile(r"title\s+number\s+([A-Za-z]{0,3}\d{3,8})", re.IGN
 _S106_SNIPPET_RADIUS = 150
 
 
+def _truncate_at_org_suffix(name: str) -> str:
+    """Stage 4B final amendment ("S106 Entity-Name Cleanliness"): a
+    legal-entity suffix (Limited/Ltd/LLP/PLC/Council) is, as a matter of
+    real UK naming convention, always the FINAL word of the entity's own
+    name - nothing legitimate follows it within the same name (a company
+    is never called "ABC Limited Something Else"; "X Borough Council" is
+    likewise always terminal). A real S106 recital routinely continues
+    PAST that point into a "whose registered office is at ..." or "of
+    <address>" clause that this module's own candidate regex (which
+    allows " of "/" and " as name-continuation joiners, so it doesn't
+    truncate at ordinary connecting words within a genuine longer name)
+    can otherwise capture as if it were still part of the name - the real
+    production example found during Stage 4B development: "WIGAN BOROUGH
+    COUNCIL of Town Hall Library Street Wigan WN1 1YN". Truncating at the
+    END of the suffix word itself is a safe, narrow, high-confidence fix
+    - it never changes a name that doesn't already contain one of these
+    specific suffix words, and it never removes anything BEFORE the
+    suffix (an ordinary word earlier in a legitimate name, e.g. "Trafford
+    Housing Trust Limited", is untouched since the suffix there already
+    IS the last word)."""
+    m = _STRONG_ORG_SUFFIX_RE.search(name)
+    if m is None:
+        return name
+    return name[:m.end()]
+
+
 @dataclass
 class S106PartyEvidenceHit:
     document_id: int
@@ -285,7 +311,11 @@ def extract_s106_defined_parties(document: Document) -> list[S106PartyEvidenceHi
         ]
         if not org_candidates:
             continue  # no confident organisation name found - report nothing, never guess
-        name = _clean_name(org_candidates[-1])
+        # Isolate the entity from any trailing "of <address>"/registered-
+        # office clause the candidate regex's own "of"/"and" joiners can
+        # otherwise sweep in (see _truncate_at_org_suffix's own docstring
+        # for the real production example this fixes).
+        name = _clean_name(_truncate_at_org_suffix(org_candidates[-1]))
         # A bare suffix word alone ("Limited", "Council") is a truncated
         # match, not a usable name - reject rather than report a
         # meaningless single-word "company name" (found against real
@@ -309,11 +339,15 @@ def extract_s106_defined_parties(document: Document) -> list[S106PartyEvidenceHi
     for m in _TERM_MEANS_NAME_RE.finditer(text):
         role_term = m.group("role")
         role = _ROLE_TERMS.get(role_term.capitalize())
-        name = _clean_name(m.group("name"))
+        raw_name = _clean_name(m.group("name"))
+        if not _STRONG_ORG_SUFFIX_RE.search(raw_name) or _COMPANY_NUMBER_PHRASE_RE.match(raw_name):
+            continue  # same "never guess an individual/description as a name" rule as Pattern A
+        # Same trailing-address isolation as Pattern A - a "means" clause
+        # can equally continue into "... Limited of 2 Park Road, ..."
+        # before its terminating punctuation.
+        name = _clean_name(_truncate_at_org_suffix(raw_name))
         if role is None or len(name) < 4 or len(name.split()) < 2:
             continue
-        if not _STRONG_ORG_SUFFIX_RE.search(name) or _COMPANY_NUMBER_PHRASE_RE.match(name):
-            continue  # same "never guess an individual/description as a name" rule as Pattern A
         key = (role, name.lower())
         if key in seen:
             continue

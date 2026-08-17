@@ -953,6 +953,50 @@ class ControlRelationship(Base):
     # relationship_if_absent - never overwritten, never deleted.
     review_status: Mapped[str] = mapped_column(String(20), default="auto_applied")
 
+    # Stage 4B FINAL AMENDMENT ("Temporal Evidence") - the date/as-of date
+    # ASSOCIATED WITH THE UNDERLYING EVIDENCE ITSELF (e.g. the date an S106
+    # agreement was executed, a Land Registry register's as-of date, or a
+    # planning application's certificate declaration date), where
+    # PropertyAIgent can establish it reliably - deliberately DISTINCT
+    # from created_at below, which only ever records when PropertyAIgent
+    # itself wrote this row, and from Document.downloaded_at, which only
+    # ever records when PropertyAIgent fetched the FILE. Neither of those
+    # is evidence of when the ownership/control relationship existed, and
+    # downloaded_at is NEVER substituted here under any circumstance -
+    # see app.enrichment.control_entities.create_control_relationship_if_
+    # absent's own docstring for the explicit rule.
+    #
+    # NULL is the normal, expected, CORRECT value for every row this
+    # task's own deterministic extractors create - the current schema has
+    # no reliable, specifically-evidence-dated field to draw from yet
+    # (Document carries no date of its own content; Application's
+    # decision_issued_date/application_received/application_validated are
+    # unparsed, portal-scraped strings representing PORTAL/DECISION
+    # metadata, not "the date this specific ownership/control fact was
+    # true" - using one of those here would be a guess dressed up as a
+    # fact, which this field exists specifically to avoid). NULL must
+    # never be treated as "no evidence" - review_status/evidence_snippet/
+    # evidence_document_id remain the source of truth for whether
+    # evidence exists at all; this field only ever narrows WHEN that
+    # evidence is dated, when known.
+    #
+    # Reserved for future sources that CAN reliably supply it without
+    # guessing, e.g.:
+    #   S106-defined owner        -> the agreement's own execution date,
+    #                                 where a future extractor reliably
+    #                                 parses one from the document text
+    #                                 (not attempted in this task).
+    #   HM Land Registry          -> the register's own authoritative
+    #                                 as-of/retrieval date.
+    #   Ownership certificate     -> the relevant application/certificate
+    #                                 declaration date, where reliably
+    #                                 known.
+    # DateTime(timezone=True), matching every other timestamp-shaped field
+    # in this codebase (no plain Date type is used anywhere here) - a
+    # calendar date with no meaningful time-of-day is still represented
+    # this way for consistency; time-of-day is not itself meaningful.
+    evidence_date: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     # Deliberately no back_populates on Application/Site/Company/Document
