@@ -189,7 +189,7 @@ def test_residual_allocation_land_does_not_inherit_from_developed_phase(session)
     sections = get_allocation_control_intelligence(session, summaries, indicative_residual_capacity=856)
 
     residual = next(s for s in sections if s.is_residual)
-    assert residual.label == "Residual allocation land"
+    assert residual.label == "Residual allocation capacity"
     assert residual.site_id is None
     assert residual.groups == []
     assert "Taylor Wimpey" not in [g.entity_name_raw for g in residual.groups]
@@ -219,7 +219,7 @@ def test_north_of_mosley_common_regression(session):
     southern_section, residual_section = sections
     assert southern_section.label == "North of Mosley Common - Southern Parcel"
     assert [g.entity_name_raw for g in southern_section.groups] == ["Taylor Wimpey"]
-    assert residual_section.label == "Residual allocation land"
+    assert residual_section.label == "Residual allocation capacity"
     assert residual_section.groups == []
 
 

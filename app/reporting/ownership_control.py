@@ -25,7 +25,7 @@ SCOPING (Sections 4/5/6 - the entire point of this module):
     SiteActivitySummary list app.reporting.allocation_development_coverage
     already builds for an allocation (Stage 3A) and queries EACH related
     Site independently, one section per Site, NEVER merged into one
-    allocation-wide owner. A "Residual allocation land" section is added
+    allocation-wide owner. A "Residual allocation capacity" section is added
     only when the allocation's own DevelopmentCoverageResult already
     evidences uncovered capacity (indicative_residual_capacity > 0) - it is
     never given any relationship, only the empty-state wording - which is
@@ -128,6 +128,23 @@ EMPTY_STATE_SITE = (
 )
 EMPTY_STATE_ALLOCATION_RESIDUAL = "No ownership/control evidence currently identified."
 
+# Stage 4B.3 ("Local Plan Ownership & Control Hierarchy UI Refinement"),
+# Section 11 - a Site-card-specific empty state within the ALLOCATION
+# detail page's Ownership & Control hierarchy. Deliberately a separate
+# constant from EMPTY_STATE_SITE (Stage 4B.2's Site Profile "Ownership &
+# Control" tab wording, "...has yet been identified...") - the two
+# surfaces are allowed to phrase the same absence-of-evidence fact
+# slightly differently without one silently drifting to match the other.
+EMPTY_STATE_ALLOCATION_SITE = (
+    "No ownership/control evidence currently identified for this Site from linked planning Applications."
+)
+
+# Stage 4B.3, Section 7 - a light, restrained cue, never a commercial
+# opportunity claim. Shown only alongside the residual allocation section,
+# never implying the land is available, uncontrolled, or that ownership is
+# "unknown" - only that further ownership investigation is warranted.
+OWNERSHIP_INTELLIGENCE_GAP_CUE = "Ownership intelligence gap — investigate"
+
 
 def _role_label(row: ControlRelationship) -> str:
     return _ROLE_LABEL_BY_EVIDENCE_CATEGORY.get(row.evidence_category) or _ROLE_LABEL_BY_ROLE_FALLBACK.get(
@@ -196,16 +213,44 @@ class ControlRelationshipGroup:
 
 
 @dataclass(frozen=True)
+class RelatedApplicationSummary:
+    """Stage 4B.3 - one Application already known to relate to a Site
+    within an allocation's Ownership & Control hierarchy (Section 4).
+    Reshapes fields Stage 3A's own SiteActivitySummary/Application already
+    carry - never a new query, never a new capacity calculation."""
+
+    reference: str
+    status: str | None
+    decision: str | None
+    is_representative: bool
+
+
+@dataclass(frozen=True)
 class SiteControlSection:
     """One Site's (or the allocation's residual land's) ownership/control
     summary within an allocation's Ownership & Control view (Section 6/7) -
     `groups` is always empty for a residual section; a residual section
-    never carries any relationship evidence, by construction."""
+    never carries any relationship evidence, by construction.
+
+    Stage 4B.3 ("Hierarchy UI Refinement") additive fields - applications/
+    representative_application_reference/capacity_known/capacity are
+    reshaped directly from the SAME SiteActivitySummary the caller already
+    passed in (Stage 3A's own already-computed, safe per-Site figures -
+    see summarise_site_activity's own docstring for why capacity is never
+    a blind sum across every Application). residual_capacity and
+    show_ownership_intelligence_gap_cue are populated ONLY on the residual
+    section; both are None/False for every Site section."""
 
     label: str
     site_id: int | None
     is_residual: bool
     groups: list[ControlRelationshipGroup] = field(default_factory=list)
+    applications: list[RelatedApplicationSummary] = field(default_factory=list)
+    representative_application_reference: str | None = None
+    capacity_known: bool = False
+    capacity: int | None = None
+    residual_capacity: int | None = None
+    show_ownership_intelligence_gap_cue: bool = False
 
 
 def _to_view(row: ControlRelationship) -> ControlRelationshipView:
@@ -310,12 +355,23 @@ def get_site_control_detail(
     return _group_views(views), by_application
 
 
+def _application_summaries(summary) -> list[RelatedApplicationSummary]:
+    rep = summary.representative_application
+    return [
+        RelatedApplicationSummary(
+            reference=app.reference, status=app.status, decision=app.decision,
+            is_representative=bool(rep and app.id == rep.id),
+        )
+        for app in summary.applications
+    ]
+
+
 def get_allocation_control_intelligence(
     session: Session, site_summaries: list, *, indicative_residual_capacity: int | None,
 ) -> list[SiteControlSection]:
     """Section 6/7 - one SiteControlSection per related Site (each queried
     independently via get_site_control_intelligence, so evidence never
-    crosses Sites), plus a trailing "Residual allocation land" section
+    crosses Sites), plus a trailing "Residual allocation capacity" section
     ONLY when the allocation's own Stage 3A DevelopmentCoverageResult has
     already evidenced uncovered capacity - that section never carries any
     relationship evidence (there is no Site to query for it), so it always
@@ -324,14 +380,34 @@ def get_allocation_control_intelligence(
     app.reporting.allocation_development_coverage.SiteActivitySummary list
     Stage 3A's own coverage computation already builds for this allocation -
     passed in, not recomputed, so this module never has to know how
-    AllocationSiteRelationship rows are resolved to Sites."""
+    AllocationSiteRelationship rows are resolved to Sites.
+
+    Stage 4B.3 - each Site section is additionally populated with that
+    Site's own already-computed planning-activity context (applications,
+    representative Application, capacity) purely reshaped from
+    SiteActivitySummary - no new query, no new capacity arithmetic (see
+    RelatedApplicationSummary/_application_summaries above). The residual
+    section carries the SAME indicative_residual_capacity figure the
+    caller already passed in, plus show_ownership_intelligence_gap_cue=True
+    - trivially always true whenever a residual section exists at all,
+    since a residual section never has any Site to carry evidence for, by
+    construction; this is a restrained investigation cue, never a
+    commercial-opportunity claim (Section 7)."""
     sections = [
         SiteControlSection(
             label=summary.site.display_address, site_id=summary.site_id, is_residual=False,
             groups=get_site_control_intelligence(session, summary.site_id),
+            applications=_application_summaries(summary),
+            representative_application_reference=(
+                summary.representative_application.reference if summary.representative_application else None
+            ),
+            capacity_known=summary.capacity_known, capacity=summary.capacity,
         )
         for summary in site_summaries
     ]
     if indicative_residual_capacity:
-        sections.append(SiteControlSection(label="Residual allocation land", site_id=None, is_residual=True, groups=[]))
+        sections.append(SiteControlSection(
+            label="Residual allocation capacity", site_id=None, is_residual=True, groups=[],
+            residual_capacity=indicative_residual_capacity, show_ownership_intelligence_gap_cue=True,
+        ))
     return sections
