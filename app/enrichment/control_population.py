@@ -14,21 +14,38 @@ report accounting - the same "thin orchestration over existing
 primitives" shape Stage 3B's app.policy.allocation_evidence_scan already
 established for a different evidence domain.
 
-ELIGIBLE DETERMINISTIC EVIDENCE (Stage 4B.1 Section 5/6/7 - the ONLY
-evidence classes this module ever persists):
+ELIGIBLE DETERMINISTIC EVIDENCE (Stage 4B.1 Section 5/6/7, FINAL AMENDMENT
+"Certificate-A Identity Safety" - the ONLY evidence classes this module
+ever persists):
 
-  CERTIFICATE_A + Application.applicant_name_raw present
-      -> OWNER relationship for the APPLICANT (Application.applicant_
-         name_raw - the raw PORTAL-scraped field, never the AI-derived
-         SchemeIntelligence.applicant_company). Certificate A is a
-         SELF-declaration by the applicant that they are the sole owner
-         "for planning-certificate purposes" - entity_category is
-         deliberately CERTIFICATE_A_APPLICANT_OWNER_DECLARATION (never a
-         bare "OWNER" evidence_category, and confidence is "medium", not
-         "high" - a self-declaration is real evidence but is NOT the
-         same evidential weight as a third-party-witnessed S106 deed).
-         It NEVER means "currently registered owner" - see Control
-         Relationship's own semantic invariant, unchanged by this module.
+  CERTIFICATE_A + applicant identity independently confirmed as
+  belonging to that SAME application-form Document
+      -> OWNER relationship for the confirmed applicant. Certificate A
+         alone only proves SOME applicant declared sole ownership - it
+         says nothing about WHO. The identity used here is resolved by
+         app.extraction.ownership_control_evidence.resolve_certificate_
+         a_applicant_identity, which reads the SAME Document's own
+         "Applicant Details" section directly (preferred) and only falls
+         back to Application.applicant_name_raw (a separate portal-
+         scraped field) when that raw name is ALSO conservatively
+         confirmed present within the same section - never the AI-
+         derived SchemeIntelligence.applicant_company, which belongs to
+         a different evidence path entirely (Stage 4C's job, not this
+         one's). A form/raw CONFLICT, or no confirmable identity at all,
+         resolves to CERTIFICATE_A_APPLICANT_IDENTITY_UNRESOLVED and
+         creates ZERO relationship - see that function's own docstring
+         for the full algorithm and the real production edge case
+         (individual applicants) it was built against.
+
+         Certificate A is a SELF-declaration by the applicant that they
+         are the sole owner "for planning-certificate purposes" -
+         entity_category is deliberately CERTIFICATE_A_APPLICANT_OWNER_
+         DECLARATION (never a bare "OWNER" evidence_category), and
+         confidence is "medium", not "high" - a self-declaration is real
+         evidence but is NOT the same evidential weight as a third-
+         party-witnessed S106 deed. It NEVER means "currently registered
+         owner" - see ControlRelationship's own semantic invariant,
+         unchanged by this module.
 
   S106_DEFINED_OWNER / S106_DEFINED_DEVELOPER / S106_DEFINED_MORTGAGEE
       -> the exact role app.extraction.ownership_control_evidence.
@@ -92,6 +109,7 @@ from app.extraction.ownership_control_evidence import (
     detect_ownership_certificate,
     extract_s106_defined_parties,
     extract_s106_title_numbers,
+    resolve_certificate_a_applicant_identity,
 )
 
 CERTIFICATE_A_EVIDENCE_CATEGORY = "CERTIFICATE_A_APPLICANT_OWNER_DECLARATION"
@@ -106,7 +124,10 @@ class PopulationReport:
     certificate_d_count: int = 0
     certificate_ambiguous_count: int = 0
     certificate_no_evidence_count: int = 0
-    certificate_a_no_entity_available: int = 0
+    certificate_a_identity_confirmed_from_form: int = 0
+    certificate_a_identity_confirmed_via_raw_fallback: int = 0
+    certificate_a_identity_unresolved: int = 0
+    certificate_a_relationships_eligible: int = 0
     certificate_bcd_reported_no_entity: int = 0
 
     s106_documents_evaluated: int = 0
@@ -163,14 +184,20 @@ def _persist_or_preview(
     application_id: int, site_id: int | None, entity_name_raw: str, role: str,
     evidence_basis: str, evidence_category: str, confidence: str,
     evidence_document_id: int, evidence_snippet: str, title_number: str | None = None,
+    known_entity_type: str | None = None,
 ) -> None:
-    company = resolve_existing_company(session, entity_name_raw)
-    if company is not None:
-        report.company_resolved_count += 1
-        entity_type, company_id = "company", company.id
+    if known_entity_type == "individual":
+        # Companies House resolution is meaningless for a named person -
+        # never attempted, never counted as company_resolved/unresolved.
+        entity_type, company_id = "individual", None
     else:
-        report.unresolved_entity_count += 1
-        entity_type, company_id = "unknown", None
+        company = resolve_existing_company(session, entity_name_raw)
+        if company is not None:
+            report.company_resolved_count += 1
+            entity_type, company_id = "company", company.id
+        else:
+            report.unresolved_entity_count += 1
+            entity_type, company_id = "unknown", None
 
     if dry_run:
         existing = _existing_rows_for(session, application_id, role, table_exists)
@@ -227,16 +254,23 @@ def run_control_relationship_population(
                 report.certificate_ambiguous_count += 1
             elif result.certificate_type == "CERTIFICATE_A":
                 report.certificate_a_count += 1
-                applicant_name = (app.applicant_name_raw or "").strip()
-                if not applicant_name:
-                    report.certificate_a_no_entity_available += 1
+                identity = resolve_certificate_a_applicant_identity(doc, app)
+                if identity.method == "unresolved":
+                    report.certificate_a_identity_unresolved += 1
                 else:
+                    report.certificate_a_relationships_eligible += 1
+                    if identity.method == "applicant_name_raw_confirmed_in_form":
+                        report.certificate_a_identity_confirmed_via_raw_fallback += 1
+                    else:  # same_form_company_name | same_form_individual_name
+                        report.certificate_a_identity_confirmed_from_form += 1
                     _persist_or_preview(
                         session, report, dry_run=dry_run, table_exists=table_exists,
-                        application_id=app.id, site_id=app.site_id, entity_name_raw=applicant_name,
+                        application_id=app.id, site_id=app.site_id, entity_name_raw=identity.resolved_name,
                         role="OWNER", evidence_basis="certificate_a_declaration",
                         evidence_category=CERTIFICATE_A_EVIDENCE_CATEGORY, confidence="medium",
-                        evidence_document_id=doc.id, evidence_snippet=result.snippet or "",
+                        evidence_document_id=doc.id,
+                        evidence_snippet=f"{result.snippet or ''} | applicant identity: {identity.snippet or ''}",
+                        known_entity_type=identity.entity_type if identity.entity_type == "individual" else None,
                     )
                     report._apps_seen.add(app.id)
                     if app.site_id:

@@ -14,6 +14,7 @@ from app.extraction.ownership_control_evidence import (
     detect_ownership_certificate,
     extract_s106_defined_parties,
     extract_s106_title_numbers,
+    resolve_certificate_a_applicant_identity,
 )
 
 
@@ -334,17 +335,39 @@ def test_s106_empty_document_text_returns_empty_lists():
 # ---------------------------------------------------------------------------
 
 
-def test_module_never_reads_applicant_or_agent_fields():
-    """This module extracts ONLY from Certificate/S106 document text - it
-    structurally cannot conflate 'applicant' or 'planning agent' with
-    'developer'/'owner', because it never reads Application.applicant_
-    name_raw, SchemeIntelligence.applicant_company, or SchemeIntelligence.
-    planning_agent at all."""
+def test_certificate_and_s106_functions_never_read_applicant_or_agent_fields():
+    """The CERTIFICATE-TYPE and S106 extraction functions specifically
+    (not the whole module - see the Stage 4B.1 note below) extract ONLY
+    from Certificate/S106 document text - they structurally cannot
+    conflate 'applicant' or 'planning agent' with 'developer'/'owner'."""
+    for fn in (detect_ownership_certificate, extract_s106_defined_parties, extract_s106_title_numbers):
+        source = inspect.getsource(fn)
+        assert "applicant_name_raw" not in source
+        assert "applicant_company" not in source
+        assert "planning_agent" not in source
+        assert "SchemeIntelligence" not in source
+
+
+def test_module_never_reads_scheme_intelligence_ai_derived_fields():
+    """Stage 4B.1 final amendment note: resolve_certificate_a_applicant_
+    identity DOES now legitimately read Application.applicant_name_raw
+    (the raw portal-scraped field, as a conservative same-form-confirmed
+    fallback only - see that function's own docstring) - this is an
+    intentional, narrowly-scoped exception introduced by this amendment,
+    NOT a regression of the module's own 'never conflate applicant with
+    developer' discipline. What must NEVER be true, before or after this
+    amendment: the module never reads the AI-DERIVED SchemeIntelligence
+    fields (applicant_company/planning_agent) at all - those remain a
+    completely different evidence path, reserved for a future Stage 4C."""
     source = inspect.getsource(oce)
-    assert "applicant_name_raw" not in source
+    assert "SchemeIntelligence" not in source
     assert "applicant_company" not in source
     assert "planning_agent" not in source
-    assert "SchemeIntelligence" not in source
+    # applicant_name_raw IS now read - deliberately, only within
+    # resolve_certificate_a_applicant_identity, verified separately below.
+    assert "applicant_name_raw" in inspect.getsource(resolve_certificate_a_applicant_identity)
+    for fn in (detect_ownership_certificate, extract_s106_defined_parties, extract_s106_title_numbers):
+        assert "applicant_name_raw" not in inspect.getsource(fn)
 
 
 def test_no_openai_or_external_api_dependency():
@@ -357,5 +380,123 @@ def test_no_openai_or_external_api_dependency():
     assert "import openai" not in source.lower()
     assert "OpenAI(" not in source
     assert "from openai" not in source.lower()
-    assert "companies_house" not in source.lower()
     assert "import requests" not in source.lower()
+    import_lines = [ln for ln in source.splitlines() if ln.strip().startswith(("import ", "from "))]
+    assert not any("companies_house" in ln.lower() for ln in import_lines)
+
+
+# ---------------------------------------------------------------------------
+# Stage 4B.1 final amendment: Certificate-A applicant identity resolution
+# ---------------------------------------------------------------------------
+
+
+class FakeApplication:
+    def __init__(self, id: int, applicant_name_raw: str | None):
+        self.id = id
+        self.applicant_name_raw = applicant_name_raw
+
+
+def _form(applicant_block: str = "", *, include_agent: bool = True) -> str:
+    text = applicant_block
+    if include_agent:
+        text += "\nAgent Details\nCompany Name\nSome Agent LLP\nAddress\n"
+    return text
+
+
+def test_resolve_identity_same_form_company_name():
+    form = _form("Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nABC Developments Limited\nAddress\n")
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, None)
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.resolved_name == "ABC Developments Limited"
+    assert result.entity_type == "company"
+    assert result.method == "same_form_company_name"
+
+
+def test_resolve_identity_no_applicant_details_section_is_unresolved():
+    doc = FakeDocument(1, 100, "This document has no Applicant Details section at all.")
+    app = FakeApplication(100, "ABC Developments Limited")
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "unresolved"
+    assert result.resolved_name is None
+
+
+def test_resolve_identity_agent_company_name_never_mistaken_for_applicants():
+    """The Applicant Details section's own bound (ending at Agent
+    Details) must prevent the AGENT's Company Name from ever being
+    picked up as if it were the applicant's."""
+    form = (
+        "Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nAddress\n"
+        "Agent Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nWrong Agent Limited\nAddress\n"
+    )
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, None)
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "unresolved"
+    assert result.resolved_name != "Wrong Agent Limited"
+
+
+def test_resolve_identity_individual_surname_duplicated_into_company_name_field():
+    """Real production edge case confirmed against live data: an
+    individual applicant's own Surname is duplicated into the form's
+    'Company Name' field - must resolve to the full individual name,
+    never a bare surname treated as a company."""
+    form = _form(
+        "Applicant Details\nName/Company\nTitle\nMr\nFirst name\nRob\nSurname\nWatson\n"
+        "Care of Agent\nCompany Name\nWatson\nAddress\n"
+    )
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, None)
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.resolved_name == "Rob Watson"
+    assert result.entity_type == "individual"
+    assert result.method == "same_form_individual_name"
+
+
+def test_resolve_identity_form_and_raw_conflict_is_unresolved():
+    form = _form("Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nABC Developments Limited\nAddress\n")
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, "Completely Different Holdings Limited")
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "unresolved"
+    assert result.resolved_name is None
+
+
+def test_resolve_identity_form_and_raw_agree_confirms():
+    form = _form("Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nABC Developments Limited\nAddress\n")
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, "ABC Developments Limited")
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "same_form_company_name"
+    assert result.resolved_name == "ABC Developments Limited"
+
+
+def test_resolve_identity_raw_fallback_confirmed_within_applicant_section():
+    """No genuine Company Name/individual name extractable from the
+    form, but applicant_name_raw IS conservatively found present within
+    the Applicant Details section's own text."""
+    form = _form(
+        "Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nAddress\n"
+        "Address line 1\nc/o Fallback Developments Limited\n"
+    )
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, "Fallback Developments Limited")
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "applicant_name_raw_confirmed_in_form"
+    assert result.resolved_name == "Fallback Developments Limited"
+
+
+def test_resolve_identity_raw_present_but_not_in_form_is_unresolved():
+    form = _form("Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nAddress\n")
+    doc = FakeDocument(1, 100, form)
+    app = FakeApplication(100, "Nowhere Near Limited")
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "unresolved"
+
+
+def test_resolve_identity_empty_document_text_is_unresolved():
+    doc = FakeDocument(1, 100, None)
+    app = FakeApplication(100, "ABC Developments Limited")
+    result = resolve_certificate_a_applicant_identity(doc, app)
+    assert result.method == "unresolved"
+    assert result.resolved_name is None

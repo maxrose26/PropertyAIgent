@@ -78,20 +78,32 @@ def _make_allocation_site_relationship(session, allocation_id: int, site_id: int
     return rel
 
 
-_CERT_A_BODY = (
+_CERT_SECTION = (
     "Ownership Certificates and Agricultural Land Declaration\n"
     "Please answer the following questions to determine which Certificate of Ownership you need to complete: A, B, C or D.\n"
-    "Some further form content for realistic spacing between sections.\n"
-    "Certificate of ownership - Certificate A\n"
-    "I certify that the requirements of Certificate A have been met in respect of this application.\n"
+    "Certificate of ownership - Certificate {letter}\n"
+    "I certify that the requirements of Certificate {letter} have been met in respect of this application.\n"
 )
 
-_CERT_B_BODY = (
-    "Ownership Certificates and Agricultural Land Declaration\n"
-    "Please answer the following questions to determine which Certificate of Ownership you need to complete: A, B, C or D.\n"
-    "Certificate of ownership - Certificate B\n"
-    "I certify that the requirements of Certificate B have been met in respect of this application.\n"
-)
+
+def _form_with_applicant(company_name: str | None = None, *, certificate_letter: str = "A", include_applicant_details: bool = True) -> str:
+    """Builds a realistic 1APP-style form body: an Applicant Details
+    section (mirroring real production field ordering - Title/First
+    name/Surname/Care of Agent/Company Name/Address), an Agent Details
+    section, then the ownership-certificate declaration."""
+    body = ""
+    if include_applicant_details:
+        body += "Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCare of Agent\nCompany Name\n"
+        if company_name:
+            body += f"{company_name}\n"
+        body += "Address\nAddress line 1\nSome Street\n"
+    body += "Agent Details\nName/Company\nTitle\nFirst name\nSurname\nCompany Name\nSome Agent LLP\nAddress\n"
+    body += _CERT_SECTION.format(letter=certificate_letter)
+    return body
+
+
+_CERT_A_BODY = _form_with_applicant("ABC Developments Limited")
+_CERT_B_BODY = _form_with_applicant("ABC Developments Limited", certificate_letter="B")
 
 
 # ---------------------------------------------------------------------------
@@ -142,15 +154,20 @@ def test_cli_execute_without_confirm_at_all_fails_closed(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_certificate_a_persists_owner_for_the_applicant(session):
+def test_certificate_a_same_form_applicant_eligible(session):
+    """Certificate A + a company name independently extracted from the
+    SAME form's own Applicant Details section (no raw name needed at
+    all) -> OWNER eligible."""
     _make_council(session, "testcouncil")
-    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="ABC Developments Limited")
-    _make_form(session, app.id, _CERT_A_BODY)
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited"))
     session.commit()
 
     report = run_control_relationship_population(session, dry_run=False)
     session.commit()
 
+    assert report.certificate_a_identity_confirmed_from_form == 1
+    assert report.certificate_a_relationships_eligible == 1
     assert report.relationships_created == 1
     rows = session.execute(select(ControlRelationship)).scalars().all()
     assert len(rows) == 1
@@ -160,18 +177,160 @@ def test_certificate_a_persists_owner_for_the_applicant(session):
     assert rows[0].confidence == "medium"  # a self-declaration, not S106-grade legal evidence
 
 
-def test_certificate_a_with_no_applicant_name_available_persists_nothing(session):
+def test_certificate_a_applicant_name_raw_absent_from_form_creates_nothing(session):
+    """applicant_name_raw is present but does NOT appear anywhere in the
+    form's Applicant Details section at all - and the form itself names
+    a DIFFERENT applicant - so this must resolve as a conflict/absence,
+    never silently trust the portal-scraped field alone."""
     _make_council(session, "testcouncil")
-    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
-    _make_form(session, app.id, _CERT_A_BODY)
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="Nowhere Near Limited")
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited"))
     session.commit()
 
     report = run_control_relationship_population(session, dry_run=False)
     session.commit()
 
+    assert report.certificate_a_identity_unresolved == 1
     assert report.relationships_created == 0
-    assert report.certificate_a_no_entity_available == 1
     assert session.execute(select(ControlRelationship)).scalars().all() == []
+
+
+def test_certificate_a_conservatively_matching_raw_and_form_applicant_eligible(session):
+    """Both sources present AND agree (after conservative normalisation)
+    -> eligible, using the form's own extraction as the confirmed name."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="ABC Developments Limited")
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited"))
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_a_identity_confirmed_from_form == 1
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].entity_name_raw == "ABC Developments Limited"
+
+
+def test_certificate_a_conflicting_raw_and_form_applicant_creates_nothing(session):
+    """Both sources present but they DISAGREE - a genuine conflict, never
+    resolved by preferring one source over the other."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="XYZ Holdings Limited")
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited"))
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_a_identity_unresolved == 1
+    assert report.relationships_created == 0
+    assert session.execute(select(ControlRelationship)).scalars().all() == []
+
+
+def test_certificate_a_unresolved_applicant_creates_nothing(session):
+    """No Applicant Details section at all, and no applicant_name_raw -
+    genuinely nothing to tie an identity to."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
+    _make_form(session, app.id, _form_with_applicant(None, include_applicant_details=False))
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_a_identity_unresolved == 1
+    assert report.relationships_created == 0
+    assert session.execute(select(ControlRelationship)).scalars().all() == []
+
+
+def test_certificate_a_applicant_name_raw_fallback_confirmed_in_form(session):
+    """No extractable Company Name/individual name in the Applicant
+    Details section itself (e.g. genuinely blank fields), but
+    applicant_name_raw IS conservatively confirmed present within that
+    same section's own text -> eligible via the fallback method."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="Fallback Developments Limited")
+    form_text = (
+        "Applicant Details\nName/Company\nTitle\nFirst name\nSurname\nCare of Agent\nCompany Name\n"
+        "Address\nAddress line 1\nc/o Fallback Developments Limited registered office\n"
+        "Agent Details\nCompany Name\nSome Agent LLP\nAddress\n"
+    ) + _CERT_SECTION.format(letter="A")
+    _make_form(session, app.id, form_text)
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_a_identity_confirmed_via_raw_fallback == 1
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].entity_name_raw == "Fallback Developments Limited"
+
+
+def test_certificate_a_individual_applicant_surname_duplicated_into_company_name_field(session):
+    """Real production edge case: an individual applicant's OWN surname
+    is duplicated into the form's 'Company Name' field by the portal
+    generator - this must resolve to the individual's full name, entity_
+    type='individual', never a bare surname treated as a company."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
+    form_text = (
+        "Applicant Details\nName/Company\nTitle\nMr\nFirst name\nRob\nSurname\nWatson\n"
+        "Care of Agent\nCompany Name\nWatson\nAddress\nAddress line 1\nc/o agent\n"
+        "Agent Details\nCompany Name\nFocus Town Planning Limited\nAddress\n"
+    ) + _CERT_SECTION.format(letter="A")
+    _make_form(session, app.id, form_text)
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_a_identity_confirmed_from_form == 1
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].entity_name_raw == "Rob Watson"
+    assert rows[0].entity_type == "individual"
+    assert rows[0].company_id is None
+
+
+def test_certificate_boilerplate_alone_still_insufficient_for_identity(session):
+    """Even with a real applicant_name_raw present, boilerplate-only
+    certificate text (no genuine A/B/C/D selection at all) must still
+    create nothing - the underlying Stage 4B certificate-detection
+    safety is unchanged by this amendment."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="ABC Developments Limited")
+    boilerplate_only = (
+        "Applicant Details\nCompany Name\nABC Developments Limited\nAddress\n"
+        "Ownership Certificates and Agricultural Land Declaration\n"
+        "Please answer the following questions to determine which Certificate of Ownership you need to complete: A, B, C or D.\n"
+    )
+    _make_form(session, app.id, boilerplate_only)
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_ambiguous_count == 1
+    assert report.relationships_created == 0
+    assert session.execute(select(ControlRelationship)).scalars().all() == []
+
+
+def test_no_scheme_intelligence_used_for_certificate_a_identity():
+    """Structural guard: this module must never IMPORT/read
+    SchemeIntelligence for Certificate A identity resolution - that is a
+    different, AI-derived evidence path reserved for a future Stage 4C
+    reconciliation, never this deterministic one. (The module docstring
+    legitimately DISCUSSES SchemeIntelligence.applicant_company while
+    explaining why it is deliberately NOT used - only the import
+    statement, the actual usage signal, is checked here.)"""
+    import app.enrichment.control_population as cp_module
+
+    source_lines = inspect.getsource(cp_module).splitlines()
+    import_lines = [ln for ln in source_lines if ln.strip().startswith(("import ", "from "))]
+    assert not any("SchemeIntelligence" in ln for ln in import_lines)
+    assert not hasattr(cp_module, "SchemeIntelligence")
 
 
 def test_certificate_b_without_named_owner_creates_no_fake_owner(session):
