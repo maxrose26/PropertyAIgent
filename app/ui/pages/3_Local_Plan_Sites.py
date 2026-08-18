@@ -39,10 +39,12 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_caption,
     total_homes_kpi_label,
 )
+from app.reporting.ownership_control import EMPTY_STATE_ALLOCATION_RESIDUAL, SOURCE_NOTE, get_allocation_control_intelligence
 from app.reporting.residential_mix import build_residential_mix
 from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db, pick_representative_application
 from app.ui.shell import (
     allocation_card,
+    control_relationship_group_card,
     empty_state,
     evidence_gap_panel,
     joint_plan_badge,
@@ -314,6 +316,31 @@ def _render_detail(view: dict, allocation_id: int) -> None:
             st.markdown(f"**{OPPORTUNITY_DETAIL_LABELS.get(opportunity['signal'], opportunity['signal'])}**")
             for reason in opportunity["reasons"]:
                 st.caption(f"• {reason}")
+
+        # 6b. Ownership & Control (Stage 4B.2, Section 6/7) - one section
+        # PER related Site, each queried independently
+        # (get_allocation_control_intelligence), never merged into one
+        # allocation-wide owner. A "Residual allocation land" section is
+        # added only when coverage itself already evidences uncovered
+        # capacity, and NEVER carries any relationship - this is the
+        # generic mechanism (no allocation-specific code) that keeps a
+        # multi-Site allocation like North of Mosley Common (JPA 32) from
+        # ever showing one Site's developer as controlling the whole
+        # allocation's residual capacity.
+        section_header("Ownership & Control", icon="🗝️")
+        control_sections = get_allocation_control_intelligence(
+            session, coverage.site_summaries, indicative_residual_capacity=coverage.indicative_residual_capacity,
+        )
+        if not control_sections:
+            st.caption(EMPTY_STATE_ALLOCATION_RESIDUAL)
+        for control_section in control_sections:
+            st.markdown(f"**{control_section.label}**")
+            if not control_section.groups:
+                st.caption(EMPTY_STATE_ALLOCATION_RESIDUAL)
+                continue
+            for group in control_section.groups:
+                control_relationship_group_card(group)
+        st.caption(SOURCE_NOTE)
 
     # 7. Source evidence and provenance
     section_header("Source evidence", icon="📄")

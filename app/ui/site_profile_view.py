@@ -23,6 +23,7 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
+from app.reporting.ownership_control import EMPTY_STATE_APPLICATION, EMPTY_STATE_SITE, SOURCE_NOTE, get_site_control_detail
 from app.reporting.residential_mix import format_affordable_tile
 from app.reporting.site_profile import build_site_profile
 from app.ui.common import (
@@ -34,6 +35,8 @@ from app.ui.shell import (
     ai_badge,
     ai_status_summary_view,
     arrow_safe_count,
+    control_relationship_group_card,
+    control_relationship_view_card,
     evidence_gap_panel,
     opportunity_position_card,
     section_header,
@@ -316,6 +319,40 @@ def _render_residential_mix(mix: dict) -> None:
     evidence_gap_panel(mix["evidence_gaps"])
 
 
+def _render_ownership_control(session, site: Site, apps: list[Application]) -> None:
+    """The Ownership & Control tab (Stage 4B.2) - a Site-level aggregate
+    (Part 5, grouped for display only) followed by a per-Application
+    breakdown (Part 4, full fidelity, each Application's own evidence
+    only) - both read via ONE query (get_site_control_detail), never one
+    query per linked Application. The Part 8 source note is shown once at
+    the end, covering both sections, never repeated per entity."""
+    section_header("Ownership & Control", icon="🗝️")
+    groups, by_application = get_site_control_detail(session, site.id)
+
+    if not groups:
+        st.info(EMPTY_STATE_SITE)
+    else:
+        for group in groups:
+            control_relationship_group_card(group)
+
+    st.divider()
+    st.markdown("**By Application**")
+    ordered_apps = sorted(
+        apps, key=lambda a: (not by_application.get(a.id), a.reference or ""),
+    )
+    for app in ordered_apps:
+        views = by_application.get(app.id, [])
+        with st.expander(app.reference or f"Application {app.id}", expanded=False):
+            if not views:
+                st.caption(EMPTY_STATE_APPLICATION)
+                continue
+            for view in views:
+                control_relationship_view_card(view)
+
+    st.divider()
+    st.caption(SOURCE_NOTE)
+
+
 def render_site_profile(session, settings, site: Site, apps: list[Application]) -> None:
     """The flagship Site Profile entry point (Sprint 4.4) - called only
     from app/ui/pages/1_Scheme_Detail.py."""
@@ -355,9 +392,9 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
             f"({site.excluded_at.strftime('%d %b %Y') if site.excluded_at else 'date unknown'})"
         )
 
-    tab_overview, tab_planning, tab_policy, tab_mix, tab_visual, tab_timeline, tab_ai = st.tabs(
+    tab_overview, tab_planning, tab_policy, tab_ownership, tab_mix, tab_visual, tab_timeline, tab_ai = st.tabs(
         [
-            "Overview", "Planning Position", "Policy Position", "Residential Mix Intelligence",
+            "Overview", "Planning Position", "Policy Position", "Ownership & Control", "Residential Mix Intelligence",
             "Visual Evidence", "Timeline", "AI Summary",
         ]
     )
@@ -386,6 +423,9 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
 
     with tab_policy:
         _render_policy_position(view)
+
+    with tab_ownership:
+        _render_ownership_control(session, site, apps)
 
     with tab_mix:
         _render_residential_mix(view["residential_mix"])
