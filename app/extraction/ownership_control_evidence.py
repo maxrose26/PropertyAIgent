@@ -9,9 +9,9 @@ control_entities.create_control_relationship_if_absent) is a separate,
 explicit step a caller opts into - mirrors Stage 2C's own "READ ONLY"
 discipline (app.policy.allocation_document_evidence) exactly.
 
-TWO independent deterministic sources, kept in two functions rather than
-one combined pass since they operate on different document types and have
-completely different regex vocabularies:
+THREE independent deterministic sources, kept in separate functions since
+they operate on different document types/sections and have completely
+different regex vocabularies:
 
 1. detect_ownership_certificate() - application_form documents. Targets
    the "Ownership Certificates and Agricultural Land Declaration"
@@ -19,7 +19,21 @@ completely different regex vocabularies:
    Procedure) (England) Order 2015) section every full/outline
    application form carries.
 
-2. extract_s106_control_evidence() - s106 documents. Targets defined-role
+2. resolve_certificate_a_applicant_identity() - Stage 4B.1 FINAL
+   AMENDMENT ("Certificate-A Identity Safety"). Certificate A alone only
+   proves SOME applicant declared sole ownership - it says nothing about
+   WHO that applicant is. This function independently confirms the
+   applicant's identity from the SAME application-form Document's own
+   "Applicant Details" section (a narrow, targeted parser - not a
+   general-purpose application-form extraction subsystem), and only
+   falls back to Application.applicant_name_raw (the separate portal-
+   scraped field) when that raw name is ALSO conservatively confirmed
+   present within the same Applicant Details section. See its own
+   docstring for the exact algorithm and the real production edge case
+   (an individual applicant's surname duplicated into the form's own
+   "Company Name" field) that shaped it.
+
+3. extract_s106_control_evidence() - s106 documents. Targets defined-role
    clauses ("... ABC Limited ... (the "Owner")" / '"the Developer" means
    ...') and Land Registry title numbers.
 
@@ -57,7 +71,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.db.models import Document
+from app.db.models import Application, Document
 
 # --- Certificate detection --------------------------------------------------
 
@@ -382,3 +396,166 @@ def extract_s106_title_numbers(document: Document) -> list[S106TitleNumberHit]:
             title_number=title_number, snippet=text[start:end].strip(),
         ))
     return hits
+
+
+# --- Certificate-A applicant identity (Stage 4B.1 final amendment) ---------
+
+CERTIFICATE_A_APPLICANT_IDENTITY_UNRESOLVED = "CERTIFICATE_A_APPLICANT_IDENTITY_UNRESOLVED"
+
+_APPLICANT_DETAILS_RE = re.compile(r"applicant\s+details", re.IGNORECASE)
+_AGENT_DETAILS_RE = re.compile(r"agent\s+details", re.IGNORECASE)
+_APPLICANT_SECTION_FALLBACK_WINDOW_CHARS = 1500
+
+_FORM_COMPANY_NAME_LABEL_RE = re.compile(r"company\s+name", re.IGNORECASE)
+_FORM_FIRST_NAME_LABEL_RE = re.compile(r"first\s+name", re.IGNORECASE)
+_FORM_SURNAME_LABEL_RE = re.compile(r"surname", re.IGNORECASE)
+
+# Real production 1APP-style forms print each field as "Label\nValue"
+# (or "Label\n<next label>" when the field is genuinely blank) - these
+# are the label words that can appear as the very next line, used to
+# detect "this field was blank" rather than mistaking the following
+# label itself for a captured value.
+_FORM_FIELD_LABEL_WORDS = {
+    "title", "first name", "surname", "care of agent", "company name", "address",
+    "address line 1", "address line 2", "address line 3", "town/city", "county",
+    "country", "postcode", "name/company",
+}
+
+
+@dataclass
+class FormApplicantIdentityResult:
+    document_id: int
+    application_id: int
+    resolved_name: str | None
+    entity_type: str  # company | individual | unresolved
+    method: str  # same_form_company_name | same_form_individual_name | applicant_name_raw_confirmed_in_form | unresolved
+    snippet: str | None
+
+
+def _normalise_for_identity_match(name: str) -> str:
+    """Deliberately simple/local (not app.enrichment.companies_house's
+    own normalise_name - this module never imports from app.enrichment,
+    keeping the extraction/enrichment package boundary Stage 4B already
+    established) - strips case/punctuation/whitespace differences only.
+    Conservative EQUALITY/CONTAINMENT matching, never a fuzzy score, per
+    Stage 4B.1's own explicit 'do not accept a weak fuzzy occurrence'
+    instruction."""
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", name.lower())).strip()
+
+
+def _applicant_details_span(text: str) -> str | None:
+    """Bounded to the Applicant Details section ONLY, ending at Agent
+    Details if present (both sections carry their own 'Company Name'/
+    'First name'/'Surname' fields on real forms - without this boundary,
+    the AGENT's details could be mistaken for the applicant's own)."""
+    m = _APPLICANT_DETAILS_RE.search(text)
+    if m is None:
+        return None
+    start = m.end()
+    agent_m = _AGENT_DETAILS_RE.search(text, start)
+    end = agent_m.start() if agent_m else min(len(text), start + _APPLICANT_SECTION_FALLBACK_WINDOW_CHARS)
+    return text[start:end]
+
+
+def _capture_form_field_value(span: str, label_re: re.Pattern) -> str | None:
+    m = label_re.search(span)
+    if m is None:
+        return None
+    rest = span[m.end():]
+    line_m = re.match(r"[ \t]*\n?[ \t]*([^\n]{0,150})", rest)
+    if not line_m:
+        return None
+    value = line_m.group(1).strip()
+    if not value or value.lower() in _FORM_FIELD_LABEL_WORDS:
+        return None  # the "next line" was actually the next label - field was blank
+    return value
+
+
+def resolve_certificate_a_applicant_identity(document: Document, application: Application) -> FormApplicantIdentityResult:
+    """Pure function - no Session, no I/O, no AI, no Companies House.
+
+    Stage 4B.1 final amendment's own explicit rule: Certificate A may
+    create an OWNER relationship ONLY when the applicant's identity is
+    independently confirmed as belonging to THAT SAME application-form
+    evidence - never from Application.applicant_name_raw alone (a
+    separate portal-scraped field with no inherent tie to the specific
+    form's own text).
+
+    ALGORITHM (in priority order):
+    1. Locate the "Applicant Details" section (bounded to end at "Agent
+       Details" if present). No section found at all -> UNRESOLVED,
+       regardless of applicant_name_raw - there is no form evidence to
+       tie any identity to.
+    2. Within that section, capture "Company Name" and "First name"/
+       "Surname" field values (each independently, blank-field-aware).
+    3. REAL PRODUCTION EDGE CASE this module was built to handle
+       correctly (found during development, not merely anticipated): for
+       an INDIVIDUAL applicant, some portals' generated PDF duplicates
+       the person's own Surname into the "Company Name" field (e.g. "Mr
+       Rob Watson" -> Company Name: "Watson", identical to Surname:
+       "Watson") - if the captured Company Name normalises to the same
+       value as Surname, it is NOT treated as a genuine company name;
+       the individual's "First name Surname" is used instead.
+    4. If a genuine form_name was found (company or individual) AND
+       Application.applicant_name_raw is ALSO present: the two must
+       match after conservative normalisation (case/punctuation/
+       whitespace only, never fuzzy) - a match CONFIRMS the form's own
+       name; a MISMATCH is a genuine conflict between the two sources
+       and resolves to UNRESOLVED (Section 2's own explicit "conflicting
+       raw/form applicant -> zero relationship" requirement) - the
+       form's own extraction is not simply preferred over a
+       disagreeing raw field, since a disagreement itself is evidence
+       something is wrong with one of the two sources.
+    5. If a genuine form_name was found and applicant_name_raw is
+       absent: the form's own text is sufficient on its own (it IS the
+       same application-form evidence Section 1 requires).
+    6. If no form_name was extracted (blank/individual fields not found)
+       but applicant_name_raw IS present: fall back to checking whether
+       applicant_name_raw appears (conservatively normalised) WITHIN the
+       Applicant Details section text itself - never anywhere else in
+       the document (Section 2's own "not a weak fuzzy occurrence
+       elsewhere in the document" instruction). A match confirms;
+       no match (or no applicant_name_raw at all) -> UNRESOLVED."""
+    if not document.extracted_text:
+        return FormApplicantIdentityResult(document.id, application.id, None, "unresolved", "unresolved", None)
+
+    span = _applicant_details_span(document.extracted_text)
+    if span is None:
+        return FormApplicantIdentityResult(document.id, application.id, None, "unresolved", "unresolved", None)
+
+    snippet = span[:300].strip()
+    company_name = _capture_form_field_value(span, _FORM_COMPANY_NAME_LABEL_RE)
+    first_name = _capture_form_field_value(span, _FORM_FIRST_NAME_LABEL_RE)
+    surname = _capture_form_field_value(span, _FORM_SURNAME_LABEL_RE)
+
+    form_name: str | None = None
+    form_entity_type = "unresolved"
+    if company_name and not (surname and _normalise_for_identity_match(company_name) == _normalise_for_identity_match(surname)):
+        form_name, form_entity_type = company_name, "company"
+    elif first_name or surname:
+        combined = " ".join(p for p in (first_name, surname) if p).strip()
+        if combined:
+            form_name, form_entity_type = combined, "individual"
+
+    raw_name = (application.applicant_name_raw or "").strip() or None
+
+    if form_name and raw_name:
+        if _normalise_for_identity_match(form_name) == _normalise_for_identity_match(raw_name):
+            method = "same_form_company_name" if form_entity_type == "company" else "same_form_individual_name"
+            return FormApplicantIdentityResult(document.id, application.id, form_name, form_entity_type, method, snippet)
+        return FormApplicantIdentityResult(document.id, application.id, None, "unresolved", "unresolved", snippet)
+
+    if form_name and not raw_name:
+        method = "same_form_company_name" if form_entity_type == "company" else "same_form_individual_name"
+        return FormApplicantIdentityResult(document.id, application.id, form_name, form_entity_type, method, snippet)
+
+    if not form_name and raw_name:
+        normalised_raw = _normalise_for_identity_match(raw_name)
+        normalised_span = _normalise_for_identity_match(span)
+        if normalised_raw and normalised_raw in normalised_span:
+            return FormApplicantIdentityResult(
+                document.id, application.id, raw_name, "unresolved", "applicant_name_raw_confirmed_in_form", snippet,
+            )
+        return FormApplicantIdentityResult(document.id, application.id, None, "unresolved", "unresolved", snippet)
+
+    return FormApplicantIdentityResult(document.id, application.id, None, "unresolved", "unresolved", snippet)
