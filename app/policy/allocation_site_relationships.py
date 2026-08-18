@@ -74,6 +74,7 @@ from app.policy.allocation_document_evidence import (
     DOCUMENT_CONFIRMED_APPLICATION_ONLY,
     DOCUMENT_CONFIRMED_SITE,
     DOCUMENT_CONTRADICTS_FUZZY,
+    EXPLICIT_REFERENCE,
     FUZZY_SUPPORTED_BY_DOCUMENT,
     MULTIPLE_DOCUMENT_SUPPORTED_SITES,
     AllocationEvidenceResult,
@@ -154,6 +155,37 @@ def _best_hit_for_site(hits: list, site_id: int):
     return max(candidates, key=lambda h: h.weight)
 
 
+def _apply_multi_allocation_collision_guard(planned: list[PlannedRelationship]) -> list[PlannedRelationship]:
+    """Stage 2E.1 Section 7 - when the SAME Site independently receives a
+    document-evidenced candidate relationship for MORE THAN ONE allocation
+    in this same planning pass, each allocation must carry its OWN
+    EXPLICIT_REFERENCE-tier evidence for that Site before auto-applying;
+    a candidate backed only by STRONG_CONTEXTUAL_REFERENCE for a Site it
+    shares with another candidate allocation is downgraded to
+    needs_confirmation rather than silently excluded (Section 7: "route to
+    review/needs_confirmation", never a silent drop). A genuinely
+    EXPLICIT_REFERENCE-backed relationship for a Site that legitimately
+    spans more than one allocation is NEVER blocked - multi-allocation
+    membership is not assumed impossible, only ambiguous STRONG_
+    CONTEXTUAL_REFERENCE-only collisions are gated. This is the general
+    (not council- or reference-specific) safety net for exactly the
+    pattern a generic-policy-code collision produces: one Site/document
+    naming several allocations' codes with none of them independently
+    proven."""
+    by_site: dict[int, list[PlannedRelationship]] = {}
+    for p in planned:
+        by_site.setdefault(p.site_id, []).append(p)
+
+    for site_id, candidates in by_site.items():
+        if len({p.allocation_id for p in candidates}) <= 1:
+            continue
+        for p in candidates:
+            if p.evidence_category != EXPLICIT_REFERENCE:
+                p.review_status = "needs_confirmation"
+
+    return planned
+
+
 def plan_document_evidence_relationships(
     evidence_results: list[AllocationEvidenceResult],
 ) -> tuple[list[PlannedRelationship], dict]:
@@ -205,6 +237,7 @@ def plan_document_evidence_relationships(
         else:
             excluded["review_required"].append(result.allocation_id)
 
+    planned = _apply_multi_allocation_collision_guard(planned)
     return planned, excluded
 
 
@@ -349,11 +382,22 @@ def run_controlled_relationship_write(session: Session) -> dict:
                 evidence_document_id=planned.evidence_document_id,
                 evidence_application_id=planned.evidence_application_id,
                 evidence_snippet=planned.evidence_snippet,
+                # Stage 2E.1 - previously always defaulted to "auto_applied"
+                # regardless of what plan_document_evidence_relationships
+                # actually decided; now honours the multi-allocation
+                # collision guard's needs_confirmation downgrade (Section 7)
+                # rather than silently discarding it.
+                review_status=planned.review_status,
             )
             if created is not None:
                 created_document += 1
 
-        if len(planned_list) == 1:
+        # Stage 2E.1 - the convenience matched_site_id pointer is only ever
+        # set for a relationship the collision guard left auto_applied;
+        # a needs_confirmation candidate (an unresolved cross-allocation
+        # collision) must never be promoted to "THE" Site for this
+        # allocation before a human has actually confirmed it.
+        if len(planned_list) == 1 and planned_list[0].review_status == "auto_applied":
             allocation = session.get(LocalPlanSite, allocation_id)
             if allocation is not None and allocation.matched_site_id is None:
                 allocation.matched_site_id = planned_list[0].site_id
