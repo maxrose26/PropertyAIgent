@@ -39,7 +39,13 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_caption,
     total_homes_kpi_label,
 )
-from app.reporting.ownership_control import EMPTY_STATE_ALLOCATION_RESIDUAL, SOURCE_NOTE, get_allocation_control_intelligence
+from app.reporting.ownership_control import (
+    EMPTY_STATE_ALLOCATION_RESIDUAL,
+    EMPTY_STATE_ALLOCATION_SITE,
+    OWNERSHIP_INTELLIGENCE_GAP_CUE,
+    SOURCE_NOTE,
+    get_allocation_control_intelligence,
+)
 from app.reporting.residential_mix import build_residential_mix
 from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db, pick_representative_application
 from app.ui.shell import (
@@ -317,29 +323,79 @@ def _render_detail(view: dict, allocation_id: int) -> None:
             for reason in opportunity["reasons"]:
                 st.caption(f"• {reason}")
 
-        # 6b. Ownership & Control (Stage 4B.2, Section 6/7) - one section
-        # PER related Site, each queried independently
+        # 6b. Ownership & Control (Stage 4B.2 baseline; Stage 4B.3 "Local
+        # Plan Ownership & Control Hierarchy UI Refinement") - a clear
+        # ALLOCATION -> related Site/phase -> Application(s) -> ownership/
+        # control evidence hierarchy, kept structurally separate from a
+        # distinct RESIDUAL ALLOCATION CAPACITY -> ownership/control
+        # section. One card PER related Site, each queried independently
         # (get_allocation_control_intelligence), never merged into one
-        # allocation-wide owner. A "Residual allocation land" section is
-        # added only when coverage itself already evidences uncovered
-        # capacity, and NEVER carries any relationship - this is the
-        # generic mechanism (no allocation-specific code) that keeps a
-        # multi-Site allocation like North of Mosley Common (JPA 32) from
-        # ever showing one Site's developer as controlling the whole
-        # allocation's residual capacity.
+        # allocation-wide owner - this is the generic mechanism (no
+        # allocation-specific code) that keeps a multi-Site allocation like
+        # North of Mosley Common (JPA 32) or North Leigh Park from ever
+        # showing one Site's developer/owner as controlling another
+        # related Site, the whole allocation, or its residual capacity.
+        # Every figure shown per card (applications, capacity) is reshaped
+        # straight from the SAME SiteActivitySummary/DevelopmentCoverage
+        # figures already computed above - no new query, no new capacity
+        # arithmetic.
         section_header("Ownership & Control", icon="🗝️")
         control_sections = get_allocation_control_intelligence(
             session, coverage.site_summaries, indicative_residual_capacity=coverage.indicative_residual_capacity,
         )
+        site_sections = [s for s in control_sections if not s.is_residual]
+        residual_sections = [s for s in control_sections if s.is_residual]
+
         if not control_sections:
             st.caption(EMPTY_STATE_ALLOCATION_RESIDUAL)
-        for control_section in control_sections:
-            st.markdown(f"**{control_section.label}**")
-            if not control_section.groups:
-                st.caption(EMPTY_STATE_ALLOCATION_RESIDUAL)
-                continue
-            for group in control_section.groups:
-                control_relationship_group_card(group)
+
+        if site_sections:
+            st.markdown("**Related planning Sites / phases**")
+            for site_section in site_sections:
+                with st.container(border=True, key=f"alloc-detail-ownership-site-{allocation_id}-{site_section.site_id}"):
+                    st.markdown(f"**Site / phase:** {site_section.label}")
+
+                    st.caption("Planning activity")
+                    if not site_section.applications:
+                        st.caption("No planning activity identified for this Site yet.")
+                    else:
+                        rep_app = next((a for a in site_section.applications if a.is_representative), None)
+                        if rep_app:
+                            status_bits = [b for b in (rep_app.status, rep_app.decision) if b]
+                            line = f"Application {rep_app.reference}"
+                            if status_bits:
+                                line += " — " + " · ".join(status_bits)
+                            st.write(line)
+                        other_count = len(site_section.applications) - (1 if rep_app else 0)
+                        if other_count > 0:
+                            st.caption(f"+ {other_count} other linked application(s)")
+                        # "If a Site capacity is not safely available: omit
+                        # it rather than guess" (Section 4) - capacity_known
+                        # is Stage 3A's own already-computed safety flag,
+                        # never re-derived here.
+                        if site_section.capacity_known:
+                            st.caption(f"Identified capacity: {site_section.capacity:,} homes")
+
+                    st.caption("Ownership & Control")
+                    if not site_section.groups:
+                        st.caption(EMPTY_STATE_ALLOCATION_SITE)
+                    else:
+                        for group in site_section.groups:
+                            control_relationship_group_card(group)
+
+        for residual_section in residual_sections:
+            st.divider()
+            st.markdown("**Residual allocation capacity**")
+            if residual_section.residual_capacity:
+                st.caption(
+                    f"Approximately {residual_section.residual_capacity:,} homes of allocation capacity are not "
+                    "currently accounted for by identified planning activity."
+                )
+            st.caption("Ownership & Control")
+            st.caption(EMPTY_STATE_ALLOCATION_RESIDUAL)
+            if residual_section.show_ownership_intelligence_gap_cue:
+                st.caption(f"🔎 {OWNERSHIP_INTELLIGENCE_GAP_CUE}")
+
         st.caption(SOURCE_NOTE)
 
     # 7. Source evidence and provenance
