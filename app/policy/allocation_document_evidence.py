@@ -75,6 +75,44 @@ isolated short token is insufficient by itself... context must matter"),
 and the same contextual pattern is re-validated in Python with word
 boundaries before any hit is recorded.
 
+GENERIC-REFERENCE NAME CORROBORATION (Stage 2E.1, "Allocation<->Site
+Relationship Matcher Integrity Fix"): the "policy <ref>"/"allocation <ref>"
+phrasing test above is NECESSARY but was found NOT SUFFICIENT - a live
+production false-positive cluster (Wigan's H3/H4/H5/H6) proved that a
+short/generic reference can be reused by the SAME council's own plan for
+BOTH a numbered site allocation AND an unrelated, generically-worded
+Development Management policy (e.g. "Policy H3: accessibility to
+sustainable transport", a borough-wide DM policy, entirely distinct from
+"Allocation H3: North Leigh Park"). A document's own boilerplate "relevant
+policies: H1, H2, H3, H4..." list, or a sentence like "policy H3 confirms
+that development across the plan area should...", satisfies the old
+"policy <ref>" phrasing test while saying NOTHING about this specific
+Site/Application's relationship to the allocation.
+
+The fix: for a GENERIC reference only (is_generic_reference), a hit is
+NEVER promoted past WEAK_REFERENCE unless the allocation's own distinctive
+site_name (the exact same distinctive_name_terms() value already used for
+this module's separate name-matching pass) is ALSO found within the same
+PROXIMITY_WINDOW_CHARS window as the reference occurrence - see
+_generic_reference_has_name_corroboration. This applies to BOTH
+EXPLICIT_REFERENCE and STRONG_CONTEXTUAL_REFERENCE for a generic
+reference (Stage 2E.1 Section 6's own instruction to also confirm
+EXPLICIT_REFERENCE is interpreting the phrase as an allocation reference,
+not merely finding the code near generic text) - every real production
+EXPLICIT_REFERENCE example already carries the allocation's own name
+alongside the code ("North Leigh Park allocation (H3)", "forms part of
+the allocation for housing need... (draft policy H3: North Leigh Park)"),
+so this never weakens a genuine case.
+
+A NON-generic reference (more than 4 alphanumeric characters, e.g. "HOM
+2.27", "JPA 30", "HLA2094") is UNCHANGED by this amendment - such
+references are already distinctive enough on their own not to need name
+corroboration (Stage 2E.1 Section 5: "do not over-correct unique
+references"). GENERIC_REFERENCE_MAX_LENGTH/is_generic_reference remain the
+one, general (non-council-specific) definition of "short/generic" used
+throughout this module - nothing here is Wigan-specific; the same rule
+applies identically to any council whose plan reuses a short code.
+
 DOCUMENT-TYPE WEIGHTING (Stage 2C Section 13) - deterministic, never an
 LLM-style judgement:
   HIGH   : officer_report, decision_notice, planning_statement, s106
@@ -323,12 +361,82 @@ def _has_negative_phrase(text: str, match_start: int, match_end: int) -> bool:
     return any(phrase in window for phrase in NEGATIVE_RELATIONSHIP_PHRASES)
 
 
+def _generic_reference_has_name_corroboration(document_text: str, distinctive_name: str | None) -> bool:
+    """Stage 2E.1 - the corroboration test a GENERIC reference hit must
+    pass before it may be classified as EXPLICIT_REFERENCE or
+    STRONG_CONTEXTUAL_REFERENCE (see module docstring's "GENERIC-REFERENCE
+    NAME CORROBORATION"). Deliberately searches the WHOLE document text,
+    not just the local PROXIMITY_WINDOW_CHARS window around the reference
+    occurrence - a real production regression check (Stage 2E.1 Section 9's
+    own re-run) found a genuine officer report ("East of Atherton", H6)
+    that names its allocation eight times throughout the document but only
+    once uses the bare "policy H6" phrasing, over 1,000 characters from the
+    nearest name mention; a same-document check correctly keeps this
+    genuine case while a narrower proximity-window check would have
+    wrongly excluded it. The SAME document-wide check still correctly
+    excludes every confirmed Stage 2E false positive (verified: none of
+    "north leigh park"/"south hindley"/"east of atherton"/"remaining land
+    south of atherton" appears ANYWHERE in the King Street or Rectory Lane
+    documents, not merely far from the reference) - the distinguishing
+    fact is genuinely whether the SAME document ever names the allocation
+    at all, not how close together the two mentions happen to fall.
+    `distinctive_name` is the allocation's own distinctive_name_terms()
+    value (None when the allocation's site_name has no distinctive/
+    searchable form at all, in which case a generic reference can never be
+    corroborated)."""
+    if not distinctive_name:
+        return False
+    return distinctive_name in document_text
+
+
 def _snippet(text: str, match_start: int, match_end: int) -> str:
     start = max(0, match_start - SNIPPET_RADIUS_CHARS)
     end = min(len(text), match_end + SNIPPET_RADIUS_CHARS)
     prefix = "..." if start > 0 else ""
     suffix = "..." if end < len(text) else ""
     return f"{prefix}{text[start:end].strip()}{suffix}"
+
+
+def _build_reference_hits(
+    text: str, ref_pattern: "re.Pattern | None", *, is_generic: bool, distinctive_name: str | None,
+    document: Document, application: Application, allocation: LocalPlanSite, weight: int,
+) -> tuple[list[DocumentEvidenceHit], list[DocumentEvidenceHit]]:
+    """Classifies every policy_reference occurrence for ONE allocation
+    within ONE document's text - the ONE shared implementation used by
+    both find_document_evidence_for_allocation (Stage 2C backward
+    direction) and find_allocation_evidence_for_document (Stage 3B forward
+    direction), so the Stage 2E.1 generic-reference name-corroboration fix
+    (see module docstring) applies identically to both paths rather than
+    risking the two independently-duplicated loops drifting apart."""
+    positive_hits: list[DocumentEvidenceHit] = []
+    contradictory_hits: list[DocumentEvidenceHit] = []
+    for m in (list(ref_pattern.finditer(text)) if ref_pattern else []):
+        if _has_negative_phrase(text, m.start(), m.end()):
+            contradictory_hits.append(DocumentEvidenceHit(
+                document_id=document.id, document_type=document.doc_type,
+                application_id=application.id, application_reference=application.reference,
+                site_id=application.site_id, matched_reference=allocation.policy_reference,
+                snippet=_snippet(text, m.start(), m.end()), category=CONTRADICTORY_REFERENCE, weight=weight,
+            ))
+            continue
+        _, has_positive = _classify_occurrence(text, m.start(), m.end())
+        if is_generic and not _generic_reference_has_name_corroboration(text, distinctive_name):
+            # Stage 2E.1: a generic/short reference alone (or even paired
+            # with a positive relationship phrase) never establishes
+            # membership without the allocation's own name corroborating
+            # it - downgraded to WEAK_REFERENCE, which is never eligible
+            # for auto-creation anywhere in this codebase, but is still
+            # recorded (never silently dropped) for human review.
+            category = WEAK_REFERENCE
+        else:
+            category = EXPLICIT_REFERENCE if has_positive else STRONG_CONTEXTUAL_REFERENCE
+        positive_hits.append(DocumentEvidenceHit(
+            document_id=document.id, document_type=document.doc_type,
+            application_id=application.id, application_reference=application.reference,
+            site_id=application.site_id, matched_reference=allocation.policy_reference,
+            snippet=_snippet(text, m.start(), m.end()), category=category, weight=weight,
+        ))
+    return positive_hits, contradictory_hits
 
 
 def find_document_evidence_for_allocation(
@@ -341,6 +449,7 @@ def find_document_evidence_for_allocation(
         return [], []
 
     ref_pattern = _reference_pattern(allocation.policy_reference) if allocation.policy_reference else None
+    is_generic = bool(allocation.policy_reference) and is_generic_reference(allocation.policy_reference)
     distinctive_name = distinctive_name_terms(allocation.site_name)
     name_pattern = _name_pattern(distinctive_name) if distinctive_name else None
 
@@ -356,25 +465,13 @@ def find_document_evidence_for_allocation(
         ref_matches = list(ref_pattern.finditer(text)) if ref_pattern else []
         name_matches = list(name_pattern.finditer(text)) if name_pattern else []
 
-        seen_any = False
-        for m in ref_matches:
-            seen_any = True
-            if _has_negative_phrase(text, m.start(), m.end()):
-                contradictory_hits.append(DocumentEvidenceHit(
-                    document_id=document.id, document_type=document.doc_type,
-                    application_id=application.id, application_reference=application.reference,
-                    site_id=application.site_id, matched_reference=allocation.policy_reference,
-                    snippet=_snippet(text, m.start(), m.end()), category=CONTRADICTORY_REFERENCE, weight=weight,
-                ))
-                continue
-            _, has_positive = _classify_occurrence(text, m.start(), m.end())
-            category = EXPLICIT_REFERENCE if has_positive else STRONG_CONTEXTUAL_REFERENCE
-            positive_hits.append(DocumentEvidenceHit(
-                document_id=document.id, document_type=document.doc_type,
-                application_id=application.id, application_reference=application.reference,
-                site_id=application.site_id, matched_reference=allocation.policy_reference,
-                snippet=_snippet(text, m.start(), m.end()), category=category, weight=weight,
-            ))
+        seen_any = bool(ref_matches)
+        ref_positive, ref_contradictory = _build_reference_hits(
+            text, ref_pattern, is_generic=is_generic, distinctive_name=distinctive_name,
+            document=document, application=application, allocation=allocation, weight=weight,
+        )
+        positive_hits.extend(ref_positive)
+        contradictory_hits.extend(ref_contradictory)
 
         for m in name_matches:
             seen_any = True
@@ -461,29 +558,14 @@ def find_allocation_evidence_for_document(
             continue
 
         ref_pattern = _reference_pattern(allocation.policy_reference) if allocation.policy_reference else None
+        is_generic = bool(allocation.policy_reference) and is_generic_reference(allocation.policy_reference)
         distinctive_name = distinctive_name_terms(allocation.site_name)
         name_pattern = _name_pattern(distinctive_name) if distinctive_name else None
 
-        positive_hits: list[DocumentEvidenceHit] = []
-        contradictory_hits: list[DocumentEvidenceHit] = []
-
-        for m in (list(ref_pattern.finditer(text)) if ref_pattern else []):
-            if _has_negative_phrase(text, m.start(), m.end()):
-                contradictory_hits.append(DocumentEvidenceHit(
-                    document_id=document.id, document_type=document.doc_type,
-                    application_id=application.id, application_reference=application.reference,
-                    site_id=application.site_id, matched_reference=allocation.policy_reference,
-                    snippet=_snippet(text, m.start(), m.end()), category=CONTRADICTORY_REFERENCE, weight=weight,
-                ))
-                continue
-            _, has_positive = _classify_occurrence(text, m.start(), m.end())
-            category = EXPLICIT_REFERENCE if has_positive else STRONG_CONTEXTUAL_REFERENCE
-            positive_hits.append(DocumentEvidenceHit(
-                document_id=document.id, document_type=document.doc_type,
-                application_id=application.id, application_reference=application.reference,
-                site_id=application.site_id, matched_reference=allocation.policy_reference,
-                snippet=_snippet(text, m.start(), m.end()), category=category, weight=weight,
-            ))
+        positive_hits, contradictory_hits = _build_reference_hits(
+            text, ref_pattern, is_generic=is_generic, distinctive_name=distinctive_name,
+            document=document, application=application, allocation=allocation, weight=weight,
+        )
 
         for m in (list(name_pattern.finditer(text)) if name_pattern else []):
             if _has_negative_phrase(text, m.start(), m.end()):

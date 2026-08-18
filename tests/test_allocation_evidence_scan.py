@@ -471,8 +471,12 @@ def test_multi_site_evidence_preserved_separately(session):
     site_b = _make_site(session, "testcouncil", "site b")
     app_a = _make_application(session, "testcouncil", "APP/A", site_id=site_a.id)
     app_b = _make_application(session, "testcouncil", "APP/B", site_id=site_b.id)
-    _make_document(session, app_a.id, "planning_statement", "This forms part of allocation H3, western parcel.")
-    _make_document(session, app_b.id, "planning_statement", "This forms part of allocation H3, eastern parcel.")
+    # Stage 2E.1 - a generic/short reference (H3) alone, even with a positive
+    # relationship phrase, no longer establishes membership; the fixture must
+    # also carry the allocation's own distinctive name for this to remain
+    # genuine EXPLICIT_REFERENCE evidence under the corrected matcher.
+    _make_document(session, app_a.id, "planning_statement", "This forms part of allocation H3, North Leigh Park, western parcel.")
+    _make_document(session, app_b.id, "planning_statement", "This forms part of allocation H3, North Leigh Park, eastern parcel.")
     session.commit()
 
     report = scan_council_for_allocation_evidence(session, "testcouncil")

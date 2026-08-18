@@ -469,8 +469,12 @@ def test_convenience_pointer_never_set_for_multi_site_relationship(session):
     site_b = _make_site(session, "testcouncil", "land bounded by jacksons lane hazel grove stockport")
     app_a = _make_application(session, "testcouncil", "APP/A", site_id=site_a.id)
     app_b = _make_application(session, "testcouncil", "APP/B", site_id=site_b.id)
-    _make_document(session, app_a.id, "officer_report", "this forms part of allocation H3, western parcel")
-    _make_document(session, app_b.id, "officer_report", "this forms part of allocation H3, eastern parcel")
+    # Stage 2E.1 - a generic/short reference (H3) alone, even with a positive
+    # relationship phrase, no longer establishes membership; the fixture must
+    # also carry the allocation's own distinctive name for this to remain
+    # genuine EXPLICIT_REFERENCE evidence under the corrected matcher.
+    _make_document(session, app_a.id, "officer_report", "this forms part of North Leigh Park allocation H3, western parcel")
+    _make_document(session, app_b.id, "officer_report", "this forms part of North Leigh Park allocation H3, eastern parcel")
     allocation = _make_allocation(session, "testcouncil", "North Leigh Park", policy_reference="H3")
     session.commit()
 
