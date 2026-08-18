@@ -1084,6 +1084,79 @@ def evidence_gap_panel(gaps: list[str]) -> None:
             st.caption(f"• {gap}")
 
 
+def _control_relationship_evidence_bits(item) -> list[str]:
+    bits = []
+    if item.confidence:
+        bits.append(f"{item.confidence.title()} confidence")
+    if item.title_number:
+        bits.append(f"Title: {item.title_number}")
+    if item.evidence_date:
+        bits.append(f"Evidence date: {item.evidence_date.strftime('%d %b %Y')}")
+    return bits
+
+
+def control_relationship_group_card(group) -> None:
+    """Stage 4B.2 - one entity/role card for a Site- or allocation-Site-
+    scoped Ownership & Control aggregate (app.reporting.ownership_control.
+    ControlRelationshipGroup). Display-layer grouping only - the reporting
+    layer never merges the underlying ControlRelationship rows, so every
+    supporting evidence record stays inspectable in the expander below
+    regardless of how many are grouped together on this one card. Accepts
+    the dataclass directly (duck-typed, not imported here, to keep this
+    presentation-only module decoupled from the reporting layer's own
+    types - see module docstring)."""
+    with st.container(border=True):
+        st.markdown(f"**{group.entity_name_raw}**")
+        st.write(group.role_label)
+        if group.needs_review:
+            status_badge("review", "Evidence requires review")
+        if group.company_id:
+            st.caption("Matched to a known company record")
+        if group.supporting_evidence_count > 1:
+            st.caption(f"{group.supporting_evidence_count} supporting planning documents")
+        else:
+            st.caption(group.items[0].evidence_source_label)
+            bits = _control_relationship_evidence_bits(group.items[0])
+            if bits:
+                st.caption(" · ".join(bits))
+        if group.application_references:
+            st.caption("Application: " + ", ".join(group.application_references))
+        with st.expander(f"View {group.supporting_evidence_count} supporting evidence record(s)"):
+            for item in group.items:
+                st.markdown(f"- **{item.evidence_source_label}** ({item.application_reference or 'application not linked'})")
+                bits = _control_relationship_evidence_bits(item)
+                if bits:
+                    st.caption(" · ".join(bits))
+                if item.needs_review:
+                    status_badge("review", "Evidence requires review")
+                if item.evidence_snippet:
+                    st.caption(f"“{item.evidence_snippet}”")
+                if item.document_source_url:
+                    st.markdown(f"[Open source document]({item.document_source_url})")
+
+
+def control_relationship_view_card(view) -> None:
+    """Stage 4B.2 - one ControlRelationship row, full fidelity, un-grouped
+    (app.reporting.ownership_control.ControlRelationshipView) - used for the
+    Application-level breakdown, which shows exactly one Application's own
+    evidence, never aggregated."""
+    with st.container(border=True):
+        st.markdown(f"**{view.entity_name_raw}**")
+        st.write(view.role_label)
+        if view.needs_review:
+            status_badge("review", "Evidence requires review")
+        st.caption(view.evidence_source_label)
+        bits = _control_relationship_evidence_bits(view)
+        if bits:
+            st.caption(" · ".join(bits))
+        if view.company_id:
+            st.caption("Matched to a known company record")
+        if view.evidence_snippet:
+            st.caption(f"“{view.evidence_snippet}”")
+        if view.document_source_url:
+            st.markdown(f"[Open source document]({view.document_source_url})")
+
+
 def _visual_evidence_card(card: dict, *, width: int = 200) -> None:
     if card.get("image_path") and os.path.exists(card["image_path"]):
         st.image(card["image_path"], width=width)
