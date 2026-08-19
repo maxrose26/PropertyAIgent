@@ -33,7 +33,7 @@ import datetime as dt
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.db.models import LocalPlan, LocalPlanSite, Site
+from app.db.models import AllocationSiteRelationship, LocalPlan, LocalPlanSite, Site
 from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.lapse_tracking import BUILD_STATUS_LABELS, compute_lapse_status
 from app.reporting.allocation_development_coverage import build_allocation_development_coverage, build_opportunity_signal
@@ -359,6 +359,100 @@ def linked_application_help() -> str:
     return "Reflects Applications currently linked in PropertyAIgent only - not confirmation that no application exists in reality."
 
 
+# --- Planning activity (Local Plan Sites Filter Refinement) -----------------
+#
+# A DELIBERATELY SEPARATE concept from has_trusted_linked_application above
+# (Product Owner amendment, Section 4/5: "if 'Planning activity' currently
+# represents something meaningfully different from 'Linked planning
+# application', retain it but make the distinction clear"). "Linked planning
+# application" is a confident yes/no: is there at least one Application this
+# platform trusts is genuinely linked. "Planning activity" is the fuller
+# picture behind that yes/no, including the one state a binary filter cannot
+# express - activity plainly exists, but this platform's own accounting
+# cannot yet confidently resolve it (a disputed/needs_confirmation
+# relationship, an unknown Site capacity, or an identified total exceeding
+# the allocation's own stated capacity - see app.reporting.
+# allocation_development_coverage.compute_development_coverage's own
+# capacity_accounting_status, reused here rather than re-derived). Every
+# value below is read straight off the SAME already-computed
+# DevelopmentCoverageResult has_trusted_linked_application reads - no new
+# query, no invented state.
+
+PLANNING_ACTIVITY_IDENTIFIED = "activity_identified"
+PLANNING_ACTIVITY_NONE = "no_activity"
+PLANNING_ACTIVITY_REVIEW_REQUIRED = "review_required"
+
+PLANNING_ACTIVITY_LABELS: dict[str, str] = {
+    PLANNING_ACTIVITY_IDENTIFIED: "Activity identified",
+    PLANNING_ACTIVITY_NONE: "No identified activity",
+    PLANNING_ACTIVITY_REVIEW_REQUIRED: "Review required",
+}
+
+
+def planning_activity_status(card: dict) -> str | None:
+    """One of PLANNING_ACTIVITY_IDENTIFIED / _NONE / _REVIEW_REQUIRED, or
+    None when this card has no Stage 3A development_coverage computed at
+    all (the same narrow fallback case has_trusted_linked_application
+    documents - never reached via the real customer-facing page, only a
+    caller that built a card without going through
+    build_allocation_discovery)."""
+    coverage = card.get("development_coverage")
+    if coverage is None:
+        return None
+    if coverage.capacity_accounting_status == "no_activity":
+        return PLANNING_ACTIVITY_NONE
+    if coverage.capacity_accounting_status == "review_required":
+        return PLANNING_ACTIVITY_REVIEW_REQUIRED
+    return PLANNING_ACTIVITY_IDENTIFIED
+
+
+def planning_activity_help() -> str:
+    return (
+        "The fuller picture behind \"linked planning application\": whether any planning activity has been "
+        "identified for this allocation's related Site(s) at all, and whether this platform's own accounting of "
+        "it is confidently resolved or still needs review."
+    )
+
+
+# --- Allocation capacity bands (Local Plan Sites Filter Refinement) ---------
+#
+# Product Owner amendment, Section 6/7: replaces a single linear slider
+# spanning the full observed ~3-15,000 range (which left the commercially
+# common 50-200-home range occupying almost none of the usable control) with
+# preset bands. Every band is inclusive at both ends; "Any" applies no
+# capacity constraint at all (unknown-capacity allocations included);
+# selecting any other band excludes unknown-capacity allocations, via the
+# SAME apply_filters capacity_min/capacity_max mechanism this module already
+# had - no change needed there, only what drives it. (label, min, max) - min/
+# max of None means "no bound on that side" (Any's own (None, None), and the
+# open-ended "2,000+" band's max=None).
+CAPACITY_BANDS: tuple[tuple[str, int | None, int | None], ...] = (
+    ("Any", None, None),
+    ("Under 25 homes", None, 24),
+    ("25–49 homes", 25, 49),
+    ("50–99 homes", 50, 99),
+    ("100–199 homes", 100, 199),
+    ("200–499 homes", 200, 499),
+    ("500–999 homes", 500, 999),
+    ("1,000–1,999 homes", 1000, 1999),
+    ("2,000+ homes", 2000, None),
+)
+
+CAPACITY_BAND_LABELS: tuple[str, ...] = tuple(label for label, _, _ in CAPACITY_BANDS)
+_CAPACITY_BAND_RANGE_BY_LABEL: dict[str, tuple[int | None, int | None]] = {
+    label: (lo, hi) for label, lo, hi in CAPACITY_BANDS
+}
+
+
+def capacity_band_range(label: str) -> tuple[int | None, int | None]:
+    """(capacity_min, capacity_max) for one CAPACITY_BANDS label, ready to
+    pass straight into apply_filters' existing capacity_min/capacity_max
+    keys. Unrecognised label (should never happen from a selectbox bound to
+    CAPACITY_BAND_LABELS) behaves exactly like "Any" - no constraint,
+    fails safe rather than raising mid-page-render."""
+    return _CAPACITY_BAND_RANGE_BY_LABEL.get(label, (None, None))
+
+
 # --- Why it matters / investigate next (Part 9 / Part 10) -------------------
 #
 # Deterministic, evidence-grounded, no AI, no permission-likelihood or
@@ -502,7 +596,58 @@ def has_trusted_linked_application(card: dict) -> bool:
     as trusted regardless of how it got that way. This exact gap had never
     been exercised before PR-2, since review_status="rejected" had never
     once been set on a matched allocation in this platform's history until
-    this sprint's individual match review."""
+    this sprint's individual match review.
+
+    LOCAL PLAN SITES FILTER REFINEMENT AMENDMENT (Stage 2E cleanup
+    follow-up) - matched_site_id/linked_application_count above are a
+    SNAPSHOT taken once, at whatever moment build_allocation_discovery's
+    matched_site_id-derived batch query ran; they never move when a
+    SEPARATE AllocationSiteRelationship row (Stage 2D's real, many-to-many,
+    continuously-revalidated relationship architecture) is later rejected
+    by app.policy.relationship_cleanup_runner. Confirmed as a genuine,
+    currently-live production gap: allocation 51 (JPA 10 Beal Valley)
+    still has matched_site_id=27 with a real linked Application on that
+    Site, so the legacy branch below would say "linked" - even though its
+    own AllocationSiteRelationship to Site 27 has since been rejected
+    (Site 27's genuine relationship is to JPA 12 Broadbent Moss instead).
+
+    First fix: card["development_coverage"] (Stage 3A, built from
+    AllocationSiteRelationship, ALREADY excludes every rejected row) wins
+    immediately whenever it shows a confidently-linked Site (a non-
+    needs_confirmation relationship with a real Application) - this is
+    always checked first, and always computed by build_allocation_
+    discovery for every card in one batched pass.
+
+    Second, narrower fix (a genuine gap the first fix alone reopened,
+    caught by this amendment's own test suite): development_coverage
+    showing NOTHING for this allocation is ambiguous by itself - it means
+    EITHER "the only relationship here was rejected" (the JPA 10 case,
+    correctly "not linked") OR "no AllocationSiteRelationship row has
+    ever existed for this allocation at all" (the pre-Stage-2D app.policy.
+    site_match_review.confirm_site_match flow never wrote one - a
+    genuinely, independently trustworthy match with no relationship row
+    to consult). matched_site_relationship_rejected (set by
+    build_allocation_discovery from a small batched query, see build_
+    allocation_card's own docstring) resolves exactly this ambiguity: only
+    when it is True does an empty development_coverage override the
+    legacy signal to "not linked"; otherwise the legacy matched_site_id/
+    linked_application_count/review_status signal (excluding needs_
+    confirmation and rejected, exactly as before this amendment) is still
+    trusted on its own terms.
+
+    Both branches are unreachable only for a caller that built a card
+    without going through build_allocation_discovery at all (e.g. a raw
+    dict in an older test, where development_coverage is None and
+    matched_site_relationship_rejected defaults to False) - falls
+    straight through to the original legacy check in that case."""
+    coverage = card.get("development_coverage")
+    if coverage is not None and any(
+        site_summary.applications and site_summary.relationship_review_status != "needs_confirmation"
+        for site_summary in coverage.site_summaries
+    ):
+        return True
+    if card.get("matched_site_relationship_rejected"):
+        return False
     return card["linked_application_count"] > 0 and card["review_status"] not in ("needs_confirmation", "rejected")
 
 
@@ -617,6 +762,7 @@ def build_allocation_card(
     allocation: LocalPlanSite, *, plan: LocalPlan | None, council_name: str, council_codes_on_plan: list[str],
     matched_site: Site | None, linked_applications: list, visual_summary: dict, visual_fallback,
     council_five_year_supply: float | None, development_coverage: dict | None = None,
+    matched_site_relationship_rejected: bool = False,
 ) -> dict:
     """Pure assembly of one allocation's full card - every input is already
     loaded by build_allocation_discovery's batched queries; this function
@@ -634,7 +780,20 @@ def build_allocation_card(
     AllocationSiteRelationship-derived intelligence, additive to the card,
     never replacing the old fields. None (the default) produces a card
     with a "coverage"/"phasing"/"opportunity" of None each, for any
-    existing caller/test that doesn't pass it."""
+    existing caller/test that doesn't pass it.
+
+    matched_site_relationship_rejected (Local Plan Sites Filter
+    Refinement) - True when an AllocationSiteRelationship row for
+    (allocation.id, allocation.matched_site_id) exists AND has
+    review_status="rejected". Needed because matched_site_id/
+    linked_applications can be legitimately genuine with NO
+    AllocationSiteRelationship row at all (the pre-Stage-2D
+    app.policy.site_match_review.confirm_site_match flow never wrote one)
+    - development_coverage alone cannot distinguish "no relationship ever
+    existed here" from "the relationship that existed has since been
+    rejected", both of which leave this Site absent from site_summaries
+    identically. has_trusted_linked_application reads this flag
+    specifically to make that distinction (see its own docstring)."""
     plan_status = plan.status if plan else (allocation.plan_status or None)
     plan_meta = PLAN_STATUS_META.get(plan_status, PLAN_STATUS_META[None])
     capacity = format_capacity(allocation)
@@ -745,7 +904,39 @@ def build_allocation_card(
         "updated_at": allocation.updated_at,
         "latitude": allocation.latitude,
         "longitude": allocation.longitude,
+        "matched_site_relationship_rejected": matched_site_relationship_rejected,
     }
+    # Stage 3A - AllocationSiteRelationship-derived development coverage,
+    # phasing and opportunity intelligence. Additive: None for any
+    # allocation this batch didn't compute it for (or any existing test/
+    # caller not yet passing development_coverage at all).
+    #
+    # MUST be set before has_trusted_linked_application(card)/
+    # build_matching_attributes(card) are called below (Local Plan Sites
+    # Filter Refinement amendment, fixed as a genuine bug caught during
+    # this task's own live verification): both now prefer card[
+    # "development_coverage"] when present, falling back to the legacy
+    # matched_site_id-derived fields only when it is genuinely absent -
+    # calling either of them BEFORE this key exists on the dict silently
+    # reads that fallback path even when development_coverage was about
+    # to be computed one statement later, exactly the stale-signal bug
+    # this whole amendment exists to fix (confirmed live: the JPA 10 Beal
+    # Valley gallery badge still read "Planning application linked" from
+    # the legacy path even though development_coverage itself correctly
+    # showed zero related Sites, until this ordering was corrected).
+    if development_coverage is not None:
+        coverage = development_coverage["coverage"]
+        phasing = development_coverage["phasing"]
+        card["development_coverage"] = coverage
+        card["phasing"] = phasing
+        card["opportunity"] = build_opportunity_signal(
+            plan_status_bucket=plan_meta["bucket"], coverage=coverage, phasing=phasing,
+        )
+    else:
+        card["development_coverage"] = None
+        card["phasing"] = None
+        card["opportunity"] = None
+
     card["why_it_matters_reasons"] = _why_it_matters_reasons(card)
     card["why_it_matters"] = card["why_it_matters_reasons"][0]
     card["investigate_next"] = _investigate_next(card)
@@ -764,24 +955,6 @@ def build_allocation_card(
     card["detail_no_application_message"] = ALLOCATION_DETAIL_NO_APPLICATION_MESSAGE
     card["detail_no_application_note"] = ALLOCATION_DETAIL_NO_APPLICATION_NOTE
     card["matching_attributes"] = build_matching_attributes(card)
-
-    # Stage 3A - AllocationSiteRelationship-derived development coverage,
-    # phasing and opportunity intelligence. Additive: None for any
-    # allocation this batch didn't compute it for (or any existing test/
-    # caller not yet passing development_coverage at all).
-    if development_coverage is not None:
-        coverage = development_coverage["coverage"]
-        phasing = development_coverage["phasing"]
-        card["development_coverage"] = coverage
-        card["phasing"] = phasing
-        card["opportunity"] = build_opportunity_signal(
-            plan_status_bucket=plan_meta["bucket"], coverage=coverage, phasing=phasing,
-        )
-    else:
-        card["development_coverage"] = None
-        card["phasing"] = None
-        card["opportunity"] = None
-
     card["development_coverage_summary"] = format_development_coverage_summary(card)
 
     return card
@@ -849,6 +1022,15 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
          source for this NEW intelligence, independent of matched_site_id
          above (which items 2-3 still use for their own, untouched
          legacy card fields).
+      8. Rejected AllocationSiteRelationship rows for exactly the
+         (allocation_id, matched_site_id) pairs this batch's own
+         matched_site_ids could name, batched by allocation_id.in_() - a
+         second, narrow query (Local Plan Sites Filter Refinement) purely
+         so has_trusted_linked_application can distinguish "this specific
+         matched_site_id's own relationship was rejected" from "no
+         AllocationSiteRelationship row exists for this allocation at
+         all" (see that function's own docstring) - never a per-
+         allocation query, one batch regardless of allocation count.
     council_five_year_supply is read directly off the already-loaded
     LocalPlan row (LocalPlan.five_year_supply_years) - no extra query.
     Council display names come from app.config.load_councils(), a config
@@ -881,6 +1063,18 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
 
     development_coverage_by_allocation = build_allocation_development_coverage(session, allocations)
 
+    rejected_relationship_pairs: set[tuple[int, int]] = set()
+    if allocation_ids:
+        rejected_relationship_pairs = {
+            (r.allocation_id, r.site_id)
+            for r in session.execute(
+                select(AllocationSiteRelationship).where(
+                    AllocationSiteRelationship.allocation_id.in_(allocation_ids),
+                    AllocationSiteRelationship.review_status == "rejected",
+                )
+            ).scalars()
+        }
+
     cards = []
     for allocation in allocations:
         plan = allocation.local_plan
@@ -902,6 +1096,10 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
             visual_fallback=plan_wide_fallbacks.get(allocation.local_plan_id) if allocation.local_plan_id else None,
             council_five_year_supply=plan.five_year_supply_years if plan else None,
             development_coverage=development_coverage_by_allocation.get(allocation.id),
+            matched_site_relationship_rejected=(
+                (allocation.id, allocation.matched_site_id) in rejected_relationship_pairs
+                if allocation.matched_site_id else False
+            ),
         )
         cards.append(card)
 
@@ -1087,6 +1285,16 @@ def apply_filters(cards: list[dict], filters: dict) -> list[dict]:
         result = [c for c in result if has_trusted_linked_application(c)]
     elif application_filter == "not_linked":
         result = [c for c in result if not has_trusted_linked_application(c)]
+
+    # Local Plan Sites Filter Refinement - a deliberately separate axis
+    # from application_linkage above (see planning_activity_status's own
+    # docstring for the exact distinction). A card with no development_
+    # coverage computed (planning_activity_status returns None) never
+    # matches any of the three concrete states - same fail-safe behaviour
+    # as every other filter here when its underlying signal is absent.
+    activity_filter = filters.get("planning_activity")
+    if activity_filter in (PLANNING_ACTIVITY_IDENTIFIED, PLANNING_ACTIVITY_NONE, PLANNING_ACTIVITY_REVIEW_REQUIRED):
+        result = [c for c in result if planning_activity_status(c) == activity_filter]
 
     visual_filter = filters.get("visual_evidence")
     if visual_filter == "confirmed":

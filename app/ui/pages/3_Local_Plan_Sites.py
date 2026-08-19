@@ -24,16 +24,23 @@ import pandas as pd
 import streamlit as st
 
 from app.reporting.allocation_discovery import (
+    CAPACITY_BAND_LABELS,
     DEVELOPMENT_COVERAGE_LABELS,
     OPPORTUNITY_DETAIL_LABELS,
     PHASING_DETAIL_LABELS,
+    PLANNING_ACTIVITY_IDENTIFIED,
+    PLANNING_ACTIVITY_LABELS,
+    PLANNING_ACTIVITY_NONE,
+    PLANNING_ACTIVITY_REVIEW_REQUIRED,
     SORT_OPTIONS,
     apply_filters,
     build_allocation_discovery,
     build_summary_metrics,
+    capacity_band_range,
     compute_categories,
     linked_application_help,
     matched_status_help,
+    planning_activity_help,
     search_allocations,
     sort_cards,
     total_homes_kpi_caption,
@@ -572,38 +579,57 @@ with st.container(border=True):
                 format_func=lambda pid: dict(local_plan_options).get(pid, str(pid)), key="alloc-filter-plan",
             )
         with col_b:
+            # Section 3/4 - two deliberately separate concepts (see
+            # planning_activity_status's own docstring for the exact
+            # distinction): a confident yes/no on trusted linked
+            # Applications, and the fuller activity/review picture behind
+            # it. Both read app.reporting.allocation_discovery's one
+            # canonical AllocationSiteRelationship-derived source, so they
+            # can never disagree with the "No Linked Application" tab or
+            # each other.
+            application_choice = st.selectbox(
+                "Planning applications", ["Any", "Linked planning application", "No linked planning application"],
+                index=0, key="alloc-filter-application", help=linked_application_help(),
+            )
+            activity_choice = st.selectbox(
+                "Planning activity", ["Any"] + [PLANNING_ACTIVITY_LABELS[s] for s in (
+                    PLANNING_ACTIVITY_IDENTIFIED, PLANNING_ACTIVITY_NONE, PLANNING_ACTIVITY_REVIEW_REQUIRED,
+                )], index=0, key="alloc-filter-activity", help=planning_activity_help(),
+            )
+        with col_c:
             matched_choice = st.selectbox(
                 "Matched Site", ["Any", "Matched", "Unmatched"], index=0, key="alloc-filter-matched",
                 help=matched_status_help(),
             )
-            application_choice = st.selectbox(
-                "Planning activity", ["Any", "Linked Application", "No linked Application"], index=0,
-                key="alloc-filter-application", help=linked_application_help(),
-            )
-        with col_c:
             visual_choice = st.selectbox(
                 "Visual evidence", ["Any", "Confirmed visual", "Suggested visual", "No visual"], index=0,
                 key="alloc-filter-visual",
             )
+
+        review_col, capacity_col = st.columns(2)
+        with review_col:
             review_choice = st.multiselect(
                 "Review state", ["auto_applied", "needs_confirmation", "confirmed"], default=[],
                 format_func=lambda r: {"auto_applied": "Auto-applied", "needs_confirmation": "Needs confirmation", "confirmed": "Confirmed"}[r],
                 key="alloc-filter-review",
             )
-
-        capacity_values = [c["capacity"]["value"] for c in all_cards if c["capacity"]["value"] is not None]
-        capacity_range = None
-        capacity_full_span = None
-        if capacity_values:
-            cap_min, cap_max = min(capacity_values), max(capacity_values)
-            if cap_min < cap_max:
-                capacity_full_span = (cap_min, cap_max)
-                capacity_range = st.slider(
-                    "Capacity range (homes)", min_value=cap_min, max_value=cap_max, value=(cap_min, cap_max),
-                    key="alloc-filter-capacity",
-                    help="An allocation with no stated capacity is only excluded once this is narrowed away "
-                         "from the full range shown here.",
-                )
+        with capacity_col:
+            # Section 6/7/9 - preset bands replace the old single linear
+            # slider (which spanned the full observed ~3-15,000 range,
+            # leaving the commercially common 50-200-home range almost no
+            # usable control). This is the allocation's own TOTAL stated
+            # capacity (card["capacity"]["value"] - unchanged field, see
+            # format_capacity), never linked-application units or residual
+            # capacity. "Any" includes unknown-capacity allocations; every
+            # other band excludes them (capacity_band_range -> apply_
+            # filters' existing capacity_min/capacity_max, unchanged
+            # mechanism, already correct on this point).
+            capacity_band_label = st.selectbox(
+                "Allocation capacity", CAPACITY_BAND_LABELS, index=0, key="alloc-filter-capacity-band",
+                help="The Local Plan allocation's own total stated capacity - not homes already identified by "
+                     "linked planning applications, and not residual (unaccounted-for) capacity. \"Any\" "
+                     "includes allocations with no stated capacity; every other band excludes them.",
+            )
 
         badge_cols = st.columns(2)
         with badge_cols[0]:
@@ -614,13 +640,16 @@ with st.container(border=True):
     if st.button("Clear filters", key="alloc-filter-clear"):
         for key in (
             "alloc-filter-council", "alloc-filter-bucket", "alloc-filter-use", "alloc-filter-plan",
-            "alloc-filter-matched", "alloc-filter-application", "alloc-filter-visual", "alloc-filter-review",
-            "alloc-filter-capacity", "alloc-filter-joint", "alloc-filter-crossboundary", "alloc-search",
+            "alloc-filter-matched", "alloc-filter-application", "alloc-filter-activity", "alloc-filter-visual",
+            "alloc-filter-review", "alloc-filter-capacity-band", "alloc-filter-joint",
+            "alloc-filter-crossboundary", "alloc-search",
         ):
             st.session_state.pop(key, None)
         if "council" in st.query_params:
             del st.query_params["council"]
         st.rerun()
+
+_capacity_min, _capacity_max = capacity_band_range(capacity_band_label)
 
 filters = {
     "councils": selected_councils or None,
@@ -628,19 +657,24 @@ filters = {
     "intended_uses": selected_uses or None,
     "local_plan_ids": selected_plan_ids or None,
     "matched": {"Matched": "matched", "Unmatched": "unmatched"}.get(matched_choice),
-    "application_linkage": {"Linked Application": "linked", "No linked Application": "not_linked"}.get(application_choice),
+    "application_linkage": {
+        "Linked planning application": "linked", "No linked planning application": "not_linked",
+    }.get(application_choice),
+    "planning_activity": {
+        PLANNING_ACTIVITY_LABELS[PLANNING_ACTIVITY_IDENTIFIED]: PLANNING_ACTIVITY_IDENTIFIED,
+        PLANNING_ACTIVITY_LABELS[PLANNING_ACTIVITY_NONE]: PLANNING_ACTIVITY_NONE,
+        PLANNING_ACTIVITY_LABELS[PLANNING_ACTIVITY_REVIEW_REQUIRED]: PLANNING_ACTIVITY_REVIEW_REQUIRED,
+    }.get(activity_choice),
     "visual_evidence": {"Confirmed visual": "confirmed", "Suggested visual": "suggested", "No visual": "none"}.get(visual_choice),
     "review_states": review_choice or None,
     "joint_plan_only": joint_plan_only,
     "cross_boundary_only": cross_boundary_only,
-    # Only a constraint once the user has actually narrowed the slider away
-    # from the full observed range - at its default (full-span) position
-    # this must behave as "no constraint", never silently excluding every
-    # allocation with an unstated capacity (apply_filters' capacity_min/max
-    # only keeps cards with a KNOWN value once set - correct once a user
-    # deliberately narrows the range, wrong as an always-on default).
-    "capacity_min": capacity_range[0] if capacity_range and capacity_range != capacity_full_span else None,
-    "capacity_max": capacity_range[1] if capacity_range and capacity_range != capacity_full_span else None,
+    # "Any" (capacity_band_range's own (None, None)) applies no
+    # constraint at all - unknown-capacity allocations included. Every
+    # other band excludes them (apply_filters' capacity_min/max already
+    # only keeps cards with a KNOWN value once set - unchanged mechanism).
+    "capacity_min": _capacity_min,
+    "capacity_max": _capacity_max,
 }
 
 filtered = search_allocations(all_cards, query)
