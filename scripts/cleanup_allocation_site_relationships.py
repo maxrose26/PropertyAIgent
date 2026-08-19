@@ -76,10 +76,17 @@ def _count(outcomes, outcome_name: str) -> int:
     return sum(1 for o in outcomes if o.outcome == outcome_name)
 
 
-def _print_coverage_comparison(session, allocation_ids: list[int]) -> None:
+def _outcome_breakdown(outcomes) -> dict[str, int]:
+    breakdown: dict[str, int] = {}
+    for o in outcomes:
+        breakdown[o.outcome] = breakdown.get(o.outcome, 0) + 1
+    return breakdown
+
+
+def _print_coverage_comparison(session, allocation_ids: list[int], report) -> None:
     allocations = [a for a in (session.get(LocalPlanSite, aid) for aid in allocation_ids) if a is not None]
     current = build_allocation_development_coverage(session, allocations)
-    proposed = simulate_proposed_coverage(session, allocation_ids)
+    proposed = simulate_proposed_coverage(session, allocation_ids, report)
 
     print("\n=== CURRENT VS PROPOSED DEVELOPMENT COVERAGE (affected allocations + regression anchor) ===")
     for allocation in allocations:
@@ -121,9 +128,11 @@ def _run_dry_run(session) -> None:
     print(f"\nreject targets requested: {len(report.reject_outcomes)}")
     print(f"reject targets still valid after revalidation: {reject_valid}")
     print(f"reject targets blocked by drift/other: {reject_blocked}")
+    print(f"  reject outcome breakdown: {_outcome_breakdown(report.reject_outcomes)}")
     print(f"needs_confirmation targets requested: {len(report.needs_confirmation_outcomes)}")
     print(f"needs_confirmation targets still valid after revalidation: {review_valid}")
     print(f"review targets blocked by drift/other: {review_blocked}")
+    print(f"  needs_confirmation outcome breakdown: {_outcome_breakdown(report.needs_confirmation_outcomes)}")
 
     keep_count = total - len(report.reject_outcomes) - len(report.needs_confirmation_outcomes)
     print(f"keep count (unaffected relationships): {keep_count}")
@@ -135,7 +144,7 @@ def _run_dry_run(session) -> None:
     print(f"\naffected allocations (allocation_id): {affected}")
 
     display_ids = sorted(set(_MINIMUM_COVERAGE_DISPLAY_ALLOCATION_IDS) | set(affected))
-    _print_coverage_comparison(session, display_ids)
+    _print_coverage_comparison(session, display_ids, report)
 
     print("\n=== RESULT ===")
     print("DRY RUN COMPLETE - NO WRITES MADE")
