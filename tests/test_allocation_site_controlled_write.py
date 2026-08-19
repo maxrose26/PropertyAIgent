@@ -465,5 +465,12 @@ def test_no_schema_change_local_plan_site_columns_unchanged():
         "match_review_note", "review_status", "duplicate_classification", "duplicate_classification_note",
         "progression_signal", "progression_reasons", "progression_computed_at", "latitude", "longitude",
         "extracted_at", "updated_at",
+        # AI Allocation Intelligence Summary (Phase 1 Local Plan Intelligence) -
+        # additive columns only, same grounded-numbers-then-narrate pattern as
+        # LocalPlan.ai_summary_*. See app.reporting.allocation_intelligence_summary.
+        "ai_summary_headline", "ai_summary_overview", "ai_summary_key_points",
+        "ai_summary_key_uncertainties", "ai_summary_investigation_priorities",
+        "ai_summary_generated_at", "ai_summary_context_fingerprint", "ai_summary_model",
+        "ai_summary_prompt_version", "ai_summary_status", "ai_summary_generation_error",
     }
     assert {c.name for c in LocalPlanSite.__table__.columns} == expected_local_plan_site_columns

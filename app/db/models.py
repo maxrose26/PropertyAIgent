@@ -593,6 +593,42 @@ class LocalPlanSite(Base):
     extracted_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
+    # --- AI Allocation Intelligence Summary (Phase 1 Local Plan
+    # Intelligence) - additive columns, deliberately named/shaped identical
+    # to LocalPlan.ai_summary_* above (same grounded-numbers-then-narrate
+    # architecture, app.reporting.allocation_intelligence_summary). NEVER
+    # overwrites any source field on this row (site_name, minimum_dwellings,
+    # policy_reference, ...) - this is purely an additive interpretation
+    # layer over facts that continue to live in their own trusted places
+    # (this row, AllocationSiteRelationship, ControlRelationship). Structured
+    # (not free text) so the UI can render distinct bullet lists without
+    # re-parsing prose - same reasoning as LocalPlan.ai_summary_key_risks
+    # etc. Persisted (not regenerated on every page view), gated by
+    # ai_summary_context_fingerprint - see should_regenerate_allocation_
+    # summary. ai_summary_status/ai_summary_generation_error record the
+    # last generation ATTEMPT's outcome without ever clobbering the last
+    # SUCCESSFUL summary fields above them - a failed regeneration leaves
+    # ai_summary_headline/overview/... exactly as they were.
+    ai_summary_headline: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_overview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_key_points: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_key_uncertainties: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_investigation_priorities: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_summary_generated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # sha256 of the narrative-relevant subset of AllocationIntelligenceContext
+    # - see compute_context_fingerprint's own docstring for exactly what is
+    # (and, deliberately, is not) included, so a routine check that finds
+    # nothing new never forces a regeneration/AI-cost event.
+    ai_summary_context_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ai_summary_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ai_summary_prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # ok | error - null means "never attempted". A row can be status="ok"
+    # with the summary fields above populated from an OLDER successful
+    # generation even while the most recent attempt failed - see
+    # generate_allocation_intelligence_summary's own docstring.
+    ai_summary_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ai_summary_generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     matched_site: Mapped["Site | None"] = relationship(foreign_keys=[matched_site_id])
     local_plan: Mapped["LocalPlan | None"] = relationship(back_populates="allocations")
     versions: Mapped[list["AllocationVersion"]] = relationship(

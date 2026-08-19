@@ -438,8 +438,14 @@ def test_source_note_wired_into_allocation_ui():
 
 
 def test_no_ai_or_external_calls_in_reporting_or_ui():
+    """AI Allocation Intelligence Summary amendment - 3_Local_Plan_Sites.py
+    now legitimately mentions "OpenAI" in a comment explaining that it
+    deliberately never calls it (Section 8) - narrowed to the actual
+    call-shaped pattern, same fix already applied once elsewhere in this
+    codebase for an identical false-positive."""
     for path in ("app/reporting/ownership_control.py", "app/ui/pages/3_Local_Plan_Sites.py"):
         lowered = _read_source(path).lower()
-        assert "openai" not in lowered
+        assert "import openai" not in lowered
+        assert "from openai" not in lowered
         assert "companies_house" not in lowered
         assert "land_registry" not in lowered

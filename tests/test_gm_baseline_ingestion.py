@@ -83,6 +83,13 @@ def test_string_column_lengths_derived_from_model_metadata_match_known_schema():
         "review_status": 30,
         "duplicate_classification": 30,
         "progression_signal": 20,
+        # AI Allocation Intelligence Summary (Phase 1 Local Plan Intelligence) -
+        # the 4 new String-typed ai_summary_* columns (the other 7 are Text,
+        # unbounded). See app.reporting.allocation_intelligence_summary.
+        "ai_summary_context_fingerprint": 64,
+        "ai_summary_model": 100,
+        "ai_summary_prompt_version": 50,
+        "ai_summary_status": 20,
     }
 
 
