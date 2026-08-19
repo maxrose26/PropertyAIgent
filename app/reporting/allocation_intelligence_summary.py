@@ -78,10 +78,51 @@ MODEL = "gpt-4o-mini"
 # app.reporting.local_plan_summary.PROMPT_VERSION exactly) so a version
 # bump alone never retroactively invalidates an already-generated summary
 # until it is actually next regenerated.
-PROMPT_VERSION = "allocation-intelligence-summary-v1"
+#
+# v2 (Pre-Sample Amendment, "Trusted Planning Application Status/Decision
+# Context") - build_summary_prompt materially changed: new representative-
+# Application status/decision/category rendering, a bounded multi-
+# Application category summary, and five new RULES distinguishing planning
+# ACTIVITY from planning OUTCOME. No production summary has ever been
+# generated under v1 (0 rows exist), so this bump has no practical effect
+# today - it is the correct, disciplined action regardless, per this
+# constant's own contract above.
+#
+# v3 (Final Pre-Merge Amendment, "needs_confirmation Trust Boundary") -
+# _render_site_line's needs_confirmation branch materially changed (no
+# longer says "capacity not yet determined"/lists any reference - a wholly
+# different, more restrictive sentence). No production summary has ever
+# been generated under v1 or v2 (0 rows exist), so this bump again has no
+# practical effect today.
+PROMPT_VERSION = "allocation-intelligence-summary-v3"
 
 
 # --- Context object (Section 4) ---------------------------------------------
+
+
+@dataclass
+class RepresentativeApplicationDetail:
+    """The trusted, portal-scraped planning status/decision facts for the
+    ONE Application app.ui.common.pick_representative_application already
+    selects for this Site (Pre-Sample Amendment, "Trusted Planning
+    Application Status/Decision Context") - the SAME Application whose
+    SchemeIntelligence.total_units_final already determines this Site's
+    capacity contribution (SiteContextEntry.capacity above), so the status/
+    decision the model sees always describes the SAME figure it is being
+    given, never a different Application's status attached to a different
+    Application's capacity. Every field here is a raw, portal-scraped fact
+    already used elsewhere in this codebase's own customer-facing
+    reporting (app.reporting.scheme_summary's own _fmt_application reads
+    the identical fields) - none of it is AI-derived, and none of it is
+    invented for this task. status/decision are PLANNING ACTIVITY/OUTCOME
+    facts only - never a construction/delivery signal (see build_summary_
+    prompt's own rules)."""
+    reference: str
+    status: str | None  # raw portal status, e.g. "Decided", "Under Consultation", "Awaiting decision"
+    decision: str | None  # raw portal decision, e.g. "Granted", "Refuse", "Withdrawn" - null until determined
+    decision_issued_date: str | None  # raw scraped date string, null until a decision exists
+    application_category: str | None  # deterministic, e.g. "primary_residential" | "condition_discharge_or_details" - see app.scrapers.unit_filter.classify_application_category, reused verbatim, never re-derived
+    proposal_summary: str | None  # truncated proposal text, same 150-char convention as app.reporting.scheme_summary._fmt_application
 
 
 @dataclass
@@ -92,7 +133,15 @@ class SiteContextEntry:
     capacity_known: bool
     capacity: int | None
     application_references: list[str] = field(default_factory=list)
-    representative_application_reference: str | None = None
+    representative_application: RepresentativeApplicationDetail | None = None
+    # Count of this Site's OTHER (non-representative) trusted Applications,
+    # grouped by their own deterministic application_category - deliberately
+    # NOT one entry per Application (Section 6: "the AI should NOT produce
+    # something resembling Application A..., B..., C... x30" - see Heald
+    # Green West's real ~30-Application case). Reuses the SAME bounded,
+    # already-existing category vocabulary as representative_application's
+    # own application_category field, never a new classification scheme.
+    other_applications_by_category: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -171,30 +220,95 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
     sites: list[SiteContextEntry] = []
     disputed_site_count = 0
     for s in site_summaries:
-        if s.relationship_review_status == "needs_confirmation":
+        is_disputed = s.relationship_review_status == "needs_confirmation"
+        if is_disputed:
             disputed_site_count += 1
+
+        # Final Pre-Merge Amendment ("needs_confirmation Trust Boundary") -
+        # a disputed AllocationSiteRelationship must never enter the
+        # context in the SAME Application-shaped structure trusted
+        # activity uses, even hedged by a text label - the ORIGINAL V1
+        # design already committed to "never named, only counted" for
+        # disputed evidence (see disputed_site_count's own comment above,
+        # unchanged); representative_application/other_applications_by_
+        # category/capacity/application_references are the Application-
+        # shaped facts that must be withheld here, STRUCTURALLY (None/
+        # empty at construction, not merely hedged in prompt text) so a
+        # disputed Site can never be mistaken for trusted linked activity
+        # by the model OR by anything else reading this dataclass (the
+        # fingerprint included - see compute_context_fingerprint below).
+        rep = s.representative_application if not is_disputed else None
+        rep_detail = None
+        if rep is not None:
+            proposal = rep.proposal or None
+            rep_detail = RepresentativeApplicationDetail(
+                reference=rep.reference, status=rep.status, decision=rep.decision,
+                decision_issued_date=rep.decision_issued_date, application_category=rep.application_category,
+                proposal_summary=proposal[:150] if proposal else None,
+            )
+
+        if is_disputed:
+            sites.append(SiteContextEntry(
+                site_id=s.site_id, label=s.site.display_address,
+                relationship_review_status=s.relationship_review_status,
+                capacity_known=False, capacity=None,
+                application_references=[], representative_application=None,
+                other_applications_by_category={},
+            ))
+            continue
+
+        # Section 6 - every OTHER trusted Application on this Site (never
+        # the representative one, already surfaced in full above) is
+        # counted, not narrated - grouped by the SAME deterministic
+        # application_category classify_application_category already
+        # assigned at ingestion, "uncategorized" only for the rare
+        # legacy row with no value at all (nullable column).
+        other_applications_by_category: dict[str, int] = {}
+        for a in s.applications:
+            if rep is not None and a.id == rep.id:
+                continue
+            category = a.application_category or "uncategorized"
+            other_applications_by_category[category] = other_applications_by_category.get(category, 0) + 1
+
         sites.append(SiteContextEntry(
             site_id=s.site_id, label=s.site.display_address,
             relationship_review_status=s.relationship_review_status,
             capacity_known=s.capacity_known, capacity=s.capacity,
             application_references=sorted({a.reference for a in s.applications}),
-            representative_application_reference=(
-                s.representative_application.reference if s.representative_application else None
-            ),
+            representative_application=rep_detail,
+            other_applications_by_category=other_applications_by_category,
         ))
 
     control_sections = get_allocation_control_intelligence(
         session, site_summaries,
         indicative_residual_capacity=coverage.indicative_residual_capacity if coverage else None,
     )
+    # Final Pre-Merge Amendment ("needs_confirmation Trust Boundary",
+    # Section 5) - get_allocation_control_intelligence only ever checks
+    # ControlRelationship.review_status (whether the OWNERSHIP evidence
+    # itself is disputed); it has no knowledge of whether the SITE it is
+    # attached to only reached this allocation via a disputed
+    # AllocationSiteRelationship. An "auto_applied" (accepted)
+    # ControlRelationship on a Site linked only by a needs_confirmation
+    # relationship must still be treated as uncertain HERE, at the
+    # allocation-context boundary - never redesigning get_allocation_
+    # control_intelligence itself (it is correct and unchanged for its
+    # own, wider callers, e.g. the Ownership & Control UI section, which
+    # has its own display requirements outside this task's scope).
+    disputed_site_ids = {s.site_id for s in site_summaries if s.relationship_review_status == "needs_confirmation"}
+
     ownership_entities: list[OwnershipContextEntry] = []
     ownership_review_pending_count = 0
     residual_ownership_known = False
     for section in control_sections:
+        site_relationship_disputed = section.site_id is not None and section.site_id in disputed_site_ids
         for group in section.groups:
-            if group.needs_review:
-                # Section 14 - a disputed ownership/control group is NEVER
-                # named as a fact, only counted as an uncertainty signal.
+            if group.needs_review or site_relationship_disputed:
+                # Section 14 (unchanged) / Section 5 (this amendment) - a
+                # disputed ownership/control group, OR any group attached
+                # to a Site whose OWN allocation linkage is itself
+                # disputed, is NEVER named as a fact - only counted as an
+                # uncertainty signal.
                 ownership_review_pending_count += 1
                 continue
             ownership_entities.append(OwnershipContextEntry(
@@ -293,6 +407,33 @@ def compute_context_fingerprint(context: AllocationIntelligenceContext) -> str:
                 "site_id": s.site_id, "relationship_review_status": s.relationship_review_status,
                 "capacity_known": s.capacity_known, "capacity": s.capacity,
                 "application_references": sorted(s.application_references),
+                # Trusted planning status/decision facts (Pre-Sample
+                # Amendment) - status/decision/decision_issued_date/
+                # application_category are all narrative-material (a
+                # pending->granted or pending->refused/withdrawn change is
+                # exactly the kind of thing a customer-facing summary must
+                # not go stale on - see the amendment's own Section 8).
+                # Deliberately EXCLUDES the representative Application's
+                # own `reference`-independent proposal_summary text and
+                # application_received date here - neither changes what
+                # the summary would actually SAY (same reasoning this
+                # function's own docstring already applies to last_checked/
+                # source_document_url above); a trivial portal wording
+                # correction or a long-past submission date being re-
+                # scraped identically must not force a regeneration.
+                # `reference` itself IS included - a different Application
+                # becoming representative is a genuinely different fact.
+                "representative_application": (
+                    {
+                        "reference": s.representative_application.reference,
+                        "status": s.representative_application.status,
+                        "decision": s.representative_application.decision,
+                        "decision_issued_date": s.representative_application.decision_issued_date,
+                        "application_category": s.representative_application.application_category,
+                    }
+                    if s.representative_application else None
+                ),
+                "other_applications_by_category": dict(sorted(s.other_applications_by_category.items())),
             }
             for s in context.sites
         ], key=lambda d: d["site_id"]),
@@ -374,15 +515,67 @@ _CAPACITY_ACCOUNTING_LABELS = {
 }
 
 
+def _render_representative_application(rep: RepresentativeApplicationDetail) -> str:
+    """The trusted planning ACTIVITY/OUTCOME facts for the one Application
+    that already determines this Site's capacity figure - status/decision
+    are raw portal facts, never a construction/delivery signal (see
+    build_summary_prompt's own RULES for how the model must use these)."""
+    category_bit = f", category: {rep.application_category}" if rep.application_category else ""
+    status_bit = rep.status or "status not stated"
+    decision_bit = rep.decision or "no decision recorded yet"
+    date_bit = f", decision dated {rep.decision_issued_date}" if rep.decision_issued_date else ""
+    proposal_bit = f" Proposal: {rep.proposal_summary}" if rep.proposal_summary else ""
+    return (
+        f"    Representative Application {rep.reference} - status: {status_bit}, decision: {decision_bit}{date_bit}{category_bit}."
+        f"{proposal_bit}"
+    )
+
+
 def _render_site_line(s: SiteContextEntry) -> str:
+    if s.relationship_review_status == "needs_confirmation":
+        # Final Pre-Merge Amendment (Section 3B/7) - a disputed Site is
+        # never described with the SAME "Linked Application(s): ..."
+        # wording trusted Sites get, even to say "none" - this Site MAY
+        # have linked Applications, they are simply withheld pending
+        # confirmation, and saying "no linked Application" would be a
+        # false statement, not just an unhedged one. No capacity,
+        # reference, status, or decision of any kind appears here -
+        # SiteContextEntry itself never carries them for a disputed Site
+        # (see build_allocation_context).
+        return (
+            f"- Site \"{s.label}\" [RELATIONSHIP STILL PENDING CONFIRMATION - do not present as settled]: "
+            f"potential planning activity may exist, but this Site's link to the allocation is unconfirmed - "
+            f"do not describe any capacity, Application, status, or decision for it."
+        )
+
     status_bit = {
         "auto_applied": "trusted relationship",
         "confirmed": "human-confirmed relationship",
-        "needs_confirmation": "RELATIONSHIP STILL PENDING CONFIRMATION - do not present as settled",
     }.get(s.relationship_review_status, s.relationship_review_status)
     cap_bit = f"{s.capacity:,} homes identified" if s.capacity_known else "capacity not yet determined"
-    apps_bit = ", ".join(s.application_references) if s.application_references else "no linked Application"
-    return f"- Site \"{s.label}\" [{status_bit}]: {cap_bit}. Linked Application(s): {apps_bit}."
+    # Section 6 - listing every reference is fine for the common small
+    # case, but for a Site with many Applications (Heald Green West's real
+    # ~30) even a bare reference list starts to invite exhaustive
+    # enumeration; above a small threshold, name only the count - the
+    # representative Application and category breakdown lines below
+    # already give the model everything it needs.
+    if not s.application_references:
+        apps_bit = "no linked Application"
+    elif len(s.application_references) <= 5:
+        apps_bit = ", ".join(s.application_references)
+    else:
+        apps_bit = f"{len(s.application_references)} linked Applications (see representative Application and category breakdown below)"
+    lines = [f"- Site \"{s.label}\" [{status_bit}]: {cap_bit}. Linked Application(s): {apps_bit}."]
+    if s.representative_application:
+        lines.append(_render_representative_application(s.representative_application))
+    if s.other_applications_by_category:
+        # Section 6 - a bounded count, never one line per Application (the
+        # real Heald Green West case has ~30 linked Applications; this is
+        # the mechanism that keeps the prompt from becoming an Application
+        # register regardless of how many secondary filings exist).
+        counts_bit = ", ".join(f"{count} {category}" for category, count in sorted(s.other_applications_by_category.items()))
+        lines.append(f"    Plus {sum(s.other_applications_by_category.values())} further Application(s) on this Site ({counts_bit}) - do not narrate these individually.")
+    return "\n".join(lines)
 
 
 def _render_ownership_line(o: OwnershipContextEntry) -> str:
@@ -440,10 +633,15 @@ RULES - follow every one of these exactly:
 8. key_uncertainties should name the specific pending-review counts, unknown capacity, or missing ownership evidence above that limit confidence - be specific, not generic.
 9. investigation_priorities must each be directly traceable to a fact given above (e.g. investigate the residual capacity, investigate a pending relationship) - never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
 10. referenced_application_references, referenced_entity_names, and referenced_roles must each list EVERY Application reference / organisation name / role label you used anywhere in headline, overview, key_points, key_uncertainties, or investigation_priorities - used for automatic fact-checking, so be complete and exact.
+11. PLANNING ACTIVITY is never the same thing as PLANNING OUTCOME. A Site having a linked Application (live, registered, or under consultation) demonstrates planning activity - it does NOT by itself mean planning permission exists, and it never means the development is consented, under construction, delivered, implemented, or completed. State the Application's actual status/decision (given above) rather than assuming one from the fact that an Application merely exists.
+12. Only describe an Application as having planning permission/consent if its stated decision above literally says so (e.g. "Granted"). A refused or withdrawn Application remains real, relevant planning history - describe it accurately as refused/withdrawn, never as ongoing or successful.
+13. Never describe an Application, or the allocation, as under construction, built, delivered, or completed - PropertyAIgent does not hold construction/delivery evidence; a granted planning permission is still only a planning permission.
+14. Never infer an Application's status or decision from the identified/residual capacity figures or the development coverage percentage above - those are pure capacity arithmetic and carry no planning-outcome information on their own. If a large share of an allocation's capacity is "identified" via an Application that is still pending/under consultation, say so explicitly - do not let the size of the figure imply the application has been decided.
+15. If a Site's further Applications are given only as a category count (never individually narrated), do not enumerate or speculate about them - one sentence acknowledging the volume (e.g. "a further N applications relate to this Site, mostly condition-discharge/technical filings") is enough; never produce anything resembling a list of every Application.
 
 Write:
 - headline: one short sentence (under 15 words) capturing the allocation's overall commercial position.
-- overview: 2-3 short paragraphs, plain prose, no markdown headers, covering: what this allocation is and its planning status/scale; what planning activity has been identified and how much capacity is accounted for versus indicative residual capacity; what ownership/control evidence exists and for which Site(s); material uncertainties.
+- overview: 2-3 short paragraphs, plain prose, no markdown headers, covering: what this allocation is and its planning status/scale; what planning activity has been identified, its actual status/decision, and how much capacity is accounted for versus indicative residual capacity (distinguishing identified activity from a determined planning outcome per Rules 11-14); what ownership/control evidence exists and for which Site(s); material uncertainties.
 - key_points: 3-5 concise bullet-style facts (each a short sentence).
 - key_uncertainties: 0-4 concise items (empty list if genuinely none).
 - investigation_priorities: 0-3 concise items (empty list if genuinely none).
