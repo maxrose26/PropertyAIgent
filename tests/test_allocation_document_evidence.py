@@ -670,3 +670,179 @@ def test_south_of_hyde_production_evidence_pattern_is_alternative_not_contradict
     assert result.recommended_outcome == DOCUMENT_CONFIRMED_SITE
     assert result.recommended_outcome != DOCUMENT_CONTRADICTS_FUZZY
     assert result.evidenced_site_ids == {document_site.id}
+
+
+# ---------------------------------------------------------------------------
+# Stage 2E.2 Final Matcher Amendment - multi-reference sentence attribution
+# (Section 17 items 1-8)
+# ---------------------------------------------------------------------------
+
+
+def test_forms_part_of_one_allocation_and_adjoins_another_attributes_correctly(session):
+    """Item 1 / the real production case (FUL/355603/26, Land South Of
+    Bullcote Lane): "forms part of JPA12 and adjoins JPA10" must not let
+    JPA12's positive phrase bleed onto JPA10 - JPA10 must instead pick up
+    its own, closer "adjoins" language as a contradiction."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10")
+    app = _make_application(session, "testcouncil", "FUL/355603/26", site_id=site.id)
+    _make_document(session, app.id, "other",
+                    "Whilst the present application envisages 248 dwellings, the site forms part of Places "
+                    "for Everyone allocation policy JPA 12 Broadbent Moss and adjoins allocation Policy "
+                    "JPA 10 Beal Valley within which a total of 1930 dwellings are proposed.")
+    session.commit()
+
+    jpa12_positive, jpa12_contra = find_document_evidence_for_allocation(session, jpa12)
+    jpa10_positive, jpa10_contra = find_document_evidence_for_allocation(session, jpa10)
+
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in jpa12_positive)
+    assert jpa12_contra == []
+
+    assert not any(h.site_id == site.id for h in jpa10_positive)
+    assert any(h.site_id == site.id and h.category == CONTRADICTORY_REFERENCE for h in jpa10_contra)
+
+
+def test_within_one_allocation_adjacent_to_another_attributes_correctly(session):
+    """Item 2 - a different phrasing pair ("within .../adjacent to
+    ...") must split the same way."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Boundary Parcel")
+    jpa30 = _make_allocation(session, "testcouncil", "New Carrington", "JPA 30")
+    jpa29 = _make_allocation(session, "testcouncil", "South of Hyde", "JPA 29")
+    app = _make_application(session, "testcouncil", "APP/2", site_id=site.id)
+    _make_document(session, app.id, "other",
+                    "The site lies within policy JPA 30, adjacent to the allocation JPA 29 to the south.")
+    session.commit()
+
+    jpa30_positive, jpa30_contra = find_document_evidence_for_allocation(session, jpa30)
+    jpa29_positive, jpa29_contra = find_document_evidence_for_allocation(session, jpa29)
+
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in jpa30_positive)
+    assert not any(h.site_id == site.id for h in jpa29_positive)
+    assert any(h.site_id == site.id and h.category == CONTRADICTORY_REFERENCE for h in jpa29_contra)
+
+
+def test_forms_part_of_two_allocations_both_positive(session):
+    """Item 3 - a single phrase governing a genuine compound object
+    ("forms part of X and Y") must still credit BOTH references - nearest-
+    phrase attribution must not require the phrase to be repeated."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Shared Parcel")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10")
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12")
+    app = _make_application(session, "testcouncil", "APP/3", site_id=site.id)
+    _make_document(session, app.id, "other",
+                    "The site forms part of allocations JPA 10 and JPA 12 within the joint masterplan area.")
+    session.commit()
+
+    jpa10_positive, _ = find_document_evidence_for_allocation(session, jpa10)
+    jpa12_positive, _ = find_document_evidence_for_allocation(session, jpa12)
+
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in jpa10_positive)
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in jpa12_positive)
+
+
+def test_straddles_two_allocations_genuine_multi_allocation_evidence(session):
+    """Item 4 - "straddles" is explicit enough to support two DIFFERENT
+    allocation references at once, unlike a bare shared conjunction."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Boundary Site")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10")
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12")
+    app = _make_application(session, "testcouncil", "APP/4", site_id=site.id)
+    _make_document(session, app.id, "other",
+                    "The development straddles allocation JPA 10 and allocation JPA 12.")
+    session.commit()
+
+    jpa10_positive, _ = find_document_evidence_for_allocation(session, jpa10)
+    jpa12_positive, _ = find_document_evidence_for_allocation(session, jpa12)
+
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in jpa10_positive)
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in jpa12_positive)
+
+
+def test_positive_phrase_does_not_bleed_across_a_more_distant_reference(session):
+    """Item 5 - a positive phrase attached to a reference right next to it
+    must not reach a SECOND reference further away in the same window just
+    because both fall inside PROXIMITY_WINDOW_CHARS."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Far Parcel")
+    near_alloc = _make_allocation(session, "testcouncil", "Near Site", "JPA 40")
+    far_alloc = _make_allocation(session, "testcouncil", "Far Site", "JPA 41")
+    app = _make_application(session, "testcouncil", "APP/5", site_id=site.id)
+    _make_document(session, app.id, "other",
+                    "The proposal forms part of allocation JPA 40, a strategic site with significant "
+                    "highway and drainage infrastructure requirements still under review, and lies "
+                    "opposite the allocation JPA 41 on the other side of the valley.")
+    session.commit()
+
+    near_positive, _ = find_document_evidence_for_allocation(session, near_alloc)
+    far_positive, far_contra = find_document_evidence_for_allocation(session, far_alloc)
+
+    assert any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in near_positive)
+    assert not any(h.site_id == site.id and h.category == EXPLICIT_REFERENCE for h in far_positive)
+    assert any(h.site_id == site.id and h.category == CONTRADICTORY_REFERENCE for h in far_contra)
+
+
+def test_negative_phrase_wins_for_its_own_reference(session):
+    """Item 6 - a negative phrase local to a reference always overrides,
+    even when there is no competing positive phrase for that reference at
+    all."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Beyond Site")
+    allocation = _make_allocation(session, "testcouncil", "Chequerbent North", "JPA 5")
+    app = _make_application(session, "testcouncil", "APP/6", site_id=site.id)
+    _make_document(session, app.id, "other", "This site sits beyond the allocation JPA 5 boundary.")
+    session.commit()
+
+    positive, contradictory = find_document_evidence_for_allocation(session, allocation)
+    assert not any(h.site_id == site.id for h in positive)
+    assert any(h.site_id == site.id and h.category == CONTRADICTORY_REFERENCE for h in contradictory)
+
+
+def test_generic_reference_safeguard_unchanged_by_attribution_fix(session):
+    """Item 7 - Stage 2E.1's generic-reference name-corroboration rule is
+    untouched: a bare "policy H3, H4..." list still never establishes
+    membership, regardless of the new nearest-phrase logic."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3")
+    site = _make_site(session, "testcouncil", "King Street")
+    app = _make_application(session, "testcouncil", "APP/7", site_id=site.id)
+    _make_document(session, app.id, "design_access",
+                    "policy h3 - accessibility to sustainable transport/bus routes. "
+                    "policy h4 - affordable housing provision.")
+    session.commit()
+
+    positive, _ = find_document_evidence_for_allocation(session, allocation)
+    site_hits = [h for h in positive if h.site_id == site.id]
+    assert site_hits
+    assert all(h.category == WEAK_REFERENCE for h in site_hits)
+
+
+def test_stage3b_explicit_only_auto_create_unchanged_by_attribution_fix(session):
+    """Item 8 - the forward (Stage 3B) direction shares _build_reference_hits
+    with the backward direction, so the attribution fix applies identically
+    there too, and JPA10/JPA12-style separation holds in that direction."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10")
+    app = _make_application(session, "testcouncil", "FUL/355603/26", site_id=site.id)
+    doc = _make_document(session, app.id, "other",
+                          "The site forms part of Places for Everyone allocation policy JPA 12 Broadbent "
+                          "Moss and adjoins allocation Policy JPA 10 Beal Valley.")
+    session.commit()
+
+    results = find_allocation_evidence_for_document(doc, app, [jpa12, jpa10])
+
+    assert jpa12.id in results
+    jpa12_positive, jpa12_contra = results[jpa12.id]
+    assert any(h.category == EXPLICIT_REFERENCE for h in jpa12_positive)
+    assert jpa12_contra == []
+
+    if jpa10.id in results:
+        jpa10_positive, jpa10_contra = results[jpa10.id]
+        assert not any(h.category in (EXPLICIT_REFERENCE, STRONG_CONTEXTUAL_REFERENCE) for h in jpa10_positive)
+        assert any(h.category == CONTRADICTORY_REFERENCE for h in jpa10_contra)

@@ -113,6 +113,66 @@ one, general (non-council-specific) definition of "short/generic" used
 throughout this module - nothing here is Wigan-specific; the same rule
 applies identically to any council whose plan reuses a short code.
 
+MULTI-REFERENCE PHRASE ATTRIBUTION (Stage 2E.2 Final Matcher Amendment,
+"Multi-Reference Sentence Attribution Fix"): the proximity-window check
+above (PROXIMITY_WINDOW_CHARS either side of a reference/name occurrence)
+was found NOT SUFFICIENT either, for a different reason than the generic-
+reference gap Stage 2E.1 fixed - a live production case proved a positive
+phrase anchored to ONE allocation reference can "bleed" onto a SECOND,
+DIFFERENT allocation reference mentioned nearby in the same sentence,
+purely because the whole undifferentiated window was treated as
+semantically uniform. Confirmed real example (application FUL/355603/26,
+Site "Land South Of Bullcote Lane"): "...the site forms part of Places
+for Everyone allocation policy JPA 12 Broadbent Moss and adjoins
+allocation Policy JPA 10 Beal Valley..." - the ONLY phrase match in this
+whole sentence is "places for everyone allocation" (grammatically
+describing JPA 12), which falls within 180 characters of BOTH references,
+so JPA 10 incorrectly inherited EXPLICIT_REFERENCE membership evidence
+from a phrase that never described it at all - while JPA 10's own
+genuinely negative "adjoins" relationship went entirely undetected,
+because no NEGATIVE_RELATIONSHIP_PHRASES entry recognised bare "adjoins
+allocation"/"adjoins policy" phrasing (only the gerund "adjoining the
+allocation" form existed).
+
+The fix, in two parts:
+1. _nearest_relationship_phrase replaces "does ANY phrase (positive or
+   negative) appear anywhere in the ±PROXIMITY_WINDOW_CHARS window" with
+   "what is the SINGLE CLOSEST phrase occurrence (by character distance,
+   not by which polarity list it happens to be in) to THIS SPECIFIC
+   reference/name occurrence". A phrase anchored to a different, more
+   distant reference is never credited to this one just because both
+   happen to fall inside the same window - only genuine proximity wins.
+   This deliberately needs no knowledge of OTHER allocations' reference
+   positions in the text (which the backward, per-allocation direction of
+   this module does not have available) - it only compares candidate
+   phrase distances against the ONE occurrence being classified, which is
+   sufficient to solve the bleed problem in general, not just for JPA10/
+   JPA12: "X and Y" (a single phrase governing a compound object, e.g.
+   "forms part of allocations X and Y") still correctly credits both X
+   and Y, since neither has a CLOSER competing phrase to displace it;
+   "forms part of X and adjoins Y" correctly separates the two, since
+   "adjoins" is closer to Y than "forms part of" now is.
+2. NEGATIVE_RELATIONSHIP_PHRASES gained bare-verb ("adjoins allocation"/
+   "adjoins the allocation"/"adjoins policy"/"adjoins the policy",
+   "adjoining allocation"/"adjoining policy") and "beyond" forms
+   alongside the pre-existing gerund/preposition forms - general phrasing
+   additions, not specific to JPA10/JPA12/Beal Valley/Broadbent Moss, so
+   the SAME widened vocabulary protects every other council's documents
+   too. POSITIVE_RELATIONSHIP_PHRASES gained "straddles" (bare, no
+   "allocation"/"policy" suffix required) - the one deliberately explicit
+   phrase this amendment adds capable of establishing GENUINE membership
+   for two DIFFERENT allocation references at once ("the development
+   straddles JPA10 and JPA12"), since nearest-phrase attribution alone
+   would otherwise have no way to let one phrase legitimately cover two
+   separate, unrelated-by-conjunction reference occurrences.
+
+Neither change touches the generic-reference name-corroboration logic
+above (_generic_reference_has_name_corroboration) - a short/generic
+reference still requires the allocation's own distinctive name to appear
+somewhere in the document before EXPLICIT_REFERENCE/STRONG_CONTEXTUAL_
+REFERENCE is possible at all, entirely independently of which phrase (if
+any) attribution picks for a given occurrence.
+
 DOCUMENT-TYPE WEIGHTING (Stage 2C Section 13) - deterministic, never an
 LLM-style judgement:
   HIGH   : officer_report, decision_notice, planning_statement, s106
@@ -193,6 +253,12 @@ POSITIVE_RELATIONSHIP_PHRASES = [
     "local plan allocation", "local plan site", "places for everyone allocation",
     "identified as allocation", "identified as an allocation", "allocated site",
     "part of policy", "within policy",
+    # Stage 2E.2 Final Matcher Amendment - the one deliberately explicit
+    # phrase capable of establishing GENUINE membership for two DIFFERENT
+    # allocation references at once ("the development straddles JPA10 and
+    # JPA12") - bare (no "allocation"/"policy" suffix required), general,
+    # not tied to any specific reference/council.
+    "straddles",
 ]
 
 NEGATIVE_RELATIONSHIP_PHRASES = [
@@ -201,6 +267,14 @@ NEGATIVE_RELATIONSHIP_PHRASES = [
     "outside the allocated site", "not within allocation", "not within the allocation",
     "not within the allocated site", "near allocation", "near the allocation",
     "opposite allocation", "opposite the allocation",
+    # Stage 2E.2 Final Matcher Amendment - bare present-tense verb forms
+    # ("adjoins", not just the gerund "adjoining") and "beyond", none of
+    # which any prior entry recognised (see module docstring's "MULTI-
+    # REFERENCE PHRASE ATTRIBUTION" for the real production sentence that
+    # slipped through: "...adjoins allocation Policy JPA 10 Beal Valley").
+    "adjoins allocation", "adjoins the allocation", "adjoins policy", "adjoins the policy",
+    "adjoining allocation", "adjoining policy",
+    "beyond allocation", "beyond the allocation", "beyond policy", "beyond the policy",
 ]
 
 GENERAL_ALLOCATION_CONTEXT_WORDS = ["local plan", "allocation", "allocated", "policy"]
@@ -340,25 +414,157 @@ def _candidate_documents(session: Session, council_code: str, terms: list[str]) 
     return list(session.execute(query).all())
 
 
-def _classify_occurrence(text: str, match_start: int, match_end: int) -> tuple[str | None, bool]:
-    """Looks at the proximity window around ONE reference/name occurrence
-    and returns (category_if_reference_alone, has_relationship_phrase) -
-    the caller combines this with whether the match was a policy_reference
-    or a site_name to pick the final category. Returns has_contradiction
-    as the second element's sibling via the caller checking NEGATIVE
-    phrases separately (see find_document_evidence)."""
+def _window(text: str, match_start: int, match_end: int) -> str:
     window_start = max(0, match_start - PROXIMITY_WINDOW_CHARS)
     window_end = min(len(text), match_end + PROXIMITY_WINDOW_CHARS)
-    window = text[window_start:window_end]
-    has_positive = any(phrase in window for phrase in POSITIVE_RELATIONSHIP_PHRASES)
+    return text[window_start:window_end]
+
+
+def _all_substring_positions(haystack: str, needle: str) -> list[int]:
+    positions: list[int] = []
+    start = 0
+    while True:
+        idx = haystack.find(needle, start)
+        if idx == -1:
+            return positions
+        positions.append(idx)
+        start = idx + 1
+
+
+def _gap_distance(a_start: int, a_end: int, b_start: int, b_end: int) -> int:
+    """Character gap between two spans - 0 if they overlap, otherwise the
+    number of characters strictly between them. Symmetric in the two
+    spans' order."""
+    if a_end <= b_start:
+        return b_start - a_end
+    if b_end <= a_start:
+        return a_start - b_end
+    return 0
+
+
+# Stage 2E.2 Final Matcher Amendment - clause segmentation (Section 4's
+# "clause segmentation around conjunctions/punctuation" option, layered on
+# top of nearest-phrase-distance). Nearest-distance alone correctly
+# separates two REFERENCE occurrences ("...JPA 12... and adjoins... JPA
+# 10..." - each code sits right next to its own governing phrase), but a
+# NAME occurrence sitting immediately AT a clause boundary ("...Broadbent
+# Moss and adjoins allocation JPA 10...") can end up textually closer to
+# the WRONG clause's phrase by raw distance alone, since "Broadbent Moss"
+# is the tail of clause 1 but only a few characters from clause 2's own
+# governing verb. Clause bounds fix this: a reference/name occurrence may
+# only be attributed a phrase from its OWN clause, never one on the other
+# side of a genuine clause break.
+_HARD_CLAUSE_BOUNDARY_CHARS = ".;:\n"
+_CLAUSE_BREAK_LOOKAHEAD_CHARS = 30
+
+
+def _and_positions(text: str) -> list[tuple[int, int]]:
+    return [(m.start(), m.end()) for m in re.finditer(r"\band\b", text)]
+
+
+def _introduces_new_relationship_clause(text: str, and_end: int) -> bool:
+    """True when a "and" conjunction is immediately followed by the START
+    of another relationship phrase (positive or negative) - a genuine new
+    clause describing a DIFFERENT relationship ("...and adjoins..."), as
+    opposed to a bare compound object with no new relationship verb at all
+    ("...forms part of allocations X and Y...", where nothing but another
+    reference follows "and"). Leading whitespace after "and" is stripped
+    before checking, so the phrase's own length is never shortchanged by
+    the separating space eating into the lookahead budget."""
+    lookahead = text[and_end:and_end + _CLAUSE_BREAK_LOOKAHEAD_CHARS].lstrip()
+    return any(lookahead.startswith(phrase) for phrase in POSITIVE_RELATIONSHIP_PHRASES + NEGATIVE_RELATIONSHIP_PHRASES)
+
+
+def _clause_bounds(text: str, position: int) -> tuple[int, int]:
+    """The widest span around `position` not crossing a hard sentence
+    boundary (.;: or newline) or a genuine "and"-introduced new-relationship
+    clause break (see _introduces_new_relationship_clause)."""
+    left_hard = 0
+    for i in range(position - 1, -1, -1):
+        if text[i] in _HARD_CLAUSE_BOUNDARY_CHARS:
+            left_hard = i + 1
+            break
+    right_hard = len(text)
+    for i in range(position, len(text)):
+        if text[i] in _HARD_CLAUSE_BOUNDARY_CHARS:
+            right_hard = i
+            break
+
+    clause_start, clause_end = left_hard, right_hard
+    for and_start, and_end in _and_positions(text[left_hard:right_hard]):
+        abs_and_start, abs_and_end = left_hard + and_start, left_hard + and_end
+        if not _introduces_new_relationship_clause(text, abs_and_end):
+            continue
+        if abs_and_start < position:
+            clause_start = max(clause_start, abs_and_end)
+        else:
+            clause_end = min(clause_end, abs_and_start)
+    return clause_start, clause_end
+
+
+def _nearest_relationship_phrase(text: str, match_start: int, match_end: int) -> tuple[str | None, bool]:
+    """Stage 2E.2 Final Matcher Amendment - the core attribution fix (see
+    module docstring's "MULTI-REFERENCE PHRASE ATTRIBUTION"). Finds every
+    POSITIVE_RELATIONSHIP_PHRASES/NEGATIVE_RELATIONSHIP_PHRASES occurrence
+    within BOTH the ±PROXIMITY_WINDOW_CHARS window AND this occurrence's
+    own clause (see _clause_bounds) around this ONE reference/name
+    occurrence, and returns the (phrase, is_negative) of whichever
+    occurrence is CLOSEST by character distance - never "does any phrase
+    exist anywhere in the window" (the old, unsafe rule that let a phrase
+    anchored to a different allocation reference bleed onto this one), and
+    never a phrase from a DIFFERENT clause even if it happens to be
+    textually closer (the refinement clause-bounding adds over distance
+    alone - see _clause_bounds' own docstring for the NAME-occurrence
+    case this specifically corrects). Returns (None, False) if no phrase
+    occurs in the window/clause at all - deliberately never falls back to
+    searching outside this occurrence's own clause.
+
+    Ties (equal distance) are broken by whichever phrase occurrence starts
+    earlier in the text - deterministic, and irrelevant in practice since
+    two phrases at the exact same distance from one occurrence essentially
+    never occurs in real planning-document prose."""
+    window_start = max(0, match_start - PROXIMITY_WINDOW_CHARS)
+    window_end = min(len(text), match_end + PROXIMITY_WINDOW_CHARS)
+    clause_start, clause_end = _clause_bounds(text, match_start)
+    search_start = max(window_start, clause_start)
+    search_end = min(window_end, clause_end)
+    search_span = text[search_start:search_end]
+
+    best_phrase: str | None = None
+    best_is_negative = False
+    best_distance: int | None = None
+    best_start = None
+
+    for phrase, is_negative in (
+        [(p, False) for p in POSITIVE_RELATIONSHIP_PHRASES] + [(p, True) for p in NEGATIVE_RELATIONSHIP_PHRASES]
+    ):
+        for occurrence_start in _all_substring_positions(search_span, phrase):
+            abs_start = search_start + occurrence_start
+            abs_end = abs_start + len(phrase)
+            distance = _gap_distance(abs_start, abs_end, match_start, match_end)
+            if best_distance is None or distance < best_distance or (distance == best_distance and abs_start < best_start):
+                best_distance, best_phrase, best_is_negative, best_start = distance, phrase, is_negative, abs_start
+
+    return best_phrase, best_is_negative
+
+
+def _classify_occurrence(text: str, match_start: int, match_end: int) -> tuple[str, bool]:
+    """Looks at the proximity window around ONE reference/name occurrence
+    and returns (window, has_relationship_phrase) - the caller combines
+    this with whether the match was a policy_reference or a site_name to
+    pick the final category. has_relationship_phrase now means "the
+    NEAREST relationship phrase to this occurrence is positive" (see
+    _nearest_relationship_phrase), not "any positive phrase anywhere in
+    the window"."""
+    window = _window(text, match_start, match_end)
+    phrase, is_negative = _nearest_relationship_phrase(text, match_start, match_end)
+    has_positive = phrase is not None and not is_negative
     return window, has_positive
 
 
 def _has_negative_phrase(text: str, match_start: int, match_end: int) -> bool:
-    window_start = max(0, match_start - PROXIMITY_WINDOW_CHARS)
-    window_end = min(len(text), match_end + PROXIMITY_WINDOW_CHARS)
-    window = text[window_start:window_end]
-    return any(phrase in window for phrase in NEGATIVE_RELATIONSHIP_PHRASES)
+    phrase, is_negative = _nearest_relationship_phrase(text, match_start, match_end)
+    return phrase is not None and is_negative
 
 
 def _generic_reference_has_name_corroboration(document_text: str, distinctive_name: str | None) -> bool:

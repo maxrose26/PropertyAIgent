@@ -19,6 +19,31 @@ own human-verified King Street/Rectory Lane findings, passed in via
 confirmed_false_positive_pairs) - every OTHER relationship that merely
 lost auto-eligibility is a needs_confirmation_candidate instead, never
 silently rejected on the matcher's word alone.
+
+CONTRADICTORY EVIDENCE MUST DISQUALIFY ELIGIBILITY TOO (Stage 2E.2 Final
+Matcher Amendment - proven bug fix, not a redesign): _best_category_for_
+site previously considered ONLY positive_hits - find_document_evidence_
+for_allocation's own contradictory_hits (a genuine CONTRADICTORY_
+REFERENCE for this exact site, e.g. "adjoins allocation X" language) were
+silently discarded by both build_cleanup_plan and revalidate_before_write
+(both used to call `positive_hits, _ = find_document_evidence_for_
+allocation(...)`). Confirmed as a REAL production gap by the JPA 10 Beal
+Valley / "Land South Of Bullcote Lane" case: the Stage 2E.2 Final Matcher
+Amendment's own multi-reference attribution fix correctly produces a
+CONTRADICTORY_REFERENCE hit for this site once the "adjoins allocation
+Policy JPA 10" language is properly attributed - but a SEPARATE, weaker,
+uncontradicted STRONG_CONTEXTUAL_REFERENCE hit from a different document
+was still enough to make _best_category_for_site call the site
+"auto-eligible", silently overriding the newly-discovered negative
+evidence. Fixed: still_eligible now additionally requires the site to
+carry NO contradictory hit at all (_site_has_contradiction) - a genuine
+negative/adjacency finding for a site always disqualifies eligibility,
+regardless of what positive evidence also exists for it elsewhere. This
+changes ONLY the still_eligible computation; the REJECT vs NEEDS_
+CONFIRMATION branching above is completely unaffected - a site
+disqualified this way is still only ever a reject_candidate when
+explicitly supplied via confirmed_false_positive_pairs, exactly as
+before.
 """
 from __future__ import annotations
 
@@ -43,6 +68,12 @@ def _best_category_for_site(hits, site_id: int) -> str | None:
     if not site_hits:
         return None
     return max(site_hits, key=lambda h: _CATEGORY_STRENGTH.get(h.category, 0)).category
+
+
+def _site_has_contradiction(contradictory_hits, site_id: int) -> bool:
+    """Stage 2E.2 Final Matcher Amendment - see module docstring's
+    "CONTRADICTORY EVIDENCE MUST DISQUALIFY ELIGIBILITY TOO"."""
+    return any(h.site_id == site_id for h in contradictory_hits)
 
 
 @dataclass(frozen=True)
@@ -85,11 +116,12 @@ def build_cleanup_plan(
         allocation = session.get(LocalPlanSite, allocation_id)
         if allocation.id not in evidence_cache:
             evidence_cache[allocation.id] = find_document_evidence_for_allocation(session, allocation)
-        positive_hits, _ = evidence_cache[allocation.id]
+        positive_hits, contradictory_hits = evidence_cache[allocation.id]
 
         for rel in rels:
             new_category = _best_category_for_site(positive_hits, rel.site_id)
-            still_eligible = new_category in _AUTO_ELIGIBLE_CATEGORIES
+            has_contradiction = _site_has_contradiction(contradictory_hits, rel.site_id)
+            still_eligible = new_category in _AUTO_ELIGIBLE_CATEGORIES and not has_contradiction
             pair = (allocation_id, rel.site_id)
 
             if still_eligible:
@@ -100,13 +132,16 @@ def build_cleanup_plan(
                 ))
                 continue
 
+            reason = (
+                f"Contradictory (negative/adjacency) evidence found for this relationship "
+                f"(best positive category otherwise: {new_category})."
+                if has_contradiction else
+                f"No longer auto-eligible under the corrected matcher (best remaining category: {new_category})."
+            )
             target = CleanupTarget(
                 allocation_id=allocation_id, site_id=rel.site_id, relationship_id=rel.id,
                 previous_evidence_category=rel.evidence_category, new_evidence_category=new_category,
-                reason=(
-                    "No longer auto-eligible under the corrected matcher "
-                    f"(best remaining category: {new_category})."
-                ),
+                reason=reason,
             )
             if pair in confirmed_false_positive_pairs:
                 plan.reject_candidates.append(target)
@@ -167,9 +202,10 @@ def revalidate_before_write(
         )
 
     allocation = session.get(LocalPlanSite, allocation_id)
-    positive_hits, _ = find_document_evidence_for_allocation(session, allocation)
+    positive_hits, contradictory_hits = find_document_evidence_for_allocation(session, allocation)
     new_category = _best_category_for_site(positive_hits, site_id)
-    still_eligible = new_category in _AUTO_ELIGIBLE_CATEGORIES
+    has_contradiction = _site_has_contradiction(contradictory_hits, site_id)
+    still_eligible = new_category in _AUTO_ELIGIBLE_CATEGORIES and not has_contradiction
 
     if expected_action == "reject" and still_eligible:
         return RevalidationResult(
@@ -178,10 +214,15 @@ def revalidate_before_write(
             reason=f"New document evidence now makes this relationship auto-eligible ({new_category}) - no longer a reject candidate.",
         )
     if expected_action == "needs_confirmation" and not still_eligible:
+        reason = (
+            "Contradictory (negative/adjacency) evidence found for this relationship - needs_confirmation still applies."
+            if has_contradiction else
+            "Still not auto-eligible under the corrected matcher - needs_confirmation still applies."
+        )
         return RevalidationResult(
             allocation_id=allocation_id, site_id=site_id, relationship_exists=True,
             current_review_status=rel.review_status, still_matches_plan=True,
-            reason="Still not auto-eligible under the corrected matcher - needs_confirmation still applies.",
+            reason=reason,
         )
     if expected_action == "needs_confirmation" and still_eligible:
         return RevalidationResult(
