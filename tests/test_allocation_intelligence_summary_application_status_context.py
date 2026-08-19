@@ -362,36 +362,36 @@ def test_fingerprint_case_d_rejected_relationship_application_change_no_effect(s
     assert fp_before == fp_after
 
 
-def test_fingerprint_case_e_needs_confirmation_status_hedged_not_silently_trusted(session):
-    """A needs_confirmation Site's Application status DOES enter the
-    context (so the prompt can still describe it, hedged) but must remain
-    marked pending - never silently promoted to a settled fact - and a
-    change to it still legitimately moves the fingerprint (it is real
-    information a customer-facing summary should reflect, just always
-    described as uncertain)."""
+def test_fingerprint_case_e_needs_confirmation_status_structurally_withheld(session):
+    """Superseded by the "needs_confirmation Trust Boundary" final
+    pre-merge amendment - a needs_confirmation Site's Application status
+    must NOT enter the context in the same Application-shaped structure
+    trusted activity uses, even hedged. representative_application is
+    None, capacity is unknown, and no reference is exposed - the ONLY
+    uncertainty signal is disputed_site_count and the Site's own bare
+    presence/label. See test_allocation_intelligence_summary_trust_
+    boundary.py for the full regression suite this amendment added."""
     _make_council(session)
     plan = _make_plan(session)
     allocation = _make_allocation(session, plan, minimum_dwellings=300)
     site = _make_site(session)
     _make_relationship(session, allocation_id=allocation.id, site_id=site.id, review_status="needs_confirmation")
-    app = _make_app(session, site.id, "APP/PENDING", units=100, status="Under Consultation")
+    _make_app(session, site.id, "APP/PENDING", units=100, status="Under Consultation")
     session.commit()
 
     context = build_allocation_context(session, allocation)
     assert context.disputed_site_count == 1
     site_entry = context.sites[0]
     assert site_entry.relationship_review_status == "needs_confirmation"
-    assert site_entry.representative_application.status == "Under Consultation"
+    assert site_entry.representative_application is None
+    assert site_entry.capacity_known is False
+    assert site_entry.capacity is None
+    assert site_entry.application_references == []
 
     prompt = build_summary_prompt(context)
     assert "PENDING CONFIRMATION - do not present as settled" in prompt
-
-    fp_before = compute_context_fingerprint(context)
-    app.status = "Decided"
-    app.decision = "Granted"
-    session.commit()
-    fp_after = compute_context_fingerprint(build_allocation_context(session, allocation))
-    assert fp_before != fp_after
+    assert "APP/PENDING" not in prompt
+    assert "Under Consultation" not in prompt
 
 
 def test_fingerprint_stable_for_non_material_field_changes(session):

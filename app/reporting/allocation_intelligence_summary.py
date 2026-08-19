@@ -87,7 +87,14 @@ MODEL = "gpt-4o-mini"
 # generated under v1 (0 rows exist), so this bump has no practical effect
 # today - it is the correct, disciplined action regardless, per this
 # constant's own contract above.
-PROMPT_VERSION = "allocation-intelligence-summary-v2"
+#
+# v3 (Final Pre-Merge Amendment, "needs_confirmation Trust Boundary") -
+# _render_site_line's needs_confirmation branch materially changed (no
+# longer says "capacity not yet determined"/lists any reference - a wholly
+# different, more restrictive sentence). No production summary has ever
+# been generated under v1 or v2 (0 rows exist), so this bump again has no
+# practical effect today.
+PROMPT_VERSION = "allocation-intelligence-summary-v3"
 
 
 # --- Context object (Section 4) ---------------------------------------------
@@ -213,10 +220,24 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
     sites: list[SiteContextEntry] = []
     disputed_site_count = 0
     for s in site_summaries:
-        if s.relationship_review_status == "needs_confirmation":
+        is_disputed = s.relationship_review_status == "needs_confirmation"
+        if is_disputed:
             disputed_site_count += 1
 
-        rep = s.representative_application
+        # Final Pre-Merge Amendment ("needs_confirmation Trust Boundary") -
+        # a disputed AllocationSiteRelationship must never enter the
+        # context in the SAME Application-shaped structure trusted
+        # activity uses, even hedged by a text label - the ORIGINAL V1
+        # design already committed to "never named, only counted" for
+        # disputed evidence (see disputed_site_count's own comment above,
+        # unchanged); representative_application/other_applications_by_
+        # category/capacity/application_references are the Application-
+        # shaped facts that must be withheld here, STRUCTURALLY (None/
+        # empty at construction, not merely hedged in prompt text) so a
+        # disputed Site can never be mistaken for trusted linked activity
+        # by the model OR by anything else reading this dataclass (the
+        # fingerprint included - see compute_context_fingerprint below).
+        rep = s.representative_application if not is_disputed else None
         rep_detail = None
         if rep is not None:
             proposal = rep.proposal or None
@@ -225,6 +246,16 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
                 decision_issued_date=rep.decision_issued_date, application_category=rep.application_category,
                 proposal_summary=proposal[:150] if proposal else None,
             )
+
+        if is_disputed:
+            sites.append(SiteContextEntry(
+                site_id=s.site_id, label=s.site.display_address,
+                relationship_review_status=s.relationship_review_status,
+                capacity_known=False, capacity=None,
+                application_references=[], representative_application=None,
+                other_applications_by_category={},
+            ))
+            continue
 
         # Section 6 - every OTHER trusted Application on this Site (never
         # the representative one, already surfaced in full above) is
@@ -252,14 +283,32 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
         session, site_summaries,
         indicative_residual_capacity=coverage.indicative_residual_capacity if coverage else None,
     )
+    # Final Pre-Merge Amendment ("needs_confirmation Trust Boundary",
+    # Section 5) - get_allocation_control_intelligence only ever checks
+    # ControlRelationship.review_status (whether the OWNERSHIP evidence
+    # itself is disputed); it has no knowledge of whether the SITE it is
+    # attached to only reached this allocation via a disputed
+    # AllocationSiteRelationship. An "auto_applied" (accepted)
+    # ControlRelationship on a Site linked only by a needs_confirmation
+    # relationship must still be treated as uncertain HERE, at the
+    # allocation-context boundary - never redesigning get_allocation_
+    # control_intelligence itself (it is correct and unchanged for its
+    # own, wider callers, e.g. the Ownership & Control UI section, which
+    # has its own display requirements outside this task's scope).
+    disputed_site_ids = {s.site_id for s in site_summaries if s.relationship_review_status == "needs_confirmation"}
+
     ownership_entities: list[OwnershipContextEntry] = []
     ownership_review_pending_count = 0
     residual_ownership_known = False
     for section in control_sections:
+        site_relationship_disputed = section.site_id is not None and section.site_id in disputed_site_ids
         for group in section.groups:
-            if group.needs_review:
-                # Section 14 - a disputed ownership/control group is NEVER
-                # named as a fact, only counted as an uncertainty signal.
+            if group.needs_review or site_relationship_disputed:
+                # Section 14 (unchanged) / Section 5 (this amendment) - a
+                # disputed ownership/control group, OR any group attached
+                # to a Site whose OWN allocation linkage is itself
+                # disputed, is NEVER named as a fact - only counted as an
+                # uncertainty signal.
                 ownership_review_pending_count += 1
                 continue
             ownership_entities.append(OwnershipContextEntry(
@@ -483,10 +532,25 @@ def _render_representative_application(rep: RepresentativeApplicationDetail) -> 
 
 
 def _render_site_line(s: SiteContextEntry) -> str:
+    if s.relationship_review_status == "needs_confirmation":
+        # Final Pre-Merge Amendment (Section 3B/7) - a disputed Site is
+        # never described with the SAME "Linked Application(s): ..."
+        # wording trusted Sites get, even to say "none" - this Site MAY
+        # have linked Applications, they are simply withheld pending
+        # confirmation, and saying "no linked Application" would be a
+        # false statement, not just an unhedged one. No capacity,
+        # reference, status, or decision of any kind appears here -
+        # SiteContextEntry itself never carries them for a disputed Site
+        # (see build_allocation_context).
+        return (
+            f"- Site \"{s.label}\" [RELATIONSHIP STILL PENDING CONFIRMATION - do not present as settled]: "
+            f"potential planning activity may exist, but this Site's link to the allocation is unconfirmed - "
+            f"do not describe any capacity, Application, status, or decision for it."
+        )
+
     status_bit = {
         "auto_applied": "trusted relationship",
         "confirmed": "human-confirmed relationship",
-        "needs_confirmation": "RELATIONSHIP STILL PENDING CONFIRMATION - do not present as settled",
     }.get(s.relationship_review_status, s.relationship_review_status)
     cap_bit = f"{s.capacity:,} homes identified" if s.capacity_known else "capacity not yet determined"
     # Section 6 - listing every reference is fine for the common small
