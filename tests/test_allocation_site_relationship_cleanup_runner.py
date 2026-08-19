@@ -938,12 +938,166 @@ def test_execute_semantics_unchanged_by_preview_fix(session, monkeypatch):
     assert "simulate_proposed_coverage" not in execute_fn_source
 
 
-def test_seven_reject_targets_unchanged_by_amendment():
-    """Item 12 - this amendment must not alter the seven approved reject
-    targets."""
-    assert runner.TO_REJECT == (
+def test_seven_original_reject_targets_still_present():
+    """Item 12 - the Stage 2E.1 Amendment's seven original approved reject
+    targets remain present and unchanged. Updated by the Stage 2E.2 Final
+    Matcher Amendment (Section 2/11), which explicitly authorises adding
+    an eighth ((51, 27), JPA 10 Beal Valley) once revalidated as a
+    genuine reject candidate - see test_eight_reject_targets_after_
+    matcher_amendment below for that addition."""
+    original_seven = (
         (210, 171), (210, 174), (211, 171), (211, 174), (212, 171), (213, 171), (146, 260),
     )
+    for pair in original_seven:
+        assert pair in runner.TO_REJECT
+
+
+def test_eight_reject_targets_after_matcher_amendment():
+    """Stage 2E.2 Final Matcher Amendment (Sections 9/11/12) - JPA 10 Beal
+    Valley / "Land South Of Bullcote Lane" (51, 27) is added as the eighth
+    reject target once the multi-reference attribution fix + the
+    relationship_cleanup_plan.py contradiction-awareness fix together
+    proved its only evidence was a misattributed "adjoins" sentence."""
+    assert runner.TO_REJECT == (
+        (210, 171), (210, 174), (211, 171), (211, 174), (212, 171), (213, 171), (146, 260),
+        (51, 27),
+    )
+    assert (51, 27) not in runner.TO_NEEDS_CONFIRMATION
+
+
+# ---------------------------------------------------------------------------
+# Stage 2E.2 Final Matcher Amendment - Section 17 items 9/10/14/15
+# (JPA10/JPA12 Bullcote Lane regression + eight-target dry-run safety)
+# ---------------------------------------------------------------------------
+
+
+def test_jpa10_bullcote_lane_regression_reject_target_would_apply(session, monkeypatch):
+    """Item 9 - reproduces the real production sentence: JPA10's only
+    supporting evidence is a misattributed "adjoins" hit - once corrected,
+    a reject target for it must WOULD_APPLY (not be BLOCK_DRIFT)."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10")
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12")
+    app = _make_application_with_capacity(session, "testcouncil", "FUL/355603/26", site.id, 248)
+    _make_relationship(session, allocation_id=jpa10.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    _make_relationship(session, allocation_id=jpa12.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="EXPLICIT_REFERENCE")
+    from app.db.models import Document
+    session.add(Document(application_id=app.id, doc_type="other", text_extracted=True,
+                          extracted_text="Whilst the present application envisages 248 dwellings, the site forms "
+                          "part of Places for Everyone allocation policy JPA 12 Broadbent Moss and adjoins "
+                          "allocation Policy JPA 10 Beal Valley within which a total of 1930 dwellings are "
+                          "proposed."))
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(jpa10.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+
+    assert report.reject_outcomes[0].outcome == runner.WOULD_APPLY
+    assert "contradictory" in report.reject_outcomes[0].detail.lower() or "adjoins" not in report.reject_outcomes[0].detail.lower()
+
+
+def test_jpa12_bullcote_lane_survives_and_keeps_evidence(session, monkeypatch):
+    """Item 10 - JPA 12's own, genuine relationship to the SAME Site is
+    untouched by rejecting JPA10's false relationship - not a target,
+    stays auto_applied, evidence unaffected."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10")
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12", minimum_dwellings=500)
+    app = _make_application_with_capacity(session, "testcouncil", "FUL/355603/26", site.id, 248)
+    _make_relationship(session, allocation_id=jpa10.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    _make_relationship(session, allocation_id=jpa12.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="EXPLICIT_REFERENCE")
+    from app.db.models import Document
+    session.add(Document(application_id=app.id, doc_type="other", text_extracted=True,
+                          extracted_text="Whilst the present application envisages 248 dwellings, the site forms "
+                          "part of Places for Everyone allocation policy JPA 12 Broadbent Moss and adjoins "
+                          "allocation Policy JPA 10 Beal Valley within which a total of 1930 dwellings are "
+                          "proposed."))
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(jpa10.id, site.id)])
+    runner.run_cleanup_relationships(session, execute=True)
+
+    assert _get_rel(session, jpa10.id, site.id).review_status == "rejected"
+    jpa12_rel = _get_rel(session, jpa12.id, site.id)
+    assert jpa12_rel.review_status == "auto_applied"
+    assert jpa12_rel.evidence_category == "EXPLICIT_REFERENCE"
+
+    jpa12_coverage = build_allocation_development_coverage(session, [jpa12])[jpa12.id]["coverage"]
+    assert jpa12_coverage.number_of_related_sites == 1
+    assert jpa12_coverage.identified_application_capacity == 248
+
+
+def test_sgl10_jpa11_jpa32_classification_unchanged_by_matcher_amendment():
+    """Items 11/12/13 - SGL10, JPA1.1, and JPA3.2 (the other three
+    Stage 2E.2 Amendment BLOCK_DRIFT cases) are untouched by the
+    multi-reference attribution fix - none involve a competing negative
+    phrase, so their classification is exactly as the prior amendment
+    found it. Reconfirmed live against production in this task's own
+    Section 10 dry run (see final report) - this test only pins that none
+    of the three accidentally became reject targets."""
+    for pair in ((155, 236), (76, 216), (80, 248)):
+        assert pair in runner.TO_NEEDS_CONFIRMATION
+        assert pair not in runner.TO_REJECT
+
+
+def test_eight_target_dry_run_safety(session, monkeypatch):
+    """Item 14 - a dry run against all eight real reject targets (mirrored
+    with fixture-local ids) makes zero writes and produces exactly eight
+    outcomes, none of them silently dropped or duplicated."""
+    _make_council(session, "testcouncil")
+    pairs = []
+    for i in range(8):
+        allocation = _make_allocation(session, "testcouncil", f"Allocation {i}", f"REF{i}")
+        site = _make_site(session, "testcouncil", f"Site {i}")
+        _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                            evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+        pairs.append((allocation.id, site.id))
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=pairs)
+    report = runner.run_cleanup_relationships(session, execute=False)
+
+    assert len(report.reject_outcomes) == 8
+    assert all(o.outcome == runner.WOULD_APPLY for o in report.reject_outcomes)
+    for allocation_id, site_id in pairs:
+        assert _get_rel(session, allocation_id, site_id).review_status == "auto_applied"  # zero writes
+
+
+def test_blocked_action_still_excluded_from_preview_with_contradiction_fix(session, monkeypatch):
+    """Item 15 - a target blocked because contradictory evidence keeps it
+    ineligible (rather than BLOCK_DRIFT from renewed positive eligibility)
+    must equally never affect the coverage preview."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    jpa10 = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10", minimum_dwellings=1930)
+    jpa12 = _make_allocation(session, "testcouncil", "Broadbent Moss", "JPA 12")
+    app = _make_application_with_capacity(session, "testcouncil", "FUL/355603/26", site.id, 248)
+    _make_relationship(session, allocation_id=jpa10.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE",
+                        review_status="needs_confirmation")
+    _make_relationship(session, allocation_id=jpa12.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="EXPLICIT_REFERENCE")
+    from app.db.models import Document
+    session.add(Document(application_id=app.id, doc_type="other", text_extracted=True,
+                          extracted_text="Whilst the present application envisages 248 dwellings, the site forms "
+                          "part of Places for Everyone allocation policy JPA 12 Broadbent Moss and adjoins "
+                          "allocation Policy JPA 10 Beal Valley within which a total of 1930 dwellings are "
+                          "proposed."))
+    session.commit()
+
+    _patch_targets(monkeypatch, needs_confirmation=[(jpa10.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+    assert report.needs_confirmation_outcomes[0].outcome == runner.ALREADY_APPLIED  # already needs_confirmation
+
+    proposed = runner.simulate_proposed_coverage(session, [jpa10.id], report)[jpa10.id]["coverage"]
+    current = build_allocation_development_coverage(session, [jpa10])[jpa10.id]["coverage"]
+    assert proposed.development_coverage_classification == current.development_coverage_classification
 
 
 def test_north_leigh_park_corrected_preview_with_mixed_outcomes(session, monkeypatch):

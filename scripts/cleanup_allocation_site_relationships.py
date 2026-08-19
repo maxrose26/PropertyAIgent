@@ -48,12 +48,18 @@ from app.policy.relationship_cleanup_runner import (
 )
 from app.reporting.allocation_development_coverage import build_allocation_development_coverage
 
-# Section 5's explicit minimum coverage display set, by allocation_id -
-# H3/H4/H5/H6/AN11 are the affected allocations named in the approved
-# TO_REJECT/TO_NEEDS_CONFIRMATION targets; JPA 32 (North of Mosley Common)
-# is deliberately NOT one of the targets - it is shown as the regression
-# anchor proving the cleanup touches nothing it shouldn't.
-_MINIMUM_COVERAGE_DISPLAY_ALLOCATION_IDS = (210, 211, 212, 213, 146, 73)
+# Section 5's / Section 15's explicit minimum coverage display set, by
+# allocation_id - H3/H4/H5/H6/AN11/JPA10 are affected allocations named in
+# the approved TO_REJECT/TO_NEEDS_CONFIRMATION targets (already surfaced
+# automatically via affected_allocation_ids, listed here too for a stable
+# minimum set regardless of target-list edits). JPA 32/North of Mosley
+# Common (73) and JPA 12/Broadbent Moss (53) are deliberately NOT targets
+# at all - both are shown purely as regression anchors: JPA 32 proves the
+# cleanup touches nothing it shouldn't in general, JPA 12 specifically
+# proves rejecting JPA 10's false Bullcote Lane relationship does not
+# disturb JPA 12's own, genuine EXPLICIT_REFERENCE relationship to the
+# same Site (Stage 2E.2 Final Matcher Amendment Section 15).
+_MINIMUM_COVERAGE_DISPLAY_ALLOCATION_IDS = (210, 211, 212, 213, 146, 73, 51, 53)
 
 
 def parse_args() -> argparse.Namespace:

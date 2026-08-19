@@ -65,17 +65,33 @@ from app.reporting.allocation_development_coverage import build_allocation_devel
 
 CONFIRM_PHRASE = "YES-CLEANUP-ALLOCATION-SITE-RELATIONSHIPS"
 
-# Stage 2E.1 Amendment's final approved semantic targets - reproduced here
-# verbatim from that report, never re-derived from the matcher at import
-# time (every write is still independently revalidated live before it
-# happens - see revalidate_before_write below).
+# Stage 2E.1 Amendment's original seven approved semantic reject targets,
+# reproduced verbatim - unchanged by the Stage 2E.2 Final Matcher
+# Amendment (Section 2: "preserve the seven proven reject targets").
+# Every write is still independently revalidated live before it happens -
+# see revalidate_before_write below - never re-derived from the matcher
+# at import time.
+#
+# (51, 27) - JPA 10 Beal Valley / "Land South Of Bullcote Lane" - added by
+# the Stage 2E.2 Final Matcher Amendment ("Multi-Reference Sentence
+# Attribution Fix + Corpus Safety Scan"), Sections 9/11/12. Moved here
+# FROM TO_NEEDS_CONFIRMATION (below) once the multi-reference attribution
+# fix + the resulting relationship_cleanup_plan.py contradiction-awareness
+# fix together proved this relationship's only supporting evidence was a
+# misattributed "adjoins allocation Policy JPA 10" sentence that actually
+# describes the site as ADJACENT to, not part of, JPA 10 (it genuinely
+# forms part of the neighbouring JPA 12 Broadbent Moss allocation
+# instead, which is correctly unaffected and remains KEEP). Confirmed via
+# live production revalidate_before_write(expected_action="reject") ->
+# still_matches_plan=True before this pair was added here.
 TO_REJECT: tuple[tuple[int, int], ...] = (
     (210, 171), (210, 174), (211, 171), (211, 174), (212, 171), (213, 171), (146, 260),
+    (51, 27),
 )
 
 TO_NEEDS_CONFIRMATION: tuple[tuple[int, int], ...] = (
     (15, 115), (13, 102), (14, 112), (18, 85), (32, 74), (3, 40),
-    (16, 123), (19, 85), (155, 236), (51, 27), (76, 216), (80, 248),
+    (16, 123), (19, 85), (155, 236), (76, 216), (80, 248),
 )
 
 WOULD_APPLY = "WOULD_APPLY"
