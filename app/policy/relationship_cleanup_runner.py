@@ -59,6 +59,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import AllocationSiteRelationship, LocalPlanSite
+from app.policy.allocation_site_relationships import EVIDENCE_BASIS_LEGACY_BACKFILL
 from app.policy.relationship_cleanup_plan import revalidate_before_write
 from app.reporting.allocation_development_coverage import build_allocation_development_coverage
 
@@ -81,6 +82,16 @@ WOULD_APPLY = "WOULD_APPLY"
 APPLIED = "APPLIED"
 ALREADY_APPLIED = "ALREADY_APPLIED"
 BLOCKED_HUMAN_CONFIRMATION = "BLOCKED_HUMAN_CONFIRMATION"
+# Stage 2E.2 Final Amendment (Section 5) - review_status == "confirmed" on a
+# relationship row is, by itself, never proof of a genuine relationship-level
+# human decision (see _verify_human_confirmation_provenance's own docstring
+# for the full inheritance-chain reasoning). A "confirmed" row whose
+# provenance cannot be traced back to a genuine app.policy.site_match_review.
+# confirm_site_match decision is protected EXACTLY as strongly as one that
+# verifies cleanly - never overwritten either way - but reported honestly
+# under this distinct outcome rather than being mislabelled
+# BLOCKED_HUMAN_CONFIRMATION when the evidence for that label doesn't exist.
+BLOCKED_LEGACY_CONFIRMED_UNVERIFIED = "BLOCKED_LEGACY_CONFIRMED_UNVERIFIED"
 BLOCKED_MISSING = "BLOCKED_MISSING"
 BLOCK_DRIFT = "BLOCK_DRIFT"
 FAILED = "FAILED"
@@ -119,6 +130,62 @@ def _get_relationship(session: Session, allocation_id: int, site_id: int) -> All
     ).scalar_one_or_none()
 
 
+def _verify_human_confirmation_provenance(
+    session: Session, allocation_id: int, rel: AllocationSiteRelationship,
+) -> tuple[bool, str]:
+    """Stage 2E.2 Final Amendment (Section 3/5) - traces WHY a relationship's
+    review_status is "confirmed" rather than trusting the bare string.
+
+    No code path in this codebase ever writes review_status="confirmed"
+    directly onto an AllocationSiteRelationship row. The only way it can
+    appear is app.policy.allocation_site_relationships.plan_legacy_backfill
+    copying LocalPlanSite.review_status verbatim at relationship-creation
+    time (legacy_matched_site_id_backfill rows only - every document-
+    evidenced row starts "auto_applied" and the multi-allocation collision
+    guard only ever downgrades to "needs_confirmation", never up to
+    "confirmed"). And the ONLY writer of LocalPlanSite.review_status=
+    "confirmed" is app.policy.site_match_review.confirm_site_match, which
+    ALWAYS sets confirmed_by/confirmed_at/match_review_note atomically in
+    that same call - there is no way for a LocalPlanSite to reach
+    review_status="confirmed" with those three fields empty.
+
+    So a "confirmed" relationship is only genuinely traceable to a real
+    human decision when: (a) it originated from that legacy backfill path,
+    (b) the allocation's matched_site_id still points at this exact site -
+    the pointer this relationship was copied from has not since drifted
+    away underneath it, and (c) the allocation actually carries
+    confirmed_by/confirmed_at. All three checked live, every call - never
+    cached, never assumed from the row's own evidence_basis alone.
+
+    Returns (verified, detail). verified=False does NOT reduce write
+    protection one bit - see BLOCKED_LEGACY_CONFIRMED_UNVERIFIED, which is
+    exactly as protected from being overwritten as BLOCKED_HUMAN_
+    CONFIRMATION. The only difference this makes is which outcome label
+    (and which explanation) the dry-run report shows - this function never
+    invents provenance that doesn't exist, it only reports honestly
+    whether provenance that DOES exist can be traced for this row."""
+    if rel.evidence_basis != EVIDENCE_BASIS_LEGACY_BACKFILL:
+        return False, (
+            f"review_status='confirmed' but evidence_basis={rel.evidence_basis!r} is not a legacy "
+            "matched_site_id backfill row - no known provenance path establishes this as human-reviewed."
+        )
+    allocation = session.get(LocalPlanSite, allocation_id)
+    if allocation is None:
+        return False, "Allocation no longer exists - cannot verify confirmation provenance."
+    if allocation.matched_site_id != rel.site_id:
+        return False, (
+            f"Allocation.matched_site_id={allocation.matched_site_id} no longer matches this relationship's "
+            f"site_id={rel.site_id} - the provenance link between the allocation's confirmed match and this "
+            "relationship row has drifted."
+        )
+    if not allocation.confirmed_by or not allocation.confirmed_at:
+        return False, "Allocation has review_status='confirmed' but no confirmed_by/confirmed_at provenance recorded."
+    return True, (
+        f"Human-confirmed via allocation matched_site_id review: confirmed_by={allocation.confirmed_by!r} "
+        f"at {allocation.confirmed_at} - {allocation.match_review_note or '(no note)'}"
+    )
+
+
 def _classify_and_maybe_write(
     session: Session, allocation_id: int, site_id: int, *, action: str, execute: bool,
 ) -> TargetOutcome:
@@ -136,33 +203,31 @@ def _classify_and_maybe_write(
             allocation_id, site_id, action, BLOCKED_MISSING, None, None, revalidation.reason,
         )
 
+    rel = _get_relationship(session, allocation_id, site_id)
     current_status = revalidation.current_review_status
-    rel_id = _get_relationship(session, allocation_id, site_id).id
 
     if current_status == "confirmed":
-        return TargetOutcome(
-            allocation_id, site_id, action, BLOCKED_HUMAN_CONFIRMATION, rel_id, current_status,
-            "Relationship has been human-confirmed since the approved audit - never overwritten by this runner.",
-        )
+        verified, detail = _verify_human_confirmation_provenance(session, allocation_id, rel)
+        outcome_name = BLOCKED_HUMAN_CONFIRMATION if verified else BLOCKED_LEGACY_CONFIRMED_UNVERIFIED
+        return TargetOutcome(allocation_id, site_id, action, outcome_name, rel.id, current_status, detail)
 
     if current_status == "rejected" or current_status == target_status:
         return TargetOutcome(
-            allocation_id, site_id, action, ALREADY_APPLIED, rel_id, current_status,
+            allocation_id, site_id, action, ALREADY_APPLIED, rel.id, current_status,
             "Already at or beyond the planned target status - idempotent, no write needed.",
         )
 
     if not revalidation.still_matches_plan:
         return TargetOutcome(
-            allocation_id, site_id, action, BLOCK_DRIFT, rel_id, current_status, revalidation.reason,
+            allocation_id, site_id, action, BLOCK_DRIFT, rel.id, current_status, revalidation.reason,
         )
 
     if not execute:
         return TargetOutcome(
-            allocation_id, site_id, action, WOULD_APPLY, rel_id, current_status,
+            allocation_id, site_id, action, WOULD_APPLY, rel.id, current_status,
             f"Revalidated eligible - would set review_status={target_status!r}.",
         )
 
-    rel = _get_relationship(session, allocation_id, site_id)
     rel.review_status = target_status
     session.flush()
     return TargetOutcome(
@@ -249,28 +314,40 @@ def affected_allocation_ids(report: CleanupRunReport | None = None) -> list[int]
     return sorted(ids)
 
 
-def simulate_proposed_coverage(session: Session, allocation_ids: list[int]) -> dict[int, dict]:
+def simulate_proposed_coverage(
+    session: Session, allocation_ids: list[int], report: CleanupRunReport,
+) -> dict[int, dict]:
     """READ ONLY, despite mutating ORM objects internally - previews what
     app.reporting.allocation_development_coverage.
     build_allocation_development_coverage would report for these
-    allocations AFTER the approved cleanup runs, by setting review_status
-    on the exact approved targets IN THIS SESSION ONLY, calling the
-    existing coverage builder unmodified, then unconditionally
-    session.rollback()-ing before returning - so nothing computed here is
-    ever flushed past this function's own return, whether or not the
-    caller is itself in a dry run. A target already "confirmed" or
-    "rejected" is left alone here exactly as run_cleanup_relationships
-    would leave it alone for real (Section 7 protections apply to the
-    preview too, so a dry-run coverage number is never rosier than what
-    execute mode would actually produce)."""
-    for allocation_id, site_id in TO_REJECT:
-        rel = _get_relationship(session, allocation_id, site_id)
-        if rel is not None and rel.review_status not in ("confirmed", "rejected"):
-            rel.review_status = "rejected"
-    for allocation_id, site_id in TO_NEEDS_CONFIRMATION:
-        rel = _get_relationship(session, allocation_id, site_id)
-        if rel is not None and rel.review_status not in ("confirmed", "rejected", "needs_confirmation"):
-            rel.review_status = "needs_confirmation"
+    allocations AFTER the approved cleanup runs.
+
+    Stage 2E.2 Final Amendment (Section 8) - CORE INVARIANT: "the dry-run
+    proposed state must equal the state execute mode would actually
+    create." This function used to independently re-decide, for every
+    approved target, whether it "should" be treated as applied - which
+    silently drifted from run_cleanup_relationships' own real
+    classification (a BLOCK_DRIFT or BLOCKED_HUMAN_CONFIRMATION target
+    was being simulated as applied here even though it would NOT actually
+    be written in execute mode). Fixed by removing that independent
+    decision entirely: `report` is the ACTUAL CleanupRunReport this same
+    dry run already produced (via run_cleanup_relationships), and this
+    function applies review_status IN MEMORY ONLY for the exact same
+    outcomes - WOULD_APPLY/APPLIED - that proposed_status_distribution
+    treats as effective, and no others. There is now exactly one place
+    that decides "would this target's status actually change" -
+    _classify_and_maybe_write, via `report` - so the coverage preview and
+    the status-distribution preview can never diverge again.
+
+    Ends with an unconditional session.rollback(), so nothing computed
+    here is ever flushed past this function's own return, whether or not
+    the caller is itself in a dry run."""
+    for outcome in report.reject_outcomes + report.needs_confirmation_outcomes:
+        if outcome.outcome not in (WOULD_APPLY, APPLIED):
+            continue
+        rel = _get_relationship(session, outcome.allocation_id, outcome.site_id)
+        if rel is not None:
+            rel.review_status = _ACTION_TO_STATUS[outcome.action]
 
     allocations = [a for a in (session.get(LocalPlanSite, aid) for aid in allocation_ids) if a is not None]
     proposed = build_allocation_development_coverage(session, allocations)

@@ -16,8 +16,10 @@ from sqlalchemy import select
 
 import app.policy.relationship_cleanup_runner as runner
 import scripts.cleanup_allocation_site_relationships as cli
-from app.db.models import AllocationSiteRelationship, ControlRelationship, Council, LocalPlanSite, Site
-from app.reporting.allocation_development_coverage import build_allocation_development_coverage
+from app.db.models import (
+    AllocationSiteRelationship, Application, ControlRelationship, Council, LocalPlanSite, SchemeIntelligence, Site,
+)
+from app.reporting.allocation_development_coverage import REVIEW_REQUIRED, build_allocation_development_coverage
 from app.reporting.ownership_control import get_allocation_control_intelligence
 
 
@@ -61,6 +63,15 @@ def _make_relationship(
     session.add(rel)
     session.flush()
     return rel
+
+
+def _make_application_with_capacity(session, council_code: str, reference: str, site_id: int, units: int) -> Application:
+    app = Application(council_code=council_code, reference=reference, site_id=site_id, application_received="01/01/2025")
+    session.add(app)
+    session.flush()
+    session.add(SchemeIntelligence(application_id=app.id, total_units_final=units, core_intelligence_complete=True))
+    session.flush()
+    return app
 
 
 def _make_control_relationship(session, *, site_id: int, review_status: str = "auto_applied") -> ControlRelationship:
@@ -276,6 +287,39 @@ def test_no_row_deletion(session, monkeypatch):
 
 
 def test_human_confirmed_row_never_overwritten(session, monkeypatch):
+    """Genuine provenance: legacy backfill row whose allocation carries a
+    real confirm_site_match decision (confirmed_by/confirmed_at/note, and
+    matched_site_id still pointing at this exact site) - the only shape
+    that traces to a real human decision (Section 3/5's provenance audit)."""
+    import datetime as dt
+
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "King Street")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3", matched_site_id=site.id)
+    allocation.review_status = "confirmed"
+    allocation.confirmed_by = "Test Reviewer"
+    allocation.confirmed_at = dt.datetime.now(dt.timezone.utc)
+    allocation.match_review_note = "Distinctive name match, verified against Application APP/1."
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="legacy_matched_site_id_backfill", evidence_category=None,
+                        review_status="confirmed")
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=True)
+
+    assert report.reject_outcomes[0].outcome == runner.BLOCKED_HUMAN_CONFIRMATION
+    assert "Test Reviewer" in report.reject_outcomes[0].detail
+    assert _get_rel(session, allocation.id, site.id).review_status == "confirmed"
+
+
+def test_legacy_confirmed_without_provenance_is_protected_but_labelled_distinctly(session, monkeypatch):
+    """A document-evidenced relationship can never legitimately reach
+    review_status='confirmed' in this codebase (see
+    _verify_human_confirmation_provenance's own docstring) - but if one
+    somehow does, it must be protected from overwrite exactly like a
+    genuinely human-confirmed row, just labelled honestly as unverified
+    rather than falsely described as human-confirmed."""
     _make_council(session, "testcouncil")
     allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3")
     site = _make_site(session, "testcouncil", "King Street")
@@ -287,7 +331,30 @@ def test_human_confirmed_row_never_overwritten(session, monkeypatch):
     _patch_targets(monkeypatch, reject=[(allocation.id, site.id)])
     report = runner.run_cleanup_relationships(session, execute=True)
 
-    assert report.reject_outcomes[0].outcome == runner.BLOCKED_HUMAN_CONFIRMATION
+    assert report.reject_outcomes[0].outcome == runner.BLOCKED_LEGACY_CONFIRMED_UNVERIFIED
+    assert _get_rel(session, allocation.id, site.id).review_status == "confirmed"  # still never overwritten
+
+
+def test_legacy_confirmed_with_drifted_matched_site_id_is_unverified(session, monkeypatch):
+    """A legacy-backfill relationship whose allocation.matched_site_id no
+    longer points at this relationship's site_id (the provenance link has
+    drifted since the relationship was created) must not be trusted as
+    human-confirmed, even though evidence_basis alone looks right."""
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "King Street")
+    other_site = _make_site(session, "testcouncil", "Rectory Lane")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3", matched_site_id=other_site.id)
+    allocation.review_status = "confirmed"
+    allocation.confirmed_by = "Test Reviewer"
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="legacy_matched_site_id_backfill", evidence_category=None,
+                        review_status="confirmed")
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=True)
+
+    assert report.reject_outcomes[0].outcome == runner.BLOCKED_LEGACY_CONFIRMED_UNVERIFIED
     assert _get_rel(session, allocation.id, site.id).review_status == "confirmed"
 
 
@@ -628,3 +695,301 @@ def test_cli_dry_run_end_to_end(session, monkeypatch, capsys):
     assert "DRY RUN COMPLETE - NO WRITES MADE" in out
     assert "reject targets requested: 1" in out
     assert _get_rel(session, allocation.id, site.id).review_status == "auto_applied"  # confirmed still unwritten
+
+
+# ---------------------------------------------------------------------------
+# Stage 2E.2 Final Amendment - Section 15 items 1-6, 9-14 (dry-run coverage-
+# preview integrity + provenance-protection reconciliation)
+# ---------------------------------------------------------------------------
+
+
+def test_would_apply_reject_affects_coverage_preview(session, monkeypatch):
+    """Item 5 - a WOULD_APPLY reject target is reflected in the preview:
+    the rejected Site's capacity drops out of the allocation's coverage."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3", minimum_dwellings=300)
+    kept_site = _make_site(session, "testcouncil", "Genuine Site")
+    reject_site = _make_site(session, "testcouncil", "King Street")
+    _make_relationship(session, allocation_id=allocation.id, site_id=kept_site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="EXPLICIT_REFERENCE")
+    _make_application_with_capacity(session, "testcouncil", "APP/KEPT", kept_site.id, 100)
+    _make_relationship(session, allocation_id=allocation.id, site_id=reject_site.id,
+                        evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    _make_application_with_capacity(session, "testcouncil", "APP/REJECT", reject_site.id, 50)
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, reject_site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+    assert report.reject_outcomes[0].outcome == runner.WOULD_APPLY
+
+    proposed = runner.simulate_proposed_coverage(session, [allocation.id], report)[allocation.id]["coverage"]
+    assert proposed.number_of_related_sites == 1
+    assert proposed.identified_application_capacity == 100
+
+    current = build_allocation_development_coverage(session, [allocation])[allocation.id]["coverage"]
+    assert current.number_of_related_sites == 2
+    assert current.identified_application_capacity == 150
+    # Rolled back - the "current" read after simulate_proposed_coverage proves nothing leaked.
+    assert _get_rel(session, allocation.id, reject_site.id).review_status == "auto_applied"
+
+
+def test_block_drift_does_not_alter_coverage_preview(session, monkeypatch):
+    """Items 1/2 - this is the exact bug the Product Owner reported: a
+    needs_confirmation target that comes back BLOCK_DRIFT (still eligible
+    under fresh evidence) must NOT be simulated as downgraded in the
+    coverage preview - it stays exactly as accepted as it is today."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10", minimum_dwellings=1930)
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    _make_application_with_capacity(session, "testcouncil", "FUL/1", site.id, 248)
+
+    from app.db.models import Document
+    app_row = session.query(Application).filter_by(reference="FUL/1").one()
+    session.add(Document(application_id=app_row.id, doc_type="other", text_extracted=True,
+                          extracted_text="the beal valley allocation jpa 10 is allocated for around 1930 dwellings and this site forms part of it."))
+    session.commit()
+
+    _patch_targets(monkeypatch, needs_confirmation=[(allocation.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+    assert report.needs_confirmation_outcomes[0].outcome == runner.BLOCK_DRIFT
+
+    proposed = runner.simulate_proposed_coverage(session, [allocation.id], report)[allocation.id]["coverage"]
+    current = build_allocation_development_coverage(session, [allocation])[allocation.id]["coverage"]
+
+    # BLOCK_DRIFT must leave the preview identical to the current state -
+    # the old buggy simulation would have forced this to REVIEW_REQUIRED.
+    assert proposed.capacity_accounting_status == current.capacity_accounting_status
+    assert proposed.capacity_accounting_status != REVIEW_REQUIRED
+    assert proposed.identified_application_capacity == current.identified_application_capacity == 248
+
+
+def test_blocked_confirmation_does_not_alter_coverage_preview(session, monkeypatch):
+    """Item 3 - a BLOCKED_HUMAN_CONFIRMATION (or BLOCKED_LEGACY_CONFIRMED_
+    UNVERIFIED) target must not be simulated as changed either."""
+    import datetime as dt
+
+    _make_council(session, "testcouncil")
+    site = _make_site(session, "testcouncil", "Genuine Site")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3", minimum_dwellings=300,
+                                   matched_site_id=site.id)
+    allocation.review_status = "confirmed"
+    allocation.confirmed_by = "Test Reviewer"
+    allocation.confirmed_at = dt.datetime.now(dt.timezone.utc)
+    allocation.match_review_note = "Verified."
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="legacy_matched_site_id_backfill", evidence_category=None,
+                        review_status="confirmed")
+    _make_application_with_capacity(session, "testcouncil", "APP/1", site.id, 100)
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+    assert report.reject_outcomes[0].outcome == runner.BLOCKED_HUMAN_CONFIRMATION
+
+    proposed = runner.simulate_proposed_coverage(session, [allocation.id], report)[allocation.id]["coverage"]
+    assert proposed.number_of_related_sites == 1  # not rejected in the preview
+    assert proposed.identified_application_capacity == 100
+
+
+def test_already_applied_reflects_current_status_only_in_preview(session, monkeypatch):
+    """Item 4 - a needs_confirmation target already at needs_confirmation
+    is ALREADY_APPLIED and the preview shows the site exactly as it is
+    now (already-disputed capacity accounting), not re-applied again."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10", minimum_dwellings=1930)
+    site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE",
+                        review_status="needs_confirmation")
+    _make_application_with_capacity(session, "testcouncil", "FUL/1", site.id, 248)
+    session.commit()
+
+    _patch_targets(monkeypatch, needs_confirmation=[(allocation.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+    assert report.needs_confirmation_outcomes[0].outcome == runner.ALREADY_APPLIED
+
+    proposed = runner.simulate_proposed_coverage(session, [allocation.id], report)[allocation.id]["coverage"]
+    current = build_allocation_development_coverage(session, [allocation])[allocation.id]["coverage"]
+    assert proposed.development_coverage_classification == current.development_coverage_classification == REVIEW_REQUIRED
+
+
+def test_status_distribution_and_coverage_preview_reconcile(session, monkeypatch):
+    """Item 6 - the exact production-shape scenario: one WOULD_APPLY
+    reject, one ALREADY_APPLIED review, one BLOCKED confirmation, one
+    BLOCK_DRIFT review. proposed_status_distribution and
+    simulate_proposed_coverage must derive from the identical effective
+    set (WOULD_APPLY/APPLIED only, nothing else)."""
+    import datetime as dt
+
+    from app.db.models import Document
+
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3", minimum_dwellings=1000)
+
+    reject_site = _make_site(session, "testcouncil", "King Street")
+    _make_relationship(session, allocation_id=allocation.id, site_id=reject_site.id,
+                        evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    _make_application_with_capacity(session, "testcouncil", "APP/REJECT", reject_site.id, 50)
+
+    already_site = _make_site(session, "testcouncil", "Already Reviewed Site")
+    _make_relationship(session, allocation_id=allocation.id, site_id=already_site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE",
+                        review_status="needs_confirmation")
+    _make_application_with_capacity(session, "testcouncil", "APP/ALREADY", already_site.id, 60)
+
+    confirmed_site = _make_site(session, "testcouncil", "Confirmed Site")
+    allocation.matched_site_id = None  # avoid interfering with the reject-site convenience pointer
+    conf_alloc = _make_allocation(session, "testcouncil", "Confirmed Allocation", "REF2",
+                                   matched_site_id=confirmed_site.id)
+    conf_alloc.review_status = "confirmed"
+    conf_alloc.confirmed_by = "Test Reviewer"
+    conf_alloc.confirmed_at = dt.datetime.now(dt.timezone.utc)
+    _make_relationship(session, allocation_id=conf_alloc.id, site_id=confirmed_site.id,
+                        evidence_basis="legacy_matched_site_id_backfill", evidence_category=None,
+                        review_status="confirmed")
+
+    drift_site = _make_site(session, "testcouncil", "Land South Of Bullcote Lane")
+    drift_alloc = _make_allocation(session, "testcouncil", "Beal Valley", "JPA 10", minimum_dwellings=1930)
+    _make_relationship(session, allocation_id=drift_alloc.id, site_id=drift_site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    drift_app = _make_application_with_capacity(session, "testcouncil", "FUL/DRIFT", drift_site.id, 248)
+    session.add(Document(application_id=drift_app.id, doc_type="other", text_extracted=True,
+                          extracted_text="the beal valley allocation jpa 10 is allocated for around 1930 dwellings and this site forms part of it."))
+    session.commit()
+
+    _patch_targets(
+        monkeypatch,
+        reject=[(allocation.id, reject_site.id), (conf_alloc.id, confirmed_site.id)],
+        needs_confirmation=[(allocation.id, already_site.id), (drift_alloc.id, drift_site.id)],
+    )
+    report = runner.run_cleanup_relationships(session, execute=False)
+
+    outcomes_by_pair = {
+        (o.allocation_id, o.site_id): o.outcome
+        for o in report.reject_outcomes + report.needs_confirmation_outcomes
+    }
+    assert outcomes_by_pair[(allocation.id, reject_site.id)] == runner.WOULD_APPLY
+    assert outcomes_by_pair[(conf_alloc.id, confirmed_site.id)] == runner.BLOCKED_HUMAN_CONFIRMATION
+    assert outcomes_by_pair[(allocation.id, already_site.id)] == runner.ALREADY_APPLIED
+    assert outcomes_by_pair[(drift_alloc.id, drift_site.id)] == runner.BLOCK_DRIFT
+
+    distribution = runner.proposed_status_distribution(session, report)
+    proposed_coverage = runner.simulate_proposed_coverage(
+        session, [allocation.id, conf_alloc.id, drift_alloc.id], report,
+    )
+
+    # Reconciliation: exactly one row moves from auto_applied to rejected
+    # (the WOULD_APPLY target) - every other outcome is a no-op for both
+    # the distribution and the coverage preview.
+    current = runner.current_status_distribution(session)
+    assert distribution["rejected"] == current.get("rejected", 0) + 1
+    assert distribution["auto_applied"] == current.get("auto_applied", 0) - 1
+
+    north_leigh = proposed_coverage[allocation.id]["coverage"]
+    assert north_leigh.number_of_related_sites == 1  # reject_site dropped, already_site (needs_confirmation) stays counted
+    assert north_leigh.development_coverage_classification == REVIEW_REQUIRED  # already_site's needs_confirmation still disputes it
+
+    beal_valley = proposed_coverage[drift_alloc.id]["coverage"]
+    assert beal_valley.development_coverage_classification != REVIEW_REQUIRED  # BLOCK_DRIFT never applied
+    assert beal_valley.identified_application_capacity == 248
+
+
+def test_second_dry_run_after_first_remains_zero_write(session, monkeypatch):
+    """Item 10 - running the (fixed) dry-run twice in a row is still fully
+    read-only both times."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3")
+    site = _make_site(session, "testcouncil", "King Street")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, site.id)])
+    first = runner.run_cleanup_relationships(session, execute=False)
+    runner.simulate_proposed_coverage(session, [allocation.id], first)
+    second = runner.run_cleanup_relationships(session, execute=False)
+    runner.simulate_proposed_coverage(session, [allocation.id], second)
+
+    assert first.reject_outcomes[0].outcome == second.reject_outcomes[0].outcome == runner.WOULD_APPLY
+    assert _get_rel(session, allocation.id, site.id).review_status == "auto_applied"
+
+
+def test_execute_semantics_unchanged_by_preview_fix(session, monkeypatch):
+    """Item 11 - execute mode never calls simulate_proposed_coverage at
+    all, so the preview fix cannot change what execute mode actually
+    writes."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3")
+    site = _make_site(session, "testcouncil", "King Street")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id,
+                        evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, site.id)])
+    report = runner.run_cleanup_relationships(session, execute=True)
+
+    assert report.reject_outcomes[0].outcome == runner.APPLIED
+    assert _get_rel(session, allocation.id, site.id).review_status == "rejected"
+
+    cli_source = inspect.getsource(cli)
+    execute_fn_source = cli_source[cli_source.index("def _run_execute"):cli_source.index("def main")]
+    assert "simulate_proposed_coverage" not in execute_fn_source
+
+
+def test_seven_reject_targets_unchanged_by_amendment():
+    """Item 12 - this amendment must not alter the seven approved reject
+    targets."""
+    assert runner.TO_REJECT == (
+        (210, 171), (210, 174), (211, 171), (211, 174), (212, 171), (213, 171), (146, 260),
+    )
+
+
+def test_north_leigh_park_corrected_preview_with_mixed_outcomes(session, monkeypatch):
+    """Item 13 - North Leigh Park's coverage preview reflects only the
+    genuinely-applied reject, even with a BLOCK_DRIFT sibling target
+    present in the same dry run."""
+    _make_council(session, "testcouncil")
+    allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3", minimum_dwellings=156)
+    genuine_site = _make_site(session, "testcouncil", "North Leigh Development Site")
+    king_street = _make_site(session, "testcouncil", "35 - 45 King Street")
+    _make_relationship(session, allocation_id=allocation.id, site_id=genuine_site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="EXPLICIT_REFERENCE")
+    _make_relationship(session, allocation_id=allocation.id, site_id=king_street.id,
+                        evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(allocation.id, king_street.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+    assert report.reject_outcomes[0].outcome == runner.WOULD_APPLY
+
+    proposed = runner.simulate_proposed_coverage(session, [allocation.id], report)[allocation.id]["coverage"]
+    assert proposed.number_of_related_sites == 1
+
+
+def test_north_of_mosley_common_unchanged_in_preview(session, monkeypatch):
+    """Item 14 - an allocation with no targets at all sees an identical
+    current vs proposed coverage preview."""
+    _make_council(session, "testcouncil")
+    other_allocation = _make_allocation(session, "testcouncil", "North Leigh Park", "H3")
+    other_site = _make_site(session, "testcouncil", "King Street")
+    _make_relationship(session, allocation_id=other_allocation.id, site_id=other_site.id,
+                        evidence_basis="multiple_document_supported_sites", evidence_category="STRONG_CONTEXTUAL_REFERENCE")
+
+    jpa32 = _make_allocation(session, "testcouncil", "North of Mosley Common", "JPA 32", minimum_dwellings=1100)
+    jpa32_site = _make_site(session, "testcouncil", "Land North Of Mosley Common")
+    _make_relationship(session, allocation_id=jpa32.id, site_id=jpa32_site.id,
+                        evidence_basis="document_confirmed_site", evidence_category="EXPLICIT_REFERENCE")
+    _make_application_with_capacity(session, "testcouncil", "A/25/099409/RMMAJ", jpa32_site.id, 244)
+    session.commit()
+
+    _patch_targets(monkeypatch, reject=[(other_allocation.id, other_site.id)])
+    report = runner.run_cleanup_relationships(session, execute=False)
+
+    current = build_allocation_development_coverage(session, [jpa32])[jpa32.id]["coverage"]
+    proposed = runner.simulate_proposed_coverage(session, [jpa32.id], report)[jpa32.id]["coverage"]
+
+    assert proposed.number_of_related_sites == current.number_of_related_sites == 1
+    assert proposed.identified_application_capacity == current.identified_application_capacity == 244
+    assert proposed.indicative_residual_capacity == current.indicative_residual_capacity == 856
