@@ -717,10 +717,22 @@ def test_capacity_filter_inactive_at_default_full_range_position():
 
 
 def test_local_plan_sites_page_only_applies_capacity_filter_once_narrowed():
+    """Local Plan Sites Filter Refinement - capacity bands replaced the old
+    linear slider, but the same invariant must hold: the default ("Any")
+    selection applies no capacity constraint at all (unknown-capacity
+    allocations included), only a deliberately narrowed band excludes
+    them. The page wires capacity_min/capacity_max straight from
+    capacity_band_range - verified here at the function level (the
+    "Any" band's own (None, None)) plus a source-level check that the
+    page actually calls it rather than hand-rolling a parallel mechanism."""
     from pathlib import Path
 
+    from app.reporting.allocation_discovery import capacity_band_range
+
+    assert capacity_band_range("Any") == (None, None)
+
     source = Path("app/ui/pages/3_Local_Plan_Sites.py").read_text(encoding="utf-8")
-    assert "capacity_range != capacity_full_span" in source
+    assert "capacity_band_range(capacity_band_label)" in source
 
 
 # --- Stage 3A wiring: build_allocation_discovery must surface development
