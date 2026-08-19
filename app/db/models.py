@@ -799,6 +799,89 @@ class AllocationSiteRelationship(Base):
     evidence_application: Mapped["Application | None"] = relationship(foreign_keys=[evidence_application_id])
 
 
+class AllocationIntelligenceSummary(Base):
+    """AI Allocation Intelligence Summary (Phase 1 Local Plan Intelligence)
+    - the GENERATED INTERPRETATION layer for one Local Plan allocation, kept
+    in a dedicated table rather than as columns on LocalPlanSite (Pre-Merge
+    Architecture Amendment, Sections 3/4/18 - superseding the V1 design,
+    which never shipped to production and is not being migrated away from,
+    only replaced before its first real migration).
+
+    ARCHITECTURE DECISION: source/structured intelligence (LocalPlanSite's
+    own fields, AllocationSiteRelationship, ControlRelationship) must stay
+    conceptually and physically separate from AI-GENERATED interpretation
+    of that intelligence - the same separation this codebase already
+    enforces for Application/SchemeIntelligence (never AI-derived columns
+    bolted directly onto Application) and Site/ControlRelationship (never
+    ownership evidence stored as columns on Site). LocalPlan.ai_summary_*
+    (module-level, above) predates this explicit principle and is left
+    untouched by this amendment - not a precedent to repeat, a known
+    exception this amendment does not attempt to retrofit.
+
+    ONE ROW PER ALLOCATION (Section 5) - enforced by the UniqueConstraint
+    below, not a versioned history table. V1 has no product requirement to
+    show a customer (or an operator) more than the current summary; a
+    "summary_version" integer or a second historical table would be a
+    field/table added because it looked plausible, not because anything
+    needs it yet - exactly what this platform's own product principles
+    warn against ("do not create fields merely because they appear
+    plausible if the platform cannot support them safely/does not need
+    them"). Nothing below blocks adding real version history later: a
+    future need could either relax this constraint, or - more likely,
+    following AllocationVersion's own append-only precedent immediately
+    above - add a separate AllocationIntelligenceSummaryVersion audit
+    table that snapshots a row here whenever it changes, without touching
+    this table's own current-row shape at all.
+
+    LAST-SUCCESSFUL-SUMMARY INVARIANT (unchanged from V1, just relocated):
+    headline/overview/... are ONLY ever written by a SUCCESSFUL, validated
+    generation (see generate_allocation_intelligence_summary) - a failed
+    OpenAI call or a rejected (ungrounded) output only ever updates status/
+    generation_error, never touches the narrative fields, so a customer
+    always sees the last genuinely successful summary, never a blank or
+    partially-generated one."""
+
+    __tablename__ = "allocation_intelligence_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # "allocation_id" (not "local_plan_site_id") deliberately mirrors
+    # AllocationSiteRelationship.allocation_id's own naming precedent
+    # exactly (both FKs target local_plan_sites.id) - LocalPlanSite IS the
+    # Allocation domain object platform-wide (see LocalPlanSite's own class
+    # docstring), so every table that relates TO it names the FK for what
+    # it conceptually is, not its legacy class name.
+    allocation_id: Mapped[int] = mapped_column(ForeignKey("local_plan_sites.id"), unique=True)
+
+    headline: Mapped[str | None] = mapped_column(Text, nullable=True)
+    overview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Structured (JSON-encoded lists), not free text - same reasoning as
+    # LocalPlan.ai_summary_key_risks etc. - so the UI renders distinct
+    # bullet lists without re-parsing prose.
+    key_points: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_uncertainties: Mapped[str | None] = mapped_column(Text, nullable=True)
+    investigation_priorities: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    generated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # sha256 of the narrative-relevant subset of AllocationIntelligenceContext
+    # - see compute_context_fingerprint's own docstring for exactly what is
+    # (and, deliberately, is not) included, so a routine check that finds
+    # nothing new never forces a regeneration/AI-cost event.
+    context_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # ok | error - null means "never attempted". A row can be status="ok"
+    # with the summary fields above populated from an OLDER successful
+    # generation even while the most recent attempt failed - see
+    # generate_allocation_intelligence_summary's own docstring.
+    status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    allocation: Mapped["LocalPlanSite"] = relationship(foreign_keys=[allocation_id])
+
+
 class ControlRelationship(Base):
     """Stage 4B ("Ownership & Control Document Intelligence") - an
     evidence-backed link between a named party (a Company we may already
@@ -2302,6 +2385,29 @@ class IntelligenceRun(Base):
     refresh_succeeded: Mapped[int] = mapped_column(Integer, default=0)
     refresh_failed: Mapped[int] = mapped_column(Integer, default=0)
 
+    # AI Allocation Intelligence Summary (Phase 1 Local Plan Intelligence,
+    # Pre-Merge Architecture Amendment, Section 8/9) - a FOURTH, independent
+    # counter family, mirroring refresh_*'s own shape exactly. Counts
+    # app.pipeline.run_weekly.stage_allocation_intelligence_refresh's work:
+    # an allocation whose AllocationIntelligenceContext fingerprint has
+    # moved since its persisted AllocationIntelligenceSummary (or whose
+    # summary is missing entirely). succeeded means a new summary was
+    # generated AND passed grounding validation; rejected means the model's
+    # own output failed grounding validation (an ungrounded output,
+    # deliberately distinct from a hard failure - see
+    # generate_allocation_intelligence_summary's own contract, "last valid
+    # summary is never replaced" either way); failed means the OpenAI call
+    # itself raised. Deliberately its own family, never folded into
+    # refresh_* above - refresh_* is PR B3's Application-evidence-driven
+    # SchemeIntelligence refresh, a different trigger and a different
+    # target entity (Application, not LocalPlanSite) that happens to share
+    # the word "refresh".
+    allocation_summaries_candidates_inspected: Mapped[int] = mapped_column(Integer, default=0)
+    allocation_summaries_attempted: Mapped[int] = mapped_column(Integer, default=0)
+    allocation_summaries_succeeded: Mapped[int] = mapped_column(Integer, default=0)
+    allocation_summaries_rejected: Mapped[int] = mapped_column(Integer, default=0)
+    allocation_summaries_failed: Mapped[int] = mapped_column(Integer, default=0)
+
     # Backlog still outstanding AFTER this run - the bounded-workload
     # mechanism's whole point (Part 6/8): a large backlog is deliberately
     # NOT drained in one run, so this is what tells an operator "there is
@@ -2309,6 +2415,7 @@ class IntelligenceRun(Base):
     # being invisible between runs.
     applications_backlog_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sites_backlog_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    allocation_summaries_backlog_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Free text - short human-readable summary, or the job-level error on
     # a "failed" run. Same discipline as ScrapeRun.detail.

@@ -15,6 +15,7 @@ components (CLAUDE.md: "keep business logic out of the UI").
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -46,6 +47,7 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_caption,
     total_homes_kpi_label,
 )
+from app.reporting.allocation_intelligence_summary import get_allocation_summary, is_allocation_summary_stale
 from app.reporting.ownership_control import (
     EMPTY_STATE_ALLOCATION_RESIDUAL,
     EMPTY_STATE_ALLOCATION_SITE,
@@ -117,6 +119,85 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     ])
     if card["is_multi_authority"]:
         joint_plan_badge()
+
+    # Loaded once here (Section 16/17) rather than deep in the Timeline
+    # section below - reused for the Timeline section further down,
+    # avoiding a second identical query.
+    from app.db.models import LocalPlanSite
+
+    allocation_row = session.get(LocalPlanSite, allocation_id)
+
+    # The AI summary itself lives in its own table (Pre-Merge Architecture
+    # Amendment - AllocationIntelligenceSummary, keyed by allocation_id,
+    # separate from LocalPlanSite's own source fields). Deliberately READ
+    # ONLY: this never calls generate_allocation_intelligence_summary or
+    # OpenAI - Section 8's own "opening an allocation page must NOT
+    # normally call OpenAI" rule.
+    ai_summary_row = get_allocation_summary(session, allocation_id)
+
+    # 0. AI Allocation Intelligence (Phase 1 Local Plan Intelligence) - an
+    # orientation layer shown BEFORE the detailed sections below (Section
+    # 16: "the user should encounter it before needing to scan the
+    # detailed intelligence sections"), never a replacement for them - all
+    # of Overview/Planning status/Capacity/Visual evidence/Related
+    # Sites+Applications/Progression/Development coverage/Ownership &
+    # Control/Source evidence/Evidence gaps/Timeline below are unchanged
+    # and fully retained.
+    section_header("AI Allocation Intelligence", icon="🤖")
+    # Deterministic snapshot (Section 17) - reuses the SAME Stage 3A
+    # development_coverage figures already computed for this card by
+    # build_allocation_discovery (no new query) - never LLM-generated
+    # numbers, shown alongside the AI narrative below as the factual
+    # anchor a reader can check the prose against.
+    coverage = card.get("development_coverage")
+    if coverage is not None:
+        snap_cols = st.columns(4)
+        with snap_cols[0]:
+            stat_tile("Allocation capacity", f"{coverage.allocation_capacity:,}" if coverage.allocation_capacity is not None else "Not stated")
+        with snap_cols[1]:
+            stat_tile("Identified planning activity", f"{coverage.identified_application_capacity:,}" if coverage.identified_application_capacity is not None else "Not determined")
+        with snap_cols[2]:
+            stat_tile("Indicative residual", f"~{coverage.indicative_residual_capacity:,}" if coverage.indicative_residual_capacity is not None else "Not determined")
+        with snap_cols[3]:
+            stat_tile(
+                "Development coverage",
+                f"{coverage.development_coverage_percentage:.0%}" if coverage.development_coverage_percentage is not None else DEVELOPMENT_COVERAGE_LABELS.get(coverage.development_coverage_classification, coverage.development_coverage_classification),
+            )
+
+    if ai_summary_row is not None and ai_summary_row.headline:
+        stale = is_allocation_summary_stale(session, allocation_row)
+        if stale:
+            st.caption("⏳ This summary may be out of date - PropertyAIgent's evidence for this allocation has changed since it was last generated.")
+        st.markdown(f"**{ai_summary_row.headline}**")
+        st.write(ai_summary_row.overview)
+
+        key_points = json.loads(ai_summary_row.key_points) if ai_summary_row.key_points else []
+        if key_points:
+            st.markdown("**Key intelligence**")
+            for point in key_points:
+                st.caption(f"• {point}")
+
+        key_uncertainties = json.loads(ai_summary_row.key_uncertainties) if ai_summary_row.key_uncertainties else []
+        if key_uncertainties:
+            st.markdown("**Key uncertainties**")
+            for item in key_uncertainties:
+                st.caption(f"• {item}")
+
+        investigation_priorities = json.loads(ai_summary_row.investigation_priorities) if ai_summary_row.investigation_priorities else []
+        if investigation_priorities:
+            st.markdown("**Investigation priorities**")
+            for item in investigation_priorities:
+                st.caption(f"• {item}")
+
+        if ai_summary_row.generated_at:
+            st.caption(f"Generated {ai_summary_row.generated_at.strftime('%d %b %Y')} · AI-generated interpretation of evidence PropertyAIgent already holds - not a substitute for the detailed intelligence below.")
+    else:
+        # Section 18 - never expose a stack trace, OpenAI error, prompt, or
+        # raw JSON here, even if the last generation attempt errored
+        # (ai_summary_row.status == "error" with no summary ever
+        # successfully generated yet) - the customer-facing state is
+        # identical either way: "not yet generated".
+        st.caption("AI allocation summary not yet generated.")
 
     # 1. Allocation overview
     section_header("Overview", icon="📋")
@@ -428,10 +509,9 @@ def _render_detail(view: dict, allocation_id: int) -> None:
 
     # 9. Timeline (where supported) - AllocationVersion rows already carry
     # a deterministic change_reason + captured_at, so this is real,
-    # already-stored evidence, not a new extraction pipeline.
-    from app.db.models import LocalPlanSite
-
-    allocation_row = session.get(LocalPlanSite, allocation_id)
+    # already-stored evidence, not a new extraction pipeline. allocation_row
+    # was already fetched once near the top of this function (AI Allocation
+    # Intelligence section) - reused here, not re-queried.
     if allocation_row and allocation_row.versions:
         section_header("Timeline", icon="🕒")
         entries = [

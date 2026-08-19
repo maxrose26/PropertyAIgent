@@ -66,9 +66,11 @@ from app.config import CouncilConfig, load_councils
 from app.db.models import IntelligenceRun
 from app.db.session import get_session, init_db
 from app.pipeline.run_weekly import (
+    count_pending_allocation_summary_refresh,
     count_pending_extraction,
     count_pending_intelligence_refresh,
     count_pending_summaries,
+    stage_allocation_intelligence_refresh,
     stage_extraction,
     stage_generate_scheme_summaries,
     stage_intelligence_refresh,
@@ -101,8 +103,32 @@ DEFAULT_MAX_EXTRACTIONS_PER_RUN = 20
 # them in one bounded run.
 DEFAULT_MAX_SUMMARIES_PER_RUN = 40
 
+# AI Allocation Intelligence Summary automatic refresh (Phase 1 Local Plan
+# Intelligence, Pre-Merge Architecture Amendment, Section 8/9/14) - its own
+# small, independent cap, same reasoning as DEFAULT_MAX_INTELLIGENCE_
+# REFRESH_PER_RUN above (a conservative default so this new stage can never
+# consume the whole run's budget and starve brand-new-scheme extraction).
+#
+# DELIBERATELY GATED BEHIND AN EXPLICIT OPT-IN, DEFAULT OFF (Section 14 -
+# "if adding scheduling configuration would implicitly activate on merge/
+# deploy, do NOT do so"): this job's cron schedule (render.yaml) already
+# runs in production TODAY; wiring this stage into process_intelligence_
+# backlog unconditionally would make the VERY NEXT scheduled run start
+# generating real AI allocation summaries the moment this amendment is
+# merged and deployed - before the Controlled Sample Generation gate this
+# feature's own spec requires. PROPERTYAIGENT_ENABLE_ALLOCATION_SUMMARY_
+# REFRESH is NOT declared in render.yaml's envVars (see that file) and
+# therefore stays unset - and this stage entirely un-invoked - through a
+# merge and deploy alone. Only a deliberate, separate Render dashboard
+# change (adding the env var, then "Sync Blueprint" or a dashboard-only
+# env var addition) turns it on - see this amendment's own final report
+# for the exact recommended future command/config.
+DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN = 10
 
-def _classify_run_status(*, extractions_failed: int, summaries_failed: int, refresh_failed: int = 0) -> str:
+
+def _classify_run_status(
+    *, extractions_failed: int, summaries_failed: int, refresh_failed: int = 0, allocation_summaries_failed: int = 0,
+) -> str:
     """success | partial - mirrors AcquisitionHealth.classify()'s own "any
     known unresolved failure counts" policy (see app.pipeline.
     acquisition_health, Render Daily Discovery Portal Resilience & Truthful
@@ -120,7 +146,7 @@ def _classify_run_status(*, extractions_failed: int, summaries_failed: int, refr
     not an AI failure, so a run made up entirely of no-usable-text items is
     still "success", per this task's own policy: "NO_USABLE_TEXT items do
     not count as AI failure if correctly classified/skipped"."""
-    if extractions_failed > 0 or summaries_failed > 0 or refresh_failed > 0:
+    if extractions_failed > 0 or summaries_failed > 0 or refresh_failed > 0 or allocation_summaries_failed > 0:
         return "partial"
     return "success"
 
@@ -154,6 +180,20 @@ def parse_args() -> argparse.Namespace:
              f"Default: ${{PROPERTYAIGENT_MAX_INTELLIGENCE_REFRESH_PER_RUN}} or {DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN}.",
     )
     parser.add_argument(
+        "--max-allocation-summaries", type=int, default=None,
+        help=f"Max AI Allocation Intelligence Summary refreshes this run, across all councils combined. "
+             f"Only used when allocation summary refresh is enabled (see --enable-allocation-summaries). "
+             f"Default: ${{PROPERTYAIGENT_MAX_ALLOCATION_SUMMARIES_PER_RUN}} or {DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN}.",
+    )
+    parser.add_argument(
+        "--enable-allocation-summaries", action="store_true",
+        help="Opt in to AI Allocation Intelligence Summary automatic refresh this run (default: disabled). "
+             "Equivalent to setting PROPERTYAIGENT_ENABLE_ALLOCATION_SUMMARY_REFRESH=1. Deliberately NOT set by "
+             "render.yaml's scheduled job - an operator must add this explicitly (CLI flag for a manual run, or "
+             "the env var in the Render dashboard for the scheduled job) before any allocation summary is "
+             "ever generated in production.",
+    )
+    parser.add_argument(
         "--triggered-by", default="scheduled", choices=["scheduled", "manual"],
         help="Recorded on the IntelligenceRun row - 'manual' for an operator-triggered catch-up run.",
     )
@@ -168,6 +208,8 @@ def process_intelligence_backlog(
     max_extractions: int,
     max_summaries: int,
     max_intelligence_refresh: int = DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN,
+    max_allocation_summaries: int = DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN,
+    enable_allocation_summaries: bool = False,
     triggered_by: str = "scheduled",
     client_factory: Callable[[str], object] = lambda api_key: OpenAI(api_key=api_key),
 ) -> IntelligenceRun:
@@ -178,7 +220,13 @@ def process_intelligence_backlog(
     about the selection/limiting/observability logic lives in main()
     itself. client_factory exists purely so tests can inject a fake
     client instead of a real openai.OpenAI(...) - production always uses
-    the default."""
+    the default.
+
+    enable_allocation_summaries defaults to False (Section 14 safety gate -
+    see DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN's own docstring) - when
+    False, allocation summary refresh is skipped ENTIRELY: no backlog
+    count, no candidate scan, no OpenAI call shaped for that stage at all,
+    regardless of how many allocations are genuinely stale."""
     run = IntelligenceRun(status="running", triggered_by=triggered_by)
     session.add(run)
     session.commit()
@@ -188,6 +236,9 @@ def process_intelligence_backlog(
     summaries_attempted = summaries_succeeded = summaries_failed = 0
     refresh_candidates_inspected = 0
     refresh_attempted = refresh_succeeded = refresh_failed = 0
+    allocation_summaries_candidates_inspected = 0
+    allocation_summaries_attempted = allocation_summaries_succeeded = 0
+    allocation_summaries_rejected = allocation_summaries_failed = 0
 
     try:
         # Read-only backlog sizing BEFORE deciding whether an OpenAI client
@@ -201,18 +252,33 @@ def process_intelligence_backlog(
         extraction_backlog = {code: count_pending_extraction(session, code) for code in council_codes}
         summary_backlog = {code: count_pending_summaries(session, code) for code in council_codes}
         refresh_backlog = {code: count_pending_intelligence_refresh(session, code) for code in council_codes}
+        # Only counted when explicitly enabled (Section 14 safety gate) -
+        # count_pending_allocation_summary_refresh builds a full
+        # AllocationIntelligenceContext per allocation (no cheap SQL
+        # predicate exists for "is this summary stale" - see that
+        # function's own docstring), so this is skipped entirely rather
+        # than paying that cost on every run before an operator has opted
+        # in at all.
+        allocation_summary_backlog = (
+            {code: count_pending_allocation_summary_refresh(session, code) for code in council_codes}
+            if enable_allocation_summaries else {code: 0 for code in council_codes}
+        )
         total_extraction_backlog = sum(extraction_backlog.values())
         total_summary_backlog = sum(summary_backlog.values())
         total_refresh_backlog = sum(refresh_backlog.values())
+        total_allocation_summary_backlog = sum(allocation_summary_backlog.values())
         print(f"[intelligence-processing] backlog: {total_extraction_backlog} application(s) awaiting extraction, "
               f"{total_summary_backlog} site(s) awaiting a summary, "
-              f"{total_refresh_backlog} application(s) awaiting evidence-driven intelligence refresh")
+              f"{total_refresh_backlog} application(s) awaiting evidence-driven intelligence refresh, "
+              f"{total_allocation_summary_backlog} allocation(s) awaiting an AI summary refresh"
+              + ("" if enable_allocation_summaries else " (allocation summary refresh disabled this run)"))
 
         extractions_planned = min(max_extractions, total_extraction_backlog)
         summaries_planned = min(max_summaries, total_summary_backlog)
         refresh_planned = min(max_intelligence_refresh, total_refresh_backlog)
+        allocation_summaries_planned = min(max_allocation_summaries, total_allocation_summary_backlog) if enable_allocation_summaries else 0
 
-        if extractions_planned == 0 and summaries_planned == 0 and refresh_planned == 0:
+        if extractions_planned == 0 and summaries_planned == 0 and refresh_planned == 0 and allocation_summaries_planned == 0:
             print("[intelligence-processing] no outstanding work within this run's limits - nothing to do, "
                   "OPENAI_API_KEY was never read.")
             detail = "No outstanding work this run."
@@ -235,6 +301,7 @@ def process_intelligence_backlog(
             remaining_extractions = extractions_planned
             remaining_summaries = summaries_planned
             remaining_refresh = refresh_planned
+            remaining_allocation_summaries = allocation_summaries_planned
 
             for code in council_codes:
                 council = councils[code]
@@ -251,6 +318,21 @@ def process_intelligence_backlog(
                     refresh_succeeded += refresh_result.succeeded
                     refresh_failed += refresh_result.failed
                     remaining_refresh -= refresh_result.attempted
+
+                # AI Allocation Intelligence Summary refresh - only reached
+                # at all when enable_allocation_summaries is True (Section
+                # 14 safety gate), independently bounded so it can never
+                # starve extraction/scheme-summary/PR B3 refresh either.
+                if enable_allocation_summaries and remaining_allocation_summaries > 0 and allocation_summary_backlog[code] > 0:
+                    allocation_summary_result = stage_allocation_intelligence_refresh(
+                        session, client, council, limit=remaining_allocation_summaries,
+                    )
+                    allocation_summaries_candidates_inspected += allocation_summary_result.candidates_inspected
+                    allocation_summaries_attempted += allocation_summary_result.attempted
+                    allocation_summaries_succeeded += allocation_summary_result.succeeded
+                    allocation_summaries_rejected += allocation_summary_result.rejected
+                    allocation_summaries_failed += allocation_summary_result.failed
+                    remaining_allocation_summaries -= allocation_summary_result.attempted
 
                 if remaining_extractions > 0 and extraction_backlog[code] > 0:
                     # stage_extraction's own bounded candidate-scan (Part 5) may
@@ -281,7 +363,10 @@ def process_intelligence_backlog(
                 f"({refresh_candidates_inspected} candidate(s) inspected). "
                 f"Extractions: {extractions_succeeded}/{extractions_attempted} succeeded "
                 f"({extractions_no_usable_text} no usable text, {extractions_candidates_inspected} candidate(s) inspected). "
-                f"Summaries: {summaries_succeeded}/{summaries_attempted} succeeded."
+                f"Summaries: {summaries_succeeded}/{summaries_attempted} succeeded. "
+                f"Allocation summaries: {allocation_summaries_succeeded}/{allocation_summaries_attempted} succeeded"
+                + (f" ({allocation_summaries_rejected} rejected as ungrounded)." if allocation_summaries_rejected else ".")
+                + ("" if enable_allocation_summaries else " (disabled this run).")
             )
     except Exception:
         # Run-level catastrophic failure (AI Processing Reliability &
@@ -320,6 +405,11 @@ def process_intelligence_backlog(
                 run.refresh_attempted = refresh_attempted
                 run.refresh_succeeded = refresh_succeeded
                 run.refresh_failed = refresh_failed
+                run.allocation_summaries_candidates_inspected = allocation_summaries_candidates_inspected
+                run.allocation_summaries_attempted = allocation_summaries_attempted
+                run.allocation_summaries_succeeded = allocation_summaries_succeeded
+                run.allocation_summaries_rejected = allocation_summaries_rejected
+                run.allocation_summaries_failed = allocation_summaries_failed
                 run.detail = "Run-level failure - processing did not complete. See process logs for the original error."
                 session.commit()
             except Exception:
@@ -339,12 +429,21 @@ def process_intelligence_backlog(
         raise
 
     # Re-count backlog AFTER the run - what's genuinely still outstanding,
-    # for the next run (or an operator) to see.
+    # for the next run (or an operator) to see. Allocation summary backlog
+    # is only re-counted when the stage actually ran this run (same
+    # cost-avoidance reasoning as the pre-run count above) - None (not 0)
+    # when the stage was never enabled, so an operator can tell "nothing
+    # outstanding" apart from "never checked".
     applications_backlog_remaining = sum(count_pending_extraction(session, code) for code in council_codes)
     sites_backlog_remaining = sum(count_pending_summaries(session, code) for code in council_codes)
+    allocation_summaries_backlog_remaining = (
+        sum(count_pending_allocation_summary_refresh(session, code) for code in council_codes)
+        if enable_allocation_summaries else None
+    )
 
     run.status = _classify_run_status(
         extractions_failed=extractions_failed, summaries_failed=summaries_failed, refresh_failed=refresh_failed,
+        allocation_summaries_failed=allocation_summaries_failed,
     )
     run.finished_at = dt.datetime.now(dt.timezone.utc)
     run.extractions_candidates_inspected = extractions_candidates_inspected
@@ -359,14 +458,22 @@ def process_intelligence_backlog(
     run.refresh_attempted = refresh_attempted
     run.refresh_succeeded = refresh_succeeded
     run.refresh_failed = refresh_failed
+    run.allocation_summaries_candidates_inspected = allocation_summaries_candidates_inspected
+    run.allocation_summaries_attempted = allocation_summaries_attempted
+    run.allocation_summaries_succeeded = allocation_summaries_succeeded
+    run.allocation_summaries_rejected = allocation_summaries_rejected
+    run.allocation_summaries_failed = allocation_summaries_failed
     run.applications_backlog_remaining = applications_backlog_remaining
     run.sites_backlog_remaining = sites_backlog_remaining
+    run.allocation_summaries_backlog_remaining = allocation_summaries_backlog_remaining
     run.detail = detail
     session.commit()
 
     print(f"\n[intelligence-processing] Done. {detail}")
     print(f"[intelligence-processing] Backlog remaining: {applications_backlog_remaining} application(s), "
-          f"{sites_backlog_remaining} site(s).")
+          f"{sites_backlog_remaining} site(s)"
+          + (f", {allocation_summaries_backlog_remaining} allocation(s) awaiting an AI summary."
+             if allocation_summaries_backlog_remaining is not None else "."))
     return run
 
 
@@ -384,17 +491,29 @@ def main() -> None:
     max_intelligence_refresh = args.max_intelligence_refresh if args.max_intelligence_refresh is not None else _int_env(
         "PROPERTYAIGENT_MAX_INTELLIGENCE_REFRESH_PER_RUN", DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN
     )
+    max_allocation_summaries = args.max_allocation_summaries if args.max_allocation_summaries is not None else _int_env(
+        "PROPERTYAIGENT_MAX_ALLOCATION_SUMMARIES_PER_RUN", DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN
+    )
+    # Section 14 safety gate - either the explicit CLI flag (a deliberate,
+    # per-invocation operator choice for a manual run) or the env var (the
+    # only way the SCHEDULED job could ever enable this, and only if an
+    # operator adds it in the Render dashboard - see render.yaml, which
+    # deliberately does not declare it). Defaults to disabled either way.
+    enable_allocation_summaries = args.enable_allocation_summaries or os.getenv("PROPERTYAIGENT_ENABLE_ALLOCATION_SUMMARY_REFRESH", "").strip() not in ("", "0", "false", "False")
 
     councils = load_councils()
     council_codes = args.councils or sorted(councils.keys())
     print(f"[intelligence-processing] {len(council_codes)} council(s) in scope: {', '.join(council_codes)}")
     print(f"[intelligence-processing] limits this run: max_extractions={max_extractions}, "
-          f"max_summaries={max_summaries}, max_intelligence_refresh={max_intelligence_refresh}")
+          f"max_summaries={max_summaries}, max_intelligence_refresh={max_intelligence_refresh}, "
+          f"max_allocation_summaries={max_allocation_summaries} (allocation summary refresh "
+          f"{'ENABLED' if enable_allocation_summaries else 'disabled'} this run)")
 
     process_intelligence_backlog(
         session, councils, council_codes,
         max_extractions=max_extractions, max_summaries=max_summaries,
-        max_intelligence_refresh=max_intelligence_refresh, triggered_by=args.triggered_by,
+        max_intelligence_refresh=max_intelligence_refresh, max_allocation_summaries=max_allocation_summaries,
+        enable_allocation_summaries=enable_allocation_summaries, triggered_by=args.triggered_by,
     )
 
 
