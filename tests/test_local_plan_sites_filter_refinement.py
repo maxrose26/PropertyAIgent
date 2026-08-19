@@ -171,8 +171,8 @@ def test_legacy_matched_site_with_no_relationship_row_still_trusted(session):
     AllocationSiteRelationship row at all) must remain trusted - an empty
     development_coverage is genuinely ambiguous on its own (no
     relationship row ever existed vs the one relationship that existed
-    was rejected), and only matched_site_relationship_rejected being
-    True should ever override the legacy signal to "not linked"."""
+    is disputed), and only matched_site_relationship_disputed being True
+    should ever override the legacy signal to "not linked"."""
     plan = _make_local_plan(session)
     allocation = _make_allocation(session, plan.id, policy_reference="REF-LEGACY", site_name="Legacy Confirmed Allocation")
     site = _make_site(session, "Legacy Matched Site")
@@ -185,7 +185,7 @@ def test_legacy_matched_site_with_no_relationship_row_still_trusted(session):
     result = build_allocation_discovery(session)
     card = next(c for c in result["cards"] if c["id"] == allocation.id)
 
-    assert card["matched_site_relationship_rejected"] is False
+    assert card["matched_site_relationship_disputed"] is False
     assert card["development_coverage"].number_of_related_sites == 0
     assert has_trusted_linked_application(card) is True
     assert card["show_linked_application_tag"] is True
@@ -587,6 +587,148 @@ def test_planning_activity_filter_wired_into_apply_filters(session):
     cards = build_allocation_discovery(session)["cards"]
     filtered = apply_filters(cards, {"planning_activity": PLANNING_ACTIVITY_NONE})
     assert [c["id"] for c in filtered] == [no_activity.id]
+
+
+# ---------------------------------------------------------------------------
+# Final Pre-Merge Amendment - Section 3 required case matrix (A-G) +
+# Section 9 items 1-11. Proves the legacy matched_site_id fallback can
+# NEVER turn a disputed (rejected OR needs_confirmation)
+# AllocationSiteRelationship into a confident "linked planning
+# application", while still trusting a genuinely history-free legacy
+# match on its own terms.
+# ---------------------------------------------------------------------------
+
+
+def _make_legacy_matched_case(session, plan, *, ref, relationship_status: str | None, allocation_review_status="auto_applied"):
+    """Builds one allocation whose matched_site_id points at a Site with a
+    real Application, optionally with an AllocationSiteRelationship of the
+    given status for that exact pair - relationship_status=None means no
+    AllocationSiteRelationship row is created at all (the pure legacy
+    case)."""
+    allocation = _make_allocation(session, plan.id, policy_reference=ref, site_name=f"Case {ref}", minimum_dwellings=200)
+    allocation.review_status = allocation_review_status
+    site = _make_site(session, f"Site {ref}")
+    allocation.matched_site_id = site.id
+    if relationship_status is not None:
+        _make_relationship(session, allocation_id=allocation.id, site_id=site.id, review_status=relationship_status)
+    _make_app_with_capacity(session, site.id, f"APP/{ref}", 50)
+    session.commit()
+    return allocation, site
+
+
+def test_case_a_trusted_relationship_auto_applied(session):
+    """Case A - auto_applied relationship + real Application -> linked."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="A-AUTO", relationship_status="auto_applied")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert has_trusted_linked_application(card) is True
+    assert planning_activity_status(card) == PLANNING_ACTIVITY_IDENTIFIED
+
+
+def test_case_a_trusted_relationship_confirmed(session):
+    """Case A - confirmed relationship + real Application -> linked."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="A-CONF", relationship_status="confirmed")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert has_trusted_linked_application(card) is True
+    assert planning_activity_status(card) == PLANNING_ACTIVITY_IDENTIFIED
+
+
+def test_case_b_rejected_relationship_with_legacy_pointer_still_present(session):
+    """Case B - rejected relationship, Site has a real Application, legacy
+    matched_site_id still points at it -> not linked. The legacy fallback
+    must never resurrect the rejected relationship."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="B", relationship_status="rejected")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert card["matched_site_relationship_disputed"] is True
+    assert has_trusted_linked_application(card) is False
+
+
+def test_case_c_needs_confirmation_relationship_principal_regression(session):
+    """Case C - the principal regression this amendment exists to fix:
+    needs_confirmation relationship, Site has a real Application, legacy
+    matched_site_id points at the same Site -> not linked, and Planning
+    activity must read "Review required", never a confident linked
+    Application."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="C", relationship_status="needs_confirmation")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert card["matched_site_relationship_disputed"] is True
+    assert has_trusted_linked_application(card) is False
+    assert planning_activity_status(card) == PLANNING_ACTIVITY_REVIEW_REQUIRED
+
+
+def test_case_d_needs_confirmation_plus_separate_trusted_relationship(session):
+    """Case D - a disputed relationship to one Site must never suppress a
+    genuinely trusted relationship to a DIFFERENT Site on the same
+    allocation."""
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id, policy_reference="D", site_name="Case D", minimum_dwellings=400)
+    disputed_site = _make_site(session, "Disputed Site D")
+    trusted_site = _make_site(session, "Trusted Site D")
+    _make_relationship(session, allocation_id=allocation.id, site_id=disputed_site.id, review_status="needs_confirmation")
+    _make_app_with_capacity(session, disputed_site.id, "APP/D-DISPUTED", 40)
+    _make_relationship(session, allocation_id=allocation.id, site_id=trusted_site.id, review_status="auto_applied")
+    _make_app_with_capacity(session, trusted_site.id, "APP/D-TRUSTED", 60)
+    session.commit()
+
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert has_trusted_linked_application(card) is True
+
+
+def test_case_e_legacy_fallback_with_no_relationship_history(session):
+    """Case E - matched_site_id + real Application + NO
+    AllocationSiteRelationship row at all -> the intentionally-supported
+    legacy fallback (Linked=True) must be preserved unchanged."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="E", relationship_status=None, allocation_review_status="confirmed")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert card["matched_site_relationship_disputed"] is False
+    assert has_trusted_linked_application(card) is True
+
+
+def test_case_f_legacy_match_relationship_rejected(session):
+    """Case F - matched_site_id + Application + an AllocationSiteRelationship
+    for that exact pair that is rejected -> False."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="F", relationship_status="rejected")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert has_trusted_linked_application(card) is False
+
+
+def test_case_g_legacy_match_relationship_needs_confirmation(session):
+    """Case G - matched_site_id + Application + an AllocationSiteRelationship
+    for that exact pair that is needs_confirmation -> False, Planning
+    activity = Review required."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="G", relationship_status="needs_confirmation")
+    card = next(c for c in build_allocation_discovery(session)["cards"] if c["id"] == allocation.id)
+    assert has_trusted_linked_application(card) is False
+    assert planning_activity_status(card) == PLANNING_ACTIVITY_REVIEW_REQUIRED
+
+
+def test_no_linked_application_tab_agrees_with_helper_for_needs_confirmation_case(session):
+    """Section 9 item 7 - the "No Linked Application" tab must classify
+    the Case C/G scenario identically to has_trusted_linked_application."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="TAB-NC", relationship_status="needs_confirmation")
+    cards = build_allocation_discovery(session)["cards"]
+    categories = compute_categories(cards)
+    tab_ids = {c["id"] for cat in categories if cat["key"] == "no_linked_application" for c in cat["cards"]}
+    assert allocation.id in tab_ids
+
+
+def test_planning_applications_filter_agrees_with_helper_for_needs_confirmation_case(session):
+    """Section 9 item 8 - the Planning applications filter must classify
+    the Case C/G scenario identically to has_trusted_linked_application."""
+    plan = _make_local_plan(session)
+    allocation, _ = _make_legacy_matched_case(session, plan, ref="FILTER-NC", relationship_status="needs_confirmation")
+    cards = build_allocation_discovery(session)["cards"]
+    not_linked = apply_filters(cards, {"application_linkage": "not_linked"})
+    linked = apply_filters(cards, {"application_linkage": "linked"})
+    assert allocation.id in {c["id"] for c in not_linked}
+    assert allocation.id not in {c["id"] for c in linked}
 
 
 # ---------------------------------------------------------------------------

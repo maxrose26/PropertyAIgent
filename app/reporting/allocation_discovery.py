@@ -620,25 +620,40 @@ def has_trusted_linked_application(card: dict) -> bool:
 
     Second, narrower fix (a genuine gap the first fix alone reopened,
     caught by this amendment's own test suite): development_coverage
-    showing NOTHING for this allocation is ambiguous by itself - it means
-    EITHER "the only relationship here was rejected" (the JPA 10 case,
-    correctly "not linked") OR "no AllocationSiteRelationship row has
-    ever existed for this allocation at all" (the pre-Stage-2D app.policy.
-    site_match_review.confirm_site_match flow never wrote one - a
-    genuinely, independently trustworthy match with no relationship row
-    to consult). matched_site_relationship_rejected (set by
-    build_allocation_discovery from a small batched query, see build_
-    allocation_card's own docstring) resolves exactly this ambiguity: only
-    when it is True does an empty development_coverage override the
-    legacy signal to "not linked"; otherwise the legacy matched_site_id/
-    linked_application_count/review_status signal (excluding needs_
-    confirmation and rejected, exactly as before this amendment) is still
-    trusted on its own terms.
+    NEVER showing a confidently-linked Site for this allocation is
+    ambiguous by itself - it means ANY of: "the only relationship here was
+    rejected" (the JPA 10 case), "the only relationship here is still
+    needs_confirmation" (a Final Pre-Merge Amendment fix - the ORIGINAL
+    version of this function only checked for "rejected" here, so a
+    needs_confirmation relationship fell all the way through to the
+    legacy branch below and read as confidently "linked" purely because
+    the ALLOCATION's own LocalPlanSite.review_status happened to be
+    auto_applied - a different field entirely from the RELATIONSHIP's own
+    review_status, exactly the kind of disputed-relationship-read-as-
+    trusted gap Stage 2E's whole cleanup effort exists to prevent), OR "no
+    AllocationSiteRelationship row has ever existed for this allocation at
+    all" (the pre-Stage-2D app.policy.site_match_review.confirm_site_match
+    flow never wrote one - a genuinely, independently trustworthy match
+    with no relationship row to consult, and the ONE case where the legacy
+    fallback below must still be trusted). matched_site_relationship_
+    disputed (set by build_allocation_discovery from a small batched
+    query, see build_allocation_card's own docstring) resolves exactly
+    this three-way ambiguity: True whenever an AllocationSiteRelationship
+    row exists for (allocation_id, matched_site_id) with review_status in
+    ("rejected", "needs_confirmation") - covering both disputed states
+    with the one shared signal, per the Final Pre-Merge Amendment's own
+    "prefer a narrow shared trust/history signal" instruction, rather than
+    two parallel special-cased checks. Only when it is False does the
+    legacy matched_site_id/linked_application_count/review_status signal
+    (excluding needs_confirmation and rejected on the ALLOCATION's own
+    review_status, exactly as before this amendment) get trusted on its
+    own terms - true legacy-only compatibility, never a loophole back into
+    a relationship this platform already has cause to doubt.
 
     Both branches are unreachable only for a caller that built a card
     without going through build_allocation_discovery at all (e.g. a raw
     dict in an older test, where development_coverage is None and
-    matched_site_relationship_rejected defaults to False) - falls
+    matched_site_relationship_disputed defaults to False) - falls
     straight through to the original legacy check in that case."""
     coverage = card.get("development_coverage")
     if coverage is not None and any(
@@ -646,7 +661,7 @@ def has_trusted_linked_application(card: dict) -> bool:
         for site_summary in coverage.site_summaries
     ):
         return True
-    if card.get("matched_site_relationship_rejected"):
+    if card.get("matched_site_relationship_disputed"):
         return False
     return card["linked_application_count"] > 0 and card["review_status"] not in ("needs_confirmation", "rejected")
 
@@ -762,7 +777,7 @@ def build_allocation_card(
     allocation: LocalPlanSite, *, plan: LocalPlan | None, council_name: str, council_codes_on_plan: list[str],
     matched_site: Site | None, linked_applications: list, visual_summary: dict, visual_fallback,
     council_five_year_supply: float | None, development_coverage: dict | None = None,
-    matched_site_relationship_rejected: bool = False,
+    matched_site_relationship_disputed: bool = False,
 ) -> dict:
     """Pure assembly of one allocation's full card - every input is already
     loaded by build_allocation_discovery's batched queries; this function
@@ -782,18 +797,21 @@ def build_allocation_card(
     with a "coverage"/"phasing"/"opportunity" of None each, for any
     existing caller/test that doesn't pass it.
 
-    matched_site_relationship_rejected (Local Plan Sites Filter
-    Refinement) - True when an AllocationSiteRelationship row for
-    (allocation.id, allocation.matched_site_id) exists AND has
-    review_status="rejected". Needed because matched_site_id/
+    matched_site_relationship_disputed (Local Plan Sites Filter
+    Refinement, generalised by the Final Pre-Merge Amendment) - True when
+    an AllocationSiteRelationship row for (allocation.id,
+    allocation.matched_site_id) exists AND has review_status in
+    ("rejected", "needs_confirmation"). Needed because matched_site_id/
     linked_applications can be legitimately genuine with NO
     AllocationSiteRelationship row at all (the pre-Stage-2D
     app.policy.site_match_review.confirm_site_match flow never wrote one)
     - development_coverage alone cannot distinguish "no relationship ever
-    existed here" from "the relationship that existed has since been
-    rejected", both of which leave this Site absent from site_summaries
-    identically. has_trusted_linked_application reads this flag
-    specifically to make that distinction (see its own docstring)."""
+    existed here" from "the relationship that existed is rejected or still
+    disputed", all three of which can leave this Site showing nothing
+    trusted in site_summaries. has_trusted_linked_application reads this
+    flag specifically to make that distinction (see its own docstring) -
+    a single shared signal covering both disputed states, not two
+    parallel rejected-only/needs_confirmation-only checks."""
     plan_status = plan.status if plan else (allocation.plan_status or None)
     plan_meta = PLAN_STATUS_META.get(plan_status, PLAN_STATUS_META[None])
     capacity = format_capacity(allocation)
@@ -904,7 +922,7 @@ def build_allocation_card(
         "updated_at": allocation.updated_at,
         "latitude": allocation.latitude,
         "longitude": allocation.longitude,
-        "matched_site_relationship_rejected": matched_site_relationship_rejected,
+        "matched_site_relationship_disputed": matched_site_relationship_disputed,
     }
     # Stage 3A - AllocationSiteRelationship-derived development coverage,
     # phasing and opportunity intelligence. Additive: None for any
@@ -1022,13 +1040,15 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
          source for this NEW intelligence, independent of matched_site_id
          above (which items 2-3 still use for their own, untouched
          legacy card fields).
-      8. Rejected AllocationSiteRelationship rows for exactly the
-         (allocation_id, matched_site_id) pairs this batch's own
-         matched_site_ids could name, batched by allocation_id.in_() - a
-         second, narrow query (Local Plan Sites Filter Refinement) purely
-         so has_trusted_linked_application can distinguish "this specific
-         matched_site_id's own relationship was rejected" from "no
-         AllocationSiteRelationship row exists for this allocation at
+      8. Rejected OR needs_confirmation AllocationSiteRelationship rows
+         for exactly the (allocation_id, matched_site_id) pairs this
+         batch's own matched_site_ids could name, batched by
+         allocation_id.in_() - a second, narrow query (Local Plan Sites
+         Filter Refinement, generalised to needs_confirmation by the
+         Final Pre-Merge Amendment) purely so has_trusted_linked_
+         application can distinguish "this specific matched_site_id's own
+         relationship is disputed (rejected or needs_confirmation)" from
+         "no AllocationSiteRelationship row exists for this allocation at
          all" (see that function's own docstring) - never a per-
          allocation query, one batch regardless of allocation count.
     council_five_year_supply is read directly off the already-loaded
@@ -1063,14 +1083,14 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
 
     development_coverage_by_allocation = build_allocation_development_coverage(session, allocations)
 
-    rejected_relationship_pairs: set[tuple[int, int]] = set()
+    disputed_relationship_pairs: set[tuple[int, int]] = set()
     if allocation_ids:
-        rejected_relationship_pairs = {
+        disputed_relationship_pairs = {
             (r.allocation_id, r.site_id)
             for r in session.execute(
                 select(AllocationSiteRelationship).where(
                     AllocationSiteRelationship.allocation_id.in_(allocation_ids),
-                    AllocationSiteRelationship.review_status == "rejected",
+                    AllocationSiteRelationship.review_status.in_(("rejected", "needs_confirmation")),
                 )
             ).scalars()
         }
@@ -1096,8 +1116,8 @@ def build_allocation_discovery(session, *, council_codes: list[str] | None = Non
             visual_fallback=plan_wide_fallbacks.get(allocation.local_plan_id) if allocation.local_plan_id else None,
             council_five_year_supply=plan.five_year_supply_years if plan else None,
             development_coverage=development_coverage_by_allocation.get(allocation.id),
-            matched_site_relationship_rejected=(
-                (allocation.id, allocation.matched_site_id) in rejected_relationship_pairs
+            matched_site_relationship_disputed=(
+                (allocation.id, allocation.matched_site_id) in disputed_relationship_pairs
                 if allocation.matched_site_id else False
             ),
         )
