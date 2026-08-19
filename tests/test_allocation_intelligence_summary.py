@@ -18,8 +18,8 @@ from sqlalchemy import event
 import app.policy  # noqa: F401  (ensures package import path resolves the same as production)
 import scripts.generate_allocation_intelligence_summaries as cli
 from app.db.models import (
-    AllocationSiteRelationship, Application, Council, ControlRelationship, LocalPlan, LocalPlanSite,
-    SchemeIntelligence, Site,
+    AllocationIntelligenceSummary, AllocationSiteRelationship, Application, Council, ControlRelationship,
+    LocalPlan, LocalPlanSite, SchemeIntelligence, Site,
 )
 from app.reporting.allocation_intelligence_summary import (
     PROMPT_VERSION,
@@ -28,10 +28,23 @@ from app.reporting.allocation_intelligence_summary import (
     build_summary_prompt,
     compute_context_fingerprint,
     generate_allocation_intelligence_summary,
+    get_allocation_summary,
     is_allocation_summary_stale,
     should_regenerate_allocation_summary,
     validate_summary_output,
 )
+
+
+def _make_summary(session, *, allocation_id, headline, context_fingerprint, prompt_version=PROMPT_VERSION,
+                   status="ok") -> AllocationIntelligenceSummary:
+    summary = AllocationIntelligenceSummary(
+        allocation_id=allocation_id, headline=headline, overview="Overview text.",
+        key_points=json.dumps([]), key_uncertainties=json.dumps([]), investigation_priorities=json.dumps([]),
+        context_fingerprint=context_fingerprint, prompt_version=prompt_version, model="gpt-4o-mini", status=status,
+    )
+    session.add(summary)
+    session.commit()
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -427,11 +440,9 @@ def test_prompt_version_change_invalidates_summary(session):
     allocation = _make_allocation(session, plan, minimum_dwellings=300)
     session.commit()
     fp = compute_context_fingerprint(build_allocation_context(session, allocation))
-    allocation.ai_summary_headline = "Old headline"
-    allocation.ai_summary_context_fingerprint = fp
-    allocation.ai_summary_prompt_version = "some-older-version"
-    session.commit()
-    assert should_regenerate_allocation_summary(allocation, fp) is True
+    summary = _make_summary(session, allocation_id=allocation.id, headline="Old headline",
+                             context_fingerprint=fp, prompt_version="some-older-version")
+    assert should_regenerate_allocation_summary(summary, fp) is True
 
 
 def test_fresh_summary_not_regenerated(session):
@@ -440,11 +451,9 @@ def test_fresh_summary_not_regenerated(session):
     allocation = _make_allocation(session, plan, minimum_dwellings=300)
     session.commit()
     fp = compute_context_fingerprint(build_allocation_context(session, allocation))
-    allocation.ai_summary_headline = "Fresh headline"
-    allocation.ai_summary_context_fingerprint = fp
-    allocation.ai_summary_prompt_version = PROMPT_VERSION
-    session.commit()
-    assert should_regenerate_allocation_summary(allocation, fp) is False
+    summary = _make_summary(session, allocation_id=allocation.id, headline="Fresh headline",
+                             context_fingerprint=fp, prompt_version=PROMPT_VERSION)
+    assert should_regenerate_allocation_summary(summary, fp) is False
 
 
 def test_stale_summary_selected_for_regeneration(session):
@@ -453,12 +462,10 @@ def test_stale_summary_selected_for_regeneration(session):
     allocation = _make_allocation(session, plan, minimum_dwellings=300)
     session.commit()
     fp = compute_context_fingerprint(build_allocation_context(session, allocation))
-    allocation.ai_summary_headline = "Stale headline"
-    allocation.ai_summary_context_fingerprint = "a-completely-different-fingerprint"
-    allocation.ai_summary_prompt_version = PROMPT_VERSION
-    session.commit()
+    summary = _make_summary(session, allocation_id=allocation.id, headline="Stale headline",
+                             context_fingerprint="a-completely-different-fingerprint", prompt_version=PROMPT_VERSION)
     assert is_allocation_summary_stale(session, allocation) is True
-    assert should_regenerate_allocation_summary(allocation, fp) is True
+    assert should_regenerate_allocation_summary(summary, fp) is True
 
 
 def test_missing_summary_selected(session):
@@ -467,9 +474,9 @@ def test_missing_summary_selected(session):
     allocation = _make_allocation(session, plan, minimum_dwellings=300)
     session.commit()
     fp = compute_context_fingerprint(build_allocation_context(session, allocation))
-    assert allocation.ai_summary_headline is None
+    assert get_allocation_summary(session, allocation.id) is None
     assert is_allocation_summary_stale(session, allocation) is False  # missing, not stale
-    assert should_regenerate_allocation_summary(allocation, fp) is True
+    assert should_regenerate_allocation_summary(None, fp) is True
 
 
 # ---------------------------------------------------------------------------
@@ -560,7 +567,7 @@ def test_last_successful_summary_survives_validation_failure(session):
     client = _fake_client(good)
     result = generate_allocation_intelligence_summary(session, client, allocation)
     assert result.regenerated is True
-    original_headline = allocation.ai_summary_headline
+    original_headline = get_allocation_summary(session, allocation.id).headline
     assert original_headline == good["headline"]
 
     # Force a regeneration attempt (context genuinely changed) whose output is ungrounded.
@@ -571,8 +578,9 @@ def test_last_successful_summary_survives_validation_failure(session):
     client2 = _fake_client(bad_output)
     result2 = generate_allocation_intelligence_summary(session, client2, allocation)
     assert result2.rejected is True
-    assert allocation.ai_summary_headline == original_headline  # unchanged
-    assert allocation.ai_summary_status == "error"
+    summary = get_allocation_summary(session, allocation.id)
+    assert summary.headline == original_headline  # unchanged
+    assert summary.status == "error"
 
 
 def test_last_successful_summary_survives_client_exception(session):
@@ -585,15 +593,16 @@ def test_last_successful_summary_survives_client_exception(session):
     good = _good_output(context)
     client = _fake_client(good)
     generate_allocation_intelligence_summary(session, client, allocation)
-    original_headline = allocation.ai_summary_headline
+    original_headline = get_allocation_summary(session, allocation.id).headline
 
     allocation.minimum_dwellings = 12345
     session.commit()
     result = generate_allocation_intelligence_summary(session, _RaisingClient(), allocation)
     assert result.regenerated is False
-    assert allocation.ai_summary_headline == original_headline
-    assert allocation.ai_summary_status == "error"
-    assert "simulated OpenAI failure" in allocation.ai_summary_generation_error
+    summary = get_allocation_summary(session, allocation.id)
+    assert summary.headline == original_headline
+    assert summary.status == "error"
+    assert "simulated OpenAI failure" in summary.generation_error
 
 
 # ---------------------------------------------------------------------------
@@ -612,7 +621,7 @@ def test_dry_run_performs_zero_writes(session, monkeypatch):
     monkeypatch.setattr(cli, "get_session", lambda: session)
 
     cli.main()
-    assert allocation.ai_summary_headline is None
+    assert get_allocation_summary(session, allocation.id) is None
 
 
 def test_execute_without_exact_confirm_phrase_fails_closed(monkeypatch):
@@ -665,10 +674,7 @@ def test_stale_only_targeting(session, monkeypatch):
     stale = _make_allocation(session, plan, policy_reference="STALE", minimum_dwellings=300)
     fresh = _make_allocation(session, plan, policy_reference="FRESH", minimum_dwellings=300)
     fresh_fp = compute_context_fingerprint(build_allocation_context(session, fresh))
-    fresh.ai_summary_headline = "Fresh"
-    fresh.ai_summary_context_fingerprint = fresh_fp
-    fresh.ai_summary_prompt_version = PROMPT_VERSION
-    session.commit()
+    _make_summary(session, allocation_id=fresh.id, headline="Fresh", context_fingerprint=fresh_fp, prompt_version=PROMPT_VERSION)
 
     monkeypatch.setattr(sys, "argv", ["generate_allocation_intelligence_summaries.py", "--stale"])
     classification_stale = cli._classify(session, stale, only_stale=True)

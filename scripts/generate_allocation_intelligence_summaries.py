@@ -32,8 +32,8 @@ deliberately the narrowest, cheapest default, never --all-eligible):
   --allocation-ids N,N,N  a specific set of allocations
   --stale                 every allocation whose summary is missing or
                            whose live context has moved since last
-                           generated (is_allocation_summary_stale /
-                           ai_summary_headline is None)
+                           generated (is_allocation_summary_stale / no
+                           AllocationIntelligenceSummary row yet)
   --all-eligible          every allocation with at least one related Site
                            OR a stated allocation capacity (the same
                            "insufficient context" gate the dry-run report
@@ -53,10 +53,10 @@ from app.db.models import LocalPlanSite
 from app.db.session import get_session, init_db
 from app.reporting.allocation_intelligence_summary import (
     PROMPT_VERSION,
-    build_allocation_context,
     generate_allocation_intelligence_summary,
+    get_allocation_summary,
+    has_sufficient_context_for_summary,
     is_allocation_summary_stale,
-    should_regenerate_allocation_summary,
 )
 
 CONFIRM_PHRASE = "YES-GENERATE-ALLOCATION-INTELLIGENCE-SUMMARIES"
@@ -74,16 +74,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _has_sufficient_context(session, allocation: LocalPlanSite) -> bool:
-    """The "insufficient context" gate (Section 19) - an allocation with no
-    stated capacity AND no related Site at all gives the model nothing
-    concrete to synthesise; every other allocation is eligible, even one
-    with NO_IDENTIFIED_ACTIVITY (that absence is itself a genuine,
-    reportable fact - see build_summary_prompt)."""
-    context = build_allocation_context(session, allocation)
-    return context.allocation_capacity_value is not None or context.number_of_related_sites > 0
-
-
 def _select_targets(session, args: argparse.Namespace) -> list[LocalPlanSite]:
     if args.allocation_id is not None:
         allocation = session.get(LocalPlanSite, args.allocation_id)
@@ -99,9 +89,10 @@ def _select_targets(session, args: argparse.Namespace) -> list[LocalPlanSite]:
 
 def _classify(session, allocation: LocalPlanSite, *, only_stale: bool) -> str:
     """One of: missing | fresh | stale | insufficient_context | would_generate."""
-    if not _has_sufficient_context(session, allocation):
+    if not has_sufficient_context_for_summary(session, allocation):
         return "insufficient_context"
-    if allocation.ai_summary_headline is None:
+    summary = get_allocation_summary(session, allocation.id)
+    if summary is None or summary.headline is None:
         return "would_generate" if not only_stale else "missing"
     if is_allocation_summary_stale(session, allocation):
         return "would_generate" if not only_stale else "stale"
@@ -150,10 +141,15 @@ def _run_execute(session, args: argparse.Namespace) -> None:
 
     generated = regenerated_count = skipped = errors = rejected = 0
     for allocation in targets:
-        if not _has_sufficient_context(session, allocation):
+        if not has_sufficient_context_for_summary(session, allocation):
             skipped += 1
             continue
-        if only_stale and allocation.ai_summary_headline is not None and not is_allocation_summary_stale(session, allocation):
+        existing_summary = get_allocation_summary(session, allocation.id)
+        already_fresh = (
+            existing_summary is not None and existing_summary.headline is not None
+            and not is_allocation_summary_stale(session, allocation)
+        )
+        if only_stale and already_fresh:
             skipped += 1
             continue
         try:

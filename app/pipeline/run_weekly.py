@@ -48,7 +48,7 @@ from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig, get_council
-from app.db.models import Application, ApplicationCompany, Council, Document, SchemeIntelligence, Site
+from app.db.models import Application, ApplicationCompany, Council, Document, LocalPlanSite, SchemeIntelligence, Site
 from app.db.session import get_session, init_db
 from app.diagnostics.memory import log_memory
 from app.enrichment.contact_pipeline import enrich_company, upsert_company_from_enrichment
@@ -2080,6 +2080,132 @@ def stage_intelligence_refresh(
             result.failed += 1
             print(f"  [intelligence-refresh] {application.reference}: outcome={outcome.outcome} - "
                   f"previous intelligence/summary preserved, remains retryable")
+
+    return result
+
+
+# --- AI Allocation Intelligence Summary automatic refresh (Phase 1 Local
+# Plan Intelligence, Pre-Merge Architecture Amendment, Sections 8/9/13) - a
+# THIRD, independent bounded-workload family alongside stage_extraction/
+# stage_intelligence_refresh above, reusing the exact same job (scripts.
+# run_intelligence_processing), never a second scheduled process. Unlike
+# INTELLIGENCE_REFRESH_ELIGIBLE above, eligibility here cannot be a cheap
+# SQL WHERE clause - whether an allocation's summary is stale depends on
+# its full AllocationIntelligenceContext fingerprint (Section 7's approved
+# design: a fingerprint recomputed on check, never a scattered "mark
+# stale" write - see app.reporting.allocation_intelligence_summary's own
+# module docstring), which requires building that context. At today's
+# scale (287 allocations platform-wide) this is an accepted cost for a
+# once-daily bounded batch job (no OpenAI involved in the check itself -
+# see has_sufficient_context_for_summary/should_regenerate_allocation_
+# summary, both read-only) - recorded as explicit technical debt if the
+# platform ever reaches an allocation count where a full per-run context
+# rebuild stops being cheap (see this amendment's own final report,
+# "Ownership/control query technical debt").
+def count_pending_allocation_summary_refresh(session: Session, council_code: str) -> int:
+    """Read-only count of exactly what stage_allocation_intelligence_
+    refresh() below would attempt for this council - never calls OpenAI."""
+    from app.reporting.allocation_intelligence_summary import (
+        build_allocation_context, compute_context_fingerprint, has_sufficient_context_for_summary,
+        should_regenerate_allocation_summary,
+    )
+    from app.reporting.allocation_intelligence_summary import get_allocation_summary as _get_summary
+
+    allocations = session.execute(
+        select(LocalPlanSite).where(LocalPlanSite.council_code == council_code)
+    ).scalars().all()
+    count = 0
+    for allocation in allocations:
+        if not has_sufficient_context_for_summary(session, allocation):
+            continue
+        context = build_allocation_context(session, allocation)
+        fingerprint = compute_context_fingerprint(context)
+        summary = _get_summary(session, allocation.id)
+        if should_regenerate_allocation_summary(summary, fingerprint):
+            count += 1
+    return count
+
+
+@dataclass
+class AllocationSummaryRefreshStageResult:
+    candidates_inspected: int = 0
+    attempted: int = 0
+    succeeded: int = 0
+    rejected: int = 0
+    failed: int = 0
+
+
+def stage_allocation_intelligence_refresh(
+    session: Session, client: OpenAI, council: CouncilConfig, *, limit: int | None = None,
+) -> AllocationSummaryRefreshStageResult:
+    """Reuses app.reporting.allocation_intelligence_summary's ONE canonical
+    generation path (build context -> fingerprint -> determine freshness ->
+    generate if required -> validate -> persist) - this loop only selects
+    candidates, counts outcomes, and applies the bounded-scan pattern
+    (EXTRACTION_CANDIDATE_SCAN_MULTIPLIER, reused rather than a new
+    allocation-specific constant - stage_intelligence_refresh above already
+    established the precedent of reusing it for a non-extraction stage), it
+    never re-implements generation, fingerprinting, or grounding validation
+    itself - Section 13's "one canonical path... never a second summary
+    generator" requirement.
+
+    Deterministic ordering: id ascending (a stable, simple order - unlike
+    stage_intelligence_refresh's material_evidence_changed_at ordering,
+    there is no single "how commercially urgent is this allocation" signal
+    to sort by yet; a future enhancement could add one without changing
+    this function's contract)."""
+    from app.reporting.allocation_intelligence_summary import (
+        build_allocation_context, compute_context_fingerprint, generate_allocation_intelligence_summary,
+        get_allocation_summary, has_sufficient_context_for_summary, should_regenerate_allocation_summary,
+    )
+
+    query = (
+        select(LocalPlanSite)
+        .where(LocalPlanSite.council_code == council.code)
+        .order_by(LocalPlanSite.id.asc())
+    )
+    if limit is not None:
+        query = query.limit(limit * EXTRACTION_CANDIDATE_SCAN_MULTIPLIER)
+    candidates = session.execute(query).scalars().all()
+
+    print(f"\n[allocation-summary-refresh] {len(candidates)} candidate(s) considered for {council.code}"
+          + (f" (targeting {limit} genuine attempt(s) this run)" if limit is not None else ""))
+
+    result = AllocationSummaryRefreshStageResult()
+    for allocation in candidates:
+        if limit is not None and result.attempted >= limit:
+            break
+        result.candidates_inspected += 1
+
+        if not has_sufficient_context_for_summary(session, allocation):
+            # No related Site and no stated capacity - nothing to
+            # synthesise. Never counts against `limit`, mirrors stage_
+            # intelligence_refresh's own free no_usable_text-style check.
+            continue
+
+        # Determined explicitly BEFORE calling generate (never inferred
+        # from the result afterwards, e.g. from a possibly-stale `status`
+        # left over from an earlier failed attempt) - the one unambiguous
+        # way to know whether this candidate is a genuine attempt this run.
+        context = build_allocation_context(session, allocation)
+        fingerprint = compute_context_fingerprint(context)
+        summary = get_allocation_summary(session, allocation.id)
+        if not should_regenerate_allocation_summary(summary, fingerprint):
+            continue
+
+        outcome = generate_allocation_intelligence_summary(session, client, allocation)
+        result.attempted += 1
+        if outcome.rejected:
+            result.rejected += 1
+            print(f"  [allocation-summary-refresh] allocation={allocation.id} ({allocation.policy_reference}): "
+                  f"rejected (ungrounded output) - previous summary preserved")
+        elif outcome.regenerated:
+            result.succeeded += 1
+            print(f"  [allocation-summary-refresh] allocation={allocation.id} ({allocation.policy_reference}): generated")
+        else:
+            result.failed += 1
+            print(f"  [allocation-summary-refresh] allocation={allocation.id} ({allocation.policy_reference}): "
+                  f"failed - {outcome.generation_error}")
 
     return result
 

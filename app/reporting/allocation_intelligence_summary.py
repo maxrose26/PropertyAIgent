@@ -18,8 +18,12 @@ model ever sees a payload:
     -> AllocationIntelligenceContext (this module, pure, no OpenAI)
     -> OpenAI structured generation (this module, gated by a fingerprint)
     -> deterministic validation (this module, rejects ungrounded output)
-    -> persisted on LocalPlanSite.ai_summary_* (additive columns only -
-       never overwrites a source field)
+    -> persisted on AllocationIntelligenceSummary, a DEDICATED table keyed
+       by allocation_id (Pre-Merge Architecture Amendment - superseded the
+       original V1 design of ai_summary_* columns directly on LocalPlanSite
+       before that design ever reached production; see AllocationIntelligenceSummary's
+       own class docstring for the full separation-of-source-from-
+       interpretation reasoning). Never overwrites any LocalPlanSite field.
     -> customer-facing UI (app/ui/pages/3_Local_Plan_Sites.py, read-only)
 
 TRUSTED SOURCES (Section 3 audit - see this module's own functions for how
@@ -60,9 +64,10 @@ import json
 import re
 from dataclasses import dataclass, field
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import LocalPlanSite
+from app.db.models import AllocationIntelligenceSummary, LocalPlanSite
 from app.reporting.allocation_development_coverage import build_allocation_development_coverage
 from app.reporting.allocation_discovery import format_capacity
 from app.reporting.ownership_control import get_allocation_control_intelligence
@@ -232,6 +237,28 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
     )
 
 
+def has_sufficient_context_for_summary(session: Session, allocation: LocalPlanSite) -> bool:
+    """The "insufficient context" eligibility gate (originally the CLI's own
+    _has_sufficient_context, promoted here - Pre-Merge Architecture
+    Amendment - so the CLI runner and the automatic refresh stage in
+    app.pipeline.run_weekly share exactly one definition rather than two
+    independently-maintained copies). An allocation with no stated capacity
+    AND no related Site at all gives the model nothing concrete to
+    synthesise; every other allocation is eligible, even one with
+    NO_IDENTIFIED_ACTIVITY (that absence is itself a genuine, reportable
+    fact - see build_summary_prompt)."""
+    context = build_allocation_context(session, allocation)
+    return context.allocation_capacity_value is not None or context.number_of_related_sites > 0
+
+
+def get_allocation_summary(session: Session, allocation_id: int) -> AllocationIntelligenceSummary | None:
+    """The one lookup path for an allocation's current (at most one row,
+    per the table's own unique constraint) persisted summary."""
+    return session.execute(
+        select(AllocationIntelligenceSummary).where(AllocationIntelligenceSummary.allocation_id == allocation_id)
+    ).scalar_one_or_none()
+
+
 # --- Fingerprint / staleness (Section 7) ------------------------------------
 
 
@@ -284,28 +311,41 @@ def compute_context_fingerprint(context: AllocationIntelligenceContext) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def should_regenerate_allocation_summary(allocation: LocalPlanSite, fingerprint: str, *, force: bool = False) -> bool:
+def should_regenerate_allocation_summary(
+    summary: AllocationIntelligenceSummary | None, fingerprint: str, *, force: bool = False,
+) -> bool:
     """Section 7's exact regeneration triggers, mirroring app.reporting.
     local_plan_summary.should_regenerate: an explicit force, no summary has
-    ever been generated, the trusted context has genuinely changed since
-    the last generation, or the prompt/model version has moved on. Nothing
-    else - a routine check that finds nothing new must NOT trigger this.
-    This is the ONE mechanism that makes "new Application ingested ->
-    relationship established -> context changes -> summary marked stale"
-    (Section 6) true - deliberately NOT a persisted boolean flag flipped by
-    some other part of the ingestion pipeline (Section 7: "prefer a
-    fingerprint over scattering ad-hoc mark-stale writes"). A newly-ingested
-    Application only ever makes an allocation's summary stale once it has
-    been linked through the trusted AllocationSiteRelationship architecture
-    and therefore actually changes the fingerprint above - an Application
-    for an unrelated Site changes nothing here at all."""
+    ever been generated (summary is None, or exists but was never
+    successfully written - headline is None), the trusted context has
+    genuinely changed since the last generation, or the prompt/model
+    version has moved on. Nothing else - a routine check that finds
+    nothing new must NOT trigger this. This is the ONE mechanism that makes
+    "new Application ingested -> relationship established -> context
+    changes -> summary marked stale" (Section 6) true - deliberately NOT a
+    persisted boolean flag flipped by some other part of the ingestion
+    pipeline (Section 7: "prefer a fingerprint over scattering ad-hoc
+    mark-stale writes"). A newly-ingested Application only ever makes an
+    allocation's summary stale once it has been linked through the trusted
+    AllocationSiteRelationship architecture and therefore actually changes
+    the fingerprint above - an Application for an unrelated Site changes
+    nothing here at all.
+
+    Takes the AllocationIntelligenceSummary row directly (Pre-Merge
+    Architecture Amendment - previously took the LocalPlanSite itself, back
+    when the summary fields lived on it) - `summary` is None for an
+    allocation that has never had a row written for it at all, distinct
+    from a row that exists but never successfully generated (headline is
+    None) - both are treated identically here (always regenerate), the
+    distinction only matters to get_allocation_summary's caller, never to
+    this decision."""
     if force:
         return True
-    if allocation.ai_summary_headline is None:
+    if summary is None or summary.headline is None:
         return True
-    if allocation.ai_summary_context_fingerprint != fingerprint:
+    if summary.context_fingerprint != fingerprint:
         return True
-    if allocation.ai_summary_prompt_version != PROMPT_VERSION:
+    if summary.prompt_version != PROMPT_VERSION:
         return True
     return False
 
@@ -316,10 +356,11 @@ def is_allocation_summary_stale(session: Session, allocation: LocalPlanSite) -> 
     False (not stale) when there is no summary at all yet - that is a
     "missing" state for the caller to handle separately, not a staleness
     one (mirrors app.reporting.local_plan_summary.is_summary_stale)."""
-    if allocation.ai_summary_headline is None:
+    summary = get_allocation_summary(session, allocation.id)
+    if summary is None or summary.headline is None:
         return False
     context = build_allocation_context(session, allocation)
-    return compute_context_fingerprint(context) != allocation.ai_summary_context_fingerprint
+    return compute_context_fingerprint(context) != summary.context_fingerprint
 
 
 # --- Prompt / structured schema (Sections 10-15) ----------------------------
@@ -553,16 +594,16 @@ class AllocationSummaryResult:
     generation_error: str | None
 
 
-def _persisted_summary_result(allocation: LocalPlanSite, *, regenerated: bool, rejected: bool, rejection_reason: list[str] | None) -> AllocationSummaryResult:
+def _persisted_summary_result(summary: AllocationIntelligenceSummary, *, regenerated: bool, rejected: bool, rejection_reason: list[str] | None) -> AllocationSummaryResult:
     return AllocationSummaryResult(
         regenerated=regenerated, rejected=rejected, rejection_reason=rejection_reason,
-        headline=allocation.ai_summary_headline, overview=allocation.ai_summary_overview,
-        key_points=json.loads(allocation.ai_summary_key_points) if allocation.ai_summary_key_points else [],
-        key_uncertainties=json.loads(allocation.ai_summary_key_uncertainties) if allocation.ai_summary_key_uncertainties else [],
-        investigation_priorities=json.loads(allocation.ai_summary_investigation_priorities) if allocation.ai_summary_investigation_priorities else [],
-        generated_at=allocation.ai_summary_generated_at, model=allocation.ai_summary_model,
-        prompt_version=allocation.ai_summary_prompt_version, status=allocation.ai_summary_status,
-        generation_error=allocation.ai_summary_generation_error,
+        headline=summary.headline, overview=summary.overview,
+        key_points=json.loads(summary.key_points) if summary.key_points else [],
+        key_uncertainties=json.loads(summary.key_uncertainties) if summary.key_uncertainties else [],
+        investigation_priorities=json.loads(summary.investigation_priorities) if summary.investigation_priorities else [],
+        generated_at=summary.generated_at, model=summary.model,
+        prompt_version=summary.prompt_version, status=summary.status,
+        generation_error=summary.generation_error,
     )
 
 
@@ -575,13 +616,25 @@ def generate_allocation_intelligence_summary(
     costs nothing. A rejected (ungrounded) output, or a raw client
     exception, NEVER overwrites the last successful summary (Section 22:
     "if validation fails, do not replace the last valid summary") - only
-    ai_summary_status/ai_summary_generation_error record that the most
-    recent attempt failed."""
+    status/generation_error record that the most recent attempt failed.
+
+    Gets-or-creates the ONE AllocationIntelligenceSummary row for this
+    allocation (Pre-Merge Architecture Amendment - previously wrote
+    directly onto the LocalPlanSite row) - a brand-new row is added but
+    left entirely without headline/overview/... until a generation
+    actually succeeds, so "row exists but headline is None" and "row does
+    not exist yet" both correctly mean "no summary has ever been
+    generated" (see should_regenerate_allocation_summary)."""
     context = build_allocation_context(session, allocation)
     fingerprint = compute_context_fingerprint(context)
 
-    if not should_regenerate_allocation_summary(allocation, fingerprint, force=force):
-        return _persisted_summary_result(allocation, regenerated=False, rejected=False, rejection_reason=None)
+    summary = get_allocation_summary(session, allocation.id)
+    if not should_regenerate_allocation_summary(summary, fingerprint, force=force):
+        return _persisted_summary_result(summary, regenerated=False, rejected=False, rejection_reason=None)
+
+    if summary is None:
+        summary = AllocationIntelligenceSummary(allocation_id=allocation.id)
+        session.add(summary)
 
     prompt = build_summary_prompt(context)
     try:
@@ -591,30 +644,30 @@ def generate_allocation_intelligence_summary(
         )
         structured = json.loads(response.output_text)
     except Exception as e:
-        allocation.ai_summary_status = "error"
-        allocation.ai_summary_generation_error = str(e)[:2000]
+        summary.status = "error"
+        summary.generation_error = str(e)[:2000]
         session.commit()
-        return _persisted_summary_result(allocation, regenerated=False, rejected=False, rejection_reason=None)
+        return _persisted_summary_result(summary, regenerated=False, rejected=False, rejection_reason=None)
 
     is_valid, problems = validate_summary_output(context, structured)
     if not is_valid:
-        allocation.ai_summary_status = "error"
-        allocation.ai_summary_generation_error = "; ".join(problems)[:2000]
+        summary.status = "error"
+        summary.generation_error = "; ".join(problems)[:2000]
         session.commit()
-        return _persisted_summary_result(allocation, regenerated=False, rejected=True, rejection_reason=problems)
+        return _persisted_summary_result(summary, regenerated=False, rejected=True, rejection_reason=problems)
 
     now = dt.datetime.now(dt.timezone.utc)
-    allocation.ai_summary_headline = structured["headline"]
-    allocation.ai_summary_overview = structured["overview"]
-    allocation.ai_summary_key_points = json.dumps(structured["key_points"])
-    allocation.ai_summary_key_uncertainties = json.dumps(structured["key_uncertainties"])
-    allocation.ai_summary_investigation_priorities = json.dumps(structured["investigation_priorities"])
-    allocation.ai_summary_generated_at = now
-    allocation.ai_summary_context_fingerprint = fingerprint
-    allocation.ai_summary_model = MODEL
-    allocation.ai_summary_prompt_version = PROMPT_VERSION
-    allocation.ai_summary_status = "ok"
-    allocation.ai_summary_generation_error = None
+    summary.headline = structured["headline"]
+    summary.overview = structured["overview"]
+    summary.key_points = json.dumps(structured["key_points"])
+    summary.key_uncertainties = json.dumps(structured["key_uncertainties"])
+    summary.investigation_priorities = json.dumps(structured["investigation_priorities"])
+    summary.generated_at = now
+    summary.context_fingerprint = fingerprint
+    summary.model = MODEL
+    summary.prompt_version = PROMPT_VERSION
+    summary.status = "ok"
+    summary.generation_error = None
     session.commit()
 
     return AllocationSummaryResult(

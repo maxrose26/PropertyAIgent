@@ -47,7 +47,7 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_caption,
     total_homes_kpi_label,
 )
-from app.reporting.allocation_intelligence_summary import is_allocation_summary_stale
+from app.reporting.allocation_intelligence_summary import get_allocation_summary, is_allocation_summary_stale
 from app.reporting.ownership_control import (
     EMPTY_STATE_ALLOCATION_RESIDUAL,
     EMPTY_STATE_ALLOCATION_SITE,
@@ -121,15 +121,19 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         joint_plan_badge()
 
     # Loaded once here (Section 16/17) rather than deep in the Timeline
-    # section below - reused for both the AI Allocation Intelligence
-    # summary AND the Timeline section, avoiding a second identical query.
-    # Deliberately READ ONLY: this never calls generate_allocation_
-    # intelligence_summary or OpenAI - Section 8's own "opening an
-    # allocation page must NOT normally call OpenAI" rule. Only the
-    # already-persisted ai_summary_* columns are read.
+    # section below - reused for the Timeline section further down,
+    # avoiding a second identical query.
     from app.db.models import LocalPlanSite
 
     allocation_row = session.get(LocalPlanSite, allocation_id)
+
+    # The AI summary itself lives in its own table (Pre-Merge Architecture
+    # Amendment - AllocationIntelligenceSummary, keyed by allocation_id,
+    # separate from LocalPlanSite's own source fields). Deliberately READ
+    # ONLY: this never calls generate_allocation_intelligence_summary or
+    # OpenAI - Section 8's own "opening an allocation page must NOT
+    # normally call OpenAI" rule.
+    ai_summary_row = get_allocation_summary(session, allocation_id)
 
     # 0. AI Allocation Intelligence (Phase 1 Local Plan Intelligence) - an
     # orientation layer shown BEFORE the detailed sections below (Section
@@ -160,39 +164,39 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 f"{coverage.development_coverage_percentage:.0%}" if coverage.development_coverage_percentage is not None else DEVELOPMENT_COVERAGE_LABELS.get(coverage.development_coverage_classification, coverage.development_coverage_classification),
             )
 
-    if allocation_row is not None and allocation_row.ai_summary_headline:
+    if ai_summary_row is not None and ai_summary_row.headline:
         stale = is_allocation_summary_stale(session, allocation_row)
         if stale:
             st.caption("⏳ This summary may be out of date - PropertyAIgent's evidence for this allocation has changed since it was last generated.")
-        st.markdown(f"**{allocation_row.ai_summary_headline}**")
-        st.write(allocation_row.ai_summary_overview)
+        st.markdown(f"**{ai_summary_row.headline}**")
+        st.write(ai_summary_row.overview)
 
-        key_points = json.loads(allocation_row.ai_summary_key_points) if allocation_row.ai_summary_key_points else []
+        key_points = json.loads(ai_summary_row.key_points) if ai_summary_row.key_points else []
         if key_points:
             st.markdown("**Key intelligence**")
             for point in key_points:
                 st.caption(f"• {point}")
 
-        key_uncertainties = json.loads(allocation_row.ai_summary_key_uncertainties) if allocation_row.ai_summary_key_uncertainties else []
+        key_uncertainties = json.loads(ai_summary_row.key_uncertainties) if ai_summary_row.key_uncertainties else []
         if key_uncertainties:
             st.markdown("**Key uncertainties**")
             for item in key_uncertainties:
                 st.caption(f"• {item}")
 
-        investigation_priorities = json.loads(allocation_row.ai_summary_investigation_priorities) if allocation_row.ai_summary_investigation_priorities else []
+        investigation_priorities = json.loads(ai_summary_row.investigation_priorities) if ai_summary_row.investigation_priorities else []
         if investigation_priorities:
             st.markdown("**Investigation priorities**")
             for item in investigation_priorities:
                 st.caption(f"• {item}")
 
-        if allocation_row.ai_summary_generated_at:
-            st.caption(f"Generated {allocation_row.ai_summary_generated_at.strftime('%d %b %Y')} · AI-generated interpretation of evidence PropertyAIgent already holds - not a substitute for the detailed intelligence below.")
+        if ai_summary_row.generated_at:
+            st.caption(f"Generated {ai_summary_row.generated_at.strftime('%d %b %Y')} · AI-generated interpretation of evidence PropertyAIgent already holds - not a substitute for the detailed intelligence below.")
     else:
         # Section 18 - never expose a stack trace, OpenAI error, prompt, or
         # raw JSON here, even if the last generation attempt errored
-        # (ai_summary_status == "error" with no summary ever successfully
-        # generated yet) - the customer-facing state is identical either
-        # way: "not yet generated".
+        # (ai_summary_row.status == "error" with no summary ever
+        # successfully generated yet) - the customer-facing state is
+        # identical either way: "not yet generated".
         st.caption("AI allocation summary not yet generated.")
 
     # 1. Allocation overview
