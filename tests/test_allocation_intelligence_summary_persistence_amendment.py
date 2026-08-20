@@ -83,7 +83,7 @@ def _good_output_for(context) -> dict:
         "overview": "This allocation is adopted and has identified planning activity.",
         "key_points": ["Identified planning activity exists."],
         "key_uncertainties": [], "investigation_priorities": [],
-        "referenced_application_references": [], "referenced_entity_names": [], "referenced_roles": [],
+        "referenced_applications": [], "referenced_entities": [],
     }
 
 
