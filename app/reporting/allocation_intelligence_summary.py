@@ -151,7 +151,38 @@ MODEL = "gpt-4o-mini"
 # rows exist - the four controlled-sample rows all carry status="error"/
 # headline=None from OpenAI-auth failures predating this amendment), so
 # this bump again has no practical effect on any existing row today.
-PROMPT_VERSION = "allocation-intelligence-summary-v5"
+# CORRECTION (recorded at v6 time, since this comment is no longer edited
+# in place) - v5 WAS subsequently deployed and used for a real controlled
+# production generation: allocation 51 (Beal Valley) succeeded under it
+# (status="ok", prompt_version="allocation-intelligence-summary-v5"); the
+# same run rejected allocations 32/66/196, which is what v6 below fixes.
+#
+# v6 (Final Grounding Hardening Amendment) - two representation gaps found
+# from REAL v5 production rejections, neither a hallucination-protection
+# weakening:
+#   (1) trusted-label masking (Section 10 above) only matched a label's
+#       FULL literal string; production proved a model narrating just the
+#       label's parenthetical sub-phrase ("Regulation 18" alone, not the
+#       whole "Draft consultation (Regulation 18)") was still flagged -
+#       _trusted_label_substrings now also masks that sub-phrase, generic
+#       to any "<phase> (<qualifier>)"-shaped trusted label, never a
+#       one-off "18" exception - see validate_summary_output's own
+#       comment.
+#   (2) a self-reported claimed_decision="" was ambiguous between "no
+#       claim made" and "explicitly claiming no decision is recorded" -
+#       production proved the model needed the latter (East of Boothstown,
+#       PA/2024/0749, decision=None) and had no way to self-report it
+#       without inventing prose the validator then rejected.
+#       referenced_applications gained decision_claim_mode ("none" |
+#       "value" | "absent") to disambiguate - "absent" is only ever
+#       accepted when the trusted decision is genuinely falsy, so a
+#       decided Application (Granted/Refused/Withdrawn/...) can never be
+#       described as undecided.
+# Both fixes are representation-only - a genuinely invented number or a
+# genuinely contradictory absence claim (e.g. "absent" against a real
+# Granted/Refused/Withdrawn decision) is still rejected, proven by
+# dedicated companion tests.
+PROMPT_VERSION = "allocation-intelligence-summary-v6"
 
 
 # --- Context object (Section 4) ---------------------------------------------
@@ -883,6 +914,7 @@ RULES - follow every one of these exactly:
 12. Never infer an Application's status or decision from the identified/residual capacity figures or the development coverage percentage above - those are pure capacity arithmetic and carry no planning-outcome information on their own. If a large share of an allocation's capacity is "identified" via an Application that is still pending/under consultation, say so explicitly - do not let the size of the figure imply the application has been decided.
 13. If a Site's further Applications are given only as a category count (never individually narrated), do not enumerate or speculate about them - one sentence acknowledging the volume (e.g. "a further N applications relate to this Site, mostly condition-discharge/technical filings") is enough; never produce anything resembling a list of every Application.
 14. referenced_applications and referenced_entities (described below) are your own structured self-report of every material claim you made anywhere in headline/overview/key_points/key_uncertainties/investigation_priorities - used for automatic fact-checking. This is bookkeeping, not composition - it does not constrain how you write the prose above. referenced_entities covers ONLY parties from the APPLICANT EVIDENCE or OWNERSHIP/CONTROL EVIDENCE sections above (applicants, owners, developers, mortgagees, etc.) - it does NOT include the council name, the Local Plan name, or any other proper noun that appears elsewhere in this brief; those are not party claims and do not need self-reporting.
+15. Where an Application's decision above is genuinely not yet recorded, you are free to say so in plain language ("no decision has yet been issued", "the application remains undetermined", "a decision is still pending", or your own equivalent phrasing) - this is a grounded, useful fact, not an invented one. Self-report it via decision_claim_mode="absent" (see below) rather than inventing a decision value. Never make such a claim for an Application whose decision above is already a real value (Granted/Refused/Withdrawn/etc.) - that Application has been decided, and the decision given above is the only thing you may say about it.
 
 Write:
 - headline: one short sentence (under 15 words) capturing the allocation's overall commercial position.
@@ -893,7 +925,8 @@ Write:
 - referenced_applications: one entry for every Application reference you named anywhere above, each with:
   - reference: the Application reference, exactly as given.
   - claimed_status: if you stated its planning status anywhere above, the EXACT status value as given above for that Application; otherwise "".
-  - claimed_decision: if you stated its decision anywhere above, the EXACT decision value as given above for that Application; otherwise "".
+  - claimed_decision: if you stated its decision anywhere above AS A SPECIFIC VALUE (e.g. "Granted"), the EXACT decision value as given above for that Application; otherwise "".
+  - decision_claim_mode: "value" if claimed_decision above is a specific decision value you stated; "absent" if you said/implied the decision is not yet recorded (Rule 15) - leave claimed_decision "" in this case, your own wording is not checked word-for-word; "none" if you made no claim about this Application's decision at all.
 - referenced_entities: one entry for every APPLICANT/OWNERSHIP/CONTROL party you named anywhere above (never the council or Local Plan name), each with:
   - name: the entity name, exactly as given.
   - role: its role label, exactly as given (e.g. "Applicant", "S106 Developer", "Planning ownership declaration").
@@ -931,8 +964,22 @@ SUMMARY_SCHEMA = {
                         "reference": {"type": "string"},
                         "claimed_status": {"type": "string"},
                         "claimed_decision": {"type": "string"},
+                        # Final Grounding Hardening Amendment - distinguishes
+                        # "I am not making a decision claim" (none) from "I
+                        # am claiming a specific decision value" (value,
+                        # claimed_decision must then be set) from "I am
+                        # explicitly claiming no decision has been recorded"
+                        # (absent, claimed_decision left "") - without this,
+                        # claimed_decision="" was ambiguous between the
+                        # first and third cases, so a genuinely grounded
+                        # absence claim (e.g. "no decision recorded yet"
+                        # when the trusted decision is None) had nothing to
+                        # self-report and was rejected as an unsupported
+                        # numeric-free prose claim by the free-text path -
+                        # see validate_summary_output's own comment.
+                        "decision_claim_mode": {"type": "string", "enum": ["none", "value", "absent"]},
                     },
-                    "required": ["reference", "claimed_status", "claimed_decision"],
+                    "required": ["reference", "claimed_status", "claimed_decision", "decision_claim_mode"],
                     "additionalProperties": False,
                 },
             },
@@ -1069,6 +1116,31 @@ def _representative_applications_by_reference(context: AllocationIntelligenceCon
     return {s.representative_application.reference: s.representative_application for s in context.sites if s.representative_application}
 
 
+_PARENTHETICAL_PATTERN = re.compile(r"\(([^()]+)\)")
+
+
+def _trusted_label_substrings(label: str | None) -> set[str]:
+    """Final Grounding Hardening Amendment - a trusted structured label
+    (context.allocation_reference, context.plan_status_label) may itself
+    be a compound phrase whose parenthetical qualifier is a distinct,
+    independently-narratable trusted string (e.g. "Draft consultation
+    (Regulation 18)" - a model may legitimately write just "Regulation 18"
+    stage without repeating "Draft consultation"). Returns the whole label
+    AND, for each parenthetical group found, both the bracketed content on
+    its own ("Regulation 18") and the label with that exact parenthetical
+    removed - so partial narration of either half of a "<phase>
+    (<qualifier>)"-shaped label is masked, without masking any digit that
+    is not part of a real trusted label. Generic over the shape, not tied
+    to "Regulation 18"/"HOM 2.33" or any other specific value - the SAME
+    rule applies to any future label carrying a parenthetical qualifier."""
+    if not label:
+        return set()
+    substrings = {label}
+    for match in _PARENTHETICAL_PATTERN.finditer(label):
+        substrings.add(match.group(1).strip())
+    return {s for s in substrings if s}
+
+
 def _mask_known_strings(text: str, known_strings: set[str]) -> str:
     """Removes every occurrence of an already-grounded string (a trusted
     Application reference or organisation name) from `text` before number
@@ -1120,23 +1192,26 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
     # Application reference's own digits, found and fixed together with
     # that bug during this amendment's own test development.
     allowed_role_labels = {o.role_label for o in context.ownership_entities}
-    # Allocation Party Evidence Amendment (Section 10) - context.allocation_
-    # reference (e.g. "HOM 2.33") and context.plan_status_label (e.g.
-    # "Draft consultation (Regulation 18)") are rendered VERBATIM in the
-    # prompt's own ALLOCATION/PLANNING STATUS lines, so the model is all but
-    # guaranteed to echo them - yet neither was ever masked before this
-    # amendment, so their own embedded digits ("2.33", "18") were
-    # independently flagged as unsupported numbers even though they are
-    # already-trusted, already-displayed identifiers, not numeric claims at
-    # all. Root-caused against real production data (Heald Green West,
-    # allocation 32, reference "HOM 2.33") - proven by masking rather than
-    # allow-listing so the fix generalises to ANY allocation's own
-    # reference/plan-stage wording (all four controlled-sample allocations'
-    # own references contain digits - JPA 10, HOM 2.33, JPA 25, HSP S2K:9 -
-    # this was never specific to Heald Green West), exactly like an
-    # Application reference or entity name is already masked, never a
-    # one-off numeric exception for "18"/"2.33" themselves.
-    trusted_labels = {n for n in (context.allocation_reference, context.plan_status_label) if n}
+    # Allocation Party Evidence Amendment (Section 10), HARDENED by the
+    # Final Grounding Hardening Amendment - context.allocation_reference
+    # (e.g. "HOM 2.33") and context.plan_status_label (e.g. "Draft
+    # consultation (Regulation 18)") are rendered VERBATIM in the prompt's
+    # own ALLOCATION/PLANNING STATUS lines, so the model is all but
+    # guaranteed to echo them - masking only the FULL literal label string
+    # fixed the common case, but real production output (Heald Green West,
+    # allocation 32) proved a model narrating just "Regulation 18" - the
+    # trusted SUB-PHRASE inside the label, not the whole "Draft consultation
+    # (Regulation 18)" string - never matches that whole-string mask, so
+    # its "18" was still independently flagged. _trusted_label_substrings
+    # below masks BOTH the whole label AND any parenthetical sub-phrase it
+    # contains (generic - PLAN_STATUS_META's own "<phase> (Regulation N)"
+    # shape is not the only label this could ever apply to), rather than
+    # allow-listing the digit "18" itself - the fix generalises to ANY
+    # trusted label carrying a parenthetical qualifier, never a one-off
+    # numeric exception.
+    trusted_labels: set[str] = set()
+    for label in (context.allocation_reference, context.plan_status_label):
+        trusted_labels.update(_trusted_label_substrings(label))
     known_strings = allowed_refs | allowed_entity_names | allowed_role_labels | _DIGIT_BEARING_ROLE_LABELS | trusted_labels
 
     allowed_numbers = _allowed_numbers(context)
@@ -1160,10 +1235,39 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
         rep = representative_by_reference.get(ref)
         claimed_status = item.get("claimed_status") or ""
         claimed_decision = item.get("claimed_decision") or ""
+        decision_claim_mode = item.get("decision_claim_mode") or ""
+        if not decision_claim_mode:
+            # Backward-compatible default, EXACTLY matching this
+            # function's own pre-v6 behaviour bit-for-bit: a legacy/
+            # unset self-report (decision_claim_mode absent - every
+            # v4/v5-era test and any real v4/v5 generation) is "value"
+            # whenever claimed_decision is non-empty (checked as a
+            # positive claim, as it always was) and "none" otherwise (no
+            # claim, as it always was) - never silently downgraded to
+            # "no check at all" just because a caller predates this field.
+            decision_claim_mode = "value" if claimed_decision else "none"
         if claimed_status and (rep is None or claimed_status != (rep.status or "")):
             problems.append(f"unsupported status claim for {ref}: {claimed_status}")
-        if claimed_decision and (rep is None or claimed_decision != (rep.decision or "")):
-            problems.append(f"unsupported decision claim for {ref}: {claimed_decision}")
+        # Final Grounding Hardening Amendment - claimed_decision is only
+        # checked as a POSITIVE value claim when decision_claim_mode is
+        # "value" (mirrors the pre-existing behaviour exactly for that
+        # mode). "absent" is a DIFFERENT, independently-grounded claim -
+        # checked against the trusted decision's own truthiness, never
+        # against a fixed phrase list (Rule 15: ground the material
+        # MEANING, not a sentence) - genuinely rejected whenever the
+        # trusted decision is actually a real value (Granted/Refused/
+        # Withdrawn/etc.), so "no decision yet" can never be claimed
+        # against an Application that really has been decided. "none"
+        # makes no claim at all, exactly as before this amendment.
+        if decision_claim_mode == "value":
+            if claimed_decision and (rep is None or claimed_decision != (rep.decision or "")):
+                problems.append(f"unsupported decision claim for {ref}: {claimed_decision}")
+        elif decision_claim_mode == "absent":
+            if rep is None or rep.decision:
+                problems.append(
+                    f"unsupported absence-of-decision claim for {ref}: trusted decision is "
+                    f"{rep.decision if rep and rep.decision else 'not recorded'}"
+                )
 
     # Allocation Party Evidence Pre-Merge Amendment ("Multi-Application
     # Party Intelligence") - unifies ownership/control tuples and applicant
