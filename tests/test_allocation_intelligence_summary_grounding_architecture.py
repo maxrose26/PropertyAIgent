@@ -1254,3 +1254,340 @@ def test_invented_policy_stage_number_still_rejected(session):
     }
     is_valid, problems = validate_summary_output(context, output)
     assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# K. Final Grounding Hardening Amendment - trusted-label SUB-PHRASE masking
+#
+# Real v5 production rejection, allocation 32 (Heald Green West):
+# generation_error "unsupported numbers: 18" - the whole-label mask fixed
+# "HOM 2.33" (context.allocation_reference, matched as prior tests in
+# section J already prove) but NOT a model narrating just "Regulation 18"
+# on its own, since that partial phrase never matches the FULL literal
+# "Draft consultation (Regulation 18)" string that was masked. This
+# section proves the root cause and the fix precisely.
+# ---------------------------------------------------------------------------
+
+
+def test_plan_stage_subphrase_alone_accepted(session):
+    """Direct regression for the real "unsupported numbers: 18" rejection
+    - the model narrates ONLY the parenthetical qualifier "Regulation 18",
+    never repeating "Draft consultation", which is exactly the shape a
+    real production generation used."""
+    allocation = _regulation_18_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.plan_status_label == "Draft consultation (Regulation 18)"
+    output = {
+        "headline": "x",
+        "overview": "This allocation's Local Plan is currently at Regulation 18 stage, with no adoption yet.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def _proposed_submission_fixture(session):
+    """A DIFFERENT plan-stage label with its own parenthetical qualifier
+    ("Regulation 19", not 18) - proves the fix generalises to the label
+    SHAPE, not a hardcoded "Regulation 18" special case."""
+    _make_council(session, "genericcouncil")
+    plan = _make_plan(session, council_code="genericcouncil", status="proposed_submission")
+    allocation = _make_allocation(session, plan, council_code="genericcouncil", policy_reference="GEN 4.1",
+                                   site_name="Generic Allocation", minimum_dwellings=200)
+    session.commit()
+    return allocation
+
+
+def test_different_plan_stage_subphrase_also_accepted(session):
+    allocation = _proposed_submission_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.plan_status_label == "Proposed submission (Regulation 19)"
+    output = {
+        "headline": "x", "overview": "The Local Plan is at Regulation 19 stage, ahead of examination.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_invented_regulation_number_still_rejected(session):
+    """The sub-phrase masking fix must not accept an INVENTED Regulation
+    number that does not match the allocation's own trusted label."""
+    allocation = _regulation_18_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "This Local Plan is already at Regulation 25 stage.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# L. Null / absence decision claims (Final Grounding Hardening Amendment)
+#
+# Real v5 production rejection, allocation 66 (East of Boothstown):
+# generation_error "unsupported decision claim for PA/2024/0749: no
+# decision recorded yet" - the model made a genuinely TRUE, grounded
+# absence claim (decision really is None) but had no way to self-report
+# it other than putting prose into claimed_decision, which was then
+# checked against the trusted decision value and failed since the trusted
+# value is "" (None), not "no decision recorded yet".
+# ---------------------------------------------------------------------------
+
+
+def test_decision_absent_claim_grounded_when_decision_none(session):
+    allocation = _boothstown_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "PA/2024/0749 remains under consultation; no decision has yet been recorded.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{
+            "reference": "PA/2024/0749", "claimed_status": "Under Consultation", "claimed_decision": "",
+            "decision_claim_mode": "absent",
+        }],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_multiple_absence_phrasings_all_pass(session):
+    """Rule 15/Section 9 - the validator grounds the MEANING of an
+    absence claim, not a fixed sentence; several natural phrasings of the
+    same self-reported decision_claim_mode="absent" must all pass."""
+    allocation = _boothstown_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    phrasings = [
+        "no decision has yet been issued for PA/2024/0749",
+        "PA/2024/0749 remains undetermined",
+        "a decision on PA/2024/0749 is still pending",
+        "no formal decision has been reached on this application",
+    ]
+    for phrase in phrasings:
+        output = {
+            "headline": "x", "overview": phrase,
+            "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+            "referenced_applications": [{
+                "reference": "PA/2024/0749", "claimed_status": "", "claimed_decision": "",
+                "decision_claim_mode": "absent",
+            }],
+            "referenced_entities": [],
+        }
+        is_valid, problems = validate_summary_output(context, output)
+        assert is_valid is True, (phrase, problems)
+
+
+def test_decision_absent_claim_rejected_when_decision_granted(session):
+    allocation = _heald_green_style_fixture(session)  # DC/084620 decision="Granted"
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "DC/084620 has no decision recorded yet.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{
+            "reference": "DC/084620", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent",
+        }],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_decision_absent_claim_rejected_when_decision_refused(session):
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    _make_app(session, site.id, "APP/REFUSED", units=100, status="Decided", decision="Refuse")
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "APP/REFUSED is still pending a decision.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{
+            "reference": "APP/REFUSED", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent",
+        }],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_decision_absent_claim_rejected_when_decision_withdrawn(session):
+    allocation = _boothstown_style_fixture(session)  # 23/81742/HYBEIA decision="Withdrawn"
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "23/81742/HYBEIA is still awaiting determination.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{
+            "reference": "23/81742/HYBEIA", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent",
+        }],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_decision_value_claim_backward_compatible_without_mode(session):
+    """A legacy self-report with NO decision_claim_mode key at all (every
+    real v4/v5 generation, and every pre-v6 test in this file) must keep
+    behaving exactly as before: a non-empty claimed_decision is still
+    checked as a positive value claim."""
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    good = {
+        "headline": "x", "overview": "DC/084620 was granted.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, good)
+    assert is_valid is True, problems
+
+    bad = dict(good)
+    bad["referenced_applications"] = [{"reference": "DC/084620", "claimed_status": "", "claimed_decision": "Refused"}]
+    is_valid, problems = validate_summary_output(context, bad)
+    assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# M. Exact real-production-rejection regressions
+# ---------------------------------------------------------------------------
+
+
+def test_heald_green_west_real_v5_rejection_now_passes(session):
+    """Direct regression for the exact real production generation_error:
+    "unsupported numbers: 18" on allocation 32."""
+    allocation = _regulation_18_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "Heald Green West shows partial coverage at an early plan stage",
+        "overview": (
+            "This allocation's Local Plan is currently at Regulation 18 stage, meaning it is not yet adopted. "
+            "124 of the allocation's 750 homes are accounted for via DC/084620, which was granted."
+        ),
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_east_of_boothstown_real_v5_rejection_now_passes(session):
+    """Direct regression for the exact real production generation_error:
+    "unsupported decision claim for PA/2024/0749: no decision recorded
+    yet" on allocation 66."""
+    allocation = _boothstown_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.indicative_residual_capacity == 18
+    output = {
+        "headline": "Substantial identified activity for East of Boothstown, decision pending",
+        "overview": (
+            "282 of the allocation's 300 homes are identified via PA/2024/0749, which remains under "
+            "consultation - no decision has yet been recorded. 18 homes remain indicative residual capacity."
+        ),
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{
+            "reference": "PA/2024/0749", "claimed_status": "Under Consultation", "claimed_decision": "",
+            "decision_claim_mode": "absent",
+        }],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def _britannia_mill_style_fixture(session):
+    """Mirrors the real Britannia Mill production case: single trusted
+    linked Application, 26/00098/FUL, status "Awaiting decision", decision
+    None; a Certificate A ownership declaration for Holmpatrick Ltd."""
+    _make_council(session, "tameside")
+    plan = _make_plan(session, council_code="tameside", status="preferred_options")
+    allocation = _make_allocation(session, plan, council_code="tameside", policy_reference="HSP S2K: Allocation 9",
+                                   site_name="Britannia Mill", minimum_dwellings=136)
+    site = _make_site(session, "Britannia New Mill Queen Street Mossley Tameside OL5 9AQ", council_code="tameside")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    app = _make_app(session, site.id, "26/00098/FUL", units=49, status="Awaiting decision", decision=None,
+                     application_category="primary_residential", council_code="tameside")
+    _make_control_relationship(session, site_id=site.id, application_id=app.id, entity_name_raw="Holmpatrick Ltd",
+                                role="OWNER", evidence_category="CERTIFICATE_A_APPLICANT_OWNER_DECLARATION")
+    session.commit()
+    return allocation
+
+
+def test_britannia_mill_fabricated_capacity_breakdown_still_rejected(session):
+    """Direct regression for the real production generation_error
+    "unsupported numbers: 17, 32" on allocation 196 - investigated and
+    found NOT to be a masking gap (no trusted string in this allocation's
+    context contains "17" or "32" in any form; 17+32=49 exactly equals
+    identified_application_capacity, consistent with the model having
+    fabricated a two-way split of that single figure that this context
+    gives no basis for - there is only ONE linked Application, not two).
+    This is correctly, deliberately still rejected - the amendment does
+    NOT special-case these digits, exactly as instructed."""
+    allocation = _britannia_mill_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.identified_application_capacity == 49
+    output = {
+        "headline": "x",
+        "overview": "Of the 49 identified homes, 17 relate to the residential element and 32 to supporting uses.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_britannia_mill_grounded_output_still_validates(session):
+    """The SAME real Britannia Mill context, narrated without inventing a
+    breakdown, validates cleanly - proving the rejection above is about
+    the fabricated split, not the allocation's own real figures."""
+    allocation = _britannia_mill_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "Partial coverage identified for Britannia Mill",
+        "overview": (
+            "49 of this allocation's 136 homes are identified via 26/00098/FUL, still awaiting a decision. "
+            "87 homes remain indicative residual capacity. Holmpatrick Ltd is named under a planning "
+            "ownership declaration for the identified Site."
+        ),
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{
+            "reference": "26/00098/FUL", "claimed_status": "Awaiting decision", "claimed_decision": "",
+            "decision_claim_mode": "absent",
+        }],
+        "referenced_entities": [{
+            "name": "Holmpatrick Ltd", "role": "Planning ownership declaration",
+            "site_scope": 'Site "Britannia New Mill Queen Street Mossley Tameside OL5 9AQ"',
+            "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_beal_valley_negative_control_unaffected(session):
+    """Beal Valley already generated successfully under v5 - confirms the
+    v6 amendment changes nothing about a zero-evidence allocation."""
+    _make_council(session, "oldham")
+    plan = _make_plan(session, council_code="oldham")
+    allocation = _make_allocation(session, plan, council_code="oldham", policy_reference="JPA 10",
+                                   site_name="Beal Valley", minimum_dwellings=480)
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    assert context.number_of_related_sites == 0
+    assert context.applicant_evidence == []
+    assert context.ownership_entities == []
+    output = {
+        "headline": "No identified planning activity for Beal Valley",
+        "overview": "No trusted planning applications or ownership evidence have been identified for this allocation.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
