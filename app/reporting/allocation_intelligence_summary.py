@@ -181,8 +181,49 @@ MODEL = "gpt-4o-mini"
 # Both fixes are representation-only - a genuinely invented number or a
 # genuinely contradictory absence claim (e.g. "absent" against a real
 # Granted/Refused/Withdrawn decision) is still rejected, proven by
-# dedicated companion tests.
-PROMPT_VERSION = "allocation-intelligence-summary-v6"
+# dedicated companion tests. v6 WAS subsequently deployed and generated
+# three real production summaries (51/66/196 succeeded, 32 was correctly
+# rejected for a genuine hallucination - "83", never fixed) - see v7's own
+# entry below for what that real output revealed.
+#
+# v7 (V7 Quality Hardening Amendment) - two real, confirmed-by-production
+# issues, fixed WITHOUT weakening any grounding check:
+#   (1) Party-attribution prompt clarity - Heald Green West's real v6
+#       rejection ("unsupported application reference for entity claim:
+#       Bloor Homes North West / Applicant / DC/084620") was the VALIDATOR
+#       CORRECTLY catching the model attributing an applicant's evidence
+#       to the Site's representative Application instead of the different,
+#       secondary Application it is actually evidenced on. Not a validator
+#       bug - a prompt-clarity gap. _render_applicant_line now states
+#       explicitly, per entry, when an applicant's own reference is NOT
+#       the representative Application; Rule 2a instructs the model to
+#       prefer the safe general form ("associated with planning activity
+#       on the Site") whenever it is not citing one specific, correctly-
+#       evidenced reference.
+#   (2) Prose-grounding clarity for non-applicant roles - the real v6
+#       Britannia Mill summary stated in free prose that "Holmpatrick Ltd
+#       has submitted a planning application", though its only trusted
+#       fact is "Planning ownership declaration" (Certificate A) - a real,
+#       confirmed prose/self-report grounding gap (free text is not
+#       cross-checked against the self-report; the model never self-
+#       reported this specific claim, so nothing caught it). No general
+#       NLP claim-parser was built (explicitly out of scope) - instead,
+#       _render_ownership_line's "(evidenced via X)" wording, which reads
+#       ambiguously close to "submitted X", was reworded to name the
+#       EVIDENCE DOCUMENT, not the Application as an act performed, and
+#       Rule 2 gained a concrete counter-example matching this exact
+#       mistake. This is a mitigation, not a structural guarantee -
+#       recorded as a known remaining limitation.
+# Also: Rule 16 ("absence of evidence is not evidence of absence") and
+# reworked headline/overview/key_uncertainties/investigation_priorities
+# guidance for information density and specific, non-generic uncertainty/
+# investigation framing (real v6 output over-claimed real-world absence -
+# "no efforts have been made to develop the site", "a distinctly cautious
+# commercial outlook" - neither supported by "no identified planning
+# activity"). No SUMMARY_SCHEMA field change. Bumped because the prompt
+# materially changed in ways that would change what the model writes -
+# not a schema/validator-behaviour change on its own.
+PROMPT_VERSION = "allocation-intelligence-summary-v7"
 
 
 # --- Context object (Section 4) ---------------------------------------------
@@ -691,16 +732,36 @@ def should_regenerate_allocation_summary(
 
 
 def is_allocation_summary_stale(session: Session, allocation: LocalPlanSite) -> bool:
-    """True when the allocation's LIVE context has moved since its summary
-    was last generated, without generating anything or calling the AI.
-    False (not stale) when there is no summary at all yet - that is a
-    "missing" state for the caller to handle separately, not a staleness
-    one (mirrors app.reporting.local_plan_summary.is_summary_stale)."""
+    """True when the allocation's LIVE context has moved, OR the prompt/
+    schema version has moved on, since its summary was last generated,
+    without generating anything or calling the AI. False (not stale) when
+    there is no summary at all yet - that is a "missing" state for the
+    caller to handle separately, not a staleness one (mirrors
+    app.reporting.local_plan_summary.is_summary_stale).
+
+    V7 Quality Hardening Amendment - PREVIOUSLY only compared the
+    fingerprint, never prompt_version, even though should_regenerate_
+    allocation_summary (the function that actually decides whether
+    generate_allocation_intelligence_summary regenerates) has ALWAYS
+    checked both. This was a genuine, confirmed parity bug: a summary
+    generated under an old PROMPT_VERSION, with an unchanged fingerprint,
+    was reported "fresh" by this function (and therefore by the CLI's own
+    --stale targeting and dry-run reporting) while generate_allocation_
+    intelligence_summary would correctly regenerate it anyway the moment
+    it was actually invoked - real production evidence (a v5 summary for
+    allocation 51 regenerated during a v6 --allocation-ids run the dry-run
+    had reported as "fresh"). Now delegates to should_regenerate_
+    allocation_summary for the actual staleness decision - the ONE
+    place that decision is made, never duplicated - keeping only its own
+    distinct "missing is not stale" pre-check (should_regenerate_
+    allocation_summary treats missing/stale identically, which is correct
+    for ITS caller but not for this function's own contract)."""
     summary = get_allocation_summary(session, allocation.id)
     if summary is None or summary.headline is None:
         return False
     context = build_allocation_context(session, allocation)
-    return compute_context_fingerprint(context) != summary.context_fingerprint
+    fingerprint = compute_context_fingerprint(context)
+    return should_regenerate_allocation_summary(summary, fingerprint)
 
 
 # --- Prompt / structured schema (Sections 10-15) ----------------------------
@@ -789,8 +850,22 @@ def _ownership_scope_label(o: OwnershipContextEntry) -> str:
 
 
 def _render_ownership_line(o: OwnershipContextEntry) -> str:
+    """V7 Quality Hardening Amendment - "(evidenced via DC/x)" was found,
+    from real production output, to be read by the model as meaning the
+    entity SUBMITTED that Application (Britannia Mill: Holmpatrick Ltd,
+    role "Planning ownership declaration" only, was narrated in free
+    prose as having "submitted a planning application") - the evidence
+    document happening to be found WITHIN an Application's own form is a
+    different fact from submitting it, and the two are not currently
+    distinguished by any wording in the prompt beyond the role label
+    itself. Reworded to name the DOCUMENT the fact was found in, not the
+    Application as if it were an act this party performed."""
     scope = _ownership_scope_label(o)
-    apps_bit = f" (evidenced via {', '.join(o.application_references)})" if o.application_references else ""
+    apps_bit = (
+        f" (this {o.role_label.lower()} was recorded in evidence found within {', '.join(o.application_references)}"
+        f" - this does NOT mean {o.entity_name_raw} submitted or applied for {'it' if len(o.application_references) == 1 else 'them'})"
+        if o.application_references else ""
+    )
     return f"- For {scope}: {o.entity_name_raw} - role: {o.role_label}{apps_bit}."
 
 
@@ -812,12 +887,27 @@ def _applicant_scope_label(e: ApplicantPartyEvidence) -> str:
     return f'Site "{e.site_label}"'
 
 
-def _render_applicant_line(e: ApplicantPartyEvidence) -> str:
+def _render_applicant_line(e: ApplicantPartyEvidence, representative_references: set[str]) -> str:
+    """V7 Quality Hardening Amendment - real production evidence (Heald
+    Green West) showed the model self-reporting an applicant's evidence
+    against the SITE'S REPRESENTATIVE APPLICATION (discussed at length,
+    directly above, with its own status/decision/date) rather than the
+    DIFFERENT, secondary Application the applicant is actually evidenced
+    on - correctly rejected by the validator, but avoidable at the prompt
+    level. When an applicant's own reference(s) do NOT include the Site's
+    representative Application, this is now stated explicitly and
+    negatively, right where the model reads the fact, rather than relying
+    on it to cross-reference two separate sections correctly itself."""
     refs_bit = ", ".join(e.application_references)
     if e.application_count == 1:
-        provenance = f"named on Application {refs_bit}'s own form"
+        ref = e.application_references[0]
+        provenance = f"named on Application {ref}'s own form"
+        if ref not in representative_references:
+            provenance += " - NOT the representative Application discussed above, a different, secondary one"
     else:
         provenance = f"named as applicant on {e.application_count} linked Applications: {refs_bit}"
+        if not (set(e.application_references) & representative_references):
+            provenance += " - none of these is the representative Application discussed above"
     return f"- For {_applicant_scope_label(e)}: {e.entity_name} - role: Applicant ({provenance})."
 
 
@@ -850,7 +940,8 @@ def build_summary_prompt(context: AllocationIntelligenceContext) -> str:
     ownership_lines = "\n".join(_render_ownership_line(o) for o in context.ownership_entities) or (
         "- No confirmed ownership/control evidence currently identified for this allocation."
     )
-    applicant_lines = "\n".join(_render_applicant_line(e) for e in context.applicant_evidence) or (
+    representative_references = {s.representative_application.reference for s in context.sites if s.representative_application}
+    applicant_lines = "\n".join(_render_applicant_line(e, representative_references) for e in context.applicant_evidence) or (
         "- No applicant evidence currently identified from any related Site's trusted linked Applications."
     )
 
@@ -901,13 +992,14 @@ OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact 
 
 RULES - follow every one of these exactly:
 1. Never invent a number, Application reference, organisation name, planning status, decision, or role not given above, and never recompute a capacity/coverage figure - every one you might want is already given above.
-2. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant") - never upgrade, downgrade, or relabel a role (an applicant is never a developer, promoter, or owner - you may note commercially that a company is "named as applicant", never that it "is developing" or "owns" anything unless a stronger role label is separately given for it; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it). The SAME entity may legitimately hold more than one role above (e.g. named as Applicant AND, separately, as S106 Developer) - only ever narrate the roles it is actually given, never merge them into a single stronger claim. An applicant named on many linked Applications for a Site is still only Applicant evidence, however many - frequency is a fact you may mention (e.g. "named as applicant on 4 linked applications"), never a reason to imply a stronger role.
+2. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant") - never upgrade, downgrade, or relabel a role (an applicant is never a developer, promoter, or owner - you may note commercially that a company is "named as applicant", never that it "is developing" or "owns" anything unless a stronger role label is separately given for it; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it). The SAME entity may legitimately hold more than one role above (e.g. named as Applicant AND, separately, as S106 Developer) - only ever narrate the roles it is actually given, never merge them into a single stronger claim. An applicant named on many linked Applications for a Site is still only Applicant evidence, however many - frequency is a fact you may mention (e.g. "named as applicant on 4 linked applications"), never a reason to imply a stronger role. Concretely: a "Planning ownership declaration" role means ONLY that - never write that this party "submitted", "applied for", "has an application for", or is otherwise the applicant/developer of any Application, even one their ownership evidence happens to have been found within, unless that SAME entity separately also carries an "Applicant" or "Developer" fact above. A specific example of what NOT to do: an entity whose only fact above is "Planning ownership declaration" must never be described as having "submitted a planning application" - it has not been shown to have done so.
+2a. When naming a SPECIFIC Application reference for a party (applicant, owner, developer, etc.), it must be one of the reference(s) given for THAT party's OWN evidence above - never assume it is the same Application discussed elsewhere in this brief (e.g. the representative Application), even if that seems like the natural one. If a party's evidence line above explicitly says its reference is NOT the representative Application, do not attribute it to the representative Application. When you are not citing one specific Application, describe the party as associated with planning activity on the Site generally instead (e.g. "is named as applicant in connection with planning activity on the Site") and leave application_reference "" in your self-report - this general form is always safe and still commercially useful.
 3. A Site relationship or ownership/control relationship marked as pending confirmation/review must be described as uncertain, never as a settled or confirmed fact - do not name any entity or role that was excluded above as "still under review".
 4. Do NOT mention any other Local Plan allocation, policy reference, or nearby/adjoining site by name or code under any circumstances, even if you think one might be nearby - this platform does not currently hold trusted adjacency evidence.
 5. Never describe this allocation as adopted unless the PLANNING STATUS line above literally says ADOPTED.
 6. Ownership/control evidence is always scoped to the specific Site or residual-capacity context it is given for above - never generalise it to "the allocation" as a whole; when you name an entity, the SCOPE you describe it in (which Site, or the residual capacity) must match exactly what is given above for that entity.
-7. key_uncertainties should name the specific pending-review counts, unknown capacity, or missing ownership evidence above that limit confidence - be specific, not generic.
-8. investigation_priorities must each be directly traceable to a fact given above (e.g. investigate the residual capacity, investigate a pending relationship) - never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
+7. key_uncertainties should name the specific pending-review counts, unknown capacity, or missing ownership evidence above that limit confidence - be specific, not generic. A vague item that would be equally true of almost any allocation (e.g. "planning outcomes are uncertain") is not useful - name the actual gap.
+8. investigation_priorities must each be directly traceable to a fact given above AND specific enough to act on - not a generic instruction that could apply to any allocation. Prefer, e.g., "verify who controls the allocation's residual capacity" over "investigate the site"; "monitor the outcome of the pending Application" over "monitor progress"; "establish whether the party named as applicant also controls the wider allocation" over "review planning". Never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
 9. PLANNING ACTIVITY is never the same thing as PLANNING OUTCOME. A Site having a linked Application (live, registered, or under consultation) demonstrates planning activity - it does NOT by itself mean planning permission exists, and it never means the development is consented, under construction, delivered, implemented, or completed. State the Application's actual status/decision (given above) rather than assuming one from the fact that an Application merely exists.
 10. Only describe an Application as having planning permission/consent if its stated decision above literally says so (e.g. "Granted"). A refused or withdrawn Application remains real, relevant planning history - describe it accurately as refused/withdrawn, never as ongoing or successful.
 11. Never describe an Application, or the allocation, as under construction, built, delivered, or completed - PropertyAIgent does not hold construction/delivery evidence; a granted planning permission is still only a planning permission.
@@ -915,13 +1007,14 @@ RULES - follow every one of these exactly:
 13. If a Site's further Applications are given only as a category count (never individually narrated), do not enumerate or speculate about them - one sentence acknowledging the volume (e.g. "a further N applications relate to this Site, mostly condition-discharge/technical filings") is enough; never produce anything resembling a list of every Application.
 14. referenced_applications and referenced_entities (described below) are your own structured self-report of every material claim you made anywhere in headline/overview/key_points/key_uncertainties/investigation_priorities - used for automatic fact-checking. This is bookkeeping, not composition - it does not constrain how you write the prose above. referenced_entities covers ONLY parties from the APPLICANT EVIDENCE or OWNERSHIP/CONTROL EVIDENCE sections above (applicants, owners, developers, mortgagees, etc.) - it does NOT include the council name, the Local Plan name, or any other proper noun that appears elsewhere in this brief; those are not party claims and do not need self-reporting.
 15. Where an Application's decision above is genuinely not yet recorded, you are free to say so in plain language ("no decision has yet been issued", "the application remains undetermined", "a decision is still pending", or your own equivalent phrasing) - this is a grounded, useful fact, not an invented one. Self-report it via decision_claim_mode="absent" (see below) rather than inventing a decision value. Never make such a claim for an Application whose decision above is already a real value (Granted/Refused/Withdrawn/etc.) - that Application has been decided, and the decision given above is the only thing you may say about it.
+16. ABSENCE OF EVIDENCE ON THIS PLATFORM IS NOT EVIDENCE OF ABSENCE IN THE REAL WORLD. When a section above states nothing has currently been identified (no linked Application, no ownership/control evidence, no applicant evidence), describe that precisely as an absence of IDENTIFIED EVIDENCE on this platform - never as a real-world fact that nothing exists, that no activity has ever occurred, that the site has no owner, that no developer is involved, or draw any conclusion about commercial viability, market interest, or risk from it. "No linked planning activity has been identified" is grounded; "no planning activity exists" or "no efforts have been made to develop the site" is not - PropertyAIgent may simply not hold the evidence yet. This cuts both ways: do not go timid or vague either - explicitly frame a genuine, material absence as exactly what it is, a concrete INVESTIGATION SIGNAL (e.g. capacity that appears entirely unaccounted for on this platform's own records, worth someone actually checking), which is itself useful commercial intelligence; never invent a speculative reason FOR the absence (e.g. "distinctly cautious commercial outlook", "a further barrier to development") that the evidence does not support.
 
-Write:
+Write like a concise land/planning intelligence analyst, not a summariser restating labels - a reader should understand, in about 20 seconds, what this allocation is, how much identified planning activity exists against how much is indicatively unaccounted for, what stage that activity is genuinely at, who appears to be behind it (in what evidenced role), and what is worth investigating next. Every sentence should add something the reader could not already get by re-reading the raw facts above - avoid restating a label in prose without interpreting it. Prioritise: allocation position -> planning activity -> status/outcome -> party intelligence -> residual opportunity -> uncertainty -> investigation signal.
 - headline: one short sentence (under 15 words) capturing the allocation's overall commercial position.
-- overview: 2-3 short paragraphs, plain prose, no markdown headers, covering: what this allocation is and its planning status/scale; what planning activity has been identified, its actual status/decision, and how much capacity is accounted for versus indicative residual capacity (distinguishing identified activity from a determined planning outcome per Rules 9-12); what ownership/control evidence exists and for which Site(s); material uncertainties.
-- key_points: 3-5 concise bullet-style facts (each a short sentence).
-- key_uncertainties: 0-4 concise items (empty list if genuinely none).
-- investigation_priorities: 0-3 concise items (empty list if genuinely none).
+- overview: 2-3 short, information-dense paragraphs, plain prose, no markdown headers, covering: what this allocation is and its planning status/scale; what planning activity has been identified, its actual status/decision, and how much capacity is accounted for versus indicative residual capacity (distinguishing identified activity from a determined planning outcome per Rules 9-12); who appears to be behind that activity and in what evidenced role, correctly scoped (Rules 2/2a); what ownership/control evidence exists and for which Site(s); material uncertainties, framed as investigation signals where genuine (Rule 16).
+- key_points: 3-5 concise bullet-style facts (each a short sentence) - material interpretation, not a restatement of the overview.
+- key_uncertainties: 0-4 concise, specific evidence gaps that actually affect commercial understanding (empty list if genuinely none) - see Rule 7.
+- investigation_priorities: 0-3 concise, specific next questions/actions arising from those gaps (empty list if genuinely none) - see Rule 8.
 - referenced_applications: one entry for every Application reference you named anywhere above, each with:
   - reference: the Application reference, exactly as given.
   - claimed_status: if you stated its planning status anywhere above, the EXACT status value as given above for that Application; otherwise "".

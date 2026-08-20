@@ -1591,3 +1591,376 @@ def test_beal_valley_negative_control_unaffected(session):
     }
     is_valid, problems = validate_summary_output(context, output)
     assert is_valid is True, problems
+
+
+# ---------------------------------------------------------------------------
+# N. V7 Quality Hardening Amendment - Heald Green party-attribution prompt
+# clarity (real v6 production rejection: "unsupported application reference
+# for entity claim: Bloor Homes North West / Applicant / DC/084620" - the
+# VALIDATOR correctly caught the model attributing Bloor Homes' evidence to
+# the representative Application DC/084620 instead of the different,
+# secondary DC/078180 it is actually evidenced on; this section proves the
+# context/prompt now states that distinction explicitly, and that every
+# correct/incorrect self-report shape is still handled correctly).
+# ---------------------------------------------------------------------------
+
+
+def _heald_green_with_bloor_homes_fixture(session):
+    """Extends the base Heald Green shape with the real DC/078180 (Bloor
+    Homes North West, applicant) alongside representative DC/084620 -
+    mirrors the exact real production case."""
+    allocation = _heald_green_style_fixture(session)
+    site = session.execute(select(Site).where(Site.display_address == "Land At Wilmslow Road Heald Green Stockport")).scalars().first()
+    _make_app(session, site.id, "DC/078180", status="Decided", decision="Granted",
+              application_category="reserved_matters", council_code="stockport",
+              applicant_name_raw="Bloor Homes North West")
+    session.commit()
+    return allocation
+
+
+def test_applicant_evidence_states_it_is_not_the_representative_application(session):
+    """The prompt-level fix itself - Bloor Homes' evidence line must now
+    explicitly say it is NOT the representative Application."""
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    prompt = build_summary_prompt(context)
+    assert "Bloor Homes North West" in prompt
+    assert "DC/078180" in prompt
+    # The applicant evidence line for Bloor Homes must call out that
+    # DC/078180 is not the representative Application (DC/084620).
+    bloor_line = next(line for line in prompt.splitlines() if "Bloor Homes North West" in line)
+    assert "NOT the representative Application" in bloor_line
+
+
+def test_a_bloor_homes_described_as_applicant_associated_with_site_generally(session):
+    """Test A - the safe, general form (no specific Application cited)
+    always grounds correctly."""
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x",
+        "overview": "Bloor Homes North West is named as applicant in planning activity linked to the Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"',
+            "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_b_bloor_homes_associated_specifically_with_dc078180(session):
+    """Test B - the CORRECT specific-Application claim grounds."""
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        # DC/078180 is not the Site's representative Application, so it
+        # carries no groundable status/decision fact of its own (only the
+        # bare, already-trusted reference) - this claim is deliberately
+        # reference-only, matching the established rule that only a
+        # representative Application's status/decision can be grounded.
+        "headline": "x", "overview": "Bloor Homes North West is named as applicant on DC/078180.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/078180", "claimed_status": "", "claimed_decision": ""}],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"',
+            "application_reference": "DC/078180",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_c_bloor_homes_cannot_be_associated_with_dc084620(session):
+    """Test C - direct regression for the exact real v6 rejection: the
+    WRONG specific-Application claim must still be rejected."""
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Bloor Homes North West is named as applicant on DC/084620.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"',
+            "application_reference": "DC/084620",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_d_bloor_homes_cannot_become_developer(session):
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Bloor Homes North West is the developer of this Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "S106 Developer", "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"',
+            "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_e_bloor_homes_cannot_become_owner(session):
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Bloor Homes North West owns this Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "Planning ownership declaration",
+            "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"', "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_f_bloor_homes_cannot_become_promoter(session):
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Bloor Homes North West is promoting this Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "Promoter evidence",
+            "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"', "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# O. V7 Quality Hardening Amendment - unsupported/derived numbers remain
+# rejected (real v6 Heald Green rejection: "unsupported numbers: 83" -
+# investigated and found to be AI-derived arithmetic, 100% - 17% coverage,
+# never a trusted deterministic value or a masking gap - correctly and
+# deliberately still rejected, never allow-listed).
+# ---------------------------------------------------------------------------
+
+
+def test_g_derived_complement_percentage_still_rejected(session):
+    """Direct regression for the exact real production generation_error -
+    100% minus the trusted 17% coverage figure is AI-DERIVED arithmetic,
+    never a number PropertyAIgent itself computed or exposed - must
+    remain rejected, exactly as it correctly was in real production."""
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "83% of this allocation's capacity remains unaccounted for by identified planning activity.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_h_trusted_allocation_and_status_numbers_still_work(session):
+    """Companion positive case - the same allocation's genuinely trusted
+    figures (capacity, identified, coverage %) still validate cleanly."""
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x",
+        "overview": "124 of this allocation's 750 homes are identified, a 17% coverage rate, via the granted DC/084620.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+# ---------------------------------------------------------------------------
+# P. V7 Quality Hardening Amendment - Britannia/Holmpatrick role-boundary
+# prompt clarity (real v6 output: "Holmpatrick Ltd has submitted a planning
+# application for redevelopment" - not supported by its only trusted fact,
+# "Planning ownership declaration"; this section proves the reworded
+# ownership-evidence rendering and Rule 2's concrete counter-example are
+# present, and that the correct/incorrect self-report shapes are still
+# handled correctly by the validator).
+# ---------------------------------------------------------------------------
+
+
+def test_ownership_evidence_rendering_does_not_imply_submission(session):
+    allocation = _ownership_fixture(session, role="OWNER", evidence_category="CERTIFICATE_A_APPLICANT_OWNER_DECLARATION")
+    context = build_allocation_context(session, allocation)
+    prompt = build_summary_prompt(context)
+    entity_line = next(line for line in prompt.splitlines() if "Test Entity Ltd" in line and "role:" in line)
+    assert "does NOT mean" in entity_line
+    assert "submitted" in entity_line
+
+
+def test_k_britannia_holmpatrick_correct_role_claim_passes(session):
+    allocation = _ownership_fixture(session, role="OWNER", evidence_category="CERTIFICATE_A_APPLICANT_OWNER_DECLARATION",
+                                     entity_name_raw="Holmpatrick Ltd")
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Holmpatrick Ltd is named under a planning ownership declaration for the identified Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Holmpatrick Ltd", "role": "Planning ownership declaration", "site_scope": 'Site "Test Site"',
+            "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_l_britannia_holmpatrick_unsupported_applicant_claim_rejected(session):
+    """Direct regression for the real v6 output - if the model DOES
+    self-report Holmpatrick Ltd as Applicant (rather than omitting the
+    self-report entirely, as the real generation did), the validator
+    correctly rejects it, since no independent Applicant-role evidence
+    exists for this entity."""
+    allocation = _ownership_fixture(session, role="OWNER", evidence_category="CERTIFICATE_A_APPLICANT_OWNER_DECLARATION",
+                                     entity_name_raw="Holmpatrick Ltd")
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Holmpatrick Ltd has submitted a planning application for redevelopment.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Holmpatrick Ltd", "role": "Applicant", "site_scope": 'Site "Test Site"', "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# Q. V7 Quality Hardening Amendment - absence-of-evidence prompt guidance
+# (real v6 Beal Valley output over-claimed real-world absence: "no efforts
+# have been made to develop the site", "a further barrier to any potential
+# development", "a distinctly cautious commercial outlook" - none supported
+# by "no identified planning activity"/"no ownership evidence identified").
+# This is a prompt-guidance change, not a new validator check - free prose
+# is deliberately never restricted to fixed tokens - so these tests prove
+# the guidance text is present and that grounded absence framing still
+# validates cleanly (there is no deterministic way to reject an over-claim
+# purely in free prose without reintroducing token-level restrictions,
+# which is explicitly out of scope).
+# ---------------------------------------------------------------------------
+
+
+def test_i_j_absence_of_evidence_guidance_present_in_prompt(session):
+    allocation = _boothstown_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    prompt = build_summary_prompt(context)
+    assert "NOT EVIDENCE OF ABSENCE" in prompt
+    assert "investigation signal" in prompt.lower()
+
+
+def test_grounded_absence_framing_as_investigation_signal_validates(session):
+    """The Product Owner's own example wording (paraphrased, proving
+    natural-language freedom, not a template) validates cleanly."""
+    _make_council(session, "oldham")
+    plan = _make_plan(session, council_code="oldham")
+    allocation = _make_allocation(session, plan, council_code="oldham", policy_reference="JPA 10",
+                                   site_name="Beal Valley", minimum_dwellings=480)
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "Beal Valley allocation with no currently identified planning activity",
+        "overview": (
+            "No linked planning activity or ownership/control evidence has currently been identified for this "
+            "allocation, leaving the full approximately 480-home capacity apparently unaccounted for on this "
+            "platform's own records - a potential investigation opportunity."
+        ),
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+# ---------------------------------------------------------------------------
+# R. V7 Quality Hardening Amendment - dry-run/execute parity (real
+# production symptom: --allocation-ids dry-run reported "fresh: 1, would
+# generate: 3" immediately before an execute run that attempted all four
+# and regenerated allocation 51 - CLI-level tests live in
+# tests/test_generate_allocation_intelligence_summaries_cli.py; this
+# section only proves the underlying is_allocation_summary_stale/
+# should_regenerate_allocation_summary parity the CLI now relies on).
+# ---------------------------------------------------------------------------
+
+
+def test_stale_check_detects_prompt_version_drift(session):
+    """Direct regression for the real parity bug's OTHER half - a summary
+    whose fingerprint has NOT changed but whose prompt_version has must
+    now be reported stale (previously only fingerprint was checked)."""
+    from app.reporting.allocation_intelligence_summary import is_allocation_summary_stale
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    fingerprint = compute_context_fingerprint(context)
+    summary = get_allocation_summary(session, allocation.id)
+    if summary is None:
+        from app.db.models import AllocationIntelligenceSummary
+        summary = AllocationIntelligenceSummary(allocation_id=allocation.id)
+        session.add(summary)
+    summary.headline = "Existing summary"
+    summary.context_fingerprint = fingerprint
+    summary.prompt_version = "allocation-intelligence-summary-v1-stale-on-purpose"
+    summary.status = "ok"
+    session.commit()
+
+    assert is_allocation_summary_stale(session, allocation) is True
+
+
+def test_stale_check_false_when_fingerprint_and_prompt_version_both_current(session):
+    from app.reporting.allocation_intelligence_summary import PROMPT_VERSION, is_allocation_summary_stale
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    fingerprint = compute_context_fingerprint(context)
+    summary = get_allocation_summary(session, allocation.id)
+    if summary is None:
+        from app.db.models import AllocationIntelligenceSummary
+        summary = AllocationIntelligenceSummary(allocation_id=allocation.id)
+        session.add(summary)
+    summary.headline = "Existing summary"
+    summary.context_fingerprint = fingerprint
+    summary.prompt_version = PROMPT_VERSION
+    summary.status = "ok"
+    session.commit()
+
+    assert is_allocation_summary_stale(session, allocation) is False
+
+
+# ---------------------------------------------------------------------------
+# S. Natural-language freedom preserved (Test R from the task's own matrix)
+# ---------------------------------------------------------------------------
+
+
+def test_natural_language_variation_remains_free_after_v7_prompt_changes(session):
+    """The v7 prompt-guidance changes add framing, not sentence templates -
+    several very differently-worded, equally-grounded summaries must all
+    still pass."""
+    allocation = _boothstown_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    variants = [
+        "This allocation's identified activity, via PA/2024/0749, covers the large majority of its 300-home "
+        "capacity - 282 homes - though the application remains under consultation, so this should not be read "
+        "as consented. Roughly 18 homes have no identified planning activity against them.",
+
+        "282 of 300 homes at East of Boothstown sit behind an active but undetermined application (PA/2024/0749); "
+        "a modest 18-home slice remains unaccounted for on this platform's own records.",
+    ]
+    for overview_text in variants:
+        output = {
+            "headline": "x", "overview": overview_text,
+            "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+            "referenced_applications": [{"reference": "PA/2024/0749", "claimed_status": "Under Consultation", "claimed_decision": ""}],
+            "referenced_entities": [],
+        }
+        is_valid, problems = validate_summary_output(context, output)
+        assert is_valid is True, (overview_text, problems)
