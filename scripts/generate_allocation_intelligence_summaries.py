@@ -88,16 +88,40 @@ def _select_targets(session, args: argparse.Namespace) -> list[LocalPlanSite]:
 
 
 def _classify(session, allocation: LocalPlanSite, *, only_stale: bool) -> str:
-    """One of: missing | fresh | stale | insufficient_context | would_generate."""
+    """One of: missing | fresh | stale | insufficient_context | would_generate -
+    the SINGLE eligibility decision both _run_dry_run and _run_execute call
+    (V7 Quality Hardening Amendment - previously _run_execute hand-wrote its
+    own separate already_fresh/only_stale skip check that had DRIFTED from
+    this function's own classification: when only_stale is False (an
+    explicit --allocation-id/--allocation-ids/--all-eligible target),
+    _run_execute's own "if only_stale and already_fresh: skip" is a no-op -
+    it attempts EVERY sufficient-context target regardless of freshness -
+    but this function used to report an already-fresh target as "fresh"
+    (not counted as "would generate") REGARDLESS of only_stale, so dry-run
+    under-reported exactly what a real --allocation-ids execute run would
+    actually attempt. Confirmed against real production behaviour: a
+    controlled --allocation-ids 51,32,66,196 dry-run reported "fresh: 1,
+    would generate: 3" immediately before an execute run that attempted
+    all four and regenerated allocation 51. Fixed by making the classifier
+    itself the single source of truth for "would this be attempted" -
+    when only_stale is False, every sufficient-context target is always
+    "would_generate", exactly mirroring _run_execute's real skip logic;
+    _run_execute now calls this SAME function instead of re-deriving the
+    decision inline, so the two paths can never drift apart again."""
     if not has_sufficient_context_for_summary(session, allocation):
         return "insufficient_context"
+    if not only_stale:
+        # An explicit target list or --all-eligible is a "generate/refresh
+        # these specific allocations" request - real execute behaviour
+        # attempts every one of them regardless of freshness (see
+        # _run_execute's own classification-driven skip below), so dry-run
+        # must report the same thing, never "fresh".
+        return "would_generate"
     summary = get_allocation_summary(session, allocation.id)
     if summary is None or summary.headline is None:
-        return "would_generate" if not only_stale else "missing"
+        return "missing"
     if is_allocation_summary_stale(session, allocation):
-        return "would_generate" if not only_stale else "stale"
-    if only_stale:
-        return "fresh"
+        return "stale"
     return "fresh"
 
 
@@ -141,15 +165,13 @@ def _run_execute(session, args: argparse.Namespace) -> None:
 
     generated = regenerated_count = skipped = errors = rejected = 0
     for allocation in targets:
-        if not has_sufficient_context_for_summary(session, allocation):
-            skipped += 1
-            continue
-        existing_summary = get_allocation_summary(session, allocation.id)
-        already_fresh = (
-            existing_summary is not None and existing_summary.headline is not None
-            and not is_allocation_summary_stale(session, allocation)
-        )
-        if only_stale and already_fresh:
+        # V7 Quality Hardening Amendment - calls the SAME _classify used by
+        # _run_dry_run, rather than a separately hand-written freshness
+        # check, so dry-run's reporting and execute's real behaviour can
+        # never drift apart again (see _classify's own comment for the
+        # real production symptom this fixes).
+        classification = _classify(session, allocation, only_stale=only_stale)
+        if classification in ("insufficient_context", "fresh"):
             skipped += 1
             continue
         try:
