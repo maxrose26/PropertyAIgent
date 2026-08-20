@@ -52,16 +52,19 @@ each is used):
     - never re-derived, re-worded, or reclassified - and a
     needs_review=True group is NEVER named as a fact (Section 14): only its
     existence is surfaced, as an uncertainty, never an owner/developer name.
-  - Applicant (Allocation Party Evidence Amendment): Application.
-    applicant_name_raw for the SAME representative Application already used
-    for status/decision above - a raw portal scrape, cleaned only of
-    non-informative placeholder values (_clean_applicant_name), never
-    SchemeIntelligence's own applicant_company/developer/landowner/
-    planning_agent fields (those are AI re-interpretations of this exact
-    value with no evidence-grounding of their own, deliberately excluded
-    from this evidence-grounded pathway). Role label is always "Applicant"
-    - being named applicant is never treated as developer, promoter, or
-    owner evidence.
+  - Applicant (Allocation Party Evidence Amendment, aggregated across ALL
+    trusted linked Applications by its own Pre-Merge Amendment "Multi-
+    Application Party Intelligence"): Application.applicant_name_raw for
+    EVERY trusted linked Application on a Site (not only the representative
+    one - see ApplicantPartyEvidence), deduplicated by exact cleaned name -
+    a raw portal scrape, cleaned only of non-informative placeholder values
+    (_clean_applicant_name), never SchemeIntelligence's own
+    applicant_company/developer/landowner/planning_agent fields (those are
+    AI re-interpretations of this exact value with no evidence-grounding of
+    their own, deliberately excluded from this evidence-grounded pathway).
+    Role label is always "Applicant" - being named applicant, on one
+    Application or many, is never treated as developer, promoter, or owner
+    evidence.
   - Adjoining/nearby allocations: NO trusted source exists on this platform
     today (Section 15) - deliberately omitted from the context entirely, so
     the model has no adjacency data to draw on even by accident.
@@ -116,25 +119,38 @@ MODEL = "gpt-4o-mini"
 # under any prior version (0 rows exist), so this bump again has no
 # practical effect today.
 #
-# v5 (Allocation Party Evidence Amendment) - the model can now see, and is
-# asked to synthesise, a representative Application's deterministic
-# applicant (RepresentativeApplicationDetail.applicant_name, sourced from
-# Application.applicant_name_raw, never SchemeIntelligence's own AI-derived
-# entity fields) alongside the existing ownership/control evidence; a new
-# APPLICANT EVIDENCE prompt section, Rule 2 widened to also guard against
-# applicant->developer/promoter/owner promotion, and referenced_entities'
-# grounding allow-set widened (via _allowed_applicant_tuples) to cover
-# applicant (name, "Applicant", site scope) claims through the SAME triple
-# mechanism already used for ownership/control claims - no SUMMARY_SCHEMA
-# change was needed. Also generalises numeric grounding to mask
-# context.allocation_reference/plan_status_label as known trusted strings
-# (root cause of the "unsupported numbers: 18, 2.33" false rejection on
-# Heald Green West's own "HOM 2.33" reference/"Regulation 18" plan-stage
-# wording - see validate_summary_output's own comment). No production
-# summary has ever been generated under any prior version (0 rows exist -
-# the four controlled-sample rows all carry status="error"/headline=None
-# from OpenAI-auth failures predating this amendment), so this bump again
-# has no practical effect on any existing row today.
+# v5 (Allocation Party Evidence Amendment, as corrected by its own
+# Pre-Merge Amendment "Multi-Application Party Intelligence" before ever
+# merging - both amendments landed on this SAME version, since the first
+# shape was never merged/deployed/used to generate any production summary,
+# 0 rows exist under it) - the model can now see, and is asked to
+# synthesise, applicant evidence AGGREGATED ACROSS EVERY TRUSTED linked
+# Application on a Site (ApplicantPartyEvidence, exact-name-deduplicated,
+# never just the representative Application's own applicant - see
+# AllocationIntelligenceContext.applicant_evidence and build_allocation_
+# context's own comment for why: the representative Application stays the
+# sole authority for capacity/status/decision, but WHICH organisations are
+# involved is a separate question answered from the Site's full trusted
+# Application set), sourced from Application.applicant_name_raw, never
+# SchemeIntelligence's own AI-derived entity fields; a new APPLICANT
+# EVIDENCE prompt section, Rule 2 widened to also guard against
+# applicant->developer/promoter/owner promotion regardless of how many
+# Applications name that applicant, and referenced_entities' grounding
+# allow-set widened (via _allowed_party_facts, unifying ownership/control
+# and applicant evidence into one (name, role, scope) -> allowed Application
+# references lookup) to cover applicant claims through the SAME mechanism
+# already used for ownership/control claims. SUMMARY_SCHEMA gained one new
+# optional field, referenced_entities[].application_reference (validated
+# against that same lookup) - needed only when the model chooses to tie a
+# claim to ONE specific Application. Also generalises numeric grounding to
+# mask context.allocation_reference/plan_status_label as known trusted
+# strings (root cause of the "unsupported numbers: 18, 2.33" false
+# rejection on Heald Green West's own "HOM 2.33" reference/"Regulation 18"
+# plan-stage wording - see validate_summary_output's own comment). No
+# production summary has ever been generated under any prior version (0
+# rows exist - the four controlled-sample rows all carry status="error"/
+# headline=None from OpenAI-auth failures predating this amendment), so
+# this bump again has no practical effect on any existing row today.
 PROMPT_VERSION = "allocation-intelligence-summary-v5"
 
 
@@ -163,20 +179,16 @@ class RepresentativeApplicationDetail:
     decision: str | None  # raw portal decision, e.g. "Granted", "Refuse", "Withdrawn" - null until determined
     decision_issued_date: str | None  # raw scraped date string, null until a decision exists
     application_category: str | None  # deterministic, e.g. "primary_residential" | "condition_discharge_or_details" - see app.scrapers.unit_filter.classify_application_category, reused verbatim, never re-derived
-    # Allocation Party Evidence Amendment - the raw, portal-scraped
-    # Application.applicant_name_raw for this SAME representative
-    # Application, cleaned only of non-informative portal placeholder
-    # values (see _clean_applicant_name) - never AI-derived, never sourced
-    # from SchemeIntelligence's own applicant_company/developer fields
-    # (those are LLM re-interpretations of this exact raw value with no
-    # evidence-grounding of their own - see this module's docstring).
-    # Deliberately just a name, not a role claim: being named as applicant
-    # here does NOT by itself mean developer, promoter, or owner - that
-    # distinction is enforced by build_summary_prompt's Rule 2 and by
-    # validate_summary_output only ever accepting the role label
-    # "Applicant" for this fact, never a stronger one.
     proposal_summary: str | None  # truncated proposal text, same 150-char convention as app.reporting.scheme_summary._fmt_application
-    applicant_name: str | None
+    # NOTE (Allocation Party Evidence Pre-Merge Amendment) - applicant is
+    # deliberately NOT a field here. The Product Owner's own review decided
+    # the representative Application stays the sole authority for capacity/
+    # status/decision/category, while WHICH ORGANISATIONS are involved is
+    # aggregated across every trusted linked Application on the Site (see
+    # ApplicantPartyEvidence / SiteContextEntry.applicant_evidence below) -
+    # a v5-only field limited to the representative Application's own
+    # applicant existed briefly and was superseded here, never shipped in
+    # any production summary (0 rows exist under any prior PROMPT_VERSION).
 
 
 @dataclass
@@ -205,6 +217,32 @@ class OwnershipContextEntry:
     entity_name_raw: str
     role_label: str
     application_references: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ApplicantPartyEvidence:
+    """Allocation Party Evidence Pre-Merge Amendment ("Multi-Application
+    Party Intelligence") - one entity named as applicant on one or more of
+    a Site's TRUSTED linked Applications, deduplicated by exact cleaned
+    name (never fuzzy-resolved - see _clean_applicant_name). Deliberately
+    NOT scoped to the representative Application: the representative
+    Application stays the sole authority for capacity/status/decision
+    (RepresentativeApplicationDetail, unchanged by this amendment); WHICH
+    organisations are involved is a separate question, answered by
+    aggregating across every trusted linked Application on the Site - the
+    exact split the Product Owner's review decided (Section 2).
+
+    Role is always "Applicant", regardless of application_count - being
+    named applicant on many Applications is still only Applicant evidence,
+    never Developer/Owner/Promoter evidence, by construction (there is no
+    field here that could carry a stronger role)."""
+    site_label: str
+    entity_name: str
+    application_references: list[str] = field(default_factory=list)
+
+    @property
+    def application_count(self) -> int:
+        return len(self.application_references)
 
 
 @dataclass
@@ -243,6 +281,14 @@ class AllocationIntelligenceContext:
     ownership_entities: list[OwnershipContextEntry] = field(default_factory=list)
     ownership_review_pending_count: int = 0  # needs_review ControlRelationship groups - never named
     residual_ownership_known: bool = False
+
+    # Allocation Party Evidence Pre-Merge Amendment - one entry per unique
+    # (Site, cleaned applicant name), aggregated across every TRUSTED
+    # linked Application on that Site (never just the representative one -
+    # see ApplicantPartyEvidence's own docstring). Flat, top-level list,
+    # mirroring ownership_entities' own shape exactly, for the same reason:
+    # both are validated by the identical (name, role, scope) mechanism.
+    applicant_evidence: list[ApplicantPartyEvidence] = field(default_factory=list)
 
     source_document_url: str | None = None
     source_page: int | None = None
@@ -302,6 +348,7 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
 
     sites: list[SiteContextEntry] = []
     disputed_site_count = 0
+    applicant_evidence: list[ApplicantPartyEvidence] = []
     for s in site_summaries:
         is_disputed = s.relationship_review_status == "needs_confirmation"
         if is_disputed:
@@ -328,7 +375,6 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
                 reference=rep.reference, status=rep.status, decision=rep.decision,
                 decision_issued_date=rep.decision_issued_date, application_category=rep.application_category,
                 proposal_summary=proposal[:150] if proposal else None,
-                applicant_name=_clean_applicant_name(rep.applicant_name_raw),
             )
 
         if is_disputed:
@@ -353,6 +399,28 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
                 continue
             category = a.application_category or "uncategorized"
             other_applications_by_category[category] = other_applications_by_category.get(category, 0) + 1
+
+        # Allocation Party Evidence Pre-Merge Amendment ("Multi-Application
+        # Party Intelligence", Section 2) - party evidence is aggregated
+        # across EVERY trusted linked Application on this Site (s.applications
+        # already is exactly that set - the same trusted, Site-scoped
+        # Application list other_applications_by_category above already
+        # iterates), INCLUDING the representative Application if it happens
+        # to carry an applicant too - unlike other_applications_by_category,
+        # this is never representative-excluding, because the representative
+        # Application's own applicant is just as valid party evidence as any
+        # other's. Exact cleaned-name deduplication only (Section 5) - no
+        # fuzzy company resolution.
+        applicant_refs_by_name: dict[str, list[str]] = {}
+        for a in s.applications:
+            name = _clean_applicant_name(a.applicant_name_raw)
+            if name is None:
+                continue
+            applicant_refs_by_name.setdefault(name, []).append(a.reference)
+        for name, refs in sorted(applicant_refs_by_name.items()):
+            applicant_evidence.append(ApplicantPartyEvidence(
+                site_label=s.site.display_address, entity_name=name, application_references=sorted(set(refs)),
+            ))
 
         sites.append(SiteContextEntry(
             site_id=s.site_id, label=s.site.display_address,
@@ -429,6 +497,7 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
         ownership_entities=ownership_entities,
         ownership_review_pending_count=ownership_review_pending_count,
         residual_ownership_known=residual_ownership_known,
+        applicant_evidence=applicant_evidence,
         source_document_url=allocation.source_document_url,
         source_page=allocation.source_page,
         last_checked=plan.last_checked.isoformat() if plan and plan.last_checked else None,
@@ -514,13 +583,6 @@ def compute_context_fingerprint(context: AllocationIntelligenceContext) -> str:
                         "decision": s.representative_application.decision,
                         "decision_issued_date": s.representative_application.decision_issued_date,
                         "application_category": s.representative_application.application_category,
-                        # Allocation Party Evidence Amendment - a later-
-                        # discovered/corrected applicant name is narrative-
-                        # material (test #15: "party changes alter
-                        # fingerprint where materially relevant") and must
-                        # trigger regeneration, exactly like status/decision
-                        # above.
-                        "applicant_name": s.representative_application.applicant_name,
                     }
                     if s.representative_application else None
                 ),
@@ -538,6 +600,21 @@ def compute_context_fingerprint(context: AllocationIntelligenceContext) -> str:
         ], key=lambda d: (d["site_label"], d["entity_name_raw"], d["role_label"])),
         "ownership_review_pending_count": context.ownership_review_pending_count,
         "residual_ownership_known": context.residual_ownership_known,
+        # Allocation Party Evidence Pre-Merge Amendment ("Multi-Application
+        # Party Intelligence") - a later-discovered/corrected applicant, or
+        # a materially different set of supporting Application references
+        # for one, is narrative-material (test #16: "applicant changes move
+        # fingerprint") and must trigger regeneration; a portal placeholder
+        # variant cleaning to the same name/reference set must not (test
+        # #17), which falls out for free since _clean_applicant_name has
+        # already run by the time this list is built.
+        "applicant_evidence": sorted([
+            {
+                "site_label": e.site_label, "entity_name": e.entity_name,
+                "application_references": sorted(e.application_references),
+            }
+            for e in context.applicant_evidence
+        ], key=lambda d: (d["site_label"], d["entity_name"])),
     }
     canonical = json.dumps(fingerprint_source, sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -686,48 +763,55 @@ def _render_ownership_line(o: OwnershipContextEntry) -> str:
     return f"- For {scope}: {o.entity_name_raw} - role: {o.role_label}{apps_bit}."
 
 
-# Allocation Party Evidence Amendment - Applicant is deliberately NOT an
-# OwnershipContextEntry: its evidence source (Application.applicant_name_raw,
-# a portal scrape) is a different, weaker, Application-submission fact than
-# a ControlRelationship row (a certificate declaration or S106-defined
-# role), and this codebase's own established discipline (see
-# ControlRelationship's "CURRENT VS HISTORICAL" class docstring) is to keep
-# evidence classes honestly distinct rather than merge them into one shape.
-# The applicant's SCOPE STRING is still deliberately identical in form to
-# _ownership_scope_label's own Site case (`Site "{label}"`) - the model
-# already knows this exact phrase from the OWNERSHIP/CONTROL section, so
-# reusing it (rather than inventing a second scope vocabulary) costs nothing
-# new to learn and keeps validate_summary_output's triple-check mechanism
-# uniform across both evidence sources.
-def _applicant_scope_label(s: SiteContextEntry) -> str:
-    return f'Site "{s.label}"'
+# Allocation Party Evidence Pre-Merge Amendment ("Multi-Application Party
+# Intelligence") - Applicant is deliberately NOT an OwnershipContextEntry:
+# its evidence source (Application.applicant_name_raw, a portal scrape) is
+# a different, weaker, Application-submission fact than a ControlRelationship
+# row (a certificate declaration or S106-defined role), and this codebase's
+# own established discipline (see ControlRelationship's "CURRENT VS
+# HISTORICAL" class docstring) is to keep evidence classes honestly distinct
+# rather than merge them into one shape. The applicant's SCOPE STRING is
+# still deliberately identical in form to _ownership_scope_label's own Site
+# case (`Site "{label}"`) - the model already knows this exact phrase from
+# the OWNERSHIP/CONTROL section, so reusing it (rather than inventing a
+# second scope vocabulary) costs nothing new to learn and keeps validate_
+# summary_output's triple-check mechanism uniform across both evidence
+# sources.
+def _applicant_scope_label(e: ApplicantPartyEvidence) -> str:
+    return f'Site "{e.site_label}"'
 
 
-def _render_applicant_line(s: SiteContextEntry) -> str | None:
-    rep = s.representative_application
-    if rep is None or not rep.applicant_name:
-        return None
-    return (
-        f'- For {_applicant_scope_label(s)}: {rep.applicant_name} - role: Applicant '
-        f"(named on Application {rep.reference}'s own form)."
-    )
+def _render_applicant_line(e: ApplicantPartyEvidence) -> str:
+    refs_bit = ", ".join(e.application_references)
+    if e.application_count == 1:
+        provenance = f"named on Application {refs_bit}'s own form"
+    else:
+        provenance = f"named as applicant on {e.application_count} linked Applications: {refs_bit}"
+    return f"- For {_applicant_scope_label(e)}: {e.entity_name} - role: Applicant ({provenance})."
 
 
-def _allowed_applicant_tuples(context: AllocationIntelligenceContext) -> set[tuple[str, str, str]]:
-    """(entity name, "Applicant", site scope) triples - the SAME shape as
-    _allowed_entity_role_scope's ownership/control triples, unioned with
-    them at the validate_summary_output call site, so a self-reported
-    Applicant claim is checked by the identical mechanism that already
-    stops an entity being paired with a role or scope it doesn't hold
-    (Section 9/10 - "real applicant claimed as Developer without developer
-    evidence" is rejected here for free: (name, "Developer", scope) is
-    simply never a member of this set, only (name, "Applicant", scope)
-    is)."""
-    return {
-        (s.representative_application.applicant_name, "Applicant", _applicant_scope_label(s))
-        for s in context.sites
-        if s.representative_application and s.representative_application.applicant_name
-    }
+def _allowed_party_facts(context: AllocationIntelligenceContext) -> dict[tuple[str, str, str], set[str]]:
+    """(entity name, role label, scope) -> the set of Application references
+    that specific claim may be tied to (Section 5/8 - a self-report may
+    optionally name ONE specific supporting Application; if it does, that
+    reference must genuinely belong to this entity/role/scope's own
+    evidence). Unifies ownership/control entities (OwnershipContextEntry)
+    and applicant evidence (ApplicantPartyEvidence) into ONE lookup so
+    validate_summary_output's referenced_entities check is a single
+    mechanism regardless of which evidence source a claim comes from -
+    "real applicant claimed as Developer without developer evidence" is
+    rejected here for free: (name, "Developer", scope) is simply never a
+    key in this dict unless a SEPARATE, independently-evidenced
+    ControlRelationship row grants it, entirely unaffected by how many
+    Applications name that same entity as Applicant."""
+    facts: dict[tuple[str, str, str], set[str]] = {}
+    for o in context.ownership_entities:
+        key = (o.entity_name_raw, o.role_label, _ownership_scope_label(o))
+        facts.setdefault(key, set()).update(o.application_references)
+    for e in context.applicant_evidence:
+        key = (e.entity_name, "Applicant", _applicant_scope_label(e))
+        facts.setdefault(key, set()).update(e.application_references)
+    return facts
 
 
 def build_summary_prompt(context: AllocationIntelligenceContext) -> str:
@@ -735,9 +819,8 @@ def build_summary_prompt(context: AllocationIntelligenceContext) -> str:
     ownership_lines = "\n".join(_render_ownership_line(o) for o in context.ownership_entities) or (
         "- No confirmed ownership/control evidence currently identified for this allocation."
     )
-    applicant_line_list = [line for line in (_render_applicant_line(s) for s in context.sites) if line is not None]
-    applicant_lines = "\n".join(applicant_line_list) or (
-        "- No applicant evidence currently identified for any related Site's representative Application."
+    applicant_lines = "\n".join(_render_applicant_line(e) for e in context.applicant_evidence) or (
+        "- No applicant evidence currently identified from any related Site's trusted linked Applications."
     )
 
     return f"""
@@ -777,7 +860,7 @@ DEVELOPMENT COVERAGE (deterministic, already computed - do NOT recalculate any o
 RELATED SITES (each independently evidenced - a Site relates to THIS allocation, never assume it covers the whole allocation):
 {site_lines}
 
-APPLICANT EVIDENCE (who submitted the representative Application, straight from the Application form - being named as applicant does NOT by itself mean this party is the developer, promoter, landowner, or "behind" the wider scheme; see Rule 2):
+APPLICANT EVIDENCE (who has submitted planning applications relating to a Site, aggregated across ALL of that Site's trusted linked Applications - not only the representative one; being named as applicant, on one Application or many, does NOT by itself mean this party is the developer, promoter, landowner, or "behind" the wider scheme; see Rule 2):
 {applicant_lines}
 
 OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact Site or residual-capacity context named, NEVER the allocation as a whole - never say an entity "owns the allocation", only that ownership/control evidence for a NAMED Site or the residual capacity names that entity in that role):
@@ -787,7 +870,7 @@ OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact 
 
 RULES - follow every one of these exactly:
 1. Never invent a number, Application reference, organisation name, planning status, decision, or role not given above, and never recompute a capacity/coverage figure - every one you might want is already given above.
-2. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant") - never upgrade, downgrade, or relabel a role (an applicant is never a developer, promoter, or owner - you may note commercially that a company is "named as applicant", never that it "is developing" or "owns" anything unless a stronger role label is separately given for it; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it). The SAME entity may legitimately hold more than one role above (e.g. named as Applicant AND, separately, as S106 Developer) - only ever narrate the roles it is actually given, never merge them into a single stronger claim.
+2. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant") - never upgrade, downgrade, or relabel a role (an applicant is never a developer, promoter, or owner - you may note commercially that a company is "named as applicant", never that it "is developing" or "owns" anything unless a stronger role label is separately given for it; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it). The SAME entity may legitimately hold more than one role above (e.g. named as Applicant AND, separately, as S106 Developer) - only ever narrate the roles it is actually given, never merge them into a single stronger claim. An applicant named on many linked Applications for a Site is still only Applicant evidence, however many - frequency is a fact you may mention (e.g. "named as applicant on 4 linked applications"), never a reason to imply a stronger role.
 3. A Site relationship or ownership/control relationship marked as pending confirmation/review must be described as uncertain, never as a settled or confirmed fact - do not name any entity or role that was excluded above as "still under review".
 4. Do NOT mention any other Local Plan allocation, policy reference, or nearby/adjoining site by name or code under any circumstances, even if you think one might be nearby - this platform does not currently hold trusted adjacency evidence.
 5. Never describe this allocation as adopted unless the PLANNING STATUS line above literally says ADOPTED.
@@ -815,6 +898,7 @@ Write:
   - name: the entity name, exactly as given.
   - role: its role label, exactly as given (e.g. "Applicant", "S106 Developer", "Planning ownership declaration").
   - site_scope: exactly the scope text given above for that entity (e.g. Site "Land At Wilmslow Road Heald Green Stockport", or "the allocation's residual (unaccounted-for) capacity") - never "the allocation" as a whole.
+  - application_reference: if you named ONE SPECIFIC Application reference in connection with this party (e.g. "named as applicant on DC/078180"), that exact reference; if you only described the party generally (e.g. "named as applicant on several linked applications", with no single reference singled out), "".
 """
 
 
@@ -860,8 +944,19 @@ SUMMARY_SCHEMA = {
                         "name": {"type": "string"},
                         "role": {"type": "string"},
                         "site_scope": {"type": "string"},
+                        # Allocation Party Evidence Pre-Merge Amendment
+                        # ("Multi-Application Party Intelligence", Section
+                        # 8) - optional: the ONE specific Application
+                        # reference this claim is tied to, if any ("" when
+                        # the claim is a general one, e.g. "named as
+                        # applicant on several linked applications"). Lets
+                        # validate_summary_output catch "assigned to an
+                        # Application where it does not occur" without
+                        # ever scanning free-text prose for reference-
+                        # shaped tokens.
+                        "application_reference": {"type": "string"},
                     },
-                    "required": ["name", "role", "site_scope"],
+                    "required": ["name", "role", "site_scope", "application_reference"],
                     "additionalProperties": False,
                 },
             },
@@ -935,6 +1030,13 @@ def _allowed_numbers(context: AllocationIntelligenceContext) -> set[str]:
             _add(count)
         if s.other_applications_by_category:
             _add(sum(s.other_applications_by_category.values()))
+    # Allocation Party Evidence Pre-Merge Amendment - "named as applicant on
+    # 4 linked applications" is legitimate narration of a genuine, trusted
+    # count (ApplicantPartyEvidence.application_count); its digit must be
+    # allowed, exactly like any other Site's other_applications_by_category
+    # count above.
+    for e in context.applicant_evidence:
+        _add(e.application_count)
     return allowed
 
 
@@ -949,11 +1051,11 @@ def _allowed_application_references(context: AllocationIntelligenceContext) -> s
 
 def _allowed_entity_names(context: AllocationIntelligenceContext) -> set[str]:
     # Allocation Party Evidence Amendment - unioned with applicant names too
-    # (a different evidence source than ownership_entities, see
-    # _allowed_applicant_tuples) so an applicant company name's own digits
-    # (e.g. a name containing a house/unit number) are masked before
-    # numeric-grounding, exactly like an ownership entity's name already is.
-    return {o.entity_name_raw for o in context.ownership_entities} | {t[0] for t in _allowed_applicant_tuples(context)}
+    # (a different evidence source than ownership_entities) so an applicant
+    # company name's own digits (e.g. a name containing a house/unit number)
+    # are masked before numeric-grounding, exactly like an ownership
+    # entity's name already is.
+    return {o.entity_name_raw for o in context.ownership_entities} | {e.entity_name for e in context.applicant_evidence}
 
 
 def _representative_applications_by_reference(context: AllocationIntelligenceContext) -> dict[str, RepresentativeApplicationDetail]:
@@ -965,19 +1067,6 @@ def _representative_applications_by_reference(context: AllocationIntelligenceCon
     claimed_status/claimed_decision for one of those must be rejected, not
     silently accepted because the bare reference happens to be trusted."""
     return {s.representative_application.reference: s.representative_application for s in context.sites if s.representative_application}
-
-
-def _allowed_entity_role_scope(context: AllocationIntelligenceContext) -> set[tuple[str, str, str]]:
-    """(entity name, role label, scope) triples - the exact combination
-    the prompt shows for each piece of ownership/control evidence (see
-    _render_ownership_line/_ownership_scope_label, the SAME function that
-    renders the scope string the model is asked to self-report verbatim).
-    Validating the TRIPLE together, not three independent sets, is what
-    stops an entity that IS genuinely in context from being paired with a
-    role or scope that belongs to a DIFFERENT entity/Site (Section 10/11 -
-    "Applicant promoted to Developer", "Site-level entity widened to the
-    whole allocation")."""
-    return {(o.entity_name_raw, o.role_label, _ownership_scope_label(o)) for o in context.ownership_entities}
 
 
 def _mask_known_strings(text: str, known_strings: set[str]) -> str:
@@ -1076,15 +1165,17 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
         if claimed_decision and (rep is None or claimed_decision != (rep.decision or "")):
             problems.append(f"unsupported decision claim for {ref}: {claimed_decision}")
 
-    # Allocation Party Evidence Amendment - unioned with applicant tuples,
-    # a DIFFERENT evidence source (Application.applicant_name_raw, never
-    # ControlRelationship) validated by the identical (name, role, scope)
-    # triple mechanism. This is what makes "real applicant claimed as
-    # Developer without developer evidence" a rejection for free: the set
-    # only ever contains (name, "Applicant", scope) for that entity unless
-    # a SEPARATE, independent ControlRelationship-sourced tuple also grants
-    # it a stronger role - never inferred, never merged.
-    allowed_entity_tuples = _allowed_entity_role_scope(context) | _allowed_applicant_tuples(context)
+    # Allocation Party Evidence Pre-Merge Amendment ("Multi-Application
+    # Party Intelligence") - unifies ownership/control tuples and applicant
+    # tuples (a DIFFERENT evidence source, Application.applicant_name_raw,
+    # never ControlRelationship) into ONE (name, role, scope) -> allowed
+    # Application references lookup. This is what makes "real applicant
+    # claimed as Developer without developer evidence" a rejection for
+    # free: the dict only ever has a (name, "Applicant", scope) key for
+    # that entity unless a SEPARATE, independent ControlRelationship-
+    # sourced tuple also grants it a stronger role - never inferred, never
+    # merged.
+    allowed_party_facts = _allowed_party_facts(context)
     # Defensive backstop, not merely prompt wording (Section 11's own
     # "do not solve this merely with prompt wording" principle, applied
     # here too): a real production generation attempt (observed directly
@@ -1100,8 +1191,20 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
         name, role, site_scope = item.get("name", ""), item.get("role", ""), item.get("site_scope", "")
         if name in non_ownership_known_names:
             continue
-        if (name, role, site_scope) not in allowed_entity_tuples:
+        key = (name, role, site_scope)
+        if key not in allowed_party_facts:
             problems.append(f"unsupported entity/role/scope claim: {name} / {role} / {site_scope}")
+            continue
+        # Multi-Application Party Intelligence, Section 8 - an OPTIONAL
+        # single-Application claim ("named as applicant on DC/078180") must
+        # genuinely belong to this entity/role/scope's own evidence; a
+        # general claim (application_reference == "") makes no such
+        # commitment and needs no further check.
+        application_reference = item.get("application_reference") or ""
+        if application_reference and application_reference not in allowed_party_facts[key]:
+            problems.append(
+                f"unsupported application reference for entity claim: {name} / {role} / {application_reference}"
+            )
 
     return len(problems) == 0, problems
 

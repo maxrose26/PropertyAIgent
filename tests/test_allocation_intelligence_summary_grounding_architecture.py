@@ -846,11 +846,19 @@ def _applicant_fixture(session, *, applicant_name_raw, site_review_status="auto_
 def test_applicant_reaches_allocation_intelligence_context(session):
     """A/B/H/I/J from the investigation - the raw, deterministic Application.
     applicant_name_raw genuinely reaches AllocationIntelligenceContext now,
-    via RepresentativeApplicationDetail.applicant_name."""
+    via context.applicant_evidence (aggregated across the Site's trusted
+    linked Applications, not scoped to RepresentativeApplicationDetail -
+    Multi-Application Party Intelligence)."""
     allocation = _applicant_fixture(session, applicant_name_raw="Bloor Homes North West")
     context = build_allocation_context(session, allocation)
-    rep = context.sites[0].representative_application
-    assert rep.applicant_name == "Bloor Homes North West"
+    assert len(context.applicant_evidence) == 1
+    evidence = context.applicant_evidence[0]
+    assert evidence.entity_name == "Bloor Homes North West"
+    assert evidence.application_references == ["APP/APPLICANT"]
+    # The representative Application itself carries no applicant field at
+    # all any more - capacity/status/decision stay its sole responsibility
+    # (Section 2).
+    assert not hasattr(context.sites[0].representative_application, "applicant_name")
 
 
 def test_applicant_placeholder_value_cleaned_to_none(session):
@@ -859,7 +867,137 @@ def test_applicant_placeholder_value_cleaned_to_none(session):
     Available", which must not be treated as a real applicant name."""
     allocation = _applicant_fixture(session, applicant_name_raw="Not Available")
     context = build_allocation_context(session, allocation)
-    assert context.sites[0].representative_application.applicant_name is None
+    assert context.applicant_evidence == []
+
+
+def test_non_representative_applicant_reaches_party_context(session):
+    """Section 1's own reported product weakness, directly reproduced:
+    Heald Green West's representative Application has a blank applicant,
+    but a DIFFERENT trusted linked Application on the SAME Site names
+    Bloor Homes North West - that evidence must now reach context even
+    though it is never the representative Application."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=750)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    # Representative (largest/most authoritative) Application - blank applicant.
+    _make_app(session, site.id, "DC/084620", units=124, status="Decided", decision="Granted",
+              application_category="reserved_matters", applicant_name_raw=None)
+    # A different, non-representative, trusted Application on the SAME Site.
+    _make_app(session, site.id, "DC/078180", status="Decided", decision="Granted",
+              application_category="reserved_matters", applicant_name_raw="Bloor Homes North West")
+    session.commit()
+
+    context = build_allocation_context(session, allocation)
+    assert context.sites[0].representative_application.reference == "DC/084620"
+    assert len(context.applicant_evidence) == 1
+    evidence = context.applicant_evidence[0]
+    assert evidence.entity_name == "Bloor Homes North West"
+    assert evidence.application_references == ["DC/078180"]
+
+
+def test_same_applicant_across_multiple_applications_deduplicates(session):
+    """Section 5 - Bloor Homes North West appearing on three Applications
+    for the same Site must be ONE entity with three supporting references,
+    not three unrelated entries."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    _make_app(session, site.id, "APP/1", units=100, applicant_name_raw="Bloor Homes North West")
+    _make_app(session, site.id, "APP/2", applicant_name_raw="Bloor Homes North West")
+    _make_app(session, site.id, "APP/3", applicant_name_raw="Bloor Homes North West")
+    session.commit()
+
+    context = build_allocation_context(session, allocation)
+    assert len(context.applicant_evidence) == 1
+    evidence = context.applicant_evidence[0]
+    assert evidence.entity_name == "Bloor Homes North West"
+    assert evidence.application_references == ["APP/1", "APP/2", "APP/3"]
+    assert evidence.application_count == 3
+
+
+def test_different_applicants_on_same_site_remain_separate(session):
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    _make_app(session, site.id, "APP/1", units=100, applicant_name_raw="Bloor Homes North West")
+    _make_app(session, site.id, "APP/2", applicant_name_raw="Persimmon Homes Ltd")
+    session.commit()
+
+    context = build_allocation_context(session, allocation)
+    names = {e.entity_name for e in context.applicant_evidence}
+    assert names == {"Bloor Homes North West", "Persimmon Homes Ltd"}
+    by_name = {e.entity_name: e.application_references for e in context.applicant_evidence}
+    assert by_name["Bloor Homes North West"] == ["APP/1"]
+    assert by_name["Persimmon Homes Ltd"] == ["APP/2"]
+
+
+def test_applicant_remains_applicant_regardless_of_frequency(session):
+    """Section 3 - appearing on 10 Applications is still only Applicant
+    evidence, never promoted by frequency alone."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    for i in range(10):
+        _make_app(session, site.id, f"APP/{i}", applicant_name_raw="Frequent Applicant Ltd")
+    session.commit()
+
+    context = build_allocation_context(session, allocation)
+    assert len(context.applicant_evidence) == 1
+    evidence = context.applicant_evidence[0]
+    assert evidence.application_count == 10
+    output = {
+        "headline": "x", "overview": "Frequent Applicant Ltd is named as applicant on 10 linked applications.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{
+            "name": "Frequent Applicant Ltd", "role": "Applicant", "site_scope": 'Site "Test Site"',
+            "application_reference": "",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+    # Promoting it to Developer, however many Applications it appears on, is still rejected.
+    promoted = dict(output)
+    promoted["referenced_entities"] = [{
+        "name": "Frequent Applicant Ltd", "role": "S106 Developer", "site_scope": 'Site "Test Site"',
+        "application_reference": "",
+    }]
+    is_valid, problems = validate_summary_output(context, promoted)
+    assert is_valid is False
+
+
+def test_specific_application_reference_claim_must_match_evidence(session):
+    """Section 8 - a self-report naming ONE specific supporting Application
+    for an applicant claim must genuinely be one of its own references."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Bloor Homes North West")
+    context = build_allocation_context(session, allocation)
+    good = {
+        "headline": "x", "overview": "Bloor Homes North West is named as applicant on APP/APPLICANT.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "APP/APPLICANT", "claimed_status": "", "claimed_decision": ""}],
+        "referenced_entities": [{
+            "name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Test Site"',
+            "application_reference": "APP/APPLICANT",
+        }],
+    }
+    is_valid, problems = validate_summary_output(context, good)
+    assert is_valid is True, problems
+
+    bad = dict(good)
+    bad["referenced_entities"] = [{
+        "name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Test Site"',
+        "application_reference": "APP/DOES-NOT-EXIST",
+    }]
+    is_valid, problems = validate_summary_output(context, bad)
+    assert is_valid is False
 
 
 def test_applicant_role_label_is_exactly_applicant(session):
