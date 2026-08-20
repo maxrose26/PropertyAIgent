@@ -33,19 +33,26 @@ Each capability section below gives its own internal suggested order too, since 
 
 ## 2. Policy Intelligence
 
-**Current maturity:** Mature for the councils it covers; narrow in national scope.
+**Current maturity:** Mature for the councils it covers; narrow in national scope. Its AI reasoning capability is expanding beyond plan-level summaries into allocation-level and (planned) delivery-level intelligence — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2 "Intelligence Hierarchy" for the full picture.
 
-**Implemented functionality:** `LocalPlan`/`LocalPlanSite` model with status, evidence and progression tracking; joint-plan support (Places for Everyone); allocation-to-allocation relationships; change-protected ingestion and monitoring; policy document coverage tracking; AI Local Plan Summary; visual evidence extraction and deterministic allocation matching. Bury and Stockport have their own Local Plans onboarded; all 9 Places for Everyone authorities have their PfE allocations onboarded.
+**Implemented functionality:** `LocalPlan`/`LocalPlanSite` model with status, evidence and progression tracking; joint-plan support (Places for Everyone); allocation-to-allocation relationships; change-protected ingestion and monitoring; policy document coverage tracking; AI Local Plan Summary; visual evidence extraction and deterministic allocation matching; `AllocationSiteRelationship` (Allocation↔Site trust boundary) and `ControlRelationship` (Site/Application-scoped ownership evidence). Bury and Stockport have their own Local Plans onboarded; all 9 Places for Everyone authorities have their PfE allocations onboarded.
 
-**Future functionality:** NPPF and national Planning Practice Guidance as a versioned policy layer; Supplementary Planning Documents and Design Codes as monitored document types; appeal decisions linked to the policy they tested; independent Local Plan monitoring for the 8 GM authorities currently known only through Places for Everyone (corrected from 7 by Pilot Readiness PR-2's PfE authority-membership fix — see `docs/PLATFORM_ARCHITECTURE.md` §2).
+**Built, not yet validated:** AI Allocation Intelligence Summary — implemented, tested, merged to master, production schema migrated. **Not deployed; zero real summaries generated.** This is the platform's **immediate priority** ahead of any of the future functionality below: a controlled, Product-Owner-reviewed four-allocation sample generation is the next gate, followed by wider rollout only on approval.
+
+**Future functionality:** NPPF and national Planning Practice Guidance as a versioned policy layer; Supplementary Planning Documents and Design Codes as monitored document types; appeal decisions linked to the policy they tested; independent Local Plan monitoring for the 8 GM authorities currently known only through Places for Everyone (corrected from 7 by Pilot Readiness PR-2's PfE authority-membership fix — see `docs/PLATFORM_ARCHITECTURE.md` §2); **Local Plan Delivery Intelligence** (Intelligence Hierarchy Level 4 — aggregate Application→Site→Allocation evidence to Local Plan/Council level; see `PLATFORM_ARCHITECTURE.md` §2 for the full deterministic-metrics list); **Housing Supply Pressure Intelligence** (a later enhancement combining Delivery Intelligence with AMR/housing-trajectory/five-year-supply evidence, not an immediate requirement).
 
 **Dependencies:** Planning Intelligence's Site records, for the eventual Allocation↔Site match (not a hard blocker — an allocation is real evidence on its own).
 
 **Suggested implementation order:**
-1. Independent Local Plan monitoring for the remaining 8 Greater Manchester authorities — closes the biggest known coverage gap using patterns that already exist (Bury/Stockport are the proof of concept).
-2. Supplementary Planning Documents and Design Codes — natural extension of the existing document-coverage/monitoring machinery.
-3. NPPF / national PPG as a versioned reference layer — needed before AI Decision Support can honestly cite national policy, not just local policy.
-4. Appeal decisions.
+1. **Validate AI Allocation Intelligence Summary** — the controlled four-allocation sample generation and Product Owner review. Nothing below this line starts before this gate is passed; this is a phasing rule, not a suggestion.
+2. Local Plan Delivery Intelligence — the logical next intelligence layer once Allocation Intelligence is validated, reusing the same evidence-grounded AI architecture at Council/Local Plan aggregate level.
+3. Independent Local Plan monitoring for the remaining 8 Greater Manchester authorities — closes the biggest known coverage gap using patterns that already exist (Bury/Stockport are the proof of concept).
+4. Supplementary Planning Documents and Design Codes — natural extension of the existing document-coverage/monitoring machinery.
+5. NPPF / national PPG as a versioned reference layer — needed before AI Decision Support can honestly cite national policy, not just local policy.
+6. Appeal decisions.
+7. Housing Supply Pressure Intelligence — sits after Local Plan Delivery Intelligence, as a supporting later capability, not a precondition for it.
+
+Opportunity Intelligence (Intelligence Hierarchy Level 5, `PLATFORM_ARCHITECTURE.md` §2) is the strategic destination this sequence is building toward — it is not scheduled work, and nothing in this section is permission to start building it now.
 
 ---
 
@@ -95,7 +102,7 @@ This is the platform's **next major build** after closing the remaining Policy I
 
 **Future functionality:** Planning assessments and planning balance; planning strategy, planning statements and supporting statements; executive reports; Call for Sites submissions; site promotion documents; pursue/don't-pursue recommendations.
 
-**Dependencies:** Planning Intelligence, Policy Intelligence, Market Intelligence and Development Economics, in that order. Every output here must cite evidence the layers beneath it already established.
+**Dependencies:** Planning Intelligence, Policy Intelligence, Market Intelligence and Development Economics, in that order. Every output here must cite evidence the layers beneath it already established. Note: "Opportunity Intelligence" (Intelligence Hierarchy Level 5, `PLATFORM_ARCHITECTURE.md` §2 — the strategic destination Policy Intelligence's allocation/delivery evidence is eventually building toward) is not a shortcut into this capability; the full pursue/don't-pursue and investment-recommendation outputs below still require Market Intelligence and Development Economics, unchanged.
 
 **Suggested implementation order:**
 1. Planning assessment / planning balance narrative — needs only Planning + Policy Intelligence, so it can start before Market Intelligence/Development Economics are complete, as long as it's scoped to planning judgement only (not viability).

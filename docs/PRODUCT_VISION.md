@@ -16,6 +16,26 @@ Today, understanding a single development opportunity means separately searching
 
 The long-term ambition is for a user to open a Site and immediately understand everything relevant about that opportunity: what's happening on it, what planning policy says about it, what it's worth, whether it's commercially viable, and what a professional planning judgement on it would be — each claim traceable back to the evidence it came from.
 
+## AI-Intelligence-First, Evidence-Grounded
+
+PropertyAIgent is an **AI-intelligence-first, evidence-grounded platform**. This is a deliberate, explicit product principle, not an implementation detail.
+
+The deterministic/structured layer — extraction, matching, relationship-building, capacity/coverage calculation, review workflows, source preservation — is essential infrastructure. It is not, on its own, the intended customer experience. Its job is to build a reliable factual foundation the AI can reason across; the customer should not normally need to scan a page of deterministic fields and assemble the conclusion themselves. The AI layer's job is to turn that foundation into concise, commercially useful intelligence.
+
+The intended presentation hierarchy, wherever an AI-narrated summary exists for an object, is:
+
+```
+AI INTELLIGENCE                  (what this means, at a glance)
+        ↓
+KEY DETERMINISTIC METRICS        (the numbers the AI's narrative is grounded in)
+        ↓
+SUPPORTING DETAIL                (everything else the platform holds)
+        ↓
+SOURCE EVIDENCE / AUDIT TRAIL    (the original document, page and method)
+```
+
+This does not relax the evidence-grounding safety principle above — a synthesised summary is only trustworthy because the deterministic layer beneath it is trustworthy. It does mean the AI is expected to *reason*, not merely *relay*: synthesising multiple facts, identifying material patterns, distinguishing settled fact from open uncertainty, and pointing at what's worth investigating next — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for how this is implemented today in the Policy Intelligence layer.
+
 ## Target Users
 
 - **Developers** — assessing whether a specific opportunity is worth pursuing and what it would take to bring it forward.
@@ -103,5 +123,23 @@ This is the single most important constraint on how PropertyAIgent is built, and
 Every fact in the platform is produced deterministically wherever a deterministic method exists — extraction, matching, classification, status derivation. AI is reserved for the narrow set of tasks that genuinely require judgement or synthesis: summarising already-verified evidence into prose, classifying an already-rendered image, or (in the future) explaining what a body of already-gathered evidence means for a planning or investment decision. AI is never the source of a *fact* — a policy reference, a unit count, a housing requirement figure — only of an *interpretation* built on top of facts a human can trace back to their source.
 
 This is why review status, source provenance, and confidence are first-class citizens throughout the platform rather than an afterthought: a user should always be able to ask "why does the platform believe this?" and get a real, evidenced answer, all the way from the AI Decision Support layer back down to the original document and page it came from.
+
+### What "grounded" means, and what it does not mean
+
+This principle governs *where facts come from*, not *how much freedom the AI has to reason once it has them*. A future implementation should not read "AI explains evidence, it does not invent conclusions" as license to reduce the AI to a sentence-template engine. Concretely:
+
+**Grounded means:**
+- deterministic systems establish every material factual input — a capacity figure, a planning status, a decision, a relationship, a role — before the AI ever sees it;
+- the AI receives that trusted evidence as its bounded context, never raw source documents or unverified general knowledge;
+- the AI's output is validated after generation so a material factual claim (a number, an organisation, a reference, a role) that doesn't trace back to the evidence it was given is rejected, not published;
+- source evidence and the reasoning that produced it stay auditable back to the original document, page and extraction method.
+
+**Grounded does not mean:**
+- that every sentence the AI writes must be assembled from a fixed template or a pre-written allow-list of phrases;
+- that the AI may only restate conclusions a deterministic system has already reached in words, rather than synthesising and interpreting them;
+- that pattern recognition, explanation of commercial significance, and "what to investigate next" are out of bounds — these are exactly the judgement-requiring tasks AI exists for in this platform;
+- that the deterministic layer *is* the product. It is the trustworthy foundation the product is built on — the customer-facing intelligence PropertyAIgent exists to deliver is the AI's synthesis of that foundation, not a requirement to scan the foundation manually. See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for how this plays out in the Policy Intelligence layer's Allocation Intelligence and Local Plan Delivery Intelligence capabilities.
+
+An implementation that satisfies "grounded" by allow-listing individual tokens or forcing the AI into fixed sentence shapes has satisfied the letter of this principle while defeating its purpose. The bar is: every *material factual claim* is traceable to evidence — not that every *word* was chosen deterministically.
 
 Full elaboration of this and every other governing principle is in [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md).
