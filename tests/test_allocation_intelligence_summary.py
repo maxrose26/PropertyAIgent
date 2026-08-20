@@ -140,17 +140,30 @@ _GOOD_OUTPUT_TEMPLATE = {
     "key_points": ["Identified planning activity exists.", "Ownership evidence has been identified for one Site."],
     "key_uncertainties": [],
     "investigation_priorities": [],
-    "referenced_application_references": [],
-    "referenced_entity_names": [],
-    "referenced_roles": [],
+    "referenced_applications": [],
+    "referenced_entities": [],
 }
 
 
 def _good_output(context: AllocationIntelligenceContext) -> dict:
+    """A grounded fake model response for `context` - self-reports every
+    trusted reference/entity, PAIRED with its own trusted status/decision/
+    role/site_scope exactly as build_summary_prompt would show it (see
+    _ownership_scope_label), matching the new (Evidence-Grounded
+    Validation Architecture Amendment) structured self-report shape."""
+    from app.reporting.allocation_intelligence_summary import _ownership_scope_label
+
     output = dict(_GOOD_OUTPUT_TEMPLATE)
-    output["referenced_application_references"] = [ref for s in context.sites for ref in s.application_references]
-    output["referenced_entity_names"] = [o.entity_name_raw for o in context.ownership_entities]
-    output["referenced_roles"] = [o.role_label for o in context.ownership_entities]
+    output["referenced_applications"] = [
+        {"reference": s.representative_application.reference,
+         "claimed_status": s.representative_application.status or "",
+         "claimed_decision": s.representative_application.decision or ""}
+        for s in context.sites if s.representative_application
+    ]
+    output["referenced_entities"] = [
+        {"name": o.entity_name_raw, "role": o.role_label, "site_scope": _ownership_scope_label(o)}
+        for o in context.ownership_entities
+    ]
     return output
 
 
@@ -522,20 +535,24 @@ def test_hallucinated_organisation_rejected(session):
     allocation = _ownership_fixture(session, role="DEVELOPER", evidence_category="S106_DEFINED_DEVELOPER")
     context = build_allocation_context(session, allocation)
     output = _good_output(context)
-    output["referenced_entity_names"] = output["referenced_entity_names"] + ["Completely Invented Organisation Ltd"]
+    output["referenced_entities"] = output["referenced_entities"] + [
+        {"name": "Completely Invented Organisation Ltd", "role": "S106 Developer", "site_scope": "Site \"Test Site\""}
+    ]
     is_valid, problems = validate_summary_output(context, output)
     assert is_valid is False
-    assert any("entity names" in p for p in problems)
+    assert any("entity/role/scope" in p for p in problems)
 
 
 def test_hallucinated_application_reference_rejected(session):
     allocation = _ownership_fixture(session, role="DEVELOPER", evidence_category="S106_DEFINED_DEVELOPER")
     context = build_allocation_context(session, allocation)
     output = _good_output(context)
-    output["referenced_application_references"] = output["referenced_application_references"] + ["FAKE/999999/99"]
+    output["referenced_applications"] = output["referenced_applications"] + [
+        {"reference": "FAKE/999999/99", "claimed_status": "", "claimed_decision": ""}
+    ]
     is_valid, problems = validate_summary_output(context, output)
     assert is_valid is False
-    assert any("application references" in p for p in problems)
+    assert any("application reference" in p for p in problems)
 
 
 def test_invalid_capacity_number_rejected(session):

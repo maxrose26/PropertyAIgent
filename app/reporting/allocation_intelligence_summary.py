@@ -94,7 +94,18 @@ MODEL = "gpt-4o-mini"
 # different, more restrictive sentence). No production summary has ever
 # been generated under v1 or v2 (0 rows exist), so this bump again has no
 # practical effect today.
-PROMPT_VERSION = "allocation-intelligence-summary-v3"
+#
+# v4 (Evidence-Grounded Validation Architecture Amendment) - the model is
+# now explicitly told it may use ordinary connective language/synthesis
+# freely (previously implied, now explicit); SUMMARY_SCHEMA's three flat
+# referenced_application_references/referenced_entity_names/referenced_
+# roles fields were replaced with two structured, PAIRED self-reports
+# (referenced_applications: reference+claimed_status+claimed_decision;
+# referenced_entities: name+role+site_scope) - see validate_summary_
+# output's own docstring. No production summary has ever been generated
+# under any prior version (0 rows exist), so this bump again has no
+# practical effect today.
+PROMPT_VERSION = "allocation-intelligence-summary-v4"
 
 
 # --- Context object (Section 4) ---------------------------------------------
@@ -578,8 +589,19 @@ def _render_site_line(s: SiteContextEntry) -> str:
     return "\n".join(lines)
 
 
+def _ownership_scope_label(o: OwnershipContextEntry) -> str:
+    """The single canonical string naming WHERE an ownership/control fact
+    applies - shared verbatim between the rendered prompt line (below) and
+    validate_summary_output's grounding check (Evidence-Grounded Validation
+    Architecture Amendment, Section 11 "site-scope grounding") - the model
+    is asked to self-report this exact string back for each entity it
+    names, so a claim naming the wrong scope (or the allocation as a
+    whole) simply cannot match any allowed (entity, role, scope) tuple."""
+    return "the allocation's residual (unaccounted-for) capacity" if o.is_residual else f'Site "{o.site_label}"'
+
+
 def _render_ownership_line(o: OwnershipContextEntry) -> str:
-    scope = "the allocation's residual (unaccounted-for) capacity" if o.is_residual else f'Site "{o.site_label}"'
+    scope = _ownership_scope_label(o)
     apps_bit = f" (evidenced via {', '.join(o.application_references)})" if o.application_references else ""
     return f"- For {scope}: {o.entity_name_raw} - role: {o.role_label}{apps_bit}."
 
@@ -594,9 +616,19 @@ def build_summary_prompt(context: AllocationIntelligenceContext) -> str:
 You are writing a concise internal briefing on ONE UK Local Plan housing
 allocation, for a housebuilder/land buyer/developer/land promoter/development
 consultant, using ONLY the verified PropertyAIgent evidence given below.
-Every fact below has already been extracted and validated by this platform -
-restate and synthesise it, never invent a fact, figure, Application
-reference, or organisation name that isn't given here.
+Every fact below has already been extracted and validated by this platform.
+
+Your job is genuine synthesis, not a copy-paste exercise: prioritise what
+matters, connect related facts, explain what they mean commercially, and
+distinguish settled fact from open uncertainty. Ordinary connective language,
+your own phrasing, and reasonable interpretation of the evidence are all
+expected and welcome - you are not restricted to a fixed vocabulary or
+sentence shape. The one hard boundary is MATERIAL FACTUAL CLAIMS - a number,
+an Application reference, an organisation name, a role, a planning status or
+decision - which must always be the exact facts given below, never invented,
+altered, or recomputed. You may write "DC/084620 was granted" as ordinary
+prose; you may not write about an Application, capacity, or entity that
+isn't listed below.
 
 ALLOCATION: {context.allocation_name} ({context.allocation_reference or 'no policy reference stated'})
 COUNCIL: {context.council_name}
@@ -623,31 +655,35 @@ OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact 
 {"- No ownership/control evidence currently identified for the allocation's residual (unaccounted-for) capacity - you may state this plainly, it is commercially useful information." if not context.residual_ownership_known and context.indicative_residual_capacity else ""}
 
 RULES - follow every one of these exactly:
-1. Never invent a number, Application reference, organisation name, or role not given above.
-2. Never perform arithmetic yourself - every capacity/coverage figure you might want is already given above; never derive a new one.
-3. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant evidence") - never upgrade, downgrade, or relabel a role (an applicant is never a developer; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it).
-4. A Site relationship or ownership/control relationship marked as pending confirmation/review must be described as uncertain, never as a settled or confirmed fact - do not name any entity or role that was excluded above as "still under review".
-5. Do NOT mention any other Local Plan allocation, policy reference, or nearby/adjoining site by name or code under any circumstances, even if you think one might be nearby - this platform does not currently hold trusted adjacency evidence.
-6. Never describe this allocation as adopted unless the PLANNING STATUS line above literally says ADOPTED.
-7. Ownership/control evidence is always scoped to the specific Site or residual-capacity context it is given for above - never generalise it to "the allocation" as a whole.
-8. key_uncertainties should name the specific pending-review counts, unknown capacity, or missing ownership evidence above that limit confidence - be specific, not generic.
-9. investigation_priorities must each be directly traceable to a fact given above (e.g. investigate the residual capacity, investigate a pending relationship) - never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
-10. referenced_application_references, referenced_entity_names, and referenced_roles must each list EVERY Application reference / organisation name / role label you used anywhere in headline, overview, key_points, key_uncertainties, or investigation_priorities - used for automatic fact-checking, so be complete and exact.
-11. PLANNING ACTIVITY is never the same thing as PLANNING OUTCOME. A Site having a linked Application (live, registered, or under consultation) demonstrates planning activity - it does NOT by itself mean planning permission exists, and it never means the development is consented, under construction, delivered, implemented, or completed. State the Application's actual status/decision (given above) rather than assuming one from the fact that an Application merely exists.
-12. Only describe an Application as having planning permission/consent if its stated decision above literally says so (e.g. "Granted"). A refused or withdrawn Application remains real, relevant planning history - describe it accurately as refused/withdrawn, never as ongoing or successful.
-13. Never describe an Application, or the allocation, as under construction, built, delivered, or completed - PropertyAIgent does not hold construction/delivery evidence; a granted planning permission is still only a planning permission.
-14. Never infer an Application's status or decision from the identified/residual capacity figures or the development coverage percentage above - those are pure capacity arithmetic and carry no planning-outcome information on their own. If a large share of an allocation's capacity is "identified" via an Application that is still pending/under consultation, say so explicitly - do not let the size of the figure imply the application has been decided.
-15. If a Site's further Applications are given only as a category count (never individually narrated), do not enumerate or speculate about them - one sentence acknowledging the volume (e.g. "a further N applications relate to this Site, mostly condition-discharge/technical filings") is enough; never produce anything resembling a list of every Application.
+1. Never invent a number, Application reference, organisation name, planning status, decision, or role not given above, and never recompute a capacity/coverage figure - every one you might want is already given above.
+2. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant evidence") - never upgrade, downgrade, or relabel a role (an applicant is never a developer; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it).
+3. A Site relationship or ownership/control relationship marked as pending confirmation/review must be described as uncertain, never as a settled or confirmed fact - do not name any entity or role that was excluded above as "still under review".
+4. Do NOT mention any other Local Plan allocation, policy reference, or nearby/adjoining site by name or code under any circumstances, even if you think one might be nearby - this platform does not currently hold trusted adjacency evidence.
+5. Never describe this allocation as adopted unless the PLANNING STATUS line above literally says ADOPTED.
+6. Ownership/control evidence is always scoped to the specific Site or residual-capacity context it is given for above - never generalise it to "the allocation" as a whole; when you name an entity, the SCOPE you describe it in (which Site, or the residual capacity) must match exactly what is given above for that entity.
+7. key_uncertainties should name the specific pending-review counts, unknown capacity, or missing ownership evidence above that limit confidence - be specific, not generic.
+8. investigation_priorities must each be directly traceable to a fact given above (e.g. investigate the residual capacity, investigate a pending relationship) - never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
+9. PLANNING ACTIVITY is never the same thing as PLANNING OUTCOME. A Site having a linked Application (live, registered, or under consultation) demonstrates planning activity - it does NOT by itself mean planning permission exists, and it never means the development is consented, under construction, delivered, implemented, or completed. State the Application's actual status/decision (given above) rather than assuming one from the fact that an Application merely exists.
+10. Only describe an Application as having planning permission/consent if its stated decision above literally says so (e.g. "Granted"). A refused or withdrawn Application remains real, relevant planning history - describe it accurately as refused/withdrawn, never as ongoing or successful.
+11. Never describe an Application, or the allocation, as under construction, built, delivered, or completed - PropertyAIgent does not hold construction/delivery evidence; a granted planning permission is still only a planning permission.
+12. Never infer an Application's status or decision from the identified/residual capacity figures or the development coverage percentage above - those are pure capacity arithmetic and carry no planning-outcome information on their own. If a large share of an allocation's capacity is "identified" via an Application that is still pending/under consultation, say so explicitly - do not let the size of the figure imply the application has been decided.
+13. If a Site's further Applications are given only as a category count (never individually narrated), do not enumerate or speculate about them - one sentence acknowledging the volume (e.g. "a further N applications relate to this Site, mostly condition-discharge/technical filings") is enough; never produce anything resembling a list of every Application.
+14. referenced_applications and referenced_entities (described below) are your own structured self-report of every material claim you made anywhere in headline/overview/key_points/key_uncertainties/investigation_priorities - used for automatic fact-checking. This is bookkeeping, not composition - it does not constrain how you write the prose above. referenced_entities covers ONLY organisations from the OWNERSHIP/CONTROL EVIDENCE section above (owners, developers, mortgagees, applicants, etc.) - it does NOT include the council name, the Local Plan name, or any other proper noun that appears elsewhere in this brief; those are not ownership/control claims and do not need self-reporting.
 
 Write:
 - headline: one short sentence (under 15 words) capturing the allocation's overall commercial position.
-- overview: 2-3 short paragraphs, plain prose, no markdown headers, covering: what this allocation is and its planning status/scale; what planning activity has been identified, its actual status/decision, and how much capacity is accounted for versus indicative residual capacity (distinguishing identified activity from a determined planning outcome per Rules 11-14); what ownership/control evidence exists and for which Site(s); material uncertainties.
+- overview: 2-3 short paragraphs, plain prose, no markdown headers, covering: what this allocation is and its planning status/scale; what planning activity has been identified, its actual status/decision, and how much capacity is accounted for versus indicative residual capacity (distinguishing identified activity from a determined planning outcome per Rules 9-12); what ownership/control evidence exists and for which Site(s); material uncertainties.
 - key_points: 3-5 concise bullet-style facts (each a short sentence).
 - key_uncertainties: 0-4 concise items (empty list if genuinely none).
 - investigation_priorities: 0-3 concise items (empty list if genuinely none).
-- referenced_application_references: every Application reference used above, exactly as given.
-- referenced_entity_names: every organisation/entity name used above, exactly as given.
-- referenced_roles: every role label used above, exactly as given.
+- referenced_applications: one entry for every Application reference you named anywhere above, each with:
+  - reference: the Application reference, exactly as given.
+  - claimed_status: if you stated its planning status anywhere above, the EXACT status value as given above for that Application; otherwise "".
+  - claimed_decision: if you stated its decision anywhere above, the EXACT decision value as given above for that Application; otherwise "".
+- referenced_entities: one entry for every OWNERSHIP/CONTROL organisation you named anywhere above (never the council or Local Plan name), each with:
+  - name: the entity name, exactly as given.
+  - role: its role label, exactly as given (e.g. "S106 Developer", "Planning ownership declaration").
+  - site_scope: exactly the scope text given above for that entity (e.g. Site "Land At Wilmslow Road Heald Green Stockport", or "the allocation's residual (unaccounted-for) capacity") - never "the allocation" as a whole.
 """
 
 
@@ -661,13 +697,47 @@ SUMMARY_SCHEMA = {
             "key_points": {"type": "array", "items": {"type": "string"}},
             "key_uncertainties": {"type": "array", "items": {"type": "string"}},
             "investigation_priorities": {"type": "array", "items": {"type": "string"}},
-            "referenced_application_references": {"type": "array", "items": {"type": "string"}},
-            "referenced_entity_names": {"type": "array", "items": {"type": "string"}},
-            "referenced_roles": {"type": "array", "items": {"type": "string"}},
+            # Evidence-Grounded Validation Architecture Amendment - replaces
+            # the three flat, independently-validated string lists this
+            # schema previously had (referenced_application_references/
+            # referenced_entity_names/referenced_roles) with two structured,
+            # PAIRED self-reports. A flat list could accidentally validate
+            # an entity and a role that both independently exist in context
+            # but are paired together WRONGLY (e.g. an Applicant reported
+            # alongside a Developer role that belongs to a different
+            # entity); pairing reference+status+decision and name+role+
+            # site_scope together closes that gap - see validate_summary_
+            # output's own docstring.
+            "referenced_applications": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "reference": {"type": "string"},
+                        "claimed_status": {"type": "string"},
+                        "claimed_decision": {"type": "string"},
+                    },
+                    "required": ["reference", "claimed_status", "claimed_decision"],
+                    "additionalProperties": False,
+                },
+            },
+            "referenced_entities": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "role": {"type": "string"},
+                        "site_scope": {"type": "string"},
+                    },
+                    "required": ["name", "role", "site_scope"],
+                    "additionalProperties": False,
+                },
+            },
         },
         "required": [
             "headline", "overview", "key_points", "key_uncertainties", "investigation_priorities",
-            "referenced_application_references", "referenced_entity_names", "referenced_roles",
+            "referenced_applications", "referenced_entities",
         ],
         "additionalProperties": False,
     },
@@ -682,6 +752,17 @@ SUMMARY_SCHEMA = {
 # Site" would otherwise fail every summary on harmless boilerplate that
 # isn't really a claimed figure).
 _NUMBER_PATTERN = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+# Every role label in the platform's fixed vocabulary that itself
+# contains a digit (see app.reporting.ownership_control._ROLE_LABEL_BY_
+# EVIDENCE_CATEGORY) - masked before number extraction REGARDLESS of
+# whether THIS allocation has any accepted ownership evidence at all,
+# since the prompt's own RULES text teaches the model these exact
+# strings verbatim (rule 2's own example list). "no S106 Developer
+# evidence has been identified" is legitimate, fully grounded prose even
+# when context.ownership_entities is empty - the digits in "S106" are not
+# an independent numeric claim either way.
+_DIGIT_BEARING_ROLE_LABELS = {"S106 Owner", "S106 Developer", "S106 Mortgagee"}
 
 
 def _numbers_in(text: str) -> set[str]:
@@ -710,6 +791,19 @@ def _allowed_numbers(context: AllocationIntelligenceContext) -> set[str]:
     _add(context.ownership_review_pending_count)
     for s in context.sites:
         _add(s.capacity)
+        if s.representative_application:
+            # Evidence-Grounded Validation Architecture Amendment - a
+            # decision date (e.g. "Thu 11 Jan 2024") is a genuine, trusted
+            # fact the model may legitimately narrate ("granted on 11 Jan
+            # 2024") - its digits must be allowed, not just its reference/
+            # status/decision. Confirmed root-caused: "2024" was observed
+            # rejected during controlled sample review precisely because
+            # this line did not exist.
+            _add(s.representative_application.decision_issued_date)
+        for count in s.other_applications_by_category.values():
+            _add(count)
+        if s.other_applications_by_category:
+            _add(sum(s.other_applications_by_category.values()))
     return allowed
 
 
@@ -726,22 +820,82 @@ def _allowed_entity_names(context: AllocationIntelligenceContext) -> set[str]:
     return {o.entity_name_raw for o in context.ownership_entities}
 
 
-def _allowed_roles(context: AllocationIntelligenceContext) -> set[str]:
-    return {o.role_label for o in context.ownership_entities}
+def _representative_applications_by_reference(context: AllocationIntelligenceContext) -> dict[str, RepresentativeApplicationDetail]:
+    """Only a Site's OWN representative Application carries a status/
+    decision fact in context at all (RepresentativeApplicationDetail) - a
+    reference appearing only in application_references/other_applications_
+    by_category (a secondary, non-representative filing) has no per-
+    reference status/decision available to ground a claim against, so a
+    claimed_status/claimed_decision for one of those must be rejected, not
+    silently accepted because the bare reference happens to be trusted."""
+    return {s.representative_application.reference: s.representative_application for s in context.sites if s.representative_application}
+
+
+def _allowed_entity_role_scope(context: AllocationIntelligenceContext) -> set[tuple[str, str, str]]:
+    """(entity name, role label, scope) triples - the exact combination
+    the prompt shows for each piece of ownership/control evidence (see
+    _render_ownership_line/_ownership_scope_label, the SAME function that
+    renders the scope string the model is asked to self-report verbatim).
+    Validating the TRIPLE together, not three independent sets, is what
+    stops an entity that IS genuinely in context from being paired with a
+    role or scope that belongs to a DIFFERENT entity/Site (Section 10/11 -
+    "Applicant promoted to Developer", "Site-level entity widened to the
+    whole allocation")."""
+    return {(o.entity_name_raw, o.role_label, _ownership_scope_label(o)) for o in context.ownership_entities}
+
+
+def _mask_known_strings(text: str, known_strings: set[str]) -> str:
+    """Removes every occurrence of an already-grounded string (a trusted
+    Application reference or organisation name) from `text` before number
+    extraction. Evidence-Grounded Validation Architecture Amendment - root
+    cause of the "084620"/"2024"/"0749" false rejections observed during
+    controlled sample review: the bare number-extraction regex below has
+    no concept of "these digits are part of a token I already validated
+    as ONE grounded identifier" - "DC/084620" contains the digit-run
+    "084620", which is not itself an independent capacity/count claim.
+    Masking the whole known string out first (longest-first, so a
+    reference that happens to be a substring of a longer one is never
+    partially masked) means its internal digits are never independently
+    extracted and checked - while an INVENTED reference (not in
+    known_strings) is left untouched and its digits are still correctly
+    flagged as unsupported, so this fixes the false positive without
+    weakening protection against a genuinely fabricated reference."""
+    for s in sorted((k for k in known_strings if k), key=len, reverse=True):
+        text = text.replace(s, " ")
+    return text
 
 
 def validate_summary_output(context: AllocationIntelligenceContext, structured_output: dict) -> tuple[bool, list[str]]:
-    """Deterministic post-generation check (Section 22) - rejects an output
-    whose claims cannot be traced back to the context it was given. Prefers
-    the model's own structured self-report (referenced_application_
-    references/referenced_entity_names/referenced_roles) over free-text
-    NLP extraction for entity/reference/role grounding - Section 22's own
-    closing instruction ("prefer structured generation that makes this
-    validation straightforward"); numeric grounding still scans the free
-    text directly, mirroring app.reporting.local_plan_summary's own proven
-    approach. Returns (is_valid, problems) - a non-empty problems list means
-    the output must be rejected, never persisted."""
+    """Deterministic post-generation check - rejects an output whose
+    MATERIAL FACTUAL CLAIMS cannot be traced back to the context it was
+    given. This validates claims, not prose tokens: ordinary connective
+    language and the model's own phrasing are never checked against an
+    allow-list at all (see the numeric-masking step below and the fact
+    that referenced_applications/referenced_entities are the model's own
+    structured self-report of what it claimed, not a free-text scan of
+    the narrative fields for reference/entity/role-shaped substrings).
+
+    Prefers the model's own structured self-report (referenced_
+    applications/referenced_entities, each a PAIRED claim - reference+
+    status+decision, name+role+site_scope - not three independent flat
+    lists) over free-text NLP extraction for reference/entity/role/scope
+    grounding; numeric grounding still scans the free text directly
+    (mirroring app.reporting.local_plan_summary's own proven approach),
+    but with known reference/entity strings masked out first so their
+    internal digits are never treated as independent numeric claims.
+    Returns (is_valid, problems) - a non-empty problems list means the
+    output must be rejected, never persisted."""
     problems: list[str] = []
+
+    allowed_refs = _allowed_application_references(context)
+    allowed_entity_names = _allowed_entity_names(context)
+    # Role labels ("S106 Owner", "S106 Developer", "S106 Mortgagee") also
+    # contain digits ("106") that must not be independently extracted as
+    # numeric claims - the exact same class of false positive as an
+    # Application reference's own digits, found and fixed together with
+    # that bug during this amendment's own test development.
+    allowed_role_labels = {o.role_label for o in context.ownership_entities}
+    known_strings = allowed_refs | allowed_entity_names | allowed_role_labels | _DIGIT_BEARING_ROLE_LABELS
 
     allowed_numbers = _allowed_numbers(context)
     all_text = " ".join([
@@ -749,25 +903,44 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
         *structured_output.get("key_points", []), *structured_output.get("key_uncertainties", []),
         *structured_output.get("investigation_priorities", []),
     ])
-    found_numbers = _numbers_in(all_text)
+    masked_text = _mask_known_strings(all_text, known_strings)
+    found_numbers = _numbers_in(masked_text)
     unsupported_numbers = sorted(n for n in found_numbers if len(n.lstrip("0")) >= 2 and n not in allowed_numbers)
     if unsupported_numbers:
         problems.append(f"unsupported numbers: {', '.join(unsupported_numbers)}")
 
-    allowed_refs = _allowed_application_references(context)
-    unsupported_refs = sorted(set(structured_output.get("referenced_application_references", [])) - allowed_refs)
-    if unsupported_refs:
-        problems.append(f"unsupported application references: {', '.join(unsupported_refs)}")
+    representative_by_reference = _representative_applications_by_reference(context)
+    for item in structured_output.get("referenced_applications", []):
+        ref = item.get("reference", "")
+        if ref not in allowed_refs:
+            problems.append(f"unsupported application reference: {ref}")
+            continue
+        rep = representative_by_reference.get(ref)
+        claimed_status = item.get("claimed_status") or ""
+        claimed_decision = item.get("claimed_decision") or ""
+        if claimed_status and (rep is None or claimed_status != (rep.status or "")):
+            problems.append(f"unsupported status claim for {ref}: {claimed_status}")
+        if claimed_decision and (rep is None or claimed_decision != (rep.decision or "")):
+            problems.append(f"unsupported decision claim for {ref}: {claimed_decision}")
 
-    allowed_entities = _allowed_entity_names(context)
-    unsupported_entities = sorted(set(structured_output.get("referenced_entity_names", [])) - allowed_entities)
-    if unsupported_entities:
-        problems.append(f"unsupported entity names: {', '.join(unsupported_entities)}")
-
-    allowed_roles = _allowed_roles(context)
-    unsupported_roles = sorted(set(structured_output.get("referenced_roles", [])) - allowed_roles)
-    if unsupported_roles:
-        problems.append(f"unsupported roles: {', '.join(unsupported_roles)}")
+    allowed_entity_tuples = _allowed_entity_role_scope(context)
+    # Defensive backstop, not merely prompt wording (Section 11's own
+    # "do not solve this merely with prompt wording" principle, applied
+    # here too): a real production generation attempt (observed directly
+    # during this amendment's own investigation) self-reported the COUNCIL
+    # NAME and LOCAL PLAN NAME as "entities" - both are true, already-
+    # given facts, just mis-bucketed into the wrong self-report field, not
+    # a hallucination. Skip (never reject) an entry whose name exactly
+    # matches one of those - the prompt's own RULE 14 now also tells the
+    # model not to self-report them at all, but this is the structural
+    # safety net if it does anyway.
+    non_ownership_known_names = {n for n in (context.council_name, context.local_plan_name) if n}
+    for item in structured_output.get("referenced_entities", []):
+        name, role, site_scope = item.get("name", ""), item.get("role", ""), item.get("site_scope", "")
+        if name in non_ownership_known_names:
+            continue
+        if (name, role, site_scope) not in allowed_entity_tuples:
+            problems.append(f"unsupported entity/role/scope claim: {name} / {role} / {site_scope}")
 
     return len(problems) == 0, problems
 
