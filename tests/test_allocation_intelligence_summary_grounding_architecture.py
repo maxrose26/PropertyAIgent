@@ -20,12 +20,14 @@ a model response, matching the established pattern from
 tests/test_allocation_intelligence_summary.py."""
 from __future__ import annotations
 
+from sqlalchemy import select
+
 from app.db.models import (
     AllocationSiteRelationship, Application, Council, ControlRelationship, LocalPlan, LocalPlanSite,
     SchemeIntelligence, Site,
 )
 from app.reporting.allocation_intelligence_summary import (
-    build_allocation_context, build_summary_prompt, generate_allocation_intelligence_summary,
+    build_allocation_context, build_summary_prompt, compute_context_fingerprint, generate_allocation_intelligence_summary,
     get_allocation_summary, validate_summary_output,
 )
 
@@ -70,9 +72,10 @@ def _make_relationship(session, *, allocation_id, site_id, review_status="auto_a
 
 
 def _make_app(session, site_id, reference, *, units=None, status=None, decision=None, decision_issued_date=None,
-              application_category=None, complete=True, council_code="testcouncil") -> Application:
+              application_category=None, complete=True, council_code="testcouncil", applicant_name_raw=None) -> Application:
     app = Application(council_code=council_code, reference=reference, site_id=site_id, status=status, decision=decision,
-                       decision_issued_date=decision_issued_date, application_category=application_category)
+                       decision_issued_date=decision_issued_date, application_category=application_category,
+                       applicant_name_raw=applicant_name_raw)
     session.add(app)
     session.commit()
     if units is not None:
@@ -821,3 +824,295 @@ def test_prompt_describes_paired_self_report_structure(session):
     assert "referenced_entities" in prompt
     assert "claimed_status" in prompt
     assert "site_scope" in prompt
+
+
+# ---------------------------------------------------------------------------
+# I. Applicant party evidence (Allocation Party Evidence Amendment)
+# ---------------------------------------------------------------------------
+
+
+def _applicant_fixture(session, *, applicant_name_raw, site_review_status="auto_applied", council_code="testcouncil"):
+    _make_council(session, council_code)
+    plan = _make_plan(session, council_code=council_code)
+    allocation = _make_allocation(session, plan, council_code=council_code, minimum_dwellings=300)
+    site = _make_site(session, council_code=council_code)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id, review_status=site_review_status)
+    _make_app(session, site.id, "APP/APPLICANT", units=100, status="Decided", decision="Granted",
+              applicant_name_raw=applicant_name_raw, council_code=council_code)
+    session.commit()
+    return allocation
+
+
+def test_applicant_reaches_allocation_intelligence_context(session):
+    """A/B/H/I/J from the investigation - the raw, deterministic Application.
+    applicant_name_raw genuinely reaches AllocationIntelligenceContext now,
+    via RepresentativeApplicationDetail.applicant_name."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Bloor Homes North West")
+    context = build_allocation_context(session, allocation)
+    rep = context.sites[0].representative_application
+    assert rep.applicant_name == "Bloor Homes North West"
+
+
+def test_applicant_placeholder_value_cleaned_to_none(session):
+    """Direct regression for real production data - DC/060928 on the Heald
+    Green West sample carries the literal portal placeholder "Not
+    Available", which must not be treated as a real applicant name."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Not Available")
+    context = build_allocation_context(session, allocation)
+    assert context.sites[0].representative_application.applicant_name is None
+
+
+def test_applicant_role_label_is_exactly_applicant(session):
+    """Section 5's mandated exact wording - not "Applicant evidence" (the
+    unrelated app.reporting.ownership_control fallback label used only if a
+    ControlRelationship APPLICANT-role row ever exists - a separate,
+    still-hypothetical pathway with no real writer today)."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Bloor Homes North West")
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "Bloor Homes North West is named as applicant for the identified Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Test Site"'}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_applicant_cannot_become_developer_without_evidence(session):
+    """Section 5/9's central requirement - a real applicant, with no
+    separate Developer-role evidence for the same entity, must be rejected
+    if self-reported as Developer. The entity name AND the role string
+    "S106 Developer" both independently exist in the platform's vocabulary
+    - only the exact (name, role, scope) triple is checked."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Bloor Homes North West")
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Bloor Homes North West", "role": "S106 Developer", "site_scope": 'Site "Test Site"'}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_agent_cannot_become_developer(session):
+    """A ControlRelationship AGENT-role row (schema-supported, no real
+    writer in production today - see investigation D/M) grounds as "Agent
+    evidence" only; self-reporting the same entity as Developer must be
+    rejected."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    app = _make_app(session, site.id, "APP/AGENT", units=100)
+    _make_control_relationship(session, site_id=site.id, application_id=app.id, entity_name_raw="Some Agent LLP",
+                                role="AGENT", evidence_category="UNMODELLED_AGENT_EVIDENCE")
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    real_role = context.ownership_entities[0].role_label
+    assert real_role == "Agent evidence"
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Some Agent LLP", "role": "S106 Developer", "site_scope": 'Site "Test Site"'}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_explicit_promoter_evidence_grounds_correctly(session):
+    """PROMOTER is reserved vocabulary (investigation D/M) with no real
+    writer today - proves the SAME validation mechanism grounds it
+    correctly if/when evidence exists, with no promoter-specific code
+    required."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    app = _make_app(session, site.id, "APP/PROMOTER", units=100)
+    _make_control_relationship(session, site_id=site.id, application_id=app.id, entity_name_raw="Land Promotions Ltd",
+                                role="PROMOTER", evidence_category="UNMODELLED_PROMOTER_EVIDENCE")
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    real_role = context.ownership_entities[0].role_label
+    assert real_role == "Promoter evidence"
+    output = {
+        "headline": "x", "overview": "Land Promotions Ltd is named as promoter for the identified Site.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Land Promotions Ltd", "role": "Promoter evidence", "site_scope": 'Site "Test Site"'}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_applicant_and_developer_can_coexist_for_different_entities(session):
+    """The SAME Site can legitimately show one entity as Applicant and a
+    DIFFERENT entity as S106 Developer - both ground correctly, neither
+    borrows the other's role."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=300)
+    site = _make_site(session)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id)
+    app = _make_app(session, site.id, "APP/BOTH", units=100, status="Decided", decision="Granted",
+                     applicant_name_raw="Volume Housebuilder Ltd")
+    _make_control_relationship(session, site_id=site.id, application_id=app.id, entity_name_raw="Deed Developer Ltd",
+                                role="DEVELOPER", evidence_category="S106_DEFINED_DEVELOPER")
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [
+            {"name": "Volume Housebuilder Ltd", "role": "Applicant", "site_scope": 'Site "Test Site"'},
+            {"name": "Deed Developer Ltd", "role": "S106 Developer", "site_scope": 'Site "Test Site"'},
+        ],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+    # Swapping the roles between the two entities must still be rejected.
+    swapped = dict(output)
+    swapped["referenced_entities"] = [
+        {"name": "Volume Housebuilder Ltd", "role": "S106 Developer", "site_scope": 'Site "Test Site"'},
+        {"name": "Deed Developer Ltd", "role": "Applicant", "site_scope": 'Site "Test Site"'},
+    ]
+    is_valid, problems = validate_summary_output(context, swapped)
+    assert is_valid is False
+
+
+def test_applicant_site_scope_cannot_be_swapped(session):
+    """Two Sites, two different applicants - claiming one applicant for
+    the OTHER Site's scope must be rejected, exactly like ownership/control
+    scope-swapping."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = _make_allocation(session, plan, minimum_dwellings=1000)
+    site_a = _make_site(session, "Site A")
+    site_b = _make_site(session, "Site B")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site_a.id)
+    _make_relationship(session, allocation_id=allocation.id, site_id=site_b.id)
+    _make_app(session, site_a.id, "APP/A", units=100, applicant_name_raw="Applicant A Ltd")
+    _make_app(session, site_b.id, "APP/B", units=100, applicant_name_raw="Applicant B Ltd")
+    session.commit()
+
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Applicant A Ltd", "role": "Applicant", "site_scope": 'Site "Site B"'}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_applicant_excluded_for_disputed_site_relationship(session):
+    """Section 7 trust boundary - a needs_confirmation AllocationSite
+    Relationship must withhold applicant evidence STRUCTURALLY (None at
+    construction), the same guarantee status/decision already has, not
+    merely hedged in prompt text."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Should Not Appear Ltd", site_review_status="needs_confirmation")
+    context = build_allocation_context(session, allocation)
+    assert context.sites[0].representative_application is None
+    # And the entity name is nowhere in the allow-set - self-reporting it
+    # anyway, however hedged, is still rejected.
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Should Not Appear Ltd", "role": "Applicant", "site_scope": 'Site "Test Site"'}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_applicant_change_alters_fingerprint(session):
+    """Test #15 - a materially different applicant name must change the
+    fingerprint (otherwise a corrected/newly-discovered applicant would
+    never trigger regeneration)."""
+    allocation_1 = _applicant_fixture(session, applicant_name_raw="Original Applicant Ltd", council_code="council1")
+    fp_1 = compute_context_fingerprint(build_allocation_context(session, allocation_1))
+
+    allocation_2 = _applicant_fixture(session, applicant_name_raw="Different Applicant Ltd", council_code="council2")
+    fp_2 = compute_context_fingerprint(build_allocation_context(session, allocation_2))
+
+    assert fp_1 != fp_2
+
+
+def test_placeholder_applicant_variants_do_not_alter_fingerprint(session):
+    """Test #16 - "Not Available" and a genuinely blank applicant both
+    clean to None, so they must produce the SAME fingerprint (an
+    irrelevant portal wording difference must never force a costly
+    regeneration). Mutates the SAME underlying Application row (same
+    site_id, same everything else) rather than comparing two separate
+    fixtures, so site_id/allocation_id differences can never confound the
+    comparison."""
+    allocation = _applicant_fixture(session, applicant_name_raw="Not Available")
+    fp_placeholder = compute_context_fingerprint(build_allocation_context(session, allocation))
+
+    app = session.execute(select(Application).where(Application.reference == "APP/APPLICANT")).scalar_one()
+    app.applicant_name_raw = None
+    session.commit()
+    fp_blank = compute_context_fingerprint(build_allocation_context(session, allocation))
+
+    assert fp_placeholder == fp_blank
+
+
+# ---------------------------------------------------------------------------
+# J. Generalised trusted-identifier numeric grounding (Section 10)
+# ---------------------------------------------------------------------------
+
+
+def _regulation_18_fixture(session):
+    """Reproduces the EXACT reported symptom: allocation reference "HOM
+    2.33" and plan status label "Draft consultation (Regulation 18)" are
+    both rendered verbatim in the prompt, and the model is expected to
+    echo them - proving the root cause is general (any allocation whose
+    own reference/plan-stage wording contains digits), not specific to one
+    allocation."""
+    _make_council(session, "stockport")
+    plan = _make_plan(session, council_code="stockport", status="draft_consultation")
+    allocation = _make_allocation(session, plan, council_code="stockport", policy_reference="HOM 2.33",
+                                   site_name="Heald Green West", minimum_dwellings=750)
+    site = _make_site(session, "Land At Wilmslow Road Heald Green Stockport", council_code="stockport")
+    _make_relationship(session, allocation_id=allocation.id, site_id=site.id, review_status="confirmed")
+    _make_app(session, site.id, "DC/084620", units=124, status="Decided", decision="Granted",
+              application_category="reserved_matters", council_code="stockport")
+    session.commit()
+    return allocation
+
+
+def test_own_policy_reference_and_plan_stage_no_longer_falsely_rejected(session):
+    allocation = _regulation_18_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.allocation_reference == "HOM 2.33"
+    assert "Regulation 18" in context.plan_status_label
+    output = {
+        "headline": "x",
+        "overview": (
+            f"This is allocation HOM 2.33, currently at Draft consultation (Regulation 18) stage, "
+            f"with 124 of its 750 homes identified via DC/084620."
+        ),
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_invented_policy_stage_number_still_rejected(session):
+    """The masking fix must not become a blanket numeric exemption - a
+    fabricated figure sharing no relationship to the allocation's own
+    reference/plan-stage wording is still rejected."""
+    allocation = _regulation_18_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "This allocation is expected to deliver 42 additional phases beyond those identified.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
