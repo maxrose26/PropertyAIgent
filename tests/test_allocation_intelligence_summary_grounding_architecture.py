@@ -2028,6 +2028,9 @@ def test_3_empty_reference_with_material_status_claim_still_rejected(session):
 
 
 def test_4_empty_reference_with_material_decision_claim_still_rejected(session):
+    """decision_claim_mode="value" is NEVER inert, even with reference and
+    claimed_decision both blank - "value" itself asserts a concrete
+    decision was stated, which cannot be attached to no Application."""
     allocation = _zero_activity_fixture(session)
     context = build_allocation_context(session, allocation)
     output = {
@@ -2038,12 +2041,12 @@ def test_4_empty_reference_with_material_decision_claim_still_rejected(session):
     is_valid, problems = validate_summary_output(context, output)
     assert is_valid is False
 
-    absent = {
+    value_mode_empty_text = {
         "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
-        "referenced_applications": [{"reference": "", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent"}],
+        "referenced_applications": [{"reference": "", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "value"}],
         "referenced_entities": [],
     }
-    is_valid, problems = validate_summary_output(context, absent)
+    is_valid, problems = validate_summary_output(context, value_mode_empty_text)
     assert is_valid is False
 
 
@@ -2393,3 +2396,330 @@ def test_27_placeholder_normalisation_does_not_erase_genuine_decision_text(sessi
     }
     is_valid, problems = validate_summary_output(context, output)
     assert is_valid is True, problems
+
+
+# ---------------------------------------------------------------------------
+# W. V9 Final Pilot Reliability Amendment - Fix A: untargeted absence claims
+# now inert (real V8 production audit: "empty_application_reference" was
+# STILL the dominant failure family after V8's own fix - 35 of 55, ~64% -
+# root-caused precisely by replaying allocation 193's real trusted context
+# through validate_summary_output: a model narrating the no-linked-
+# Application product principle naturally wants to add "no decision has
+# been recorded" as a companion fact, and with no real Application to
+# attach it to, sets decision_claim_mode="absent" on an otherwise fully
+# blank entry - V8's boundary treated any non-"none" mode as automatically
+# material, so this fell through to "unsupported application reference: ").
+# ---------------------------------------------------------------------------
+
+
+def test_a_untargeted_absent_decision_claim_now_inert(session):
+    """Direct regression for the exact real production shape reproduced
+    against allocation 193's real trusted context this task's own
+    investigation confirmed."""
+    allocation = _zero_activity_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "No decision has been recorded for this allocation's planning activity.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_b_blank_reference_with_material_status_still_rejects_alongside_absent(session):
+    """Safety guard - decision_claim_mode="absent" widening must not leak
+    into claimed_status: any real status text still rejects."""
+    allocation = _zero_activity_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "", "claimed_status": "Awaiting decision", "claimed_decision": "", "decision_claim_mode": "absent"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_c_blank_reference_value_mode_still_rejects(session):
+    allocation = _zero_activity_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "", "claimed_status": "", "claimed_decision": "Granted", "decision_claim_mode": "value"}],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_d_blank_reference_absent_claim_on_real_representative_still_fine_when_genuinely_no_decision(session):
+    """D - a blank-reference absent claim cannot bypass Application-
+    specific grounding: it is inert (asserts nothing checkable), it does
+    NOT retroactively ground anything about a REAL Application - a
+    separate, correctly-targeted absent claim for a real Application
+    whose decision is genuinely recorded must still fail."""
+    allocation = _heald_green_style_fixture(session)  # DC/084620 decision="Granted"
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "No decision has been recorded. DC/084620 has no decision recorded yet.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [
+            {"reference": "", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent"},
+            {"reference": "DC/084620", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "absent"},
+        ],
+        "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+# ---------------------------------------------------------------------------
+# X. V9 Final Pilot Reliability Amendment - Fix B: trusted allocation_name/
+# local_plan_name substring masking, and the allocation_capacity_display
+# range figure (real V8 production audit: 17 of 17 investigated
+# "unsupported numbers" rejections traced to one of these three sources -
+# never a genuine hallucination).
+# ---------------------------------------------------------------------------
+
+
+def _address_named_allocation_fixture(session, *, site_name, council_code="testcouncil", policy_reference="ADDR-1"):
+    _make_council(session, council_code)
+    plan = _make_plan(session, council_code=council_code)
+    allocation = _make_allocation(session, plan, council_code=council_code, policy_reference=policy_reference,
+                                   site_name=site_name, minimum_dwellings=50)
+    session.commit()
+    return allocation
+
+
+def test_e_trusted_site_name_digits_validate_as_part_of_full_name(session):
+    """Direct regression for real allocation 142 ("499 Chester Road, Old
+    Trafford") - the full trusted name narrated verbatim validates."""
+    allocation = _address_named_allocation_fixture(session, site_name="499 Chester Road, Old Trafford")
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "This site, 499 Chester Road, Old Trafford, has no identified planning activity.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_f_multiple_address_formats_validate(session):
+    """F - several distinct real production address shapes, each
+    narrating only the STREET portion (not the full comma-suffixed name) -
+    proves comma-segment masking, not just whole-string masking."""
+    addresses = [
+        "88-118 Chorlton Road, Old Trafford",
+        "Rear 61-83 Palace Road, Ashton-under-Lyne",
+        "Former Two Trees School, 101 Two Trees Lane, Denton",
+        "Site of River Mill, 6-32 Waggon Road, Mossley",
+    ]
+    for i, addr in enumerate(addresses):
+        allocation = _address_named_allocation_fixture(session, site_name=addr, policy_reference=f"ADDR-{i}")
+        context = build_allocation_context(session, allocation)
+        street_portion = addr.split(",")[-2].strip() if addr.count(",") >= 1 else addr
+        # Narrate only ONE comma-separated segment, never the full string.
+        segment = [p.strip() for p in addr.split(",")][-2] if addr.count(",") >= 1 else addr
+        output = {
+            "headline": "x", "overview": f"This allocation, {segment}, has no identified planning activity.",
+            "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+            "referenced_applications": [], "referenced_entities": [],
+        }
+        is_valid, problems = validate_summary_output(context, output)
+        assert is_valid is True, (addr, problems)
+
+
+def test_g_invented_number_still_rejected_on_address_named_allocation(session):
+    allocation = _address_named_allocation_fixture(session, site_name="499 Chester Road, Old Trafford")
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "This allocation is expected to deliver 777 additional units.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def _local_plan_year_fixture(session):
+    """Direct regression for real allocations 155-160 - a Local Plan name
+    with its own embedded target year, rendered verbatim."""
+    _make_council(session, "manchestertest")
+    plan = LocalPlan(council_code="manchestertest", plan_name="Draft Manchester Local Plan (September 2025)",
+                      status="draft_consultation", raw_status="draft_consultation")
+    session.add(plan)
+    session.commit()
+    allocation = _make_allocation(session, plan, council_code="manchestertest", policy_reference="H1 (Test)",
+                                   site_name="Test Manchester Allocation", minimum_dwellings=500)
+    session.commit()
+    return allocation
+
+
+def test_local_plan_name_year_validates(session):
+    allocation = _local_plan_year_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.local_plan_name == "Draft Manchester Local Plan (September 2025)"
+    output = {
+        "headline": "x", "overview": "This allocation sits under the Draft Manchester Local Plan (September 2025).",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_local_plan_name_year_validates_without_trailing_parenthetical(session):
+    """Proves the paren-stripped-prefix masking, not just the whole
+    string - narrating "...to 2040" without repeating "(Initial Draft)"."""
+    _make_council(session, "wigantest")
+    plan = LocalPlan(council_code="wigantest", plan_name="Wigan Borough Local Plan: Planning for the Future to 2040 (Initial Draft)",
+                      status="draft_consultation", raw_status="draft_consultation")
+    session.add(plan)
+    session.commit()
+    allocation = _make_allocation(session, plan, council_code="wigantest", policy_reference="H5",
+                                   site_name="Test Wigan Allocation", minimum_dwellings=300)
+    session.commit()
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x",
+        "overview": "This allocation sits under the Wigan Borough Local Plan: Planning for the Future to 2040.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def _range_capacity_fixture(session):
+    """Direct regression for real allocations 136/139 - a "range"-kind
+    capacity whose own lower bound is rendered verbatim in
+    allocation_capacity_display ("8,400-15,000 homes") but was never in
+    allocation_capacity_value (which reports only the upper bound)."""
+    _make_council(session)
+    plan = _make_plan(session)
+    allocation = LocalPlanSite(
+        council_code="testcouncil", local_plan_id=plan.id, policy_reference="RANGE-1", site_name="Range Test Allocation",
+        plan_name="Test Local Plan", plan_status="adopted", minimum_dwellings=8400, maximum_capacity=15000,
+        intended_use="mixed_use",
+    )
+    session.add(allocation)
+    session.commit()
+    return allocation
+
+
+def test_range_capacity_lower_bound_validates(session):
+    allocation = _range_capacity_fixture(session)
+    context = build_allocation_context(session, allocation)
+    assert context.allocation_capacity_kind == "range"
+    assert "8,400" in context.allocation_capacity_display
+    output = {
+        "headline": "x", "overview": f"This allocation has an indicative range of {context.allocation_capacity_display}.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+# ---------------------------------------------------------------------------
+# Y. V9 Final Pilot Reliability Amendment - remaining V8-behaviour
+# regressions (H-O from the task's own matrix - largely already covered
+# elsewhere in this file; re-asserted here explicitly against the V9 code)
+# ---------------------------------------------------------------------------
+
+
+def test_h_derived_arithmetic_still_rejected_after_v9(session):
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "x", "overview": "83% of this allocation's capacity remains unaccounted for.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_i_j_k_wrong_role_scope_and_attribution_still_rejected_after_v9(session):
+    allocation = _heald_green_with_bloor_homes_fixture(session)
+    context = build_allocation_context(session, allocation)
+    wrong_role = {
+        "headline": "x", "overview": "Bloor Homes North West is the developer.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Bloor Homes North West", "role": "S106 Developer", "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"', "application_reference": ""}],
+    }
+    assert validate_summary_output(context, wrong_role)[0] is False
+    wrong_scope = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Bloor Homes North West", "role": "Applicant", "site_scope": "the allocation", "application_reference": ""}],
+    }
+    assert validate_summary_output(context, wrong_scope)[0] is False
+    wrong_attribution = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "", "claimed_decision": "", "decision_claim_mode": "none"}],
+        "referenced_entities": [{"name": "Bloor Homes North West", "role": "Applicant", "site_scope": 'Site "Land At Wilmslow Road Heald Green Stockport"', "application_reference": "DC/084620"}],
+    }
+    assert validate_summary_output(context, wrong_attribution)[0] is False
+
+
+def test_l_no_linked_application_allocation_produces_valid_grounded_summary(session):
+    allocation = _zero_activity_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {
+        "headline": "No identified planning activity for this allocation",
+        "overview": (
+            "No linked planning application has been identified in PropertyAIgent's current evidence, leaving "
+            "the allocation's capacity currently unaccounted for by identified planning activity and "
+            "highlighting a potential development opportunity for further investigation."
+        ),
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is True, problems
+
+
+def test_n_needs_confirmation_boundary_unchanged_after_v9(session):
+    allocation = _applicant_fixture(session, applicant_name_raw="Should Not Appear Ltd", site_review_status="needs_confirmation")
+    context = build_allocation_context(session, allocation)
+    assert context.sites[0].representative_application is None
+    output = {
+        "headline": "x", "overview": "x", "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [],
+        "referenced_entities": [{"name": "Should Not Appear Ltd", "role": "Applicant", "site_scope": 'Site "Test Site"', "application_reference": ""}],
+    }
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False
+
+
+def test_o_failure_preserves_last_valid_summary_after_v9(session):
+    allocation = _heald_green_style_fixture(session)
+    good_output = {
+        "headline": "Reserved matters granted for part of the allocation",
+        "overview": "DC/084620 was granted on 11 Jan 2024, covering 124 of the allocation's 750 homes.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
+        "referenced_entities": [],
+    }
+    client = _fake_client(good_output)
+    result = generate_allocation_intelligence_summary(session, client, allocation)
+    assert result.regenerated is True, result.rejection_reason
+    summary = get_allocation_summary(session, allocation.id)
+    assert summary.headline == good_output["headline"]
+
+    bad_output = {
+        "headline": "x", "overview": "This allocation could deliver up to 99999 homes.",
+        "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
+        "referenced_applications": [], "referenced_entities": [],
+    }
+    client2 = _fake_client(bad_output)
+    result2 = generate_allocation_intelligence_summary(session, client2, allocation, force=True)
+    assert result2.rejected is True
+    summary2 = get_allocation_summary(session, allocation.id)
+    assert summary2.headline == good_output["headline"]  # last valid summary preserved
+    assert summary2.status == "error"

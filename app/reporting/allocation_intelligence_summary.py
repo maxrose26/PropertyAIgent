@@ -1240,6 +1240,17 @@ def _allowed_numbers(context: AllocationIntelligenceContext) -> set[str]:
             allowed.add(f"{value:.0%}".rstrip("%"))
 
     _add(context.allocation_capacity_value)
+    # V9 Final Pilot Reliability Amendment - allocation_capacity_value is
+    # a single number, but a "range"-kind allocation's OWN capacity_
+    # display string ("8,400-15,000 homes") is rendered verbatim in the
+    # prompt's ALLOCATION CAPACITY line and legitimately contains a
+    # SECOND trusted figure (the range's lower bound) that capacity_value
+    # alone never captures. _numbers_in already strips thousands
+    # separators and splits cleanly on the en-dash between the two
+    # figures - confirmed for real production allocations 136 ("8,400-
+    # 15,000 homes", capacity_value=15000, rejected "8400") and 139
+    # ("2,050-3,200 homes", capacity_value=3200, rejected "2050").
+    _add(context.allocation_capacity_display)
     _add(context.identified_application_capacity)
     _add(context.indicative_residual_capacity)
     _add(context.development_coverage_percentage)
@@ -1305,24 +1316,46 @@ _PARENTHETICAL_PATTERN = re.compile(r"\(([^()]+)\)")
 
 
 def _trusted_label_substrings(label: str | None) -> set[str]:
-    """Final Grounding Hardening Amendment - a trusted structured label
-    (context.allocation_reference, context.plan_status_label) may itself
-    be a compound phrase whose parenthetical qualifier is a distinct,
-    independently-narratable trusted string (e.g. "Draft consultation
-    (Regulation 18)" - a model may legitimately write just "Regulation 18"
-    stage without repeating "Draft consultation"). Returns the whole label
-    AND, for each parenthetical group found, both the bracketed content on
-    its own ("Regulation 18") and the label with that exact parenthetical
-    removed - so partial narration of either half of a "<phase>
-    (<qualifier>)"-shaped label is masked, without masking any digit that
-    is not part of a real trusted label. Generic over the shape, not tied
-    to "Regulation 18"/"HOM 2.33" or any other specific value - the SAME
-    rule applies to any future label carrying a parenthetical qualifier."""
+    """Final Grounding Hardening Amendment, WIDENED by the V9 Final Pilot
+    Reliability Amendment - a trusted structured label (context.
+    allocation_reference, plan_status_label, allocation_name, local_
+    plan_name) may itself be a compound phrase whose PARTS are each
+    independently narratable trusted strings, not just the whole label
+    verbatim:
+      - a parenthetical qualifier (e.g. "Draft consultation (Regulation
+        18)" -> "Regulation 18" on its own) - the original Final Grounding
+        Hardening Amendment case.
+      - the label with its OWN trailing parenthetical removed (e.g.
+        "Wigan Borough Local Plan: Planning for the Future to 2040
+        (Initial Draft)" -> "...to 2040" without repeating "(Initial
+        Draft)") - the docstring here always claimed this, but the V9
+        audit found the code never actually did it; real production
+        proof this genuinely matters: allocations 212/215 narrating that
+        exact plan name's own "to 2040" prefix, without ever repeating
+        "(Initial Draft)", were still flagged.
+      - comma-separated segments, individually and as cumulative
+        prefixes (e.g. "499 Chester Road, Old Trafford" -> "499 Chester
+        Road" masks on its own too) - confirmed necessary against real
+        production allocation_name values that are themselves street
+        addresses (allocations 142/143/173/176/190/194/202), where a
+        model narrating just the street portion, without repeating the
+        suburb, had its own trusted house-number digits flagged.
+    Generic over the shape, never tied to one specific value - the same
+    rules apply to any future label with this structure."""
     if not label:
         return set()
     substrings = {label}
     for match in _PARENTHETICAL_PATTERN.finditer(label):
         substrings.add(match.group(1).strip())
+    stripped = _PARENTHETICAL_PATTERN.sub("", label).strip()
+    if stripped:
+        substrings.add(stripped)
+    parts = [p.strip() for p in label.split(",") if p.strip()]
+    prefix = ""
+    for part in parts:
+        prefix = f"{prefix}, {part}" if prefix else part
+        substrings.add(prefix)
+        substrings.add(part)
     return {s for s in substrings if s}
 
 
@@ -1372,40 +1405,50 @@ def _mask_known_strings_case_insensitive(text: str, known_strings: set[str]) -> 
 
 
 def _is_inert_application_entry(item: dict) -> bool:
-    """V8 Reliability Hardening Amendment - the dominant real production
-    false-rejection pattern (72 of 102 rejected allocations in the V7
-    platform-wide audit, ~71%), root-caused precisely: SUMMARY_SCHEMA
-    requires every field on every referenced_applications item, but never
-    tells the model what to do when there is genuinely nothing to report -
-    so instead of returning an empty array, the model sometimes emits ONE
-    entry with every field blank. The bare validator then read reference=""
-    as if "" were a CLAIMED Application reference and rejected it
-    ("unsupported application reference: ") - even though the entry
-    asserts no material fact whatsoever. Confirmed as a representation
-    mismatch, not a hallucination, via a direct control-group comparison:
-    140 of 161 real successful V7 summaries also have zero linked
-    Applications and correctly return referenced_applications: [] - the
-    architecture already handles this correctly most of the time; the
-    model is simply inconsistent about HOW it represents "nothing to
-    report" only some of the time.
+    """V8 Reliability Hardening Amendment, WIDENED by the V9 Final Pilot
+    Reliability Amendment - the dominant real production false-rejection
+    pattern (72 of 102 rejected allocations in the V7 platform-wide audit,
+    then 35 of 55 STILL remaining after V8's own fix, ~64%), root-caused
+    precisely both times: SUMMARY_SCHEMA requires every field on every
+    referenced_applications item, but never tells the model what to do
+    when there is genuinely nothing to report.
 
-    SAFETY (do not weaken beyond this exact case): an entry is inert ONLY
-    when it makes NO material claim at all - empty reference AND empty
-    status AND empty decision AND no decision_claim_mode beyond the
-    default "no claim" state. The moment ANY field carries a real claim
-    (a status, a decision value, or an explicit "absent" decision claim),
-    the entry is NOT inert and falls through to full grounding exactly as
-    before - an empty reference can never be used to attach an unsupported
-    status/decision claim "for free", because decision_claim_mode="absent"
-    or a non-empty claimed_status/claimed_decision on an entry with
-    reference="" still reaches the normal `ref not in allowed_refs`
-    rejection below (there being no representative Application for an
-    empty reference to ground a claim against)."""
+    V8 covered the simplest case (every field literally blank/default).
+    V9's own real-production reproduction (allocation 193's real trusted
+    context, replayed through this exact function) found the REMAINING
+    shape: a model narrating the NO-LINKED-APPLICATION product principle
+    ("no linked planning application has been identified, so no decision
+    has been recorded") naturally wants to also express "no decision" as
+    a companion fact - but with no real Application to attach it to, it
+    sets decision_claim_mode="absent" on an entry whose reference/
+    claimed_status/claimed_decision are ALL still blank. V8's boundary
+    treated ANY non-"none" decision_claim_mode as automatically material,
+    so this untargeted "absent" claim fell through to `ref not in
+    allowed_refs` and was rejected as `"unsupported application
+    reference: "` - reproduced exactly against allocation 193's real
+    context.
+
+    SAFETY (the boundary this widens, and the one it deliberately does
+    NOT move) - an untargeted decision_claim_mode="absent" asserts
+    nothing CHECKABLE: it names no Application, so there is nothing for
+    it to be grounded against or contradicted by - structurally
+    equivalent to "no claim" rather than a real, verifiable fact.
+    decision_claim_mode="value" is NEVER treated as inert, even with an
+    empty claimed_decision text and an empty reference - "value" is
+    itself an assertion that a concrete decision was stated, and an
+    empty reference can still never be used to attach a claimed_status or
+    non-empty claimed_decision "for free": the moment claimed_status or
+    claimed_decision carries real text, or decision_claim_mode is
+    "value", the entry is NOT inert and falls through to full grounding
+    exactly as before (there being no representative Application for an
+    empty reference to ground any of those claims against)."""
     reference = item.get("reference") or ""
     claimed_status = item.get("claimed_status") or ""
     claimed_decision = item.get("claimed_decision") or ""
     decision_claim_mode = item.get("decision_claim_mode") or "none"
-    return not reference and not claimed_status and not claimed_decision and decision_claim_mode == "none"
+    if reference or claimed_status or claimed_decision:
+        return False
+    return decision_claim_mode in ("none", "absent")
 
 
 def _is_inert_entity_entry(item: dict) -> bool:
@@ -1479,8 +1522,40 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
     # known_strings set above - see that function's own docstring for why
     # references/entity names must stay exact-case while a natural-
     # language label like "Regulation 18" must not.
+    #
+    # V9 Final Pilot Reliability Amendment - context.allocation_name was
+    # never included here, and real production proved it needed to be:
+    # many UK Local Plan allocations are named after their own street
+    # address (e.g. "499 Chester Road, Old Trafford", "88-118 Chorlton
+    # Road, Old Trafford") - rendered verbatim in the prompt's own
+    # ALLOCATION line exactly like allocation_reference already was, so a
+    # model narrating the allocation by name (or address-range) had its
+    # own trusted house-number digits flagged as unsupported. Confirmed
+    # for 8 real production allocations (142/143/173/176/190/194/202/257),
+    # every one of which has ZERO trusted linked Sites (number_of_related_
+    # sites=0) - the address-shaped digits could only ever have come from
+    # the allocation's own name, never a Site label (Site labels are
+    # already covered separately, via _render_site_line's own literal
+    # rendering path, not this trusted-label set). Masked via the SAME
+    # _trusted_label_substrings/case-insensitive mechanism as allocation_
+    # reference/plan_status_label - never a numeric allow-list, and only
+    # because the complete trusted allocation_name string is genuinely
+    # present in context.
+    # V9 Final Pilot Reliability Amendment - context.local_plan_name was
+    # never included here either, and real production proved the same
+    # gap class again: several real Local Plan names embed their own
+    # target year VERBATIM ("Draft Manchester Local Plan (September
+    # 2025)", "Wigan Borough Local Plan: Planning for the Future to 2040
+    # (Initial Draft)"), rendered in the prompt's own LOCAL PLAN line
+    # exactly like plan_status_label already is - a model narrating the
+    # plan by name had its own trusted year digits flagged. Confirmed for
+    # 7 real production allocations (155/156/157/159/160 -> "2025";
+    # 212/215 -> "2040") - together with allocation_name above, this
+    # accounts for every one of the V9 audit's originally-unexplained
+    # "unsupported numbers" rejections (9 of 9 investigated, covering all
+    # 17 real production occurrences).
     trusted_labels: set[str] = set()
-    for label in (context.allocation_reference, context.plan_status_label):
+    for label in (context.allocation_reference, context.plan_status_label, context.allocation_name, context.local_plan_name):
         trusted_labels.update(_trusted_label_substrings(label))
     known_strings = allowed_refs | allowed_entity_names | allowed_role_labels | _DIGIT_BEARING_ROLE_LABELS
 
