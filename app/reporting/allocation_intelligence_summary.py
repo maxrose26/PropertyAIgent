@@ -58,7 +58,7 @@ each is used):
     EVERY trusted linked Application on a Site (not only the representative
     one - see ApplicantPartyEvidence), deduplicated by exact cleaned name -
     a raw portal scrape, cleaned only of non-informative placeholder values
-    (_clean_applicant_name), never SchemeIntelligence's own
+    (_clean_portal_value), never SchemeIntelligence's own
     applicant_company/developer/landowner/planning_agent fields (those are
     AI re-interpretations of this exact value with no evidence-grounding of
     their own, deliberately excluded from this evidence-grounded pathway).
@@ -222,8 +222,63 @@ MODEL = "gpt-4o-mini"
 # commercial outlook" - neither supported by "no identified planning
 # activity"). No SUMMARY_SCHEMA field change. Bumped because the prompt
 # materially changed in ways that would change what the model writes -
-# not a schema/validator-behaviour change on its own.
-PROMPT_VERSION = "allocation-intelligence-summary-v7"
+# not a schema/validator-behaviour change on its own. v7 WAS subsequently
+# deployed platform-wide (287 allocations): 161 succeeded, 102 rejected -
+# a read-only audit of every rejection found the underlying architecture
+# sound but three narrow representation/normalisation defects causing the
+# large majority of false rejections - see v8's own entry below.
+#
+# v8 (V8 Reliability Hardening Amendment) - three narrow fixes, each
+# root-caused against real persisted V7 production rejections, NONE
+# weakening any grounding check:
+#   (1) Inert empty self-report entries - SUMMARY_SCHEMA requires every
+#       field on every referenced_applications/referenced_entities item,
+#       but never told the model what to do with genuinely nothing to
+#       report, so it sometimes emitted one all-blank entry instead of an
+#       empty array - the validator then read reference="" as a CLAIMED
+#       reference and rejected it. This was the dominant real cause: 72 of
+#       102 rejected allocations (~71%), confirmed as a representation
+#       mismatch (not a hallucination) via a direct control-group
+#       comparison - 140 of 161 real successful summaries also have zero
+#       linked Applications and already correctly return []. An entry
+#       making NO material claim (empty reference/name AND no status/
+#       decision/role/scope/application_reference) is now treated as
+#       inert and skipped - see _is_inert_application_entry/_is_inert_
+#       entity_entry's own docstrings for the exact, narrow boundary: any
+#       entry carrying so much as one real claim still receives full
+#       grounding, unchanged. Rule 17 added, telling the model directly
+#       that [] is the correct, expected self-report when nothing was
+#       named - not an error state.
+#   (2) Case-insensitive trusted-label masking - confirmed via a direct
+#       reproduction that "Regulation 18" (exact-case, as it appears in
+#       context.plan_status_label) was masked correctly, but a model
+#       naturally writing "regulation 18" (lower-case, ordinary mid-
+#       sentence capitalisation) was not - 9 of the 25 "unsupported
+#       numbers" rejections in the V7 audit trace to exactly this.
+#       _mask_known_strings_case_insensitive now masks trusted LABEL
+#       substrings only (never Application references or entity names,
+#       which stay exact-case - see that function's own docstring for
+#       why) - "Regulation 25" (never a real trusted label) remains
+#       correctly rejected.
+#   (3) Placeholder decision normalisation - confirmed via a full query of
+#       every distinct real Application.decision value in production that
+#       "Not Available" is the ONLY placeholder-shaped value among 60+
+#       genuine decision outcomes (Approve/Granted/Refuse/Withdrawn/Split/
+#       etc., all real). RepresentativeApplicationDetail.decision is now
+#       cleaned through the same portal-placeholder cleaner applicant
+#       names already used (generalised and renamed _clean_portal_value),
+#       so a placeholder decision correctly grounds a decision_claim_
+#       mode="absent" claim instead of falsely rejecting it as
+#       contradicting "a real decision". status was investigated for the
+#       same phenomenon and deliberately left unchanged - production does
+#       contain a genuine "Unknown" status value, but claimed_status
+#       grounding is a plain exact-match check with no "absent" mode, and
+#       the V7 audit found zero rejections attributable to status.
+# Estimated combined unlock (NOT a guarantee - a real regeneration could
+# produce different output): roughly 80-88 of the 102 previously-rejected
+# allocations, moving eligible-summary coverage from 61.2% (161/263)
+# toward an estimated 90%+.
+PROMPT_VERSION = "allocation-intelligence-summary-v8"
 
 
 # --- Context object (Section 4) ---------------------------------------------
@@ -296,7 +351,7 @@ class ApplicantPartyEvidence:
     """Allocation Party Evidence Pre-Merge Amendment ("Multi-Application
     Party Intelligence") - one entity named as applicant on one or more of
     a Site's TRUSTED linked Applications, deduplicated by exact cleaned
-    name (never fuzzy-resolved - see _clean_applicant_name). Deliberately
+    name (never fuzzy-resolved - see _clean_portal_value). Deliberately
     NOT scoped to the representative Application: the representative
     Application stays the sole authority for capacity/status/decision
     (RepresentativeApplicationDetail, unchanged by this amendment); WHICH
@@ -367,31 +422,53 @@ class AllocationIntelligenceContext:
     last_checked: str | None = None
 
 
-# Allocation Party Evidence Amendment - Application.applicant_name_raw is a
-# raw portal scrape, and portals sometimes populate it with a non-answer
-# placeholder rather than leaving it NULL (confirmed in real production data
+# Allocation Party Evidence Amendment, GENERALISED by the V8 Reliability
+# Hardening Amendment - Application fields are raw portal scrapes, and
+# portals sometimes populate a field with a non-answer placeholder rather
+# than leaving it NULL. Originally named _NON_INFORMATIVE_APPLICANT_VALUES
+# and scoped to applicant_name_raw only (confirmed in real production data
 # - DC/060928 on the Heald Green West sample carries the literal string
-# "Not Available"). A placeholder is not evidence of who the applicant is;
-# treating it as a real name would let the model narrate "Not Available is
-# named as the applicant", a factually-empty but schema-valid-looking claim.
-# Generalises to the standard equivalents a scraped portal field can hold,
-# not just the one literal string observed - never allocation/council-
-# specific.
-_NON_INFORMATIVE_APPLICANT_VALUES = {
+# "Not Available"); the V8 audit found the EXACT SAME phenomenon on
+# Application.decision (allocation 13/DC/094533's real production decision
+# value is literally the string "Not Available" - confirmed by querying
+# every distinct decision value in production: it is the ONLY placeholder-
+# shaped value among 60+ real decision outcomes - Approve/Granted/Refuse/
+# Withdrawn/Split/etc. are all genuine, never placeholders), so this is now
+# a shared, reusable cleaner rather than a second, narrower, decision-only
+# vocabulary invented from scratch. Generalises to the standard equivalents
+# a scraped portal field can hold, not just the one literal string
+# observed - never allocation/council-specific. A placeholder is not
+# evidence; treating it as a real value would let the model narrate
+# "Not Available is named as the applicant" or ground a decision that was
+# never actually recorded - both factually-empty but schema-valid-looking
+# claims.
+#
+# NOTE - Application.status was investigated for the same phenomenon and
+# deliberately NOT changed: production does contain a genuine "Unknown"
+# status value (78 rows), but claimed_status grounding is a plain exact-
+# match check with no "absent" claim concept at all (unlike decision,
+# which has decision_claim_mode) - there is no code path where "Unknown"
+# status causes a false rejection (a model claiming status="Unknown"
+# simply matches the real stored value), and the V7 platform-wide audit
+# found zero real production rejections attributable to status. Changing
+# status handling here would be an unevidenced, out-of-scope addition.
+_NON_INFORMATIVE_PORTAL_VALUES = {
     "not available", "n/a", "na", "unknown", "not known", "not provided", "not stated", "tbc", "to be confirmed",
 }
 
 
-def _clean_applicant_name(raw: str | None) -> str | None:
-    """Returns the trimmed raw applicant name, or None if it is blank or a
-    known non-informative portal placeholder (see _NON_INFORMATIVE_
-    APPLICANT_VALUES above) - "no applicant evidence" and "a placeholder
-    value" must both present to the model as the SAME thing (absence), not
-    as a fabricated-looking real name."""
+def _clean_portal_value(raw: str | None) -> str | None:
+    """Returns the trimmed raw portal value, or None if it is blank or a
+    known non-informative placeholder (see _NON_INFORMATIVE_PORTAL_VALUES
+    above) - "no evidence" and "a placeholder value" must both present to
+    the model as the SAME thing (absence), never as a fabricated-looking
+    real value. Reused for both Application.applicant_name_raw and
+    Application.decision - see this module's own class-level comment for
+    why status is deliberately excluded."""
     if not raw:
         return None
     cleaned = raw.strip()
-    if not cleaned or cleaned.casefold() in _NON_INFORMATIVE_APPLICANT_VALUES:
+    if not cleaned or cleaned.casefold() in _NON_INFORMATIVE_PORTAL_VALUES:
         return None
     return cleaned
 
@@ -444,7 +521,18 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
         if rep is not None:
             proposal = rep.proposal or None
             rep_detail = RepresentativeApplicationDetail(
-                reference=rep.reference, status=rep.status, decision=rep.decision,
+                reference=rep.reference, status=rep.status,
+                # V8 Reliability Hardening Amendment - cleaned via the same
+                # portal-placeholder cleaner applicant names already use
+                # (see _clean_portal_value's own comment - confirmed real
+                # production case: allocation 13/DC/094533's decision is
+                # literally the string "Not Available"). Without this, a
+                # placeholder string is truthy, so decision_claim_mode=
+                # "absent" is rejected in validate_summary_output even
+                # though the model's claim - no real decision has been
+                # recorded - is correct. status is deliberately NOT
+                # cleaned here; see that same comment for why.
+                decision=_clean_portal_value(rep.decision),
                 decision_issued_date=rep.decision_issued_date, application_category=rep.application_category,
                 proposal_summary=proposal[:150] if proposal else None,
             )
@@ -485,7 +573,7 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
         # fuzzy company resolution.
         applicant_refs_by_name: dict[str, list[str]] = {}
         for a in s.applications:
-            name = _clean_applicant_name(a.applicant_name_raw)
+            name = _clean_portal_value(a.applicant_name_raw)
             if name is None:
                 continue
             applicant_refs_by_name.setdefault(name, []).append(a.reference)
@@ -678,8 +766,11 @@ def compute_context_fingerprint(context: AllocationIntelligenceContext) -> str:
         # for one, is narrative-material (test #16: "applicant changes move
         # fingerprint") and must trigger regeneration; a portal placeholder
         # variant cleaning to the same name/reference set must not (test
-        # #17), which falls out for free since _clean_applicant_name has
-        # already run by the time this list is built.
+        # #17), which falls out for free since _clean_portal_value has
+        # already run by the time this list is built. The SAME reasoning
+        # now applies to a cleaned representative_application.decision
+        # above (V8 Reliability Hardening Amendment) - already included in
+        # this fingerprint via that dict's own "decision" key.
         "applicant_evidence": sorted([
             {
                 "site_label": e.site_label, "entity_name": e.entity_name,
@@ -1008,6 +1099,7 @@ RULES - follow every one of these exactly:
 14. referenced_applications and referenced_entities (described below) are your own structured self-report of every material claim you made anywhere in headline/overview/key_points/key_uncertainties/investigation_priorities - used for automatic fact-checking. This is bookkeeping, not composition - it does not constrain how you write the prose above. referenced_entities covers ONLY parties from the APPLICANT EVIDENCE or OWNERSHIP/CONTROL EVIDENCE sections above (applicants, owners, developers, mortgagees, etc.) - it does NOT include the council name, the Local Plan name, or any other proper noun that appears elsewhere in this brief; those are not party claims and do not need self-reporting.
 15. Where an Application's decision above is genuinely not yet recorded, you are free to say so in plain language ("no decision has yet been issued", "the application remains undetermined", "a decision is still pending", or your own equivalent phrasing) - this is a grounded, useful fact, not an invented one. Self-report it via decision_claim_mode="absent" (see below) rather than inventing a decision value. Never make such a claim for an Application whose decision above is already a real value (Granted/Refused/Withdrawn/etc.) - that Application has been decided, and the decision given above is the only thing you may say about it.
 16. ABSENCE OF EVIDENCE ON THIS PLATFORM IS NOT EVIDENCE OF ABSENCE IN THE REAL WORLD. When a section above states nothing has currently been identified (no linked Application, no ownership/control evidence, no applicant evidence), describe that precisely as an absence of IDENTIFIED EVIDENCE on this platform - never as a real-world fact that nothing exists, that no activity has ever occurred, that the site has no owner, that no developer is involved, or draw any conclusion about commercial viability, market interest, or risk from it. "No linked planning activity has been identified" is grounded; "no planning activity exists" or "no efforts have been made to develop the site" is not - PropertyAIgent may simply not hold the evidence yet. This cuts both ways: do not go timid or vague either - explicitly frame a genuine, material absence as exactly what it is, a concrete INVESTIGATION SIGNAL (e.g. capacity that appears entirely unaccounted for on this platform's own records, worth someone actually checking), which is itself useful commercial intelligence; never invent a speculative reason FOR the absence (e.g. "distinctly cautious commercial outlook", "a further barrier to development") that the evidence does not support.
+17. If you named NO Application reference anywhere in your prose, return referenced_applications as an empty array, []. If you named NO party/entity anywhere in your prose, return referenced_entities as an empty array, []. Never invent a placeholder entry (an empty reference, or an empty entity name) just to have "something" in the array - an empty array is the correct, complete self-report of "nothing to report here", and is expected and normal for an allocation with no identified planning activity or ownership evidence (Rule 16) - it is not an error state.
 
 Write like a concise land/planning intelligence analyst, not a summariser restating labels - a reader should understand, in about 20 seconds, what this allocation is, how much identified planning activity exists against how much is indicatively unaccounted for, what stage that activity is genuinely at, who appears to be behind it (in what evidenced role), and what is worth investigating next. Every sentence should add something the reader could not already get by re-reading the raw facts above - avoid restating a label in prose without interpreting it. Prioritise: allocation position -> planning activity -> status/outcome -> party intelligence -> residual opportunity -> uncertainty -> investigation signal.
 - headline: one short sentence (under 15 words) capturing the allocation's overall commercial position.
@@ -1015,12 +1107,12 @@ Write like a concise land/planning intelligence analyst, not a summariser restat
 - key_points: 3-5 concise bullet-style facts (each a short sentence) - material interpretation, not a restatement of the overview.
 - key_uncertainties: 0-4 concise, specific evidence gaps that actually affect commercial understanding (empty list if genuinely none) - see Rule 7.
 - investigation_priorities: 0-3 concise, specific next questions/actions arising from those gaps (empty list if genuinely none) - see Rule 8.
-- referenced_applications: one entry for every Application reference you named anywhere above, each with:
+- referenced_applications: one entry for every Application reference you named anywhere above - [] if you named none (Rule 17), each with:
   - reference: the Application reference, exactly as given.
   - claimed_status: if you stated its planning status anywhere above, the EXACT status value as given above for that Application; otherwise "".
   - claimed_decision: if you stated its decision anywhere above AS A SPECIFIC VALUE (e.g. "Granted"), the EXACT decision value as given above for that Application; otherwise "".
   - decision_claim_mode: "value" if claimed_decision above is a specific decision value you stated; "absent" if you said/implied the decision is not yet recorded (Rule 15) - leave claimed_decision "" in this case, your own wording is not checked word-for-word; "none" if you made no claim about this Application's decision at all.
-- referenced_entities: one entry for every APPLICANT/OWNERSHIP/CONTROL party you named anywhere above (never the council or Local Plan name), each with:
+- referenced_entities: one entry for every APPLICANT/OWNERSHIP/CONTROL party you named anywhere above (never the council or Local Plan name) - [] if you named none (Rule 17), each with:
   - name: the entity name, exactly as given.
   - role: its role label, exactly as given (e.g. "Applicant", "S106 Developer", "Planning ownership declaration").
   - site_scope: exactly the scope text given above for that entity (e.g. Site "Land At Wilmslow Road Heald Green Stockport", or "the allocation's residual (unaccounted-for) capacity") - never "the allocation" as a whole.
@@ -1255,6 +1347,85 @@ def _mask_known_strings(text: str, known_strings: set[str]) -> str:
     return text
 
 
+def _mask_known_strings_case_insensitive(text: str, known_strings: set[str]) -> str:
+    """V8 Reliability Hardening Amendment - a case-INSENSITIVE sibling of
+    _mask_known_strings, used ONLY for trusted structured LABELS
+    (context.allocation_reference/plan_status_label), never for
+    Application references or entity names (those stay exact-case via
+    _mask_known_strings above - a reference or company name is a fixed
+    identifier, and case is part of what makes it that exact identifier).
+    Root cause confirmed directly against real V7 production output
+    (Heald Green West and others): "Draft consultation (Regulation 18)"
+    was masked as a whole string, and its parenthetical sub-phrase
+    "Regulation 18" was masked too - but only in that EXACT case. A model
+    naturally writing "...at regulation 18 stage..." mid-sentence (lower-
+    case, a completely ordinary stylistic choice) was never masked, so its
+    "18" was independently flagged as an unsupported number even though it
+    is the exact same trusted fact, merely re-cased. "Regulation 18" and
+    "regulation 18" and "REGULATION 18" must all mask identically - this
+    does not allow-list the digits "18"/"19" themselves (an invented
+    "Regulation 25" still fails, since "Regulation 25" was never a trusted
+    label substring in the first place, in any case)."""
+    for s in sorted((k for k in known_strings if k), key=len, reverse=True):
+        text = re.sub(re.escape(s), " ", text, flags=re.IGNORECASE)
+    return text
+
+
+def _is_inert_application_entry(item: dict) -> bool:
+    """V8 Reliability Hardening Amendment - the dominant real production
+    false-rejection pattern (72 of 102 rejected allocations in the V7
+    platform-wide audit, ~71%), root-caused precisely: SUMMARY_SCHEMA
+    requires every field on every referenced_applications item, but never
+    tells the model what to do when there is genuinely nothing to report -
+    so instead of returning an empty array, the model sometimes emits ONE
+    entry with every field blank. The bare validator then read reference=""
+    as if "" were a CLAIMED Application reference and rejected it
+    ("unsupported application reference: ") - even though the entry
+    asserts no material fact whatsoever. Confirmed as a representation
+    mismatch, not a hallucination, via a direct control-group comparison:
+    140 of 161 real successful V7 summaries also have zero linked
+    Applications and correctly return referenced_applications: [] - the
+    architecture already handles this correctly most of the time; the
+    model is simply inconsistent about HOW it represents "nothing to
+    report" only some of the time.
+
+    SAFETY (do not weaken beyond this exact case): an entry is inert ONLY
+    when it makes NO material claim at all - empty reference AND empty
+    status AND empty decision AND no decision_claim_mode beyond the
+    default "no claim" state. The moment ANY field carries a real claim
+    (a status, a decision value, or an explicit "absent" decision claim),
+    the entry is NOT inert and falls through to full grounding exactly as
+    before - an empty reference can never be used to attach an unsupported
+    status/decision claim "for free", because decision_claim_mode="absent"
+    or a non-empty claimed_status/claimed_decision on an entry with
+    reference="" still reaches the normal `ref not in allowed_refs`
+    rejection below (there being no representative Application for an
+    empty reference to ground a claim against)."""
+    reference = item.get("reference") or ""
+    claimed_status = item.get("claimed_status") or ""
+    claimed_decision = item.get("claimed_decision") or ""
+    decision_claim_mode = item.get("decision_claim_mode") or "none"
+    return not reference and not claimed_status and not claimed_decision and decision_claim_mode == "none"
+
+
+def _is_inert_entity_entry(item: dict) -> bool:
+    """V8 Reliability Hardening Amendment - the SAME empty-self-report-
+    placeholder pattern found on referenced_applications (see
+    _is_inert_application_entry) was also confirmed on referenced_entities
+    in real production output (allocation 179: an entry with name="",
+    role="Planning ownership declaration", scope the residual capacity -
+    a claim with no actual party attached to it). Inert ONLY when EVERY
+    field is empty - a name paired with any real role/scope/application_
+    reference is NOT inert and still reaches full grounding below (there
+    being no allowed_party_facts key for an empty name, so a role/scope
+    claim smuggled in behind a blank name is still rejected)."""
+    name = item.get("name") or ""
+    role = item.get("role") or ""
+    site_scope = item.get("site_scope") or ""
+    application_reference = item.get("application_reference") or ""
+    return not name and not role and not site_scope and not application_reference
+
+
 def validate_summary_output(context: AllocationIntelligenceContext, structured_output: dict) -> tuple[bool, list[str]]:
     """Deterministic post-generation check - rejects an output whose
     MATERIAL FACTUAL CLAIMS cannot be traced back to the context it was
@@ -1302,10 +1473,16 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
     # allow-listing the digit "18" itself - the fix generalises to ANY
     # trusted label carrying a parenthetical qualifier, never a one-off
     # numeric exception.
+    # V8 Reliability Hardening Amendment - trusted LABEL substrings are
+    # masked case-insensitively (via _mask_known_strings_case_insensitive,
+    # applied separately below), never folded into the case-sensitive
+    # known_strings set above - see that function's own docstring for why
+    # references/entity names must stay exact-case while a natural-
+    # language label like "Regulation 18" must not.
     trusted_labels: set[str] = set()
     for label in (context.allocation_reference, context.plan_status_label):
         trusted_labels.update(_trusted_label_substrings(label))
-    known_strings = allowed_refs | allowed_entity_names | allowed_role_labels | _DIGIT_BEARING_ROLE_LABELS | trusted_labels
+    known_strings = allowed_refs | allowed_entity_names | allowed_role_labels | _DIGIT_BEARING_ROLE_LABELS
 
     allowed_numbers = _allowed_numbers(context)
     all_text = " ".join([
@@ -1314,6 +1491,7 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
         *structured_output.get("investigation_priorities", []),
     ])
     masked_text = _mask_known_strings(all_text, known_strings)
+    masked_text = _mask_known_strings_case_insensitive(masked_text, trusted_labels)
     found_numbers = _numbers_in(masked_text)
     unsupported_numbers = sorted(n for n in found_numbers if len(n.lstrip("0")) >= 2 and n not in allowed_numbers)
     if unsupported_numbers:
@@ -1321,6 +1499,15 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
 
     representative_by_reference = _representative_applications_by_reference(context)
     for item in structured_output.get("referenced_applications", []):
+        if _is_inert_application_entry(item):
+            # V8 Reliability Hardening Amendment - see _is_inert_application_
+            # entry's own docstring: this entry asserts NOTHING (no
+            # reference, no status, no decision claim of any kind) - the
+            # model's way of saying "I have nothing to report here" rather
+            # than returning an empty referenced_applications array.
+            # Semantically identical to the entry not existing at all; never
+            # validated as though "" were a claimed reference.
+            continue
         ref = item.get("reference", "")
         if ref not in allowed_refs:
             problems.append(f"unsupported application reference: {ref}")
@@ -1385,6 +1572,11 @@ def validate_summary_output(context: AllocationIntelligenceContext, structured_o
     # safety net if it does anyway.
     non_ownership_known_names = {n for n in (context.council_name, context.local_plan_name) if n}
     for item in structured_output.get("referenced_entities", []):
+        if _is_inert_entity_entry(item):
+            # V8 Reliability Hardening Amendment - see _is_inert_entity_
+            # entry's own docstring: no entity name, no role, no scope, no
+            # Application attribution - asserts nothing about any party.
+            continue
         name, role, site_scope = item.get("name", ""), item.get("role", ""), item.get("site_scope", "")
         if name in non_ownership_known_names:
             continue
