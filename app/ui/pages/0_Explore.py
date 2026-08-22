@@ -64,6 +64,7 @@ from app.ui.housing_type import (
 )
 from app.ui.map_selection import resolve_selected_site_id
 from app.ui.shell import clean_display_text, entity_search_results_panel, page_header, status_badge, wide_canvas
+from app.ui.shortlist import SHORTLIST_SESSION_KEY, shortlist_count
 from app.ui.site_headline import build_site_headline, clean_tooltip_text, format_site_tooltip
 
 council_regions = {code: cfg.region for code, cfg in bootstrap().items()}
@@ -110,6 +111,20 @@ if unmatched_local_plan_count:
         LOCAL_PLAN_PAGE,
         label=f"{unmatched_local_plan_count} Local Plan allocated sites with no application yet →",
         icon="📋",
+    )
+
+# --- Allocation shortlist (Site Selection & Reporting V1 Gate 1) - purely
+# additive discoverability, same "N items awaiting X →" pattern as the two
+# links above; does not touch this page's own Planning Discovery selection
+# (selected_site_ids/table_event below), which remains entirely separate.
+st.session_state.setdefault(SHORTLIST_SESSION_KEY, {})
+_shortlisted_count = shortlist_count(st.session_state[SHORTLIST_SESSION_KEY], "allocation")
+if _shortlisted_count:
+    SHORTLIST_PAGE = Path(__file__).resolve().parent / "3b_Shortlist.py"
+    st.page_link(
+        SHORTLIST_PAGE,
+        label=f"{_shortlisted_count} allocation{'s' if _shortlisted_count != 1 else ''} shortlisted →",
+        icon="⭐",
     )
 
 # --- Excluded sites (manually killed as not genuinely residential) ---------

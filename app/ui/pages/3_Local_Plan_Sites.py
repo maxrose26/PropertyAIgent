@@ -57,6 +57,14 @@ from app.reporting.ownership_control import (
 )
 from app.reporting.residential_mix import build_residential_mix
 from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db, pick_representative_application
+from app.ui.shortlist import (
+    SHORTLIST_SESSION_KEY,
+    ReportCandidate,
+    add_candidate,
+    is_shortlisted,
+    remove_candidate,
+    shortlist_count,
+)
 from app.ui.shell import (
     allocation_card,
     control_relationship_group_card,
@@ -83,6 +91,22 @@ st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
 credits_sidebar(session, settings)
 wide_canvas()
+
+# Site Selection & Reporting V1 Gate 1 - session-only shortlist, keyed by
+# (candidate_type, candidate_id) - see app.ui.shortlist. Initialised once
+# here (the first page in the session that needs it) rather than in every
+# page separately; st.session_state.setdefault is a no-op on every
+# subsequent rerun/page visit within the same browser session.
+st.session_state.setdefault(SHORTLIST_SESSION_KEY, {})
+
+_shortlisted_count = shortlist_count(st.session_state[SHORTLIST_SESSION_KEY], "allocation")
+if _shortlisted_count:
+    SHORTLIST_PAGE = Path(__file__).resolve().parent / "3b_Shortlist.py"
+    st.page_link(
+        SHORTLIST_PAGE,
+        label=f"{_shortlisted_count} allocation{'s' if _shortlisted_count != 1 else ''} shortlisted →",
+        icon="⭐",
+    )
 
 
 # --- Allocation detail state (Part 12 - a query-param selected state on
@@ -119,6 +143,28 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     ])
     if card["is_multi_authority"]:
         joint_plan_badge()
+
+    # Site Selection & Reporting V1 Gate 1 - same toggle semantics as the
+    # gallery card's shortlist button (app.ui.shell.allocation_card), just
+    # rendered directly here since the detail view isn't built from that
+    # component - the underlying app.ui.shortlist helpers are identical
+    # either way, so a card added from the gallery and one added from
+    # here behave identically.
+    _in_shortlist = is_shortlisted(st.session_state[SHORTLIST_SESSION_KEY], "allocation", allocation_id)
+    if st.button(
+        "✓ Shortlisted — remove" if _in_shortlist else "☆ Add to shortlist",
+        key=f"alloc-detail-shortlist-toggle-{allocation_id}",
+    ):
+        if _in_shortlist:
+            st.session_state[SHORTLIST_SESSION_KEY] = remove_candidate(
+                st.session_state[SHORTLIST_SESSION_KEY], "allocation", allocation_id,
+            )
+        else:
+            st.session_state[SHORTLIST_SESSION_KEY] = add_candidate(
+                st.session_state[SHORTLIST_SESSION_KEY],
+                ReportCandidate(candidate_type="allocation", candidate_id=allocation_id, display_name=card["site_name"]),
+            )
+        st.rerun()
 
     # Loaded once here (Section 16/17) rather than deep in the Timeline
     # section below - reused for the Timeline section further down,
@@ -793,7 +839,21 @@ for tab, category in zip(tabs, categories):
         cols = st.columns(3)
         for i, card in enumerate(page):
             with cols[i % 3]:
-                allocation_card(card, key=f"{category['key']}-{card['id']}")
+                _card_in_shortlist = is_shortlisted(st.session_state[SHORTLIST_SESSION_KEY], "allocation", card["id"])
+                _toggle_clicked = allocation_card(
+                    card, key=f"{category['key']}-{card['id']}", in_shortlist=_card_in_shortlist,
+                )
+                if _toggle_clicked:
+                    if _card_in_shortlist:
+                        st.session_state[SHORTLIST_SESSION_KEY] = remove_candidate(
+                            st.session_state[SHORTLIST_SESSION_KEY], "allocation", card["id"],
+                        )
+                    else:
+                        st.session_state[SHORTLIST_SESSION_KEY] = add_candidate(
+                            st.session_state[SHORTLIST_SESSION_KEY],
+                            ReportCandidate(candidate_type="allocation", candidate_id=card["id"], display_name=card["site_name"]),
+                        )
+                    st.rerun()
 
         if shown < len(ordered):
             st.caption(f"Showing {len(page)} of {len(ordered)} allocations.")
