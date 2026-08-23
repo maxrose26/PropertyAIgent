@@ -1218,7 +1218,7 @@ def status_badge_row(badges: list[tuple[str, str]]) -> None:
             status_badge(kind, label)
 
 
-def allocation_card(card: dict, *, key: str) -> None:
+def allocation_card(card: dict, *, key: str, in_shortlist: bool = False) -> bool:
     """One Allocation Discovery gallery card (Sprint 4.5, Part 7; commercial
     presentation refined in Sprint 4.5a, Part 1) - card is
     app.reporting.allocation_discovery.build_allocation_card's own output;
@@ -1235,7 +1235,14 @@ def allocation_card(card: dict, *, key: str) -> None:
     scale). Reuses _visual_evidence_card for the thumbnail, status_badge/
     joint_plan_badge for badges, and render_alert for the "no linked
     application" commercial signal - no new badge/image/alert rendering
-    invented here beyond registering that one new render_alert kind."""
+    invented here beyond registering that one new render_alert kind.
+
+    Site Selection & Reporting V1 Gate 1 - `in_shortlist` is a plain
+    already-computed bool the caller passes in (this module never touches
+    st.session_state itself, per its own "presentation-only" module
+    docstring); the return value is just this render's button click,
+    letting the page script decide what to do about it (add/remove via
+    app.ui.shortlist) rather than this component owning that decision."""
     with st.container(border=True, key=f"alloc-card-{key}"):
         # 1. Allocation name
         st.markdown(f"##### {_escape(card['site_name'])}")
@@ -1302,6 +1309,14 @@ def allocation_card(card: dict, *, key: str) -> None:
         # least important) last - a simple visual hierarchy rather than
         # four identical, undifferentiated links in a row.
         st.divider()
+        # Site Selection & Reporting V1 Gate 1 - the shortlist toggle sits
+        # above the navigation links, as its own full-width button (a
+        # mutation, not a navigation - kept visually distinct from the
+        # page_links below rather than folded into the same row).
+        shortlist_clicked = st.button(
+            "✓ Shortlisted — remove" if in_shortlist else "☆ Add to shortlist",
+            key=f"alloc-shortlist-toggle-{key}", use_container_width=True,
+        )
         st.page_link(
             "pages/3_Local_Plan_Sites.py", label="Open Allocation →",
             query_params={"allocation_id": str(card["id"])},
@@ -1318,6 +1333,8 @@ def allocation_card(card: dict, *, key: str) -> None:
         source_link = card.get("plan_page_url") or card.get("source_document_url")
         if source_link:
             st.caption(f"[Open source document →]({source_link})")
+
+    return shortlist_clicked
 
 
 def entity_search_result_row(result, *, key: str) -> None:

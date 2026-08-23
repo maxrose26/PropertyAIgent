@@ -49,13 +49,19 @@ council_intelligence_detail_page = st.Page(
     "pages/6_Council_Intelligence_Detail.py", title="Council Intelligence", icon="🏛️", visibility="hidden"
 )
 local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Allocation Discovery", icon="🗺️")
+# Site Selection & Reporting V1 Gate 1 - hidden, same pattern as
+# site_profile_page/council_intelligence_detail_page above: reached via the
+# "N allocations shortlisted →" page_link on Allocation Discovery/Explore,
+# not a persistent top-level tab (a V1 workflow step, not a standing
+# destination in its own right yet).
+shortlist_page = st.Page("pages/3b_Shortlist.py", title="Shortlist", icon="⭐", visibility="hidden")
 council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️")
 review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗")
 
 pg = st.navigation(
     {
         "": [dashboard_page, explore_page, site_profile_page],
-        "Policy": [council_intelligence_page, council_intelligence_detail_page, local_plan_page],
+        "Policy": [council_intelligence_page, council_intelligence_detail_page, local_plan_page, shortlist_page],
         "Administration": [council_operations_page, review_links_page],
     },
     position="top",
