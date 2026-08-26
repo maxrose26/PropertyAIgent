@@ -10,6 +10,7 @@ and tests/test_site_profile.py.
 from __future__ import annotations
 
 import datetime as dt
+from types import SimpleNamespace
 
 from sqlalchemy import event
 
@@ -17,15 +18,19 @@ from app.db.models import Application, LocalPlan, LocalPlanCouncil, LocalPlanSit
 from app.reporting.allocation_discovery import (
     CATEGORY_DEFINITIONS,
     MAJOR_HOUSING_CAPACITY_THRESHOLD,
+    TABLE_CORE_COLUMNS,
+    TABLE_SECONDARY_COLUMNS,
     apply_filters,
     build_allocation_card,
     build_allocation_discovery,
     build_summary_metrics,
+    build_table_row,
     compute_categories,
     format_capacity,
     is_major_housing_allocation,
     linked_application_text,
     matched_status_text,
+    resolve_selected_cards,
     search_allocations,
     sort_cards,
 )
@@ -798,3 +803,236 @@ def test_card_surfaces_development_coverage_via_allocation_site_relationship(ses
     assert card["development_coverage"].identified_application_capacity == 244
     assert card["development_coverage"].indicative_residual_capacity == 856
     assert card["opportunity"]["signal"] == "INVESTIGATE"
+
+
+# --- Gate 1A screening table (build_table_row) -------------------------------
+# Allocation Discovery Selection UX + Performance Amendment - the compact
+# table's row shape. build_table_row is a pure reshape of an already-built
+# card dict (same discipline as build_matching_attributes above), so these
+# tests use the same hand-built _card() fixture the rest of this file already
+# relies on for exactly that reason - no database, no Streamlit runtime.
+
+def _coverage(**overrides) -> SimpleNamespace:
+    base = {
+        "capacity_accounting_status": "activity_identified",
+        "development_coverage_percentage": 0.45,
+        "indicative_residual_capacity": 82,
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_build_table_row_maps_core_identity_and_status_fields():
+    card = _card(site_name="Northern Gateway", council_name="Bury Metropolitan Borough Council", plan_name="Bury Local Plan")
+    row = build_table_row(card, shortlisted=False)
+    assert row["Allocation / Site"] == "Northern Gateway"
+    assert row["Authority"] == "Bury Metropolitan Borough Council"
+    assert row["Plan Status"] == card["plan_status_label"]
+    assert row["Capacity"] == card["capacity"]["display"]
+    assert row["Local Plan"] == "Bury Local Plan"
+    assert row["Intended Use"] == card["intended_use_label"]
+
+
+def test_build_table_row_planning_activity_matches_the_canonical_filter_classification():
+    card = _card(development_coverage=_coverage(capacity_accounting_status="activity_identified"))
+    row = build_table_row(card, shortlisted=False)
+    assert row["Planning Activity"] == "Activity identified"
+
+
+def test_build_table_row_no_linked_application_is_neutral_wording_not_an_error():
+    # PLANNING_ACTIVITY_NONE's own label - "No identified activity" - is
+    # deliberately plain, evidence-bounded text, not a warning/error phrase
+    # (Section 14: no linked Application is not a red flag).
+    card = _card(development_coverage=_coverage(capacity_accounting_status="no_activity"))
+    row = build_table_row(card, shortlisted=False)
+    assert row["Planning Activity"] == "No identified activity"
+    banned = ("error", "warning", "problem", "missing", "failed")
+    assert not any(word in row["Planning Activity"].lower() for word in banned)
+
+
+def test_build_table_row_review_required_activity_status():
+    card = _card(development_coverage=_coverage(capacity_accounting_status="review_required"))
+    row = build_table_row(card, shortlisted=False)
+    assert row["Planning Activity"] == "Review required"
+
+
+def test_build_table_row_planning_activity_falls_back_when_no_coverage_computed_at_all():
+    card = _card()  # _card()'s own base dict has no "development_coverage" key
+    row = build_table_row(card, shortlisted=False)
+    assert row["Planning Activity"] == "Not determined"
+
+
+def test_build_table_row_development_coverage_percentage_formatted_and_none_safe():
+    with_coverage = _card(development_coverage=_coverage(development_coverage_percentage=0.5))
+    assert build_table_row(with_coverage, shortlisted=False)["Development Coverage %"] == "50%"
+
+    no_percentage = _card(development_coverage=_coverage(development_coverage_percentage=None))
+    assert build_table_row(no_percentage, shortlisted=False)["Development Coverage %"] == "Not determined"
+
+    no_coverage_at_all = _card()
+    assert build_table_row(no_coverage_at_all, shortlisted=False)["Development Coverage %"] == "Not determined"
+
+
+def test_build_table_row_indicative_residual_capacity_formatted_and_none_safe():
+    with_residual = _card(development_coverage=_coverage(indicative_residual_capacity=1234))
+    assert build_table_row(with_residual, shortlisted=False)["Indicative Residual Capacity"] == "1,234"
+
+    zero_residual = _card(development_coverage=_coverage(indicative_residual_capacity=0))
+    # 0 is a real, meaningful value (fully accounted-for capacity) - must
+    # not be treated as falsy/missing the way `if coverage.indicative_...`
+    # alone would (confirmed against the exact same pitfall the platform's
+    # allocation summary validators already guard against elsewhere).
+    assert build_table_row(zero_residual, shortlisted=False)["Indicative Residual Capacity"] == "0"
+
+    no_residual = _card(development_coverage=_coverage(indicative_residual_capacity=None))
+    assert build_table_row(no_residual, shortlisted=False)["Indicative Residual Capacity"] == "Not determined"
+
+
+def test_build_table_row_shortlisted_column_reflects_the_passed_in_flag():
+    card = _card()
+    assert build_table_row(card, shortlisted=True)["Shortlisted"] == "✓"
+    assert build_table_row(card, shortlisted=False)["Shortlisted"] == ""
+
+
+def test_table_column_lists_are_disjoint_and_match_build_table_row_keys():
+    card = _card(development_coverage=_coverage())
+    row_keys = set(build_table_row(card, shortlisted=False).keys())
+    assert set(TABLE_CORE_COLUMNS) <= row_keys
+    assert set(TABLE_SECONDARY_COLUMNS) <= row_keys
+    assert set(TABLE_CORE_COLUMNS).isdisjoint(TABLE_SECONDARY_COLUMNS)
+
+
+# --- Gate 1A row-selection resolution (resolve_selected_cards) ---------------
+# The one piece of the batch-shortlist path with real logic in it: mapping
+# st.dataframe's 0-based selection-event row positions back to the card dicts
+# they refer to. Directly covers the test task's "selected row indices map to
+# correct allocation IDs" / "multiple selected rows produce multiple
+# candidates" / "selected rows from one page don't accidentally map to
+# another page" requirements at the pure-function level.
+
+def test_resolve_selected_cards_maps_single_row_index_to_correct_card():
+    page = [_card(id=10, site_name="A"), _card(id=20, site_name="B"), _card(id=30, site_name="C")]
+    assert [c["id"] for c in resolve_selected_cards(page, [1])] == [20]
+
+
+def test_resolve_selected_cards_maps_multiple_row_indices_preserving_selection_order_input():
+    page = [_card(id=10), _card(id=20), _card(id=30)]
+    resolved = resolve_selected_cards(page, [0, 2])
+    assert [c["id"] for c in resolved] == [10, 30]
+
+
+def test_resolve_selected_cards_no_selection_returns_empty_list():
+    page = [_card(id=10), _card(id=20)]
+    assert resolve_selected_cards(page, []) == []
+
+
+def test_resolve_selected_cards_ignores_out_of_range_indices_rather_than_raising():
+    page = [_card(id=10), _card(id=20)]
+    # A stale selection event referencing a row position that no longer
+    # exists in the current page (e.g. the page shrank between render and
+    # submit) must not crash the batch-add - it should simply be dropped.
+    assert [c["id"] for c in resolve_selected_cards(page, [0, 5, -1])] == [10]
+
+
+def test_resolve_selected_cards_a_different_pages_own_indices_never_leak_into_this_ones_result():
+    # Confirms row positions are resolved strictly against the SAME page
+    # list passed in - a different tab/page's row 0 is a different
+    # allocation, and this function has no way (and must have no way) to
+    # confuse the two, since it never sees any page but the one it's given.
+    page_one = [_card(id=100, site_name="Page One Row Zero")]
+    page_two = [_card(id=200, site_name="Page Two Row Zero")]
+    assert [c["id"] for c in resolve_selected_cards(page_one, [0])] == [100]
+    assert [c["id"] for c in resolve_selected_cards(page_two, [0])] == [200]
+
+
+# --- Gate 1A pre-merge performance amendment: no explicit rerun in the
+# batch-submit handler -------------------------------------------------------
+# Regression guard for the exact bug this amendment fixes: an explicit
+# st.rerun() placed after build_allocation_discovery() has already executed
+# once for the current script run forces it to execute a SECOND time
+# (~2s/14 queries), purely to refresh a badge/message that can be (and now
+# is) updated inline in the same pass instead. No streamlit.testing.v1.
+# AppTest harness exists in this codebase to run the real page and count
+# discovery-build calls live (this codebase's established convention - see
+# every other test file's own docstring - is to unit-test pure helpers, not
+# page scripts); this instead inspects the actual submit-handling source
+# block via `ast`, a precise, low-complexity way to lock in the fix without
+# inventing new test infrastructure. See
+# specifications/013-allocation-discovery-gate-1a-performance-amendment.md.
+
+def _local_plan_sites_source() -> str:
+    from pathlib import Path
+
+    source_path = Path(__file__).resolve().parents[1] / "app" / "ui" / "pages" / "3_Local_Plan_Sites.py"
+    return source_path.read_text(encoding="utf-8")
+
+
+def _local_plan_sites_ast():
+    import ast
+
+    return ast.parse(_local_plan_sites_source())
+
+
+def _is_rerun_call(node) -> bool:
+    import ast
+
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "rerun"
+
+
+def _rerun_calls_within(node) -> list:
+    import ast
+
+    return [n for n in ast.walk(node) if _is_rerun_call(n)]
+
+
+def test_batch_submit_handler_contains_no_explicit_rerun():
+    import ast
+
+    tree = _local_plan_sites_ast()
+
+    def _references_submitted(test_node: ast.expr) -> bool:
+        return any(isinstance(n, ast.Name) and n.id == "submitted" for n in ast.walk(test_node))
+
+    submit_if_blocks = [node for node in ast.walk(tree) if isinstance(node, ast.If) and _references_submitted(node.test)]
+    assert submit_if_blocks, "expected to find an `if submitted:`-shaped block in the Allocation Discovery page"
+
+    for node in submit_if_blocks:
+        assert not _rerun_calls_within(node), (
+            "an explicit st.rerun() inside the batch-submit handler forces build_allocation_discovery() to run "
+            "a second time per batch submit - this is the exact regression the Gate 1A pre-merge performance "
+            "amendment fixed"
+        )
+
+
+def test_page_contains_exactly_the_three_pre_existing_non_shortlist_rerun_calls():
+    """The only actual st.rerun() CALLS left in this page (as real AST Call
+    nodes, not substring matches against comment text - a plain text search
+    would false-positive on this very file's own explanatory comments about
+    NOT calling st.rerun()) are pre-existing and unrelated to the shortlist:
+    the detail-view "back" button, "Clear filters", and "Show more"
+    pagination. The shortlist batch-submit and detail-view toggle paths
+    must never reintroduce one. A deliberately blunt regression net: if
+    this count ever needs to grow for a genuine, unrelated reason, update
+    it explicitly rather than loosening it."""
+    assert len(_rerun_calls_within(_local_plan_sites_ast())) == 3
+
+
+def test_detail_view_shortlist_toggle_contains_no_explicit_rerun():
+    import ast
+
+    tree = _local_plan_sites_ast()
+    toggle_functions = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_render_detail"
+    ]
+    assert toggle_functions, "expected to find _render_detail in the Allocation Discovery page"
+
+    def _references_in_shortlist(test_node: ast.expr) -> bool:
+        return any(isinstance(n, ast.Name) and n.id == "_in_shortlist" for n in ast.walk(test_node))
+
+    toggle_if_blocks = [
+        node for node in ast.walk(toggle_functions[0]) if isinstance(node, ast.If) and _references_in_shortlist(node.test)
+    ]
+    assert toggle_if_blocks, "expected to find the shortlist toggle's `if _in_shortlist:` inside _render_detail"
+    for node in toggle_if_blocks:
+        assert not _rerun_calls_within(node), "the detail-view shortlist toggle must remain free of an explicit st.rerun()"

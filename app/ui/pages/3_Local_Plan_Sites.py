@@ -34,14 +34,18 @@ from app.reporting.allocation_discovery import (
     PLANNING_ACTIVITY_NONE,
     PLANNING_ACTIVITY_REVIEW_REQUIRED,
     SORT_OPTIONS,
+    TABLE_CORE_COLUMNS,
+    TABLE_SECONDARY_COLUMNS,
     apply_filters,
     build_allocation_discovery,
     build_summary_metrics,
+    build_table_row,
     capacity_band_range,
     compute_categories,
     linked_application_help,
     matched_status_help,
     planning_activity_help,
+    resolve_selected_cards,
     search_allocations,
     sort_cards,
     total_homes_kpi_caption,
@@ -66,7 +70,6 @@ from app.ui.shortlist import (
     shortlist_count,
 )
 from app.ui.shell import (
-    allocation_card,
     control_relationship_group_card,
     empty_state,
     evidence_gap_panel,
@@ -80,7 +83,11 @@ from app.ui.shell import (
     wide_canvas,
 )
 
-PAGE_SIZE = 24
+# Gate 1A - a compact table row is far shorter than a 3-column gallery card,
+# so a larger page fits comfortably without excessive scrolling; still
+# bounded pagination, not an unbounded render of every allocation at once
+# (Section 13: "do not load/render an unbounded future national dataset").
+TABLE_PAGE_SIZE = 50
 THIS_PAGE = "pages/3_Local_Plan_Sites.py"
 
 bootstrap()
@@ -99,14 +106,31 @@ wide_canvas()
 # subsequent rerun/page visit within the same browser session.
 st.session_state.setdefault(SHORTLIST_SESSION_KEY, {})
 
-_shortlisted_count = shortlist_count(st.session_state[SHORTLIST_SESSION_KEY], "allocation")
-if _shortlisted_count:
-    SHORTLIST_PAGE = Path(__file__).resolve().parent / "3b_Shortlist.py"
-    st.page_link(
-        SHORTLIST_PAGE,
-        label=f"{_shortlisted_count} allocation{'s' if _shortlisted_count != 1 else ''} shortlisted →",
-        icon="⭐",
-    )
+SHORTLIST_PAGE = Path(__file__).resolve().parent / "3b_Shortlist.py"
+
+# Gate 1A pre-merge performance amendment - rendered via a placeholder
+# rather than a direct call, so the batch-submit handler further down (in
+# the tab loop) can update this SAME on-screen slot with the fresh count
+# later in this same script execution - without an explicit st.rerun(),
+# which would otherwise force a second, ~2s/14-query
+# build_allocation_discovery() rebuild just to refresh this badge (the
+# exact double-build the pre-merge review caught - see
+# specifications/013-allocation-discovery-gate-1a-performance-amendment.md).
+_shortlist_badge_placeholder = st.empty()
+
+
+def _render_shortlist_badge() -> None:
+    count = shortlist_count(st.session_state[SHORTLIST_SESSION_KEY], "allocation")
+    if count:
+        with _shortlist_badge_placeholder.container():
+            st.page_link(
+                SHORTLIST_PAGE, label=f"{count} allocation{'s' if count != 1 else ''} shortlisted →", icon="⭐",
+            )
+    else:
+        _shortlist_badge_placeholder.empty()
+
+
+_render_shortlist_badge()
 
 
 # --- Allocation detail state (Part 12 - a query-param selected state on
@@ -144,12 +168,17 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     if card["is_multi_authority"]:
         joint_plan_badge()
 
-    # Site Selection & Reporting V1 Gate 1 - same toggle semantics as the
-    # gallery card's shortlist button (app.ui.shell.allocation_card), just
-    # rendered directly here since the detail view isn't built from that
-    # component - the underlying app.ui.shortlist helpers are identical
-    # either way, so a card added from the gallery and one added from
-    # here behave identically.
+    # Site Selection & Reporting V1 Gate 1A - same toggle semantics as the
+    # table's batch shortlist action, just a single-allocation shortcut
+    # rendered directly here since the detail view isn't built from the
+    # table/form. Deliberately NO explicit st.rerun() (Gate 1A performance
+    # amendment, "batch-submit rerun decision"): this is a single-allocation
+    # page outside the rapid-screening flow the redundant rerun was actually
+    # costing latency on, so the only visible cost of omitting it is this
+    # button's own label lagging by one interaction (fixed by the next
+    # click, a filter change, or navigating away and back) - a small,
+    # accepted trade against paying another full build_allocation_discovery
+    # rebuild just to refresh one label on a page that shows one allocation.
     _in_shortlist = is_shortlisted(st.session_state[SHORTLIST_SESSION_KEY], "allocation", allocation_id)
     if st.button(
         "✓ Shortlisted — remove" if _in_shortlist else "☆ Add to shortlist",
@@ -164,7 +193,6 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 st.session_state[SHORTLIST_SESSION_KEY],
                 ReportCandidate(candidate_type="allocation", candidate_id=allocation_id, display_name=card["site_name"]),
             )
-        st.rerun()
 
     # Loaded once here (Section 16/17) rather than deep in the Timeline
     # section below - reused for the Timeline section further down,
@@ -833,30 +861,89 @@ for tab, category in zip(tabs, categories):
     with tab:
         ordered = sort_cards(category["cards"], sort_key)
         show_key = f"alloc-show-{category['key']}"
-        shown = st.session_state.get(show_key, PAGE_SIZE)
+        shown = st.session_state.get(show_key, TABLE_PAGE_SIZE)
         page = ordered[:shown]
 
-        cols = st.columns(3)
-        for i, card in enumerate(page):
-            with cols[i % 3]:
-                _card_in_shortlist = is_shortlisted(st.session_state[SHORTLIST_SESSION_KEY], "allocation", card["id"])
-                _toggle_clicked = allocation_card(
-                    card, key=f"{category['key']}-{card['id']}", in_shortlist=_card_in_shortlist,
-                )
-                if _toggle_clicked:
-                    if _card_in_shortlist:
-                        st.session_state[SHORTLIST_SESSION_KEY] = remove_candidate(
-                            st.session_state[SHORTLIST_SESSION_KEY], "allocation", card["id"],
-                        )
-                    else:
-                        st.session_state[SHORTLIST_SESSION_KEY] = add_candidate(
-                            st.session_state[SHORTLIST_SESSION_KEY],
-                            ReportCandidate(candidate_type="allocation", candidate_id=card["id"], display_name=card["site_name"]),
-                        )
-                    st.rerun()
+        # Gate 1A - compact multi-select screening table, the primary
+        # results surface (replacing the per-card gallery grid here; the
+        # rich card/detail rendering itself, app.ui.shell.allocation_card,
+        # is unchanged and untouched - it is simply no longer called from
+        # this loop, detail remains one click away via the selector below).
+        # Wrapped in st.form so row selection is deferred client-side and
+        # never triggers a backend rerun (Gate 1A performance amendment,
+        # verified against the installed Streamlit 1.59.0 source:
+        # st.dataframe's selection state is bound to the same form_id
+        # batching mechanism every standard widget uses) - selecting any
+        # number of rows costs zero additional build_allocation_discovery()
+        # calls; only submitting the form does, once per batch.
+        table_df = pd.DataFrame([
+            build_table_row(c, shortlisted=is_shortlisted(st.session_state[SHORTLIST_SESSION_KEY], "allocation", c["id"]))
+            for c in page
+        ])
+        with st.form(key=f"alloc-shortlist-form-{category['key']}"):
+            table_event = st.dataframe(
+                table_df[TABLE_CORE_COLUMNS + TABLE_SECONDARY_COLUMNS],
+                use_container_width=True, hide_index=True,
+                selection_mode="multi-row", on_select="rerun",
+                key=f"alloc-table-{category['key']}",
+            )
+            submitted = st.form_submit_button("Add selected to shortlist")
+
+        if submitted:
+            selected_rows = table_event["selection"]["rows"] if table_event else []
+            selected_cards = resolve_selected_cards(page, selected_rows)
+            if selected_cards:
+                new_shortlist_state = st.session_state[SHORTLIST_SESSION_KEY]
+                for selected_card in selected_cards:
+                    new_shortlist_state = add_candidate(
+                        new_shortlist_state,
+                        ReportCandidate(
+                            candidate_type="allocation", candidate_id=selected_card["id"],
+                            display_name=selected_card["site_name"],
+                        ),
+                    )
+                st.session_state[SHORTLIST_SESSION_KEY] = new_shortlist_state
+                # Gate 1A pre-merge performance amendment - deliberately NO
+                # st.rerun() here. build_allocation_discovery() already ran
+                # once for this script execution (the form_submit_button
+                # click's own natural rerun, per Streamlit's own click
+                # semantics) - an explicit second rerun would pay that
+                # ~2s/14-query cost again purely to refresh the badge and
+                # show this message, which is exactly the double-build the
+                # pre-merge review identified. Both are instead updated
+                # inline, in this same pass, at zero extra backend cost:
+                # the success message renders directly here, and the badge
+                # placeholder (created near the top of the script) is
+                # re-rendered in place with the fresh count.
+                st.success(f"{len(selected_cards)} allocation{'s' if len(selected_cards) != 1 else ''} added to shortlist.")
+                _render_shortlist_badge()
 
         if shown < len(ordered):
             st.caption(f"Showing {len(page)} of {len(ordered)} allocations.")
             if st.button("Show more", key=f"alloc-show-more-{category['key']}"):
-                st.session_state[show_key] = shown + PAGE_SIZE
+                st.session_state[show_key] = shown + TABLE_PAGE_SIZE
                 st.rerun()
+
+        # Detail drill-down (Section 7) - a separate selector + button,
+        # mirroring the exact pattern already proven at the bottom of
+        # Explore (app/ui/pages/0_Explore.py, "Or get a shareable link to a
+        # specific scheme") rather than a table LinkColumn. LinkColumn
+        # renders a real <a href> anchor needing a literal, resolvable URL
+        # string; this app's internal page routing normally goes through
+        # st.switch_page/st.page_link with a file-path identifier, not a
+        # confirmed URL string in the same way an external portal link is.
+        # Using the already-proven internal-navigation mechanism sidesteps
+        # that uncertainty entirely rather than guessing at a URL shape -
+        # see specifications/012-allocation-discovery-gate-1a-table.md for
+        # the full reasoning.
+        if page:
+            detail_options = {f"{c['site_name']} ({c['council_name']})": c["id"] for c in page}
+            detail_col1, detail_col2 = st.columns([4, 1])
+            with detail_col1:
+                detail_label = st.selectbox(
+                    "Open allocation detail", list(detail_options.keys()),
+                    label_visibility="collapsed", key=f"alloc-detail-select-{category['key']}",
+                )
+            with detail_col2:
+                if st.button("Open detail →", key=f"alloc-detail-open-{category['key']}", use_container_width=True):
+                    st.switch_page(THIS_PAGE, query_params={"allocation_id": str(detail_options[detail_label])})
