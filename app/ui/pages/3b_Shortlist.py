@@ -1,28 +1,24 @@
-"""Shortlist review (Site Selection & Reporting V1 Gate 1) - shows the
-allocations added to the session-only shortlist (app.ui.shortlist) together,
-so a user can review them as a group before Gate 3/4 add CSV/PDF export.
+"""Shortlist review + CSV export (Site Selection & Reporting V1 Gate 2) -
+shows the allocations added to the session-only shortlist (app.ui.shortlist)
+together, so a user can review them as a group and export a deterministic
+opportunity dataset.
 
-Deliberately NOT an analytics dashboard: no new scoring, ranking, or charts -
-just the same evidence already shown elsewhere, reused (never re-derived)
-for a set of allocations instead of one at a time.
+Deliberately NOT a full report or an analytics dashboard: no new scoring,
+ranking, or charts - concise party-evidence signal only (Applicant/Developer/
+a count of other ownership evidence), with full per-allocation detail
+remaining one click away on Allocation Detail, exactly as Gate 1 already
+established.
 
-Data reuse (Section 9 of the approved design): reuses
-app.reporting.allocation_discovery.build_allocation_discovery's already-
-batched card list, filtered down to the shortlisted ids, rather than a new
-query path built solely for this page. The one per-allocation read is
-app.reporting.allocation_intelligence_summary.get_allocation_summary
-(read-only, never generates) - acceptable at the 5-10 item scale this V1
-targets; a batched sibling is Gate 3 scope, not this one, per the approved
-design's explicit batching plan for the eventual report-context builder.
-
-Party/ownership evidence (known Applicant/Developer signal) is deliberately
-NOT shown on this page - surfacing it correctly requires
-app.reporting.ownership_control.get_allocation_control_intelligence, which
-today queries per related Site, only ever called per-allocation - looping it
-here would be exactly the kind of new architecture Gate 1 was told not to
-introduce (a batched entrypoint is explicitly Gate 3 scope). Omitted per the
-task's own instruction: "If showing this evidence would require new party
-logic, omit it from Gate 1 rather than expanding scope."
+Data reuse (Gate 2): consumes app.reporting.allocation_report.
+build_allocation_report_context - the SAME deterministic report context CSV
+export reads from - rather than a separate query path per surface (see that
+module's own docstring). Replaces Gate 1's build_allocation_discovery +
+per-card get_allocation_summary reuse now that the batched, purpose-built
+report-context builder exists; party/ownership evidence (omitted in Gate 1
+because the underlying batching didn't exist yet) is now shown, backed by
+app.reporting.ownership_control.get_allocations_control_intelligence's new
+batched entrypoint - a single query across every shortlisted allocation's
+related Sites, never one query per allocation.
 """
 from __future__ import annotations
 
@@ -33,10 +29,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import streamlit as st
 
-from app.reporting.allocation_discovery import build_allocation_discovery
-from app.reporting.allocation_intelligence_summary import get_allocation_summary
+from app.reporting.allocation_discovery import ALLOCATION_REVIEW_STATUS_META, PLAN_STATUS_META
+from app.reporting.allocation_report import build_allocation_report_context, to_csv_bytes
 from app.ui.common import bootstrap, credits_sidebar, get_db
-from app.ui.shell import empty_state, page_header, section_header, stat_tile, status_badge_row, wide_canvas
+from app.ui.shell import empty_state, page_header, stat_tile, status_badge_row, wide_canvas
 from app.ui.shortlist import SHORTLIST_SESSION_KEY, clear_shortlist, remove_candidate, shortlist_items
 
 bootstrap()
@@ -71,26 +67,41 @@ if not candidates:
     st.stop()
 
 st.caption(f"{len(candidates)} allocation{'s' if len(candidates) != 1 else ''} shortlisted.")
-if st.button("Clear shortlist", key="shortlist-clear-all"):
-    st.session_state[SHORTLIST_SESSION_KEY] = clear_shortlist(st.session_state[SHORTLIST_SESSION_KEY])
-    st.rerun()
 
-# Reuses the same batched view Allocation Discovery itself already builds
-# (fixed query budget regardless of allocation count) rather than a new
-# query path built solely for this page - then filters down to just the
-# shortlisted ids.
-all_view = build_allocation_discovery(session)
-cards_by_id = {c["id"]: c for c in all_view["cards"]}
+# Site Selection & Reporting V1 Gate 2 - ONE deterministic report context,
+# built fresh from current trusted data, powers both this review surface
+# and the CSV export below - never a separate query path per consumer (see
+# app.reporting.allocation_report's own module docstring).
+context = build_allocation_report_context(session, [c.candidate_id for c in candidates])
+entries_by_id = {entry.allocation_id: entry for entry in context.entries}
+
+action_col1, action_col2 = st.columns(2)
+with action_col1:
+    if st.button("Clear shortlist", key="shortlist-clear-all"):
+        st.session_state[SHORTLIST_SESSION_KEY] = clear_shortlist(st.session_state[SHORTLIST_SESSION_KEY])
+        st.rerun()
+with action_col2:
+    # Gate 2 CSV UX (Section 23) - a clear, deterministic export action; the
+    # user downloads exactly the currently shortlisted allocation set, no
+    # more, no less (context.entries is built from these exact candidate
+    # ids). No PDF/AI-report controls yet - those remain Gate 3/4.
+    st.download_button(
+        f"Download shortlist CSV ({len(context.entries)} allocation{'s' if len(context.entries) != 1 else ''})",
+        data=to_csv_bytes(context), file_name="allocation_shortlist.csv", mime="text/csv",
+        key="shortlist-download-csv", use_container_width=True,
+    )
 
 st.divider()
 
 for candidate in candidates:
-    card = cards_by_id.get(candidate.candidate_id)
+    entry = entries_by_id.get(candidate.candidate_id)
 
-    if card is None:
-        # Stale/missing candidate (Section 10) - never crash, never
-        # silently drop it from the shortlist on our own initiative; show
-        # it as unavailable and let the user remove it explicitly.
+    if entry is None:
+        # Stale/missing candidate (Gate 1 Section 10, unchanged) - never
+        # crash, never silently drop it from the shortlist on our own
+        # initiative; show it as unavailable and let the user remove it
+        # explicitly. Driven by context.excluded now rather than a missing
+        # build_allocation_discovery card, same user-facing behaviour.
         with st.container(border=True, key=f"shortlist-missing-{candidate.candidate_id}"):
             st.markdown(f"**{candidate.display_name}**")
             st.caption("This allocation is no longer available - it may have been removed or reclassified.")
@@ -101,53 +112,74 @@ for candidate in candidates:
                 st.rerun()
         continue
 
-    with st.container(border=True, key=f"shortlist-card-{card['id']}"):
+    with st.container(border=True, key=f"shortlist-card-{entry.allocation_id}"):
         header_cols = st.columns([5, 1])
         with header_cols[0]:
-            st.markdown(f"##### {card['site_name']}")
-            context_bits = [b for b in (card["council_name"], card["plan_name"], card.get("policy_reference")) if b]
+            st.markdown(f"##### {entry.allocation_name}")
+            context_bits = [b for b in (entry.council_name, entry.local_plan_name, entry.allocation_reference) if b]
             st.caption(" · ".join(str(b) for b in context_bits))
         with header_cols[1]:
-            if st.button("Remove", key=f"shortlist-remove-{card['id']}", use_container_width=True):
+            if st.button("Remove", key=f"shortlist-remove-{entry.allocation_id}", use_container_width=True):
                 st.session_state[SHORTLIST_SESSION_KEY] = remove_candidate(
-                    st.session_state[SHORTLIST_SESSION_KEY], "allocation", card["id"],
+                    st.session_state[SHORTLIST_SESSION_KEY], "allocation", entry.allocation_id,
                 )
                 st.rerun()
 
         status_badge_row([
-            (card["plan_status_chip_kind"], card["plan_status_label"]),
-            (card["review_status_badge_kind"], card["review_status_label"]),
+            (PLAN_STATUS_META.get(entry.plan_status, PLAN_STATUS_META[None])["chip_kind"], entry.plan_status_label),
+            (ALLOCATION_REVIEW_STATUS_META.get(entry.review_status, ALLOCATION_REVIEW_STATUS_META[None])["badge_kind"], entry.review_status_label),
         ])
 
         info_cols = st.columns(4)
         with info_cols[0]:
-            stat_tile("Intended use", card["intended_use_label"])
+            stat_tile("Intended use", entry.intended_use_label)
         with info_cols[1]:
-            stat_tile("Capacity", card["capacity"]["display"])
+            stat_tile("Capacity", entry.capacity_display)
         with info_cols[2]:
-            coverage = card.get("development_coverage")
             stat_tile(
                 "Development coverage",
-                f"{coverage.development_coverage_percentage:.0%}" if coverage and coverage.development_coverage_percentage is not None else "Not determined",
+                f"{entry.development_coverage_percentage:.0%}" if entry.development_coverage_percentage is not None else "Not determined",
             )
         with info_cols[3]:
             stat_tile(
                 "Indicative residual",
-                f"~{coverage.indicative_residual_capacity:,}" if coverage and coverage.indicative_residual_capacity else "Not determined",
+                f"~{entry.indicative_residual_capacity:,}" if entry.indicative_residual_capacity else "Not determined",
             )
 
-        # Evidence-bounded wording (Section 14) - identical phrasing to the
-        # gallery card/detail page, never a warning/error styling solely
-        # because no application is linked.
-        st.caption(card["matched_summary"], help=card["matched_summary_help"])
+        # Evidence-bounded wording (Gate 1 Section 14, unchanged) - no
+        # warning/error styling solely because no application is linked;
+        # no linked Application is a valid intelligence state.
+        if entry.linked_application_count:
+            st.caption(f"{entry.linked_application_count} linked planning application(s) identified.")
+        else:
+            st.caption("No linked planning application has been identified.")
 
-        ai_summary_row = get_allocation_summary(session, card["id"])
-        if ai_summary_row is not None and ai_summary_row.headline:
-            st.markdown(f"**AI Allocation Intelligence:** {ai_summary_row.headline}")
+        # Gate 2 - concise party-evidence signal only (Section 18: "keep
+        # the page concise... full detail remains in Allocation Detail").
+        # Applicant and Developer are always shown as separate, never
+        # conflated - Applicant-only evidence is never promoted to
+        # Developer (Section 10).
+        applicant_names = sorted({e.entity_name for e in entry.applicant_evidence})
+        if applicant_names:
+            st.caption(f"**Applicant:** {', '.join(applicant_names)}")
+
+        developer_names = sorted({e.entity_name_raw for e in entry.ownership_evidence if e.role == "DEVELOPER"})
+        if developer_names:
+            st.caption(f"**Developer:** {', '.join(developer_names)}")
+
+        other_ownership_count = sum(1 for e in entry.ownership_evidence if e.role != "DEVELOPER")
+        if other_ownership_count:
+            st.caption(
+                f"{other_ownership_count} other ownership/control evidence item(s) identified - "
+                "see Allocation Detail for full evidence."
+            )
+
+        if entry.ai_intelligence.available:
+            st.markdown(f"**AI Allocation Intelligence:** {entry.ai_intelligence.headline}")
         else:
             st.caption("AI allocation summary not yet generated.")
 
         st.page_link(
             "pages/3_Local_Plan_Sites.py", label="Open full allocation detail →",
-            query_params={"allocation_id": str(card["id"])},
+            query_params={"allocation_id": str(entry.allocation_id)},
         )
