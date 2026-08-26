@@ -1019,6 +1019,66 @@ def build_matching_attributes(card: dict) -> dict:
     }
 
 
+# Gate 1A (Allocation Discovery Selection UX + Performance) - the compact
+# screening table's row shape. A pure reshape of an already-built card dict,
+# same discipline as build_matching_attributes above: never re-derives or
+# invents a value. Takes `shortlisted` as an explicit argument rather than
+# reading st.session_state itself, keeping this module free of any
+# Streamlit/session dependency (its own module docstring: "a pure, batched
+# view model") - the page script is responsible for looking up shortlist
+# membership and passing the result in.
+TABLE_CORE_COLUMNS = [
+    "Allocation / Site", "Authority", "Plan Status", "Capacity", "Planning Activity",
+    "Development Coverage %", "Indicative Residual Capacity", "Shortlisted",
+]
+TABLE_SECONDARY_COLUMNS = ["Local Plan", "Intended Use"]
+
+
+def build_table_row(card: dict, *, shortlisted: bool) -> dict:
+    """One row of the Gate 1A screening table. Planning Activity reuses
+    planning_activity_status's canonical classification - the SAME one the
+    "Planning activity" filter already applies - so this column can never
+    disagree with what a user just filtered by, including its neutral "No
+    identified activity" wording for PLANNING_ACTIVITY_NONE (no linked
+    Application is not an error, never styled as one)."""
+    coverage = card.get("development_coverage")
+    return {
+        "Allocation / Site": card["site_name"],
+        "Authority": card["council_name"],
+        "Plan Status": card["plan_status_label"],
+        "Capacity": card["capacity"]["display"],
+        "Planning Activity": PLANNING_ACTIVITY_LABELS.get(planning_activity_status(card), "Not determined"),
+        "Development Coverage %": (
+            f"{coverage.development_coverage_percentage:.0%}"
+            if coverage and coverage.development_coverage_percentage is not None else "Not determined"
+        ),
+        "Indicative Residual Capacity": (
+            f"{coverage.indicative_residual_capacity:,}"
+            if coverage and coverage.indicative_residual_capacity is not None else "Not determined"
+        ),
+        "Local Plan": card["plan_name"],
+        "Intended Use": card["intended_use_label"],
+        "Shortlisted": "✓" if shortlisted else "",
+    }
+
+
+def resolve_selected_cards(page: list[dict], selected_row_indices: list[int]) -> list[dict]:
+    """Maps st.dataframe's selection-event row positions (0-based positions
+    into whatever list the table was built from) back to the card dicts they
+    refer to. `page` must be the EXACT same list, in the EXACT same order,
+    that the table's rows were built from - true by construction on the
+    calling page, since the table is built via build_table_row(c) for c in
+    page, row-for-row. Kept as its own pure function (rather than an inline
+    list comprehension on the page) specifically so this mapping - the one
+    piece of Gate 1A's batch-shortlist path with any real logic in it - is
+    unit-testable without a Streamlit runtime, matching every other pure
+    helper in this module. Out-of-range indices are ignored rather than
+    raising - defensive against a selection event referencing a row that no
+    longer exists in the current page (e.g. the underlying list length
+    changed between render and submit)."""
+    return [page[i] for i in selected_row_indices if 0 <= i < len(page)]
+
+
 # --- Batched, bounded top-level builder --------------------------------------
 
 

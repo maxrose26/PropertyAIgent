@@ -177,6 +177,46 @@ def test_report_candidate_instances_are_equal_by_value_not_identity():
     assert a is not b
 
 
+# --- Gate 1A batch-add pattern (add_candidate looped over a selection) ------
+# Gate 1A's table submits a BATCH of candidates in one action (looping
+# add_candidate once per selected row, per app/ui/pages/3_Local_Plan_Sites.py)
+# rather than Gate 1's one-candidate-per-click. These tests exercise that
+# exact loop pattern directly, confirming batch-level idempotency and
+# duplicate-freedom follow from add_candidate's already-proven per-call
+# behaviour rather than assuming it.
+
+def _batch_add(state: dict, candidates: list[ReportCandidate]) -> dict:
+    """Mirrors the exact loop app/ui/pages/3_Local_Plan_Sites.py runs on
+    "Add selected to shortlist" submit."""
+    for candidate in candidates:
+        state = add_candidate(state, candidate)
+    return state
+
+
+def test_batch_add_of_several_new_candidates_adds_them_all():
+    batch = [ReportCandidate("allocation", i, f"Allocation {i}") for i in range(5)]
+    state = _batch_add({}, batch)
+    assert shortlist_count(state) == 5
+    assert all(is_shortlisted(state, "allocation", i) for i in range(5))
+
+
+def test_batch_add_is_idempotent_when_the_same_batch_is_submitted_twice():
+    batch = [ReportCandidate("allocation", i, f"Allocation {i}") for i in range(5)]
+    state = _batch_add({}, batch)
+    state = _batch_add(state, batch)  # simulates a second, accidental submit of the same selection
+    assert shortlist_count(state) == 5
+
+
+def test_batch_add_does_not_duplicate_allocations_already_in_the_shortlist():
+    state = add_candidate({}, ReportCandidate("allocation", 1, "Already Shortlisted"))
+    batch = [
+        ReportCandidate("allocation", 1, "Already Shortlisted"),
+        ReportCandidate("allocation", 2, "New Addition"),
+    ]
+    state = _batch_add(state, batch)
+    assert shortlist_count(state) == 2
+
+
 def test_report_candidate_is_frozen():
     candidate = ReportCandidate("allocation", 1, "Northern Gateway")
     try:
