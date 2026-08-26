@@ -163,9 +163,23 @@ for candidate in candidates:
         if applicant_names:
             st.caption(f"**Applicant:** {', '.join(applicant_names)}")
 
-        developer_names = sorted({e.entity_name_raw for e in entry.ownership_evidence if e.role == "DEVELOPER"})
-        if developer_names:
-            st.caption(f"**Developer:** {', '.join(developer_names)}")
+        # Pre-merge semantic hardening (Gate 2 amendment) - trusted and
+        # needs_review Developer evidence are never shown on the same line.
+        # A needs_review "Developer" claim must not read as settled fact
+        # merely because it shares the bolded "Developer:" caption with a
+        # trusted one (Section 6/7) - it gets its own, plainly-worded,
+        # unbolded line instead.
+        trusted_developer_names = sorted(
+            {e.entity_name_raw for e in entry.trusted_ownership_evidence if e.role == "DEVELOPER"}
+        )
+        if trusted_developer_names:
+            st.caption(f"**Developer:** {', '.join(trusted_developer_names)}")
+
+        pending_developer_names = sorted(
+            {e.entity_name_raw for e in entry.review_pending_ownership_evidence if e.role == "DEVELOPER"}
+        )
+        if pending_developer_names:
+            st.caption(f"Developer evidence pending confirmation: {', '.join(pending_developer_names)}")
 
         other_ownership_count = sum(1 for e in entry.ownership_evidence if e.role != "DEVELOPER")
         if other_ownership_count:

@@ -443,15 +443,16 @@ def test_only_invalid_ids_returns_valid_context_with_everything_excluded(session
 
 # --- Aggregates: known_total + unknown_count, never a manufactured total ----
 
-def test_aggregates_separate_known_totals_from_unknown_counts(session):
+def test_aggregates_separate_exact_totals_from_unknown_counts(session):
     plan = _make_local_plan(session)
     known = _make_allocation(session, plan.id, policy_reference="K1", minimum_dwellings=100)
     unknown = _make_allocation(session, plan.id, policy_reference="K2")  # no capacity stated at all
 
     context = build_allocation_report_context(session, [known.id, unknown.id])
 
-    assert context.aggregates.capacity_known_total == 100
-    assert context.aggregates.capacity_unknown_count == 1
+    assert context.aggregates.exact_capacity_total == 100
+    assert context.aggregates.exact_capacity_count == 1
+    assert context.aggregates.unknown_capacity_count == 1
 
 
 def test_aggregates_plan_status_and_activity_counts(session):
@@ -469,6 +470,244 @@ def test_aggregates_plan_status_and_activity_counts(session):
     assert context.aggregates.emerging_count == 1
     assert context.aggregates.allocations_with_linked_activity == 1
     assert context.aggregates.allocations_with_no_identified_activity == 1
+
+
+# --- Pre-merge semantic hardening: capacity range aggregation (Section 10) --
+# A ranged allocation's capacity_value is format_capacity's own existing
+# upper-bound convention (e.g. 15000 for "8,400-15,000") - these tests prove
+# it can never be silently summed into a total presented as exact.
+
+def test_exact_capacity_contributes_to_the_exact_aggregate(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id, minimum_dwellings=300)
+    context = build_allocation_report_context(session, [allocation.id])
+
+    assert context.aggregates.exact_capacity_total == 300
+    assert context.aggregates.exact_capacity_count == 1
+    assert context.aggregates.ranged_capacity_count == 0
+
+
+def test_ranged_capacity_is_not_aggregated_as_an_exact_upper_bound(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id, minimum_dwellings=8400, maximum_capacity=15000)
+    context = build_allocation_report_context(session, [allocation.id])
+
+    # The upper bound (15000) must NOT appear in exact_capacity_total - the
+    # range contributes zero to it, and is counted separately instead.
+    assert context.aggregates.exact_capacity_total == 0
+    assert context.aggregates.exact_capacity_count == 0
+    assert context.aggregates.ranged_capacity_count == 1
+    # The individual entry itself still carries the real range, untouched.
+    [entry] = context.entries
+    assert entry.capacity_kind == "range"
+    assert entry.capacity_value == 15000
+    assert entry.capacity_display == "8,400–15,000 homes"
+
+
+def test_multiple_exact_allocations_aggregate_correctly(session):
+    plan = _make_local_plan(session)
+    a1 = _make_allocation(session, plan.id, policy_reference="E1", minimum_dwellings=100)
+    a2 = _make_allocation(session, plan.id, policy_reference="E2", minimum_dwellings=250)
+    a3 = _make_allocation(session, plan.id, policy_reference="E3", indicative_capacity=50)
+
+    context = build_allocation_report_context(session, [a1.id, a2.id, a3.id])
+
+    assert context.aggregates.exact_capacity_total == 400
+    assert context.aggregates.exact_capacity_count == 3
+
+
+def test_mixed_exact_ranged_and_unknown_population_remains_evidence_faithful(session):
+    plan = _make_local_plan(session)
+    exact = _make_allocation(session, plan.id, policy_reference="M1", minimum_dwellings=100)
+    ranged = _make_allocation(session, plan.id, policy_reference="M2", minimum_dwellings=8400, maximum_capacity=15000)
+    unknown = _make_allocation(session, plan.id, policy_reference="M3")
+
+    context = build_allocation_report_context(session, [exact.id, ranged.id, unknown.id])
+
+    # Only the genuinely exact allocation's 100 contributes - the range's
+    # 15000 upper bound and the unknown allocation are both excluded from
+    # the exact total, each accounted for in its own separate count.
+    assert context.aggregates.exact_capacity_total == 100
+    assert context.aggregates.exact_capacity_count == 1
+    assert context.aggregates.ranged_capacity_count == 1
+    assert context.aggregates.unknown_capacity_count == 1
+    assert context.aggregates.allocation_count == 3
+
+
+def test_unknown_capacity_is_not_silently_treated_as_zero(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)  # no capacity stated at all
+    context = build_allocation_report_context(session, [allocation.id])
+
+    assert context.aggregates.exact_capacity_total == 0  # correctly empty, not a fabricated allocation total
+    assert context.aggregates.unknown_capacity_count == 1  # the allocation is accounted for, not silently dropped
+
+
+def test_review_required_residual_capacity_excluded_from_the_residual_aggregate(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id, minimum_dwellings=1000)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id, review_status="needs_confirmation")
+    app = _make_app(session, site.id, reference="APP/1")
+    session.add(SchemeIntelligence(application_id=app.id, total_units_final=300, core_intelligence_complete=True))
+    session.commit()
+
+    context = build_allocation_report_context(session, [allocation.id])
+
+    # The entry's own residual is None (review_required, never a
+    # manufactured number - see test_needs_confirmation_relationship_
+    # forces_review_required_coverage_not_a_confident_number above); the
+    # AGGREGATE must reflect that too, not silently sum a None as zero.
+    assert context.aggregates.indicative_residual_capacity_known_total == 0
+    assert context.aggregates.indicative_residual_capacity_unknown_count == 1
+
+
+def test_ranged_csv_output_preserves_the_range_not_a_bare_upper_bound(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id, minimum_dwellings=8400, maximum_capacity=15000)
+    context = build_allocation_report_context(session, [allocation.id])
+    [row] = to_csv_rows(context)
+
+    assert row["Allocation Capacity"] == "8,400–15,000 homes"
+    assert row["Allocation Capacity"] != "15000"
+    assert row["Allocation Capacity"] != "15,000"
+
+
+def test_aggregates_dataclass_has_no_field_that_could_blend_ranges_into_an_exact_total(session):
+    """Structural safety (Section 9/10H) - the ambiguous field this
+    amendment removed (a single "capacity_known_total" blending exact
+    figures and range upper bounds) must not exist at all, so a future
+    PDF/AI consumer cannot accidentally reach for it and reproduce the
+    exact bug this amendment fixes."""
+    import dataclasses
+
+    from app.reporting.allocation_report import AllocationReportAggregates
+
+    field_names = {f.name for f in dataclasses.fields(AllocationReportAggregates)}
+    assert "capacity_known_total" not in field_names
+    assert "capacity_unknown_count" not in field_names
+    assert {"exact_capacity_total", "exact_capacity_count", "ranged_capacity_count", "unknown_capacity_count"} <= field_names
+
+
+# --- Pre-merge semantic hardening: review-pending party evidence (Section 11)
+
+def test_trusted_applicant_appears_correctly(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_app(session, site.id, reference="APP/1", applicant_name_raw="Trusted Applicant Ltd")
+
+    [entry] = build_allocation_report_context(session, [allocation.id]).entries
+    assert entry.applicant_evidence[0].entity_name == "Trusted Applicant Ltd"
+
+
+def test_trusted_developer_appears_correctly_via_the_trust_partition_property(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_control(session, site_id=site.id, entity_name_raw="Trusted Developer Ltd", role="DEVELOPER", evidence_category="S106_DEFINED_DEVELOPER")
+
+    [entry] = build_allocation_report_context(session, [allocation.id]).entries
+    assert [e.entity_name_raw for e in entry.trusted_ownership_evidence] == ["Trusted Developer Ltd"]
+    assert entry.review_pending_ownership_evidence == []
+
+
+def test_needs_review_developer_is_not_presented_as_a_settled_known_developer(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_control(
+        session, site_id=site.id, entity_name_raw="Uncertain Developer Ltd", role="DEVELOPER",
+        evidence_category="S106_DEFINED_DEVELOPER", review_status="needs_confirmation",
+    )
+
+    context = build_allocation_report_context(session, [allocation.id])
+    [entry] = context.entries
+
+    # Structurally partitioned: a needs_review Developer is never in
+    # trusted_ownership_evidence, only in review_pending_ownership_evidence.
+    assert entry.trusted_ownership_evidence == []
+    assert [e.entity_name_raw for e in entry.review_pending_ownership_evidence] == ["Uncertain Developer Ltd"]
+
+    # And the CSV's "Known Developer(s)" column - the one a spreadsheet
+    # user reads as confident fact - must not contain it at all.
+    [row] = to_csv_rows(context)
+    assert row["Known Developer(s)"] == ""
+    assert "Uncertain Developer Ltd" not in row["Known Developer(s)"]
+
+
+def test_needs_review_ownership_evidence_retains_uncertainty_marker_in_general_evidence_column(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_control(
+        session, site_id=site.id, entity_name_raw="Uncertain Owner Ltd", role="OWNER",
+        evidence_category="S106_DEFINED_OWNER", review_status="needs_confirmation",
+    )
+
+    context = build_allocation_report_context(session, [allocation.id])
+    [row] = to_csv_rows(context)
+
+    # Still visible (never simply hidden) in the general evidence column,
+    # but explicitly qualified - never presented identically to trusted evidence.
+    assert "Uncertain Owner Ltd" in row["Ownership / Control Evidence"]
+    assert "needs confirmation" in row["Ownership / Control Evidence"]
+
+
+def test_rejected_relationship_remains_excluded_from_both_trust_partitions(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_control(
+        session, site_id=site.id, entity_name_raw="Rejected Ltd", role="DEVELOPER",
+        evidence_category="S106_DEFINED_DEVELOPER", review_status="rejected",
+    )
+
+    [entry] = build_allocation_report_context(session, [allocation.id]).entries
+    assert entry.trusted_ownership_evidence == []
+    assert entry.review_pending_ownership_evidence == []
+
+
+def test_csv_does_not_silently_flatten_trusted_and_review_pending_developer_evidence(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_control(session, site_id=site.id, entity_name_raw="Confirmed Developer Ltd", role="DEVELOPER", evidence_category="S106_DEFINED_DEVELOPER")
+    _make_control(
+        session, site_id=site.id, entity_name_raw="Unconfirmed Developer Ltd", role="DEVELOPER",
+        evidence_category="S106_DEFINED_DEVELOPER", review_status="needs_confirmation",
+    )
+
+    context = build_allocation_report_context(session, [allocation.id])
+    [row] = to_csv_rows(context)
+
+    assert "Confirmed Developer Ltd" in row["Known Developer(s)"]
+    assert "Unconfirmed Developer Ltd" not in row["Known Developer(s)"]
+    assert "Unconfirmed Developer Ltd" in row["Ownership / Control Evidence"]
+    assert "needs confirmation" in row["Ownership / Control Evidence"]
+
+
+def test_applicant_remains_distinct_from_developer_after_trust_partitioning(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    site = _make_site(session)
+    _make_relationship(session, allocation.id, site.id)
+    _make_app(session, site.id, reference="APP/1", applicant_name_raw="Applicant Co")
+    _make_control(session, site_id=site.id, entity_name_raw="Developer Co", role="DEVELOPER", evidence_category="S106_DEFINED_DEVELOPER")
+
+    context = build_allocation_report_context(session, [allocation.id])
+    [row] = to_csv_rows(context)
+
+    assert "Applicant Co" in row["Known Applicant(s)"]
+    assert "Applicant Co" not in row["Known Developer(s)"]
+    assert "Developer Co" in row["Known Developer(s)"]
+    assert "Developer Co" not in row["Known Applicant(s)"]
 
 
 # --- CSV tests (Section 26) ---------------------------------------------------

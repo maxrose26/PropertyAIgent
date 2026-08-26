@@ -200,6 +200,23 @@ class AllocationReportEntry:
     source_document_url: str | None = None
     last_checked: dt.datetime | None = None
 
+    # Pre-merge semantic hardening (Gate 2 amendment) - structural trust
+    # partitioning of ownership_evidence, so a consumer (this gate's own
+    # Shortlist page and CSV, and future Gate 3/4 PDF/AI code) never has to
+    # remember to check needs_review itself before treating an entry as
+    # settled fact. trusted_ownership_evidence is safe to present as plain
+    # evidence with its existing role label; review_pending_ownership_
+    # evidence must always be shown with an explicit uncertainty marker (or
+    # omitted from a "Known X" style signal entirely) - never silently
+    # merged into the same display as trusted evidence (Section 6/9).
+    @property
+    def trusted_ownership_evidence(self) -> list[OwnershipEvidenceEntry]:
+        return [e for e in self.ownership_evidence if not e.needs_review]
+
+    @property
+    def review_pending_ownership_evidence(self) -> list[OwnershipEvidenceEntry]:
+        return [e for e in self.ownership_evidence if e.needs_review]
+
 
 @dataclass(frozen=True)
 class ExcludedCandidate:
@@ -214,20 +231,49 @@ class ExcludedCandidate:
 @dataclass(frozen=True)
 class AllocationReportAggregates:
     """Low-risk deterministic shortlist-wide totals (Section 19). Every
-    *_total is a sum over entries with a KNOWN value only - *_unknown_count
-    names how many entries were excluded from that sum, rather than
-    pretending a total is complete when it isn't (Section 19/20's explicit
-    "expose known_total + unknown_count rather than manufacturing a precise
-    total from uncertain values"). capacity totals reuse format_capacity's
-    own existing single-best-guess-per-allocation convention (the same
-    figure already summed elsewhere on this platform, e.g. Allocation
-    Discovery's own KPI tiles) - a range's own upper bound, never an
-    invented midpoint - so this total is consistent with, not a new
-    interpretation of, the platform's existing capacity-range convention."""
+    *_total is a sum over entries with a KNOWN value only - a paired
+    *_unknown_count/_count field names how many entries were excluded from
+    that sum, rather than pretending a total is complete when it isn't
+    (Section 19/20's explicit "expose known_total + unknown_count rather
+    than manufacturing a precise total from uncertain values").
+
+    Pre-merge semantic hardening (Gate 2 amendment) - allocation CAPACITY is
+    deliberately NOT one blended "known total": format_capacity's own
+    capacity_kind ("minimum" | "maximum" | "indicative" | "range" |
+    "unknown") distinguishes a genuinely single stated figure from a range
+    that only has an upper BOUND, never an exact value. Blending the two
+    into one total (as an earlier version of this dataclass did) let a
+    range's upper bound silently masquerade as an exact figure the moment
+    it was summed - exactly the risk a future PDF/AI consumer must be
+    structurally unable to reproduce. exact_capacity_total therefore sums
+    ONLY entries whose capacity_kind is "minimum"/"maximum"/"indicative" (a
+    single genuinely-stated figure, whichever field it came from);
+    ranged_capacity_count/unknown_capacity_count are separate counts, never
+    folded into that total - see each individual entry's own capacity_kind/
+    capacity_value/capacity_display (never fabricated here) for the actual
+    range bounds. There is deliberately no field that could be read as "the
+    total capacity including ranges" - if a future consumer wants that, it
+    must compute and explicitly label it as an upper-bound total itself,
+    never inherit that framing silently from this dataclass.
+
+    identified_application_capacity and indicative_residual_capacity carry
+    NO equivalent range concept - app.reporting.allocation_development_
+    coverage.compute_development_coverage only ever returns a single
+    genuine integer for these (summed from real per-Site Application unit
+    counts, or arithmetic on the allocation's own single capacity_value) or
+    None when accounting is review_required/capacity_unknown (see that
+    function's own docstring/tests) - never a range. Their existing known_
+    total/unknown_count pairs are therefore already safe as originally
+    designed: None (including every REVIEW_REQUIRED case) is correctly
+    excluded from the sum and counted separately, never fabricated as
+    zero or as a confident number - see tests/test_allocation_report.py's
+    dedicated aggregate-level proof of this."""
 
     allocation_count: int
-    capacity_known_total: int
-    capacity_unknown_count: int
+    exact_capacity_total: int
+    exact_capacity_count: int
+    ranged_capacity_count: int
+    unknown_capacity_count: int
     identified_application_capacity_known_total: int
     identified_application_capacity_unknown_count: int
     indicative_residual_capacity_known_total: int
@@ -467,7 +513,8 @@ def _json_list(raw: str | None) -> list[str]:
 
 def _empty_aggregates() -> AllocationReportAggregates:
     return AllocationReportAggregates(
-        allocation_count=0, capacity_known_total=0, capacity_unknown_count=0,
+        allocation_count=0, exact_capacity_total=0, exact_capacity_count=0,
+        ranged_capacity_count=0, unknown_capacity_count=0,
         identified_application_capacity_known_total=0, identified_application_capacity_unknown_count=0,
         indicative_residual_capacity_known_total=0, indicative_residual_capacity_unknown_count=0,
         adopted_count=0, emerging_count=0, other_plan_status_count=0,
@@ -475,19 +522,31 @@ def _empty_aggregates() -> AllocationReportAggregates:
     )
 
 
+# capacity_kind values that represent one genuinely-stated single figure
+# (never a range's upper bound) - format_capacity's own vocabulary, see
+# app.reporting.allocation_discovery.format_capacity. Deliberately excludes
+# "range" (two differing bounds - see EXACT vs RANGE distinction above) and
+# "unknown" (no figure stated at all).
+_EXACT_CAPACITY_KINDS = {"minimum", "maximum", "indicative"}
+
+
 def _build_aggregates(entries: list[AllocationReportEntry]) -> AllocationReportAggregates:
     def _known_total_and_unknown(values: list[int | None]) -> tuple[int, int]:
         known = [v for v in values if v is not None]
         return sum(known), len(values) - len(known)
 
-    capacity_total, capacity_unknown = _known_total_and_unknown([e.capacity_value for e in entries])
     identified_total, identified_unknown = _known_total_and_unknown([e.identified_application_capacity for e in entries])
     residual_total, residual_unknown = _known_total_and_unknown([e.indicative_residual_capacity for e in entries])
 
+    exact_entries = [e for e in entries if e.capacity_kind in _EXACT_CAPACITY_KINDS]
+    exact_capacity_total = sum(e.capacity_value for e in exact_entries if e.capacity_value is not None)
+
     return AllocationReportAggregates(
         allocation_count=len(entries),
-        capacity_known_total=capacity_total,
-        capacity_unknown_count=capacity_unknown,
+        exact_capacity_total=exact_capacity_total,
+        exact_capacity_count=len(exact_entries),
+        ranged_capacity_count=sum(1 for e in entries if e.capacity_kind == "range"),
+        unknown_capacity_count=sum(1 for e in entries if e.capacity_kind == "unknown"),
         identified_application_capacity_known_total=identified_total,
         identified_application_capacity_unknown_count=identified_unknown,
         indicative_residual_capacity_known_total=residual_total,
@@ -521,6 +580,13 @@ def _format_applicant_evidence(entries: list[ApplicantEvidenceEntry]) -> str:
 
 
 def _format_ownership_evidence(entries: list[OwnershipEvidenceEntry], *, role: str | None = None) -> str:
+    """needs_review entries are always suffixed "(needs confirmation)" -
+    never silently indistinguishable from trusted evidence in this general
+    evidence column. "Known Developer(s)" (see to_csv_rows below) does NOT
+    call this on the unfiltered list - it is deliberately restricted to
+    entry.trusted_ownership_evidence first, so a column whose own name
+    ("Known") implies confidence never contains review-pending evidence at
+    all, qualified or not (Section 8: "exclude it from trusted columns")."""
     filtered = [e for e in entries if role is None or e.role == role]
     return _MULTI_VALUE_DELIMITER.join(
         f"{e.entity_name_raw} [{e.role_label}]" + (" (needs confirmation)" if e.needs_review else "")
@@ -579,7 +645,12 @@ def to_csv_rows(context: AllocationReportContext) -> list[dict]:
             ),
             "Linked Application Count": entry.linked_application_count,
             "Known Applicant(s)": _format_applicant_evidence(entry.applicant_evidence),
-            "Known Developer(s)": _format_ownership_evidence(entry.ownership_evidence, role="DEVELOPER"),
+            # Deliberately trusted_ownership_evidence only (Section 8) - a
+            # needs_review "Developer" claim never appears in this column,
+            # however it were worded; it remains visible in the general
+            # Ownership / Control Evidence column below, explicitly
+            # qualified "(needs confirmation)".
+            "Known Developer(s)": _format_ownership_evidence(entry.trusted_ownership_evidence, role="DEVELOPER"),
             "Ownership / Control Evidence": _format_ownership_evidence(entry.ownership_evidence),
             "AI Intelligence Headline": entry.ai_intelligence.headline or "",
             "AI Summary Available": "Yes" if entry.ai_intelligence.available else "No",
