@@ -943,3 +943,96 @@ def test_resolve_selected_cards_a_different_pages_own_indices_never_leak_into_th
     page_two = [_card(id=200, site_name="Page Two Row Zero")]
     assert [c["id"] for c in resolve_selected_cards(page_one, [0])] == [100]
     assert [c["id"] for c in resolve_selected_cards(page_two, [0])] == [200]
+
+
+# --- Gate 1A pre-merge performance amendment: no explicit rerun in the
+# batch-submit handler -------------------------------------------------------
+# Regression guard for the exact bug this amendment fixes: an explicit
+# st.rerun() placed after build_allocation_discovery() has already executed
+# once for the current script run forces it to execute a SECOND time
+# (~2s/14 queries), purely to refresh a badge/message that can be (and now
+# is) updated inline in the same pass instead. No streamlit.testing.v1.
+# AppTest harness exists in this codebase to run the real page and count
+# discovery-build calls live (this codebase's established convention - see
+# every other test file's own docstring - is to unit-test pure helpers, not
+# page scripts); this instead inspects the actual submit-handling source
+# block via `ast`, a precise, low-complexity way to lock in the fix without
+# inventing new test infrastructure. See
+# specifications/013-allocation-discovery-gate-1a-performance-amendment.md.
+
+def _local_plan_sites_source() -> str:
+    from pathlib import Path
+
+    source_path = Path(__file__).resolve().parents[1] / "app" / "ui" / "pages" / "3_Local_Plan_Sites.py"
+    return source_path.read_text(encoding="utf-8")
+
+
+def _local_plan_sites_ast():
+    import ast
+
+    return ast.parse(_local_plan_sites_source())
+
+
+def _is_rerun_call(node) -> bool:
+    import ast
+
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "rerun"
+
+
+def _rerun_calls_within(node) -> list:
+    import ast
+
+    return [n for n in ast.walk(node) if _is_rerun_call(n)]
+
+
+def test_batch_submit_handler_contains_no_explicit_rerun():
+    import ast
+
+    tree = _local_plan_sites_ast()
+
+    def _references_submitted(test_node: ast.expr) -> bool:
+        return any(isinstance(n, ast.Name) and n.id == "submitted" for n in ast.walk(test_node))
+
+    submit_if_blocks = [node for node in ast.walk(tree) if isinstance(node, ast.If) and _references_submitted(node.test)]
+    assert submit_if_blocks, "expected to find an `if submitted:`-shaped block in the Allocation Discovery page"
+
+    for node in submit_if_blocks:
+        assert not _rerun_calls_within(node), (
+            "an explicit st.rerun() inside the batch-submit handler forces build_allocation_discovery() to run "
+            "a second time per batch submit - this is the exact regression the Gate 1A pre-merge performance "
+            "amendment fixed"
+        )
+
+
+def test_page_contains_exactly_the_three_pre_existing_non_shortlist_rerun_calls():
+    """The only actual st.rerun() CALLS left in this page (as real AST Call
+    nodes, not substring matches against comment text - a plain text search
+    would false-positive on this very file's own explanatory comments about
+    NOT calling st.rerun()) are pre-existing and unrelated to the shortlist:
+    the detail-view "back" button, "Clear filters", and "Show more"
+    pagination. The shortlist batch-submit and detail-view toggle paths
+    must never reintroduce one. A deliberately blunt regression net: if
+    this count ever needs to grow for a genuine, unrelated reason, update
+    it explicitly rather than loosening it."""
+    assert len(_rerun_calls_within(_local_plan_sites_ast())) == 3
+
+
+def test_detail_view_shortlist_toggle_contains_no_explicit_rerun():
+    import ast
+
+    tree = _local_plan_sites_ast()
+    toggle_functions = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_render_detail"
+    ]
+    assert toggle_functions, "expected to find _render_detail in the Allocation Discovery page"
+
+    def _references_in_shortlist(test_node: ast.expr) -> bool:
+        return any(isinstance(n, ast.Name) and n.id == "_in_shortlist" for n in ast.walk(test_node))
+
+    toggle_if_blocks = [
+        node for node in ast.walk(toggle_functions[0]) if isinstance(node, ast.If) and _references_in_shortlist(node.test)
+    ]
+    assert toggle_if_blocks, "expected to find the shortlist toggle's `if _in_shortlist:` inside _render_detail"
+    for node in toggle_if_blocks:
+        assert not _rerun_calls_within(node), "the detail-view shortlist toggle must remain free of an explicit st.rerun()"

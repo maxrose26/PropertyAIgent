@@ -106,21 +106,31 @@ wide_canvas()
 # subsequent rerun/page visit within the same browser session.
 st.session_state.setdefault(SHORTLIST_SESSION_KEY, {})
 
-_shortlisted_count = shortlist_count(st.session_state[SHORTLIST_SESSION_KEY], "allocation")
-if _shortlisted_count:
-    SHORTLIST_PAGE = Path(__file__).resolve().parent / "3b_Shortlist.py"
-    st.page_link(
-        SHORTLIST_PAGE,
-        label=f"{_shortlisted_count} allocation{'s' if _shortlisted_count != 1 else ''} shortlisted →",
-        icon="⭐",
-    )
+SHORTLIST_PAGE = Path(__file__).resolve().parent / "3b_Shortlist.py"
 
-# Gate 1A batch-add feedback (Section 9) - a one-shot flash message
-# surviving the single post-submit rerun (session_state.pop so it only
-# shows once, the same "transient message across a forced rerun" pattern
-# already used by app.ui.common's own message_key mechanism elsewhere).
-if _shortlist_feedback := st.session_state.pop("_shortlist_add_feedback", None):
-    st.success(_shortlist_feedback)
+# Gate 1A pre-merge performance amendment - rendered via a placeholder
+# rather than a direct call, so the batch-submit handler further down (in
+# the tab loop) can update this SAME on-screen slot with the fresh count
+# later in this same script execution - without an explicit st.rerun(),
+# which would otherwise force a second, ~2s/14-query
+# build_allocation_discovery() rebuild just to refresh this badge (the
+# exact double-build the pre-merge review caught - see
+# specifications/013-allocation-discovery-gate-1a-performance-amendment.md).
+_shortlist_badge_placeholder = st.empty()
+
+
+def _render_shortlist_badge() -> None:
+    count = shortlist_count(st.session_state[SHORTLIST_SESSION_KEY], "allocation")
+    if count:
+        with _shortlist_badge_placeholder.container():
+            st.page_link(
+                SHORTLIST_PAGE, label=f"{count} allocation{'s' if count != 1 else ''} shortlisted →", icon="⭐",
+            )
+    else:
+        _shortlist_badge_placeholder.empty()
+
+
+_render_shortlist_badge()
 
 
 # --- Allocation detail state (Part 12 - a query-param selected state on
@@ -893,16 +903,20 @@ for tab, category in zip(tabs, categories):
                         ),
                     )
                 st.session_state[SHORTLIST_SESSION_KEY] = new_shortlist_state
-                st.session_state["_shortlist_add_feedback"] = (
-                    f"{len(selected_cards)} allocation{'s' if len(selected_cards) != 1 else ''} added to shortlist."
-                )
-                # One rerun for the whole batch, never one per row (Gate 1A
-                # "batch-submit rerun decision") - needed only so the
-                # shortlist badge computed near the top of this script
-                # (before this form) reflects the new count immediately,
-                # rather than lagging by one interaction. A single rebuild
-                # per batch confirm is an accepted, bounded cost.
-                st.rerun()
+                # Gate 1A pre-merge performance amendment - deliberately NO
+                # st.rerun() here. build_allocation_discovery() already ran
+                # once for this script execution (the form_submit_button
+                # click's own natural rerun, per Streamlit's own click
+                # semantics) - an explicit second rerun would pay that
+                # ~2s/14-query cost again purely to refresh the badge and
+                # show this message, which is exactly the double-build the
+                # pre-merge review identified. Both are instead updated
+                # inline, in this same pass, at zero extra backend cost:
+                # the success message renders directly here, and the badge
+                # placeholder (created near the top of the script) is
+                # re-rendered in place with the fresh count.
+                st.success(f"{len(selected_cards)} allocation{'s' if len(selected_cards) != 1 else ''} added to shortlist.")
+                _render_shortlist_badge()
 
         if shown < len(ordered):
             st.caption(f"Showing {len(page)} of {len(ordered)} allocations.")
