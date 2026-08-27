@@ -686,6 +686,23 @@ def get_allocation_summary(session: Session, allocation_id: int) -> AllocationIn
     ).scalar_one_or_none()
 
 
+def get_allocation_summaries(session: Session, allocation_ids: list[int]) -> dict[int, AllocationIntelligenceSummary]:
+    """Site Selection & Reporting V1 Gate 2 - batched sibling of
+    get_allocation_summary: ONE query across every given allocation_id
+    (WHERE allocation_id IN (...)), never one per allocation, for a
+    shortlist report's Allocation Intelligence read. Read-only, exactly
+    like get_allocation_summary - never generates or calls OpenAI. An
+    allocation with no row simply has no key in the returned dict -
+    callers should use `.get(allocation_id)` and treat a missing key the
+    same as "no summary yet"."""
+    if not allocation_ids:
+        return {}
+    rows = session.execute(
+        select(AllocationIntelligenceSummary).where(AllocationIntelligenceSummary.allocation_id.in_(allocation_ids))
+    ).scalars().all()
+    return {row.allocation_id: row for row in rows}
+
+
 # --- Fingerprint / staleness (Section 7) ------------------------------------
 
 

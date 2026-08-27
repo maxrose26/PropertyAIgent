@@ -366,6 +366,32 @@ def _application_summaries(summary) -> list[RelatedApplicationSummary]:
     ]
 
 
+def get_allocations_control_intelligence(session: Session, site_ids: list[int]) -> dict[int, list[ControlRelationshipGroup]]:
+    """Site Selection & Reporting V1 Gate 2 - batched sibling of
+    get_site_control_intelligence: ONE query across every given site_id
+    (WHERE site_id IN (...)), never one per Site, so a shortlist spanning
+    many allocations' many related Sites can be evidenced without an N+1
+    query pattern. Does not replace or modify get_site_control_intelligence
+    or get_allocation_control_intelligence below (both still used,
+    unchanged, by the Allocation Detail page) - purely an additive,
+    batch-scale entrypoint for report-context building. Sites with no
+    evidence rows simply have no key in the returned dict - callers should
+    use `.get(site_id, [])`."""
+    if not site_ids:
+        return {}
+    stmt = select(ControlRelationship).where(
+        ControlRelationship.review_status != "rejected",
+        ControlRelationship.site_id.in_(site_ids),
+    ).options(
+        selectinload(ControlRelationship.application), selectinload(ControlRelationship.evidence_document),
+    ).order_by(ControlRelationship.site_id, ControlRelationship.role, ControlRelationship.id)
+    rows = session.execute(stmt).scalars().all()
+    views_by_site: dict[int, list[ControlRelationshipView]] = {}
+    for row in rows:
+        views_by_site.setdefault(row.site_id, []).append(_to_view(row))
+    return {site_id: _group_views(views) for site_id, views in views_by_site.items()}
+
+
 def get_allocation_control_intelligence(
     session: Session, site_summaries: list, *, indicative_residual_capacity: int | None,
 ) -> list[SiteControlSection]:
