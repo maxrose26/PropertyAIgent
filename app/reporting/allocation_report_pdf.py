@@ -27,6 +27,21 @@ party evidence with its trust partition, AI Allocation Intelligence
 snapshot, source/evidence, and the aggregate totals) was already present
 from Gate 2. See specifications/015-allocation-reporting-v1-gate-3-pdf.md
 for the full audit trail of that decision.
+
+GATE 4 EXTENSION (optional composition, never a rewrite): render_allocation_
+report_pdf now additionally accepts optional executive_intelligence
+(app.reporting.cross_site_intelligence.CrossSiteIntelligence) and
+web_evidence (app.reporting.allocation_web_research.AllocationWebResearchContext)
+parameters. Both default to None, so every Gate 3 call site/test is
+byte-for-byte unaffected. When executive_intelligence is provided, an
+"EXECUTIVE INTELLIGENCE" section is inserted near the front (after the
+cover, before the deterministic Section 1 Shortlist Overview) and an
+"External Web Sources" section is appended near the end - the deterministic
+shortlist/allocation sections in between are completely unchanged, still
+driven ONLY by AllocationReportContext, never by executive_intelligence or
+web_evidence (Gate 4's own Section 3: the two evidence layers stay
+structurally separate). See specifications/016-allocation-reporting-v1-
+gate-4-ai-web.md.
 """
 from __future__ import annotations
 
@@ -55,6 +70,8 @@ from app.reporting.allocation_report import (
     LinkedApplicationEntry,
     _planning_activity_label,
 )
+from app.reporting.allocation_web_research import AllocationWebResearchContext
+from app.reporting.cross_site_intelligence import CrossSiteIntelligence
 from app.reporting.pdf_report import _styles
 
 REPORT_TITLE = "Allocation Opportunity Report"
@@ -72,6 +89,23 @@ NO_LINKED_APPLICATION_TEXT = "No linked planning application has been identified
 AI_INTELLIGENCE_UNAVAILABLE_TEXT = "AI Allocation Intelligence not currently available."
 
 _PROPOSAL_MAX_CHARS = 220
+
+# Gate 4 Section 27 - a concise evidence note, not a heavyweight legal
+# disclaimer. Shown only above the Executive Intelligence section, i.e.
+# only when executive_intelligence is actually provided - the deterministic
+# Gate 3 report carries no such note, since it makes no web-sourced claims
+# at all.
+WEB_EVIDENCE_NOTE = (
+    "External web research supplements PropertyAIgent's structured planning evidence. Public web information may "
+    "change and should be verified against primary sources before acquisition or planning decisions are made."
+)
+
+# Gate 4 Section 11 - exact wording for a report where bounded web research
+# found nothing useful. Mirrors NO_LINKED_APPLICATION_TEXT's own discipline:
+# a valid, neutral state, never read as "nothing has happened".
+NO_WEB_EVIDENCE_TEXT = (
+    "No additional relevant public web evidence was identified during this report's research."
+)
 
 
 def _e(value) -> str:
@@ -97,6 +131,14 @@ def _allocation_pdf_styles():
     styles.add(ParagraphStyle("Small", parent=styles["Normal"], fontSize=8, leading=11, textColor=colors.grey))
     styles.add(ParagraphStyle("Pending", parent=styles["Normal"], fontSize=9.5, leading=13, textColor=colors.HexColor("#8a6d00"), spaceAfter=4))
     styles.add(ParagraphStyle("TableCell", parent=styles["Normal"], fontSize=8.5, leading=11))
+    # Gate 4 - Executive Intelligence gets its own heading weight (bolder
+    # than an ordinary SectionHeading, since it is the AI-enhanced report's
+    # lead section) and a distinct source-list style for External Web
+    # Sources, kept visually subordinate (small, grey) exactly like the
+    # deterministic report's own Source/Evidence line already is.
+    styles.add(ParagraphStyle("ExecutiveHeading", parent=styles["SectionHeading"], fontSize=15, textColor=colors.HexColor("#1a3c5e")))
+    styles.add(ParagraphStyle("EvidenceNote", parent=styles["Small"], fontSize=8, spaceAfter=10, textColor=colors.grey))
+    styles.add(ParagraphStyle("SourceEntry", parent=styles["Small"], fontSize=8.5, leading=12, spaceAfter=6))
     return styles
 
 
@@ -421,6 +463,84 @@ def _excluded_section(styles, context: AllocationReportContext) -> list:
     return story
 
 
+# --- Gate 4: Executive Intelligence (optional, Section 25) --------------------
+
+
+def _bulleted(styles, items: list[str], style_name: str = "AllocationBody") -> list:
+    return [Paragraph(f"• {_e(item)}", styles[style_name]) for item in items]
+
+
+def _executive_intelligence_section(styles, intelligence: CrossSiteIntelligence) -> list:
+    """Rendered near the front of the AI-enhanced report only (Section 25) -
+    entirely absent from the plain Gate 3 deterministic PDF. Every field
+    here is a plain string/list of strings the caller already validated
+    (app.reporting.cross_site_intelligence.validate_cross_site_output) -
+    this function does no further judgement of its own, exactly like Gate
+    3's own AI Allocation Intelligence section trusts its input."""
+    story = [
+        Paragraph("Executive Intelligence", styles["ExecutiveHeading"]),
+        Paragraph(WEB_EVIDENCE_NOTE, styles["EvidenceNote"]),
+        Paragraph("Executive Summary", styles["AllocationHeading"]),
+        Paragraph(_e(intelligence.executive_summary), styles["AllocationBody"]),
+    ]
+    if intelligence.priority_opportunities:
+        story.append(Paragraph("Priority Opportunities", styles["AllocationHeading"]))
+        story.extend(_bulleted(styles, intelligence.priority_opportunities))
+    if intelligence.recent_external_developments:
+        story.append(Paragraph("Recent External Developments", styles["AllocationHeading"]))
+        story.extend(_bulleted(styles, intelligence.recent_external_developments))
+    if intelligence.cross_site_observations:
+        story.append(Paragraph("Key Cross-Site Observations", styles["AllocationHeading"]))
+        story.extend(_bulleted(styles, intelligence.cross_site_observations))
+    if intelligence.key_uncertainties:
+        story.append(Paragraph("Key Uncertainties", styles["AllocationHeading"]))
+        story.extend(_bulleted(styles, intelligence.key_uncertainties))
+    if intelligence.investigation_priorities:
+        story.append(Paragraph("Investigation Priorities", styles["AllocationHeading"]))
+        story.extend(_bulleted(styles, intelligence.investigation_priorities))
+    story.append(Paragraph(
+        f"Generated {intelligence.generated_at:%d %b %Y %H:%M} UTC - citations in square brackets (e.g. [W1]) refer "
+        "to the External Web Sources section at the end of this report.",
+        styles["Small"],
+    ))
+    story.append(Spacer(1, 4 * mm))
+    return story
+
+
+# --- Gate 4: External Web Sources (optional, Section 26) -----------------------
+
+
+def _external_web_sources_section(styles, web_evidence: AllocationWebResearchContext) -> list:
+    """Appended near the end of the AI-enhanced report only (Section 26) -
+    clearly labelled EXTERNAL WEB RESEARCH, never mixed into the
+    deterministic Source/Evidence lines Gate 3 already renders per
+    allocation (Section 3: the two evidence layers stay structurally
+    separate). Every citation id [Wn] the Executive Intelligence section
+    may reference resolves to exactly one entry here - the same
+    web_evidence.all_evidence() ordering cross_site_intelligence's own
+    validator already checked citations against."""
+    story = [Paragraph("External Web Sources", styles["SectionHeading"])]
+    story.append(Paragraph(
+        "EXTERNAL WEB RESEARCH - public web sources located during bounded research for this report, distinct "
+        "from PropertyAIgent's own trusted planning evidence above.", styles["Small"],
+    ))
+    items = web_evidence.all_evidence()
+    if not items:
+        story.append(Paragraph(NO_WEB_EVIDENCE_TEXT, styles["AllocationBody"]))
+        return story
+    for item in items:
+        scope_bit = f" (Allocation: {_e(item.allocation_name)})" if item.allocation_name else " (Shortlist-level)"
+        date_bit = _e(item.published_date) if item.published_date else "undated"
+        safe_url = _e(item.url)
+        story.append(Paragraph(
+            f"<b>[{item.evidence_id}]</b> {_e(item.publisher)} — “{_e(item.title)}” — {date_bit}{scope_bit}"
+            f"<br/><link href=\"{safe_url}\">{safe_url}</link>"
+            f"<br/>Retrieved {item.retrieved_at:%d %b %Y} · Source tier: {_e(item.source_tier)} · Confidence: {_e(item.confidence)}",
+            styles["SourceEntry"],
+        ))
+    return story
+
+
 # --- Footer (page numbers) ----------------------------------------------------
 
 
@@ -436,13 +556,31 @@ def _footer(canvas, doc) -> None:
 # --- Top-level renderer contract (Section 10) ---------------------------------
 
 
-def render_allocation_report_pdf(context: AllocationReportContext) -> bytes:
+def render_allocation_report_pdf(
+    context: AllocationReportContext, *,
+    executive_intelligence: CrossSiteIntelligence | None = None,
+    web_evidence: AllocationWebResearchContext | None = None,
+) -> bytes:
     """AllocationReportContext -> PDF bytes. Pure renderer: no Session, no
     ORM object, no OpenAI client, zero database queries - every fact
-    rendered is already present on `context`. Deterministic for the same
-    context (byte-identical PDF metadata aside, which ReportLab itself may
-    stamp with a creation timestamp - not something application code
-    controls)."""
+    rendered is already present on `context` (and, when given,
+    `executive_intelligence`/`web_evidence` - both already-validated,
+    already-built Gate 4 objects; this function performs no OpenAI call and
+    no further judgement of its own). Deterministic for the same inputs
+    (byte-identical PDF metadata aside, which ReportLab itself may stamp
+    with a creation timestamp - not something application code controls).
+
+    executive_intelligence/web_evidence default to None, so every existing
+    Gate 3 call site is completely unaffected - calling this with only
+    `context` produces the identical deterministic report it always has.
+    When executive_intelligence is provided, an Executive Intelligence
+    section is inserted right after the cover (before the deterministic
+    Section 1 Shortlist Overview) and an External Web Sources section is
+    appended at the very end, after Excluded Shortlist Items - every
+    section in between is completely unchanged and still driven ONLY by
+    `context` (Gate 4 Section 3 - the two evidence layers stay structurally
+    separate; web_evidence/executive_intelligence are never read by any of
+    the deterministic per-allocation section functions above)."""
     styles = _allocation_pdf_styles()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -453,19 +591,33 @@ def render_allocation_report_pdf(context: AllocationReportContext) -> bytes:
 
     story: list = []
     story.extend(_cover(styles, context))
+    if executive_intelligence is not None:
+        story.extend(_executive_intelligence_section(styles, executive_intelligence))
     story.extend(_shortlist_overview(styles, context))
     story.append(Spacer(1, 4 * mm))
     story.extend(_summary_table(styles, context))
     story.append(Spacer(1, 4 * mm))
     story.extend(_allocation_details(styles, context))
     story.extend(_excluded_section(styles, context))
+    if executive_intelligence is not None:
+        # Rendered whenever executive_intelligence is present, even if
+        # web_evidence itself is None/empty (Section 11 - "no useful
+        # results" is a valid, reportable state, not an omission) -
+        # web_evidence defaults to an empty context in that case so the
+        # section still prints its own honest NO_WEB_EVIDENCE_TEXT rather
+        # than being silently skipped.
+        story.extend(_external_web_sources_section(styles, web_evidence or AllocationWebResearchContext()))
 
     doc.build(story, onFirstPage=_footer, onLaterPages=_footer)
     return buffer.getvalue()
 
 
-def allocation_report_pdf_filename(context: AllocationReportContext) -> str:
+def allocation_report_pdf_filename(context: AllocationReportContext, *, ai_enhanced: bool = False) -> str:
     """Deterministic, safe filename - built entirely from context.generated_at
     (an internally-produced UTC timestamp, never arbitrary site/user input),
-    so no sanitisation of external text is needed."""
-    return f"property-aigent-allocation-report-{context.generated_at:%Y-%m-%d}.pdf"
+    so no sanitisation of external text is needed. ai_enhanced defaults to
+    False, preserving the exact Gate 3 filename for every existing caller;
+    pass True for a report built with executive_intelligence to distinguish
+    the two files."""
+    suffix = "-ai-intelligence" if ai_enhanced else ""
+    return f"property-aigent-allocation-report{suffix}-{context.generated_at:%Y-%m-%d}.pdf"
