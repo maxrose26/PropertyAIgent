@@ -237,3 +237,105 @@ def test_ampersand_in_web_source_does_not_break_rendering():
     assert pdf_bytes.startswith(b"%PDF-")
     text = _pdf_text(pdf_bytes)
     assert "Smith & Sons" in text
+
+
+# --- Live-defect regression: AI PDF renderer signature mismatch ---------------
+#
+# Product Owner live validation (Gate 4, master 59b3cb2) reported:
+#
+#   TypeError: render_allocation_report_pdf() got an unexpected keyword
+#   argument 'executive_intelligence'
+#
+# raised from app/ui/pages/3b_Shortlist.py's exact call shape:
+#
+#   render_allocation_report_pdf(context, executive_intelligence=ai_result.intelligence, web_evidence=web_evidence)
+#
+# Root cause investigation confirmed this was NOT a source-code defect - the
+# committed render_allocation_report_pdf signature already carried
+# `*, executive_intelligence=None, web_evidence=None` (verified via
+# `inspect.signature` in a fresh Python process, and via a repo-wide search
+# proving exactly ONE definition of render_allocation_report_pdf exists and
+# app/ui/pages/3b_Shortlist.py imports it from the correct module). The
+# error was reproduced in this session's own long-running Streamlit dev
+# server process log (captured 2026-08-27 15:18:26) - a stale, already-
+# imported `app.reporting.allocation_report_pdf` module object cached in
+# that process's own `sys.modules` from before the Gate 3 -> Gate 4
+# signature extension, never reloaded across the subsequent git checkout/
+# merge operations. Restarting the process resolved it immediately, with
+# zero source changes. These tests exist as a permanent regression guard
+# and an import-contract proof, not because any source line changed.
+
+
+def test_live_defect_regression_exact_reported_call_shape_does_not_raise():
+    """Reproduces the EXACT reported call shape (keyword order and all)
+    against a real render - proves no TypeError, valid PDF bytes, and both
+    the Executive Intelligence and External Web Sources sections present."""
+    context = _make_context()
+    ai_result_intelligence = _make_intelligence()
+    web_evidence = _make_web_evidence()
+
+    # Literally the same call shape as app/ui/pages/3b_Shortlist.py's own
+    # download_button data= argument.
+    pdf_bytes = render_allocation_report_pdf(
+        context, executive_intelligence=ai_result_intelligence, web_evidence=web_evidence,
+    )
+
+    assert pdf_bytes.startswith(b"%PDF-")
+    text = _pdf_text(pdf_bytes)
+    assert "Executive Intelligence" in text
+    assert "External Web Sources" in text
+
+
+def test_live_defect_regression_plain_context_call_still_works_unchanged():
+    """The deterministic Gate 3 call path - render_allocation_report_pdf(context)
+    with no keyword arguments at all - must remain completely unaffected."""
+    context = _make_context()
+
+    pdf_bytes = render_allocation_report_pdf(context)
+
+    assert pdf_bytes.startswith(b"%PDF-")
+    text = _pdf_text(pdf_bytes)
+    assert "Executive Intelligence" not in text
+    assert "External Web Sources" not in text
+
+
+def test_import_contract_exactly_one_renderer_definition_repo_wide():
+    """Closes off "wrong/duplicate renderer" as a possible future regression
+    (Phase 1 diagnosis category B/C/E) - asserts, from source, that exactly
+    one `def render_allocation_report_pdf` exists anywhere under app/, and
+    that it is the same function object app.ui.pages.3b_Shortlist imports
+    from app.reporting.allocation_report_pdf (the identical import
+    statement that module itself uses)."""
+    import ast
+    from pathlib import Path
+
+    import app.reporting.allocation_report_pdf as module
+    from app.reporting.allocation_report_pdf import render_allocation_report_pdf as imported_via_module
+
+    app_root = Path(module.__file__).resolve().parents[1]  # .../app
+    definitions = []
+    for path in app_root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "render_allocation_report_pdf":
+                definitions.append(path)
+
+    assert definitions == [Path(module.__file__)], f"expected exactly one definition, found: {definitions}"
+    assert imported_via_module is render_allocation_report_pdf  # same function object, no shadowing
+
+
+def test_import_contract_runtime_signature_matches_gate_4_contract():
+    """Direct runtime proof (Phase 5's own request) - importable exactly the
+    way app/ui/pages/3b_Shortlist.py imports it, with the exact expected
+    Gate 4 signature shape."""
+    import inspect
+
+    from app.reporting.allocation_report_pdf import render_allocation_report_pdf as page_import
+
+    sig = inspect.signature(page_import)
+    params = list(sig.parameters.values())
+
+    assert [p.name for p in params] == ["context", "executive_intelligence", "web_evidence"]
+    assert params[0].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    assert params[1].kind is inspect.Parameter.KEYWORD_ONLY and params[1].default is None
+    assert params[2].kind is inspect.Parameter.KEYWORD_ONLY and params[2].default is None
