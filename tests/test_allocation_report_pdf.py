@@ -508,14 +508,27 @@ def test_renderer_performs_zero_database_queries(session):
 
 def test_renderer_needs_no_session_or_orm_object():
     """Signature-level proof: render_allocation_report_pdf takes exactly one
-    positional argument (the context) - no Session, no engine, no ORM
-    object can be passed because nothing else is accepted."""
+    REQUIRED argument (context) - no Session, no engine, no ORM object, no
+    OpenAI client can be required. Gate 4 (specifications/016-...) added two
+    OPTIONAL, keyword-only, default-None parameters (executive_intelligence/
+    web_evidence, both already-built plain dataclasses, never a Session/
+    client/engine) - every Gate 3 call site (`render_allocation_report_pdf(
+    context)`) is therefore still exactly as isolated as this test always
+    asserted; only the "exactly one parameter, full stop" shape of the
+    original assertion needed updating for the new, deliberate optional
+    extension."""
     import inspect
 
     sig = inspect.signature(render_allocation_report_pdf)
     params = list(sig.parameters.values())
-    assert len(params) == 1
-    assert params[0].name == "context"
+    required = [p for p in params if p.default is inspect.Parameter.empty]
+    optional = [p for p in params if p.default is not inspect.Parameter.empty]
+
+    assert [p.name for p in required] == ["context"]
+    for p in optional:
+        assert p.default is None
+        assert p.kind is inspect.Parameter.KEYWORD_ONLY
+        assert not any(kw in p.name.lower() for kw in ("session", "client", "engine", "openai", "db"))
 
 
 def test_full_query_count_context_plus_pdf_remains_flat_across_shortlist_sizes(session):
