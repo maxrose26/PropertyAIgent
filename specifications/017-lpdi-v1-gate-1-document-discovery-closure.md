@@ -14,7 +14,15 @@ Not Local Plan Delivery Intelligence itself — a data-foundation gate that mate
 
 ## Source strategy — config-only, zero code change
 
-`app.policy.sources.register_sources_for_council` (unmodified) is fully idempotent, config-driven from `config/policy_sources.yaml`, and auto-resolves `local_plan_id` by exact `(plan_name, plan_version)` match against an already-ingested `LocalPlan` row. This gate's entire implementation is therefore **config data only** — 9 new `MonitoredSource` entries added across 8 councils, every one located and verified by direct, live browser navigation against the council's own real website (never a search-engine summary, never AI-generated):
+`app.policy.sources.register_sources_for_council` (unmodified) is fully idempotent, config-driven from `config/policy_sources.yaml`, and auto-resolves `local_plan_id` by exact `(plan_name, plan_version)` match against an already-ingested `LocalPlan` row. This gate's entire implementation is therefore **config data only** — **12 new `MonitoredSource` entries added across 9 councils** (6 newly covered: Bolton, Manchester, Oldham, Rochdale, Tameside, Wigan; 3 extended: Bury, Salford, Trafford), on top of **9 pre-existing** entries (Stockport 2, Bury 3, Salford 2, Trafford 2), for **21 total**. Every new entry was located and verified by direct, live browser navigation against the council's own real website (never a search-engine summary, never AI-generated):
+
+<!-- Documentation-only correction (LPDI V1 Gate 2) - this section originally
+     miscounted/transposed the pre-existing vs. new split ("9 new across 8
+     councils"; "12 pre-existing + 9 new" further below). The implementation
+     (config/policy_sources.yaml), the tests, and every other number in this
+     specification were always correct - only this prose summary was wrong.
+     Corrected here to: 9 pre-existing + 12 new = 21 total, across 9 councils
+     touched by this gate (6 newly covered + 3 extended). -->
 
 | Council | New source(s) | Verified content |
 |---|---|---|
@@ -85,7 +93,7 @@ Both are genuine, narrow, well-understood gaps — but per Section 10's own "dis
 
 ## Baseline vs. validated coverage (controlled, local-only validation)
 
-**Registration** (config parse + idempotent DB write, isolated local SQLite, 0.17s): 21 `MonitoredSource` rows across all 10 councils (12 pre-existing + 9 new). 13 auto-linked to a real `LocalPlan` row; Rochdale (0) and Tameside (0) correctly stayed unlinked as designed; Salford (1 of 3) and Trafford (1 of 3) only auto-linked their *new* Gate-1 entry, not their pre-existing `emerging_plan` entry — direct, live confirmation of the `plan_version`-drift finding above.
+**Registration** (config parse + idempotent DB write, isolated local SQLite, 0.17s): 21 `MonitoredSource` rows across all 10 councils (9 pre-existing + 12 new). 13 auto-linked to a real `LocalPlan` row; Rochdale (0) and Tameside (0) correctly stayed unlinked as designed; Salford (1 of 3) and Trafford (1 of 3) only auto-linked their *new* Gate-1 entry, not their pre-existing `emerging_plan` entry — direct, live confirmation of the `plan_version`-drift finding above.
 
 **Discovery** (real network requests against real council websites, 95.29s total, 21 sources checked):
 
