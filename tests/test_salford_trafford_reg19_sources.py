@@ -2,6 +2,13 @@
 INVESTIGATE phase. This task made no code changes to the ingestion
 pipeline, extraction schema, or database models - the only new artefact is
 the config/policy_sources.yaml registration for both councils (Section 7).
+
+Source counts below were updated (not weakened) by LPDI V1 Gate 1
+("Greater Manchester Document Discovery Closure") - that later gate added
+one monitoring_page source each to salford, trafford, AND bury for their
+real AMR/5YHLS evidence pages, on top of what this original task
+registered. See specifications/017-lpdi-v1-gate-1-document-discovery-closure.md.
+
 These tests lock the two things that are genuinely new/at risk:
 
 1. The Salford and Trafford source entries parse and register correctly
@@ -36,7 +43,11 @@ def _real_config() -> dict:
 def test_salford_source_config_is_registered_with_correct_types():
     config = _real_config()
     salford = config["councils"]["salford"]["sources"]
-    assert len(salford) == 2
+    # 3, not the original 2 - LPDI V1 Gate 1 ("Greater Manchester Document
+    # Discovery Closure") added one monitoring_page source for Salford's
+    # own real "Planning policy research and monitoring" page; see
+    # specifications/017-lpdi-v1-gate-1-document-discovery-closure.md.
+    assert len(salford) == 3
 
     landing = next(s for s in salford if s["source_type"] == "landing_page")
     assert "salford.gov.uk" in landing["url"]
@@ -46,11 +57,18 @@ def test_salford_source_config_is_registered_with_correct_types():
     assert plan_doc["url"].endswith(".pdf")
     assert plan_doc["plan_name"] == "Salford Local Plan: Core Strategy and Allocations"
 
+    monitoring = next(s for s in salford if s["source_type"] == "monitoring_page")
+    assert "salford.gov.uk" in monitoring["url"]
+    assert monitoring["plan_name"] == "Salford Local Plan: Core Strategy and Allocations"
+
 
 def test_trafford_source_config_is_registered_with_correct_types():
     config = _real_config()
     trafford = config["councils"]["trafford"]["sources"]
-    assert len(trafford) == 2
+    # 3, not the original 2 - LPDI V1 Gate 1 added one monitoring_page
+    # source for Trafford's own real "Supporting information, evidence and
+    # monitoring" page (see this file's own docstring update).
+    assert len(trafford) == 3
 
     landing = next(s for s in trafford if s["source_type"] == "landing_page")
     assert "trafford.gov.uk" in landing["url"]
@@ -59,15 +77,25 @@ def test_trafford_source_config_is_registered_with_correct_types():
     assert plan_doc["url"].endswith(".pdf")
     assert plan_doc["plan_name"] == "Trafford Local Plan"
 
+    monitoring = next(s for s in trafford if s["source_type"] == "monitoring_page")
+    assert "trafford.gov.uk" in monitoring["url"]
+    assert monitoring["plan_name"] == "Trafford Local Plan"
+
 
 def test_stockport_and_bury_source_config_unchanged_by_this_task():
+    """"This task" = the Salford/Trafford Regulation 19 ingestion task this
+    file was originally written for - stockport is genuinely untouched by
+    both that task and LPDI V1 Gate 1. bury gained one monitoring_page
+    source under Gate 1 (see the two tests above for the equivalent
+    salford/trafford change) - the count/type-set here is updated to match,
+    not "unchanged" in the absolute sense the original name still reads."""
     config = _real_config()
     stockport = config["councils"]["stockport"]["sources"]
     bury = config["councils"]["bury"]["sources"]
     assert len(stockport) == 2
-    assert len(bury) == 3
+    assert len(bury) == 4
     assert {s["source_type"] for s in stockport} == {"emerging_plan", "policies_map"}
-    assert {s["source_type"] for s in bury} == {"landing_page", "emerging_plan", "adopted_plan"}
+    assert {s["source_type"] for s in bury} == {"landing_page", "emerging_plan", "adopted_plan", "monitoring_page"}
 
 
 def test_salford_and_trafford_register_without_a_local_plan_existing_yet(session):
@@ -75,8 +103,8 @@ def test_salford_and_trafford_register_without_a_local_plan_existing_yet(session
     salford_sources = register_sources_for_council(session, "salford", config=config)
     trafford_sources = register_sources_for_council(session, "trafford", config=config)
 
-    assert len(salford_sources) == 2
-    assert len(trafford_sources) == 2
+    assert len(salford_sources) == 3
+    assert len(trafford_sources) == 3
     # Neither council has had its Regulation 19 plan ingested in this
     # task (INVESTIGATE only) - both plan-tied sources must resolve to no
     # LocalPlan yet, exactly like Bury's did before Bury was first onboarded.
@@ -97,7 +125,7 @@ def test_registering_salford_and_trafford_does_not_disturb_bury_or_stockport(ses
 
     assert {s.id for s in bury_after} == {s.id for s in bury_before}
     assert {s.id for s in stockport_after} == {s.id for s in stockport_before}
-    assert len(bury_after) == 3
+    assert len(bury_after) == 4
     assert len(stockport_after) == 2
 
 
