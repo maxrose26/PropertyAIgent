@@ -160,10 +160,139 @@ Defined here transparently, describing evidence **completeness only**:
 
 By authority: Bolton (1 irrelevant report only), Manchester (blocked), Oldham/Rochdale/Tameside/Wigan (0 discovered reports this run), Bury (attribution ambiguous), Trafford (2 needs_review only). By evidence type: **HDT remains 0/11 populated platform-wide** — no council's SAFE_TO_EXTRACT cohort this gate contained an `authority_monitoring_report`/`housing_land_supply_statement`-typed document at all (Salford's 6 were all generically `local_plan`-typed) — five-year-supply and completions/trajectory fields remain equally unaddressed by this gate's own narrow cohort.
 
-## Recommendations
+## Recommendations (Gate 2's own, superseded in part — see Gate 2A below)
 
-1. **Do not yet proceed to LPDI authority-level aggregation.** Coverage remains thin (1 of 11 plans meaningfully improved this gate) and — more importantly — this gate surfaced a genuine, unresolved evidence-grounding risk (the wrong-plan-reference finding) that argues for caution before broader ancillary-document extraction is trusted at scale.
-2. A future, dedicated gate should design and build a genuine same-plan-reference validator check before extraction is run more broadly against supporting/ancillary documents (Viability Assessments, SFRAs, etc.) — a real feature requiring its own product review, not a "smallest possible fix."
-3. Resolve Bury's/Tameside's plan-attribution question (which of two real plans housing-delivery evidence should attach to) — a Product Owner decision, not an engineering one.
-4. Consider whether the `local_plan` `MonitoredReport.source_type` bucket should be split more finely to stop conflating a real plan document with consultation-process schedules — a product/classification decision for a future gate.
-5. Manchester's HTTP 403 remains unresolved (Gate 1 finding, unchanged).
+1. ~~Do not yet proceed to LPDI authority-level aggregation~~ — still true, but for a narrower reason: Gate 2A closed the specific grounding-gap risk named here; see Gate 2A's own recommendations for what remains.
+2. ~~A future, dedicated gate should design and build a genuine same-plan-reference validator check~~ — **done, this gate (2A)**; see below.
+3. Resolve Bury's/Tameside's plan-attribution question — **substantially addressed for Bury this gate (2A)** via report-level attribution rather than a schema change; Tameside remains open.
+4. Consider whether the `local_plan` `MonitoredReport.source_type` bucket should be split more finely — still open, unchanged.
+5. Manchester's HTTP 403 remains unresolved — still open, unchanged.
+
+---
+
+# Gate 2A — Multi-Plan Attribution & Same-Plan Evidence Validation Hardening
+
+## Purpose
+
+Gate 2 found and documented, but deliberately did not fix, two related attribution problems: (1) a fact whose excerpt genuinely supports a claimed value can still be about a verifiably different, sibling plan document (the Salford SLP:CSA/SLP:DMP finding), and (2) a genuinely multi-plan authority (Bury: its own Local Plan *and* Places for Everyone) had every one of its reports excluded outright rather than resolved. Gate 2A closes both with the smallest reusable, generic (never per-authority-hardcoded) hardening the existing architecture supports — **no schema change, no new database table.**
+
+## Root cause 1 — Salford sibling-plan contamination
+
+`validate_fact`'s excerpt-must-contain-the-claimed-value check (Gate 1/2, unchanged) answers *"does this excerpt support this number?"*, never *"is this excerpt about the plan being extracted for?"*. Nothing in the pipeline compared a fact's supporting text against the identity of any *other* known plan.
+
+## Root cause 2 — Bury's blanket exclusion
+
+`resolve_plan(session, council_code, plan_id=None)` (Gate 1/2, still unchanged — it remains the correct human-operator-facing CLI tool for its own use case) filters `LocalPlan.council_code == council_code` directly. Two real findings from auditing this properly this gate:
+
+1. **`plans_for_council(session, council_code)` already exists** (`app.policy.joint_plans`, built in the prior "Joint Plan Support" sprint) and correctly resolves Places for Everyone as a candidate for **every one of its 9 real participating authorities** via the `LocalPlanCouncil` join table — not just Bury (PfE's `LocalPlan.council_code` legacy/lead value). `resolve_plan` was never updated to use it. Rebuilding the Gate 2A isolated validation database with the real `LocalPlanCouncil` backfill applied (the same `ensure_council_links_for_plan` logic `scripts/migrate_joint_plan_support.py` already runs in production) confirms this directly: Salford, Trafford, Manchester, Oldham, Wigan, Bolton, and Rochdale are **all** genuinely multi-plan authorities via PfE membership — Gate 2's own Salford SAFE_TO_EXTRACT cohort was only "unambiguous" because `resolve_plan`'s raw-column check happened not to notice PfE for Salford, not because Salford was genuinely single-plan. This is corrected, not just documented: Gate 2A's own attribution results for Salford (below) prove the new mechanism still resolves the 6 Salford reports correctly even once Salford is properly recognised as multi-plan.
+2. **The 7 Bury reports were never actually discovered via the plan-linked `monitoring_page` source** (which does correctly carry `local_plan_id`) — they were all discovered via the plan-unlinked `landing_page` source, so `MonitoredReport.local_plan_id` was `None` on all 7, and `resolve_plan`'s blanket 2-plans-exist refusal excluded every one of them regardless of what each document actually was.
+
+## Report-level attribution — `app.policy.plan_attribution.attribute_report`
+
+New, small, generic module (`app/policy/plan_attribution.py`) — never a per-authority rule. For each report:
+
+1. `plans_for_council` gives the true candidate set (correctly including joint plans).
+2. Exactly one candidate → `PLAN_MATCH` (trivial — single-plan authorities are completely unaffected).
+3. **Tier 1**: `MonitoredReport.local_plan_id` (inherited from an explicitly plan-linked discovering source, e.g. `plan_name` set in `config/policy_sources.yaml`) → `PLAN_MATCH`, the strongest signal.
+4. **Tier 2**: the report's own title contains a configured identity alias (`config/plan_aliases.yaml`, falling back to the plan's own `plan_name` for any plan with no config entry) for exactly one candidate → `PLAN_MATCH`. More than one candidate named → `AMBIGUOUS`.
+5. **Tier 2b**: the discovering source *page's own title* (not the individual document's) carries an alias for exactly one candidate → `PLAN_MATCH`. Needed because a Viability Assessment or a schedule of responses rarely restates which plan it belongs to in its own title, even though the landing page that discovered it is itself scoped to one specific plan's consultation.
+6. **Tier 3**: no signal ties it to one plan, but its `source_type` is one that conventionally carries authority-level, not plan-specific, evidence (`AUTHORITY_WIDE_CAPABLE_SOURCE_TYPES` — AMR/housing-delivery/five-year-supply/trajectory types) → `AUTHORITY_WIDE`, `plan=None`.
+7. Otherwise → `AMBIGUOUS`, review-required, never guessed.
+
+`resolve_plan` itself is untouched — `attribute_report` is the new, additional, automated-cohort-classification path; the CLI's own human-operator contract is unchanged.
+
+## Fact-level sibling-plan validation — `evidence_validation.detect_sibling_plan_reference`
+
+New, small, optional (fully backward-compatible — every existing caller of `validate_fact`/`validate_facts` is unaffected) check, reusing the *existing* rejection mechanism (`is_valid=False`, `rejection_reason` set) rather than inventing a new outcome type. Given the target plan's known sibling alias groups (`plan_identity.sibling_alias_groups`), a fact is rejected if a sibling's name appears in its excerpt.
+
+**A real, live re-run of the exact original finding demonstrated the excerpt-only version of this check is insufficient**: a fresh, real OpenAI extraction call against the same Viability Assessment returned the *same* short excerpt as Gate 2 originally saw — `"adopted on 18 January 2023"` — with no sibling name in it at all, even though the full sentence in the source (`"...the Salford Local Plan: Development Management Policies and Designations (SLP:DMP), which was adopted on 18 January 2023."`) plainly names the sibling plan. The model's own returned `source_page` for this fact (15) also does not match any of the real pages (3, 7, 8, 12, 26) that actually contain this text — a second, separate, previously-undocumented extractor citation-accuracy limitation.
+
+**Smallest possible fix actually implemented** (Section 21 discipline — reproduced live, fixture/test added, minimal validator-only change, no new OpenAI capability, no prompt change): `detect_sibling_plan_reference` now also accepts `source_text` (the full text of the pages the extraction pass actually read, already available in `run_extraction` — nothing new is fetched or sent to OpenAI) and searches the **single sentence** containing the fact's excerpt for a sibling alias, not just the excerpt string itself.
+
+**Why bounded to one sentence, not the whole page/document**: a second real, live extraction (the Bury Local Plan regression, below) demonstrated a document can legitimately mention a sibling plan (Places for Everyone) in a *different, nearby* sentence while correctly stating its *own* plan's genuine figure — Bury's own housing requirement (452/9,486 dwellings) sits in the same paragraph, one sentence away from an explicit "Places for Everyone" reference explaining where the underlying policy figure originates. A page- or paragraph-wide check would have wrongly blocked this genuine, correctly-attributed evidence. The sentence boundary is the narrowest window that catches the real Salford case while preserving the real Bury case — verified directly against both, not assumed.
+
+**Re-verified directly with a fresh, live OpenAI call** (not reused from the first run, to rule out having gotten lucky): the same excerpt (`"adopted on 18 January 2023"`) came back again, and this time `validate_fact` correctly rejected it — `rejection_reason: "supporting evidence explicitly references a different Local Plan ('Salford Local Plan: Development Management Policies and Designations')"`.
+
+## Alias/config strategy — `config/plan_aliases.yaml`
+
+New config file, same pattern as the existing `config/joint_plans.yaml`: entries matched by exact `(council_code, plan_name, plan_version)` triple (falling back to `(council_code, plan_name)` alone when `plan_version` drifts — a known, real, already-documented risk in this codebase per spec 017's own note on Salford's `plan_version` string not always matching the live value one-for-one; without this fallback, a version mismatch would make `sibling_alias_groups` mistake a plan's own identity entry for a sibling of itself and wrongly block its own genuine evidence). Four entries: `bury_local_plan`, `bury_pfe`, `salford_slp_csa`, and **`salford_slp_dmp`** — an **identity-only** entry (`plan_name: null`) that exists solely so SLP:DMP's own name/aliases can be recognised as "a different, real plan" for contamination-detection purposes, without ingesting it as a new `LocalPlan` row (no schema/data-model change). Every plan not listed here still works correctly — `aliases_for_plan` falls back to the plan's own `plan_name`, `sibling_alias_groups` returns no groups, degrading to "nothing to conflict with." No keyword hack, no per-authority `if council == "bury"` logic anywhere in application code — every distinguishing string lives in this one config file.
+
+## Bury/Places for Everyone analysis — all 7 Gate 2-excluded reports individually reassessed
+
+| # | Title | Attribution result | Extraction scope decision |
+|---|---|---|---|
+| 2 | Publication Local Plan | **BURY_LOCAL_PLAN** (title alias) | SAFE_TO_EXTRACT — the actual plan document (189 pages, extracted in full) |
+| 3 | Publication Local Plan Policies Map | **BURY_LOCAL_PLAN** (title alias) | SAFE_TO_EXTRACT — 1 page, extracted (near-zero cost) |
+| 4 | Publication Local Plan representation guidance note | **BURY_LOCAL_PLAN** (title alias) | IRRELEVANT — pure procedural document (how to make a representation), not a source of plan evidence by genre |
+| 5 | Publication Local Plan Statement of the representations procedure | **BURY_LOCAL_PLAN** (title alias) | IRRELEVANT — same, pure procedure document |
+| 6 | Publication Local Plan representation form (word version) | **BURY_LOCAL_PLAN** (title alias) | IRRELEVANT — non-PDF format (`.docx`); existing pipeline is PDF-only (`pdfplumber`) — Category C, genuine format limitation, and a blank form template regardless |
+| 7 | Publication Local Plan representation form (pdf) | **BURY_LOCAL_PLAN** (title alias) | IRRELEVANT — blank/fillable representation form template, inherently no plan-evidence content |
+| 8 | Local Plan Consultation Statement (June 2026) | **BURY_LOCAL_PLAN** (discovering source page title alias — the document's own title carries no plan name) | SAFE_TO_EXTRACT — 25 pages, extracted in full |
+
+**Result: 7/7 attributed (all `BURY_LOCAL_PLAN`, zero `PLACES_FOR_EVERYONE`, zero `AUTHORITY_WIDE`, zero `AMBIGUOUS`, zero `IRRELEVANT`-for-attribution-purposes)** — none of the 7 real titles mention Places for Everyone/PfE at all, so no false PfE attribution was ever at risk; the mechanism resolved all 7 on real, explicit signals, never a guess. Of those 7, **3 were sent to extraction** (#2, #3, #8) and **4 were excluded from extraction** on documented content/format grounds (not attribution grounds) — comfortably clearing Section 18's own stated bar ("if only 3/7 can be safely attributed, that is acceptable").
+
+## Controlled Bury extraction (isolated Gate 2A database, zero production writes)
+
+| Report | Categories | Facts extracted | Rejected | Auto-applied | Needs review |
+|---|---|---|---|---|---|
+| #2 (full plan, 189p) | housing_requirement, plan_identity | 13 | 2 | 8 | 4 |
+| #3 (Policies Map, 1p) | housing_requirement, plan_identity | 1 | 0 | 0 | 1 |
+| #8 (Consultation Statement, 25p) | housing_requirement, plan_identity | 11 | 7 | 0 | 6 |
+
+Real, grounded result: `annual_housing_requirement = 452`, `total_housing_requirement = 9,486` (both auto-applied, page-28 excerpts — "*a requirement of 452 dwellings per year will apply...*"; "*this results in a total housing requirement of 9,486 dwellings from 2022 – 2043*"), plus `plan_period_start/end = 2022/2043`, `publication_date`, `expected_adoption_date`, `next_milestone`/`next_milestone_date` auto-applied from #2. **These figures are explicitly sourced from Places for Everyone's own Policy JP-H1 ("the scale of housing growth...has been set through the Joint Places for Everyone Development Plan") — Bury's own Local Plan text says so directly, in a *different* sentence one paragraph away from the figures themselves.** The sentence-bounded sibling check correctly did **not** treat this as contamination (verified directly, not assumed — see the dedicated regression test) because the figures are genuinely, legitimately Bury Local Plan's own stated requirement, merely derived from the joint plan's policy — not a case of the wrong document's fact being misattributed.
+
+## Controlled Salford re-run (sibling hardening active)
+
+| Report | Facts extracted | Rejected | Auto-applied | Needs review |
+|---|---|---|---|---|
+| #12 (full plan, 98p) | 13 | 2 | 8 | 5 |
+| #26 (Viability Assessment, bounded 1–30p) | 8 | 3 | 1 | 6 |
+
+**`adoption_date` is no longer among the auto-applied facts.** Directly re-verified with an isolated, fresh OpenAI call (`app.extraction.plan_evidence.extract_plan_evidence` against the real PDF, real API, outside of `run_extraction`): the model still returns `adoption_date = "18 January 2023"` with the same short excerpt; `validate_facts` (with the target plan's sibling groups and `source_text` supplied) now correctly rejects it with `rejection_reason: "supporting evidence explicitly references a different Local Plan ('Salford Local Plan: Development Management Policies and Designations')"`. Genuine SLP:CSA evidence remains fully intact: `annual_housing_requirement = 1,658`, `total_housing_requirement = 34,818`, `plan_period_end = 2043`, `requirement_basis`, `publication_date`, `expected_adoption_date`, `next_milestone`/`next_milestone_date`, `status_notes` all still auto-applied exactly as Gate 2 found them (real run-to-run wording/page-citation variance is expected LLM non-determinism, not a regression — the same real figures and real excerpts recur every run).
+
+## Authority-wide evidence — architectural finding (not exercised, still worth recording)
+
+`AUTHORITY_WIDE_CAPABLE_SOURCE_TYPES` (AMR/housing-delivery/five-year-supply/trajectory `source_type`s) exists and is tested (unit level: an AMR-typed report with no plan-specific title signal correctly returns `AUTHORITY_WIDE`, `plan=None`, never forced onto either candidate plan). **No report in this gate's real 43-report cohort actually reached this branch** — none of Bury's 7 reports, nor Salford's 6, are AMR/housing-delivery-typed. The deeper architectural question the task poses — *can this platform actually WRITE structured authority-level evidence once one is found?* — was audited: `PolicyChangeEvent.local_plan_id` is nullable (already usable for a plan-independent event), but every structured evidence FIELD (`annual_housing_requirement`, `homes_delivered_latest_period`, etc.) lives only on `LocalPlan`, never on `Council`. **There is currently no authority-level (Council-scoped) structured evidence storage** — a real, confirmed gap, matching the task's own anticipated finding. Not a blocker for this gate (nothing needed to be written this way), but a genuine limitation for the next gate that discovers a real AMR: it will hit this exact wall. **Not fixed here — no schema change was made or proposed; recorded per Section 20 for the next gate that needs it.**
+
+## Schema/dependency changes
+
+**None.** `git diff --stat` against Gate 2's own HEAD (`88322f6`) confirms: 2 new small modules (`app/policy/plan_identity.py`, `app/policy/plan_attribution.py`), 1 new config file (`config/plan_aliases.yaml`), targeted edits to `app/policy/evidence_validation.py` (2 new optional, backward-compatible parameters + 1 new function) and `app/policy/extract_plan_evidence.py` (4 lines wiring `sibling_alias_groups`/`source_text` through), 2 new test files. Zero migrations. Zero new tables. Zero new columns. Zero new dependencies (`pyyaml` was already a dependency — `config/joint_plans.yaml` already used it).
+
+## Remaining limitations (Gate 2A)
+
+- **The sentence-bounded sibling check is not a complete solution** — it depends on the model's excerpt/value and the source text lining up within one sentence; a contamination spread across two sentences (e.g. "...SLP:DMP..." in one sentence, "...adopted 18 January 2023" in the next) would still slip through. No case requiring a wider check was found in this gate's real cohort, but this is a real, honestly-stated limit, not a claim of completeness.
+- **Extractor page-citation accuracy is unreliable** — the model's own `source_page` for the contaminated fact (15) never matched any real occurrence (3, 7, 8, 12, 26) of the text it claims to cite. Not investigated further this gate (out of scope — a prompt/extraction-behaviour question, not an attribution/validation one); worth a dedicated look in a future gate since it also affects how much a human reviewer can trust `source_page` when confirming a `needs_review` fact by hand.
+- **Tameside's own 2-plan ambiguity is untouched** — no Tameside report existed in this gate's cohort to test against; the mechanism should generalise (it is not Bury-specific) but this was not demonstrated live.
+- **The authority-wide evidence storage gap is real but unexercised** — see above.
+
+## Revised evidence coverage (Gate 2 + Gate 2A combined)
+
+| Council | Gate 2 coverage | Gate 2A change | Coverage after 2A |
+|---|---|---|---|
+| Bury | PARTIAL (pre-existing 452/9,486 only) | +`plan_period_start/end`, `publication_date`, `expected_adoption_date`, `next_milestone`/date (5 new fields, all real, isolated DB only) | PARTIAL (broader) |
+| Salford | PARTIAL (13 fields, 1 flagged wrong) | `adoption_date` misattribution now blocked (correctly null instead of wrong); all other genuine fields unchanged | PARTIAL (same breadth, **correct** now instead of 1 field wrong) |
+| All other 9 authorities | unchanged | unchanged (no report from any of them reached extraction this gate either) | unchanged |
+
+## Success criteria — verified against Section 29's own 12 items
+
+1. ✅ Salford sibling-plan contamination can no longer auto-apply (verified directly, twice, with live OpenAI calls).
+2. ✅ Correct Salford evidence remains usable (annual/total housing requirement, plan period, publication date, etc. all still auto-apply).
+3. ✅ Multi-plan authorities are no longer handled by blanket exclusion (Bury: 7/7 attributed, not 0/7).
+4. ✅ Bury's 7 reports individually classified by evidence scope (table above).
+5. ✅ Deterministically attributable Bury reports safely reached the existing extraction pipeline (3 real, isolated-DB extractions).
+6. ✅ PfE evidence is not written to Bury Local Plan merely because Bury participates in PfE (all 7 correctly resolved to Bury Local Plan on real title signals, zero PfE misattribution risk existed in this real cohort — and the mechanism itself keeps them structurally distinct, tested at the unit level with a synthetic PfE-titled report).
+7. ✅ Bury Local Plan evidence is not written to PfE merely because both belong to the same authority (same mechanism, same test coverage).
+8. ✅ Authority-wide evidence is identified rather than forced into a plan (mechanism exists, tested; no live case existed in this cohort to exercise it further).
+9. ✅ Ambiguous reports remain review-required (`AMBIGUOUS` status never silently resolved; unit-tested with a two-candidate-named-in-title case).
+10. ✅ Zero production writes (isolated Gate 2A SQLite database only, throughout).
+11. ✅ No new scoring/intelligence introduced (attribution and validation only).
+12. ✅ Tests prove the solution is reusable beyond Bury (single-plan-authority test, generic multi-plan-with-no-signal test, PfE-side attribution test, authority-wide test — none reference Bury by name in their logic, only in fixture data).
+
+## Recommendations (Gate 2A)
+
+1. Do not yet proceed to LPDI authority-level aggregation — coverage is still thin (2 of 11 plans meaningfully improved across Gates 2+2A) and the authority-wide evidence storage gap remains real and unaddressed.
+2. Build the authority-level (Council-scoped) structured evidence storage this gate found missing, before any future gate needs to write a genuine AMR-derived authority-wide fact.
+3. Consider widening the sibling-plan sentence check if a future real case demonstrates a two-sentence-spanning contamination (do not widen pre-emptively based on assumption, per Section 21's own discipline).
+4. Investigate the extractor's own page-citation accuracy — a real, separate, previously-undocumented limitation surfaced as a side effect of this gate's work.
+5. Extend the same Tameside-vs-its-2-plans question Bury's own resolution here modelled, once a real Tameside report exists in a future cohort to test against.
+6. Manchester's HTTP 403 remains unresolved (Gate 1 finding, unchanged).

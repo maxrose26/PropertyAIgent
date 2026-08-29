@@ -266,21 +266,30 @@ def test_a_second_extraction_for_an_already_populated_field_never_auto_applies(s
     assert stats["needs_review"] == 1
 
 
-# --- 5. The genuine, demonstrated grounding-gap finding (documented, not fixed) -
+# --- 5. The genuine, demonstrated grounding-gap finding - FIXED in Gate 2A ------
+#
+# Gate 2 found and documented this as an unfixed limitation; Gate 2A
+# ("Multi-Plan Attribution & Same-Plan Evidence Validation Hardening")
+# closes it via app.policy.evidence_validation.detect_sibling_plan_reference
+# + config/plan_aliases.yaml. This test previously asserted the OLD,
+# undesirable behaviour (auto_applied == 1) with an explicit note that it
+# was expected to start failing once a fix landed - it now asserts the
+# fixed, correct behaviour instead.
 
 
-def test_a_correctly_excerpted_fact_about_a_different_named_plan_can_still_auto_apply(session):
+def test_a_fact_about_an_explicitly_different_sibling_plan_is_blocked_not_auto_applied(session):
     """Reproduces this gate's own real, controlled-validation finding
     (verified directly against the real downloaded Salford Local Plan
     Viability Assessment PDF): the document's own text explicitly names a
     DIFFERENT, sibling plan ("Salford Local Plan: Development Management
     Policies and Designations (SLP:DMP)... adopted on 18 January 2023") -
     genuinely, verifiably NOT the plan (SLP:CSA) this extraction run is
-    attributing facts to. validate_fact correctly confirms the excerpt
-    contains the claimed date; it has no mechanism to check the claim is
-    about the SAME plan as the one being extracted for. This is a real,
-    demonstrated limitation - not fixed in this gate (see the module
-    docstring above and this gate's own specification for why)."""
+    attributing facts to. Gate 2A hardening: validate_facts is now given
+    the target plan's known sibling-identity aliases (config/
+    plan_aliases.yaml) and rejects a fact whose excerpt explicitly names
+    one of them, via the SAME existing rejection mechanism used for every
+    other validation failure - never silently auto-applied, never
+    silently dropped without a reason."""
     plan = _make_plan(session, council_code="salford", plan_name="Salford Local Plan: Core Strategy and Allocations")
     excerpt = (
         "This work follows on from Part One of the Local Plan - the Salford Local Plan: Development Management "
@@ -296,12 +305,35 @@ def test_a_correctly_excerpted_fact_about_a_different_named_plan_can_still_auto_
 
     stats = run_extraction(session, client, plan, "stub.pdf", 1, 30, "local_plan")
 
-    # Documents the CURRENT (undesirable, unfixed) behaviour precisely -
-    # this assertion is expected to start FAILING the day a future gate
-    # adds a genuine same-plan-reference check, which is the correct,
-    # intended outcome of that future fix landing.
+    assert stats["auto_applied"] == 0
+    assert stats["needs_review"] == 0  # rejected outright, not queued - see evidence_validation's existing rejection contract
+    assert stats["facts_rejected"] == 1
+    assert plan.adoption_date is None  # never applied to the wrong plan
+
+
+def test_genuine_target_plan_evidence_still_auto_applies_after_sibling_hardening(session):
+    """The other half of the same regression: hardening against sibling
+    contamination must not become a blanket rejection of everything.
+    Genuine SLP:CSA evidence, with no sibling-plan reference anywhere in
+    its excerpt, must still auto-apply exactly as it did before Gate 2A -
+    the real, grounded Salford annual_housing_requirement/
+    total_housing_requirement figures this gate's own controlled
+    extraction produced."""
+    plan = _make_plan(session, council_code="salford", plan_name="Salford Local Plan: Core Strategy and Allocations")
+    excerpt = "phased at an average of 1,658 dwellings per annum across the plan period 2022 to 2043."
+    client = _FakeClient({
+        "housing_requirement": [
+            _fact("annual_housing_requirement", "1658", page=18, excerpt=excerpt, confidence="high"),
+            *[_null_fact(f) for f in CATEGORIES["housing_requirement"] if f != "annual_housing_requirement"],
+        ],
+        "plan_identity": _all_null_facts("plan_identity"),
+    })
+
+    stats = run_extraction(session, client, plan, "stub.pdf", 1, 30, "local_plan")
+
     assert stats["auto_applied"] == 1
-    assert plan.adoption_date == "18 January 2023"
+    assert stats["facts_rejected"] == 0
+    assert plan.annual_housing_requirement == 1658
 
 
 # --- 6. Failure isolation / idempotency (Section 22) ----------------------------

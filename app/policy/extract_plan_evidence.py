@@ -49,6 +49,7 @@ from app.extraction.plan_evidence import (
 from app.policy.document_selection import DOCUMENT_TYPE_TO_CATEGORIES
 from app.policy.evidence_validation import validate_facts
 from app.policy.history import snapshot_field
+from app.policy.plan_identity import sibling_alias_groups
 
 # app.extraction.plan_evidence field names that don't match their LocalPlan
 # column name 1:1 - the extraction schema's names were chosen to read
@@ -187,11 +188,19 @@ def run_extraction(
     source_text = format_pages_for_prompt(pages)
     now = dt.datetime.now(dt.timezone.utc)
     usage_events: list = []
+    # LPDI V1 Gate 2A ("Multi-Plan Attribution & Same-Plan Evidence
+    # Validation Hardening") - a fact whose excerpt explicitly names a
+    # different, known sibling plan (config/plan_aliases.yaml) must never
+    # auto-apply to THIS plan, even when the excerpt genuinely contains the
+    # claimed value (specifications/018's Salford SLP:CSA/SLP:DMP finding).
+    # Computed once per document rather than per-fact - the target plan
+    # doesn't change within a single run_extraction call.
+    sibling_groups = sibling_alias_groups(plan)
 
     for category in categories:
         stats["passes_run"] += 1
         raw_facts = extract_plan_evidence(client, category, source_text, usage_sink=usage_events)
-        validated = validate_facts(raw_facts)
+        validated = validate_facts(raw_facts, sibling_groups, source_text)
 
         for result in validated:
             if not result["is_valid"]:
