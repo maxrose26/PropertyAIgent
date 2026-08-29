@@ -103,13 +103,117 @@ def _looks_like_a_plausible_date(value: str) -> bool:
     return _MIN_PLAUSIBLE_YEAR <= year <= _MAX_PLAUSIBLE_YEAR
 
 
-def validate_fact(fact: dict) -> dict:
+def _sentence_span_containing(text: str, needle: str) -> str | None:
+    """The single sentence within text that contains needle (case-
+    insensitive substring search), bounded by the nearest '.', '!', or '?'
+    on either side (or the start/end of text) - deliberately simple,
+    single-sentence-only string bounding, never full NLP sentence
+    splitting and never a fuzzy/semantic match. Returns None if needle
+    isn't found in text at all (e.g. the model paraphrased its own
+    excerpt rather than quoting verbatim - a known, real, separately
+    documented limitation, not something this function can recover)."""
+    if not text or not needle:
+        return None
+    lowered = text.lower()
+    idx = lowered.find(needle.lower())
+    if idx == -1:
+        return None
+    start = 0
+    for m in re.finditer(r"[.!?]\s+", text[:idx]):
+        start = m.end()
+    end_match = re.search(r"[.!?](\s+|$)", text[idx:])
+    end = idx + end_match.end() if end_match else len(text)
+    return text[start:end]
+
+
+def detect_sibling_plan_reference(
+    excerpt: str | None, sibling_groups: list[list[str]], source_text: str | None = None,
+) -> str | None:
+    """LPDI V1 Gate 2A ("Multi-Plan Attribution & Same-Plan Evidence
+    Validation Hardening") - generic, config-driven check: does the fact's
+    supporting context explicitly name a different, sibling plan identity?
+    Returns a human-readable rejection reason when it does, else None.
+
+    Checks the excerpt itself PLUS - when source_text is given (the full
+    text of the pages this extraction pass actually read) - the single
+    SENTENCE within source_text containing that excerpt. This second check
+    exists because a real, live controlled extraction run (specifications/
+    018's Gate 2A section) demonstrated the model's own returned excerpt
+    can be trimmed to just the value-supporting fragment ("adopted on 18
+    January 2023"), silently dropping the surrounding clause that actually
+    names the sibling plan ("...the Salford Local Plan: Development
+    Management Policies and Designations (SLP:DMP), which was adopted on
+    18 January 2023.") - even though both clauses are literally one
+    sentence in the source. Bounded to the SAME SENTENCE only, deliberately
+    not a wider paragraph/page/document window - a second real, live run
+    (the same finding's Bury Local Plan regression case) demonstrated a
+    document can legitimately mention a sibling plan (Places for Everyone)
+    in a NEARBY but different sentence while still correctly stating ITS
+    OWN plan's genuine figure (Bury's own housing requirement, sourced from
+    but not mis-attributed to PfE) - a page/paragraph-wide check would have
+    wrongly blocked that genuine evidence, which the sentence boundary
+    avoids.
+
+    Deliberately asymmetric (Gate 2A's own Section 12): the ABSENCE of the
+    target plan's own name near a fact does NOT itself indicate a problem -
+    only an EXPLICIT reference to a different, KNOWN sibling plan's own
+    name/alias does. sibling_groups (see
+    app.policy.plan_identity.sibling_alias_groups) already excludes the
+    target plan's own aliases, so this function never needs to know what
+    the target plan itself is called - only what its known siblings are
+    called. Text that happens to ALSO mention the target plan's own name
+    alongside a sibling's is still blocked, not treated as resolved in the
+    target's favour - genuinely ambiguous context is not silently guessed
+    either way."""
+    if not sibling_groups:
+        return None
+
+    texts_to_check = []
+    if excerpt:
+        texts_to_check.append(excerpt)
+    if source_text and excerpt:
+        sentence = _sentence_span_containing(source_text, excerpt)
+        if sentence:
+            texts_to_check.append(sentence)
+
+    for text in texts_to_check:
+        lowered = text.lower()
+        for group in sibling_groups:
+            for alias in group:
+                if alias and alias.lower() in lowered:
+                    return f"supporting evidence explicitly references a different Local Plan ({alias!r})"
+    return None
+
+
+def validate_fact(
+    fact: dict, sibling_groups: list[list[str]] | None = None, source_text: str | None = None,
+) -> dict:
     """fact: {"field", "value", "source_page", "source_excerpt", "confidence"}
     (see app.extraction.plan_evidence). Returns
     {"field", "parsed_value", "is_valid", "rejection_reason", "raw_fact"} -
     parsed_value is None whenever is_valid is False OR the source value
     itself was null (both are legitimate "nothing to propose" outcomes,
-    distinguished by rejection_reason being set only for the former)."""
+    distinguished by rejection_reason being set only for the former).
+
+    sibling_groups, source_text (LPDI V1 Gate 2A, both optional, default
+    None - fully backward compatible with every existing caller):
+    sibling_groups is the target plan's known sibling plan identities (see
+    app.policy.plan_identity.sibling_alias_groups); source_text is the
+    full text of the pages this extraction pass read (see
+    app.policy.extract_plan_evidence.run_extraction). When sibling_groups
+    is given, a would-otherwise-be-accepted fact whose excerpt (or, when
+    source_text is also given, whose excerpt's own sentence within
+    source_text) explicitly names a sibling plan is rejected instead - see
+    detect_sibling_plan_reference."""
+    result = _validate_fact_fields(fact)
+    if sibling_groups and result["is_valid"] and result["parsed_value"] is not None:
+        reason = detect_sibling_plan_reference(fact.get("source_excerpt"), sibling_groups, source_text)
+        if reason:
+            return {"field": result["field"], "parsed_value": None, "is_valid": False, "rejection_reason": reason, "raw_fact": fact}
+    return result
+
+
+def _validate_fact_fields(fact: dict) -> dict:
     field = fact["field"]
     value = fact.get("value")
     excerpt = fact.get("source_excerpt")
@@ -198,12 +302,17 @@ def validate_fact(fact: dict) -> dict:
     return {"field": field, "parsed_value": value.strip(), "is_valid": True, "rejection_reason": None, "raw_fact": fact}
 
 
-def validate_facts(facts: list[dict]) -> list[dict]:
+def validate_facts(
+    facts: list[dict], sibling_groups: list[list[str]] | None = None, source_text: str | None = None,
+) -> list[dict]:
     """Runs validate_fact over a whole extraction pass's results, then
     applies the cross-field rules that can't be checked per-fact in
     isolation: plan_period_end must not precede plan_period_start, and the
-    two must not be equal."""
-    results = [validate_fact(f) for f in facts]
+    two must not be equal.
+
+    sibling_groups, source_text: see validate_fact - both optional,
+    default None, fully backward compatible."""
+    results = [validate_fact(f, sibling_groups, source_text) for f in facts]
 
     by_field = {r["field"]: r for r in results}
     start = by_field.get("plan_period_start")

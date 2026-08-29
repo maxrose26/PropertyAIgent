@@ -1,0 +1,103 @@
+# Config-driven plan identity/alias data (LPDI V1 Gate 2A, "Multi-Plan
+# Attribution & Same-Plan Evidence Validation Hardening").
+#
+# Two things this file drives, both read by app.policy.plan_identity:
+#
+# 1. REPORT ATTRIBUTION (app.policy.plan_attribution.attribute_report) - when
+#    a council has more than one LocalPlan, which one does a discovered
+#    report belong to? A report/document title or its discovering source's
+#    own title often names the plan explicitly, using one of several
+#    conventional labels (full formal title, shortened title, acronym) -
+#    listed here so that matching stays config-driven and generic, never a
+#    per-authority hardcoded rule in application code.
+#
+# 2. SIBLING-PLAN FACT VALIDATION (app.policy.evidence_validation's
+#    sibling-plan check) - a fact's supporting excerpt can be entirely
+#    accurate about a value while describing a genuinely DIFFERENT, sibling
+#    planning document (see specifications/018's Salford SLP:CSA/SLP:DMP
+#    finding: an excerpt named "Salford Local Plan: Development Management
+#    Policies and Designations (SLP:DMP)", not the SLP:CSA plan the whole
+#    extraction run was attributing facts to). Recognising that requires
+#    knowing a sibling plan's own name/aliases - including for a sibling
+#    that has NO LocalPlan row of its own (plan_name: null below) - an
+#    identity-only entry that exists purely so its aliases can be
+#    recognised as "a different, real plan", without creating a new
+#    LocalPlan row or implying the plan is otherwise tracked by this
+#    platform.
+#
+# Every entry with plan_name/plan_version set is bound to a real LocalPlan
+# row using the exact same (council_code, plan_name, plan_version) matching
+# convention config/joint_plans.yaml's own entries use. A plan with no
+# entry here still works correctly - app.policy.plan_identity.aliases_for_plan
+# falls back to the plan's own plan_name as its only alias, and
+# sibling_alias_groups returns no groups for it - so this file only needs
+# entries where a real, demonstrated attribution or contamination risk
+# exists, not a permanent exhaustive taxonomy of every plan in the platform.
+
+plan_identities:
+  - key: bury_local_plan
+    council_code: bury
+    plan_name: "Bury Local Plan"
+    plan_version: "Publication June 2026"
+    aliases:
+      - "Bury Local Plan"
+      - "Publication Local Plan"
+      - "Bury Publication Local Plan"
+    source_note: >
+      config/policy_sources.yaml's own bury.sources entries already use
+      "Bury Local Plan" as this plan's registered plan_name;
+      "Publication Local Plan" is the label Bury's own website consistently
+      uses for every document discovered off its Local Plan landing page
+      (confirmed directly against the real discovered report titles: e.g.
+      "Publication Local Plan", "Publication Local Plan Policies Map").
+
+  - key: bury_pfe
+    council_code: bury
+    plan_name: "Places for Everyone Joint Development Plan (Bury allocations)"
+    plan_version: "2022-2039"
+    aliases:
+      - "Places for Everyone Joint Development Plan"
+      - "Places for Everyone"
+      - "PfE"
+    source_note: >
+      Matches config/joint_plans.yaml's own plan_name/plan_version for this
+      LocalPlan row exactly - see that file's own source_note for how the
+      participating-authority list (including Bury) was confirmed.
+
+  - key: salford_slp_csa
+    council_code: salford
+    plan_name: "Salford Local Plan: Core Strategy and Allocations"
+    plan_version: "Regulation 19 Publication"
+    aliases:
+      - "Salford Local Plan: Core Strategy and Allocations"
+      - "SLP:CSA"
+      - "SLP: CSA"
+      - "Core Strategy and Allocations"
+    source_note: >
+      Matches config/policy_sources.yaml's own salford.sources plan_name for
+      this plan; "SLP:CSA" is the plan's own self-referential acronym, used
+      throughout its Publication document (see the real downloaded PDF,
+      e.g. its own title page and running headers).
+
+  - key: salford_slp_dmp
+    council_code: salford
+    plan_name: null  # identity-only - no LocalPlan row exists for this plan; see this file's own header
+    plan_version: null
+    aliases:
+      - "Salford Local Plan: Development Management Policies and Designations"
+      - "SLP:DMP"
+      - "SLP: DMP"
+      - "Development Management Policies and Designations"
+    source_note: >
+      LPDI V1 Gate 2A - this is Salford's OWN Part One of its Local Plan,
+      adopted 18 January 2023, genuinely distinct from the Part Two SLP:CSA
+      row above (specifications/018's Gate 2 finding: the Salford Local
+      Plan Viability Assessment's own text, pages 3/7/12/26 of the real
+      downloaded PDF, describes SLP:DMP as "Part One of the Local Plan"
+      that "was adopted on 18 January 2023" - a genuinely different
+      document from the SLP:CSA row this platform tracks). Not ingested as
+      its own LocalPlan row in this gate (Section 26's "no schema change,
+      no new plan" discipline) - this entry exists solely so a fact whose
+      excerpt names THIS plan can be recognised as sibling-plan
+      contamination and blocked from auto-applying to SLP:CSA, per
+      specifications/018's Gate 2A hardening section.
