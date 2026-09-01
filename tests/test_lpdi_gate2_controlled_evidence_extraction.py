@@ -98,9 +98,21 @@ def _make_report(session, council_code, *, source_type, classification_status="a
     return report
 
 
+# LPDI V1 Gate 3A ("Deterministic Evidence Citation Verification") - page
+# 18 below needs to genuinely contain the excerpt text this file's own
+# genuine-Salford-evidence tests use, since run_extraction now
+# deterministically verifies source_excerpt against this same page-bounded
+# text before a fact can auto-apply. The longer real excerpt used by
+# test_genuine_target_plan_evidence_still_auto_applies_after_sibling_
+# hardening already contains, as a strict prefix, the shorter one used by
+# test_existing_extraction_pipeline_produces_grounded_auto_applied_facts -
+# one string covers both.
+_STUB_PAGE_18_TEXT = "phased at an average of 1,658 dwellings per annum across the plan period 2022 to 2043."
+
+
 @pytest.fixture(autouse=True)
 def _stub_pdf_pages():
-    with patch("app.policy.extract_plan_evidence.extract_pdf_pages", return_value=[(1, "stub source text")]):
+    with patch("app.policy.extract_plan_evidence.extract_pdf_pages", return_value=[(1, "stub source text"), (18, _STUB_PAGE_18_TEXT)]):
         yield
 
 

@@ -200,7 +200,14 @@ def run_extraction(
     for category in categories:
         stats["passes_run"] += 1
         raw_facts = extract_plan_evidence(client, category, source_text, usage_sink=usage_events)
-        validated = validate_facts(raw_facts, sibling_groups, source_text)
+        # LPDI V1 Gate 3A ("Deterministic Evidence Citation Verification") -
+        # pages (the same page-bounded text just read above) lets
+        # validate_facts deterministically verify/correct/flag each fact's
+        # own source_page against the real document, instead of trusting
+        # the model's citation unchecked (Gate 2B's own finding: ~7% of
+        # sampled auto-applied facts carried a wrong page citation, though
+        # every sampled VALUE was itself correct).
+        validated = validate_facts(raw_facts, sibling_groups, source_text, pages)
 
         for result in validated:
             if not result["is_valid"]:
@@ -225,9 +232,31 @@ def run_extraction(
 
             raw_fact = result["raw_fact"]
             classification = classify_evidence_confidence(current_value, raw_fact.get("confidence"))
+
+            # LPDI V1 Gate 3A - a citation the deterministic verifier could
+            # not resolve to exactly one page must never reach auto_applied,
+            # no matter how confident the extraction itself was: a citation
+            # problem is not necessarily a VALUE problem (Gate 2B's own
+            # table/diagram finding - a fact can be genuinely correct while
+            # its excerpt is unverifiable via linear text), so this forces
+            # the EXISTING needs_review pathway rather than rejecting the
+            # fact outright. citation_status "corrected" is NOT downgraded -
+            # a uniquely, deterministically found page is more verified than
+            # the model's own unchecked citation ever was.
+            citation_status = result["citation_status"]
+            if citation_status in ("ambiguous", "unverified") and classification == "auto_applied":
+                classification = "needs_review"
+            detail = f"{model_field} proposed from {source_title or pdf_path} (category={category})."
+            if citation_status == "corrected":
+                detail += f" [Gate 3A citation correction: {result['citation_note']}]"
+            elif citation_status in ("ambiguous", "unverified"):
+                detail += f" [Gate 3A citation check: {result['citation_note']}]"
+            verified_source_page = result["verified_source_page"]
+
             stats["proposals"].append({
                 "field": model_field, "old_value": current_value, "new_value": parsed_value,
-                "classification": classification, "source_page": raw_fact.get("source_page"),
+                "classification": classification, "source_page": verified_source_page,
+                "citation_status": citation_status,
             })
 
             if not dry_run:
@@ -240,9 +269,9 @@ def run_extraction(
                     local_plan_id=plan.id, monitored_report_id=monitored_report_id, event_type="plan_evidence_proposed",
                     old_value=None if current_value is None else str(current_value),
                     new_value=str(parsed_value),
-                    detail=f"{model_field} proposed from {source_title or pdf_path} (category={category}).",
+                    detail=detail,
                     proposed_data=json.dumps({model_field: parsed_value}),
-                    source_document_url=source_url, source_page=raw_fact.get("source_page"),
+                    source_document_url=source_url, source_page=verified_source_page,
                     confidence=_confidence_to_float(raw_fact.get("confidence")),
                     source_document_title=source_title, source_excerpt=raw_fact.get("source_excerpt"),
                     extraction_method="ai_structured_extraction", extraction_model=MODEL,
