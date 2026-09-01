@@ -90,7 +90,15 @@ def _make_source(session, council_code, *, source_type, local_plan_id=None, titl
 
 @pytest.fixture(autouse=True)
 def _stub_pdf_pages():
-    with patch("app.policy.extract_plan_evidence.extract_pdf_pages", return_value=[(1, "stub source text")]):
+    # LPDI V1 Gate 3A ("Deterministic Evidence Citation Verification") -
+    # page 18 needs to genuinely contain the excerpt
+    # test_run_extraction_still_auto_applies_genuine_target_plan_evidence
+    # uses, since run_extraction now deterministically verifies
+    # source_excerpt against this same page-bounded text before a fact can
+    # auto-apply.
+    with patch("app.policy.extract_plan_evidence.extract_pdf_pages", return_value=[
+        (1, "stub source text"), (18, "1,658 dwellings per annum across the plan period"),
+    ]):
         yield
 
 

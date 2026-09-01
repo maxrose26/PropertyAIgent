@@ -15,9 +15,15 @@ def _fact(field, value, excerpt="the plan states a figure here", page=5, confide
 
 def test_null_value_is_valid_and_stays_null():
     result = validate_fact(_fact("annual_housing_requirement", None, excerpt=None, page=None, confidence=None))
+    # LPDI V1 Gate 3A ("Deterministic Evidence Citation Verification") adds
+    # citation_status/verified_source_page/citation_note to every result -
+    # "not_checked"/original page/None here, since no pages= was given
+    # (fully backward compatible - a null-value fact has no citation to
+    # verify regardless).
     assert result == {
         "field": "annual_housing_requirement", "parsed_value": None,
         "is_valid": True, "rejection_reason": None, "raw_fact": result["raw_fact"],
+        "citation_status": "not_checked", "verified_source_page": None, "citation_note": None,
     }
 
 

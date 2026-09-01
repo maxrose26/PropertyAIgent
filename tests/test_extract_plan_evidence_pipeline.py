@@ -73,6 +73,22 @@ def _all_null_facts(category):
     return [_null_fact(f) for f in CATEGORIES[category]]
 
 
+# LPDI V1 Gate 3A ("Deterministic Evidence Citation Verification") - the
+# stub page below now needs to genuinely CONTAIN every _fact()-generated
+# excerpt a test in this file expects to auto-apply, since run_extraction
+# deterministically verifies source_excerpt against this same page-bounded
+# text before a fact can auto-apply. _fact()'s own excerpt template is
+# f"a supporting figure of {value} is stated in the text" (default page 5,
+# but the stub below is page 1 - a real citation-verification mismatch
+# this file's tests never needed to care about before Gate 3A) - listing
+# every value actually used with that default template across this file's
+# auto-apply assertions is simpler and more transparent than trying to
+# generate it dynamically.
+_STUB_PAGE_TEXT = " ".join(
+    f"a supporting figure of {v} is stated in the text" for v in (936, 1100, 17800)
+)
+
+
 @pytest.fixture(autouse=True)
 def _stub_pdf_pages():
     # run_extraction always reads real page text via
@@ -82,7 +98,7 @@ def _stub_pdf_pages():
     # so stubbing this out avoids every test needing a real PDF file on
     # disk, the same way tests/test_monitor.py stubs requests.get rather
     # than hitting a real URL.
-    with patch("app.policy.extract_plan_evidence.extract_pdf_pages", return_value=[(1, "stub source text")]):
+    with patch("app.policy.extract_plan_evidence.extract_pdf_pages", return_value=[(1, _STUB_PAGE_TEXT), (5, _STUB_PAGE_TEXT)]):
         yield
 
 

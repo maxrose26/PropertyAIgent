@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import unicodedata
+from dataclasses import dataclass
 
 from app.policy.status import normalise_plan_status
 
@@ -185,8 +187,158 @@ def detect_sibling_plan_reference(
     return None
 
 
+# --- LPDI V1 Gate 3A ("Deterministic Evidence Citation Verification") ----------
+#
+# Gate 2B's own real, controlled-validation finding: source_page is model-
+# generated text, supplied with correct [PAGE N] markers but never checked
+# against the actual page-bounded document text - and the UI turns
+# source_page straight into a clickable PDF deep-link (#page=N). 3 of 43
+# sampled auto-applied facts (~7%) carried a demonstrably wrong page
+# citation, though every sampled VALUE was itself correct - a genuine,
+# user-facing provenance defect distinct from a value-correctness one.
+#
+# The trust chain this closes: model-extracted fact + excerpt -> DETERMINISTIC
+# citation verification (this section, no LLM involved) -> existing
+# validation/review pathway. The LLM identifies evidence; the application
+# verifies where it came from.
+
+# A short/generic excerpt for a FREE-TEXT field ("new", a bare word or two)
+# proved capable of trivially "matching" hundreds of pages in Gate 2B's real
+# sample (running headers/footers, boilerplate legal text) - not real
+# evidence of anything. NUMERIC/DATE fields are exempt from this floor: they
+# already carry an independent, existing value-presence guarantee
+# (_excerpt_supports_number / _looks_like_a_plausible_date, enforced in
+# _validate_fact_fields before citation verification ever runs) that a
+# short free-text excerpt has no equivalent of - "Total 3,847" is short but
+# is genuinely anchored to a specific real number, not boilerplate.
+_MIN_SIGNIFICANT_EXCERPT_WORDS = 4
+_MIN_SIGNIFICANT_EXCERPT_CHARS = 15
+
+
+def _normalise_for_citation(text: str) -> str:
+    """Conservative normalisation for CITATION matching only - deliberately
+    much less aggressive than could be imagined, so genuinely different
+    text never becomes a false match. Handles only the specific harmless
+    extraction/quoting differences Gate 2B directly demonstrated in real
+    documents: typographic vs straight quotes, dash variants, thousands-
+    separator commas, surrounding parentheses, and line-wrap/whitespace
+    differences. Does NOT strip general punctuation, does NOT touch word
+    order, does NOT drop words - this is a substring-match normaliser, not
+    a bag-of-words/fuzzy scorer."""
+    text = unicodedata.normalize("NFKD", text)
+    text = text.replace("’", "'").replace("‘", "'")
+    text = text.replace("“", '"').replace("”", '"')
+    # Dash variants (hyphen, non-breaking hyphen, figure/en/em/horizontal-
+    # bar dashes, U+2010-U+2015) -> plain ASCII hyphen.
+    text = re.sub(r"[‐-―]", "-", text)
+    # Thousands separators: a comma directly between two digits is a
+    # formatting artefact, not meaningful punctuation - stripped only
+    # there, never elsewhere, so a genuine clause-separating comma
+    # anywhere else still distinguishes different text.
+    text = re.sub(r"(?<=\d),(?=\d)", "", text)
+    # "(November 2027)" vs "November 2027" is the same evidence with
+    # different bracketing, not different evidence - parentheses are
+    # dropped as bare punctuation; their CONTENTS are always kept.
+    text = text.replace("(", "").replace(")", "")
+    # Line-wrapping / general whitespace: pdfplumber inserts a newline at
+    # every wrapped line break - collapse any run of whitespace to one
+    # space so a wrapped quote still matches its unwrapped source.
+    text = re.sub(r"\s+", " ", text)
+    return text.lower().strip()
+
+
+def _strip_trailing_sentence_punctuation(text: str) -> str:
+    """A real, live controlled extraction (specifications/018's Gate 2A
+    section) showed the model's own "verbatim" excerpt ending with a
+    period the source text does not actually have at that exact position
+    (closing its own quotation like a sentence, mid-clause in the real
+    text). Stripped ONLY from the excerpt's own trailing edge, never
+    mid-string and never from the page text being searched - this can
+    only ever make a match MORE permissive at the boundary, never
+    anywhere else in the comparison."""
+    return text.rstrip(".,;:")
+
+
+def _is_significant_excerpt(field: str, normalised_excerpt: str) -> bool:
+    if field in _NUMERIC_FIELDS or field in _DATE_FIELDS:
+        return True
+    words = normalised_excerpt.split()
+    return len(words) >= _MIN_SIGNIFICANT_EXCERPT_WORDS and len(normalised_excerpt) >= _MIN_SIGNIFICANT_EXCERPT_CHARS
+
+
+@dataclass(frozen=True)
+class CitationVerification:
+    # "not_checked" (no page-bounded text supplied - every existing caller
+    # before Gate 3A) | "verified" (excerpt confirmed on the cited page) |
+    # "corrected" (not on the cited page, but uniquely findable elsewhere -
+    # source_page deterministically corrected) | "ambiguous" (credibly
+    # findable on more than one page - never guessed) | "unverified" (not
+    # found anywhere, or the excerpt was too short/generic to trust either
+    # way).
+    status: str
+    verified_page: int | None
+    note: str | None
+
+
+def verify_citation(
+    field: str, source_page: int | None, source_excerpt: str | None, pages: list[tuple[int, str]] | None,
+) -> CitationVerification:
+    """Deterministically verifies - or corrects, or flags as unresolved - a
+    fact's page citation against the ACTUAL page-bounded text the model was
+    given (pages: [(page_number, text), ...], the same structure
+    app.extraction.plan_evidence.extract_pdf_pages already returns - see
+    app.policy.extract_plan_evidence.run_extraction for where it's threaded
+    through). Never calls an LLM; every outcome is a plain substring search
+    over conservatively normalised text - like every other check in this
+    module, explainable in one sentence.
+
+    page_number throughout is the PHYSICAL PDF page index (1-indexed from
+    the start of the file) - the same numbering extract_pdf_pages already
+    uses and the UI's own "#page=N" PDF deep-link requires. This function
+    never attempts to interpret or convert a document's own printed/footer
+    page number (Gate 2B found these can differ from the PDF's physical
+    index by a constant offset) - only the physical index is ever compared
+    or returned.
+
+    pages=None (every caller before Gate 3A) means "no page-bounded text
+    available to verify against" - status "not_checked", source_page
+    returned unchanged, fully backward compatible."""
+    if pages is None or not source_excerpt:
+        return CitationVerification("not_checked", source_page, None)
+
+    normalised_excerpt = _strip_trailing_sentence_punctuation(_normalise_for_citation(source_excerpt))
+    if not _is_significant_excerpt(field, normalised_excerpt):
+        return CitationVerification(
+            "unverified", None,
+            f"supporting evidence excerpt is too short/generic to verify a citation deterministically ({source_excerpt!r})",
+        )
+
+    page_lookup = {page_number: _normalise_for_citation(text) for page_number, text in pages}
+
+    if source_page in page_lookup and normalised_excerpt in page_lookup[source_page]:
+        return CitationVerification("verified", source_page, None)
+
+    matches = sorted(page_number for page_number, text in page_lookup.items() if normalised_excerpt in text)
+
+    if len(matches) == 1:
+        return CitationVerification(
+            "corrected", matches[0],
+            f"model cited page {source_page}, deterministically verified on page {matches[0]} instead",
+        )
+    if len(matches) > 1:
+        return CitationVerification(
+            "ambiguous", None,
+            f"supporting evidence citation is ambiguous across multiple pages {matches}",
+        )
+    return CitationVerification(
+        "unverified", None,
+        "supporting evidence citation could not be verified against the source document",
+    )
+
+
 def validate_fact(
     fact: dict, sibling_groups: list[list[str]] | None = None, source_text: str | None = None,
+    pages: list[tuple[int, str]] | None = None,
 ) -> dict:
     """fact: {"field", "value", "source_page", "source_excerpt", "confidence"}
     (see app.extraction.plan_evidence). Returns
@@ -194,6 +346,13 @@ def validate_fact(
     parsed_value is None whenever is_valid is False OR the source value
     itself was null (both are legitimate "nothing to propose" outcomes,
     distinguished by rejection_reason being set only for the former).
+
+    Also returns (Gate 3A, always present, "not_checked"/original page when
+    pages isn't given - fully backward compatible): "citation_status" (see
+    CitationVerification.status), "verified_source_page" (the page a
+    caller should actually WRITE - equal to the model's own source_page
+    unless status is "corrected"), "citation_note" (a human-readable
+    explanation, set whenever status isn't "verified"/"not_checked").
 
     sibling_groups, source_text (LPDI V1 Gate 2A, both optional, default
     None - fully backward compatible with every existing caller):
@@ -204,12 +363,37 @@ def validate_fact(
     is given, a would-otherwise-be-accepted fact whose excerpt (or, when
     source_text is also given, whose excerpt's own sentence within
     source_text) explicitly names a sibling plan is rejected instead - see
-    detect_sibling_plan_reference."""
+    detect_sibling_plan_reference.
+
+    pages (LPDI V1 Gate 3A, optional, default None - fully backward
+    compatible): the same page-bounded [(page_number, text), ...] the
+    extraction pass itself read - see verify_citation. When given, a fact
+    that is otherwise valid is additionally checked for citation integrity;
+    an ambiguous or unverifiable citation does NOT reject the fact (a
+    citation problem is not necessarily a VALUE problem - see verify_
+    citation's own docstring) - it is surfaced via citation_status/
+    citation_note for the caller (app.policy.extract_plan_evidence.
+    run_extraction) to force into the existing needs_review pathway."""
     result = _validate_fact_fields(fact)
     if sibling_groups and result["is_valid"] and result["parsed_value"] is not None:
         reason = detect_sibling_plan_reference(fact.get("source_excerpt"), sibling_groups, source_text)
         if reason:
-            return {"field": result["field"], "parsed_value": None, "is_valid": False, "rejection_reason": reason, "raw_fact": fact}
+            return {
+                "field": result["field"], "parsed_value": None, "is_valid": False, "rejection_reason": reason,
+                "raw_fact": fact, "citation_status": "not_checked", "verified_source_page": fact.get("source_page"),
+                "citation_note": None,
+            }
+
+    result = dict(result)
+    original_page = fact.get("source_page")
+    if result["is_valid"] and result["parsed_value"] is not None:
+        citation = verify_citation(result["field"], original_page, fact.get("source_excerpt"), pages)
+    else:
+        citation = CitationVerification("not_checked", original_page, None)
+
+    result["citation_status"] = citation.status
+    result["verified_source_page"] = citation.verified_page if citation.status == "corrected" else original_page
+    result["citation_note"] = citation.note
     return result
 
 
@@ -304,15 +488,16 @@ def _validate_fact_fields(fact: dict) -> dict:
 
 def validate_facts(
     facts: list[dict], sibling_groups: list[list[str]] | None = None, source_text: str | None = None,
+    pages: list[tuple[int, str]] | None = None,
 ) -> list[dict]:
     """Runs validate_fact over a whole extraction pass's results, then
     applies the cross-field rules that can't be checked per-fact in
     isolation: plan_period_end must not precede plan_period_start, and the
     two must not be equal.
 
-    sibling_groups, source_text: see validate_fact - both optional,
+    sibling_groups, source_text, pages: see validate_fact - all optional,
     default None, fully backward compatible."""
-    results = [validate_fact(f, sibling_groups, source_text) for f in facts]
+    results = [validate_fact(f, sibling_groups, source_text, pages) for f in facts]
 
     by_field = {r["field"]: r for r in results}
     start = by_field.get("plan_period_start")
