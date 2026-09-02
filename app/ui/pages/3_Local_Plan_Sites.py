@@ -26,7 +26,6 @@ import streamlit as st
 
 from app.reporting.allocation_discovery import (
     CAPACITY_BAND_LABELS,
-    DEVELOPMENT_COVERAGE_LABELS,
     OPPORTUNITY_DETAIL_LABELS,
     PHASING_DETAIL_LABELS,
     PLANNING_ACTIVITY_IDENTIFIED,
@@ -52,6 +51,11 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_label,
 )
 from app.reporting.allocation_intelligence_summary import get_allocation_summary, is_allocation_summary_stale
+from app.policy.allocation_planning_coverage import (
+    PLANNING_ACTIVITY_COVERAGE_LABELS,
+    classify_planning_activity_coverage,
+    enrich_none_found_reason,
+)
 from app.reporting.ownership_control import (
     EMPTY_STATE_ALLOCATION_RESIDUAL,
     EMPTY_STATE_ALLOCATION_SITE,
@@ -89,6 +93,20 @@ from app.ui.shell import (
 # (Section 13: "do not load/render an unbounded future national dataset").
 TABLE_PAGE_SIZE = 50
 THIS_PAGE = "pages/3_Local_Plan_Sites.py"
+
+# Website V2 (Step 26, technical-language audit) - AllocationVersion.
+# change_reason is an internal, engineering-facing code (e.g.
+# "gate_4a_hectares_provenance_added" - a real value found leaking into
+# this page's own Timeline as "Gate 4A Hectares Provenance Added"). Known
+# values get a plain-English label; anything not listed here (a future
+# change_reason this page hasn't been updated for yet) safely falls back
+# to the same generic titlecase formatting used before, never a raw key
+# or a KeyError.
+CHANGE_REASON_LABELS = {
+    "new_allocation": "Allocation added",
+    "initial_migration": "Initial data migration",
+    "gate_4a_hectares_provenance_added": "Site area and source evidence added",
+}
 
 bootstrap()
 session, settings = get_db()
@@ -197,7 +215,7 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     # Loaded once here (Section 16/17) rather than deep in the Timeline
     # section below - reused for the Timeline section further down,
     # avoiding a second identical query.
-    from app.db.models import LocalPlanSite
+    from app.db.models import LocalPlanSite, Site
 
     allocation_row = session.get(LocalPlanSite, allocation_id)
 
@@ -233,9 +251,14 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         with snap_cols[2]:
             stat_tile("Indicative residual", f"~{coverage.indicative_residual_capacity:,}" if coverage.indicative_residual_capacity is not None else "Not determined")
         with snap_cols[3]:
+            # Website V2 - product-facing FULL/PARTIAL/NONE_FOUND/UNCERTAIN
+            # wording (Gate 4B/4C's own app.policy.allocation_planning_
+            # coverage, already built and tested) rather than the
+            # underlying engine's raw 6-value classification string.
+            activity_coverage = classify_planning_activity_coverage(coverage)
             stat_tile(
                 "Development coverage",
-                f"{coverage.development_coverage_percentage:.0%}" if coverage.development_coverage_percentage is not None else DEVELOPMENT_COVERAGE_LABELS.get(coverage.development_coverage_classification, coverage.development_coverage_classification),
+                f"{coverage.development_coverage_percentage:.0%}" if coverage.development_coverage_percentage is not None else PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification],
             )
 
     if ai_summary_row is not None and ai_summary_row.headline:
@@ -295,11 +318,29 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     section_header("Capacity and intended use", icon="🏗️")
     if card.get("development_type"):
         st.caption(f"🏘️ {card['development_type']}")
-    cap_cols = st.columns(2)
+    cap_cols = st.columns(3)
     with cap_cols[0]:
         stat_tile("Intended use", card["intended_use_label"])
     with cap_cols[1]:
-        stat_tile("Capacity", card["capacity"]["display"])
+        # Website V2 (Step 11) - a bare "Capacity" label is ambiguous once
+        # both a minimum and a maximum figure are stated (format_capacity's
+        # own "range" kind) - never invents a "plan-period"/"wider capacity"
+        # split as a universal label (minimum/maximum don't always mean
+        # that), so the label just names what IS known (a range was
+        # stated) and defers to the real source wording (below, when
+        # captured) to explain WHY it differs, rather than PropertyAIgent
+        # asserting an interpretation the evidence doesn't always support.
+        capacity_label = "Capacity (range)" if card["capacity"]["kind"] == "range" else "Capacity"
+        stat_tile(capacity_label, card["capacity"]["display"])
+    with cap_cols[2]:
+        # Website V2 (Step 12) - Gate 4A's site_area_hectares column, now
+        # reaching the card (see app.reporting.allocation_discovery) but
+        # never inferred: "Not yet verified" for the 278/287 allocations
+        # without a captured hectares figure, never a bare 0 ha.
+        hectares = card.get("site_area_hectares")
+        stat_tile("Site area", f"{hectares:,.2f} ha" if hectares is not None else "Not yet verified")
+    if card["capacity"]["kind"] == "range" and card.get("source_excerpt"):
+        st.caption(f"Source wording: “{card['source_excerpt']}”")
     if card["category"]:
         st.caption(f"Council grouping: {card['category']}")
 
@@ -411,7 +452,13 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 stat_tile("Development coverage", f"{coverage.development_coverage_percentage:.0%}")
             if coverage.indicative_residual_capacity is not None:
                 stat_tile("Indicative residual capacity", f"~{coverage.indicative_residual_capacity:,} homes")
-        st.caption(DEVELOPMENT_COVERAGE_LABELS.get(coverage.development_coverage_classification, coverage.development_coverage_classification))
+        # Website V2 (Step 14) - product-facing label + the full, already-
+        # written safe reason sentence (Gate 4B/4C's own app.policy.
+        # allocation_planning_coverage, never re-worded here) rather than
+        # the raw 6-value engine classification string.
+        activity_coverage = classify_planning_activity_coverage(coverage)
+        st.markdown(f"**{PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification]}**")
+        st.caption(activity_coverage.reason)
         if coverage.note:
             st.caption(coverage.note)
         if coverage.indicative_residual_capacity:
@@ -481,7 +528,17 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         section_header("Opportunity", icon="🔎")
         opportunity = card.get("opportunity")
         if opportunity:
+            # Website V2 (Step 33) - Gate 4C's own enrich_none_found_reason
+            # was already built and tested but never called from this page.
+            # Appends one extra, honest sentence distinguishing "nothing
+            # found" from "a candidate Site exists but isn't safely
+            # corroborated" (e.g. Trafford Waters) from "a corroborated
+            # candidate hasn't been recorded yet" (e.g. Pomona) - never
+            # changes opportunity["signal"] or the reasons already there.
+            candidate_sites = session.query(Site).filter_by(council_code=card["council_code"]).all()
+            opportunity = enrich_none_found_reason(card["site_name"], candidate_sites, opportunity)
             st.markdown(f"**{OPPORTUNITY_DETAIL_LABELS.get(opportunity['signal'], opportunity['signal'])}**")
+            st.caption("Opportunity signal based on current planning evidence - not an investment recommendation.")
             for reason in opportunity["reasons"]:
                 st.caption(f"• {reason}")
 
@@ -562,6 +619,13 @@ def _render_detail(view: dict, allocation_id: int) -> None:
 
     # 7. Source evidence and provenance
     section_header("Source evidence", icon="📄")
+    # Website V2 (Step 17) - the real excerpt Gate 4A captured, shown
+    # verbatim alongside the existing document link (never a summary or
+    # PropertyAIgent's own paraphrase of it) - absent for the 278/287
+    # allocations that don't have one yet, exactly like every other
+    # evidence field on this page.
+    if card.get("source_excerpt"):
+        st.markdown(f"> {card['source_excerpt']}")
     source_link = card.get("plan_page_url") or card.get("source_document_url")
     if source_link:
         st.markdown(f"[Open source document]({source_link})")
@@ -591,7 +655,7 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         entries = [
             {
                 "icon": "📝",
-                "label": v.change_reason.replace("_", " ").title(),
+                "label": CHANGE_REASON_LABELS.get(v.change_reason, v.change_reason.replace("_", " ").title()),
                 "when": v.captured_at,
             }
             for v in sorted(allocation_row.versions, key=lambda v: v.captured_at or 0, reverse=True)
@@ -617,8 +681,10 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         visual_display = "Plan-wide only"
     else:
         visual_display = "None identified"
+    hectares = card.get("site_area_hectares")
     attribute_rows = [
         ("Capacity", card["capacity"]["display"]),
+        ("Site area", f"{hectares:,.2f} ha" if hectares is not None else "Not yet verified"),
         ("Intended use", card["intended_use_label"]),
         ("Planning status", card["plan_status_label"]),
         ("Build status", card["build_status_label"] or "Not established"),

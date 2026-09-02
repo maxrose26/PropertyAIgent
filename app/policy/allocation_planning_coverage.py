@@ -126,6 +126,22 @@ _COVERAGE_TO_GATE_4B = {
 }
 
 
+# Website V2 (Website V2 / Product Review + Deployment Preparation, Step
+# 14) - this module's own classification/reason text already existed and
+# was already safe, but was never wired into the product UI
+# (app/ui/pages/3_Local_Plan_Sites.py used the underlying engine's own raw
+# 6-value DEVELOPMENT_COVERAGE_LABELS instead - see that task's final
+# report). These are the short, product-facing labels a land professional
+# reads, one definition reused everywhere this classification is shown -
+# never a second, slightly-different wording invented at the UI layer.
+PLANNING_ACTIVITY_COVERAGE_LABELS = {
+    FULL: "Fully represented by known activity",
+    PARTIAL: "Partial activity identified",
+    NONE_FOUND: "No identified activity",
+    UNCERTAIN: "Activity uncertain — requires review",
+}
+
+
 @dataclass(frozen=True)
 class PlanningActivityCoverage:
     classification: str  # FULL | PARTIAL | NONE_FOUND | UNCERTAIN
