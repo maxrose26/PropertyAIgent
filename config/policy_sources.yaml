@@ -237,6 +237,25 @@ councils:
         plan_name: "Bolton's Allocations Plan"
         plan_version: "Adopted (3 December 2014, unrevised)"
 
+      # LPDI V1 Gate 3J ("Normal Authority Cohort Activation") - the direct,
+      # verified primary-plan document itself (Gate 3I found no direct
+      # source was configured at all; this is that gap closed). Confirmed
+      # live this gate: HTTP 200, application/pdf, 1,007,902 bytes, no
+      # redirect. The document's own page 1 reads "Bolton's Allocations
+      # Plan / Adopted December 2014" - an exact match to the existing
+      # production LocalPlan id 15 identity/plan_version, so no identity
+      # correction is required. Bolton's Core Strategy (adopted March
+      # 2011, a separate document forming the rest of Bolton's statutory
+      # development plan) is deliberately NOT onboarded here - out of this
+      # gate's scope per its own task boundary, and would need its own
+      # LocalPlan row (same pattern as Bury's two rows), not a source
+      # under this one.
+      - url: "https://www.bolton.gov.uk/downloads/file/671/allocations-plan-written-statement"
+        source_type: adopted_plan
+        title: "Bolton's Allocations Plan - Written Statement (adopted December 2014)"
+        plan_name: "Bolton's Allocations Plan"
+        plan_version: "Adopted (3 December 2014, unrevised)"
+
   manchester:
     sources:
       - url: "https://www.manchester.gov.uk/planning-and-regeneration/planning/authority-monitoring-report"
@@ -267,29 +286,87 @@ councils:
         plan_name: "Oldham Saved Unitary Development Plan (Policy H1, saved allocations)"
         plan_version: "Adopted (saved UDP)"
 
+      # LPDI V1 Gate 3J ("Normal Authority Cohort Activation") - the direct,
+      # verified primary-plan document (Gate 3I found the monitoring_page
+      # above is a navigation dead-end with zero document links; this is a
+      # separately-located, individually-verified direct PDF, not something
+      # extract_document_links found from the page above). Confirmed live
+      # this gate: HTTP 200, application/pdf, 299,753 bytes, reached via
+      # https://www.oldham.gov.uk/info/200708/unitary_development_plan/1005/
+      # about_the_unitary_development_plan (an HTML landing page, not itself
+      # registered - only the direct file below is). The document's own
+      # page 1 reads "Oldham Metropolitan Borough Unitary Development Plan -
+      # Saved Policies... post adoption of the Joint Core Strategy and
+      # Development Policies DPD (adopted 9 November 2011)" - an exact match
+      # to production LocalPlan id 11's identity/plan_version, so no
+      # identity correction is required. No AMR/monitoring source is added
+      # here - Gate 3I's candidate monitoring-report page was never verified
+      # to document level and nothing this gate does depends on it.
+      - url: "https://www.oldham.gov.uk/download/downloads/id/6788/saved_udp_policies_document.pdf"
+        source_type: adopted_plan
+        title: "Oldham Saved Unitary Development Plan - Saved Policies (post-2011 Joint Core Strategy)"
+        plan_name: "Oldham Saved Unitary Development Plan (Policy H1, saved allocations)"
+        plan_version: "Adopted (saved UDP)"
+
   rochdale:
     sources:
-      # NO plan_name (Section 6/12 of this gate's own task - do not invent
-      # a supersession/attribution rule where the architecture doesn't
-      # support one) - Rochdale has NO independent LocalPlan row of its
-      # own in this database (confirmed via direct query at implementation
-      # time); it is currently known to this platform only through its
-      # LocalPlanCouncil "participating_authority" link to the SHARED
-      # Places for Everyone plan row (id 2). That shared row's own
-      # scalar housing-delivery fields cannot safely hold Rochdale's own,
-      # genuinely distinct AMR figures without silently conflating them
-      # with Bolton's/Oldham's/etc. - registering this source as council-
-      # level (local_plan_id left null, a valid, documented steady state
-      # per app.policy.sources' own docstring) is the correct, honest
-      # action until Rochdale has its own independent LocalPlan row -
-      # a separately-roadmapped item (PRODUCT_ROADMAP.md §2, "Independent
-      # Local Plan monitoring for the remaining 8 GM authorities"), not
-      # something this gate's own narrow scope should silently expand
-      # into. See this gate's own specification for the full reasoning.
+      # UPDATE (LPDI V1 Gate 3J, "Normal Authority Cohort Activation"): the
+      # reasoning below (no plan_name - Rochdale had no own LocalPlan row)
+      # was correct as of Gate 3I/earlier and is kept unedited as the
+      # historical record of why this source was originally registered
+      # unlinked. Gate 3J's own onboarding step gives Rochdale its own
+      # LocalPlan row (see the emerging_plan entry below) - this amr_page
+      # entry's fields are intentionally left completely unchanged this
+      # gate (per Gate 3J's own instruction: "preserve existing amr_page
+      # configuration"; do not force-link it). Whether it can now safely
+      # resolve to the new own-plan row, or should remain council-level
+      # (local_plan_id null) pending independent verification of its own
+      # figures, is a registration-time question for a future gate, not
+      # something decided by editing this entry.
+      #
+      # Original reasoning (NO plan_name - Section 6/12 of this gate's own
+      # task - do not invent a supersession/attribution rule where the
+      # architecture doesn't support one) - Rochdale has NO independent
+      # LocalPlan row of its own in this database (confirmed via direct
+      # query at implementation time); it is currently known to this
+      # platform only through its LocalPlanCouncil "participating_authority"
+      # link to the SHARED Places for Everyone plan row (id 2). That shared
+      # row's own scalar housing-delivery fields cannot safely hold
+      # Rochdale's own, genuinely distinct AMR figures without silently
+      # conflating them with Bolton's/Oldham's/etc. - registering this
+      # source as council-level (local_plan_id left null, a valid,
+      # documented steady state per app.policy.sources' own docstring) is
+      # the correct, honest action until Rochdale has its own independent
+      # LocalPlan row - a separately-roadmapped item (PRODUCT_ROADMAP.md
+      # §2, "Independent Local Plan monitoring for the remaining 8 GM
+      # authorities"), not something this gate's own narrow scope should
+      # silently expand into. See this gate's own specification for the
+      # full reasoning.
       - url: "https://www.rochdale.gov.uk/planning-policy/authority-monitoring-reports"
         source_type: amr_page
         title: "Rochdale Borough Council - Authority Monitoring Reports (current edition updated May 2025, covers 1 Apr 2022 - 31 Mar 2023)"
         # No plan_name - see comment above.
+
+      # LPDI V1 Gate 3J ("Normal Authority Cohort Activation") - Rochdale's
+      # own, currently LIVE, directly-processable primary-plan document.
+      # Confirmed live this gate: HTTP 200, application/pdf, 6,862,846
+      # bytes, no redirect, Last-Modified 7 Aug 2026. The document's own
+      # page 1 reads "Rochdale Borough Local Plan / Publication Plan / July
+      # 2026" - matching Regulation 19/Publication stage exactly, per the
+      # council's own page (https://www.rochdale.gov.uk/planning-policy/
+      # local-plan) stating a Regulation 19 consultation window of 14
+      # August - 25 September 2026 (open as of this gate). plan_name/
+      # plan_version below are the identity this source's own future
+      # registration will resolve against ONLY once the matching LocalPlan
+      # row exists (see Step 8's onboarding, performed separately, in that
+      # order, per this gate's own critical ordering constraint) - adding
+      # this config entry alone does not create or link anything by
+      # itself.
+      - url: "https://www.rochdale.gov.uk/downloads/file/3280/publication-local-plan-document"
+        source_type: emerging_plan
+        title: "Rochdale Borough Local Plan - Publication Plan (July 2026, Regulation 19)"
+        plan_name: "Rochdale Local Plan"
+        plan_version: "Regulation 19 Publication"
 
   tameside:
     sources:
