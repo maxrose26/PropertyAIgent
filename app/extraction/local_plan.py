@@ -67,14 +67,62 @@ SCHEMA = {
                         "site_name": {"type": "string"},
                         "minimum_dwellings": {
                             "type": ["integer", "null"],
-                            "description": "The dwelling count printed against this specific site. Null if none is stated for it.",
+                            "description": "The dwelling count printed against this specific site. If the source distinguishes a "
+                                           "smaller PLAN-PERIOD figure from a larger comprehensive/whole-scheme total (e.g. "
+                                           "'15,000 dwellings (8,400 in plan period)'), put the plan-period figure here, not the "
+                                           "larger one. Null if none is stated for it - never estimate or infer one.",
+                        },
+                        # Gate 4A ("Controlled Residential Allocation
+                        # Intelligence Extraction") - a genuinely separate,
+                        # LARGER figure some sites state alongside the plan-
+                        # period one (a comprehensive/whole-scheme total that
+                        # extends beyond the plan period). Deliberately NOT
+                        # populated merely because a phase table or delivery
+                        # trajectory sums to a bigger number - only when the
+                        # source EXPLICITLY states this as the site's own
+                        # wider total capacity.
+                        "maximum_capacity": {
+                            "type": ["integer", "null"],
+                            "description": "A separate, LARGER comprehensive/whole-scheme dwelling total explicitly stated for this "
+                                           "site alongside its plan-period figure (e.g. the '15,000' in '15,000 dwellings (8,400 in "
+                                           "plan period)'). Null if the source states only one figure for this site, or if a second "
+                                           "number is a phase/delivery-trajectory figure rather than an explicitly stated whole-"
+                                           "scheme total - never infer or compute this from a phasing table.",
+                        },
+                        "site_area_hectares": {
+                            "type": ["number", "null"],
+                            "description": "This site's own stated area in hectares (e.g. from a 'Site Size (Ha)' field), exactly as "
+                                           "printed. Null if not explicitly stated for this specific site.",
+                        },
+                        "green_belt_excerpt": {
+                            "type": ["string", "null"],
+                            "description": "If this site's own text explicitly mentions Green Belt in any way (adjacent to, "
+                                           "released from, within, boundary of, etc.), the verbatim sentence containing that mention. "
+                                           "Null if Green Belt is not mentioned in connection with this specific site at all - never "
+                                           "infer a Green Belt relationship that isn't explicitly stated.",
                         },
                         "category": {
                             "type": "string",
                             "description": "The MOST SPECIFIC heading this site sits under, copied verbatim - if a list is split into lettered sub-groups (e.g. 'a. Previously developed land', 'b. Grey belt', 'c. Other') under a numbered list heading (e.g. 'List 2: sites outside the existing built-up area'), combine both as 'List 2: sites outside the existing built-up area - Grey belt', not just the outer list name alone. This distinction matters: grey belt/greenfield sites carry different planning risk to brownfield ones.",
                         },
+                        "source_page": {
+                            "type": ["integer", "null"],
+                            "description": "The PHYSICAL page number (as printed in the page markers of the source text below, "
+                                           "e.g. '--- page 294 ---') where THIS site's own detail (its policy reference and/or site "
+                                           "name, together with its capacity/area) is actually stated. Null if genuinely unsure - "
+                                           "never guess a page number.",
+                        },
+                        "source_excerpt": {
+                            "type": ["string", "null"],
+                            "description": "A short, verbatim excerpt from the source text (copied exactly, not paraphrased) that "
+                                           "supports this site's name and capacity figure(s). Null only if minimum_dwellings is also "
+                                           "null and there is nothing numeric to support.",
+                        },
                     },
-                    "required": ["policy_reference", "site_name", "minimum_dwellings", "category"],
+                    "required": [
+                        "policy_reference", "site_name", "minimum_dwellings", "maximum_capacity",
+                        "site_area_hectares", "green_belt_excerpt", "category", "source_page", "source_excerpt",
+                    ],
                     "additionalProperties": False,
                 },
             },
@@ -87,10 +135,38 @@ SCHEMA = {
 
 def extract_pdf_page_range(pdf_path: str, first_page: int, last_page: int) -> str:
     """1-indexed, inclusive - matches how a human would cite a page number
-    when pointing this module at a new council's document."""
+    when pointing this module at a new council's document. Concatenates
+    the whole range into one string with no page markers - kept for
+    backward compatibility with existing callers (ingest_local_plan.py's
+    site-extraction path is the only one that still needs a bare string);
+    new code should prefer extract_pdf_pages below, which - unlike this
+    function - keeps page boundaries addressable, the minimum mechanism a
+    per-allocation citation needs (see app.extraction.plan_evidence.
+    extract_pdf_pages, whose exact same shape this mirrors)."""
     with pdfplumber.open(pdf_path) as pdf:
         pages = pdf.pages[first_page - 1:last_page]
         return "\n\n".join(page.extract_text() or "" for page in pages)
+
+
+def extract_pdf_pages(pdf_path: str, first_page: int, last_page: int) -> list[tuple[int, str]]:
+    """1-indexed, inclusive. Returns [(page_number, page_text), ...] - the
+    exact same shape as app.extraction.plan_evidence.extract_pdf_pages,
+    reused here (LPDI V1 Gate 4A, "Controlled Residential Allocation
+    Intelligence Extraction") so allocation extraction gets the same real
+    per-page citation capability plan-level evidence extraction already
+    has, rather than a second, differently-shaped mechanism."""
+    with pdfplumber.open(pdf_path) as pdf:
+        pages = pdf.pages[first_page - 1:last_page]
+        return [(first_page + i, (page.extract_text() or "")) for i, page in enumerate(pages)]
+
+
+def format_pages_for_prompt(pages: list[tuple[int, str]]) -> str:
+    """Explicit [PAGE N] markers - the exact same convention
+    app.extraction.plan_evidence.format_pages_for_prompt already
+    established - so the model can cite a real physical page number per
+    allocation instead of guessing or defaulting to the range's first
+    page."""
+    return "\n\n".join(f"[PAGE {page_number}]\n{text}" for page_number, text in pages)
 
 
 def build_local_plan_prompt(source_text: str) -> str:
@@ -114,6 +190,38 @@ Never invent a policy reference/code. If no code is printed for a specific
 site anywhere in the source text, use null for policy_reference rather
 than guessing, reusing an example format, or inferring one from a nearby
 site's code.
+
+CAPACITY - do not assume a number is this site's capacity unless the
+source text explicitly, unambiguously associates it with THIS site:
+- Never assign a capacity figure printed against a DIFFERENT site to this
+  one, even if they appear on the same page or in the same table.
+- Never treat a PHASE's own delivery figure (from a phasing/trajectory
+  table showing amounts across several time periods) as the site's overall
+  capacity - those are delivery timing, not a separate capacity claim.
+- Never treat a wider masterplan/strategic-allocation total, an existing
+  permission's unit count, or completed units as this site's own
+  allocation capacity unless the text explicitly says so.
+- If a source states two figures for the same site (e.g. "15,000 dwellings
+  (8,400 in plan period)"), put the SMALLER plan-period figure in
+  minimum_dwellings and the larger comprehensive/whole-scheme figure in
+  maximum_capacity - never combine, average, or pick one arbitrarily.
+- If the capacity wording is unclear about what it actually covers, leave
+  minimum_dwellings null rather than guessing.
+
+HECTARES - only extract site_area_hectares when a figure is clearly
+printed as THIS site's own area (e.g. a "Site Size (Ha)" line against this
+site's own entry). Never assign another site's area to this one.
+
+GREEN BELT - only populate green_belt_excerpt when this site's OWN text
+explicitly mentions Green Belt in any way. Copy the exact sentence - do
+not summarise, classify, or decide what it means; that is done separately.
+Leave it null if Green Belt is not mentioned for this specific site, even
+if Green Belt is mentioned elsewhere in the document for other sites.
+
+CITATION - source_page must be the physical page (from this text's own
+[PAGE N] markers) where this site's own policy reference/name is actually
+printed, not the first page of the whole extract. source_excerpt must be
+copied verbatim from the source text, never paraphrased or invented.
 
 SOURCE TEXT:
 {source_text}

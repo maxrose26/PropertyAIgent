@@ -528,6 +528,11 @@ def test_no_unrelated_schema_changes():
         "match_review_note", "review_status", "duplicate_classification", "duplicate_classification_note",
         "progression_signal", "progression_reasons", "progression_computed_at", "latitude", "longitude",
         "extracted_at", "updated_at",
+        # UPDATE (Gate 4A): see the identical note in
+        # tests/test_allocation_document_evidence.py - three columns were
+        # added, explicitly authorised by Gate 4A's own schema-decision
+        # checkpoint, not by this module.
+        "site_area_hectares", "green_belt_status", "source_excerpt",
     }
     expected_site_columns = {
         "id", "council_code", "canonical_address", "display_address", "postcode", "latitude", "longitude",

@@ -83,6 +83,14 @@ def test_string_column_lengths_derived_from_model_metadata_match_known_schema():
         "review_status": 30,
         "duplicate_classification": 30,
         "progression_signal": 20,
+        # UPDATE (Gate 4A, "Controlled Residential Allocation Intelligence
+        # Extraction") - green_belt_status is a new, explicitly-authorised
+        # LocalPlanSite column (String(30), a small bounded controlled
+        # vocabulary - see the model's own docstring); this hotfix's
+        # dynamic derivation correctly picks it up automatically, and this
+        # lock-in test is updated to match, same as every other schema-
+        # guard test this gate touched.
+        "green_belt_status": 30,
     }
 
 
