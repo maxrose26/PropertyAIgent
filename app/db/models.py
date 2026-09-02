@@ -475,6 +475,36 @@ class LocalPlanSite(Base):
     indicative_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     maximum_capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # --- Gate 4A ("Controlled Residential Allocation Intelligence
+    # Extraction") - two minimal, evidence-backed additions, proven
+    # materially present in Trafford's real Regulation 19 allocations
+    # before being added (see this gate's own final report): every real
+    # per-site policy page states its own site area, and Green Belt
+    # relationship - where it appears at all - is evidenced as one of a
+    # small number of DISTINCT concepts (a site described as adjacent to
+    # the Green Belt is not the same claim as a site released FROM the
+    # Green Belt), which a naive Boolean would silently collapse into one
+    # meaning and lose. ---
+    site_area_hectares: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Deliberately a small, bounded free-text label (never a Boolean, never
+    # a large ontology) - populated ONLY when the source text explicitly
+    # states a Green Belt relationship for THIS allocation (e.g.
+    # "adjacent_to_green_belt", "green_belt_release" - see
+    # app.extraction.local_plan's own classify_green_belt_status for the
+    # exact narrow vocabulary this gate's real evidence justified). Null
+    # means "no Green Belt statement found for this allocation" - the
+    # ordinary, expected case for most allocations - never inferred or
+    # defaulted to a negative claim.
+    green_belt_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # The verbatim source sentence/table row a capacity/area/Green-Belt
+    # claim was read from - mirrors PolicyChangeEvent.source_excerpt's
+    # already-established platform-wide provenance pattern (Part 5: "Do
+    # not store only an AI explanation without the underlying evidence"),
+    # simply never added to this specific table before now. Enables a
+    # future reviewer or a later gate to independently re-verify a trusted
+    # allocation fact without re-fetching/re-searching the source PDF.
+    source_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Council-specific grouping as it appears in the source document (e.g.
     # "List 1: built-up area", "List 2: grey belt") - kept verbatim rather
     # than normalised into an enum, since this varies by council and the

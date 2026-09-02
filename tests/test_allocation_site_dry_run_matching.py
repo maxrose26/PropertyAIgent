@@ -396,6 +396,10 @@ def test_no_openai_dependency():
 
 
 def test_no_schema_change_local_plan_site_and_site_columns_unchanged():
+    # UPDATE (Gate 4A): see the identical note in
+    # tests/test_allocation_document_evidence.py - three columns were
+    # added, explicitly authorised by Gate 4A's own schema-decision
+    # checkpoint, not by this module.
     expected_local_plan_site_columns = {
         "id", "council_code", "local_plan_id", "policy_reference", "site_name", "intended_use",
         "minimum_dwellings", "indicative_capacity", "maximum_capacity", "category", "allocation_status",
@@ -404,6 +408,7 @@ def test_no_schema_change_local_plan_site_and_site_columns_unchanged():
         "match_review_note", "review_status", "duplicate_classification", "duplicate_classification_note",
         "progression_signal", "progression_reasons", "progression_computed_at", "latitude", "longitude",
         "extracted_at", "updated_at",
+        "site_area_hectares", "green_belt_status", "source_excerpt",
     }
     expected_site_columns = {
         "id", "council_code", "canonical_address", "display_address", "postcode", "latitude", "longitude",
