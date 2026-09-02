@@ -1,4 +1,5 @@
-"""Gate 4B ("Allocation <-> Site/Application Planning Activity Coverage") -
+"""Gate 4B ("Allocation <-> Site/Application Planning Activity Coverage") /
+Gate 4C ("Strategic Opportunity Identification") -
 maps the existing, mature app.reporting.allocation_development_coverage
 engine's own 6-value classification onto the narrower product-facing
 4-value vocabulary this gate's own task requires (FULL/PARTIAL/NONE_FOUND/
@@ -172,3 +173,65 @@ def classify_planning_activity_coverage(coverage: DevelopmentCoverageResult) -> 
         )
 
     return PlanningActivityCoverage(classification, reason, coverage.development_coverage_classification)
+
+
+# --- Gate 4C ("Strategic Opportunity Identification") -----------------------
+#
+# Duplication finding (Gate 4C's own Step 3): the opportunity engine itself
+# ALREADY EXISTS - app.reporting.allocation_development_coverage.
+# build_opportunity_signal, already wired into production reporting
+# (app.reporting.allocation_discovery's own card builder), already
+# producing INVESTIGATE/MONITOR/LOWER_PRIORITY/INSUFFICIENT_EVIDENCE with
+# an explicit ownership caveat, already never using an LLM. This gate does
+# NOT reimplement it. The one real, evidenced gap this gate's own
+# investigation found: build_opportunity_signal's own NO_IDENTIFIED_
+# ACTIVITY reason ("No planning activity has been identified within this
+# allocation.") is IDENTICAL whether literally nothing was ever found
+# (e.g. AN9) or whether a real candidate Site was found but not safely
+# corroborated (AN3 "Trafford Waters" - a genuine false match) or was
+# corroborated but never recorded as a relationship (AN4 "Pomona" - a
+# real, evidenced candidate). Step 18's own instruction is to prefer a
+# REASON-level distinction over a new top-level coverage state - exactly
+# what enrich_none_found_reason below does, appending one extra sentence
+# to the EXISTING reasons list, never replacing build_opportunity_signal's
+# own signal or its own primary reasons.
+from app.extraction.local_plan import match_to_existing_site  # noqa: E402
+
+
+def enrich_none_found_reason(
+    allocation_site_name: str, candidate_sites: list[Site], opportunity: dict,
+) -> dict:
+    """Only ever appends one extra sentence to opportunity["reasons"] - never
+    changes opportunity["signal"], never overrides build_opportunity_signal's
+    own decision. Re-runs match_to_existing_site (already used elsewhere in
+    the same request, cheap, deterministic, no LLM) purely to distinguish,
+    for a NONE_FOUND-based INVESTIGATE, which of three real evidence shapes
+    applies - "nothing found", "a candidate exists but isn't corroborated"
+    (the Trafford Waters case), or "a corroborated candidate exists but has
+    not yet been recorded as a relationship" (the Pomona case). No write to
+    AllocationSiteRelationship happens here or anywhere in Gate 4C - this
+    is evidence-pack enrichment only."""
+    if not opportunity or "No planning activity has been identified" not in " ".join(opportunity.get("reasons", [])):
+        return opportunity
+
+    site, score = match_to_existing_site(allocation_site_name, candidate_sites)
+    if site is None:
+        note = "No candidate Site was identified by Property AIgent's own name/address matching either."
+    else:
+        assessment = classify_site_match_confidence(allocation_site_name, site, score)
+        if assessment.confidence == "HIGH":
+            note = (
+                f"Property AIgent's own matching identified a plausible candidate Site ({site.display_address}) "
+                f"corroborated by shared specific identifying wording, but this has not yet been recorded as a "
+                f"confirmed Site relationship - this candidate should be reviewed before being relied upon."
+            )
+        else:
+            note = (
+                f"Property AIgent's own matching found a text-similar candidate Site ({site.display_address}), but "
+                f"it shares no specific identifying wording with this allocation beyond generic terms - not treated "
+                f"as a credible candidate."
+            )
+
+    enriched = dict(opportunity)
+    enriched["reasons"] = [*opportunity["reasons"][:-1], note, opportunity["reasons"][-1]]
+    return enriched
