@@ -22,12 +22,16 @@ def test_null_value_is_valid_and_stays_null():
     # verify regardless). LPDI V1 Gate 3D ("Structured Evidence Semantic
     # Safety") adds structured_text_risk/force_review_reason similarly -
     # "not_applicable"/None here, since a null-value fact has no
-    # structured claim to assess either.
+    # structured claim to assess either. LPDI V1 Gate 3K ("Numeric Scope &
+    # Multi-Section Evidence Safety") adds numeric_scope_risk/
+    # numeric_scope_review_reason similarly - "not_applicable"/None here,
+    # since a null-value fact has no numeric scope to assess either.
     assert result == {
         "field": "annual_housing_requirement", "parsed_value": None,
         "is_valid": True, "rejection_reason": None, "raw_fact": result["raw_fact"],
         "citation_status": "not_checked", "verified_source_page": None, "citation_note": None,
         "structured_text_risk": "not_applicable", "force_review_reason": None,
+        "numeric_scope_risk": "not_applicable", "numeric_scope_review_reason": None,
     }
 
 

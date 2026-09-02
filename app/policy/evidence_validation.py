@@ -432,6 +432,162 @@ def _structured_text_review_reason(field: str) -> str:
     )
 
 
+# --- LPDI V1 Gate 3K ("Numeric Scope & Multi-Section Evidence Safety") --------
+#
+# Gate 3J's own real, controlled production finding: Oldham's
+# total_plan_housing_requirement was proposed as 1,310 with excerpt
+# "TOTAL 1310" - the number IS genuinely on the cited page (Gate 3A's
+# citation check passes; there is nothing to correct or flag), and the
+# excerpt genuinely contains the claimed digits (the ordinary numeric-
+# presence check above passes too). But the document's own page 14 is a
+# "Housing Land Release - Phase 1" schedule (policy H1.1), and its page 17
+# - within the SAME processed page range - is a SEPARATE "Housing Land
+# Release - Phase 2" schedule (policy H1.2) with its own "TOTAL 451". The
+# stored value silently presented a Phase 1 SUBTOTAL as the definitive
+# whole-plan total, omitting Phase 2's additional 451 dwellings entirely.
+# Neither citation verification (the page is correct) nor the numeric-
+# presence check (the excerpt states 1,310) nor Gate 3D's structured-text
+# classifier (this is a single plain integer field, not one of the four
+# free-text notes fields Gate 3D targets) can catch this - it is a
+# genuinely different failure shape: not a WRONG number, not a
+# MISATTRIBUTED period/value pairing, but an INCOMPLETE claim of scope -
+# the number is real, but nothing establishes it covers the whole plan
+# rather than one of several separately-totalled sections.
+#
+# Per Gate 3K's own explicit product decision: the system must NOT attempt
+# to reconstruct or sum the true total (1,310 + 451 = 1,761 is never
+# computed or asserted anywhere below) - only to recognise, deterministically
+# and narrowly, when a candidate whole-plan total's own evidence gives no
+# reason to trust it covers the whole plan AND the surrounding processed
+# text shows a genuine multi-section/multi-phase structure for the same
+# concept. The safe outcome is abstention (needs_review), exactly the same
+# non-rejecting "force existing review pathway" pattern Gate 3A/3D already
+# established - the proposal, its citation and its excerpt are all still
+# preserved untouched.
+
+# The real risk surface, evidenced by exactly one production finding so
+# far: total_plan_housing_requirement (app.extraction.plan_evidence's own
+# field name for LocalPlan.total_housing_requirement - see
+# app.policy.extract_plan_evidence.EXTRACTION_FIELD_TO_MODEL_FIELD).
+# Deliberately NOT annual_housing_requirement - Oldham's own real evidence
+# proves an annual "required building rate" figure can remain genuinely
+# singular and correct even when the same document's allocation schedule
+# is phased (270 dwellings/year was the one, unambiguous, correct annual
+# figure governing BOTH phases) - broadening this set without a second
+# real, evidenced failure would be exactly the "manufacture further gates
+# from theoretical risks" this gate's own task explicitly warns against.
+_NUMERIC_SCOPE_RISK_FIELDS = frozenset({"total_plan_housing_requirement"})
+
+# Whole-plan SCOPE-QUALIFYING language - if a candidate's own excerpt
+# already ties the number to the whole plan (a plan-period year range, or
+# an explicit "housing requirement"/"total need"/"net additional dwellings
+# ... delivered" phrase), that is real, positive evidence of whole-plan
+# scope and the candidate is trusted on that basis alone, regardless of
+# what else the wider document contains - real evidence from every
+# authority processed so far (Bury "total housing requirement of 9,486
+# ... from 2022 - 2043", Stockport "total need of 31,790" "for the plan
+# period 2025-2042", Trafford "minimum of 19,077 ... in the plan period
+# (April 2022 - March 2039)", Bolton "10,738 for the period 2012-2026")
+# confirms every genuinely correct, already-trusted total in this
+# codebase carries this kind of qualifying language, while Oldham's bare
+# "TOTAL 1310" carries none of it. Reuses _YEAR_RANGE_RE (already defined
+# above for Gate 3D) rather than a second near-duplicate pattern.
+_WHOLE_PLAN_SCOPE_PHRASES_RE = re.compile(
+    r"housing requirement|total need|net additional dwellings|plan period", re.I,
+)
+
+# An explicit, repeated phase label - Oldham's own real evidence ("Housing
+# Land Release - Phase 1" / "... Phase 2"). Requires TWO OR MORE distinct
+# phase labels to count as a genuine multi-section signal (a document that
+# merely mentions "Phase 1" once, with no "Phase 2" anywhere, is not
+# evidence of a competing untotalled section - the same "only a positive,
+# multi-occurrence signal counts" discipline Gate 3D's own
+# _has_number_nearby already established for year-range/label-value pairs).
+_PHASE_RE = re.compile(r"\bPhase\s+(?:One|Two|Three|Four|1|2|3|4)\b", re.I)
+
+# A bare "TOTAL <number>" table-style label, deliberately distinct from the
+# rich, qualified language above - exactly Oldham's own "TOTAL 1310"/
+# "TOTAL 451" shape. Reused both to classify the candidate's OWN excerpt
+# (unqualified -> proceed to the phase/competing-total check below) and to
+# search the wider processed text for a DIFFERING total near a phase label.
+_BARE_TOTAL_RE = re.compile(r"\bTOTAL\b[:\s]*([\d,]+)", re.I)
+
+# How close a "TOTAL <number>" must appear to a "Phase N" mention on the
+# SAME page to count as that phase's own total, rather than an unrelated
+# figure elsewhere on a page that also happens to mention a phase in
+# passing - Oldham's real pages have the phase heading immediately above
+# its own schedule's total (a few hundred characters at most).
+_PHASE_TOTAL_PROXIMITY_CHARS = 800
+
+
+def classify_numeric_scope_risk(
+    field: str, value: int | float, source_page: int | None, source_excerpt: str | None,
+    pages: list[tuple[int, str]] | None,
+) -> str:
+    """"SINGLE_SCOPE" (safe to trust on the same terms as any other numeric
+    fact) or "MULTI_SCOPE" (the candidate's own evidence gives no reason to
+    believe it covers the whole plan, and the processed document shows a
+    genuine repeated-phase/multi-section structure for the same concept -
+    see this section's own module comment for the real Oldham finding this
+    exists for).
+
+    Only ever returns "MULTI_SCOPE" for the narrow, evidenced risk surface
+    (_NUMERIC_SCOPE_RISK_FIELDS) with pages actually supplied - with no
+    page-bounded text to inspect (every caller before Gate 3K, or a
+    citation that never resolved to a real page), there is nothing to
+    safely check against, so the field is left exactly as every other
+    check already leaves it: not this classifier's business to guess.
+
+    Deliberately does NOT attempt to determine, compute, or suggest the
+    correct total - it only ever answers "is there a reason to distrust
+    this claim's SCOPE", never "what is the right number"."""
+    if field not in _NUMERIC_SCOPE_RISK_FIELDS or not pages or source_page is None:
+        return "SINGLE_SCOPE"
+
+    if source_excerpt and _WHOLE_PLAN_SCOPE_PHRASES_RE.search(source_excerpt):
+        return "SINGLE_SCOPE"
+    if source_excerpt and _YEAR_RANGE_RE.search(source_excerpt):
+        return "SINGLE_SCOPE"
+
+    # The candidate's own excerpt carries none of the whole-plan
+    # qualifying language above - exactly the bare "TOTAL <number>" shape.
+    # Only now is it worth checking whether the wider processed text shows
+    # a genuine multi-phase structure with a DIFFERING total near another
+    # phase mention.
+    phase_pages: dict[int, list[re.Match]] = {}
+    for page_number, text in pages:
+        matches = list(_PHASE_RE.finditer(text))
+        if matches:
+            phase_pages[page_number] = matches
+
+    distinct_phase_labels = {
+        _normalise_for_citation(m.group(0)) for matches in phase_pages.values() for m in matches
+    }
+    if len(distinct_phase_labels) < 2:
+        return "SINGLE_SCOPE"
+
+    for page_number, phase_matches in phase_pages.items():
+        page_text = dict(pages)[page_number]
+        for total_match in _BARE_TOTAL_RE.finditer(page_text):
+            competing_value = _parse_int(total_match.group(1))
+            if competing_value is None or competing_value == value:
+                continue
+            for phase_match in phase_matches:
+                if abs(total_match.start() - phase_match.start()) <= _PHASE_TOTAL_PROXIMITY_CHARS:
+                    return "MULTI_SCOPE"
+
+    return "SINGLE_SCOPE"
+
+
+def _numeric_scope_review_reason(field: str, value) -> str:
+    return (
+        f"{field!r}={value!r} is not clearly qualified as the whole-plan total in its own supporting evidence, "
+        f"and the processed document shows a repeated-phase/multi-section structure with another, differing total - "
+        f"this proposal requires human review to confirm it represents the complete whole-plan figure rather than "
+        f"one of several sections/phases"
+    )
+
+
 def validate_fact(
     fact: dict, sibling_groups: list[list[str]] | None = None, source_text: str | None = None,
     pages: list[tuple[int, str]] | None = None,
@@ -479,7 +635,16 @@ def validate_fact(
     linearised source text - not a rejection, the proposal/citation are
     still preserved; the caller forces this into the existing
     needs_review pathway exactly as it already does for an ambiguous/
-    unverified citation)."""
+    unverified citation).
+
+    Also always returns (LPDI V1 Gate 3K): "numeric_scope_risk" (see
+    classify_numeric_scope_risk - "not_applicable" for a null/rejected
+    fact or a field outside the narrow risk surface) and
+    "numeric_scope_review_reason" (set, alongside "MULTI_SCOPE", when a
+    whole-plan numeric total's own evidence doesn't establish whole-plan
+    scope and the processed document shows a repeated-phase/multi-section
+    structure - same non-rejecting, force-into-review pattern as Gate 3A/
+    3D above)."""
     result = _validate_fact_fields(fact)
     if sibling_groups and result["is_valid"] and result["parsed_value"] is not None:
         reason = detect_sibling_plan_reference(fact.get("source_excerpt"), sibling_groups, source_text)
@@ -488,6 +653,7 @@ def validate_fact(
                 "field": result["field"], "parsed_value": None, "is_valid": False, "rejection_reason": reason,
                 "raw_fact": fact, "citation_status": "not_checked", "verified_source_page": fact.get("source_page"),
                 "citation_note": None, "structured_text_risk": "not_applicable", "force_review_reason": None,
+                "numeric_scope_risk": "not_applicable", "numeric_scope_review_reason": None,
             }
 
     result = dict(result)
@@ -509,6 +675,17 @@ def validate_fact(
             force_review_reason = _structured_text_review_reason(result["field"])
     result["structured_text_risk"] = structured_risk
     result["force_review_reason"] = force_review_reason
+
+    numeric_scope_risk = "not_applicable"
+    numeric_scope_review_reason = None
+    if result["is_valid"] and result["parsed_value"] is not None:
+        numeric_scope_risk = classify_numeric_scope_risk(
+            result["field"], result["parsed_value"], result["verified_source_page"], fact.get("source_excerpt"), pages,
+        )
+        if numeric_scope_risk == "MULTI_SCOPE":
+            numeric_scope_review_reason = _numeric_scope_review_reason(result["field"], result["parsed_value"])
+    result["numeric_scope_risk"] = numeric_scope_risk
+    result["numeric_scope_review_reason"] = numeric_scope_review_reason
     return result
 
 
