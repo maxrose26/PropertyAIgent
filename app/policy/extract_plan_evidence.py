@@ -253,10 +253,25 @@ def run_extraction(
                 detail += f" [Gate 3A citation check: {result['citation_note']}]"
             verified_source_page = result["verified_source_page"]
 
+            # LPDI V1 Gate 3D - a real, controlled production finding
+            # (specifications/018's Gate 3C section): a free-text fact can
+            # have a correct, Gate-3A-verified citation and still encode a
+            # WRONG relationship between multiple periods/labels and their
+            # values (a table-column misattribution) - correct document,
+            # correct page, real numbers, wrong structured claim. Never a
+            # rejection (the proposal/citation are preserved) - forces the
+            # SAME existing needs_review pathway citation ambiguity
+            # already uses, since a semantic-structure problem is not
+            # necessarily a value problem either.
+            structured_text_risk = result["structured_text_risk"]
+            if structured_text_risk == "STRUCTURED_TEXT" and classification == "auto_applied":
+                classification = "needs_review"
+                detail += f" [Gate 3D semantic safety: {result['force_review_reason']}]"
+
             stats["proposals"].append({
                 "field": model_field, "old_value": current_value, "new_value": parsed_value,
                 "classification": classification, "source_page": verified_source_page,
-                "citation_status": citation_status,
+                "citation_status": citation_status, "structured_text_risk": structured_text_risk,
             })
 
             if not dry_run:

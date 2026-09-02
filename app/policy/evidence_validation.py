@@ -336,6 +336,102 @@ def verify_citation(
     )
 
 
+# --- LPDI V1 Gate 3D ("Structured Evidence Semantic Safety") -------------------
+#
+# Gate 3C's own real, controlled production finding: a free-text fact
+# (requirement_notes) whose excerpt was genuinely on the correct, Gate-3A-
+# citation-verified page, and whose individual numbers were genuinely
+# present in the source, still encoded a WRONG relationship between table
+# periods and values - a column-shift misattribution, independently
+# re-confirmed via pdfplumber's own word-level bounding-box coordinates
+# (specifications/018's Gate 3C section). Nothing in the validation
+# architecture above catches this: the free-text passthrough branch of
+# _validate_fact_fields only confirms PRESENCE (value/excerpt non-empty),
+# never that a period/label is correctly paired with its value (SEMANTIC
+# RELATIONSHIP) - a materially different, harder question this module has
+# never attempted, and still does not attempt to SOLVE here. The
+# objective is safe abstention, not table understanding: a free-text
+# "notes" field that states MULTIPLE period/label -> value relationships
+# is routed to needs_review instead of trusted, because the application
+# has no way to verify those specific pairings from linearised page text
+# alone. Deliberately NOT a hard rejection (the proposal, excerpt and
+# citation are all preserved) - a semantic-structure problem is not
+# necessarily a value problem, the same principle Gate 3A already
+# established for citation verification.
+
+# The real risk surface, not "every free-text field": these four fields
+# share an identical extraction-schema description across all four
+# categories - "Any other short, materially useful nuance...that the
+# fields above can't capture" (app.extraction.plan_evidence) - an
+# explicit catch-all for content that doesn't fit a single-purpose field,
+# exactly where an unrelated multi-value table fragment would land. A
+# narrow, single-purpose label field (plan_name, requirement_basis,
+# calculation_method, next_milestone...) is not in this set - even given
+# a risky-looking value, it is never held up by this check.
+_STRUCTURED_TEXT_RISK_FIELDS = frozenset({
+    "status_notes", "requirement_notes", "delivery_notes", "supply_position_notes",
+})
+
+_NUMBER_RE = re.compile(r"\d[\d,]*")
+# A year-range: two 4-digit years joined by a dash variant - the exact
+# shape the real Gate 3C finding's own table used ("2022-2025",
+# "2025–2030"...).
+_YEAR_RANGE_RE = re.compile(r"(?:19|20)\d{2}\s*[-‐‑‒–—―]\s*(?:19|20)\d{2}")
+# An enumerated "label: number" pair - a colon directly followed by a
+# number, the generic shape of a label -> value list (e.g. "Core Growth
+# Area: 1,500, Inner Area: 900").
+_LABEL_VALUE_RE = re.compile(r"[A-Za-z][\w /]{1,40}:\s*\d[\d,]*")
+_STRUCTURED_TEXT_PROXIMITY_CHARS = 25
+
+
+def _has_number_nearby(text: str, span: tuple[int, int], window: int = _STRUCTURED_TEXT_PROXIMITY_CHARS) -> bool:
+    """Is there a number within `window` characters immediately before or
+    after the given span (a year-range match's own position)? A bare date
+    mention with no number anywhere near it isn't a period->value claim
+    at all - the ABSENCE of a nearby number must never itself be treated
+    as risky (mirrors detect_sibling_plan_reference's own asymmetric
+    principle: absence is not evidence of a problem, only an explicit
+    positive signal is)."""
+    start, end = span
+    return bool(_NUMBER_RE.search(text[max(0, start - window):start]) or _NUMBER_RE.search(text[end:end + window]))
+
+
+def classify_structured_text_risk(field: str, value: str) -> str:
+    """Conservative, deterministic classification of a free-text VALUE's
+    own internal structure: "SIMPLE_TEXT" (safe to trust on the same
+    terms as any other free-text field) or "STRUCTURED_TEXT" (states 2+
+    period/label -> value relationships that cannot be verified from
+    linearised source text alone).
+
+    Only ever returns "STRUCTURED_TEXT" for the narrow, evidenced risk
+    surface (_STRUCTURED_TEXT_RISK_FIELDS) - the same value for any other
+    field is always "SIMPLE_TEXT", since a genuinely single-purpose field
+    has nowhere for an unrelated multi-value table fragment to land.
+
+    Deliberately targets STRUCTURE, not raw number count: a sentence with
+    two or more genuinely UNRELATED numbers, or exactly one period/value
+    pair (no ambiguity about which number belongs to it), is still
+    SIMPLE_TEXT - only multiple DISTINCT period-or-label markers each
+    with a number nearby trips this."""
+    if field not in _STRUCTURED_TEXT_RISK_FIELDS or not value:
+        return "SIMPLE_TEXT"
+
+    year_range_pairs = sum(1 for m in _YEAR_RANGE_RE.finditer(value) if _has_number_nearby(value, m.span()))
+    label_value_pairs = len(_LABEL_VALUE_RE.findall(value))
+
+    if year_range_pairs >= 2 or label_value_pairs >= 2:
+        return "STRUCTURED_TEXT"
+    return "SIMPLE_TEXT"
+
+
+def _structured_text_review_reason(field: str) -> str:
+    return (
+        f"structured multi-value evidence in {field!r} cannot be safely verified from linearised source text - "
+        f"the relationship between individual periods/labels and their values cannot be deterministically "
+        f"established, so this proposal requires human review rather than being trusted automatically"
+    )
+
+
 def validate_fact(
     fact: dict, sibling_groups: list[list[str]] | None = None, source_text: str | None = None,
     pages: list[tuple[int, str]] | None = None,
@@ -373,7 +469,17 @@ def validate_fact(
     citation problem is not necessarily a VALUE problem - see verify_
     citation's own docstring) - it is surfaced via citation_status/
     citation_note for the caller (app.policy.extract_plan_evidence.
-    run_extraction) to force into the existing needs_review pathway."""
+    run_extraction) to force into the existing needs_review pathway.
+
+    Also always returns (LPDI V1 Gate 3D): "structured_text_risk" (see
+    classify_structured_text_risk - "not_applicable" for a null/rejected
+    fact) and "force_review_reason" (set, alongside "STRUCTURED_TEXT",
+    when a free-text fact in the narrow risk surface states multiple
+    period/label -> value relationships that cannot be verified from
+    linearised source text - not a rejection, the proposal/citation are
+    still preserved; the caller forces this into the existing
+    needs_review pathway exactly as it already does for an ambiguous/
+    unverified citation)."""
     result = _validate_fact_fields(fact)
     if sibling_groups and result["is_valid"] and result["parsed_value"] is not None:
         reason = detect_sibling_plan_reference(fact.get("source_excerpt"), sibling_groups, source_text)
@@ -381,7 +487,7 @@ def validate_fact(
             return {
                 "field": result["field"], "parsed_value": None, "is_valid": False, "rejection_reason": reason,
                 "raw_fact": fact, "citation_status": "not_checked", "verified_source_page": fact.get("source_page"),
-                "citation_note": None,
+                "citation_note": None, "structured_text_risk": "not_applicable", "force_review_reason": None,
             }
 
     result = dict(result)
@@ -394,6 +500,15 @@ def validate_fact(
     result["citation_status"] = citation.status
     result["verified_source_page"] = citation.verified_page if citation.status == "corrected" else original_page
     result["citation_note"] = citation.note
+
+    structured_risk = "not_applicable"
+    force_review_reason = None
+    if result["is_valid"] and result["parsed_value"] is not None:
+        structured_risk = classify_structured_text_risk(result["field"], str(result["parsed_value"]))
+        if structured_risk == "STRUCTURED_TEXT":
+            force_review_reason = _structured_text_review_reason(result["field"])
+    result["structured_text_risk"] = structured_risk
+    result["force_review_reason"] = force_review_reason
     return result
 
 
