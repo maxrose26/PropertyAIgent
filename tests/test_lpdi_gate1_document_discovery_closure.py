@@ -76,16 +76,49 @@ def test_bury_salford_trafford_gained_exactly_one_new_monitoring_source_each():
     assert len(config["councils"]["stockport"]["sources"]) == 2  # untouched by this gate
 
 
-def test_rochdale_and_tameside_sources_deliberately_carry_no_plan_name():
+def test_tameside_sources_deliberately_carry_no_plan_name():
     """Section 6/12 of this gate's own task - do not invent a supersession/
     attribution rule where the architecture doesn't safely support one.
-    Rochdale has no independent LocalPlan row; Tameside has two and no safe
-    way to disambiguate from the monitoring page alone - both are
-    registered as council-level sources on purpose, not by omission."""
+    Tameside has two LocalPlan rows (plus Places for Everyone) and no safe
+    way to disambiguate from the monitoring page alone - registered as a
+    council-level source on purpose, not by omission. Still true; untouched
+    by LPDI V1 Gate 3J ("Normal Authority Cohort Activation")."""
     config = _real_config()
-    for code in ("rochdale", "tameside"):
-        for source in config["councils"][code]["sources"]:
-            assert source.get("plan_name") is None, f"{code} source unexpectedly carries a plan_name: {source}"
+    for source in config["councils"]["tameside"]["sources"]:
+        assert source.get("plan_name") is None, f"tameside source unexpectedly carries a plan_name: {source}"
+
+
+def test_rochdale_amr_page_source_still_deliberately_carries_no_plan_name():
+    """Rochdale's ORIGINAL amr_page source (this gate) - genuinely
+    untouched by LPDI V1 Gate 3J, which explicitly preserves it rather than
+    force-linking it (see config/policy_sources.yaml's own comment on this
+    entry). It still carries no plan_name for the same reason as when this
+    test was first written: its own AMR figures have not been independently
+    verified as belonging to Rochdale's own plan rather than being genuinely
+    authority-wide content, so it stays council-level pending that check."""
+    config = _real_config()
+    amr_sources = [s for s in config["councils"]["rochdale"]["sources"] if s["source_type"] == "amr_page"]
+    assert len(amr_sources) == 1
+    assert amr_sources[0].get("plan_name") is None
+
+
+def test_rochdale_emerging_plan_source_deliberately_now_carries_a_plan_name():
+    """UPDATE (LPDI V1 Gate 3J, "Normal Authority Cohort Activation"): unlike
+    the amr_page source above, Rochdale's own directly-verified Publication
+    Local Plan document IS explicitly plan-linked - Gate 3I/3J established
+    Rochdale genuinely has its own current plan (Regulation 19 Publication,
+    a live consultation as of this gate), independent of Places for
+    Everyone, with a verified direct PDF - see this gate's own Rochdale
+    onboarding step, which creates the matching LocalPlan row THIS source
+    entry resolves against. This is the deliberate exception to the
+    Section 6/12 "do not invent attribution" rule above: it isn't inventing
+    anything - it's stating a real, independently-verified plan identity,
+    exactly the same as every other council's plan-linked source."""
+    config = _real_config()
+    emerging_sources = [s for s in config["councils"]["rochdale"]["sources"] if s["source_type"] == "emerging_plan"]
+    assert len(emerging_sources) == 1
+    assert emerging_sources[0]["plan_name"] == "Rochdale Local Plan"
+    assert emerging_sources[0]["plan_version"] == "Regulation 19 Publication"
 
 
 def test_every_other_new_council_source_has_a_real_plan_name():
