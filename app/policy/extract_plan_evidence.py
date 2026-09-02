@@ -268,10 +268,26 @@ def run_extraction(
                 classification = "needs_review"
                 detail += f" [Gate 3D semantic safety: {result['force_review_reason']}]"
 
+            # LPDI V1 Gate 3K - a real, controlled production finding
+            # (Oldham's total_housing_requirement=1310): a numeric whole-
+            # plan total can have a correct, Gate-3A-verified citation and
+            # a genuinely-present value, and still be an incomplete claim
+            # of SCOPE - a real subtotal from one of several separately-
+            # totalled phases/sections, silently presented as the whole-
+            # plan figure. Never a rejection (the proposal/citation are
+            # preserved, and no summed/inferred replacement is ever
+            # computed) - forces the SAME existing needs_review pathway
+            # citation ambiguity and structured-text risk already use.
+            numeric_scope_risk = result["numeric_scope_risk"]
+            if numeric_scope_risk == "MULTI_SCOPE" and classification == "auto_applied":
+                classification = "needs_review"
+                detail += f" [Gate 3K numeric scope safety: {result['numeric_scope_review_reason']}]"
+
             stats["proposals"].append({
                 "field": model_field, "old_value": current_value, "new_value": parsed_value,
                 "classification": classification, "source_page": verified_source_page,
                 "citation_status": citation_status, "structured_text_risk": structured_text_risk,
+                "numeric_scope_risk": numeric_scope_risk,
             })
 
             if not dry_run:
