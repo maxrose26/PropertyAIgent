@@ -17,10 +17,16 @@ strip, scheme stack and AI rail all get meaningfully more room than the
 shared shell's normal contained width - every OTHER page keeps that
 default untouched (see wide_canvas's own docstring in app.ui.shell).
 
-Section order: KPI strip (full width) -> AI Daily Brief (full width) ->
-two-column split: main column (~76%: Planning Intelligence scheme stack ->
-Opportunities -> Policy Intelligence -> Recent Activity) and right rail
-(~24%: Recent AI Summaries). Declaring main_col before right_col means
+Section order (Opportunity Experience V2 - Opportunities promoted to lead
+the main column, ahead of Planning Intelligence, per the live product
+review's own finding that the land opportunity should be the Dashboard's
+hero, not a mid-page section competing with the Recent AI Summaries rail
+for prominence): KPI strip (full width) -> AI Daily Brief (full width) ->
+two-column split: main column (~76%: Opportunities -> Planning
+Intelligence scheme stack -> Policy Intelligence -> Recent Activity) and
+right rail (~24%: Recent AI Summaries, unchanged - Step 10 of that
+workstream's own brief explicitly allows "retained unchanged" once
+Opportunities leads the page). Declaring main_col before right_col means
 Streamlit's native narrow-width stacking naturally puts the main column
 first and the AI rail second - no CSS reordering trick needed now that the
 body no longer has a competing left column.
@@ -35,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import streamlit as st
 
 from app.reporting.dashboard import build_dashboard
+from app.reporting.opportunity_feed import build_opportunity_feed
 from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import (
     activity_timeline,
@@ -42,7 +49,7 @@ from app.ui.shell import (
     ai_summary_rail,
     empty_state,
     metric_row,
-    opportunity_category_section,
+    opportunity_feed_card,
     page_header,
     quick_actions_panel,
     relative_time,
@@ -75,6 +82,7 @@ page_header(
 )
 
 data = build_dashboard(session)
+opportunity_feed = build_opportunity_feed(session)
 
 # --- KPI strip (full width) --------------------------------------------------
 #
@@ -116,15 +124,40 @@ st.divider()
 main_col, right_col = st.columns([0.76, 0.24], gap="large")
 
 with main_col:
-    section_header("Planning Intelligence", icon="🏗️")
-    scheme_stack(data["scheme_stack"], key="dashboard")
+    # Opportunity Experience V2 - Opportunities leads the page. Strategic
+    # land allocations (e.g. Wharfside) and planning/delivery signals
+    # (approaching lapse, undeveloped permission) are presented as actual
+    # opportunities to open and investigate, not as separate technical
+    # signal-category sections - see app.reporting.opportunity_feed's own
+    # docstring for the reasoning and app/ui/shell.py's opportunity_feed_
+    # card for the render. Plan/council-level context (low housing supply,
+    # emerging policy, recent policy activity, recently adopted plans) is
+    # deliberately not shown here as an "opportunity" - that content
+    # remains covered by Policy Intelligence below, where it correctly
+    # belongs.
+    section_header("Opportunities", icon="🎯")
+    st.caption(
+        "Real Local Plan allocations and planning-application signals worth investigating today - reused directly "
+        "from Property AIgent's existing evidence, never a scored or predicted ranking."
+    )
+    counts = opportunity_feed["counts"]
+    st.caption(
+        f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
+        f"{counts['undeveloped_phase']} undeveloped permission identified across the platform."
+    )
+    if not opportunity_feed["cards"]:
+        st.caption("Nothing to investigate right now.")
+    else:
+        cols = st.columns(2)
+        for i, card in enumerate(opportunity_feed["cards"]):
+            with cols[i % 2]:
+                opportunity_feed_card(card, key="dashboard")
+    st.page_link("pages/3_Local_Plan_Sites.py", label="View all Local Plan opportunities →", icon="🗺️")
 
     st.divider()
 
-    section_header("Opportunities", icon="🎯")
-    st.caption("Deterministic signals only - a plain filter/sort over real data, never a scored or predicted ranking.")
-    for category in data["opportunity_categories"]:
-        opportunity_category_section(category, key="dashboard")
+    section_header("Planning Intelligence", icon="🏗️")
+    scheme_stack(data["scheme_stack"], key="dashboard")
 
     st.divider()
 

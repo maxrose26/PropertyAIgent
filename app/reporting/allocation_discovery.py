@@ -29,6 +29,7 @@ already-built card dicts, no session required.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -144,6 +145,15 @@ INTENDED_USE_LABELS = {
     "residential": "Residential",
     "employment": "Employment",
     "mixed use": "Mixed use",
+    # Opportunity Experience V2 (internal-language audit) - the real
+    # extracted value is "mixed_use" (underscore) for 18 production
+    # allocations including Wharfside, never "mixed use" (space) above -
+    # confirmed by querying every distinct intended_use value in
+    # production. Without this key the old lookup silently fell through to
+    # allocation.intended_use itself, leaking the raw value onto the live
+    # page. "gypsy_traveller_accommodation" (1 allocation) had the same gap.
+    "mixed_use": "Mixed use",
+    "gypsy_traveller_accommodation": "Gypsy and Traveller accommodation",
     None: "Not stated",
 }
 
@@ -223,6 +233,33 @@ def format_capacity(allocation: LocalPlanSite) -> dict:
     if maximum is not None:
         return {"kind": "maximum", "display": f"Up to {maximum:,} homes", "value": maximum}
     return {"kind": "indicative", "display": f"Approximately {indicative:,} homes", "value": indicative}
+
+
+# Opportunity Experience V2, Step 13 - minimum_dwellings/maximum_capacity
+# are generic min/max bounds platform-wide (see format_capacity's own
+# docstring and the db model's own comment) - NOT a universal "plan-period
+# vs wider capacity" split. That specific relationship is only ever safe to
+# assert when the allocation's own captured source wording says so
+# explicitly (Wharfside's real excerpt: "15,000 dwellings (8,400 in plan
+# period)"; Pomona's: "...around 3,200 dwellings with around 2,050
+# dwellings in plan period" - both real Trafford Local Plan phrasing, both
+# Gate 4A source_excerpt captures). Never infers this from the bare
+# presence of a range alone - a different allocation's min/max could mean
+# a plain uncertainty range with no phasing relationship at all.
+_PLAN_PERIOD_PHRASE_RE = re.compile(r"in plan period", re.IGNORECASE)
+
+
+def capacity_range_labels(capacity: dict, source_excerpt: str | None) -> tuple[str, str] | None:
+    """Returns ("Plan-period capacity", "Wider capacity") only when
+    capacity is a genuine range AND source_excerpt explicitly states the
+    plan-period relationship in its own words; otherwise None, so callers
+    fall back to an honest, generic "Capacity range" label rather than
+    inventing a semantic the evidence doesn't support for this allocation."""
+    if capacity["kind"] != "range":
+        return None
+    if not source_excerpt or not _PLAN_PERIOD_PHRASE_RE.search(source_excerpt):
+        return None
+    return ("Plan-period capacity", "Wider capacity")
 
 
 def kpi_capacity_contribution(allocation: LocalPlanSite) -> dict:
