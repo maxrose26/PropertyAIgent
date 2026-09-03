@@ -401,18 +401,29 @@ def test_dashboard_page_section_order_matches_the_revised_hierarchy():
     data layer can express - this reads the page's own source and checks
     that each section marker appears in the documented order: sidebar
     Quick Actions -> sidebar Credits -> KPI strip -> AI Daily Brief -> main
-    column (Planning Intelligence scheme stack, Opportunities, Policy
+    column (Opportunities, Planning Intelligence scheme stack, Policy
     Intelligence, Recent Activity) -> right rail (AI Summary rail) - a
     structural proxy for the Dashboard layout correction, without needing a
-    full browser-driven UI test."""
+    full browser-driven UI test.
+
+    Opportunity Experience V2 amendment: Opportunities now leads the main
+    column, ahead of Planning Intelligence (previously the other way
+    round) - the live product review's own finding that the land
+    opportunity should be the Dashboard's hero, not a mid-page section -
+    and renders via opportunity_feed_card (the unified opportunity-card
+    component), not the old per-signal-category opportunity_category_
+    section. That older component still exists, still correctly tested,
+    simply no longer called from this page - see app.ui.shell.
+    opportunity_feed_card and app.reporting.opportunity_feed's own
+    docstrings for why."""
     page_source = (Path(__file__).resolve().parents[1] / "app" / "ui" / "pages" / "00_Dashboard.py").read_text(encoding="utf-8")
     markers = [
         "quick_actions_panel(",
         "credits_sidebar(",
         "metric_row(",
         "ai_daily_brief_placeholder()",
+        "opportunity_feed_card(",
         "scheme_stack(",
-        "opportunity_category_section(",
         "section_container(",
         "activity_timeline(",
         "ai_summary_rail(",
