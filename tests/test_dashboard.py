@@ -808,6 +808,25 @@ def test_allocations_without_application_matches_unmatched_large_allocations(ses
     assert "no linked planning application" in category["cards"][0]["reason"]
 
 
+def test_allocations_without_application_card_deep_links_to_its_own_allocation(session):
+    """Website V2 (Step 9/21) - this card must open the specific allocation's
+    own detail view (3_Local_Plan_Sites.py's existing ?allocation_id=<id>
+    support), not a bare, unfiltered allocations list the user then has to
+    search from scratch - the real, evidenced click-count gap found in the
+    Wharfside journey audit (see the Website V2 final report)."""
+    allocation = LocalPlanSite(
+        council_code="testcouncil", site_name="Wharfside", plan_name="Plan", plan_status="adopted",
+        minimum_dwellings=8400, matched_site_id=None,
+    )
+    session.add(allocation)
+    session.commit()
+
+    category = next(c for c in build_opportunity_categories(session) if c["key"] == "allocations_without_application")
+    card = category["cards"][0]
+    assert card["page"] == "pages/3_Local_Plan_Sites.py"
+    assert card["params"] == {"allocation_id": str(allocation.id)}
+
+
 def test_emerging_policy_excludes_adopted_plans(session):
     session.add(LocalPlan(council_code="testcouncil", plan_name="Draft Plan", status="draft_consultation"))
     session.add(LocalPlan(council_code="othercouncil", plan_name="Settled Plan", status="adopted"))

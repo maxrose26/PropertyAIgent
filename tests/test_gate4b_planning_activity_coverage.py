@@ -283,3 +283,20 @@ def test_20_legacy_vs_gate4a_verified_provenance_remains_distinguishable():
     coverage = _coverage(PARTIAL_COVERAGE, development_coverage_percentage=0.5, indicative_residual_capacity=500)
     result = classify_planning_activity_coverage(coverage)
     assert "legacy" not in result.reason.lower() and "gate 4a" not in result.reason.lower()
+
+
+# --- Website V2 (Product Review + Deployment Preparation, Step 14) - the
+# product-facing short labels this gate's own classification was finally
+# wired into the live UI with (app/ui/pages/3_Local_Plan_Sites.py) - a
+# missing label for any real classification value would either crash the
+# page (a bare .get with no default) or silently show nothing, so this is
+# a real regression guard, not a cosmetic check. ----------------------------
+
+def test_21_planning_activity_coverage_labels_cover_every_real_classification():
+    from app.policy.allocation_planning_coverage import PLANNING_ACTIVITY_COVERAGE_LABELS
+    assert set(PLANNING_ACTIVITY_COVERAGE_LABELS) == {FULL, PARTIAL, NONE_FOUND, UNCERTAIN}
+    # Product-facing text only - never the raw constant itself leaking
+    # through as its own label (the exact bug this whole gate exists to
+    # avoid, just one layer up).
+    for label in PLANNING_ACTIVITY_COVERAGE_LABELS.values():
+        assert label not in {FULL, PARTIAL, NONE_FOUND, UNCERTAIN}

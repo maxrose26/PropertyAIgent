@@ -1125,7 +1125,13 @@ def _allocations_without_application_cards(session: Session, limit: int) -> list
         "id": f"opp-unmatched-{a.id}", "title": a.policy_reference or a.site_name, "subtitle": a.council_code,
         "reason": "Confirmed allocation with no linked planning application yet",
         "metric": f"{a.minimum_dwellings} dwellings",
-        "when": a.updated_at, "page": "pages/3_Local_Plan_Sites.py", "params": {},
+        # Website V2 - deep-links straight to this allocation's own detail
+        # view (app/ui/pages/3_Local_Plan_Sites.py already supports
+        # ?allocation_id=<id>, used elsewhere on that same page) rather than
+        # the bare allocation-list page a user then had to search from
+        # scratch - cuts the Dashboard -> opportunity journey from three-
+        # plus clicks to one.
+        "when": a.updated_at, "page": "pages/3_Local_Plan_Sites.py", "params": {"allocation_id": str(a.id)},
     } for a in rows]
 
 

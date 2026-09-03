@@ -890,6 +890,15 @@ def build_allocation_card(
         "development_type": development_type,
         "capacity": capacity,
         "kpi_capacity_contribution": kpi_capacity,
+        # Website V2 - Gate 4A's own three columns (site_area_hectares,
+        # green_belt_status, source_excerpt) were captured for 9 real
+        # Trafford allocations but never reached this card dict, so the UI
+        # could never show them (see docs/ website-v2 final report). Added
+        # here verbatim - no new extraction, no schema change, honestly
+        # None for the 278/287 allocations that don't have them yet.
+        "site_area_hectares": allocation.site_area_hectares,
+        "green_belt_status": allocation.green_belt_status,
+        "source_excerpt": allocation.source_excerpt,
         "major_housing": major_housing,
         "category": allocation.category,
         "allocation_status": allocation.allocation_status,

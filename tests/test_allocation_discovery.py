@@ -700,6 +700,34 @@ def test_build_allocation_discovery_unmatched_allocation_has_zero_linked_applica
     assert card["linked_application_count"] == 0
 
 
+# --- Website V2 (Product Review + Deployment Preparation, Step 12/17) -
+# Gate 4A's own site_area_hectares/green_belt_status/source_excerpt columns
+# reach the card dict, honestly None when not captured - the real, evidenced
+# gap that meant the live UI could never show them for any allocation
+# (see the Website V2 final report). ------------------------------------
+
+def test_card_carries_gate_4a_hectares_and_excerpt_fields_when_present(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(
+        session, plan.id, site_area_hectares=145.0, source_excerpt="15,000 dwellings (8,400 in plan period)",
+    )
+    view = build_allocation_discovery(session)
+    card = next(c for c in view["cards"] if c["id"] == allocation.id)
+    assert card["site_area_hectares"] == 145.0
+    assert card["source_excerpt"] == "15,000 dwellings (8,400 in plan period)"
+    assert card["green_belt_status"] is None
+
+
+def test_card_carries_none_for_gate_4a_fields_when_not_captured(session):
+    plan = _make_local_plan(session)
+    allocation = _make_allocation(session, plan.id)
+    view = build_allocation_discovery(session)
+    card = next(c for c in view["cards"] if c["id"] == allocation.id)
+    assert card["site_area_hectares"] is None
+    assert card["source_excerpt"] is None
+    assert card["green_belt_status"] is None
+
+
 # --- Page-level regression: capacity slider must not filter anything at its
 # default (full-range) position (a real bug caught during live verification -
 # the slider's own value=(cap_min, cap_max) default made apply_filters'
