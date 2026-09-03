@@ -148,10 +148,15 @@ with main_col:
     if not opportunity_feed["cards"]:
         st.caption("Nothing to investigate right now.")
     else:
-        cols = st.columns(2)
-        for i, card in enumerate(opportunity_feed["cards"]):
-            with cols[i % 2]:
-                opportunity_feed_card(card, key="dashboard")
+        # Full main-column width, one card per row (Step 25/26) - a
+        # 2-column grid left a strategic-land card's own 3 metrics (site
+        # area, plan-period capacity, wider capacity - Wharfside's own
+        # real shape) cramped into roughly a sixth of the page width at a
+        # normal laptop width, with values wrapping mid-word. One column
+        # gives every metric tile room to read cleanly without a broader
+        # responsive redesign.
+        for card in opportunity_feed["cards"]:
+            opportunity_feed_card(card, key="dashboard")
     st.page_link("pages/3_Local_Plan_Sites.py", label="View all Local Plan opportunities →", icon="🗺️")
 
     st.divider()
