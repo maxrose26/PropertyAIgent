@@ -125,6 +125,16 @@ _BADGE_KIND_STYLE = {
     # plan_* is Allocation Discovery-only), but keeping them visually
     # distinct removes any ambiguity regardless.
     "dev_type_unknown": {"color": "gray", "icon": "◻️", "label": "Unknown"},
+    # Opportunity Experience V2 - the opportunity-signal badge shown on the
+    # unified Opportunities feed and the Opportunity Profile header.
+    # Deliberately blue/gray (the same neutral, informational colour family
+    # as "info"/"plan_examination" above), never green ("confirmed"/
+    # "success") or a "hot deal" colour - this is a deterministic evidence
+    # signal, not an endorsement (that product distinction is explicit in
+    # the Opportunity Experience V2 brief: "prominent but not resemble an
+    # investment recommendation").
+    "signal_investigate": {"color": "blue", "icon": "🔎", "label": "Investigate"},
+    "signal_monitor": {"color": "gray", "icon": "👁", "label": "Monitor"},
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -165,6 +175,17 @@ def inject_global_styles() -> None:
                       color: #8A97A3; font-size: 0.85rem; line-height: 1.6; }
         .pig-empty-state { text-align: center; padding: 2.5rem 1.5rem; }
         .pig-empty-state-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+        /* Opportunity Experience V2 - reason/tag pills on the unified
+           Opportunities feed and Opportunity Profile header. Muted/neutral
+           (not the signal badge's own colour) since a tag here is
+           supporting context (opportunity type, plan stage, planning
+           activity state), never a second competing signal. */
+        .pig-opp-tag {
+            display: inline-block; background-color: #EEF1F4; color: #445264;
+            border-radius: 999px; padding: 0.15rem 0.65rem; margin: 0 0.3rem 0.3rem 0;
+            font-size: 0.78rem; font-weight: 500;
+        }
 
         /* Live Intelligence Leaderboard (Sprint 4.2 amendment) */
         .pig-live-dot {
@@ -802,6 +823,44 @@ def opportunity_category_section(category: dict, *, key: str) -> None:
                     st.markdown(f"**{_escape(str(card['metric']))}**")
                     if card.get("page"):
                         st.page_link(card["page"], label="View →", query_params=card.get("params") or {})
+
+
+OPPORTUNITY_SIGNAL_BADGE_KIND = {"INVESTIGATE": "signal_investigate", "MONITOR": "signal_monitor"}
+
+
+def opportunity_feed_card(card: dict, *, key: str) -> None:
+    """One card in the unified Opportunities feed (Opportunity Experience
+    V2) - card is app.reporting.opportunity_feed.build_opportunity_feed's
+    own output; this only renders it. Deliberately a single shape for both
+    opportunity types (strategic land / planning-delivery) - `signal` is
+    None for a planning/delivery card (that type never had a build_
+    opportunity_signal classification computed for it - see that module's
+    own docstring on why this never invents one) so only strategic-land
+    cards show the signal badge; every card shows its own real
+    headline_reason regardless of type, so the "why surfaced" story is
+    never missing just because a type lacks a formal signal."""
+    with st.container(border=True, key=f"opp-feed-{key}-{card['id']}"):
+        st.markdown(f"##### {_escape(card['title'])}")
+        st.caption(card["subtitle"])
+        if card.get("signal"):
+            status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(card["signal"], "info"), card.get("signal_label") or card["signal"])
+        if card.get("headline_reason"):
+            st.write(card["headline_reason"])
+
+        if card.get("metrics"):
+            cols = st.columns(len(card["metrics"]))
+            for col, (label, value) in zip(cols, card["metrics"]):
+                with col:
+                    stat_tile(label, value)
+
+        if card.get("tags"):
+            st.markdown(
+                " ".join(f'<span class="pig-opp-tag">{_escape(t)}</span>' for t in card["tags"]),
+                unsafe_allow_html=True,
+            )
+
+        if card.get("page"):
+            st.page_link(card["page"], label="View opportunity →", query_params=card.get("params") or {})
 
 
 def ai_summary_rail(items: list[dict], *, key: str, cycle_seconds: int = 40) -> None:

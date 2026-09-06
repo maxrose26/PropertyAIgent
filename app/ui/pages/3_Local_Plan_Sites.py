@@ -40,6 +40,7 @@ from app.reporting.allocation_discovery import (
     build_summary_metrics,
     build_table_row,
     capacity_band_range,
+    capacity_range_labels,
     compute_categories,
     linked_application_help,
     matched_status_help,
@@ -74,6 +75,7 @@ from app.ui.shortlist import (
     shortlist_count,
 )
 from app.ui.shell import (
+    OPPORTUNITY_SIGNAL_BADGE_KIND,
     control_relationship_group_card,
     empty_state,
     evidence_gap_panel,
@@ -81,6 +83,7 @@ from app.ui.shell import (
     page_header,
     section_header,
     stat_tile,
+    status_badge,
     status_badge_row,
     timeline,
     visual_evidence_gallery,
@@ -173,16 +176,34 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         )
         return
 
+    # Loaded once here (Section 16/17; Opportunity Experience V2 moved this
+    # earlier - now needed for the header badge and hero metrics below too,
+    # not just the Timeline section further down) - reused throughout,
+    # never re-queried.
+    from app.db.models import LocalPlanSite, Site
+
+    allocation_row = session.get(LocalPlanSite, allocation_id)
+    coverage = card.get("development_coverage")
+    opportunity = card.get("opportunity")
+
+    # --- Opportunity Profile header (Opportunity Experience V2, Step 12) --
     page_header(card["site_name"], icon="🗺️")
     if card.get("development_type"):
         st.caption(f"🏘️ {card['development_type']}")
     caption_bits = [b for b in (card["council_name"], card["plan_name"], card.get("policy_reference")) if b]
     st.caption(" · ".join(caption_bits))
 
-    status_badge_row([
-        (card["plan_status_chip_kind"], card["plan_status_label"]),
-        (card["review_status_badge_kind"], card["review_status_label"]),
-    ])
+    # The opportunity signal now leads the badge row alongside plan status
+    # - the single most commercially important fact on the page, per this
+    # workstream's own product review. The old "Auto-applied match"/"Needs
+    # confirmation" review-workflow badge is demoted out of this primary
+    # row (Step 19/27's own internal-language example) - not deleted, it
+    # remains visible in Key Attributes below, where every other secondary
+    # fact already lives.
+    header_badges = [(card["plan_status_chip_kind"], card["plan_status_label"])]
+    if opportunity and opportunity["signal"] in OPPORTUNITY_SIGNAL_BADGE_KIND:
+        header_badges.append((OPPORTUNITY_SIGNAL_BADGE_KIND[opportunity["signal"]], OPPORTUNITY_DETAIL_LABELS.get(opportunity["signal"], opportunity["signal"])))
+    status_badge_row(header_badges)
     if card["is_multi_authority"]:
         joint_plan_badge()
 
@@ -212,12 +233,108 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 ReportCandidate(candidate_type="allocation", candidate_id=allocation_id, display_name=card["site_name"]),
             )
 
-    # Loaded once here (Section 16/17) rather than deep in the Timeline
-    # section below - reused for the Timeline section further down,
-    # avoiding a second identical query.
-    from app.db.models import LocalPlanSite, Site
+    # --- Opportunity Summary (Opportunity Experience V2, Steps 11-17) -----
+    # Answers WHAT IS THIS / WHY IS IT INTERESTING / WHAT EVIDENCE SUPPORTS
+    # THIS / WHAT REMAINS UNKNOWN, entirely from already-computed,
+    # deterministic fields - before any detailed investigation section
+    # below. Renamed from "AI Allocation Intelligence" (Step 20): the
+    # reader cares about the intelligence, not which process generated it,
+    # and this summary must work identically whether or not an AI
+    # narrative has ever been generated for this allocation (most
+    # allocations today have none - see the AI narrative expander further
+    # down, kept, just repositioned).
+    section_header("Opportunity Summary", icon="🎯")
+    st.markdown(f"**{card['why_it_matters']}**")
+    if len(card["why_it_matters_reasons"]) > 1:
+        for reason in card["why_it_matters_reasons"][1:]:
+            st.caption(f"• {reason}")
+    st.caption(f"Investigate next: {card['investigate_next']}")
 
-    allocation_row = session.get(LocalPlanSite, allocation_id)
+    # Key metrics (Step 13) - site area and capacity first (the scale
+    # questions), then planning activity state and plan stage (the status
+    # questions). "Plan-period capacity"/"Wider capacity" labels are used
+    # ONLY when this allocation's own captured source wording explicitly
+    # states that relationship (capacity_range_labels' own docstring) -
+    # otherwise an honest generic "Capacity (range)"/"Capacity" label, per
+    # Step 13's explicit "do not infer semantics" instruction.
+    hectares = card.get("site_area_hectares")
+    range_labels = capacity_range_labels(card["capacity"], card.get("source_excerpt"))
+    scale_metrics: list[tuple[str, str]] = [("Site area", f"{hectares:,.2f} ha" if hectares is not None else "Not yet verified")]
+    if range_labels and allocation_row.minimum_dwellings is not None and allocation_row.maximum_capacity is not None:
+        scale_metrics.append((range_labels[0], f"{allocation_row.minimum_dwellings:,} homes"))
+        scale_metrics.append((range_labels[1], f"{allocation_row.maximum_capacity:,} homes"))
+    else:
+        capacity_label = "Capacity (range)" if card["capacity"]["kind"] == "range" else "Capacity"
+        scale_metrics.append((capacity_label, card["capacity"]["display"]))
+    scale_cols = st.columns(len(scale_metrics))
+    for col, (label, value) in zip(scale_cols, scale_metrics):
+        with col:
+            stat_tile(label, value)
+    if not range_labels and card["capacity"]["kind"] == "range" and card.get("source_excerpt"):
+        st.caption(f"Source wording: “{card['source_excerpt']}”")
+
+    activity_coverage = classify_planning_activity_coverage(coverage) if coverage is not None else None
+    status_cols = st.columns(2)
+    with status_cols[0]:
+        stat_tile("Planning activity", PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification] if activity_coverage else "Not determined")
+    with status_cols[1]:
+        stat_tile("Plan stage", card["plan_status_label"])
+
+    # Why this opportunity was surfaced (Step 14) - the existing, already-
+    # tested reasons (Gate 4C's own enrich_none_found_reason, called once
+    # here and reused nowhere else on this page). build_opportunity_signal
+    # ends its reasons with the ownership/control caveat only for
+    # INVESTIGATE/MONITOR (see that function's own docstring/source) -
+    # INSUFFICIENT_EVIDENCE returns a single, different-in-kind reason
+    # (e.g. "Capacity accounting requires review") that is NOT an
+    # ownership caveat, so only split one out for the two signals that
+    # actually carry one - otherwise every reason stays here, and "What we
+    # don't yet know" below falls back to its own honest generic caveat
+    # rather than duplicating this section's own text.
+    section_header("Why this opportunity was surfaced", icon="🔎")
+    caveat_reason = None
+    if opportunity:
+        candidate_sites = session.query(Site).filter_by(council_code=card["council_code"]).all()
+        opportunity = enrich_none_found_reason(card["site_name"], candidate_sites, opportunity)
+        st.caption("Opportunity signal based on current planning evidence - not an investment recommendation.")
+        reasons = opportunity["reasons"]
+        if opportunity["signal"] in ("INVESTIGATE", "MONITOR") and len(reasons) > 1:
+            positive_reasons, caveat_reason = reasons[:-1], reasons[-1]
+        else:
+            positive_reasons = reasons
+        for reason in positive_reasons:
+            st.write(f"• {reason}")
+    else:
+        st.caption("An investigation signal has not been established for this allocation.")
+
+    # Evidence (Step 15) - moved up from the bottom of the page; the real
+    # excerpt Gate 4A captured, shown verbatim alongside the existing
+    # document link (never a summary or PropertyAIgent's own paraphrase of
+    # it) - absent for the 278/287 allocations that don't have one yet,
+    # exactly like every other evidence field on this page.
+    section_header("Evidence", icon="📄")
+    if card.get("source_excerpt"):
+        st.markdown(f"> {card['source_excerpt']}")
+    source_link = card.get("plan_page_url") or card.get("source_document_url")
+    if source_link:
+        st.markdown(f"[Open source document]({source_link})")
+    else:
+        st.caption("No source document link available yet.")
+    if card["last_checked"]:
+        st.caption(f"Local Plan evidence last checked {card['last_checked'].strftime('%d %b %Y')}.")
+
+    # What we don't yet know (Step 17) - a compact, honest caveat block,
+    # not a legal disclaimer wall. Ownership always appears (every
+    # allocation's ownership/control position is genuinely unassessed
+    # today - see Ownership & Control below); viability is a fixed,
+    # platform-wide true statement (Property AIgent does not model
+    # viability at all - a hard boundary of this workstream, not a gap
+    # specific to this allocation).
+    section_header("What we don't yet know", icon="❔")
+    st.caption(f"**Ownership & control:** {caveat_reason or 'Not yet assessed.'}")
+    if not card["matched"]:
+        st.caption("**Planning activity:** No confirmed Site relationship in Property AIgent - its own evidence may not be exhaustive.")
+    st.caption("**Viability:** Not assessed - Property AIgent does not currently model development viability.")
 
     # The AI summary itself lives in its own table (Pre-Merge Architecture
     # Amendment - AllocationIntelligenceSummary, keyed by allocation_id,
@@ -226,83 +343,44 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     # OpenAI - Section 8's own "opening an allocation page must NOT
     # normally call OpenAI" rule.
     ai_summary_row = get_allocation_summary(session, allocation_id)
-
-    # 0. AI Allocation Intelligence (Phase 1 Local Plan Intelligence) - an
-    # orientation layer shown BEFORE the detailed sections below (Section
-    # 16: "the user should encounter it before needing to scan the
-    # detailed intelligence sections"), never a replacement for them - all
-    # of Overview/Planning status/Capacity/Visual evidence/Related
-    # Sites+Applications/Progression/Development coverage/Ownership &
-    # Control/Source evidence/Evidence gaps/Timeline below are unchanged
-    # and fully retained.
-    section_header("AI Allocation Intelligence", icon="🤖")
-    # Deterministic snapshot (Section 17) - reuses the SAME Stage 3A
-    # development_coverage figures already computed for this card by
-    # build_allocation_discovery (no new query) - never LLM-generated
-    # numbers, shown alongside the AI narrative below as the factual
-    # anchor a reader can check the prose against.
-    coverage = card.get("development_coverage")
-    if coverage is not None:
-        snap_cols = st.columns(4)
-        with snap_cols[0]:
-            stat_tile("Allocation capacity", f"{coverage.allocation_capacity:,}" if coverage.allocation_capacity is not None else "Not stated")
-        with snap_cols[1]:
-            stat_tile("Identified planning activity", f"{coverage.identified_application_capacity:,}" if coverage.identified_application_capacity is not None else "Not determined")
-        with snap_cols[2]:
-            stat_tile("Indicative residual", f"~{coverage.indicative_residual_capacity:,}" if coverage.indicative_residual_capacity is not None else "Not determined")
-        with snap_cols[3]:
-            # Website V2 - product-facing FULL/PARTIAL/NONE_FOUND/UNCERTAIN
-            # wording (Gate 4B/4C's own app.policy.allocation_planning_
-            # coverage, already built and tested) rather than the
-            # underlying engine's raw 6-value classification string.
-            activity_coverage = classify_planning_activity_coverage(coverage)
-            stat_tile(
-                "Development coverage",
-                f"{coverage.development_coverage_percentage:.0%}" if coverage.development_coverage_percentage is not None else PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification],
-            )
-
     if ai_summary_row is not None and ai_summary_row.headline:
-        stale = is_allocation_summary_stale(session, allocation_row)
-        if stale:
-            st.caption("⏳ This summary may be out of date - PropertyAIgent's evidence for this allocation has changed since it was last generated.")
-        st.markdown(f"**{ai_summary_row.headline}**")
-        st.write(ai_summary_row.overview)
+        with st.expander("AI narrative", icon="🤖", expanded=False):
+            stale = is_allocation_summary_stale(session, allocation_row)
+            if stale:
+                st.caption("⏳ This summary may be out of date - PropertyAIgent's evidence for this allocation has changed since it was last generated.")
+            st.markdown(f"**{ai_summary_row.headline}**")
+            st.write(ai_summary_row.overview)
 
-        key_points = json.loads(ai_summary_row.key_points) if ai_summary_row.key_points else []
-        if key_points:
-            st.markdown("**Key intelligence**")
-            for point in key_points:
-                st.caption(f"• {point}")
+            key_points = json.loads(ai_summary_row.key_points) if ai_summary_row.key_points else []
+            if key_points:
+                st.markdown("**Key intelligence**")
+                for point in key_points:
+                    st.caption(f"• {point}")
 
-        key_uncertainties = json.loads(ai_summary_row.key_uncertainties) if ai_summary_row.key_uncertainties else []
-        if key_uncertainties:
-            st.markdown("**Key uncertainties**")
-            for item in key_uncertainties:
-                st.caption(f"• {item}")
+            key_uncertainties = json.loads(ai_summary_row.key_uncertainties) if ai_summary_row.key_uncertainties else []
+            if key_uncertainties:
+                st.markdown("**Key uncertainties**")
+                for item in key_uncertainties:
+                    st.caption(f"• {item}")
 
-        investigation_priorities = json.loads(ai_summary_row.investigation_priorities) if ai_summary_row.investigation_priorities else []
-        if investigation_priorities:
-            st.markdown("**Investigation priorities**")
-            for item in investigation_priorities:
-                st.caption(f"• {item}")
+            investigation_priorities = json.loads(ai_summary_row.investigation_priorities) if ai_summary_row.investigation_priorities else []
+            if investigation_priorities:
+                st.markdown("**Investigation priorities**")
+                for item in investigation_priorities:
+                    st.caption(f"• {item}")
 
-        if ai_summary_row.generated_at:
-            st.caption(f"Generated {ai_summary_row.generated_at.strftime('%d %b %Y')} · AI-generated interpretation of evidence PropertyAIgent already holds - not a substitute for the detailed intelligence below.")
+            if ai_summary_row.generated_at:
+                st.caption(f"Generated {ai_summary_row.generated_at.strftime('%d %b %Y')} · AI-generated interpretation of evidence PropertyAIgent already holds - not a substitute for the detailed intelligence below.")
     else:
         # Section 18 - never expose a stack trace, OpenAI error, prompt, or
         # raw JSON here, even if the last generation attempt errored
         # (ai_summary_row.status == "error" with no summary ever
         # successfully generated yet) - the customer-facing state is
         # identical either way: "not yet generated".
-        st.caption("AI allocation summary not yet generated.")
+        st.caption("🤖 AI narrative: Not yet generated.")
 
-    # 1. Allocation overview
-    section_header("Overview", icon="📋")
-    st.markdown(f"**Why it matters:** {card['why_it_matters']}")
-    if len(card["why_it_matters_reasons"]) > 1:
-        for reason in card["why_it_matters_reasons"][1:]:
-            st.caption(f"• {reason}")
-    st.markdown(f"**Investigate next:** {card['investigate_next']}")
+    st.divider()
+    st.caption("Detailed investigation")
 
     # 2. Planning and policy status
     section_header("Planning and policy status", icon="🏛️")
@@ -313,39 +391,14 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     if card["is_multi_authority"] and card["cross_boundary_councils"]:
         other_names = ", ".join(view["council_names"].get(c, c) for c in card["cross_boundary_councils"])
         st.caption(f"Cross-boundary: this Local Plan is also linked to {other_names}.")
-
-    # 3. Capacity and intended use
-    section_header("Capacity and intended use", icon="🏗️")
     if card.get("development_type"):
         st.caption(f"🏘️ {card['development_type']}")
-    cap_cols = st.columns(3)
-    with cap_cols[0]:
-        stat_tile("Intended use", card["intended_use_label"])
-    with cap_cols[1]:
-        # Website V2 (Step 11) - a bare "Capacity" label is ambiguous once
-        # both a minimum and a maximum figure are stated (format_capacity's
-        # own "range" kind) - never invents a "plan-period"/"wider capacity"
-        # split as a universal label (minimum/maximum don't always mean
-        # that), so the label just names what IS known (a range was
-        # stated) and defers to the real source wording (below, when
-        # captured) to explain WHY it differs, rather than PropertyAIgent
-        # asserting an interpretation the evidence doesn't always support.
-        capacity_label = "Capacity (range)" if card["capacity"]["kind"] == "range" else "Capacity"
-        stat_tile(capacity_label, card["capacity"]["display"])
-    with cap_cols[2]:
-        # Website V2 (Step 12) - Gate 4A's site_area_hectares column, now
-        # reaching the card (see app.reporting.allocation_discovery) but
-        # never inferred: "Not yet verified" for the 278/287 allocations
-        # without a captured hectares figure, never a bare 0 ha.
-        hectares = card.get("site_area_hectares")
-        stat_tile("Site area", f"{hectares:,.2f} ha" if hectares is not None else "Not yet verified")
-    if card["capacity"]["kind"] == "range" and card.get("source_excerpt"):
-        st.caption(f"Source wording: “{card['source_excerpt']}”")
+    st.write(f"**Intended use:** {card['intended_use_label']}")
     if card["category"]:
         st.caption(f"Council grouping: {card['category']}")
 
-    # 4. Visual evidence gallery
-    section_header("Visual evidence", icon="🖼️")
+    # 4. Visual evidence gallery (Step 18 - collapsed to a one-line status
+    # when nothing exists, never a large empty-looking section).
     gallery = {
         "has_any": card["visual_primary"] is not None or bool(card["visual_others"]) or card["visual_fallback"] is not None,
         "primary": card["visual_primary"],
@@ -353,14 +406,19 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         "needs_review": [c for c in card["visual_others"] if c["review_status"] != "confirmed"],
     }
     if not card["visual_primary"] and card["visual_fallback"]:
-        st.info(
-            "No allocation-specific image has been confirmed for this allocation. The council publishes "
-            "allocation boundaries through one authority-wide Policies Map rather than a separate image per "
-            "allocation - shown below for reference. This is not an allocation-specific boundary image."
-        )
         gallery["primary"] = card["visual_fallback"]
         gallery["has_any"] = True
-    visual_evidence_gallery(gallery)
+    if gallery["has_any"]:
+        section_header("Visual evidence", icon="🖼️")
+        if not card["visual_primary"] and card["visual_fallback"]:
+            st.info(
+                "No allocation-specific image has been confirmed for this allocation. The council publishes "
+                "allocation boundaries through one authority-wide Policies Map rather than a separate image per "
+                "allocation - shown below for reference. This is not an allocation-specific boundary image."
+            )
+        visual_evidence_gallery(gallery)
+    else:
+        st.caption("🖼️ Visual evidence: Not yet available.")
 
     # 4a. Location (Live Deployment Integrity audit, Part 8) - strictly
     # gated on a real stored coordinate. LocalPlanSite.geometry_placeholder
@@ -424,23 +482,25 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 "under a different address or reference."
             )
 
-    # 6. Progression / build evidence
-    section_header("Progression and build evidence", icon="🏗️")
-    if card["build_status_label"]:
-        st.write(f"**Build status:** {card['build_status_label']}")
+    # 6. Progression / build evidence (Step 18 - collapsed when empty)
+    if card["build_status_label"] or card["delivery_note"]:
+        section_header("Progression and build evidence", icon="🏗️")
+        if card["build_status_label"]:
+            st.write(f"**Build status:** {card['build_status_label']}")
+        if card["delivery_note"]:
+            st.caption(card["delivery_note"])
     else:
-        st.caption("No build/commencement evidence available yet for this allocation.")
-    if card["delivery_note"]:
-        st.caption(card["delivery_note"])
+        st.caption("🏗️ Progression and build evidence: Not yet available.")
 
-    # 6a. Development Coverage + Phasing + Opportunity (Stage 3A) - built
-    # from AllocationSiteRelationship, never matched_site_id (see
+    # 6a. Development Coverage + Phasing (Stage 3A) - built from
+    # AllocationSiteRelationship, never matched_site_id (see
     # app.reporting.allocation_development_coverage's own module
     # docstring). An EVIDENCE layer only: never equates "not currently
     # accounted for by identified planning activity" with land
-    # availability - see the explicit ownership/control caveat in the
-    # Opportunity subsection below.
-    coverage = card.get("development_coverage")
+    # availability - see the explicit ownership/control caveat already
+    # surfaced in "What we don't yet know" above. The Opportunity
+    # signal/reasons themselves are shown once, in "Why this opportunity
+    # was surfaced" above - not repeated here.
     if coverage is not None:
         section_header("Development coverage", icon="📊")
         cov_cols = st.columns(2)
@@ -452,11 +512,6 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 stat_tile("Development coverage", f"{coverage.development_coverage_percentage:.0%}")
             if coverage.indicative_residual_capacity is not None:
                 stat_tile("Indicative residual capacity", f"~{coverage.indicative_residual_capacity:,} homes")
-        # Website V2 (Step 14) - product-facing label + the full, already-
-        # written safe reason sentence (Gate 4B/4C's own app.policy.
-        # allocation_planning_coverage, never re-worded here) rather than
-        # the raw 6-value engine classification string.
-        activity_coverage = classify_planning_activity_coverage(coverage)
         st.markdown(f"**{PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification]}**")
         st.caption(activity_coverage.reason)
         if coverage.note:
@@ -467,7 +522,7 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 "currently accounted for by identified planning activity."
             )
 
-        section_header("Planning activity", icon="🏗️")
+        section_header("Planning activity detail", icon="🏗️")
         st.caption(
             f"{coverage.number_of_related_sites} related Site(s) · {coverage.number_of_linked_applications} linked "
             f"Application(s) · {coverage.number_of_sites_with_planning_activity} with identified activity · "
@@ -492,20 +547,19 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 else:
                     st.caption("Capacity contribution not yet determined.")
 
-        section_header("Phasing", icon="🕒")
+        # Phasing / Residential mix (Step 18 - collapsed when empty)
         phasing = card.get("phasing")
-        if phasing:
+        if phasing and phasing["evidence"]:
+            section_header("Phasing", icon="🕒")
             st.write(f"**{PHASING_DETAIL_LABELS.get(phasing['classification'], phasing['classification'])}**")
             for hit in phasing["evidence"]:
                 st.caption(f"\"{hit.phrase}\" — {hit.application_reference} ({hit.document_type})")
                 st.caption(hit.snippet)
+        else:
+            st.caption("🕒 Phasing: Not yet available.")
 
-        section_header("Residential mix", icon="🏠")
-        st.caption(
-            "Housing mix belongs to the specific application/phase that supplied it - never an implication that "
-            "it represents the whole allocation."
-        )
         any_mix_shown = False
+        mix_blocks = []
         for site_summary in coverage.site_summaries:
             if not site_summary.applications:
                 continue
@@ -515,32 +569,23 @@ def _render_detail(view: dict, allocation_id: int) -> None:
             if overview["total_homes"] is None and not mix["affordable_headline"]["affordable_units"]:
                 continue
             any_mix_shown = True
-            st.markdown(f"**{site_summary.site.display_address}** — {rep_app.reference if rep_app else 'n/a'}")
-            if overview["total_homes"] is not None:
-                st.caption(f"{overview['total_homes']:,} homes")
-            if mix["affordable_headline"]["headline_units"]:
-                st.caption(mix["affordable_headline"]["headline_units"])
-            if mix["structured_summary"]:
-                st.caption(mix["structured_summary"])
-        if not any_mix_shown:
-            st.caption("No residential mix intelligence extracted yet for the applications linked to this allocation.")
-
-        section_header("Opportunity", icon="🔎")
-        opportunity = card.get("opportunity")
-        if opportunity:
-            # Website V2 (Step 33) - Gate 4C's own enrich_none_found_reason
-            # was already built and tested but never called from this page.
-            # Appends one extra, honest sentence distinguishing "nothing
-            # found" from "a candidate Site exists but isn't safely
-            # corroborated" (e.g. Trafford Waters) from "a corroborated
-            # candidate hasn't been recorded yet" (e.g. Pomona) - never
-            # changes opportunity["signal"] or the reasons already there.
-            candidate_sites = session.query(Site).filter_by(council_code=card["council_code"]).all()
-            opportunity = enrich_none_found_reason(card["site_name"], candidate_sites, opportunity)
-            st.markdown(f"**{OPPORTUNITY_DETAIL_LABELS.get(opportunity['signal'], opportunity['signal'])}**")
-            st.caption("Opportunity signal based on current planning evidence - not an investment recommendation.")
-            for reason in opportunity["reasons"]:
-                st.caption(f"• {reason}")
+            mix_blocks.append((site_summary, rep_app, mix, overview))
+        if any_mix_shown:
+            section_header("Residential mix", icon="🏠")
+            st.caption(
+                "Housing mix belongs to the specific application/phase that supplied it - never an implication "
+                "that it represents the whole allocation."
+            )
+            for site_summary, rep_app, mix, overview in mix_blocks:
+                st.markdown(f"**{site_summary.site.display_address}** — {rep_app.reference if rep_app else 'n/a'}")
+                if overview["total_homes"] is not None:
+                    st.caption(f"{overview['total_homes']:,} homes")
+                if mix["affordable_headline"]["headline_units"]:
+                    st.caption(mix["affordable_headline"]["headline_units"])
+                if mix["structured_summary"]:
+                    st.caption(mix["structured_summary"])
+        else:
+            st.caption("🏠 Residential mix: Not yet available.")
 
         # 6b. Ownership & Control (Stage 4B.2 baseline; Stage 4B.3 "Local
         # Plan Ownership & Control Hierarchy UI Refinement") - a clear
@@ -617,20 +662,8 @@ def _render_detail(view: dict, allocation_id: int) -> None:
 
         st.caption(SOURCE_NOTE)
 
-    # 7. Source evidence and provenance
-    section_header("Source evidence", icon="📄")
-    # Website V2 (Step 17) - the real excerpt Gate 4A captured, shown
-    # verbatim alongside the existing document link (never a summary or
-    # PropertyAIgent's own paraphrase of it) - absent for the 278/287
-    # allocations that don't have one yet, exactly like every other
-    # evidence field on this page.
-    if card.get("source_excerpt"):
-        st.markdown(f"> {card['source_excerpt']}")
-    source_link = card.get("plan_page_url") or card.get("source_document_url")
-    if source_link:
-        st.markdown(f"[Open source document]({source_link})")
-    if card["last_checked"]:
-        st.caption(f"Local Plan evidence last checked {card['last_checked'].strftime('%d %b %Y')}.")
+    # Source evidence and provenance now shown once, in the "Evidence"
+    # section near the top of the page (Step 15) - not repeated here.
 
     # 8. Evidence gaps
     gaps = []
