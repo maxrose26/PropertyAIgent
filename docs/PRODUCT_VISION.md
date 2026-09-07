@@ -8,13 +8,21 @@ See also: [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) (how the vision i
 
 ## Mission
 
-Build the richest possible understanding of every residential development opportunity in the UK, centred on a single object — the **Site** — so that the people who evaluate, promote, permission and invest in development opportunities can make faster, better-evidenced decisions.
+Property AIgent is an AI-native residential land and development opportunity intelligence platform. It continuously identifies development opportunities from fragmented UK planning and policy evidence, builds the richest possible evidence-backed understanding of each one — centred on the **Site** or Local Plan allocation it belongs to — and helps the people who evaluate, promote, permission and invest in development opportunities determine why an opportunity matters, who it may suit, and what to investigate next.
+
+*(Product Vision & Roadmap Refresh, post–Opportunity Experience V2: this restates, rather than replaces, the platform's founding mission below. The original wording described building understanding of an opportunity; the platform has since shipped the first real instance of *identifying* one — deterministic opportunity signals, a Dashboard discovery feed, and an Opportunity Profile — so the mission now says what the product actually does, not only what it will eventually understand. Every substantive commitment in the original mission is preserved: evidence-backed, Site-centred, serving the same four user groups, judged by the same "faster, better-evidenced decisions" standard.)*
 
 ## Vision
 
 Today, understanding a single development opportunity means separately searching a council planning portal, a GIS constraints viewer, Companies House, a policy document library, and a market-data provider — then manually holding all of it in your head at once. PropertyAIgent's vision is that this synthesis happens once, automatically, and continuously, and is presented back as a single coherent picture of the Site — not a pile of documents the user still has to read and reconcile themselves.
 
 The long-term ambition is for a user to open a Site and immediately understand everything relevant about that opportunity: what's happening on it, what planning policy says about it, what it's worth, whether it's commercially viable, and what a professional planning judgement on it would be — each claim traceable back to the evidence it came from.
+
+## Site, Allocation, and Opportunity
+
+The **Site** remains the platform's core data object, per `CLAUDE.md`: the physical development opportunity, everything else exists to describe, explain, enrich, predict or connect to it. A **Local Plan Allocation** is a distinct object — planning intent, not a physical Site — that may relate to zero, one or several Sites, and is frequently the *only* evidence a genuinely early opportunity has (a strategic allocation with no matched Site yet is real policy intent, not an empty record waiting for one).
+
+**Opportunity** is the product-experience term for whichever of the two a user is actually looking at: a Site with a real planning signal (approaching lapse, undeveloped permission), or an allocation with a real strategic-land signal (no or partial identified planning activity against its stated capacity). This is a presentation-layer generalisation, not a third data model — Opportunity Experience V2 (2026) is the first capability built at this level, and it deliberately keeps the two types distinct (a planning/delivery Site is never given an invented strategic-land classification, and vice versa) rather than merging them into one synthetic entity. See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2 "Opportunity Intelligence" for what is built today versus what remains future direction.
 
 ## AI-Intelligence-First, Evidence-Grounded
 
@@ -61,6 +69,29 @@ PropertyAIgent is not a bigger, better version of either. It is the connective l
 ## Long-Term Ambition
 
 PropertyAIgent should become the operating system for evaluating UK residential development opportunities: the first place a professional opens when a Site enters their pipeline, and the place that already has more evidence attached to it, at higher confidence, than they could have assembled by hand in the same time.
+
+Opportunity Experience V2 marks a real shift in what "opening the platform" means: the product is organising itself around **Opportunities** — things worth investigating — rather than presenting itself as a database of planning records a user has to search and filter to find one. The long-term direction this points toward, not yet built, is a platform that continuously processes evidence and surfaces something conceptually like *"12 opportunities identified for you this week"* — each already carrying its own reasons, evidence, planning status, planning activity, strategic-land context, monitoring changes, buyer fit and recommended next investigations. Search and the underlying database of Sites, Applications and allocations remain essential infrastructure; they simply stop being the entire product experience, the same way a search index is essential to a search engine without being the product a user thinks they're using.
+
+### The Commercial Product Journey
+
+The long-term acquisition journey this platform serves, independent of which specific capability is built at any given time:
+
+```
+DISCOVER → UNDERSTAND → INVESTIGATE → MATCH → MONITOR → CONTACT → ASSESS → DECIDE
+```
+
+| Stage | Question | Current Property AIgent capability |
+|---|---|---|
+| Discover | Where are opportunities worth looking at? | **Built** — Dashboard Opportunities feed (Opportunity Experience V2), Allocation Discovery, Explore |
+| Understand | What is this opportunity, in plain terms? | **Built** — Opportunity Profile / Site Profile, deterministic why-it-matters and key metrics |
+| Investigate | Why does it matter, and what's uncertain? | **Partially built** — deterministic reasons and evidence gaps exist; agentic synthesis (Opportunity Analyst) does not yet |
+| Match | Who is this opportunity valuable to? | **Not built** — no buyer profiles or fit logic yet |
+| Monitor | Has anything material changed? | **Foundation exists** — deterministic source/content monitoring exists for policy; not yet opportunity-level change significance |
+| Contact | Who do I need to reach, and how? | **Foundation exists** — Companies House/contact enrichment exists per-company, on demand; no ownership/control resolution or recommended-route reasoning yet |
+| Assess | Does this stack up commercially? | **Not built** — Market Intelligence and Development Economics (Phase 2) |
+| Decide | Should I pursue this? | **Always human** — see "Evidence-First, Agent-Assisted, Human-Decided" below; the platform is not designed to ever answer this on a professional's behalf |
+
+This table is a map of gaps, not a committed build order — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for how the next stage to invest in is actually chosen.
 
 ## The Capability Stack
 
@@ -144,6 +175,36 @@ An implementation that satisfies "grounded" by allow-listing individual tokens o
 
 ### The same discipline applies to interpreting what a user is asking for
 
-"Grounded" governs the platform's outputs today; the same distinction is intended to govern its future inputs. A future capability — **AI-assisted Opportunity Discovery** — is intended to let a user describe the kind of opportunity they're looking for in ordinary acquisition language (*"emerging residential sites with capacity for 50–100 homes in areas with low housing delivery"*) rather than manually interrogating the underlying planning and policy data themselves. Where a term in that language is genuinely subjective or requires interpretation — *emerging*, *low housing delivery*, *significant residual capacity* — the platform must make that interpretation transparent and evidence-grounded, the same way it already grounds a summary: never silently decide what a subjective term means and present the result as if it were objective fact. AI may translate a commercial brief into structured search criteria and reason about which opportunities match it; it may not quietly become the source of what the criteria themselves mean. Full detail on how this is expected to fit the platform's existing capability sequencing is in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2 ("Opportunity Intelligence").
+"Grounded" governs the platform's outputs today; the same distinction is intended to govern its future inputs. Opportunity discovery itself — a deterministic feed of Opportunities, each with a real signal and a real reason it was surfaced — is now built (Opportunity Experience V2; see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2 "Opportunity Intelligence" for exactly what exists today). What remains future is **AI-assisted Opportunity Discovery** specifically: letting a user describe the kind of opportunity they're looking for in ordinary acquisition language (*"emerging residential sites with capacity for 50–100 homes in areas with low housing delivery"*) rather than using the platform's own filters. Where a term in that language is genuinely subjective or requires interpretation — *emerging*, *low housing delivery*, *significant residual capacity* — the platform must make that interpretation transparent and evidence-grounded, the same way it already grounds a summary: never silently decide what a subjective term means and present the result as if it were objective fact. AI may translate a commercial brief into structured search criteria and reason about which opportunities match it; it may not quietly become the source of what the criteria themselves mean.
+
+## Evidence-First, Agent-Assisted, Human-Decided
+
+Opportunity Experience V2 and the LPDI programme together establish the platform's next governing architectural principle — a direct, more precise restatement of "AI explains evidence, it does not invent conclusions" for an era where the platform's AI increasingly takes the shape of specialist reasoning agents, not just narrative-generation calls:
+
+```
+Data
+  ↓
+Evidence
+  ↓
+Structured / verified intelligence
+  ↓
+Deterministic intelligence (facts, calculations, classifications)
+  ↓
+Specialist agentic investigation and interpretation
+  ↓
+Evidence-backed recommendation
+  ↓
+Human acquisition decision
+```
+
+**Deterministic systems establish facts and calculations. Agents investigate, interpret and reason over those facts. Humans make the acquisition decision.** An agent is a consumer of the platform's structured intelligence, never an alternative source of truth for it — it must not silently overwrite planning status, capacity, Local Plan evidence, planning activity, ownership, development coverage, or any other structured fact the deterministic layers below it already established.
+
+The concrete discipline this requires is **preserving uncertainty, not resolving it into a false positive or negative**. If Property AIgent's own evidence says `Planning activity: UNCERTAIN`, an agent must never restate that as "no planning activity exists" — the platform's own Opportunity Experience V2 language ("Activity uncertain — requires review") already exists specifically to prevent that collapse, and any agent reasoning on top of it inherits the same obligation. Likewise, `Ownership: unknown` must never become "the site is available" — the two are not the same claim, and only one of them is actually evidenced. Where an agent cannot resolve a genuine gap, the correct output is to say so, name what's missing, and suggest what would resolve it — never to quietly fill the gap with a plausible-sounding assumption. This is the same "Never Invent" discipline in [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md) applied to agentic reasoning specifically, not a new rule invented for it.
+
+This principle also disciplines *which* future capabilities become agents at all. A capability that primarily builds or maintains structured evidence — Strategic Land Intelligence, Ownership & Control Intelligence, Opportunity Monitoring — remains **platform intelligence**: deterministic, evidence-producing, and the thing an agent reasons *over*, not a personality wrapped around an LLM call. A capability that genuinely requires judgement over already-established facts — is this worth investigating, who does it suit, what does the market evidence imply — is where **agentic reasoning** belongs. Full detail on this distinction, the three agentic capabilities it currently justifies, and the ones it deliberately does not, is in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7 ("Agentic Reasoning").
+
+## Commercial Defensibility
+
+Property AIgent's long-term moat is not "we use AI agents" — agent technology will keep commoditising, and a competitor can call the same model APIs Property AIgent does. The durable advantage is the **accumulated, proprietary evidence and intelligence graph** underneath those agents: the source documents and citations already gathered; the extraction and validation outcomes already proven correct against real councils' real documents; Local Plan and allocation histories; Site and Application relationships; development and build status; planning-activity coverage; opportunity history; ownership and control relationships once built; monitoring and change history; buyer profiles and fit once built; market and comparable evidence once built; and, over time, the record of which opportunities users actually investigated, pursued or passed on. None of this is reproducible by pointing a general-purpose agent at public planning portals — it is built once, correctly, with provenance, and it compounds every time the platform is used. Agents reason over this graph; they do not replace the work of building it, and a future architecture must never let agent development outpace the evidence base it depends on.
 
 Full elaboration of this and every other governing principle is in [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md).

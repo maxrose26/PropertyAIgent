@@ -5,7 +5,7 @@ This document describes the intended end-to-end experience for each of the platf
 Every journey below follows the same underlying shape, because there is one Site Intelligence Engine underneath all four user types (see [PRODUCT_VISION.md](PRODUCT_VISION.md)):
 
 ```
-Search site
+Discover opportunity
     ↓
 Planning history
     ↓
@@ -22,7 +22,7 @@ Planning assessment
 Generate professional report
 ```
 
-Today, the platform delivers the first three steps of this chain in full (Planning Intelligence and Policy Intelligence, including visual evidence) and stops there. Every journey below is written as **Current workflow** (what exists today), **Future workflow** (the next capabilities that extend it), and **Ultimate experience** (the full chain once every layer is built).
+**Updated at the Product Vision & Roadmap Refresh (post–Opportunity Experience V2):** the first step above was "Search site" until Opportunity Experience V2 shipped a real discovery entry point — a Dashboard feed of actual opportunities, not just a Site search box — described here as "Discover opportunity" to match. The platform now delivers Planning Intelligence, Policy Intelligence (including visual evidence) and opportunity discovery/profile in full, and stops there. The four persona sections below still describe their "Current workflow" as "search or browse Sites," which predates this change; read that as "discover an opportunity, whether a Site-level signal or a Local Plan allocation with no matched Site yet" rather than a Site-only search, and see [PRODUCT_VISION.md](PRODUCT_VISION.md)'s "Commercial Product Journey" for the fuller, opportunity-centred version of this same chain. Every journey below is otherwise written as **Current workflow** (what exists today), **Future workflow** (the next capabilities that extend it), and **Ultimate experience** (the full chain once every layer is built).
 
 ---
 
