@@ -24,6 +24,16 @@ one mutually-exclusive enum value.
 
 Every reason string is generated from one of the rules below, grounded in
 a real field this module read - never freeform text, never AI-generated.
+
+Housing Association amendment (fourth pilot profile): every per-buyer
+behavioural difference introduced by this amendment is expressed as an
+explicit, generic BuyerProfile field - never a Housing-Association-only
+branch keyed on profile.key - see app.policy.buyer_profiles.BuyerProfile's
+own field docstrings (scale_metric, specialist_development_is_exclusion,
+wholly_affordable_is_exclusion, below_minimum_scale_is_exclusion) and the
+matching blocks below for exactly how each one changes assess_buyer_fit's
+behaviour. Every housebuilder pilot profile's own flag values reproduce
+the original (pre-amendment) behaviour and reason-string text exactly.
 """
 from __future__ import annotations
 
@@ -31,6 +41,7 @@ from dataclasses import dataclass, field
 
 from app.policy.buyer_profiles import (
     ADOPTED_ALLOCATION,
+    AFFORDABLE_UNITS,
     EMERGING_ALLOCATION,
     OTHER_OR_UNKNOWN,
     PERMISSION_GRANTED,
@@ -59,11 +70,25 @@ class MatchingFacts:
     a plain lookup - see the two build_*_matching_facts functions below for
     exactly which field each one comes from."""
     opportunity_type: str  # STRATEGIC_LAND | PLANNING_DELIVERY
-    unit_count: int | None  # the single most representative scale figure available (see extractors)
+    unit_count: int | None  # the single most representative TOTAL scale figure available (see extractors)
     development_type_raw: str | None
     is_specialist_development: bool | None  # None = genuinely unknown, never inferred as False
     affordable_percentage: float | None
     affordable_percentage_trusted: bool
+    # Housing Association amendment - the number of AFFORDABLE homes,
+    # distinct from unit_count (total). None = genuinely not safely
+    # knowable, never 0 by assumption. See build_planning_delivery_
+    # matching_facts's own docstring for exactly where this comes from
+    # (SchemeIntelligence.affordable_units_final - already app.extraction.
+    # reconcile's own fully reconciled figure, derived from total x
+    # percentage using that module's own existing convention where the
+    # classifier didn't state an explicit count, and reset to None there
+    # whenever that derivation would be unsafe - no second derivation is
+    # implemented here). Always None for STRATEGIC_LAND (Local Plan
+    # allocations carry no scheme-specific affordable-unit evidence at all -
+    # never estimated from a Local Plan/NPPF affordable-housing policy
+    # percentage applied to allocation capacity).
+    affordable_unit_count: int | None
     planning_state: str  # one of app.policy.buyer_profiles' four planning-state constants
     has_identified_planning_activity: bool | None  # None = not applicable/not determined
     has_phasing_evidence: bool
@@ -119,6 +144,14 @@ def build_strategic_land_matching_facts(allocation, coverage, phasing) -> Matchi
         # assumed 0%.
         affordable_percentage=None,
         affordable_percentage_trusted=False,
+        # Housing Association amendment (brief Section 10): no scheme-
+        # specific affordable-unit evidence exists for a Local Plan
+        # allocation - deliberately never estimated by applying a Local
+        # Plan/NPPF affordable-housing policy percentage to allocation
+        # capacity. Genuinely unknown, correctly producing INSUFFICIENT_
+        # EVIDENCE for the Housing Association profile rather than a
+        # fabricated figure.
+        affordable_unit_count=None,
         planning_state=planning_state,
         has_identified_planning_activity=has_activity,
         has_phasing_evidence=has_phasing,
@@ -137,6 +170,7 @@ def build_planning_delivery_matching_facts(scheme_intelligence) -> MatchingFacts
         return MatchingFacts(
             opportunity_type=PLANNING_DELIVERY, unit_count=None, development_type_raw=None,
             is_specialist_development=None, affordable_percentage=None, affordable_percentage_trusted=False,
+            affordable_unit_count=None,
             # Every planning/delivery opportunity card in this platform is
             # already sourced from a granted decision (see app.reporting.
             # dashboard's _approaching_lapse_cards/_undeveloped_phase_cards,
@@ -157,6 +191,25 @@ def build_planning_delivery_matching_facts(scheme_intelligence) -> MatchingFacts
     # otherwise be indistinguishable.
     affordable_trusted = affordable_pct is not None and not bool(getattr(scheme_intelligence, "affordable_missing", False))
 
+    # Housing Association amendment (brief Sections 4-5) - the safest
+    # existing source for "number of affordable homes" is SchemeIntelligence.
+    # affordable_units_final itself: app.extraction.reconcile.reconcile_
+    # application_intelligence already computes this as the platform's own
+    # fully reconciled figure - preferring an explicit classifier-stated
+    # affordable-unit count, and ONLY where no such count was stated,
+    # deterministically deriving one from total_units_final x
+    # affordable_percentage_final (that module's own existing round()
+    # convention - never a new rounding rule invented here), and that same
+    # reconciliation resets this field to None in every case it judges the
+    # derivation unsafe (an unconfirmed split, an external-consultation
+    # record, a self-contradictory classifier result). Reading this field
+    # directly - rather than re-deriving from total x percentage a second
+    # time in this module - reuses that existing, already-tested provenance
+    # verbatim instead of duplicating it (CLAUDE.md: "reuse existing
+    # architecture"). A None value here already means "not safely knowable"
+    # per that module's own rules - never assumed to be 0 by this function.
+    affordable_unit_count = scheme_intelligence.affordable_units_final
+
     return MatchingFacts(
         opportunity_type=PLANNING_DELIVERY,
         unit_count=scheme_intelligence.total_units_final,
@@ -164,6 +217,7 @@ def build_planning_delivery_matching_facts(scheme_intelligence) -> MatchingFacts
         is_specialist_development=is_specialist,
         affordable_percentage=affordable_pct if affordable_trusted else None,
         affordable_percentage_trusted=affordable_trusted,
+        affordable_unit_count=affordable_unit_count,
         planning_state=PERMISSION_GRANTED,
         has_identified_planning_activity=True,
         has_phasing_evidence=False,
@@ -205,28 +259,59 @@ def assess_buyer_fit(profile: BuyerProfile, facts: MatchingFacts) -> BuyerFitAss
     is_investigative_exception = False
 
     # --- Hard exclusion 1: specialist/non-general-needs development type ---
+    #
+    # Housing Association amendment: profile.specialist_development_is_
+    # exclusion is True for every housebuilder pilot profile (unchanged
+    # behaviour/wording), but False for Housing Association, whose own
+    # brief forbids inventing this exclusion for a buyer whose specialist-
+    # product appetite was never stated. `facts.opportunity_type ==
+    # STRATEGIC_LAND` is ORed in regardless of that flag because this flag
+    # only ever means "employment allocation" for strategic land (see
+    # build_strategic_land_matching_facts) - genuinely non-residential, a
+    # universal exclusion for every buyer in this pilot, not an unstated
+    # specialist-housing preference question.
     if facts.is_specialist_development is True:
-        does_not_match.append(
-            f"Trusted evidence identifies this as a specialist development "
-            f"({facts.development_type_raw or 'non-residential use'}), not the general-needs residential "
-            f"development this buyer requires."
-        )
+        if profile.specialist_development_is_exclusion or facts.opportunity_type == STRATEGIC_LAND:
+            does_not_match.append(
+                f"Trusted evidence identifies this as a specialist development "
+                f"({facts.development_type_raw or 'non-residential use'}), not the general-needs residential "
+                f"development this buyer requires."
+            )
+        else:
+            unknown.append(
+                f"Trusted evidence identifies this as a specialist development "
+                f"({facts.development_type_raw or 'a specialist residential product'}); this buyer's own "
+                f"appetite for specialist/retirement housing has not been specified, so this is not treated "
+                f"as confirmed positive or negative evidence."
+            )
     elif facts.is_specialist_development is None:
         unknown.append("Development type has not been established with enough confidence to confirm this is general-needs housing.")
 
     # --- Hard exclusion 2: wholly (100%) affordable-led ---------------------
+    #
+    # Housing Association amendment: deliberately reversed polarity for a
+    # buyer whose own primary requirement IS affordable housing - see
+    # BuyerProfile.wholly_affordable_is_exclusion's own docstring.
     if facts.affordable_percentage is not None and facts.affordable_percentage >= WHOLLY_AFFORDABLE_THRESHOLD:
-        does_not_match.append(
-            f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
-            f"scheme, not open-market residential development."
-        )
+        if profile.wholly_affordable_is_exclusion:
+            does_not_match.append(
+                f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
+                f"scheme, not open-market residential development."
+            )
+        else:
+            matches.append(
+                f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
+                f"scheme, directly relevant to this buyer's affordable-housing focus."
+            )
     elif not facts.affordable_percentage_trusted:
         unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
     # A trusted, non-100% figure (the normal policy-compliant case) is
-    # deliberately NOT added as a "matches" reason - per the brief, the
-    # mere presence of policy-compliant affordable housing inside an
-    # otherwise open-market scheme must never itself read as a point in
-    # favour or against; it is simply not a disqualifier.
+    # deliberately NOT added as a "matches"/"does_not_match" reason for any
+    # profile - per the brief, the mere presence of policy-compliant
+    # affordable housing inside an otherwise open-market scheme must never
+    # itself read as a point in favour or against; the affordable UNIT
+    # COUNT (below) is where a Housing Association's own interest in that
+    # component is actually assessed.
 
     # --- Planning appetite - never a hard exclusion (see module docstring) -
     if facts.planning_state in profile.accepted_planning_states:
@@ -244,23 +329,53 @@ def assess_buyer_fit(profile: BuyerProfile, facts: MatchingFacts) -> BuyerFitAss
             unknown.append("Planning activity position could not be established for this allocation.")
 
     # --- Unit-range assessment -----------------------------------------------
-    if facts.unit_count is None:
-        unknown.append("No trusted unit count is available to assess against this buyer's target range.")
-    elif profile.target_unit_min <= facts.unit_count <= profile.target_unit_max:
-        matches.append(f"Approximately {facts.unit_count:,} homes sits within this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} homes).")
-    elif facts.unit_count < profile.target_unit_min:
-        unknown.append(f"Approximately {facts.unit_count:,} homes is below this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} homes) - not treated as a disqualifying fact on its own.")
+    #
+    # Housing Association amendment: profile.scale_metric picks which of
+    # MatchingFacts' two unit figures this buyer's target_unit_min/max is
+    # actually measured against. For every housebuilder pilot profile
+    # (scale_metric=TOTAL_UNITS) this reproduces the original behaviour and
+    # message text exactly (unit_noun/no_count_message below both resolve
+    # to the pre-amendment literal strings). Housing Association
+    # (scale_metric=AFFORDABLE_UNITS) is assessed against facts.
+    # affordable_unit_count instead - a 400-home scheme with 120 affordable
+    # homes is judged on 120, never rejected for the total exceeding 300.
+    if profile.scale_metric == AFFORDABLE_UNITS:
+        scale_value = facts.affordable_unit_count
+        unit_noun = "affordable homes"
+        no_count_message = "No trusted affordable-unit count is available to assess against this buyer's target range."
+    else:
+        scale_value = facts.unit_count
+        unit_noun = "homes"
+        no_count_message = "No trusted unit count is available to assess against this buyer's target range."
+
+    if scale_value is None:
+        unknown.append(no_count_message)
+    elif profile.target_unit_min <= scale_value <= profile.target_unit_max:
+        matches.append(f"Approximately {scale_value:,} {unit_noun} sits within this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}).")
+    elif scale_value < profile.target_unit_min:
+        # Housing Association amendment: below_minimum_scale_is_exclusion is
+        # False for every housebuilder profile (unchanged "unknown" branch,
+        # never a disqualifier on its own) but True for Housing Association,
+        # whose own brief states a scheme with fewer than 50 affordable
+        # homes is NOT SUITABLE, not merely under-evidenced.
+        if profile.below_minimum_scale_is_exclusion:
+            does_not_match.append(
+                f"Trusted evidence shows only {scale_value:,} {unit_noun}, below this buyer's minimum "
+                f"requirement of {profile.target_unit_min} {unit_noun}."
+            )
+        else:
+            unknown.append(f"Approximately {scale_value:,} {unit_noun} is below this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}) - not treated as a disqualifying fact on its own.")
     else:  # oversized
         if profile.large_allocation_is_self_qualifying and facts.opportunity_type == STRATEGIC_LAND:
             matches.append(
-                f"This allocation's own scale (~{facts.unit_count:,} homes) represents a meaningful "
+                f"This allocation's own scale (~{scale_value:,} {unit_noun}) represents a meaningful "
                 f"strategic-land position in its own right, independent of whether a specific parcel size "
                 f"is confirmed."
             )
         elif facts.has_phasing_evidence:
             investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
         else:
-            unknown.append(f"Overall scale (~{facts.unit_count:,} homes) materially exceeds this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} homes); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.")
+            unknown.append(f"Overall scale (~{scale_value:,} {unit_noun}) materially exceeds this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.")
         investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
         is_investigative_exception = True
 

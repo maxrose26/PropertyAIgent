@@ -15,11 +15,14 @@ from sqlalchemy import select
 
 from app.db.models import Application, LocalPlan, LocalPlanSite, Site, SchemeIntelligence
 from app.policy.buyer_profiles import (
+    AFFORDABLE_UNITS,
     BUYER_PROFILES,
     BUYER_PROFILE_ORDER,
+    HOUSING_ASSOCIATION,
     NATIONAL_HOUSEBUILDER,
     NESTEN_HOMES,
     STRATEGIC_LAND_BUYER,
+    TOTAL_UNITS,
 )
 from app.policy.buyer_matching import (
     INSUFFICIENT_EVIDENCE,
@@ -67,13 +70,14 @@ def test_matching_modules_make_no_llm_or_network_calls():
 
 # --- Buyer profile configuration ---------------------------------------------
 
-def test_exactly_three_pilot_profiles_with_correct_ranges_and_appetite():
-    assert set(BUYER_PROFILES) == {"nesten_homes", "strategic_land_buyer", "national_housebuilder"}
-    assert len(BUYER_PROFILE_ORDER) == 3
+def test_exactly_four_pilot_profiles_with_correct_ranges_and_appetite():
+    assert set(BUYER_PROFILES) == {"nesten_homes", "strategic_land_buyer", "national_housebuilder", "housing_association"}
+    assert len(BUYER_PROFILE_ORDER) == 4
 
     assert (NESTEN_HOMES.target_unit_min, NESTEN_HOMES.target_unit_max) == (50, 100)
     assert (STRATEGIC_LAND_BUYER.target_unit_min, STRATEGIC_LAND_BUYER.target_unit_max) == (100, 300)
     assert (NATIONAL_HOUSEBUILDER.target_unit_min, NATIONAL_HOUSEBUILDER.target_unit_max) == (200, 500)
+    assert (HOUSING_ASSOCIATION.target_unit_min, HOUSING_ASSOCIATION.target_unit_max) == (50, 300)
 
     assert "permission_granted" in NESTEN_HOMES.accepted_planning_states
     assert "adopted_allocation" in NESTEN_HOMES.accepted_planning_states
@@ -89,9 +93,33 @@ def test_exactly_three_pilot_profiles_with_correct_ranges_and_appetite():
     assert STRATEGIC_LAND_BUYER.treats_no_activity_as_positive is True
     assert NESTEN_HOMES.treats_no_activity_as_positive is False
     assert NATIONAL_HOUSEBUILDER.treats_no_activity_as_positive is False
+    assert HOUSING_ASSOCIATION.treats_no_activity_as_positive is False
     assert STRATEGIC_LAND_BUYER.large_allocation_is_self_qualifying is True
     assert NESTEN_HOMES.large_allocation_is_self_qualifying is False
     assert NATIONAL_HOUSEBUILDER.large_allocation_is_self_qualifying is False
+    assert HOUSING_ASSOCIATION.large_allocation_is_self_qualifying is False
+
+
+def test_scale_metric_configuration():
+    """The generic scale-metric concept (Housing Association amendment):
+    every housebuilder profile is measured against TOTAL_UNITS (unchanged),
+    only Housing Association against AFFORDABLE_UNITS."""
+    for profile in (NESTEN_HOMES, STRATEGIC_LAND_BUYER, NATIONAL_HOUSEBUILDER):
+        assert profile.scale_metric == TOTAL_UNITS
+    assert HOUSING_ASSOCIATION.scale_metric == AFFORDABLE_UNITS
+
+
+def test_housing_association_reverses_the_housebuilder_exclusion_polarity():
+    """Housing Association amendment: the three profile-level flags this
+    amendment introduces must have exactly the opposite polarity from every
+    housebuilder profile - not merely "unset", a deliberate reversal."""
+    for profile in (NESTEN_HOMES, STRATEGIC_LAND_BUYER, NATIONAL_HOUSEBUILDER):
+        assert profile.specialist_development_is_exclusion is True
+        assert profile.wholly_affordable_is_exclusion is True
+        assert profile.below_minimum_scale_is_exclusion is False
+    assert HOUSING_ASSOCIATION.specialist_development_is_exclusion is False
+    assert HOUSING_ASSOCIATION.wholly_affordable_is_exclusion is False
+    assert HOUSING_ASSOCIATION.below_minimum_scale_is_exclusion is True
 
 
 # --- Core matching rules, against synthetic MatchingFacts (no DB needed) ----
@@ -100,7 +128,7 @@ def _facts(**overrides) -> MatchingFacts:
     base = dict(
         opportunity_type=PLANNING_DELIVERY, unit_count=75, development_type_raw="houses",
         is_specialist_development=False, affordable_percentage=30.0, affordable_percentage_trusted=True,
-        planning_state="permission_granted", has_identified_planning_activity=True,
+        affordable_unit_count=None, planning_state="permission_granted", has_identified_planning_activity=True,
         has_phasing_evidence=False, matched_to_site=True,
     )
     base.update(overrides)
@@ -217,6 +245,167 @@ def test_focus_school_with_missing_scheme_intelligence_reads_as_unknown_not_excl
     assert result.classification == INSUFFICIENT_EVIDENCE
 
 
+# --- Required acceptance case (Housing Association amendment, Section 13):
+#     same site, opposite buyer effect ------------------------------------
+
+def _focus_school_scheme_intelligence(session) -> SchemeIntelligence:
+    """Real Focus School figures - see test_focus_school_is_not_a_strong_
+    nesten_fit's own docstring and this amendment's live production check
+    (72 affordable of 82 total, 100% affordable, mixed_retirement_and_
+    market_housing, applicant Anwyl Partnerships)."""
+    site = Site(council_code="stockport", canonical_address="focus school ha", display_address="Focus School 237 Didsbury Road")
+    session.add(site)
+    session.flush()
+    app = Application(council_code="stockport", reference="DC/085997-HA", site_id=site.id, status="Decided", decision="Granted")
+    session.add(app)
+    session.flush()
+    si = SchemeIntelligence(
+        application_id=app.id, total_units_final=82, affordable_units_final=72, affordable_percentage_final=100.0,
+        affordable_missing=False, development_type="mixed_retirement_and_market_housing",
+        applicant_company="Anwyl Partnerships", core_intelligence_complete=True,
+    )
+    session.add(si)
+    session.commit()
+    return si
+
+
+def test_focus_school_same_evidence_opposite_buyer_effect(session):
+    """Required acceptance case (Housing Association amendment, Section 13):
+    the SAME trusted evidence (Focus School) must be a hard negative for
+    Nesten Homes but NOT a negative for Housing Association - proving
+    buyer-fit is genuinely buyer-relative, not a universal opportunity
+    quality judgement."""
+    si = _focus_school_scheme_intelligence(session)
+    facts = build_planning_delivery_matching_facts(si)
+
+    nesten = assess_buyer_fit(NESTEN_HOMES, facts)
+    housing_association = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+
+    # Nesten: 100% affordable remains a hard exclusion (unchanged).
+    assert nesten.classification == NOT_SUITABLE
+    assert any("100%" in r for r in nesten.does_not_match)
+
+    # Housing Association: 100% affordable is NOT a negative - it is
+    # explicit positive evidence instead.
+    assert not any("100%" in r for r in housing_association.does_not_match)
+    assert any("100%" in r and "affordable-housing focus" in r for r in housing_association.matches)
+
+    # Its scale is assessed against the 72 AFFORDABLE homes (not the 82
+    # total) - within the 50-300 affordable-home target range.
+    assert any("72" in r and "affordable homes" in r for r in housing_association.matches)
+
+    # An unresolved criterion (the buyer's own specialist/retirement
+    # appetite was never specified) correctly prevents STRONG_FIT without
+    # inventing a hard exclusion the brief never asked for.
+    assert housing_association.classification == INSUFFICIENT_EVIDENCE
+    assert any("specialist" in u and "not been specified" in u for u in housing_association.unknown)
+    assert not any("specialist" in r for r in housing_association.does_not_match)
+
+
+def test_focus_school_housing_association_does_not_fabricate_ownership(session):
+    """Same non-fabrication requirement as the Nesten acceptance case -
+    Anwyl's applicant role must never be read as ownership/control proof,
+    for any buyer, including Housing Association."""
+    si = _focus_school_scheme_intelligence(session)
+    facts = build_planning_delivery_matching_facts(si)
+    result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    all_reasons = result.matches + result.does_not_match + result.unknown + result.investigate
+    assert not any("Anwyl" in r for r in all_reasons)
+    assert not any("owner" in r.lower() or "control" in r.lower() for r in all_reasons)
+
+
+# --- Required acceptance case (Housing Association amendment, Section 14):
+#     affordable component within range despite a large total scheme -----
+
+def test_affordable_component_in_range_despite_total_exceeding_housing_association_max():
+    """400 total homes / 120 affordable homes: Housing Association must
+    NOT be rejected because the TOTAL (400) exceeds its 300-unit maximum -
+    120 affordable homes is the relevant scale, and sits within its 50-300
+    target. Existing housebuilder profiles continue to assess the SAME
+    opportunity using their own total-unit requirements, from the exact
+    same underlying facts."""
+    facts = _facts(
+        unit_count=400, affordable_unit_count=120, affordable_percentage=30.0, affordable_percentage_trusted=True,
+        development_type_raw="mixed_apartments_and_houses",
+    )
+    housing_association = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert housing_association.classification != NOT_SUITABLE
+    assert any("120" in m and "affordable homes" in m for m in housing_association.matches)
+    assert not any("400" in u or "exceeds" in u for u in housing_association.unknown)
+
+    # National Housebuilder (200-500 total): 400 total homes matches its
+    # own range directly - a different metric, same underlying facts.
+    national = assess_buyer_fit(NATIONAL_HOUSEBUILDER, facts)
+    assert any("400" in m and "homes" in m for m in national.matches)
+
+    # Nesten (50-100 total): 400 total homes is oversized on ITS OWN metric
+    # - correctly investigated, never silently matched.
+    nesten = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert nesten.is_investigative_exception is True
+    assert nesten.classification != STRONG_FIT
+
+
+# --- Required acceptance case (Housing Association amendment, Section 15):
+#     below the affordable-unit minimum -------------------------------------
+
+def test_below_affordable_minimum_is_not_suitable_for_housing_association():
+    """80 total homes / 20 affordable homes: Housing Association's own
+    brief states this is NOT SUITABLE (fewer than 50 affordable homes) -
+    unlike the housebuilder profiles' own "below minimum" handling, this is
+    a genuine hard exclusion for this buyer, with a reason naming both the
+    evidenced figure and the stated minimum."""
+    facts = _facts(unit_count=80, affordable_unit_count=20, development_type_raw="houses")
+    result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert result.classification == NOT_SUITABLE
+    assert any("20" in r and "50" in r for r in result.does_not_match)
+
+
+# --- Required acceptance case (Housing Association amendment, Section 16):
+#     missing affordable evidence never becomes zero ------------------------
+
+def test_missing_affordable_evidence_is_insufficient_not_not_suitable_for_housing_association():
+    """Total units known, affordable-unit provision genuinely unknown -
+    Housing Association must return INSUFFICIENT_EVIDENCE, never
+    NOT_SUITABLE, and must never assume 0 affordable homes."""
+    facts = _facts(
+        unit_count=150, affordable_unit_count=None, affordable_percentage=None, affordable_percentage_trusted=False,
+        development_type_raw="houses",
+    )
+    result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert any("affordable-unit count is available" in u for u in result.unknown)
+
+
+# --- Non-residential (employment) allocations stay excluded for every
+#     buyer, including Housing Association --------------------------------
+
+def test_employment_allocation_excluded_for_housing_association_too():
+    """A genuinely non-residential (employment) Local Plan allocation is a
+    universal exclusion for every pilot profile - Housing Association's own
+    relaxed specialist-development handling (Section 8) is about an
+    UNSTATED specialist-residential-product appetite, never about accepting
+    non-residential land."""
+    facts = _facts(
+        opportunity_type=STRATEGIC_LAND, is_specialist_development=True, development_type_raw="employment",
+        affordable_unit_count=None, affordable_percentage=None, affordable_percentage_trusted=False,
+    )
+    result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert result.classification == NOT_SUITABLE
+    assert any("employment" in r for r in result.does_not_match)
+
+
+# --- Housing Association appears in and uses the same widened-pool
+#     personalisation architecture as every other pilot buyer -------------
+
+def test_housing_association_uses_the_shared_buyer_feed_architecture(session):
+    """Not a separate Housing Association dashboard/pipeline - the same
+    build_opportunity_feed(buyer_key=...) entry point every other pilot
+    buyer already uses."""
+    feed = build_opportunity_feed(session, limit=6, buyer_key="housing_association")
+    assert feed["buyer_key"] == "housing_association"
+    assert "excluded_not_suitable" in feed["counts"]
+
+
 # --- Required acceptance case: Elton Reservoir (real shape) ------------------
 
 def _make_elton_like_allocation(session) -> LocalPlanSite:
@@ -245,12 +434,23 @@ def test_elton_reservoir_produces_materially_different_conclusions_per_buyer(ses
     nesten = assess_buyer_fit(NESTEN_HOMES, facts)
     strategic = assess_buyer_fit(STRATEGIC_LAND_BUYER, facts)
     national = assess_buyer_fit(NATIONAL_HOUSEBUILDER, facts)
+    housing_association = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
 
     # None is a hard mismatch - the allocation itself is genuinely
     # residential and adopted, matching every profile's planning appetite.
     assert nesten.classification == INSUFFICIENT_EVIDENCE and nesten.is_investigative_exception
     assert strategic.classification == INSUFFICIENT_EVIDENCE and strategic.is_investigative_exception
     assert national.classification == INSUFFICIENT_EVIDENCE and national.is_investigative_exception
+
+    # Housing Association (Section 10): no scheme-specific affordable-unit
+    # evidence exists at all for a Local Plan allocation - correctly
+    # INSUFFICIENT_EVIDENCE, never a fabricated affordable-unit estimate
+    # from Local Plan/NPPF policy percentages applied to allocation
+    # capacity. Not flagged as an "investigative exception" - that flag is
+    # specific to the oversized-scale branch, which this buyer's own scale
+    # metric (affordable units) never reaches here.
+    assert housing_association.classification == INSUFFICIENT_EVIDENCE
+    assert any("affordable-unit count is available" in u for u in housing_association.unknown)
 
     # Nesten: allocation matches, scale materially exceeds target, no
     # parcel evidence -> investigation required (never claimed to fit).
