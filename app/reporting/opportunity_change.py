@@ -27,6 +27,24 @@ such card is already gated on a granted decision upstream); this module's
 own fingerprint separately includes raw `decision`/`status` precisely so a
 genuine change there (e.g. a later refusal-on-appeal) is still caught even
 though it wouldn't move MatchingFacts.planning_state itself.
+
+BASELINE ESTABLISHMENT vs. ONGOING DISCOVERY (Gate 1 amendment, Product
+Owner review): the very first time monitoring is ever established
+against an already-populated Property AIgent database, every opportunity
+already in the current universe is HISTORICAL/EXISTING baseline - it must
+never be persisted, or later read by Gate 2, as if it had just been
+"discovered". `BASELINE_EXISTING` is the distinct, persisted classification
+for exactly this - never NEW. This is not derived from timestamp ordering
+or from which script happened to run first ("do NOT rely solely on
+ordering/timestamp luck" per the amendment brief): sync_opportunity_
+monitoring_state below determines whether THIS call is a baseline-
+establishing run by checking whether OpportunityMonitoringState currently
+holds ANY row at all before it starts - an empty table unambiguously means
+"monitoring has never been established before", regardless of what order
+scripts.bootstrap_acquisition_monitoring/scripts.sync_opportunity_
+monitoring happen to be invoked in. Once at least one row exists, every
+subsequent call is ordinary ongoing monitoring, where a genuinely new
+opportunity_id correctly becomes NEW.
 """
 from __future__ import annotations
 
@@ -34,7 +52,7 @@ import json
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db.models import OpportunityMonitoringState, utcnow
 from app.reporting.opportunity_universe import (
@@ -43,6 +61,12 @@ from app.reporting.opportunity_universe import (
     compute_opportunity_fingerprint,
 )
 
+# Persisted classifications. BASELINE_EXISTING is distinct from NEW -
+# see this module's own "BASELINE ESTABLISHMENT vs. ONGOING DISCOVERY"
+# docstring section above. Gate 2's own future "what's new for this
+# buyer" query must treat BASELINE_EXISTING as historical, never as a
+# discovery event.
+BASELINE_EXISTING = "BASELINE_EXISTING"
 NEW = "NEW"
 MATERIALLY_CHANGED = "MATERIALLY_CHANGED"
 UNCHANGED = "UNCHANGED"
@@ -97,7 +121,7 @@ _REASON_BY_FIELD = {
 
 @dataclass(frozen=True)
 class OpportunityChangeResult:
-    classification: str  # NEW | MATERIALLY_CHANGED | UNCHANGED
+    classification: str  # BASELINE_EXISTING | NEW | MATERIALLY_CHANGED | UNCHANGED
     reasons: tuple[str, ...]
     fingerprint: str
 
@@ -116,14 +140,18 @@ def _diff_reasons(old_fields: dict, new_fields: dict) -> tuple[str, ...]:
 
 
 def classify_opportunity_change(
-    record: OpportunityRecord, previous_state: OpportunityMonitoringState | None,
+    record: OpportunityRecord, previous_state: OpportunityMonitoringState | None, *, is_baseline_run: bool = False,
 ) -> OpportunityChangeResult:
     """The ONE canonical classifier - every caller (sync_opportunity_
     monitoring_state below, and Gate 2's own future "what changed since I
     last looked" query) must go through this rather than re-implementing
     the fingerprint comparison. `previous_state` is None for an opportunity
-    identity never seen before -> NEW, with no reasons (nothing to diff
-    against). An identical fingerprint -> UNCHANGED. Otherwise the
+    identity never tracked before - BASELINE_EXISTING when `is_baseline_run`
+    is True (monitoring has never been established before at all - see
+    this module's own "BASELINE ESTABLISHMENT vs. ONGOING DISCOVERY"
+    docstring section), otherwise NEW (ordinary ongoing monitoring found a
+    genuinely new opportunity_id) - either way with no reasons (nothing to
+    diff against). An identical fingerprint -> UNCHANGED. Otherwise the
     per-field diff above names every reason it can - REASON_OTHER_FACT_
     CHANGED only fires if this module's own field-to-reason map has
     drifted out of date with app.reporting.opportunity_universe's actual
@@ -131,7 +159,8 @@ def classify_opportunity_change(
     fix here, not a real "unknown" opportunity state."""
     fingerprint = compute_opportunity_fingerprint(record.fingerprint_fields)
     if previous_state is None:
-        return OpportunityChangeResult(classification=NEW, reasons=(), fingerprint=fingerprint)
+        classification = BASELINE_EXISTING if is_baseline_run else NEW
+        return OpportunityChangeResult(classification=classification, reasons=(), fingerprint=fingerprint)
     if previous_state.fingerprint == fingerprint:
         return OpportunityChangeResult(classification=UNCHANGED, reasons=(), fingerprint=fingerprint)
 
@@ -140,21 +169,36 @@ def classify_opportunity_change(
     return OpportunityChangeResult(classification=MATERIALLY_CHANGED, reasons=reasons, fingerprint=fingerprint)
 
 
-def sync_opportunity_monitoring_state(session, *, pool_limit: int | None = None) -> dict[str, int]:
-    """Rebuilds the current opportunity universe and reconciles app.db.
-    models.OpportunityMonitoringState against it - the one function a
-    future bounded cron stage (Gate 2's own trigger mechanism) calls.
-    Deterministic, idempotent, bounded, no OpenAI call. Never deletes a
-    row for an opportunity that has disappeared from the live candidate
-    universe (per the approved investigation's own "an opportunity that
-    vanishes from the read model is itself meaningful information, not an
-    error requiring cleanup" - its last-known state simply stops being
-    refreshed, which is the correct, non-destructive behaviour here).
+def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) -> dict[str, int]:
+    """Rebuilds the COMPLETE current opportunity universe (see app.
+    reporting.opportunity_universe's own "COMPLETENESS" docstring section -
+    this never silently truncates, however large the universe grows) and
+    reconciles app.db.models.OpportunityMonitoringState against it - the
+    one function a future bounded cron stage (Gate 2's own trigger
+    mechanism) calls. Deterministic, idempotent, no OpenAI call. Never
+    deletes a row for an opportunity that has disappeared from the live
+    candidate universe (per the approved investigation's own "an
+    opportunity that vanishes from the read model is itself meaningful
+    information, not an error requiring cleanup" - its last-known state
+    simply stops being refreshed, which is the correct, non-destructive
+    behaviour here).
+
+    Self-detects whether THIS call is establishing the baseline for the
+    first time ever (OpportunityMonitoringState holds zero rows before
+    this call starts) versus ongoing monitoring - see classify_
+    opportunity_change's own docstring and this module's own top-level
+    "BASELINE ESTABLISHMENT vs. ONGOING DISCOVERY" section. This makes
+    scripts.bootstrap_acquisition_monitoring's own canonical sequencing
+    (global baseline before buyer onboarding) a safety-in-depth measure,
+    never the ONLY thing preventing a false NEW - correct regardless of
+    which order the deployment scripts are actually invoked in.
 
     Returns a plain counts dict (never a numeric score) - one line an
     operator or a future cron log can print, mirroring app.pipeline.
     material_change.MaterialChangeStats.summary_line's own convention."""
-    kwargs = {} if pool_limit is None else {"pool_limit": pool_limit}
+    kwargs = {} if page_size is None else {"page_size": page_size}
+    is_baseline_run = session.execute(select(func.count()).select_from(OpportunityMonitoringState)).scalar() == 0
+
     universe = build_current_opportunity_universe(session, **kwargs)
 
     existing_by_id = {
@@ -166,17 +210,22 @@ def sync_opportunity_monitoring_state(session, *, pool_limit: int | None = None)
         ).scalars()
     } if universe else {}
 
-    counts = {NEW: 0, MATERIALLY_CHANGED: 0, UNCHANGED: 0}
+    counts = {BASELINE_EXISTING: 0, NEW: 0, MATERIALLY_CHANGED: 0, UNCHANGED: 0}
     for record in universe:
         previous = existing_by_id.get(record.opportunity_id)
-        result = classify_opportunity_change(record, previous)
+        result = classify_opportunity_change(record, previous, is_baseline_run=is_baseline_run)
         counts[result.classification] += 1
 
         if previous is None:
             session.add(OpportunityMonitoringState(
                 opportunity_id=record.opportunity_id, opportunity_type=record.opportunity_type,
                 fingerprint=result.fingerprint, fingerprint_fields=json.dumps(record.fingerprint_fields, sort_keys=True, default=str),
-                last_change_at=None, last_change_classification=NEW, last_change_reasons=None,
+                # last_change_at stays None for a freshly-created row
+                # regardless of BASELINE_EXISTING/NEW - it records when the
+                # fingerprint of an ALREADY-tracked opportunity genuinely
+                # moved, not when the row was first created (first_seen_at,
+                # set by the column default, is that signal instead).
+                last_change_at=None, last_change_classification=result.classification, last_change_reasons=None,
             ))
         else:
             previous.fingerprint = result.fingerprint
@@ -194,6 +243,7 @@ def sync_opportunity_monitoring_state(session, *, pool_limit: int | None = None)
     session.commit()
     return {
         "opportunities_considered": len(universe),
+        "baseline_existing": counts[BASELINE_EXISTING],
         "new": counts[NEW],
         "materially_changed": counts[MATERIALLY_CHANGED],
         "unchanged": counts[UNCHANGED],

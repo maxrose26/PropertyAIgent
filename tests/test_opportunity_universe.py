@@ -9,6 +9,7 @@ import datetime as dt
 
 from app.db.models import Application, ControlRelationship, LocalPlan, LocalPlanSite, Site
 from app.reporting.opportunity_universe import (
+    DEFAULT_STRATEGIC_LAND_PAGE_SIZE,
     build_current_opportunity_universe,
     compute_opportunity_fingerprint,
     planning_delivery_phase_opportunity_id,
@@ -160,3 +161,62 @@ def test_ownership_evidence_count_is_part_of_the_planning_delivery_fingerprint(s
     record_after = next(r for r in universe_after if r.opportunity_id == planning_delivery_site_opportunity_id(site.id))
     assert record_after.fingerprint_fields["ownership_evidence_count"] == 1
     assert compute_opportunity_fingerprint(record_before.fingerprint_fields) != compute_opportunity_fingerprint(record_after.fingerprint_fields)
+
+
+# --- Completeness / pagination (Gate 1 amendment, Product Owner review) ----
+#
+# The canonical monitoring/onboarding universe must never silently
+# truncate, unlike a bounded UI feed - these tests prove the keyset-
+# pagination loop in _strategic_land_universe genuinely continues across
+# multiple pages rather than stopping at some fixed count.
+
+def _bulk_make_allocations(session, plan_id: int, count: int, *, prefix: str) -> list[int]:
+    """Efficient bulk insert (one commit) - only the fields _strategic_
+    land_universe's own candidate query and build_allocation_development_
+    coverage actually need, so a large synthetic universe stays fast to
+    construct in a test."""
+    allocations = [
+        LocalPlanSite(
+            council_code="testcouncil", local_plan_id=plan_id, policy_reference=f"{prefix}-{i}",
+            site_name=f"{prefix} Allocation {i}", plan_name="Test Local Plan", plan_status="proposed_submission",
+            matched_site_id=None, minimum_dwellings=60 + (i % 40),
+        )
+        for i in range(count)
+    ]
+    session.add_all(allocations)
+    session.commit()
+    return [a.id for a in allocations]
+
+
+def test_pagination_loop_spans_multiple_pages_with_a_small_page_size(session):
+    """A small page_size forces several round-trips - proves the loop
+    itself continues fetching pages rather than stopping after the first,
+    without needing thousands of real rows."""
+    plan = _make_plan(session)
+    allocation_ids = _bulk_make_allocations(session, plan.id, 10, prefix="Paged")
+
+    universe = build_current_opportunity_universe(session, page_size=3)  # 10 rows over page_size=3 -> 4 pages
+    returned_ids = {r.opportunity_id for r in universe}
+    expected_ids = {strategic_land_opportunity_id(i) for i in allocation_ids}
+    assert expected_ids <= returned_ids
+    assert len(returned_ids) == 10  # every allocation returned exactly once - no duplicates, no gaps across page boundaries
+
+
+def test_pagination_processes_a_universe_exceeding_the_old_2000_limit(session):
+    """The exact scenario the Gate 1 amendment requires proof of: a
+    synthetic opportunity universe larger than the old, now-removed
+    DEFAULT_UNIVERSE_POOL_LIMIT = 2000 correctness cap must be processed
+    COMPLETELY, using the real default page_size (a pure batching
+    parameter, not a truncation point)."""
+    plan = _make_plan(session)
+    total = 2500
+    allocation_ids = _bulk_make_allocations(session, plan.id, total, prefix="Scale")
+
+    universe = build_current_opportunity_universe(session)  # default page_size - never a truncating limit
+    strategic_records = [r for r in universe if r.opportunity_id.startswith("strategic_land:allocation:")]
+    assert len(strategic_records) == total
+    assert {r.opportunity_id for r in strategic_records} == {strategic_land_opportunity_id(i) for i in allocation_ids}
+    # Confirms the default page size genuinely required more than one
+    # round-trip to cover this universe (i.e. this is a real pagination
+    # proof, not an accidental single query that happened to fit).
+    assert total > DEFAULT_STRATEGIC_LAND_PAGE_SIZE

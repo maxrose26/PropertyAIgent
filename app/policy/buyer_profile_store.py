@@ -34,7 +34,8 @@ from app.db.models import BuyerProfile as BuyerProfileRecord
 from app.db.models import Workspace, utcnow
 from app.policy.buyer_matching import INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit
 from app.policy.buyer_profiles import BUYER_PROFILE_ORDER, BUYER_PROFILES, BuyerProfile
-from app.reporting.opportunity_universe import DEFAULT_UNIVERSE_POOL_LIMIT, build_current_opportunity_universe
+from app.reporting.opportunity_change import sync_opportunity_monitoring_state
+from app.reporting.opportunity_universe import DEFAULT_STRATEGIC_LAND_PAGE_SIZE, build_current_opportunity_universe
 
 DEFAULT_WORKSPACE_NAME = "Property AIgent Pilot"
 
@@ -227,7 +228,7 @@ class OnboardingBaselineResult:
         self.summary_line = summary_line
 
 
-def run_buyer_onboarding_baseline(session, record: BuyerProfileRecord, *, pool_limit: int = DEFAULT_UNIVERSE_POOL_LIMIT) -> OnboardingBaselineResult:
+def run_buyer_onboarding_baseline(session, record: BuyerProfileRecord, *, page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE) -> OnboardingBaselineResult:
     """Gate 1 brief, Sections 17-18: when a BuyerProfile is newly onboarded
     (or its mandate has genuinely changed - see is_buyer_profile_baseline_
     stale), review the CURRENT opportunity universe against it once,
@@ -246,7 +247,7 @@ def run_buyer_onboarding_baseline(session, record: BuyerProfileRecord, *, pool_l
     onboarding_summary and commits; creates no BuyerOpportunityAssessment
     row (Gate 2's own responsibility, explicitly out of scope here)."""
     profile = record_to_dataclass(record)
-    universe = build_current_opportunity_universe(session, pool_limit=pool_limit)
+    universe = build_current_opportunity_universe(session, page_size=page_size)
 
     strong_fit = not_suitable = insufficient_evidence = investigative_exceptions = 0
     for opportunity in universe:
@@ -295,15 +296,39 @@ def is_buyer_profile_baseline_stale(record: BuyerProfileRecord) -> bool:
     return current_fingerprint != record.matching_fingerprint
 
 
-def bootstrap_acquisition_monitoring(session, *, pool_limit: int = DEFAULT_UNIVERSE_POOL_LIMIT) -> dict:
+def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE) -> dict:
     """The single Gate 1 entry point (scripts.bootstrap_acquisition_
-    monitoring's own only call): resolve the default workspace, seed the
-    four pilot profiles into it, and run/re-run the onboarding baseline for
-    every active profile whose baseline is currently stale (never
-    onboarded yet, or genuinely changed since). Idempotent and safe to
-    call repeatedly - seeding never overwrites an existing row, and
-    checking staleness for an already-current buyer is a cheap in-memory
-    fingerprint comparison with no opportunity-universe scan at all."""
+    monitoring's own only call) - the ONE canonical, safe sequence (Gate 1
+    amendment, Product Owner review):
+
+        existing DB
+        -> global opportunity monitoring baseline established
+        -> current buyer onboarding baseline established
+        -> (ongoing, separately scheduled) monitoring starts
+
+    1. Establishes the GLOBAL opportunity monitoring baseline first
+       (app.reporting.opportunity_change.sync_opportunity_monitoring_state)
+       - on a fresh/never-before-monitored database this persists every
+       current opportunity as BASELINE_EXISTING, never NEW (see that
+       function's own docstring); on an already-monitored database this is
+       ordinary, idempotent ongoing sync.
+    2. Resolves the default workspace and seeds the four pilot profiles
+       into it (idempotent - never overwrites an already-persisted, edited
+       row).
+    3. Runs/re-runs the onboarding baseline for every active profile whose
+       baseline is currently stale (never onboarded yet, or genuinely
+       changed since) - safe to call repeatedly, since checking staleness
+       for an already-current buyer is a cheap in-memory fingerprint
+       comparison with no opportunity-universe scan at all.
+
+    Doing step 1 before step 3 is a deliberate belt-and-braces ordering,
+    not the ONLY thing preventing a false NEW - sync_opportunity_
+    monitoring_state's own self-detection (an empty monitoring table means
+    "never established before", regardless of call order) is what actually
+    guarantees correctness even if these steps were ever invoked out of
+    order or from separate processes."""
+    global_baseline = sync_opportunity_monitoring_state(session, page_size=page_size)
+
     workspace = resolve_default_workspace(session)
     seed_default_buyer_profiles(session, workspace)
 
@@ -314,10 +339,11 @@ def bootstrap_acquisition_monitoring(session, *, pool_limit: int = DEFAULT_UNIVE
     onboarding_results: dict[str, OnboardingBaselineResult] = {}
     for record in records:
         if is_buyer_profile_baseline_stale(record):
-            onboarding_results[record.profile_key] = run_buyer_onboarding_baseline(session, record, pool_limit=pool_limit)
+            onboarding_results[record.profile_key] = run_buyer_onboarding_baseline(session, record, page_size=page_size)
 
     return {
         "workspace_id": workspace.id,
+        "global_opportunity_baseline": global_baseline,
         "profiles_total": len(records),
         "profiles_onboarded_this_run": list(onboarding_results.keys()),
         "results": onboarding_results,

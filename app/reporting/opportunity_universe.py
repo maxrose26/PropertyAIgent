@@ -30,6 +30,30 @@ status, site area, ownership-evidence count, the STABLE lapse/build facts
 - deliberately never the live "N days left" countdown, which would change
 every single day and falsely register as a material change; see
 _planning_delivery_universe's own comment).
+
+COMPLETENESS (Gate 1 amendment, Product Owner review): the canonical
+monitoring/onboarding universe this module builds must never silently
+truncate, unlike a bounded UI feed - a new Buyer Profile must be
+evaluated against the COMPLETE current opportunity universe, and
+PropertyAIgent is expected to scale well past today's few hundred
+candidates. build_current_opportunity_universe therefore takes no
+correctness-affecting size limit at all:
+  - Strategic land is fetched via genuine keyset pagination
+    (_strategic_land_universe below) - `page_size` only bounds the cost
+    of each individual database round-trip, never the total number of
+    allocations returned; the loop continues until every matching
+    allocation has been fetched, however many there are.
+  - Planning/delivery reuses app.reporting.dashboard._approaching_lapse_
+    cards/_undeveloped_phase_cards UNCHANGED, passing `limit=None` -
+    both functions already fetch their ENTIRE underlying candidate
+    population in an unbounded query and only ever slice their own
+    already-complete, already-sorted output list at the very end
+    (confirmed by inspection: neither query has a SQL-level LIMIT
+    anywhere); Python's own slicing semantics make `some_list[:None]`
+    return the complete list unchanged, so this reuses those two
+    functions exactly as they already exist - no modification, no
+    redesign - while genuinely disabling only the final truncation this
+    module never wants.
 """
 from __future__ import annotations
 
@@ -52,14 +76,12 @@ from app.reporting.allocation_discovery import PLAN_STATUS_META
 from app.reporting.opportunity_feed import PLANNING_DELIVERY, STRATEGIC_LAND
 from app.ui.common import pick_representative_application
 
-# A real, adjustable overfetch bound (mirrors app.reporting.opportunity_
-# feed._strategic_land_cards' own `limit(max(limit*3,12))` convention) -
-# NOT a full unbounded table scan, but generous enough to cover the
-# entire current opportunity universe (255 as of this gate - see the
-# Gate 1 implementation report) many times over. Raise this, or make it a
-# real paging loop, only once repository evidence shows the universe has
-# genuinely grown past it - never pre-optimised speculatively.
-DEFAULT_UNIVERSE_POOL_LIMIT = 2000
+# A pure batching parameter - bounds the size of each individual keyset-
+# pagination page/query, never the total number of allocations returned
+# (see _strategic_land_universe below, and this module's own "COMPLETENESS"
+# docstring section). Safe to override in a test to exercise the pagination
+# loop itself without needing thousands of real rows.
+DEFAULT_STRATEGIC_LAND_PAGE_SIZE = 500
 
 
 def strategic_land_opportunity_id(allocation_id: int) -> str:
@@ -101,14 +123,12 @@ def compute_opportunity_fingerprint(fingerprint_fields: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _strategic_land_universe(session, pool_limit: int) -> list[OpportunityRecord]:
-    candidates = session.execute(
-        select(LocalPlanSite).where(LocalPlanSite.matched_site_id.is_(None), LocalPlanSite.minimum_dwellings.is_not(None))
-        .order_by(LocalPlanSite.id.asc()).limit(pool_limit)
-    ).scalars().all()
-    if not candidates:
-        return []
-
+def _strategic_land_records_for_page(session, candidates: list[LocalPlanSite]) -> list[OpportunityRecord]:
+    """The per-page processing step - identical logic to what a single,
+    unpaginated pass used to do, just scoped to one page's worth of
+    allocations at a time so each individual query stays bounded (Gate 1
+    amendment, "batch/page opportunity candidates; keep individual
+    queries/processing bounded")."""
     coverage_by_id = build_allocation_development_coverage(session, candidates)
     plan_ids = {a.local_plan_id for a in candidates if a.local_plan_id}
     plans_by_id = (
@@ -154,14 +174,53 @@ def _strategic_land_universe(session, pool_limit: int) -> list[OpportunityRecord
     return records
 
 
-def _planning_delivery_universe(session, pool_limit: int) -> list[OpportunityRecord]:
+def _strategic_land_universe(session, page_size: int) -> list[OpportunityRecord]:
+    """Genuine keyset pagination - `page_size` bounds only the cost of
+    each individual round-trip; this loop continues fetching pages,
+    ordered by LocalPlanSite.id, until a page comes back with fewer than
+    `page_size` rows (i.e. the true end of the candidate set), however
+    many pages that takes. Unlike a single `LIMIT N` query, this can never
+    silently drop an allocation beyond some fixed count - see this
+    module's own "COMPLETENESS" docstring section."""
+    records: list[OpportunityRecord] = []
+    last_id = 0
+    while True:
+        page = session.execute(
+            select(LocalPlanSite)
+            .where(
+                LocalPlanSite.matched_site_id.is_(None),
+                LocalPlanSite.minimum_dwellings.is_not(None),
+                LocalPlanSite.id > last_id,
+            )
+            .order_by(LocalPlanSite.id.asc())
+            .limit(page_size)
+        ).scalars().all()
+        if not page:
+            break
+        records.extend(_strategic_land_records_for_page(session, page))
+        last_id = page[-1].id
+        if len(page) < page_size:
+            break
+    return records
+
+
+def _planning_delivery_universe(session) -> list[OpportunityRecord]:
     # Local import: avoids a circular import, exactly the same reason
     # app.reporting.opportunity_feed.build_opportunity_feed's own local
     # import of these two functions already exists - not a new pattern.
     from app.reporting.dashboard import _approaching_lapse_cards, _undeveloped_phase_cards
 
-    lapse_cards = _approaching_lapse_cards(session, pool_limit)
-    undeveloped_cards = _undeveloped_phase_cards(session, pool_limit)
+    # limit=None: both functions already fetch their ENTIRE underlying
+    # candidate population in one unbounded query each and only slice
+    # their own already-complete, already-sorted list at the very end
+    # (`scored[:limit]` / `cards[:limit]` - confirmed by inspection, no
+    # SQL-level LIMIT exists in either function). Python's own slicing
+    # treats `some_list[:None]` as "the whole list" - this reuses both
+    # functions completely unmodified while genuinely disabling only the
+    # truncation this canonical module never wants (see this module's own
+    # "COMPLETENESS" docstring section).
+    lapse_cards = _approaching_lapse_cards(session, None)
+    undeveloped_cards = _undeveloped_phase_cards(session, None)
     tagged = [(c, "site") for c in lapse_cards] + [(c, "phase") for c in undeveloped_cards]
     if not tagged:
         return []
@@ -246,11 +305,14 @@ def _planning_delivery_universe(session, pool_limit: int) -> list[OpportunityRec
     return records
 
 
-def build_current_opportunity_universe(session, *, pool_limit: int = DEFAULT_UNIVERSE_POOL_LIMIT) -> list[OpportunityRecord]:
+def build_current_opportunity_universe(session, *, page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE) -> list[OpportunityRecord]:
     """The Gate 1 canonical opportunity read model - every current
     candidate the platform's existing detection functions already produce,
     each carrying a stable logical identity and a deterministic fingerprint
-    fact set. Never persisted itself; app.reporting.opportunity_change and
-    app.policy.buyer_profile_store's onboarding baseline are this
-    function's only two callers this gate."""
-    return _strategic_land_universe(session, pool_limit) + _planning_delivery_universe(session, pool_limit)
+    fact set. ALWAYS complete - see this module's own "COMPLETENESS"
+    docstring section; `page_size` only tunes the strategic-land
+    pagination's own batch size and never truncates the result. Never
+    persisted itself; app.reporting.opportunity_change and app.policy.
+    buyer_profile_store's onboarding baseline are this function's only two
+    callers this gate."""
+    return _strategic_land_universe(session, page_size) + _planning_delivery_universe(session)

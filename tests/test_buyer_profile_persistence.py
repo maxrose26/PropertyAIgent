@@ -270,20 +270,28 @@ def test_profile_change_makes_the_baseline_stale_without_touching_opportunities(
 def test_new_buyer_does_not_report_existing_opportunities_as_new(session):
     """Required acceptance scenario E: existing opportunities must be
     HISTORICAL baseline for a newly onboarded buyer, never later reported
-    as newly discovered merely because monitoring has just started. This
-    models exactly the query Gate 2's own future "what's new for this
-    buyer" step will use: OpportunityMonitoringState.first_seen_at >
-    buyer.onboarding_completed_at."""
+    as newly discovered merely because monitoring has just started.
+    Proven two ways: the definitive persisted signal (last_change_
+    classification == BASELINE_EXISTING, never NEW) from the very first
+    sync, and the timestamp-based query Gate 2's own future "what's new
+    for this buyer" step will use as a secondary check."""
+    from app.db.models import OpportunityMonitoringState
+    from app.reporting.opportunity_change import BASELINE_EXISTING, NEW
+
     plan = _make_plan(session)
     for i in range(3):
         _make_allocation(session, plan.id, site_name=f"Pre-existing {i}", policy_reference=f"PRE-{i}", minimum_dwellings=70)
-    sync_opportunity_monitoring_state(session)  # these opportunities already exist in the global read model
+    sync_opportunity_monitoring_state(session)  # first-ever sync - these become BASELINE_EXISTING, not NEW
+
+    states = session.execute(select(OpportunityMonitoringState)).scalars().all()
+    assert len(states) >= 3
+    assert all(s.last_change_classification == BASELINE_EXISTING for s in states)
+    assert not any(s.last_change_classification == NEW for s in states)
 
     workspace = resolve_default_workspace(session)
     [record] = [r for r in seed_default_buyer_profiles(session, workspace) if r.profile_key == "nesten_homes"]
     run_buyer_onboarding_baseline(session, record)
 
-    from app.db.models import OpportunityMonitoringState
     new_for_buyer = session.execute(
         select(OpportunityMonitoringState).where(OpportunityMonitoringState.first_seen_at > record.onboarding_completed_at)
     ).scalars().all()
@@ -292,12 +300,57 @@ def test_new_buyer_does_not_report_existing_opportunities_as_new(session):
 
 def test_bootstrap_is_idempotent_end_to_end(session):
     """Scenario A (existing database + first deployment): one call sets
-    everything up; a second call changes nothing further."""
+    everything up - including establishing the GLOBAL opportunity baseline
+    BEFORE buyer onboarding, per the canonical sequence - and a second
+    call changes nothing further."""
+    from app.db.models import OpportunityMonitoringState
+    from app.reporting.opportunity_change import BASELINE_EXISTING
+
+    plan = _make_plan(session)
+    for i in range(3):
+        _make_allocation(session, plan.id, site_name=f"Already In The Database {i}", policy_reference=f"EXIST-{i}", minimum_dwellings=80)
+
     first = bootstrap_acquisition_monitoring(session)
     assert len(first["profiles_onboarded_this_run"]) == 4
+    assert first["global_opportunity_baseline"]["baseline_existing"] >= 3
+    assert first["global_opportunity_baseline"]["new"] == 0
+
+    states = session.execute(select(OpportunityMonitoringState)).scalars().all()
+    assert states and all(s.last_change_classification == BASELINE_EXISTING for s in states)
 
     second = bootstrap_acquisition_monitoring(session)
     assert second["profiles_onboarded_this_run"] == []  # every baseline already current - no re-scan
+    assert second["global_opportunity_baseline"]["baseline_existing"] == 0  # table was no longer empty
+    assert second["global_opportunity_baseline"]["new"] == 0
+    assert second["global_opportunity_baseline"]["materially_changed"] == 0
     assert second["profiles_total"] == 4
     assert len(session.execute(select(Workspace)).scalars().all()) == 1
     assert len(session.execute(select(BuyerProfileRecord)).scalars().all()) == 4
+
+
+def test_a_fifth_buyer_added_later_also_treats_existing_opportunities_as_baseline(session):
+    """Scenario E via the real deployment entry point: after first
+    deployment has already run (existing opportunities baselined, four
+    profiles onboarded), a fifth Buyer Profile seeded afterward must still
+    review the SAME pre-existing opportunities as historical onboarding
+    context, never as newly discovered - proven by re-running bootstrap
+    after adding a fifth profile row directly."""
+    plan = _make_plan(session)
+    _make_allocation(session, plan.id, site_name="Pre-existing For Fifth Buyer", minimum_dwellings=90)
+    bootstrap_acquisition_monitoring(session)  # first deployment - baselines everything, onboards the four pilots
+
+    workspace = resolve_default_workspace(session)
+    from app.policy.buyer_profiles import NESTEN_HOMES
+    from app.policy.buyer_profile_store import _template_to_record_fields
+    fifth = BuyerProfileRecord(**_template_to_record_fields(NESTEN_HOMES, workspace.id))
+    fifth.profile_key = "fifth_pilot_buyer"
+    fifth.display_name = "Fifth Pilot Buyer"
+    session.add(fifth)
+    session.commit()
+    assert is_buyer_profile_baseline_stale(fifth) is True
+
+    result = bootstrap_acquisition_monitoring(session)
+    assert "fifth_pilot_buyer" in result["profiles_onboarded_this_run"]
+    assert result["global_opportunity_baseline"]["new"] == 0  # the pre-existing opportunity is still not "new"
+    assert fifth.onboarding_completed_at is not None
+    assert fifth.onboarding_summary is not None and "reviewed=" in fifth.onboarding_summary

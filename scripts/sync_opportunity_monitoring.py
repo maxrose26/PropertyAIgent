@@ -1,9 +1,11 @@
-"""Gate 1 (Acquisition Monitoring Substrate) - explicit opportunity
-change-detection sync command.
+"""Gate 1 (Acquisition Monitoring Substrate) - explicit, ONGOING
+opportunity change-detection sync command.
 
-Rebuilds the current opportunity universe (app.reporting.opportunity_
-universe.build_current_opportunity_universe - the platform's own existing,
-unmodified opportunity-detection functions) and reconciles app.db.models.
+Rebuilds the COMPLETE current opportunity universe (app.reporting.
+opportunity_universe.build_current_opportunity_universe - the platform's
+own existing, unmodified opportunity-detection functions; this never
+silently truncates, however large the universe grows - see that module's
+own "COMPLETENESS" docstring section) and reconciles app.db.models.
 OpportunityMonitoringState against it: every opportunity identity is
 classified NEW / MATERIALLY_CHANGED / UNCHANGED (app.reporting.
 opportunity_change.classify_opportunity_change) and the monitoring table
@@ -11,18 +13,29 @@ is updated accordingly.
 
     python -m scripts.sync_opportunity_monitoring
 
-Idempotent, deterministic, bounded (see app.reporting.opportunity_universe.
-DEFAULT_UNIVERSE_POOL_LIMIT), no OpenAI call, no opportunity scoring.
-Requires scripts.migrate_schema to have already created the
-opportunity_monitoring_states table.
+Idempotent, deterministic, no OpenAI call, no opportunity scoring. Requires
+scripts.migrate_schema to have already created the opportunity_monitoring_
+states table.
+
+NOT part of first deployment - scripts.bootstrap_acquisition_monitoring
+already establishes the global opportunity baseline (BASELINE_EXISTING)
+as its own first step, so every opportunity already present in the
+database at first deployment is correctly recorded as historical, not
+"newly discovered", before this command ever needs to run. This command
+is the SEPARATE, ONGOING step: run it on its own recurring schedule from
+then on (e.g. as a new bounded stage of scripts.run_intelligence_
+processing.py's existing daily cron - not wired in during this gate, see
+the Gate 1 implementation report) to detect genuinely new or materially
+changed opportunities as the underlying planning intelligence changes.
+Safe to run even if scripts.bootstrap_acquisition_monitoring has not been
+run yet - sync_opportunity_monitoring_state self-detects an empty
+monitoring table and establishes the baseline correctly (BASELINE_
+EXISTING, not NEW) either way; it never relies on being called in a
+particular order relative to bootstrap.
 
 NOT wired into scripts.run_intelligence_processing.py or any production
 cron in this gate (Gate 1 brief, Section 22: "do NOT activate new
-production scheduling in this gate unless required and clearly safe") -
-this is the standalone building block Gate 2's own selective Acquisition
-Agent trigger will call as a new bounded stage of that existing cron; see
-the Gate 1 implementation report for exactly how that wiring would work
-once approved.
+production scheduling in this gate unless required and clearly safe").
 """
 from __future__ import annotations
 
@@ -39,7 +52,8 @@ def main() -> None:
 
     print(
         f"[sync-opportunity-monitoring] considered={counts['opportunities_considered']} "
-        f"new={counts['new']} materially_changed={counts['materially_changed']} unchanged={counts['unchanged']}"
+        f"baseline_existing={counts['baseline_existing']} new={counts['new']} "
+        f"materially_changed={counts['materially_changed']} unchanged={counts['unchanged']}"
     )
 
 
