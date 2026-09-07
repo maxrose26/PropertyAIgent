@@ -57,6 +57,9 @@ from app.policy.allocation_planning_coverage import (
     classify_planning_activity_coverage,
     enrich_none_found_reason,
 )
+from app.policy.buyer_matching import assess_buyer_fit, build_strategic_land_matching_facts
+from app.policy.buyer_profiles import BUYER_PROFILES
+from app.ui.buyer_selector import active_buyer_key, buyer_selector
 from app.reporting.ownership_control import (
     EMPTY_STATE_ALLOCATION_RESIDUAL,
     EMPTY_STATE_ALLOCATION_SITE,
@@ -75,6 +78,7 @@ from app.ui.shortlist import (
     shortlist_count,
 )
 from app.ui.shell import (
+    BUYER_FIT_BADGE_KIND,
     OPPORTUNITY_SIGNAL_BADGE_KIND,
     control_relationship_group_card,
     empty_state,
@@ -233,6 +237,12 @@ def _render_detail(view: dict, allocation_id: int) -> None:
                 ReportCandidate(candidate_type="allocation", candidate_id=allocation_id, display_name=card["site_name"]),
             )
 
+    # Buyer Profiles V1 - the same shared selector the Dashboard uses
+    # (app.ui.buyer_selector); switching buyer here also changes what the
+    # Dashboard shows next, and vice versa - one active-buyer session
+    # state, not two independent ones.
+    buyer_selector(key="allocation-detail")
+
     # --- Opportunity Summary (Opportunity Experience V2, Steps 11-17) -----
     # Answers WHAT IS THIS / WHY IS IT INTERESTING / WHAT EVIDENCE SUPPORTS
     # THIS / WHAT REMAINS UNKNOWN, entirely from already-computed,
@@ -306,6 +316,40 @@ def _render_detail(view: dict, allocation_id: int) -> None:
             st.write(f"• {reason}")
     else:
         st.caption("An investigation signal has not been established for this allocation.")
+
+    # Buyer Profiles V1 - "Fit for <buyer>", shown only when a buyer is
+    # active (session-only selection, app.ui.buyer_selector) - generic mode
+    # renders nothing here, leaving every section above and below byte-for-
+    # byte unchanged from Opportunity Experience V2. Deliberately placed
+    # immediately after "Why this opportunity was surfaced" rather than as
+    # a new top-level heading elsewhere on the page - buyer fit IS a
+    # buyer-specific reading of exactly that same "why surfaced" evidence,
+    # not a separate concern.
+    active_buyer = active_buyer_key()
+    if active_buyer:
+        profile = BUYER_PROFILES[active_buyer]
+        matching_facts = build_strategic_land_matching_facts(allocation_row, coverage, card.get("phasing"))
+        assessment = assess_buyer_fit(profile, matching_facts)
+        section_header(f"Fit for {profile.display_name}", icon="🧭")
+        status_badge(BUYER_FIT_BADGE_KIND.get(assessment.classification, "info"), assessment.classification.replace("_", " ").title())
+        if assessment.is_investigative_exception:
+            st.caption("Outside this buyer's normal range, but flagged as worth investigating - see below.")
+        if assessment.matches:
+            st.markdown("**Why it matches**")
+            for reason in assessment.matches:
+                st.write(f"• {reason}")
+        if assessment.does_not_match:
+            st.markdown("**Why it may not match**")
+            for reason in assessment.does_not_match:
+                st.write(f"• {reason}")
+        if assessment.unknown:
+            st.markdown("**What we don't know**")
+            for reason in assessment.unknown:
+                st.write(f"• {reason}")
+        if assessment.investigate:
+            st.markdown("**Investigate next**")
+            for reason in assessment.investigate:
+                st.write(f"• {reason}")
 
     # Evidence (Step 15) - moved up from the bottom of the page; the real
     # excerpt Gate 4A captured, shown verbatim alongside the existing
