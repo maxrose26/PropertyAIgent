@@ -58,7 +58,7 @@ from app.policy.allocation_planning_coverage import (
     enrich_none_found_reason,
 )
 from app.policy.buyer_matching import assess_buyer_fit, build_strategic_land_matching_facts
-from app.policy.buyer_profiles import BUYER_PROFILES
+from app.policy.buyer_profile_store import get_buyer_profile_dataclass
 from app.ui.buyer_selector import active_buyer_key, buyer_selector
 from app.reporting.ownership_control import (
     EMPTY_STATE_ALLOCATION_RESIDUAL,
@@ -241,7 +241,7 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     # (app.ui.buyer_selector); switching buyer here also changes what the
     # Dashboard shows next, and vice versa - one active-buyer session
     # state, not two independent ones.
-    buyer_selector(key="allocation-detail")
+    buyer_selector(key="allocation-detail", session=session)
 
     # --- Opportunity Summary (Opportunity Experience V2, Steps 11-17) -----
     # Answers WHAT IS THIS / WHY IS IT INTERESTING / WHAT EVIDENCE SUPPORTS
@@ -327,7 +327,10 @@ def _render_detail(view: dict, allocation_id: int) -> None:
     # not a separate concern.
     active_buyer = active_buyer_key()
     if active_buyer:
-        profile = BUYER_PROFILES[active_buyer]
+        profile = get_buyer_profile_dataclass(session, active_buyer)
+    else:
+        profile = None
+    if profile is not None:
         matching_facts = build_strategic_land_matching_facts(allocation_row, coverage, card.get("phasing"))
         assessment = assess_buyer_fit(profile, matching_facts)
         section_header(f"Fit for {profile.display_name}", icon="🧭")

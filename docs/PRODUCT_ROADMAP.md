@@ -74,6 +74,8 @@ The next implementation workstream is chosen **after** Phase 1 Opportunity Valid
 
 This is a genuine decision gate, not a formality — if the validation sample shows a different, unlisted gap most often, that gap is what gets built next, not whichever of the above looks most appealing in the abstract.
 
+**Factual update, post-refresh (Product Owner decision, recorded here without rewriting the gate structure above):** "Buyer Profiles + Deterministic Fit V1" was subsequently chosen and implemented - four pilot profiles (Nesten Homes, Strategic Land Buyer, National Housebuilder, Housing Association), deterministic `assess_buyer_fit` (`STRONG_FIT`/`NOT_SUITABLE`/`INSUFFICIENT_EVIDENCE` + an orthogonal investigative-exception flag, no LLM, no numeric score), and a personalised Dashboard/Opportunity Profile feed built on the widened-candidate-pool architecture described in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7 - merged to master (commit `0d1b564`). A follow-on **Gate 1: Acquisition Monitoring Substrate** has since been implemented on a feature branch (Workspace ownership boundary, persistent Buyer Profiles, stable opportunity identity, deterministic opportunity fingerprinting/change detection, and a buyer onboarding baseline) as the prerequisite substrate for a future Selective Acquisition Agent (Opportunity Analyst / Buyer Analyst, §7 below) - **awaiting Product Owner review, not yet merged or deployed.** The Opportunity Analyst/Buyer Analyst agentic capabilities themselves remain unbuilt; see §7's own status table.
+
 ---
 
 ## 1. Planning Intelligence
@@ -211,10 +213,11 @@ Candidates the Roadmap Decision Gate chooses between — **not** a committed seq
 
 Sequenced after Phase 1 opportunities are individually well understood, not before:
 
-- Structured Buyer Profiles (geography, scale, planning-risk appetite, development type, tenure, delivery horizon, brownfield/greenfield preference)
-- Deterministic buyer-fit logic against those profiles
-- **Opportunity Analyst V1**, if validation shows the underlying intelligence is already rich enough that interpretation is the main remaining burden
-- **Buyer Analyst V1**, once deterministic fit exists to interpret — never before it, and never as an opaque LLM-generated score
+- ~~Structured Buyer Profiles~~ (geography, scale, planning-risk appetite, development type, tenure, delivery horizon, brownfield/greenfield preference) - **implemented as Buyer Profiles V1** (four pilot profiles; unit/affordable-unit scale, planning appetite, development-type and wholly-affordable exclusion polarity - geography/tenure/brownfield-greenfield preference were explicitly out of scope for the pilot and remain future work)
+- ~~Deterministic buyer-fit logic against those profiles~~ - **implemented** (`app.policy.buyer_matching.assess_buyer_fit`)
+- Buyer Profiles are now **persistent and Workspace-owned** (Gate 1: Acquisition Monitoring Substrate, feature branch, awaiting Product Owner review) rather than code/config-only, as the substrate for a future selective agent
+- **Opportunity Analyst V1**, if validation shows the underlying intelligence is already rich enough that interpretation is the main remaining burden - **not yet built**
+- **Buyer Analyst V1**, once deterministic fit exists to interpret — never before it, and never as an opaque LLM-generated score - deterministic fit now exists (above); the agentic interpretation layer itself is **not yet built**
 
 ## Phase 2 — Market, Comparables & Investment Intelligence
 

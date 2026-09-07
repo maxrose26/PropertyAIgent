@@ -2452,3 +2452,203 @@ class IntelligenceRun(Base):
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     triggered_by: Mapped[str] = mapped_column(String(20), default="scheduled")
+
+
+class Workspace(Base):
+    """Gate 1 (Acquisition Monitoring Substrate) - the top-level customer/
+    data-isolation boundary for persistent Buyer Profiles and (Gate 2)
+    Acquisition Agent assessments, per the approved Workspace & Ownership
+    Architecture Investigation. Deliberately the ONLY new ownership concept
+    introduced this gate - that investigation found no repository or
+    product evidence justifying Organisation, User, or WorkspaceMembership
+    yet, and building them now would sit entirely unused (there is no
+    authentication to attach them to). Nothing about this table's shape
+    blocks adding an optional `organisation_id` FK above it later, or
+    `User`/`WorkspaceMembership` below it later - see that investigation's
+    own "Multi-user future" section.
+
+    Exactly one row exists in the current, still-single-user deployment
+    (see app.policy.workspace_bootstrap.resolve_default_workspace) -
+    mirrors this codebase's own existing Settings table precedent (a
+    single, hand-maintained "default installation" row), never a second,
+    novel singleton pattern.
+
+    Deliberately minimal - no enterprise fields (billing, plan tier,
+    contact details, ...) invented ahead of any evidence they're needed."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    # active | archived - prefer archival over destructive deletion,
+    # matching this schema's own consistent convention (LocalPlan/
+    # MonitoredReport/VisualEvidence all use a status/superseded pattern,
+    # never a hard DELETE, so audit history and every dependent row's FK
+    # stays valid).
+    status: Mapped[str] = mapped_column(String(20), default="active")
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class BuyerProfile(Base):
+    """Gate 1 (Acquisition Monitoring Substrate) - the persistent,
+    Workspace-owned counterpart of the existing app.policy.buyer_profiles.
+    BuyerProfile dataclass (deliberately kept as a SEPARATE class under a
+    different module path, never renamed/merged - see app.policy.
+    buyer_profile_store's own module docstring for exactly why and how the
+    two convert between each other). Every matching-relevant field here
+    mirrors that dataclass's own fields one-for-one; app.policy.
+    buyer_matching.assess_buyer_fit itself is completely unchanged by this
+    gate - it is only ever handed a dataclass instance built FROM one of
+    these rows, never a row directly.
+
+    accepted_planning_states is stored as a comma-joined string (mirrors
+    Application.evidence_refresh_reason's own "comma-joined reason codes,
+    not a new join table" convention) rather than a new association table
+    for a fixed, small, already-bounded vocabulary
+    (app.policy.buyer_profiles.PERMISSION_GRANTED/ADOPTED_ALLOCATION/
+    EMERGING_ALLOCATION/OTHER_OR_UNKNOWN).
+
+    matching_fingerprint/onboarding_completed_at/onboarding_summary exist
+    to answer exactly two Gate 1 product questions without a second table:
+    "has this buyer ever been onboarded against the current opportunity
+    universe" (onboarding_completed_at is None until it has) and "has this
+    buyer's own mandate changed since that onboarding" (compare a freshly
+    computed app.policy.buyer_profile_store.compute_buyer_profile_
+    fingerprint against matching_fingerprint - mirrors app.reporting.
+    allocation_intelligence_summary.should_regenerate_allocation_summary's
+    own "prefer a fingerprint over scattering ad-hoc mark-stale writes"
+    principle exactly)."""
+
+    __tablename__ = "buyer_profiles"
+    __table_args__ = (UniqueConstraint("workspace_id", "profile_key", name="uq_workspace_buyer_profile_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"))
+
+    # Stable identity within a workspace (e.g. "nesten_homes") - never the
+    # display name, which may change; mirrors app.policy.buyer_profiles.
+    # BuyerProfile.key exactly for the four seeded pilot profiles.
+    profile_key: Mapped[str] = mapped_column(String(100))
+    display_name: Mapped[str] = mapped_column(String(200))
+    buyer_type: Mapped[str] = mapped_column(String(200))
+    primary_requirement: Mapped[str] = mapped_column(String(300))
+
+    target_unit_min: Mapped[int] = mapped_column(Integer)
+    target_unit_max: Mapped[int] = mapped_column(Integer)
+    # "total_units" | "affordable_units" - app.policy.buyer_profiles.
+    # TOTAL_UNITS/AFFORDABLE_UNITS.
+    scale_metric: Mapped[str] = mapped_column(String(30))
+    # Comma-joined app.policy.buyer_profiles planning-state constants -
+    # see class docstring for why this is a plain string, not a table.
+    accepted_planning_states: Mapped[str] = mapped_column(String(200))
+    treats_no_activity_as_positive: Mapped[bool] = mapped_column(Boolean, default=False)
+    large_allocation_is_self_qualifying: Mapped[bool] = mapped_column(Boolean, default=False)
+    specialist_development_is_exclusion: Mapped[bool] = mapped_column(Boolean, default=True)
+    wholly_affordable_is_exclusion: Mapped[bool] = mapped_column(Boolean, default=True)
+    below_minimum_scale_is_exclusion: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # active | archived - never hard-deleted (see Workspace's own status
+    # field docstring for the same reasoning); an archived profile is
+    # simply skipped by future monitoring/onboarding passes.
+    status: Mapped[str] = mapped_column(String(20), default="active")
+
+    # Which app.policy.buyer_profiles code template this row was seeded
+    # from (e.g. "nesten_homes") - purely informational provenance, never
+    # read by matching logic, and never re-applied automatically (Section
+    # 9's own "rerunning bootstrap does not overwrite user-edited
+    # persistent values" requirement - this field only ever records WHERE
+    # a row started, not a live link back to the template).
+    source_template_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # sha256 of this profile's own matching-relevant fields (see
+    # app.policy.buyer_profile_store.compute_buyer_profile_fingerprint) as
+    # of the last successful onboarding baseline. Null until onboarding has
+    # run once. Comparing a freshly computed fingerprint against this value
+    # is the ONLY mechanism used to detect BUYER_PROFILE_CHANGED - never a
+    # separate boolean flag that could drift from the truth.
+    matching_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    onboarding_completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # A short, deterministic, human-readable line (e.g. "reviewed=255
+    # strong_fit=2 not_suitable=5 insufficient_evidence=248
+    # investigative_exceptions=2") - mirrors app.pipeline.material_change.
+    # MaterialChangeStats.summary_line's own "one summary line per batch"
+    # convention. Never a numeric score, never AI-generated.
+    onboarding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    workspace: Mapped["Workspace"] = relationship(foreign_keys=[workspace_id])
+
+
+class OpportunityMonitoringState(Base):
+    """Gate 1 (Acquisition Monitoring Substrate) - GLOBAL (not Workspace-
+    scoped) monitoring metadata for one opportunity identity string, per
+    the approved architecture investigation's own "objective opportunity
+    change is global; buyer INTERPRETATION of it is workspace-specific"
+    boundary (see docs/PLATFORM_ARCHITECTURE.md). This is deliberately NOT
+    a persisted Opportunity table - it stores no site/allocation facts of
+    its own (no unit counts, no addresses, nothing app.reporting.
+    opportunity_universe.build_current_opportunity_universe already reads
+    straight from Site/Application/LocalPlanSite/SchemeIntelligence every
+    time) - only the minimum metadata needed to answer "have I seen this
+    exact opportunity before, and if so, has it materially changed since":
+    identity, its last-known fingerprint, and when it was first/last seen
+    and last genuinely changed.
+
+    opportunity_id is a plain, indexed, unenforced string (see app.
+    reporting.opportunity_universe's own *_opportunity_id helpers) -
+    deliberately NOT a foreign key to any table, since no persisted
+    Opportunity row exists to point at (mirrors PolicyChangeEvent's own
+    several independently-nullable, non-enforced-both-ways target FKs
+    elsewhere in this schema). A row whose opportunity_id no longer
+    matches anything in the current live candidate universe simply means
+    that opportunity is no longer open - itself meaningful information,
+    never treated as corruption or cleaned up automatically."""
+
+    __tablename__ = "opportunity_monitoring_states"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    opportunity_id: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    # "strategic_land" | "planning_delivery" - app.reporting.
+    # opportunity_feed.STRATEGIC_LAND/PLANNING_DELIVERY - kept here purely
+    # for cheap filtering/observability, never re-derived from parsing
+    # opportunity_id's own string shape.
+    opportunity_type: Mapped[str] = mapped_column(String(30))
+
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    # JSON-encoded snapshot of ONLY app.reporting.opportunity_universe's
+    # own small fingerprint_fields dict for this opportunity as of
+    # last_seen_at - NOT a second copy of the underlying Site/Application/
+    # LocalPlanSite/SchemeIntelligence facts (those are never duplicated;
+    # this is a compact, purpose-built change-detection snapshot). Exists
+    # for exactly one reason: a hash-to-hash comparison alone can prove
+    # THAT something changed but never WHAT, and this gate's own brief
+    # requires deterministic per-field reason codes (see app.reporting.
+    # opportunity_change.classify_opportunity_change) - mirrors
+    # PolicyChangeEvent.old_value/new_value's own already-established
+    # "store enough of a before/after snapshot to explain a diff"
+    # precedent, applied to opportunities instead of policy.
+    fingerprint_fields: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    # Only advances when the fingerprint itself actually changes -
+    # deliberately distinct from last_seen_at, which advances on every
+    # routine scan regardless of whether anything changed (mirrors
+    # Application.evidence_refresh_last_checked_at's own "truthful
+    # timestamp" precedent: "means EXACTLY the most recent time X
+    # genuinely happened", never "the most recent time we merely looked").
+    last_change_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # NEW | MATERIALLY_CHANGED | UNCHANGED - app.reporting.
+    # opportunity_change.classify_opportunity_change's own three constants.
+    last_change_classification: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Comma-joined deterministic reason codes (e.g. "unit_count_changed",
+    # "planning_status_changed") - same "prefer deterministic reason codes
+    # over free-form-only text" discipline as app.pipeline.material_change.
+    # Null whenever last_change_classification is UNCHANGED or NEW (a new
+    # opportunity has nothing to compare against, so no reason code is
+    # invented for it).
+    last_change_reasons: Mapped[str | None] = mapped_column(String(300), nullable=True)
