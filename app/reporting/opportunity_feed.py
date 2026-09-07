@@ -282,10 +282,17 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
     included). Within each bucket, the pool's own existing order (strategic
     land already capacity-ranked; planning/delivery already lapse/date-
     ranked) is preserved - buyer-fit never re-ranks by scale itself."""
-    from app.policy.buyer_profiles import BUYER_PROFILES
     from app.policy.buyer_matching import assess_buyer_fit
+    from app.policy.buyer_profile_store import get_buyer_profile_dataclass
 
-    profile = BUYER_PROFILES[buyer_key]
+    profile = get_buyer_profile_dataclass(session, buyer_key)
+    if profile is None:
+        # buyer_key no longer resolves to an active persisted or template
+        # profile (e.g. archived between selection and this render) -
+        # degrade gracefully rather than crash; the UI's own buyer_selector
+        # only ever offers currently-active keys, so this is a defensive
+        # fallback, not an expected path.
+        return [], {"excluded_not_suitable": 0}
     _attach_planning_delivery_matching_facts(session, delivery)
 
     strong, exception, insufficient = [], [], []

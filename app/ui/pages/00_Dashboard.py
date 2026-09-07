@@ -145,7 +145,7 @@ with main_col:
     # re-selects the feed from a materially larger candidate pool for that
     # buyer specifically - see app.reporting.opportunity_feed.
     # build_opportunity_feed's own docstring for exactly what changes.
-    buyer_key = buyer_selector(key="dashboard")
+    buyer_key = buyer_selector(key="dashboard", session=session)
     opportunity_feed = build_opportunity_feed(session, buyer_key=buyer_key)
     counts = opportunity_feed["counts"]
     if buyer_key is None:
