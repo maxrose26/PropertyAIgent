@@ -69,3 +69,37 @@ Each capability is built as an independently reasoned-about layer with clear inp
 A user should always be able to ask "why does the platform believe this?" and get a real answer, down to the original evidence — not a black-box output presented as fact.
 
 *In practice:* review status, source provenance, match method and confidence are first-class, always-populated fields throughout the schema, not optional metadata — this is what makes it possible for a human reviewer to audit any AI-assisted or automated conclusion the platform has produced.
+
+---
+
+*The five principles below were added at the Product Vision & Roadmap Refresh (post–Opportunity Experience V2), formalising discipline the platform's own agentic-reasoning direction now depends on — see [PRODUCT_VISION.md](PRODUCT_VISION.md), "Evidence-First, Agent-Assisted, Human-Decided," and [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7.*
+
+## Preserve Uncertainty
+
+An uncertain or unresolved fact must never be silently converted into a false positive or a false negative by a later layer — including a future reasoning agent sitting on top of it.
+
+*In practice:* Opportunity Experience V2's own product language exists specifically to prevent this collapse — `UNCERTAIN` planning activity renders as "Activity uncertain — requires review," never as "no planning activity"; unknown ownership renders as "not yet assessed," never as "available." A future Opportunity Analyst inherits this obligation unchanged: where it cannot resolve a genuine evidence gap, the correct output names the gap, never fills it with a plausible-sounding assumption.
+
+## Opportunities Before Raw Records
+
+The product should present itself around things worth investigating, not as a searchable database of underlying records the user has to interrogate to find one.
+
+*In practice:* Opportunity Experience V2's Dashboard replaced seven technical signal-category sections ("Approaching lapse date," "Allocations without planning applications") with a single unified feed of real opportunities, each carrying its own reason and evidence — the signals became supporting tags on an opportunity, not the primary thing being browsed.
+
+## No Opaque Scoring
+
+A conclusion is never expressed as a number or ranking unless the platform can also show the defensible methodology behind it — a plausible-looking score with no inspectable basis is worse than no score at all.
+
+*In practice:* `build_opportunity_signal` classifies an allocation into one of four named states (INVESTIGATE/MONITOR/LOWER_PRIORITY/INSUFFICIENT_EVIDENCE) with a real, cited reason for each — never a 0–100 opportunity score. The same discipline is a hard constraint on the future Opportunity Analyst and Buyer Analyst: see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7.
+
+## Buyer Suitability Is Contextual, Not Universal
+
+An opportunity's value is relative to who's asking — it should never be reduced to one universal ranking that pretends otherwise.
+
+*In practice:* not yet built (Buyer Profiles, Phase 1.5 — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)), but architecturally committed in advance: an opportunity may legitimately be highly suitable for one buyer profile and unsuitable for another, and any future buyer-fit output must show that difference, not average it into one number.
+
+## Build Only Where Validated
+
+A capability — especially an agentic one — is built because real evidence from real use shows it's needed, not because it's the most exciting thing to build next.
+
+*In practice:* the Product Owner paused further implementation after Opportunity Experience V2 specifically to run Phase 1 Opportunity Validation — reviewing 10–15 genuine opportunities as a land professional would — before choosing the next workstream, rather than defaulting to whichever capability looks most appealing in the abstract. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Current Validation Milestone."
