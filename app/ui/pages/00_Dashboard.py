@@ -42,6 +42,7 @@ import streamlit as st
 
 from app.reporting.dashboard import build_dashboard
 from app.reporting.opportunity_feed import build_opportunity_feed
+from app.ui.buyer_selector import buyer_selector
 from app.ui.common import bootstrap, credits_sidebar, get_db
 from app.ui.shell import (
     activity_timeline,
@@ -82,7 +83,6 @@ page_header(
 )
 
 data = build_dashboard(session)
-opportunity_feed = build_opportunity_feed(session)
 
 # --- KPI strip (full width) --------------------------------------------------
 #
@@ -140,11 +140,25 @@ with main_col:
         "Real Local Plan allocations and planning-application signals worth investigating today - reused directly "
         "from Property AIgent's existing evidence, never a scored or predicted ranking."
     )
+    # Buyer Profiles V1 - generic mode (the default) preserves Opportunity
+    # Experience V2's own behaviour unchanged; selecting a pilot buyer here
+    # re-selects the feed from a materially larger candidate pool for that
+    # buyer specifically - see app.reporting.opportunity_feed.
+    # build_opportunity_feed's own docstring for exactly what changes.
+    buyer_key = buyer_selector(key="dashboard")
+    opportunity_feed = build_opportunity_feed(session, buyer_key=buyer_key)
     counts = opportunity_feed["counts"]
-    st.caption(
-        f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
-        f"{counts['undeveloped_phase']} undeveloped permission identified across the platform."
-    )
+    if buyer_key is None:
+        st.caption(
+            f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
+            f"{counts['undeveloped_phase']} undeveloped permission identified across the platform."
+        )
+    else:
+        st.caption(
+            f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
+            f"{counts['undeveloped_phase']} undeveloped permission considered · "
+            f"{counts.get('excluded_not_suitable', 0)} excluded as not suitable for this buyer."
+        )
     if not opportunity_feed["cards"]:
         st.caption("Nothing to investigate right now.")
     else:

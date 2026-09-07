@@ -57,6 +57,12 @@ from app.reporting.allocation_discovery import (
     capacity_range_labels,
     format_capacity,
 )
+from app.policy.buyer_matching import (
+    NOT_SUITABLE,
+    STRONG_FIT,
+    build_planning_delivery_matching_facts,
+    build_strategic_land_matching_facts,
+)
 
 STRATEGIC_LAND = "strategic_land"
 PLANNING_DELIVERY = "planning_delivery"
@@ -154,6 +160,11 @@ def _strategic_land_cards(session, limit: int) -> list[dict]:
             "page": "pages/3_Local_Plan_Sites.py",
             "params": {"allocation_id": str(a.id)},
             "when": a.updated_at,
+            # Buyer Profiles V1 - computed here, once, from the exact same
+            # allocation/coverage/phasing objects already in scope in this
+            # loop (no re-query) - None in generic mode until a buyer-fit
+            # pass (build_opportunity_feed, buyer_key set) reads it.
+            "matching_facts": build_strategic_land_matching_facts(a, result["coverage"], result["phasing"]),
         })
     return cards
 
@@ -166,7 +177,10 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
     computed (Step 3/24: "Do not pretend these are identical... Do not
     force allocation-specific fields onto planning-application
     opportunities") - "signal" stays None; the card's own real reason/
-    metric carry the explanation instead."""
+    metric carry the explanation instead. "matching_facts" starts None -
+    _attach_planning_delivery_matching_facts (below) fills it in, in a
+    single batched pass over every reshaped card, only when buyer matching
+    is actually requested."""
     return {
         "id": card["id"],
         "opportunity_type": opportunity_type,
@@ -181,43 +195,60 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
         "page": card["page"],
         "params": card["params"],
         "when": card["when"],
+        "matching_facts": None,
     }
 
 
-def build_opportunity_feed(session, limit: int = 6) -> dict:
-    """The Dashboard's own small, curated opportunity feed. Returns
-    {"cards": [...], "counts": {...}} - counts cover every card considered
-    (not just the ones shown), so a caller can show an honest "N more" /
-    "view all" line without re-querying.
+def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None:
+    """Buyer Profiles V1 - batched, additive enrichment of already-built
+    planning/delivery cards with a MatchingFacts reader over
+    SchemeIntelligence, mutating each card's own "matching_facts" key in
+    place. Never touches app.reporting.dashboard's own card-building
+    functions - this reads the same site_id every one of their cards
+    already carries in "params", via one batched query for every card in
+    the list, not one query per card. The representative application per
+    Site is chosen by the SAME app.ui.common.pick_representative_application
+    every other part of the platform already uses - never a second,
+    parallel "which application matters" rule invented here."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
 
-    Sort order (transparent, never a score - Step 8): strategic land
-    (INVESTIGATE, then MONITOR) first, since this workstream's own product
-    review found strategic Local Plan opportunities specifically buried
-    under a technical category label and asked for them promoted; then
-    planning/delivery items in their own existing, already-sorted order
-    (approaching lapse - genuinely time-bound - before undeveloped phase);
-    scale (capacity/hectares, already the tie-break within each source
-    query) is never used to rank ACROSS types, only within one."""
-    from app.reporting.dashboard import _approaching_lapse_cards, _undeveloped_phase_cards  # local import: avoids a circular import (dashboard.py may grow a reason to import this module later)
+    from app.db.models import Application
+    from app.ui.common import pick_representative_application
 
-    strategic = _strategic_land_cards(session, limit)
-    lapse_raw = _approaching_lapse_cards(session, limit)
-    undeveloped_raw = _undeveloped_phase_cards(session, limit)
+    site_ids = {int(c["params"]["site_id"]) for c in cards if c.get("params", {}).get("site_id")}
+    if not site_ids:
+        return
 
-    lapse = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Approaching lapse"]) for c in lapse_raw]
-    undeveloped = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Undeveloped permission"]) for c in undeveloped_raw]
-    delivery = [*lapse, *undeveloped]  # already sorted within each source query - lapse (time-bound) first
+    apps = session.execute(
+        select(Application)
+        .where(Application.site_id.in_(site_ids))
+        .options(selectinload(Application.scheme_intelligence))
+    ).scalars().all()
+    apps_by_site: dict[int, list] = {}
+    for app in apps:
+        apps_by_site.setdefault(app.site_id, []).append(app)
 
+    facts_by_site_id = {}
+    for site_id, site_apps in apps_by_site.items():
+        rep = pick_representative_application(site_apps)
+        si = rep.scheme_intelligence if rep else None
+        facts_by_site_id[site_id] = build_planning_delivery_matching_facts(si)
+
+    for card in cards:
+        site_id_raw = card.get("params", {}).get("site_id")
+        if site_id_raw is not None:
+            card["matching_facts"] = facts_by_site_id.get(int(site_id_raw))
+
+
+def _generic_selection(strategic: list[dict], delivery: list[dict], limit: int) -> list[dict]:
+    """The original Opportunity Experience V2 ordering (Step 8), extracted
+    unchanged so buyer mode can reuse the exact same rule rather than a
+    parallel copy of it - see build_opportunity_feed's own docstring for
+    the full rationale, preserved verbatim here."""
     investigate_cards = [c for c in strategic if c["signal"] == INVESTIGATE]
     monitor_cards = [c for c in strategic if c["signal"] == MONITOR]
 
-    # Reserve roughly half the feed for planning/delivery opportunities
-    # whenever any exist, rather than letting strategic land - which is
-    # usually more numerous - crowd them out entirely by raw count. A
-    # fixed, explainable reservation rule, never a cross-type score: both
-    # opportunity types remain genuinely discoverable together, matching
-    # this workstream's own "planning/delivery opportunities remain
-    # supported" requirement.
     delivery_reserved = min(len(delivery), limit // 2) if delivery else 0
     strategic_slots = limit - delivery_reserved
     chosen_strategic = investigate_cards[:strategic_slots]
@@ -226,13 +257,111 @@ def build_opportunity_feed(session, limit: int = 6) -> dict:
         chosen_strategic += monitor_cards[:remaining_strategic_slots]
     chosen_delivery = delivery[:limit - len(chosen_strategic)]
 
-    ordered = (chosen_strategic + chosen_delivery)[:limit]
+    return (chosen_strategic + chosen_delivery)[:limit]
 
-    return {
-        "cards": ordered,
-        "counts": {
-            "strategic_land": len(strategic),
-            "approaching_lapse": len(lapse_raw),
-            "undeveloped_phase": len(undeveloped_raw),
-        },
+
+def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit: int, buyer_key: str) -> tuple[list[dict], dict]:
+    """Buyer Profiles V1 (Phase 1 pilot) - selects and orders the STRONGEST
+    candidates for one buyer from the FULL candidate pool passed in (built
+    at a materially larger pool_limit than generic mode - see
+    build_opportunity_feed), not merely a re-filter of the generic top-N.
+    This is the one place this module departs from "reuse the generic
+    selection verbatim" - the brief's own "Critical Feed Requirement" is
+    explicit that filtering only the existing small generic feed would not
+    constitute meaningful personalisation.
+
+    Ordering (deterministic, documented, never a score):
+      1. STRONG_FIT
+      2. INSUFFICIENT_EVIDENCE marked as an investigative exception
+      3. INSUFFICIENT_EVIDENCE, not an investigative exception
+    NOT_SUITABLE opportunities are excluded from the personalised feed
+    entirely (the count is still reported - see the returned counts dict -
+    so nothing is silently dropped from view; a buyer-fit assessment is
+    always still computable and reviewable via the Opportunity Profile's
+    own "Fit for <buyer>" section for any opportunity, generic-mode
+    included). Within each bucket, the pool's own existing order (strategic
+    land already capacity-ranked; planning/delivery already lapse/date-
+    ranked) is preserved - buyer-fit never re-ranks by scale itself."""
+    from app.policy.buyer_profiles import BUYER_PROFILES
+    from app.policy.buyer_matching import assess_buyer_fit
+
+    profile = BUYER_PROFILES[buyer_key]
+    _attach_planning_delivery_matching_facts(session, delivery)
+
+    strong, exception, insufficient = [], [], []
+    excluded_not_suitable = 0
+    for card in (*strategic, *delivery):
+        facts = card.get("matching_facts")
+        if facts is None:
+            continue
+        assessment = assess_buyer_fit(profile, facts)
+        card["buyer_fit"] = assessment
+        if assessment.classification == NOT_SUITABLE:
+            excluded_not_suitable += 1
+            continue
+        if assessment.classification == STRONG_FIT:
+            strong.append(card)
+        elif assessment.is_investigative_exception:
+            exception.append(card)
+        else:
+            insufficient.append(card)
+
+    ordered = (strong + exception + insufficient)[:limit]
+    return ordered, {"excluded_not_suitable": excluded_not_suitable}
+
+
+def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None) -> dict:
+    """The Dashboard's own opportunity feed. Returns {"cards": [...],
+    "counts": {...}, "buyer_key": buyer_key} - counts cover every candidate
+    considered (not just the ones shown), so a caller can show an honest
+    "N more" / "view all" line without re-querying.
+
+    Generic mode (buyer_key=None, the default - unchanged from Opportunity
+    Experience V2): candidate pool size equals `limit` itself, and
+    selection/ordering is exactly _generic_selection above - byte-for-byte
+    the same behaviour this function always had.
+
+    Buyer mode (buyer_key set - Buyer Profiles V1): the candidate pool is
+    deliberately widened to a fixed, bounded ceiling (never unbounded/a
+    full-platform search - "preserve bounded performance" per the brief)
+    so buyer-fit selection has a genuinely larger universe to choose the
+    strongest opportunities from, not just the generic top-6 re-filtered -
+    see _buyer_selection's own docstring for the selection/ordering rule.
+
+    Sort order within generic mode (transparent, never a score - Step 8):
+    strategic land (INVESTIGATE, then MONITOR) first, since this
+    workstream's own product review found strategic Local Plan
+    opportunities specifically buried under a technical category label
+    and asked for them promoted; then planning/delivery items in their own
+    existing, already-sorted order (approaching lapse - genuinely
+    time-bound - before undeveloped phase); scale (capacity/hectares,
+    already the tie-break within each source query) is never used to rank
+    ACROSS types, only within one."""
+    from app.reporting.dashboard import _approaching_lapse_cards, _undeveloped_phase_cards  # local import: avoids a circular import (dashboard.py may grow a reason to import this module later)
+
+    # Buyer mode needs a materially larger pool to select FROM (the
+    # brief's own "Critical Feed Requirement") - a fixed, documented
+    # ceiling, not the display limit itself and not unbounded.
+    pool_limit = limit if buyer_key is None else max(limit * 8, 40)
+
+    strategic = _strategic_land_cards(session, pool_limit)
+    lapse_raw = _approaching_lapse_cards(session, pool_limit)
+    undeveloped_raw = _undeveloped_phase_cards(session, pool_limit)
+
+    lapse = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Approaching lapse"]) for c in lapse_raw]
+    undeveloped = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Undeveloped permission"]) for c in undeveloped_raw]
+    delivery = [*lapse, *undeveloped]  # already sorted within each source query - lapse (time-bound) first
+
+    counts = {
+        "strategic_land": len(strategic),
+        "approaching_lapse": len(lapse_raw),
+        "undeveloped_phase": len(undeveloped_raw),
     }
+
+    if buyer_key is None:
+        ordered = _generic_selection(strategic, delivery, limit)
+    else:
+        ordered, buyer_counts = _buyer_selection(session, strategic, delivery, limit, buyer_key)
+        counts.update(buyer_counts)
+
+    return {"cards": ordered, "counts": counts, "buyer_key": buyer_key}

@@ -135,6 +135,26 @@ _BADGE_KIND_STYLE = {
     # investment recommendation").
     "signal_investigate": {"color": "blue", "icon": "🔎", "label": "Investigate"},
     "signal_monitor": {"color": "gray", "icon": "👁", "label": "Monitor"},
+    # Buyer Profiles V1 - a buyer-fit classification badge, deliberately a
+    # different colour family from the opportunity-signal badges above (a
+    # buyer-fit result is relative to ONE buyer's stated requirements, an
+    # opportunity signal is not) so the two are never visually confused.
+    "buyer_strong_fit": {"color": "green", "icon": "✅", "label": "Strong fit"},
+    "buyer_insufficient_evidence": {"color": "gray", "icon": "❔", "label": "Insufficient evidence"},
+    "buyer_not_suitable": {"color": "red", "icon": "🚫", "label": "Not suitable"},
+}
+
+# Buyer Profiles V1 - shared between the Dashboard's opportunity_feed_card
+# and the Opportunity Profile's own "Fit for <buyer>" section, so the two
+# surfaces never drift into inconsistent badge kinds for the same
+# classification. Kept here (never importing app.policy.buyer_matching's
+# own string constants) - this module's own "presentation-only, no app.*
+# imports" convention (see this file's own docstring); callers pass the
+# already-known classification string.
+BUYER_FIT_BADGE_KIND = {
+    "STRONG_FIT": "buyer_strong_fit",
+    "INSUFFICIENT_EVIDENCE": "buyer_insufficient_evidence",
+    "NOT_SUITABLE": "buyer_not_suitable",
 }
 
 # Alert kinds native Streamlit already renders well - never reimplemented.
@@ -844,8 +864,13 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
         st.caption(card["subtitle"])
         if card.get("signal"):
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(card["signal"], "info"), card.get("signal_label") or card["signal"])
+        buyer_fit = card.get("buyer_fit")
+        if buyer_fit is not None:
+            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), buyer_fit.classification.replace("_", " ").title())
         if card.get("headline_reason"):
             st.write(card["headline_reason"])
+        if buyer_fit is not None and buyer_fit.matches:
+            st.caption("Why it fits: " + " · ".join(buyer_fit.matches[:2]))
 
         if card.get("metrics"):
             cols = st.columns(len(card["metrics"]))
