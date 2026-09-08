@@ -2738,16 +2738,45 @@ class ApplicantIntelligence(Base):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON list of strings - open questions the evidence cannot yet answer.
     unresolved_questions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Gate 2A amendment ("Evidence-Grounded Applicant Web Research") - JSON
+    # list of {"source_type": ..., "title": ..., "url": ..., "publisher": ...,
+    # "claim": ..., "accessed_date": ...} - concise, attributable supporting
+    # evidence ONLY (never a copied passage of source text), embedded on this
+    # SAME row rather than a separate table (mirrors roles/parent_group/
+    # unresolved_questions' own established "JSON-in-Text sub-field of one
+    # entity-level row" convention - Section 17's own "do not over-normalise
+    # prematurely" instruction). May include BOTH internal-context references
+    # (see app.reporting.applicant_intelligence.allowed_evidence_refs) and
+    # NEW, model-discovered external evidence found via bounded web research -
+    # each role's own evidence_refs may cite either kind (an "evidence:<i>"
+    # ref points into THIS array). Never populated for a not-researched
+    # (person-shaped) identity - see web_research_performed below.
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Observability only (Gate 2A amendment Section 19) - True only when the
+    # model's own response actually included a completed web_search_call
+    # item (never inferred from the prompt merely OFFERING the tool - the
+    # native Responses API web_search tool is model-invoked, not forced, so
+    # an eligible identity with sufficient internal evidence may legitimately
+    # skip searching). False for every not-researched (person-shaped)
+    # identity and every identity classified before this amendment.
+    web_research_performed: Mapped[bool] = mapped_column(Boolean, default=False)
 
     generated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # sha256 of the narrative-relevant subset of ApplicantIdentityContext -
     # see app.reporting.applicant_intelligence.compute_context_fingerprint's
     # own docstring. A routine check that finds nothing new never forces a
-    # regeneration/AI-cost event (Gate 2A Section 20).
+    # regeneration/AI-cost event (Gate 2A Section 20) - deliberately does
+    # NOT include today's date or any other time-based value (Gate 2A
+    # amendment Section 18: "do not make Applicant Intelligence stale simply
+    # because today's date changed" - the weekly Opportunity Engine must
+    # never trigger a re-search purely from time passing).
     context_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    # ok | error - null means "never attempted".
+    # ok | error | not_researched - null means "never attempted".
+    # not_researched (Gate 2A amendment Section 12) is a DELIBERATE,
+    # zero-AI-cost terminal state for a person-shaped applicant identity -
+    # never a failure, never retried merely because time has passed.
     status: Mapped[str | None] = mapped_column(String(20), nullable=True)
     generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

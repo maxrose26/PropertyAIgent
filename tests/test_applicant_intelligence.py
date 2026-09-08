@@ -20,10 +20,14 @@ from app.reporting.applicant_identity import (
     IDENTITY_COMPANY, IDENTITY_NAME, clean_organisation_name, resolve_applicant_identity,
 )
 from app.reporting.applicant_intelligence import (
-    ROLE_UNKNOWN, ROLE_LAND_PROMOTER, ROLE_HOUSEBUILDER, CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, SPV_UNKNOWN, SPV_TRUE,
+    ROLE_UNKNOWN, ROLE_LAND_PROMOTER, ROLE_HOUSEBUILDER, CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW,
+    SPV_UNKNOWN, SPV_TRUE, PROMPT_VERSION,
     allowed_evidence_refs, build_applicant_identity_contexts, compute_context_fingerprint,
     generate_applicant_intelligence, get_applicant_intelligence, process_applicant_intelligence_backlog,
     select_priority_identity_refs, should_regenerate, validate_applicant_intelligence_output,
+    apply_evidence_sufficiency_ceiling, evidence_supported_confidence_ceiling, is_planning_opportunity_linked,
+    is_person_shaped_identity, estimate_bootstrap_scope,
+    SOURCE_OFFICIAL_COMPANY_WEBSITE, SOURCE_REPUTABLE_NEWS_SOURCE,
 )
 
 
@@ -211,7 +215,7 @@ def test_valid_grounded_output_passes(session):
         "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
         "is_spv": SPV_UNKNOWN, "parent_group": None,
         "summary": "Named as applicant on one application, still pending.",
-        "unresolved_questions": [],
+        "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert ok, problems
@@ -222,7 +226,7 @@ def test_unknown_role_needs_no_evidence(session):
     structured = {
         "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Insufficient evidence to classify.",
-        "unresolved_questions": [],
+        "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert ok, problems
@@ -232,7 +236,7 @@ def test_hallucinated_evidence_ref_is_rejected(session):
     ctx = _minimal_context(session)
     structured = {
         "roles": [{"role": ROLE_HOUSEBUILDER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["occurrence:DOES-NOT-EXIST"]}],
-        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [],
+        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert not ok
@@ -243,7 +247,7 @@ def test_non_unknown_role_with_no_evidence_is_rejected(session):
     ctx = _minimal_context(session)
     structured = {
         "roles": [{"role": ROLE_HOUSEBUILDER, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
-        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [],
+        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert not ok
@@ -257,7 +261,7 @@ def test_banned_commercial_overreach_phrase_is_rejected(session):
         "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
         "is_spv": SPV_UNKNOWN, "parent_group": None,
         "summary": "This site is for sale and represents an acquisition opportunity.",
-        "unresolved_questions": [],
+        "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert not ok
@@ -270,7 +274,7 @@ def test_parent_group_evidence_ref_must_also_be_grounded(session):
         "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
         "is_spv": SPV_UNKNOWN,
         "parent_group": {"name": "Big Group PLC", "confidence": CONFIDENCE_MEDIUM, "evidence_refs": ["company:not_a_real_ref"]},
-        "summary": "x", "unresolved_questions": [],
+        "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert not ok
@@ -299,7 +303,7 @@ def test_new_application_changes_fingerprint(session):
 
 def test_should_regenerate_triggers(session):
     assert should_regenerate(None, "abc") is True
-    row = ApplicantIntelligence(identity_type="name", identity_key="x", display_name="X", roles=json.dumps([]), context_fingerprint="abc", prompt_version="applicant-intelligence-v1")
+    row = ApplicantIntelligence(identity_type="name", identity_key="x", display_name="X", roles=json.dumps([]), context_fingerprint="abc", prompt_version=PROMPT_VERSION)
     assert should_regenerate(row, "abc") is False
     assert should_regenerate(row, "different") is True
     assert should_regenerate(row, "abc", force=True) is True
@@ -310,8 +314,17 @@ def test_should_regenerate_triggers(session):
 # --- Orchestration / persistence --------------------------------------------
 
 class _FakeResponse:
-    def __init__(self, output: dict):
+    def __init__(self, output: dict, web_search_called: bool = False):
         self.output_text = json.dumps(output)
+        # Mirrors the real Responses API's own `output` list of typed items
+        # (see app.reporting.applicant_intelligence.generate_applicant_
+        # intelligence's own web_research_performed detection) - a plain
+        # object with a `.type` attribute stands in for a real
+        # ResponseFunctionWebSearch item; no real SDK type needed for tests.
+        class _Item:
+            def __init__(self, type_):
+                self.type = type_
+        self.output = [_Item("web_search_call")] if web_search_called else [_Item("message")]
 
 
 class _FakeClient:
@@ -333,7 +346,7 @@ def test_successful_generation_persists_and_reuses(session):
     client = _FakeClient({
         "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Named as applicant, still pending.",
-        "unresolved_questions": [],
+        "unresolved_questions": [], "evidence": [],
     })
     result = generate_applicant_intelligence(session, client, ctx)
     assert result.regenerated
@@ -355,7 +368,7 @@ def test_rejected_output_does_not_destroy_last_good_result(session):
     ref = next(iter(allowed_evidence_refs(ctx)))
     good_client = _FakeClient({
         "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
-        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [],
+        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [], "evidence": [],
     })
     generate_applicant_intelligence(session, good_client, ctx)
     row = get_applicant_intelligence(session, ctx.identity_ref)
@@ -363,7 +376,7 @@ def test_rejected_output_does_not_destroy_last_good_result(session):
 
     bad_client = _FakeClient({
         "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": ["occurrence:FAKE"]}],
-        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [],
+        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [], "evidence": [],
     })
     result = generate_applicant_intelligence(session, bad_client, ctx, force=True)
     assert result.rejected
@@ -377,7 +390,7 @@ def test_client_exception_does_not_destroy_last_good_result(session):
     ref = next(iter(allowed_evidence_refs(ctx)))
     good_client = _FakeClient({
         "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
-        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [],
+        "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [], "evidence": [],
     })
     generate_applicant_intelligence(session, good_client, ctx)
     original = get_applicant_intelligence(session, ctx.identity_ref).roles
@@ -392,10 +405,31 @@ def test_client_exception_does_not_destroy_last_good_result(session):
 
 # --- Bounded processing ------------------------------------------------------
 
+def _make_long_pending_opportunity(session, *, address, applicant_company, ref):
+    """A genuine LONG_PENDING_APPLICATION Opportunity Candidate (Gate 2A
+    amendment Section 1/14 - process_applicant_intelligence_backlog now
+    only ever selects planning-opportunity-linked identities, so bounded-
+    processing tests need real candidates, not merely any Application)."""
+    import datetime as dt
+    from app.reporting.opportunity_universe import add_calendar_months, LONG_PENDING_APPLICATION_WINDOW_MONTHS
+
+    site = _make_site(session, address=address)
+    submitted = add_calendar_months(dt.date.today(), -(LONG_PENDING_APPLICATION_WINDOW_MONTHS + 2))
+    app = Application(
+        council_code=site.council_code, reference=ref, site_id=site.id, status="Under consideration",
+        application_category="primary_residential", application_received=submitted.strftime("%a %d %b %Y"),
+        first_seen_at=dt.datetime.now(dt.timezone.utc),
+    )
+    session.add(app)
+    session.flush()
+    session.add(SchemeIntelligence(application_id=app.id, applicant_company=applicant_company))
+    session.commit()
+    return site, app
+
+
 def test_bounded_processing_respects_limit_and_isolates_failures(session):
     for i in range(5):
-        site = _make_site(session, address=f"Site {i}")
-        _make_application(session, site, ref=f"REF-{i}", applicant_company=f"Bounded Org {i} Ltd")
+        _make_long_pending_opportunity(session, address=f"Site {i}", applicant_company=f"Bounded Org {i} Ltd", ref=f"REF-{i}")
 
     call_count = {"n": 0}
 
@@ -405,7 +439,7 @@ def test_bounded_processing_respects_limit_and_isolates_failures(session):
             return _FakeClient(RuntimeError("simulated failure"))
         return _FakeClient({
             "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
-            "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [],
+            "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
         })
 
     result = process_applicant_intelligence_backlog(session, factory, limit=3)
@@ -413,14 +447,25 @@ def test_bounded_processing_respects_limit_and_isolates_failures(session):
     assert result["identities_considered"] == 5
 
 
-def test_rerun_with_unchanged_backlog_is_idempotent(session):
+def test_processing_excludes_identities_with_no_opportunity_candidate_link(session):
+    """A raw Application with no live Opportunity Candidate signal at all
+    (Gate 2A amendment Section 1/14's own scope decision) must never be
+    selected by the bounded processing stage, even though it still appears
+    in the platform-wide identity index."""
     site = _make_site(session)
-    _make_application(session, site, ref="REF-1", applicant_company="Idempotent Org Ltd")
+    _make_application(session, site, ref="REF-NOT-A-CANDIDATE", applicant_company="Never Processed Ltd")
+
+    result = process_applicant_intelligence_backlog(session, lambda: _FakeClient(RuntimeError("should never be called")), limit=10)
+    assert result["attempted"] == 0
+
+
+def test_rerun_with_unchanged_backlog_is_idempotent(session):
+    _make_long_pending_opportunity(session, address="Idempotent Site", applicant_company="Idempotent Org Ltd", ref="REF-1")
 
     def factory():
         return _FakeClient({
             "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
-            "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [],
+            "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
         })
 
     first = process_applicant_intelligence_backlog(session, factory, limit=10)

@@ -40,6 +40,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
@@ -50,12 +51,33 @@ from app.pipeline.material_change import (
     STATE_GRANTED, STATE_REFUSED, STATE_WITHDRAWN, _classify_planning_state,
 )
 from app.reporting.applicant_identity import (
-    ApplicantIdentity, IDENTITY_COMPANY, clean_organisation_name, resolve_applicant_identity,
+    ApplicantIdentity, IDENTITY_COMPANY, clean_organisation_name, is_likely_individual_name, resolve_applicant_identity,
 )
 from app.reporting.opportunity_universe import build_current_opportunity_universe
 
 MODEL = "gpt-4o-mini"  # matches every other OpenAI call already made across this codebase - no new model introduced (Gate 2A Section 17)
-PROMPT_VERSION = "applicant-intelligence-v1"
+# v2 (Gate 2A amendment, "Evidence-Grounded Applicant Web Research") - adds
+# the bounded web-search tool, the `evidence` schema field, and the
+# evidence-sufficiency confidence ceiling (see apply_evidence_sufficiency_
+# ceiling below) - a materially different prompt/schema/validation contract
+# from v1, so every v1-generated row is correctly treated as stale by
+# should_regenerate's own existing prompt_version check, with NO other
+# staleness mechanism needed.
+PROMPT_VERSION = "applicant-intelligence-v2-web-research"
+
+# Gate 2A amendment Section 20 - the native OpenAI Responses API hosted
+# web_search tool (confirmed against the ACTUALLY INSTALLED openai SDK,
+# v2.44.0 - app.reporting.applicant_intelligence's own implementation
+# report documents the exact smoke test used to verify this, never assumed
+# from memory). This is a server-side, MODEL-INVOKED tool: attaching it to
+# a single client.responses.create(...) call lets the model decide for
+# itself whether searching is needed at all (Section 5/11 - "do not
+# necessarily execute all queries"), still within ONE bounded, non-
+# autonomous turn - never a persistent loop, never the Agents SDK. Kept at
+# "low" context size deliberately (Section 4 - "bounded research, not
+# free-roaming autonomy"): enough for a handful of targeted lookups per
+# identity, not an open-ended browse.
+WEB_SEARCH_TOOL = {"type": "web_search", "search_context_size": "low"}
 
 # Gate 2A Section 9 - multiple roles may genuinely apply; UNKNOWN is a valid,
 # desirable output when evidence cannot support any commercial-role claim
@@ -77,6 +99,61 @@ CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW = "HIGH", "MEDIUM", "LOW"
 CONFIDENCE_LEVELS = (CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW)
 SPV_TRUE, SPV_FALSE, SPV_UNKNOWN = "TRUE", "FALSE", "UNKNOWN"
 SPV_STATUSES = (SPV_TRUE, SPV_FALSE, SPV_UNKNOWN)
+
+# Gate 2A amendment Section 7 - the evidence source-type taxonomy.
+# INTERNAL_* are named here for completeness/documentation only - internal
+# facts are already represented via the existing evidence_ref mechanism
+# (occurrence:*/company:*/raw_name:*/fact:*/control:*, see
+# allowed_evidence_refs) and are never duplicated into the `evidence` array
+# below, which is reserved for EXTERNALLY-discovered (bounded web research)
+# evidence only - a deliberate, narrow split, not the maximal taxonomy
+# Section 7 itself warns against ("do not create excessive taxonomy").
+SOURCE_INTERNAL_PLANNING_RECORD = "INTERNAL_PLANNING_RECORD"
+SOURCE_INTERNAL_COMPANY_RECORD = "INTERNAL_COMPANY_RECORD"
+SOURCE_INTERNAL_CONTROL_RECORD = "INTERNAL_CONTROL_RECORD"
+SOURCE_OFFICIAL_COMPANY_WEBSITE = "OFFICIAL_COMPANY_WEBSITE"
+SOURCE_COMPANIES_HOUSE = "COMPANIES_HOUSE"
+SOURCE_GOVERNMENT_OR_LOCAL_AUTHORITY = "GOVERNMENT_OR_LOCAL_AUTHORITY"
+SOURCE_PLANNING_DOCUMENT = "PLANNING_DOCUMENT"
+SOURCE_CORPORATE_GROUP_WEBSITE = "CORPORATE_GROUP_WEBSITE"
+SOURCE_REPUTABLE_PROPERTY_PRESS = "REPUTABLE_PROPERTY_PRESS"
+SOURCE_REPUTABLE_NEWS_SOURCE = "REPUTABLE_NEWS_SOURCE"
+SOURCE_OTHER_RELIABLE_PUBLIC_SOURCE = "OTHER_RELIABLE_PUBLIC_SOURCE"
+# The ONLY source types the model may use in the `evidence` array - Section
+# 8's own quality hierarchy, ordered most- to least-trusted; also this
+# module's own tier classification below.
+EXTERNAL_SOURCE_TYPES = (
+    SOURCE_OFFICIAL_COMPANY_WEBSITE, SOURCE_COMPANIES_HOUSE, SOURCE_GOVERNMENT_OR_LOCAL_AUTHORITY,
+    SOURCE_PLANNING_DOCUMENT, SOURCE_CORPORATE_GROUP_WEBSITE, SOURCE_REPUTABLE_PROPERTY_PRESS,
+    SOURCE_REPUTABLE_NEWS_SOURCE, SOURCE_OTHER_RELIABLE_PUBLIC_SOURCE,
+)
+
+# Gate 2A amendment Section 6/22 - the SEMANTIC evidence-sufficiency tiers
+# (deterministic, never a second LLM "judge" call - "the narrowest robust
+# approach"). STRONG: a direct, independently verifiable, official/
+# governmental source - can support HIGH. MEDIUM: a reputable but indirect
+# source (press/news/other reliable public source), OR an internal
+# Companies House fact this platform already holds (a verified legal-entity
+# record - real, but proves incorporation/status, not commercial ROLE) -
+# can support MEDIUM, or HIGH only when STRONG evidence is also present.
+# WEAK: everything else this platform holds internally about planning
+# ACTIVITY (an occurrence/raw name/aggregate fact/site-specific control
+# relationship) - real, but Section 6's own example is exact: being named
+# on N applications, or a bare raw name, does not by itself prove a
+# commercial role - WEAK evidence alone can never exceed LOW.
+_STRONG_SOURCE_TYPES = {
+    SOURCE_OFFICIAL_COMPANY_WEBSITE, SOURCE_CORPORATE_GROUP_WEBSITE, SOURCE_COMPANIES_HOUSE,
+    SOURCE_GOVERNMENT_OR_LOCAL_AUTHORITY, SOURCE_PLANNING_DOCUMENT,
+}
+_MEDIUM_SOURCE_TYPES = {SOURCE_REPUTABLE_PROPERTY_PRESS, SOURCE_REPUTABLE_NEWS_SOURCE, SOURCE_OTHER_RELIABLE_PUBLIC_SOURCE}
+_CONFIDENCE_RANK = {CONFIDENCE_LOW: 0, CONFIDENCE_MEDIUM: 1, CONFIDENCE_HIGH: 2}
+
+# Syntactic-only check (Gate 2A amendment Section 29: "invalid URL/source
+# reference rejected") - this platform has no live URL-fetch/liveness
+# check anywhere, and adding one here would be a new, flaky, out-of-scope
+# network dependency inside validation; a malformed/empty URL is still
+# rejected outright.
+_URL_PATTERN = re.compile(r"^https?://[^\s]+\.[^\s]+$", re.IGNORECASE)
 
 # Gate 2A Section 13 - a narrow, deliberately literal lexical safety net over
 # the one free-text field this schema has (summary) - mirrors app.reporting.
@@ -341,13 +418,47 @@ def build_applicant_identity_contexts(session: Session) -> dict[str, ApplicantId
     return contexts
 
 
-def select_priority_identity_refs(contexts: dict[str, ApplicantIdentityContext], *, limit: int) -> list[str]:
-    """Gate 2A Section 24 - priority order: entities touching a
-    long_pending_application candidate first, then recent_permission, then
-    any other planning-delivery candidate, then (lowest) everything else on
-    the platform. Deterministic tie-break (identity_ref) so repeated runs
-    with an unchanged backlog select the same identities, never an
-    arbitrary dict-iteration order."""
+def is_planning_opportunity_linked(context: ApplicantIdentityContext) -> bool:
+    """Gate 2A amendment Section 1/14 - the SCOPE gate: eligible only when
+    at least one of this identity's occurrences sits on a Site the current
+    Opportunity Universe actually flags as a planning-delivery candidate
+    (long_pending_application/recent_permission/site[approaching_lapse]/
+    phase[undeveloped_permission]) - never merely "an Application exists
+    somewhere in the platform's history". A strategic_land allocation
+    (LocalPlanSite) never produces an occurrence at all (build_applicant_
+    identity_contexts only ever scans Application rows), so this already
+    correctly excludes every strategic-land-only opportunity by
+    construction; a strategic-land Site that ALSO carries a genuine linked
+    Application is unaffected and remains eligible through that
+    Application relationship (see test_strategic_land_regression)."""
+    return any(o.is_opportunity_candidate for o in context.occurrences)
+
+
+def is_person_shaped_identity(context: ApplicantIdentityContext) -> bool:
+    """Gate 2A amendment Section 12 - True only when EVERY raw name variant
+    seen for this identity looks like a named individual (app.reporting.
+    applicant_identity.is_likely_individual_name) - conservative toward
+    treating an identity as a real organisation: a single organisation-
+    shaped variant among several is enough to disqualify this check, so a
+    genuine company is never silently skipped merely because one raw
+    portal field happened to record a person's name for it too."""
+    names = context.raw_name_variants or [context.display_name]
+    return all(is_likely_individual_name(n) for n in names)
+
+
+def select_priority_identity_refs(
+    contexts: dict[str, ApplicantIdentityContext], *, limit: int, only_opportunity_linked: bool = True,
+) -> list[str]:
+    """Gate 2A Section 24, NARROWED by the Gate 2A amendment's own Section 1/
+    14 scope decision - `only_opportunity_linked` (default True, matching
+    the amendment's explicit product decision) restricts selection to
+    identities is_planning_opportunity_linked accepts; pass False only for
+    diagnostic/reporting purposes (see estimate_bootstrap_scope below),
+    never for real processing. Priority order among eligible identities:
+    long_pending_application first, then recent_permission, then any other
+    planning-delivery candidate. Deterministic tie-break (identity_ref) so
+    repeated runs with an unchanged backlog select the same identities,
+    never an arbitrary dict-iteration order."""
     def _priority(ctx: ApplicantIdentityContext) -> tuple[int, str]:
         kinds = set(ctx.opportunity_candidate_kinds)
         if "long_pending_application" in kinds:
@@ -360,7 +471,10 @@ def select_priority_identity_refs(contexts: dict[str, ApplicantIdentityContext],
             band = 3
         return (band, ctx.identity_ref)
 
-    ordered = sorted(contexts.values(), key=_priority)
+    pool = contexts.values()
+    if only_opportunity_linked:
+        pool = [ctx for ctx in pool if is_planning_opportunity_linked(ctx)]
+    ordered = sorted(pool, key=_priority)
     return [ctx.identity_ref for ctx in ordered[:limit]]
 
 
@@ -529,19 +643,63 @@ APPLICATION/SITE OCCURRENCES (each independently evidenced - being named here me
 COMPANIES HOUSE / VERIFIED COMPANY EVIDENCE:
 {company_lines}
 
-SITE-SPECIFIC OWNERSHIP/CONTROL EVIDENCE (Gate 2A Section 14 - kept SEPARATE from your own role classification below; never flatten these into one claim):
+SITE-SPECIFIC OWNERSHIP/CONTROL EVIDENCE (kept SEPARATE from your own role classification below; never flatten these into one claim):
 {control_lines}
+
+EVERYTHING ABOVE IS INTERNAL PROPERTY AIGENT EVIDENCE. It proves planning
+ACTIVITY (this name was submitted on these applications) and, where a
+Company row exists, verified legal-entity facts (incorporation/status) -
+it does NOT by itself prove a COMMERCIAL ROLE. A bare name, or a count of
+applications, is a fact about activity, never proof of what kind of
+organisation this is.
+
+YOU HAVE ACCESS TO A WEB SEARCH TOOL. Use it when the internal evidence
+above is insufficient, ambiguous, or purely name-derived to support a
+confident role - which will be the common case for a name-based identity
+with no Companies House record. Do NOT search if the internal evidence
+already gives you everything you need (e.g. you have nothing useful to
+add beyond restating activity, and UNKNOWN is the honest answer either
+way). Search efficiently and stop once you have enough - a small number
+of targeted queries (e.g. "<organisation> official website", "<organisation>
+land promoter", "<organisation> housebuilder", "<organisation> planning")
+is normally sufficient; you do not need to run every possible query.
+
+SOURCE QUALITY - prefer, in this order, and cite every external fact you
+rely on in the `evidence` array below with the matching source_type:
+1. OFFICIAL_COMPANY_WEBSITE - the organisation's own official website.
+2. COMPANIES_HOUSE - a Companies House / equivalent government company record.
+3. GOVERNMENT_OR_LOCAL_AUTHORITY - an official government or local/planning authority source.
+4. PLANNING_DOCUMENT - an official planning application document.
+5. CORPORATE_GROUP_WEBSITE - an official parent/group company website.
+6. REPUTABLE_PROPERTY_PRESS - a reputable property/planning industry publication.
+7. REPUTABLE_NEWS_SOURCE - a reputable general news source.
+8. OTHER_RELIABLE_PUBLIC_SOURCE - another source you can confidently attribute and inspect.
+AVOID relying on search-result snippets you cannot attribute to a real,
+inspectable page, SEO/company directories, scraped aggregators, social
+media, forums, or unverified user-generated content - if that is genuinely
+all you can find, treat the evidence as insufficient rather than citing it.
+
+ROLE-SPECIFIC EVIDENCE - what counts as real support (never a name alone):
+- HOUSEBUILDER: an official/reputable source explicitly describing the organisation building and selling homes (a portfolio, an explicit description).
+- LAND_PROMOTER: an official/reputable source explicitly describing land promotion or strategic land activity (acquiring/controlling land, pursuing planning, then disposing or partnering).
+- HOUSING_ASSOCIATION: an official description, or a regulator/government source, identifying it as a registered provider/housing association.
+- PUBLIC_SECTOR: a source establishing the entity is a public authority or public body.
+- CONSULTANT_AGENT: an official professional-services website, or planning documentation, showing an agent/consultant relationship (not the applicant themselves).
+- DEVELOPER: a source establishing actual development activity or an explicit developer role - broader/weaker than HOUSEBUILDER, do not use HOUSEBUILDER unless residential housebuilding specifically is shown.
+- LANDOWNER_PRIVATE: treat with special care - never infer ownership merely from applicant status; this is a role about the organisation's own described business (e.g. a private estate/landowning company), never a substitute for the separate, site-specific ControlRelationship evidence above.
+- OTHER / UNKNOWN: use whenever the evidence above does not meet the bar for one of the defined roles - never force a classification.
 
 RULES - follow every one of these exactly:
 1. You may assert MULTIPLE roles for this organisation (e.g. LAND_PROMOTER and DEVELOPER together) if the evidence genuinely supports more than one - never force a single label.
-2. Every role you assert (other than UNKNOWN) MUST cite at least one evidence_ref from the refs shown in brackets above - a hallucinated or unlisted ref is an automatic rejection. UNKNOWN needs no evidence_refs and is the correct, expected output when nothing above supports a confident role.
-3. Confidence is categorical only: HIGH, MEDIUM, or LOW - never a numeric percentage, never invented precision.
-4. is_spv (Special Purpose Vehicle) is a SEPARATE corporate-structure question from role - having "Limited"/"Ltd" in a name is NEVER by itself evidence of SPV status; "Developments" in a name is NEVER by itself evidence of LAND_PROMOTER; "Homes" in a name is NEVER by itself evidence of HOUSEBUILDER. Return UNKNOWN for is_spv unless the evidence above (e.g. a very narrow application/site footprint alongside other signals) genuinely supports TRUE or FALSE.
-5. parent_group is null unless the evidence above genuinely names a parent/group relationship - never invented from a name resembling a larger group.
-6. NEVER assert, or let your summary imply: that this site or any site above is for sale or available; that this organisation owns any site solely because it is the applicant; that a promoter will sell after permission; that any Application/Site above is an "acquisition opportunity"; that being an applicant establishes ownership, control, or exclusivity. Ownership/control evidence above is SEPARATE, SITE-SPECIFIC evidence - never merge it with your own role classification into a single stronger claim (e.g. never write "promoter-owned site for sale").
-7. summary must be plain, evidence-only prose (2-4 sentences) - state only what the facts above actually show; frame genuine gaps as investigation signals, never as a real-world absence (an application with no ownership evidence here means Property AIgent has not identified any, not that none exists).
+2. Every role you assert (other than UNKNOWN) MUST cite at least one evidence_ref from the refs shown in brackets above, and/or an "evidence:<index>" ref into the `evidence` array you return - a hallucinated or unlisted ref is an automatic rejection. UNKNOWN needs no evidence_refs and is the correct, expected output when nothing above supports a confident role.
+3. Confidence is categorical only: HIGH, MEDIUM, or LOW - never a numeric percentage, never invented precision. HIGH requires direct, official/reliable evidence (internal facts about planning ACTIVITY alone, e.g. a bare name or an application count, can never alone support HIGH or MEDIUM - only LOW). MEDIUM requires either one reliable indirect source or multiple converging weaker ones. Do not use HIGH merely because you feel certain - use it only when the evidence cited genuinely is that strong.
+4. is_spv (Special Purpose Vehicle) is a SEPARATE corporate-structure question from role - having "Limited"/"Ltd" in a name is NEVER by itself evidence of SPV status; "Developments" in a name is NEVER by itself evidence of LAND_PROMOTER; "Homes" in a name is NEVER by itself evidence of HOUSEBUILDER; "Land"/"Properties" in a name is NEVER by itself evidence of LAND_PROMOTER or LANDOWNER_PRIVATE. Return UNKNOWN for is_spv unless the evidence above or your research genuinely supports TRUE or FALSE.
+5. parent_group is null unless the evidence above or your research genuinely names a parent/group relationship - never invented from a name resembling a larger group.
+6. NEVER assert, or let your summary imply: that this site or any site above is for sale or available; that this organisation owns any site solely because it is the applicant; that a promoter will sell after permission; that an SPV means a site is being flipped; that Certificate A evidence means current disposal intent; that any Application/Site above is an "acquisition opportunity"; that being an applicant establishes ownership, control, or exclusivity. Ownership/control evidence above is SEPARATE, SITE-SPECIFIC evidence - never merge it with your own role classification into a single stronger claim (e.g. never write "promoter-owned site for sale"). Gate 2A intelligence should generally avoid site-specific commercial conclusions entirely.
+7. summary must be plain, evidence-only prose (2-4 sentences) - state only what the facts above and your research actually show; frame genuine gaps as investigation signals, never as a real-world absence (an application with no ownership evidence here means Property AIgent has not identified any, not that none exists).
 8. unresolved_questions: 0-3 short, specific open questions the evidence above cannot yet answer (empty list if genuinely none) - never a generic instruction.
-9. Every evidence_ref you cite anywhere (roles[].evidence_refs, parent_group.evidence_refs) must be an EXACT string from the bracketed refs shown above - never invent, abbreviate, or paraphrase a ref.
+9. Every evidence_ref you cite anywhere (roles[].evidence_refs, parent_group.evidence_refs) must be an EXACT string from the bracketed refs shown above, or a valid "evidence:<index>" into your own `evidence` array - never invent, abbreviate, or paraphrase a ref.
+10. evidence: one entry per EXTERNAL fact you found via web search and relied on (empty array if you did not search, or found nothing usable) - each with source_type (from the list above), title, url (the real page you found), publisher (the site/organisation name), and a concise claim (one sentence - never a copied passage). Leave accessed_date as an empty string - Property AIgent records the real access date itself. Never fabricate a URL or title - if you are not confident a source is real and inspectable, do not include it.
 """
 
 
@@ -576,8 +734,30 @@ APPLICANT_INTELLIGENCE_SCHEMA = {
             },
             "summary": {"type": "string"},
             "unresolved_questions": {"type": "array", "items": {"type": "string"}},
+            # Gate 2A amendment ("Evidence-Grounded Applicant Web Research")
+            # Section 7/17 - EXTERNAL evidence only (internal facts are
+            # already covered by the existing evidence_ref mechanism - see
+            # EXTERNAL_SOURCE_TYPES' own docstring). [] is the correct,
+            # expected value whenever web research was not needed or found
+            # nothing usable (Section 5) - never inert placeholder entries.
+            "evidence": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_type": {"type": "string", "enum": list(EXTERNAL_SOURCE_TYPES)},
+                        "title": {"type": "string"},
+                        "url": {"type": "string"},
+                        "publisher": {"type": "string"},
+                        "claim": {"type": "string"},
+                        "accessed_date": {"type": "string"},
+                    },
+                    "required": ["source_type", "title", "url", "publisher", "claim", "accessed_date"],
+                    "additionalProperties": False,
+                },
+            },
         },
-        "required": ["roles", "is_spv", "parent_group", "summary", "unresolved_questions"],
+        "required": ["roles", "is_spv", "parent_group", "summary", "unresolved_questions", "evidence"],
         "additionalProperties": False,
     },
 }
@@ -586,16 +766,42 @@ APPLICANT_INTELLIGENCE_SCHEMA = {
 # --- Grounding validation (Gate 2A Section 19) ------------------------------
 
 
+def _evidence_ref_pool(context: ApplicantIdentityContext, structured_evidence: list[dict]) -> set[str]:
+    """The complete whitelist for THIS specific response: every internal
+    context ref PLUS one "evidence:<i>" ref per entry the model itself
+    returned in its own `evidence` array (Section 17's own external-
+    evidence mechanism) - computed per-response, since the external
+    entries don't exist until the model returns them."""
+    return allowed_evidence_refs(context) | {f"evidence:{i}" for i in range(len(structured_evidence))}
+
+
 def validate_applicant_intelligence_output(context: ApplicantIdentityContext, structured: dict) -> tuple[bool, list[str]]:
-    """Rejects any output citing an evidence_ref not present in
-    allowed_evidence_refs(context), any role/confidence/spv_status outside
-    the fixed enums (defensive - already enforced by the strict JSON
-    schema, but checked again here so this function is a complete,
+    """Rejects any output citing an evidence_ref not present in this
+    response's own ref pool (internal context refs + this response's own
+    `evidence` array indices), any role/confidence/spv_status/source_type
+    outside the fixed enums (defensive - already enforced by the strict
+    JSON schema, but checked again here so this function is a complete,
     independently-correct grounding gate on its own), a non-UNKNOWN role
-    with zero evidence_refs, or a summary containing one of the banned
-    commercial-overreach phrases (Gate 2A Section 13)."""
+    with zero evidence_refs, a malformed/missing evidence URL, or a summary
+    containing one of the banned commercial-overreach phrases (Gate 2A
+    Section 13/23).
+
+    This function checks ONLY that cited evidence EXISTS and is well-
+    formed - "evidence exists" is necessary but not sufficient (Gate 2A
+    amendment Section 6). Whether the cited evidence actually SUPPORTS the
+    confidence level claimed is a separate, deterministic question answered
+    by apply_evidence_sufficiency_ceiling below, applied by the
+    orchestrator AFTER this validation passes."""
     problems: list[str] = []
-    allowed = allowed_evidence_refs(context)
+    evidence_list = structured.get("evidence", [])
+    allowed = _evidence_ref_pool(context, evidence_list)
+
+    for i, item in enumerate(evidence_list):
+        if item.get("source_type") not in EXTERNAL_SOURCE_TYPES:
+            problems.append(f"evidence[{i}] has an unrecognised source_type: {item.get('source_type')!r}")
+        url = item.get("url") or ""
+        if not _URL_PATTERN.match(url):
+            problems.append(f"evidence[{i}] has a missing or malformed URL: {url!r}")
 
     for entry in structured.get("roles", []):
         role = entry.get("role")
@@ -629,6 +835,82 @@ def validate_applicant_intelligence_output(context: ApplicantIdentityContext, st
     return (len(problems) == 0, problems)
 
 
+# --- Semantic evidence sufficiency (Gate 2A amendment Section 6/22) --------
+
+
+def _evidence_ref_tier(ref: str, structured_evidence: list[dict]) -> str:
+    """STRONG | MEDIUM | WEAK for one evidence_ref string - see the module-
+    level _STRONG_SOURCE_TYPES/_MEDIUM_SOURCE_TYPES docstring for the exact
+    reasoning behind each tier."""
+    if ref.startswith("evidence:"):
+        try:
+            idx = int(ref.split(":", 1)[1])
+        except ValueError:
+            return "WEAK"
+        if 0 <= idx < len(structured_evidence):
+            source_type = structured_evidence[idx].get("source_type")
+            if source_type in _STRONG_SOURCE_TYPES:
+                return "STRONG"
+            if source_type in _MEDIUM_SOURCE_TYPES:
+                return "MEDIUM"
+        return "WEAK"
+    if ref.startswith("company:"):
+        # A Companies House-derived fact this platform already holds - a
+        # real, verified legal-entity record (MEDIUM), but proves
+        # incorporation/status, never commercial ROLE on its own (Gate 2A
+        # amendment Section 6's own reasoning for why internal evidence is
+        # "often insufficient to establish commercial role reliably").
+        return "MEDIUM"
+    # occurrence:* / raw_name:* / fact:* / control:* - planning ACTIVITY or
+    # site-specific control evidence, never commercial-role proof alone
+    # (the exact "raw_name:Bloor Homes... does not prove LAND_PROMOTER"
+    # example the amendment brief itself gives).
+    return "WEAK"
+
+
+def evidence_supported_confidence_ceiling(evidence_refs: list[str], structured_evidence: list[dict]) -> str:
+    """The HIGHEST confidence this specific set of evidence_refs can
+    actually support, independent of what the model itself claimed."""
+    if not evidence_refs:
+        return CONFIDENCE_LOW
+    tiers = [_evidence_ref_tier(ref, structured_evidence) for ref in evidence_refs]
+    if "STRONG" in tiers:
+        return CONFIDENCE_HIGH
+    if tiers.count("MEDIUM") >= 1 or tiers.count("WEAK") >= 2:
+        return CONFIDENCE_MEDIUM
+    return CONFIDENCE_LOW
+
+
+def apply_evidence_sufficiency_ceiling(structured: dict) -> tuple[dict, list[str]]:
+    """Gate 2A amendment Section 6/22's own semantic-sufficiency layer,
+    applied AFTER validate_applicant_intelligence_output passes (never
+    instead of it - ref-existence and semantic-sufficiency are two
+    independent checks). Deterministically DOWNGRADES (never upgrades,
+    never rejects) each non-UNKNOWN role's confidence to the ceiling its
+    OWN cited evidence can support - "evidence exists" is already proven
+    by validation; this proves "evidence exists AT THIS STRENGTH". Returns
+    the (possibly adjusted) structured dict plus a list of human-readable
+    adjustment notes for observability/tests - the notes are NEVER
+    persisted as intelligence fact, only used for reporting/audit."""
+    adjustments: list[str] = []
+    evidence_list = structured.get("evidence", [])
+    new_roles = []
+    for entry in structured.get("roles", []):
+        role = dict(entry)
+        if role["role"] != ROLE_UNKNOWN:
+            ceiling = evidence_supported_confidence_ceiling(role.get("evidence_refs", []), evidence_list)
+            if _CONFIDENCE_RANK[role["confidence"]] > _CONFIDENCE_RANK[ceiling]:
+                adjustments.append(
+                    f"{role['role']}: downgraded {role['confidence']} -> {ceiling} "
+                    f"(cited evidence does not support the higher confidence claimed)"
+                )
+                role["confidence"] = ceiling
+        new_roles.append(role)
+    adjusted = dict(structured)
+    adjusted["roles"] = new_roles
+    return adjusted, adjustments
+
+
 # --- Orchestration -----------------------------------------------------------
 
 
@@ -642,6 +924,9 @@ class ApplicantIntelligenceResult:
     parent_group: dict | None
     summary: str | None
     unresolved_questions: list[str] | None
+    evidence: list[dict] | None
+    web_research_performed: bool
+    confidence_adjustments: list[str] | None
     model: str | None
     prompt_version: str | None
     status: str | None
@@ -656,9 +941,23 @@ def _persisted_result(row: ApplicantIntelligence | None, *, regenerated: bool, r
         parent_group=json.loads(row.parent_group) if row and row.parent_group else None,
         summary=row.summary if row else None,
         unresolved_questions=json.loads(row.unresolved_questions) if row and row.unresolved_questions else None,
+        evidence=json.loads(row.evidence) if row and row.evidence else None,
+        web_research_performed=bool(row.web_research_performed) if row else False,
+        confidence_adjustments=None,
         model=row.model if row else None, prompt_version=row.prompt_version if row else None,
         status=row.status if row else None, generation_error=row.generation_error if row else None,
     )
+
+
+# Gate 2A amendment Section 12 - the fixed, honest summary text for a
+# person-shaped identity's deterministic not_researched result. Never
+# generated by the model, never varying - a private individual applicant
+# gets exactly this, every time, at zero AI cost.
+_NOT_RESEARCHED_SUMMARY = (
+    "This applicant identity appears to be a named individual rather than an organisation. "
+    "Property AIgent does not perform commercial-role classification or web research on private "
+    "individuals named on planning applications."
+)
 
 
 def generate_applicant_intelligence(
@@ -669,7 +968,15 @@ def generate_applicant_intelligence(
     client exception, NEVER overwrites the last successful classification -
     only status/generation_error record that the most recent attempt
     failed (Gate 2A Section 19: "if validation fails, retain last known
-    good intelligence")."""
+    good intelligence").
+
+    PERSON-SHAPED IDENTITY FAST PATH (Gate 2A amendment Section 12): an
+    identity whose every raw name variant looks like a named individual
+    never reaches the model at all - `client` is never called, zero AI
+    cost - and is instead persisted directly as a fixed, honest
+    not_researched result. Still subject to the SAME should_regenerate
+    staleness gate, so an unchanged person-shaped identity is not
+    needlessly re-written on every run either."""
     fingerprint = compute_context_fingerprint(context)
     identity_type, key = context.identity_ref.split(":", 1)
     row = get_applicant_intelligence(session, context.identity_ref)
@@ -688,16 +995,44 @@ def generate_applicant_intelligence(
     else:
         row.display_name = context.display_name
 
+    if is_person_shaped_identity(context):
+        not_researched_roles = [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}]
+        row.roles = json.dumps(not_researched_roles)
+        row.is_spv = SPV_UNKNOWN
+        row.parent_group = None
+        row.summary = _NOT_RESEARCHED_SUMMARY
+        row.unresolved_questions = json.dumps([])
+        row.evidence = json.dumps([])
+        row.web_research_performed = False
+        row.generated_at = dt.datetime.now(dt.timezone.utc)
+        row.context_fingerprint = fingerprint
+        row.model = None
+        row.prompt_version = PROMPT_VERSION
+        row.status = "not_researched"
+        row.generation_error = None
+        session.commit()
+        return ApplicantIntelligenceResult(
+            regenerated=True, rejected=False, rejection_reason=None,
+            roles=not_researched_roles, is_spv=SPV_UNKNOWN, parent_group=None,
+            summary=_NOT_RESEARCHED_SUMMARY, unresolved_questions=[], evidence=[], web_research_performed=False,
+            confidence_adjustments=None, model=None, prompt_version=PROMPT_VERSION, status="not_researched", generation_error=None,
+        )
+
     prompt = build_applicant_prompt(context)
     try:
         response = client.responses.create(
-            model=MODEL, input=prompt,
+            model=MODEL, input=prompt, tools=[WEB_SEARCH_TOOL],
             text={"format": {
                 "type": "json_schema", "name": APPLICANT_INTELLIGENCE_SCHEMA["name"],
                 "schema": APPLICANT_INTELLIGENCE_SCHEMA["schema"], "strict": True,
             }},
         )
         structured = json.loads(response.output_text)
+        # Observability only (Section 19) - True only when the model's own
+        # response actually invoked the tool, never merely because it was
+        # offered (Section 5: search is skipped when internal evidence is
+        # already sufficient).
+        web_research_performed = any(getattr(item, "type", None) == "web_search_call" for item in response.output)
     except Exception as e:
         row.status = "error"
         row.generation_error = str(e)[:2000]
@@ -711,12 +1046,27 @@ def generate_applicant_intelligence(
         session.commit()
         return _persisted_result(row, regenerated=False, rejected=True, rejection_reason=problems)
 
+    # Semantic evidence-sufficiency layer (Section 6/22) - "evidence
+    # exists" was just proven by validation above; this proves "evidence
+    # exists AT THIS STRENGTH", deterministically downgrading (never
+    # rejecting) an overclaimed confidence.
+    structured, confidence_adjustments = apply_evidence_sufficiency_ceiling(structured)
+
+    # accessed_date is recorded server-side, not trusted from the model
+    # (Section 7: "when researched" must be accurate, not a guess) - every
+    # evidence entry gets the real date this generation actually ran.
+    today_str = dt.date.today().isoformat()
+    for item in structured["evidence"]:
+        item["accessed_date"] = today_str
+
     now = dt.datetime.now(dt.timezone.utc)
     row.roles = json.dumps(structured["roles"])
     row.is_spv = structured["is_spv"]
     row.parent_group = json.dumps(structured["parent_group"]) if structured["parent_group"] else None
     row.summary = structured["summary"]
     row.unresolved_questions = json.dumps(structured["unresolved_questions"])
+    row.evidence = json.dumps(structured["evidence"])
+    row.web_research_performed = web_research_performed
     row.generated_at = now
     row.context_fingerprint = fingerprint
     row.model = MODEL
@@ -729,6 +1079,8 @@ def generate_applicant_intelligence(
         regenerated=True, rejected=False, rejection_reason=None,
         roles=structured["roles"], is_spv=structured["is_spv"], parent_group=structured["parent_group"],
         summary=structured["summary"], unresolved_questions=structured["unresolved_questions"],
+        evidence=structured["evidence"], web_research_performed=web_research_performed,
+        confidence_adjustments=confidence_adjustments,
         model=MODEL, prompt_version=PROMPT_VERSION, status="ok", generation_error=None,
     )
 
@@ -742,10 +1094,17 @@ def count_pending_applicant_intelligence(session: Session) -> int:
     answer it) - callers should only pay this cost once an operator has
     explicitly opted in (see scripts.run_intelligence_processing's own
     enable_applicant_intelligence gate), never on every routine run before
-    opt-in."""
+    opt-in.
+
+    Scoped to is_planning_opportunity_linked identities only (Gate 2A
+    amendment Section 1/14's own product decision) - matches
+    select_priority_identity_refs' own default scope exactly, so this
+    count and what actually gets processed never disagree."""
     contexts = build_applicant_identity_contexts(session)
     pending = 0
     for context in contexts.values():
+        if not is_planning_opportunity_linked(context):
+            continue
         fingerprint = compute_context_fingerprint(context)
         existing = get_applicant_intelligence(session, context.identity_ref)
         if should_regenerate(existing, fingerprint):
@@ -792,4 +1151,46 @@ def process_applicant_intelligence_backlog(
     return {
         "identities_considered": len(contexts), "attempted": attempted,
         "succeeded": succeeded, "rejected": rejected, "failed": failed, "skipped_fresh": skipped_fresh,
+    }
+
+
+def estimate_bootstrap_scope(session: Session, *, intelligence_session: Session | None = None) -> dict:
+    """Gate 2A amendment Section 31 - READ ONLY, no AI call. Exact current
+    bootstrap scope, deduplicated at the ENTITY level (never "182
+    opportunities = 182 calls" - Section 14's own explicit warning): the
+    real cost driver is the number of DISTINCT eligible organisation
+    identities, which is materially smaller than the opportunity count
+    since one organisation commonly appears across several candidates
+    (e.g. a housebuilder active on 5 current Sites is still one call, once
+    classified, reused everywhere).
+
+    `intelligence_session` defaults to `session` - pass a SEPARATE session
+    only when `session` (e.g. the real production database, for this
+    read-only planning-data query) does not yet have the applicant_
+    intelligences table at all (this amendment's own explicit production
+    state: no migration has been run there - see this module's own
+    implementation report). In that case every identity is correctly
+    counted as "requiring generation", exactly matching reality."""
+    intelligence_session = intelligence_session if intelligence_session is not None else session
+    universe = build_current_opportunity_universe(session)
+    planning_delivery_records = [r for r in universe if r.opportunity_type != "strategic_land"]
+
+    contexts = build_applicant_identity_contexts(session)
+    linked = [c for c in contexts.values() if is_planning_opportunity_linked(c)]
+    person_shaped_refs = {c.identity_ref for c in linked if is_person_shaped_identity(c)}
+    org_shaped = [c for c in linked if c.identity_ref not in person_shaped_refs]
+
+    already_classified_refs = {
+        c.identity_ref for c in org_shaped
+        if not should_regenerate(get_applicant_intelligence(intelligence_session, c.identity_ref), compute_context_fingerprint(c))
+    }
+    requiring_generation = [c for c in org_shaped if c.identity_ref not in already_classified_refs]
+
+    return {
+        "planning_application_opportunities": len(planning_delivery_records),
+        "distinct_eligible_organisation_identities": len(org_shaped),
+        "already_classified": len(already_classified_refs),
+        "requiring_generation_or_refresh": len(requiring_generation),
+        "private_person_identities_excluded": len(person_shaped_refs),
+        "estimated_openai_calls": len(requiring_generation),
     }

@@ -415,8 +415,11 @@ def _render_applicant_intelligence(session, apps: list[Application]) -> None:
             else:
                 st.caption("Name-based identity - no verified company record has been matched yet.")
 
-            if row is None or row.status != "ok" or not row.roles:
+            if row is None or row.status not in ("ok", "not_researched") or not row.roles:
                 st.caption("Applicant Intelligence not yet generated for this organisation.")
+                continue
+            if row.status == "not_researched":
+                st.caption(row.summary or "This applicant identity appears to be a named individual - not researched.")
                 continue
 
             roles = json.loads(row.roles)
@@ -431,14 +434,27 @@ def _render_applicant_intelligence(session, apps: list[Application]) -> None:
                 parent = json.loads(row.parent_group)
                 st.caption(f"Possible parent/group: {parent['name']} ({_CONFIDENCE_BADGES.get(parent['confidence'], parent['confidence'])})")
             if row.summary:
-                st.markdown(f"*{row.summary}*")
+                st.markdown(f"*Why Property AIgent believes this:* {row.summary}")
+            # Gate 2A amendment ("Evidence-Grounded Applicant Web Research")
+            # Section 28 - external sources, minimal read-only display. Only
+            # ever populated when web research was actually performed (see
+            # app.reporting.applicant_intelligence.generate_applicant_
+            # intelligence's own web_research_performed flag) - never shown
+            # as "sources" for a purely internal-evidence classification.
+            evidence = json.loads(row.evidence) if row.evidence else []
+            if evidence:
+                st.markdown("**Sources:**")
+                for item in evidence:
+                    publisher_bit = f" ({item['publisher']})" if item.get("publisher") else ""
+                    st.markdown(f"- [{item.get('title') or item.get('url')}]({item['url']}){publisher_bit} — {item.get('claim', '')}")
             if row.unresolved_questions:
                 questions = json.loads(row.unresolved_questions)
                 if questions:
                     st.caption("Unresolved: " + "; ".join(questions))
             st.caption(
                 f"Generated {row.generated_at.strftime('%d %b %Y') if row.generated_at else 'unknown date'} "
-                "- an AI-assisted classification, not a verified legal or commercial fact. Never implies the site "
+                + ("(web research used) " if row.web_research_performed else "(internal evidence only) ")
+                + "- an AI-assisted classification, not a verified legal or commercial fact. Never implies the site "
                 "is for sale or that this organisation owns it."
             )
 

@@ -106,6 +106,57 @@ def clean_organisation_name(raw: str | None) -> str | None:
     return cleaned
 
 
+# Gate 2A amendment ("Evidence-Grounded Applicant Web Research") Section 12:
+# "Do NOT perform broad web research on private individuals merely because
+# their name appears on a planning application." _INDIVIDUAL_TITLE_PREFIX
+# above already keeps an OBVIOUSLY-titled individual ("Mr Darran Morrison")
+# out of the identity index entirely - but a real production case slipped
+# through that filter with no title at all ("Annabel Baker", two bare
+# capitalised words) and still reached the AI with no organisational
+# keyword to hint otherwise. This is a SEPARATE, WIDER, DELIBERATELY
+# over-inclusive heuristic used ONLY to gate whether an already-resolved
+# identity is offered to bounded web research at all (see app.reporting.
+# applicant_intelligence's own eligibility check) - it does NOT remove the
+# identity from the platform's index, and a false positive here (a small
+# organisation whose name happens to look like a person) only costs a
+# skipped web search, never a wrong or invented classification: internal-
+# only evidence can still classify it (typically UNKNOWN, honestly). A
+# false negative (missing a genuine individual) is caught downstream by the
+# prompt's own explicit rule never to assert a role from a name alone -
+# this heuristic is a cost/privacy guard, not the last line of defence.
+_ORGANISATION_KEYWORDS = {
+    "ltd", "limited", "plc", "llp", "llc", "inc", "corp", "corporation", "company", "co", "cic",
+    "homes", "home", "developments", "development", "developers", "properties", "property", "land",
+    "estates", "estate", "group", "holdings", "holding", "trust", "housing", "construction", "constructions",
+    "investments", "investment", "capital", "partners", "partnership", "ventures", "assets", "management",
+    "strategic", "promotions", "promoters", "promoter", "society", "association", "council", "university",
+    "nhs", "church", "charity", "charitable", "foundation", "enterprises", "consultancy", "consultants",
+    "architects", "planning", "surveyors", "developments", "regeneration", "residential", "living",
+}
+
+
+def is_likely_individual_name(name: str) -> bool:
+    """True for a title-prefixed name (redundant with clean_organisation_name's
+    own filter, kept here too so this function is a complete, independently-
+    correct check) OR a bare 2-3 capitalised-word name with no digit and no
+    recognised organisational keyword - the shape of an ordinary personal
+    name ("Annabel Baker", "John A Smith"), never a claim about who the
+    person actually is."""
+    if _INDIVIDUAL_TITLE_PREFIX.match(name):
+        return True
+    if "&" in name:
+        return False  # an ampersand is a business-naming convention ("L&P", "M&S"), never part of an ordinary personal name
+    words = [w for w in name.strip().split() if w]
+    if not (2 <= len(words) <= 3):
+        return False
+    if any(ch.isdigit() for ch in name):
+        return False
+    lowered = {w.strip(".,()").lower() for w in words}
+    if lowered & _ORGANISATION_KEYWORDS:
+        return False
+    return all(w[:1].isupper() for w in words if w[:1].isalpha())
+
+
 def best_organisation_name_candidates(
     *, si_applicant_company: str | None, si_developer: str | None, raw_applicant_name: str | None,
 ) -> list[str]:
