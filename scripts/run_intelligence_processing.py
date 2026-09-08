@@ -75,6 +75,7 @@ from app.pipeline.run_weekly import (
     stage_generate_scheme_summaries,
     stage_intelligence_refresh,
 )
+from app.reporting.applicant_intelligence import count_pending_applicant_intelligence, process_applicant_intelligence_backlog
 
 # PR B3 (Evidence-Driven AI Intelligence Refresh) - its own small, separate
 # cap (Part 30: "material refresh candidates are commercially important, but
@@ -125,9 +126,24 @@ DEFAULT_MAX_SUMMARIES_PER_RUN = 40
 # for the exact recommended future command/config.
 DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN = 10
 
+# Gate 2A ("Applicant Intelligence") - its own small, independent,
+# OPT-IN-ONLY cap, same "cannot consume the whole run's budget and starve
+# brand-new-scheme extraction" reasoning as DEFAULT_MAX_ALLOCATION_
+# SUMMARIES_PER_RUN above. DELIBERATELY GATED BEHIND AN EXPLICIT OPT-IN,
+# DEFAULT OFF, for the SAME reason (Section 14 of that amendment, reused
+# verbatim here): this job's cron schedule already runs in production
+# today; wiring this stage in unconditionally would start generating real
+# AI applicant classifications the moment this gate is merged and
+# deployed, before any Controlled Sample Generation / Product Owner review
+# has happened. PROPERTYAIGENT_ENABLE_APPLICANT_INTELLIGENCE is NOT
+# declared in render.yaml's envVars and therefore stays unset - this stage
+# entirely un-invoked - through a merge and deploy alone.
+DEFAULT_MAX_APPLICANT_INTELLIGENCE_PER_RUN = 10
+
 
 def _classify_run_status(
     *, extractions_failed: int, summaries_failed: int, refresh_failed: int = 0, allocation_summaries_failed: int = 0,
+    applicant_intelligence_failed: int = 0,
 ) -> str:
     """success | partial - mirrors AcquisitionHealth.classify()'s own "any
     known unresolved failure counts" policy (see app.pipeline.
@@ -146,7 +162,8 @@ def _classify_run_status(
     not an AI failure, so a run made up entirely of no-usable-text items is
     still "success", per this task's own policy: "NO_USABLE_TEXT items do
     not count as AI failure if correctly classified/skipped"."""
-    if extractions_failed > 0 or summaries_failed > 0 or refresh_failed > 0 or allocation_summaries_failed > 0:
+    if (extractions_failed > 0 or summaries_failed > 0 or refresh_failed > 0 or allocation_summaries_failed > 0
+            or applicant_intelligence_failed > 0):
         return "partial"
     return "success"
 
@@ -194,6 +211,19 @@ def parse_args() -> argparse.Namespace:
              "ever generated in production.",
     )
     parser.add_argument(
+        "--max-applicant-intelligence", type=int, default=None,
+        help=f"Max Gate 2A Applicant Intelligence classifications this run (platform-wide, not per-council). "
+             f"Only used when enabled (see --enable-applicant-intelligence). "
+             f"Default: ${{PROPERTYAIGENT_MAX_APPLICANT_INTELLIGENCE_PER_RUN}} or {DEFAULT_MAX_APPLICANT_INTELLIGENCE_PER_RUN}.",
+    )
+    parser.add_argument(
+        "--enable-applicant-intelligence", action="store_true",
+        help="Opt in to Gate 2A Applicant Intelligence automatic classification this run (default: disabled). "
+             "Equivalent to setting PROPERTYAIGENT_ENABLE_APPLICANT_INTELLIGENCE=1. Deliberately NOT set by "
+             "render.yaml's scheduled job - an operator must add this explicitly before any applicant classification "
+             "is ever generated in production.",
+    )
+    parser.add_argument(
         "--triggered-by", default="scheduled", choices=["scheduled", "manual"],
         help="Recorded on the IntelligenceRun row - 'manual' for an operator-triggered catch-up run.",
     )
@@ -210,6 +240,8 @@ def process_intelligence_backlog(
     max_intelligence_refresh: int = DEFAULT_MAX_INTELLIGENCE_REFRESH_PER_RUN,
     max_allocation_summaries: int = DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN,
     enable_allocation_summaries: bool = False,
+    max_applicant_intelligence: int = DEFAULT_MAX_APPLICANT_INTELLIGENCE_PER_RUN,
+    enable_applicant_intelligence: bool = False,
     triggered_by: str = "scheduled",
     client_factory: Callable[[str], object] = lambda api_key: OpenAI(api_key=api_key),
 ) -> IntelligenceRun:
@@ -226,7 +258,14 @@ def process_intelligence_backlog(
     see DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN's own docstring) - when
     False, allocation summary refresh is skipped ENTIRELY: no backlog
     count, no candidate scan, no OpenAI call shaped for that stage at all,
-    regardless of how many allocations are genuinely stale."""
+    regardless of how many allocations are genuinely stale.
+
+    enable_applicant_intelligence defaults to False for the identical
+    reason (Gate 2A - see DEFAULT_MAX_APPLICANT_INTELLIGENCE_PER_RUN's own
+    docstring) - unlike every stage above, this one is not council-scoped
+    (an organisation's identity spans authorities), so it runs at most
+    ONCE per invocation, after the per-council loop, never once per
+    council."""
     run = IntelligenceRun(status="running", triggered_by=triggered_by)
     session.add(run)
     session.commit()
@@ -236,6 +275,8 @@ def process_intelligence_backlog(
     summaries_attempted = summaries_succeeded = summaries_failed = 0
     refresh_candidates_inspected = 0
     refresh_attempted = refresh_succeeded = refresh_failed = 0
+    applicant_intelligence_attempted = applicant_intelligence_succeeded = 0
+    applicant_intelligence_rejected = applicant_intelligence_failed = 0
     allocation_summaries_candidates_inspected = 0
     allocation_summaries_attempted = allocation_summaries_succeeded = 0
     allocation_summaries_rejected = allocation_summaries_failed = 0
@@ -263,6 +304,12 @@ def process_intelligence_backlog(
             {code: count_pending_allocation_summary_refresh(session, code) for code in council_codes}
             if enable_allocation_summaries else {code: 0 for code in council_codes}
         )
+        # Gate 2A - not council-scoped (see this function's own docstring),
+        # so a single platform-wide count, not a per-council dict like
+        # every stage above. Only computed when opted in (Section 14
+        # safety gate reasoning, reused verbatim - this builds the full
+        # identity index, not a cheap SQL predicate).
+        total_applicant_intelligence_backlog = count_pending_applicant_intelligence(session) if enable_applicant_intelligence else 0
         total_extraction_backlog = sum(extraction_backlog.values())
         total_summary_backlog = sum(summary_backlog.values())
         total_refresh_backlog = sum(refresh_backlog.values())
@@ -271,14 +318,18 @@ def process_intelligence_backlog(
               f"{total_summary_backlog} site(s) awaiting a summary, "
               f"{total_refresh_backlog} application(s) awaiting evidence-driven intelligence refresh, "
               f"{total_allocation_summary_backlog} allocation(s) awaiting an AI summary refresh"
-              + ("" if enable_allocation_summaries else " (allocation summary refresh disabled this run)"))
+              + ("" if enable_allocation_summaries else " (allocation summary refresh disabled this run)") + ", "
+              + f"{total_applicant_intelligence_backlog} applicant identit{'y' if total_applicant_intelligence_backlog == 1 else 'ies'} awaiting classification"
+              + ("" if enable_applicant_intelligence else " (applicant intelligence disabled this run)"))
 
         extractions_planned = min(max_extractions, total_extraction_backlog)
         summaries_planned = min(max_summaries, total_summary_backlog)
         refresh_planned = min(max_intelligence_refresh, total_refresh_backlog)
         allocation_summaries_planned = min(max_allocation_summaries, total_allocation_summary_backlog) if enable_allocation_summaries else 0
+        applicant_intelligence_planned = min(max_applicant_intelligence, total_applicant_intelligence_backlog) if enable_applicant_intelligence else 0
 
-        if extractions_planned == 0 and summaries_planned == 0 and refresh_planned == 0 and allocation_summaries_planned == 0:
+        if (extractions_planned == 0 and summaries_planned == 0 and refresh_planned == 0
+                and allocation_summaries_planned == 0 and applicant_intelligence_planned == 0):
             print("[intelligence-processing] no outstanding work within this run's limits - nothing to do, "
                   "OPENAI_API_KEY was never read.")
             detail = "No outstanding work this run."
@@ -358,6 +409,25 @@ def process_intelligence_backlog(
                     summaries_failed += max(planned_this_council - generated, 0)
                     remaining_summaries -= planned_this_council
 
+            # Gate 2A ("Applicant Intelligence") - runs ONCE per invocation,
+            # after every council's own stages above, never per-council
+            # (see this function's own docstring for why). Only reached at
+            # all when enable_applicant_intelligence is True AND real
+            # backlog was found - client is already created above (an
+            # OpenAI key was only ever read because SOME stage found work;
+            # this stage never independently forces that read - if this
+            # were the ONLY stage with backlog, the `else` branch above is
+            # still entered because applicant_intelligence_planned is
+            # itself part of the zero-work gate).
+            if enable_applicant_intelligence and applicant_intelligence_planned > 0:
+                ai_result = process_applicant_intelligence_backlog(
+                    session, lambda: client, limit=applicant_intelligence_planned,
+                )
+                applicant_intelligence_attempted = ai_result["attempted"]
+                applicant_intelligence_succeeded = ai_result["succeeded"]
+                applicant_intelligence_rejected = ai_result["rejected"]
+                applicant_intelligence_failed = ai_result["failed"]
+
             detail = (
                 f"Refresh: {refresh_succeeded}/{refresh_attempted} succeeded "
                 f"({refresh_candidates_inspected} candidate(s) inspected). "
@@ -367,6 +437,9 @@ def process_intelligence_backlog(
                 f"Allocation summaries: {allocation_summaries_succeeded}/{allocation_summaries_attempted} succeeded"
                 + (f" ({allocation_summaries_rejected} rejected as ungrounded)." if allocation_summaries_rejected else ".")
                 + ("" if enable_allocation_summaries else " (disabled this run).")
+                + f" Applicant intelligence: {applicant_intelligence_succeeded}/{applicant_intelligence_attempted} succeeded"
+                + (f" ({applicant_intelligence_rejected} rejected as ungrounded, {applicant_intelligence_failed} failed)." if (applicant_intelligence_rejected or applicant_intelligence_failed) else ".")
+                + ("" if enable_applicant_intelligence else " (disabled this run).")
             )
     except Exception:
         # Run-level catastrophic failure (AI Processing Reliability &
@@ -443,7 +516,7 @@ def process_intelligence_backlog(
 
     run.status = _classify_run_status(
         extractions_failed=extractions_failed, summaries_failed=summaries_failed, refresh_failed=refresh_failed,
-        allocation_summaries_failed=allocation_summaries_failed,
+        allocation_summaries_failed=allocation_summaries_failed, applicant_intelligence_failed=applicant_intelligence_failed,
     )
     run.finished_at = dt.datetime.now(dt.timezone.utc)
     run.extractions_candidates_inspected = extractions_candidates_inspected
@@ -500,6 +573,10 @@ def main() -> None:
     # operator adds it in the Render dashboard - see render.yaml, which
     # deliberately does not declare it). Defaults to disabled either way.
     enable_allocation_summaries = args.enable_allocation_summaries or os.getenv("PROPERTYAIGENT_ENABLE_ALLOCATION_SUMMARY_REFRESH", "").strip() not in ("", "0", "false", "False")
+    max_applicant_intelligence = args.max_applicant_intelligence if args.max_applicant_intelligence is not None else _int_env(
+        "PROPERTYAIGENT_MAX_APPLICANT_INTELLIGENCE_PER_RUN", DEFAULT_MAX_APPLICANT_INTELLIGENCE_PER_RUN
+    )
+    enable_applicant_intelligence = args.enable_applicant_intelligence or os.getenv("PROPERTYAIGENT_ENABLE_APPLICANT_INTELLIGENCE", "").strip() not in ("", "0", "false", "False")
 
     councils = load_councils()
     council_codes = args.councils or sorted(councils.keys())
@@ -507,13 +584,17 @@ def main() -> None:
     print(f"[intelligence-processing] limits this run: max_extractions={max_extractions}, "
           f"max_summaries={max_summaries}, max_intelligence_refresh={max_intelligence_refresh}, "
           f"max_allocation_summaries={max_allocation_summaries} (allocation summary refresh "
-          f"{'ENABLED' if enable_allocation_summaries else 'disabled'} this run)")
+          f"{'ENABLED' if enable_allocation_summaries else 'disabled'} this run), "
+          f"max_applicant_intelligence={max_applicant_intelligence} (applicant intelligence "
+          f"{'ENABLED' if enable_applicant_intelligence else 'disabled'} this run)")
 
     process_intelligence_backlog(
         session, councils, council_codes,
         max_extractions=max_extractions, max_summaries=max_summaries,
         max_intelligence_refresh=max_intelligence_refresh, max_allocation_summaries=max_allocation_summaries,
-        enable_allocation_summaries=enable_allocation_summaries, triggered_by=args.triggered_by,
+        enable_allocation_summaries=enable_allocation_summaries,
+        max_applicant_intelligence=max_applicant_intelligence, enable_applicant_intelligence=enable_applicant_intelligence,
+        triggered_by=args.triggered_by,
     )
 
 

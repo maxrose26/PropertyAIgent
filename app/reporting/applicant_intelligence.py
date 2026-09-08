@@ -733,6 +733,26 @@ def generate_applicant_intelligence(
     )
 
 
+def count_pending_applicant_intelligence(session: Session) -> int:
+    """How many identities currently need a (re)generation - the same
+    should_regenerate trigger process_applicant_intelligence_backlog itself
+    uses. NOT a cheap SQL predicate (mirrors app.pipeline.run_weekly.
+    count_pending_allocation_summary_refresh's own "no cheap SQL predicate
+    exists" reasoning exactly - this must build the full identity index to
+    answer it) - callers should only pay this cost once an operator has
+    explicitly opted in (see scripts.run_intelligence_processing's own
+    enable_applicant_intelligence gate), never on every routine run before
+    opt-in."""
+    contexts = build_applicant_identity_contexts(session)
+    pending = 0
+    for context in contexts.values():
+        fingerprint = compute_context_fingerprint(context)
+        existing = get_applicant_intelligence(session, context.identity_ref)
+        if should_regenerate(existing, fingerprint):
+            pending += 1
+    return pending
+
+
 def process_applicant_intelligence_backlog(
     session: Session, client_factory, *, limit: int, force: bool = False,
 ) -> dict:
