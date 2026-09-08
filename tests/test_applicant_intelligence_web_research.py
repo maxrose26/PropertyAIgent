@@ -127,7 +127,9 @@ def test_person_shaped_identity_never_calls_the_model_and_is_not_researched(sess
 
     result = generate_applicant_intelligence(session, _NeverCalledClient(), ctx)
     assert result.status == "not_researched"
-    assert result.roles == [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}]
+    assert result.primary_type == "PRIVATE"
+    assert result.primary_type_confidence == CONFIDENCE_LOW
+    assert result.secondary_roles == []
     assert result.web_research_performed is False
 
     row = get_applicant_intelligence(session, ctx.identity_ref)
@@ -186,34 +188,42 @@ def test_apply_evidence_sufficiency_ceiling_downgrades_overclaimed_confidence(se
     brief itself: a role claiming HIGH but citing only a bare raw_name ref
     must be downgraded to LOW, never silently accepted."""
     structured = {
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["raw_name:Bloor Homes"]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": ["raw_name:Bloor Homes"],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     adjusted, notes = apply_evidence_sufficiency_ceiling(structured)
-    assert adjusted["roles"][0]["confidence"] == CONFIDENCE_LOW
+    assert adjusted["primary_type_confidence"] == CONFIDENCE_LOW
     assert len(notes) == 1
-    assert "LAND_PROMOTER" in notes[0]
+    assert "PROMOTER" in notes[0]
 
 
 def test_apply_evidence_sufficiency_ceiling_never_upgrades(session):
     evidence = [{"source_type": SOURCE_OFFICIAL_COMPANY_WEBSITE, "title": "x", "url": "https://example.com", "publisher": "x", "claim": "x", "accessed_date": ""}]
     structured = {
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_LOW, "evidence_refs": ["evidence:0"]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_LOW, "primary_type_evidence_refs": ["evidence:0"],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": evidence,
     }
     adjusted, notes = apply_evidence_sufficiency_ceiling(structured)
-    assert adjusted["roles"][0]["confidence"] == CONFIDENCE_LOW  # model's own LOW is never raised to the HIGH ceiling
+    assert adjusted["primary_type_confidence"] == CONFIDENCE_LOW  # model's own LOW is never raised to the HIGH ceiling
     assert notes == []
 
 
-def test_unknown_role_is_never_downgraded_or_flagged(session):
+def test_not_determined_confidence_is_always_forced_to_low(session):
+    """Gate 2A final taxonomy amendment Section 3/8 - NOT_DETERMINED must
+    never carry fake precision: even if the model claims HIGH, the
+    ceiling deterministically forces LOW, since there is nothing to be
+    confident about when the type itself could not be determined."""
     structured = {
-        "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
+        "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     adjusted, notes = apply_evidence_sufficiency_ceiling(structured)
-    assert adjusted["roles"][0]["confidence"] == CONFIDENCE_HIGH  # UNKNOWN's own "confidence" is not a role-strength claim
-    assert notes == []
+    assert adjusted["primary_type_confidence"] == CONFIDENCE_LOW
+    assert len(notes) == 1
+    assert "NOT_DETERMINED" in notes[0]
 
 
 # --- Web evidence validation (Section 17/29) --------------------------------
@@ -227,7 +237,8 @@ def _minimal_context(session, *, applicant="Sample Web Org Ltd"):
 def test_external_evidence_with_valid_url_is_accepted(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}],
+        "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_LOW, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [],
         "evidence": [{"source_type": SOURCE_OFFICIAL_COMPANY_WEBSITE, "title": "Official site", "url": "https://sampleweborg.co.uk", "publisher": "Sample Web Org", "claim": "Builds homes.", "accessed_date": ""}],
     }
@@ -238,7 +249,8 @@ def test_external_evidence_with_valid_url_is_accepted(session):
 def test_malformed_url_is_rejected(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}],
+        "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_LOW, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [],
         "evidence": [{"source_type": SOURCE_OFFICIAL_COMPANY_WEBSITE, "title": "x", "url": "not-a-real-url", "publisher": "x", "claim": "x", "accessed_date": ""}],
     }
@@ -250,7 +262,8 @@ def test_malformed_url_is_rejected(session):
 def test_role_citing_out_of_range_evidence_index_is_rejected(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["evidence:0"]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": ["evidence:0"],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
@@ -262,7 +275,8 @@ def test_evidence_persists_with_intelligence(session):
     ctx = _minimal_context(session)
     evidence = [{"source_type": SOURCE_OFFICIAL_COMPANY_WEBSITE, "title": "Official site", "url": "https://sampleweborg.co.uk", "publisher": "Sample Web Org", "claim": "Builds homes.", "accessed_date": ""}]
     client = _FakeClient({
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["evidence:0"]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": ["evidence:0"],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": evidence,
     }, web_search_called=True)
     result = generate_applicant_intelligence(session, client, ctx)
@@ -280,7 +294,8 @@ def test_evidence_persists_with_intelligence(session):
 def test_unchanged_identity_does_not_call_the_model_twice(session):
     ctx = _minimal_context(session)
     client = _FakeClient({
-        "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}],
+        "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_LOW, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     })
     generate_applicant_intelligence(session, client, ctx)
@@ -299,7 +314,8 @@ def test_one_entity_across_multiple_opportunities_is_researched_once(session):
     def factory():
         call_count["n"] += 1
         return _FakeClient({
-            "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}],
+            "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_LOW, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
             "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
         })
 

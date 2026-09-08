@@ -79,7 +79,15 @@ MODEL = "gpt-4o-mini"  # matches every other OpenAI call already made across thi
 # instruction). Schema unchanged from v2, so this bump exists purely to
 # mark the prompt-contract change and force a fresh classification for
 # any row generated under v2.
-PROMPT_VERSION = "applicant-intelligence-v3-evidence-linkage"
+# v4 (Gate 2A final taxonomy amendment) - the SINGLE most material schema
+# change since Gate 2A began: the model now returns exactly one primary_
+# type from the approved V1 taxonomy (PRIMARY_TYPE_TAXONOMY) plus
+# secondary_roles, replacing the original flat, unordered "roles" list
+# entirely (renamed on the persisted row too - see ApplicantIntelligence's
+# own docstring - production never held a row under the old name, so no
+# migration/data-loss concern). Every v1/v2/v3 row is correctly treated as
+# stale by should_regenerate's own prompt_version check.
+PROMPT_VERSION = "applicant-intelligence-v4-primary-type-taxonomy"
 
 # Gate 2A amendment Section 20 - the native OpenAI Responses API hosted
 # web_search tool (confirmed against the ACTUALLY INSTALLED openai SDK,
@@ -95,26 +103,87 @@ PROMPT_VERSION = "applicant-intelligence-v3-evidence-linkage"
 # identity, not an open-ended browse.
 WEB_SEARCH_TOOL = {"type": "web_search", "search_context_size": "low"}
 
-# Gate 2A Section 9 - multiple roles may genuinely apply; UNKNOWN is a valid,
-# desirable output when evidence cannot support any commercial-role claim
-# (Section 11) - never rewarded for guessing.
-ROLE_HOUSEBUILDER = "HOUSEBUILDER"
-ROLE_LAND_PROMOTER = "LAND_PROMOTER"
-ROLE_HOUSING_ASSOCIATION = "HOUSING_ASSOCIATION"
-ROLE_LANDOWNER_PRIVATE = "LANDOWNER_PRIVATE"
-ROLE_PUBLIC_SECTOR = "PUBLIC_SECTOR"
-ROLE_CONSULTANT_AGENT = "CONSULTANT_AGENT"
-ROLE_DEVELOPER = "DEVELOPER"
-ROLE_OTHER = "OTHER"
-ROLE_UNKNOWN = "UNKNOWN"
-ROLE_TAXONOMY = (
-    ROLE_HOUSEBUILDER, ROLE_LAND_PROMOTER, ROLE_HOUSING_ASSOCIATION, ROLE_LANDOWNER_PRIVATE,
-    ROLE_PUBLIC_SECTOR, ROLE_CONSULTANT_AGENT, ROLE_DEVELOPER, ROLE_OTHER, ROLE_UNKNOWN,
+# Gate 2A final taxonomy amendment ("Final Taxonomy Amendment", Section 2) -
+# the APPROVED V1 primary applicant-type taxonomy. Replaces the original
+# Gate 2A role list (HOUSEBUILDER/LAND_PROMOTER/HOUSING_ASSOCIATION/
+# LANDOWNER_PRIVATE/PUBLIC_SECTOR/CONSULTANT_AGENT/DEVELOPER/OTHER/UNKNOWN)
+# entirely - the Product Owner's own explicit "do not add additional
+# primary categories without approval" instruction means this list is
+# exhaustive, never extended ad hoc. Every value here is used BOTH as a
+# possible primary_type AND as a possible secondary_roles entry (Section 4
+# - "the smallest architecture change" reuses one taxonomy rather than
+# inventing a second, narrower vocabulary just for secondary roles).
+#
+# Renames/remappings from the original taxonomy (Section 2/3, exact
+# reasoning per category):
+#   LAND_PROMOTER -> PROMOTER (same concept, approved rename).
+#   LANDOWNER_PRIVATE -> SPLIT into PRIVATE (a genuine individual) and
+#     LANDOWNER_PROPERTY_COMPANY (a corporate landowner) - the original
+#     value conflated two genuinely different things (Section 3's own
+#     LANDOWNER_PROPERTY_COMPANY definition: "evidence supports ownership/
+#     management/investment in land/property but does NOT sufficiently
+#     establish [a more specific category]").
+#   CONSULTANT_AGENT -> REMOVED. Section 6: "applicant type is NOT the
+#     same thing as... a planning agent... a consultant" - a genuine
+#     consultancy business named as applicant (e.g. a real engineering/
+#     planning consultancy) now correctly resolves to NOT_DETERMINED
+#     under the approved taxonomy, which has no dedicated "consultant"
+#     primary type - an honest, deliberate scope boundary, not a gap to
+#     silently work around.
+#   OTHER / UNKNOWN -> REMOVED, replaced by NOT_DETERMINED (organisations)
+#     and PRIVATE (confidently-identified individuals) - Section 3's own
+#     explicit instruction that these mean DIFFERENT things and must
+#     never be merged.
+#   NEW: ESTATE, SPV, FUND_INVESTOR, CONTRACTOR, CHARITY_INSTITUTION -
+#     Section 2/3's own new categories, each with its own "do not infer
+#     from name alone" guard (see build_applicant_prompt's own ROLE-
+#     SPECIFIC EVIDENCE section for the exact per-category bar).
+PRIMARY_TYPE_HOUSEBUILDER = "HOUSEBUILDER"
+PRIMARY_TYPE_DEVELOPER = "DEVELOPER"
+PRIMARY_TYPE_PROMOTER = "PROMOTER"
+PRIMARY_TYPE_PUBLIC_SECTOR = "PUBLIC_SECTOR"
+PRIMARY_TYPE_HOUSING_ASSOCIATION = "HOUSING_ASSOCIATION"
+PRIMARY_TYPE_ESTATE = "ESTATE"
+PRIMARY_TYPE_SPV = "SPV"
+PRIMARY_TYPE_PRIVATE = "PRIVATE"
+PRIMARY_TYPE_FUND_INVESTOR = "FUND_INVESTOR"
+PRIMARY_TYPE_LANDOWNER_PROPERTY_COMPANY = "LANDOWNER_PROPERTY_COMPANY"
+PRIMARY_TYPE_CONTRACTOR = "CONTRACTOR"
+PRIMARY_TYPE_CHARITY_INSTITUTION = "CHARITY_INSTITUTION"
+PRIMARY_TYPE_NOT_DETERMINED = "NOT_DETERMINED"
+PRIMARY_TYPE_TAXONOMY = (
+    PRIMARY_TYPE_HOUSEBUILDER, PRIMARY_TYPE_DEVELOPER, PRIMARY_TYPE_PROMOTER, PRIMARY_TYPE_PUBLIC_SECTOR,
+    PRIMARY_TYPE_HOUSING_ASSOCIATION, PRIMARY_TYPE_ESTATE, PRIMARY_TYPE_SPV, PRIMARY_TYPE_PRIVATE,
+    PRIMARY_TYPE_FUND_INVESTOR, PRIMARY_TYPE_LANDOWNER_PROPERTY_COMPANY, PRIMARY_TYPE_CONTRACTOR,
+    PRIMARY_TYPE_CHARITY_INSTITUTION, PRIMARY_TYPE_NOT_DETERMINED,
 )
+# Categories a role never legitimately appears as a SECONDARY entry for -
+# PRIVATE/NOT_DETERMINED are terminal, whole-identity outcomes, never a
+# secondary characteristic alongside some other primary classification.
+SECONDARY_ROLE_TAXONOMY = tuple(t for t in PRIMARY_TYPE_TAXONOMY if t not in (PRIMARY_TYPE_PRIVATE, PRIMARY_TYPE_NOT_DETERMINED))
+
+# Backward-compatible aliases (same module, old names) - the OLD Gate 2A
+# role taxonomy constants some already-written code/tests reference by
+# these names; every one of these is now just a specific PRIMARY_TYPE_*
+# value under its new name (ROLE_TAXONOMY -> PRIMARY_TYPE_TAXONOMY, since
+# secondary_roles now uses the SAME 13-value list, not a separate one).
+ROLE_HOUSEBUILDER = PRIMARY_TYPE_HOUSEBUILDER
+ROLE_LAND_PROMOTER = PRIMARY_TYPE_PROMOTER
+ROLE_HOUSING_ASSOCIATION = PRIMARY_TYPE_HOUSING_ASSOCIATION
+ROLE_PUBLIC_SECTOR = PRIMARY_TYPE_PUBLIC_SECTOR
+ROLE_DEVELOPER = PRIMARY_TYPE_DEVELOPER
+ROLE_UNKNOWN = PRIMARY_TYPE_NOT_DETERMINED
+ROLE_TAXONOMY = PRIMARY_TYPE_TAXONOMY
+
 CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW = "HIGH", "MEDIUM", "LOW"
 CONFIDENCE_LEVELS = (CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_LOW)
 SPV_TRUE, SPV_FALSE, SPV_UNKNOWN = "TRUE", "FALSE", "UNKNOWN"
 SPV_STATUSES = (SPV_TRUE, SPV_FALSE, SPV_UNKNOWN)
+# "" is the explicit sentinel for "parent's own type is not reliably known"
+# (Section 3's SPV worked example only sometimes knows the parent's type) -
+# a real PRIMARY_TYPE_TAXONOMY value is used when it genuinely is known.
+PARENT_TYPE_UNKNOWN = ""
+PARENT_TYPE_OPTIONS = PRIMARY_TYPE_TAXONOMY + (PARENT_TYPE_UNKNOWN,)
 
 # Gate 2A amendment Section 7 - the evidence source-type taxonomy.
 # INTERNAL_* are named here for completeness/documentation only - internal
@@ -619,7 +688,7 @@ def should_regenerate(existing: ApplicantIntelligence | None, fingerprint: str, 
     prompt/model version has moved on. Nothing else."""
     if force:
         return True
-    if existing is None or existing.roles is None:
+    if existing is None or existing.primary_type is None:
         return True
     if existing.context_fingerprint != fingerprint:
         return True
@@ -764,30 +833,45 @@ inspectable page, SEO/company directories, scraped aggregators, social
 media, forums, or unverified user-generated content - if that is genuinely
 all you can find, treat the evidence as insufficient rather than citing it.
 
-ROLE-SPECIFIC EVIDENCE - what counts as real support (never a name alone):
-- HOUSEBUILDER: an official/reputable source explicitly describing the organisation building and selling homes (a portfolio, an explicit description).
-- LAND_PROMOTER: an official/reputable source explicitly describing land promotion or strategic land activity (acquiring/controlling land, pursuing planning, then disposing or partnering).
-- HOUSING_ASSOCIATION: an official description, or a regulator/government source, identifying it as a registered provider/housing association.
-- PUBLIC_SECTOR: a source establishing the entity is a public authority or public body.
-- CONSULTANT_AGENT: an official professional-services website, or planning documentation, showing an agent/consultant relationship (not the applicant themselves).
-- DEVELOPER: a source establishing actual development activity or an explicit developer role - broader/weaker than HOUSEBUILDER, do not use HOUSEBUILDER unless residential housebuilding specifically is shown.
-- LANDOWNER_PRIVATE: treat with special care - never infer ownership merely from applicant status; this is a role about the organisation's own described business (e.g. a private estate/landowning company), never a substitute for the separate, site-specific ControlRelationship evidence above.
-- OTHER / UNKNOWN: use whenever the evidence above does not meet the bar for one of the defined roles - never force a classification.
+PRIMARY APPLICANT TYPE - choose EXACTLY ONE value that best answers "what kind of party is behind this planning application", from this closed list (never invent another category):
+- HOUSEBUILDER: evidenced as building residential homes, normally for sale, as a material part of its business. NEVER inferred merely from "Homes" in the name, submitting a residential application, or residential development activity alone - you need an explicit description/portfolio of homes built and sold.
+- DEVELOPER: evidenced as undertaking property development where no MORE SPECIFIC category (HOUSEBUILDER/PROMOTER/HOUSING_ASSOCIATION/PUBLIC_SECTOR/...) is better supported. NEVER the automatic fallback for "submitted a planning application" - if development activity itself cannot be established, prefer NOT_DETERMINED.
+- PROMOTER: evidenced as undertaking land promotion / strategic land promotion / planning-led value creation (promotes land through planning on behalf of landowners, controls strategic land, seeks consent before sale/partnership/disposal). NEVER inferred merely from "Land" in the name, having planning applications, or owning/controlling land.
+- PUBLIC_SECTOR: a local authority, government body, NHS/public health body, or other public authority.
+- HOUSING_ASSOCIATION: a housing association, registered provider, or equivalent affordable-housing organisation - prefer official/regulatory/government evidence.
+- ESTATE: a landed estate, family estate, estate/trust structure, or similar established landholding entity. NEVER inferred merely from "Estate" in the name.
+- SPV: a special-purpose/project/property-specific corporate vehicle, where evidence genuinely supports that interpretation. NEVER inferred merely from "Ltd", a numbered/project-style company name, or limited public information alone - absence of information is not evidence of SPV status.
+- PRIVATE: a genuine private individual (this should essentially never apply here - a confidently person-shaped identity is filtered out before reaching you at all).
+- FUND_INVESTOR: an institutional investor, property investment fund, real-estate investment vehicle, or investment manager acting through an investment strategy. NEVER inferred merely from owning property.
+- LANDOWNER_PROPERTY_COMPANY: a corporate landowner/property company where evidence supports ownership/management/investment in land/property but does NOT sufficiently establish HOUSEBUILDER/DEVELOPER/PROMOTER/FUND_INVESTOR or another more specific type. Applicant status alone never establishes ownership of THIS site - that is a separate, site-specific question (see ownership/control evidence above).
+- CONTRACTOR: a construction/building contractor, where that is the best-supported identity - never a housebuilder merely because it undertakes construction.
+- CHARITY_INSTITUTION: a charity, university, school, religious institution, foundation, or similar institutional body that does not better fit PUBLIC_SECTOR. NEVER inferred from name alone.
+- NOT_DETERMINED: reliable evidence is insufficient to place this organisation in any category above. This is a VALID, EXPECTED, IMPORTANT result - never force a guess. It does NOT mean the opportunity is unimportant or the applicant is irrelevant, only that the evidence available does not reliably support a specific commercial type.
+
+PRIMARY TYPE SELECTION - the correct choice is the MOST COMMERCIALLY DESCRIPTIVE category the evidence genuinely supports, never a fixed hierarchy applied blindly:
+- A more specific category (HOUSEBUILDER, PROMOTER, HOUSING_ASSOCIATION, PUBLIC_SECTOR, ...) is preferred over generic DEVELOPER whenever it is genuinely, independently evidenced - do not default to DEVELOPER just because it is broader and easier.
+- SPV may correctly be the primary type for a project company even when you also discover its PARENT is a housebuilder/developer/promoter - do not pretend the SPV itself is that parent's business; use parent_group/parent_type to record the parent's own identity separately instead (see below).
+- LANDOWNER_PROPERTY_COMPANY is preferred over DEVELOPER when the evidence shows land/property ownership or management but does not itself establish development, promotion, or investment-fund activity.
+- When genuinely unsure between two categories, or when evidence is simply too thin, choose NOT_DETERMINED rather than guessing at the "most plausible" one.
+
+SECONDARY ROLES - after choosing primary_type, you may ALSO list secondary_roles: additional, independently-evidenced categories from the SAME list that genuinely also apply (e.g. a HOUSEBUILDER that also independently promotes land, or a HOUSING_ASSOCIATION with its own evidenced development arm) - never PRIVATE or NOT_DETERMINED as a secondary role, and never a role you cannot independently evidence just to seem thorough. Empty list is normal and expected.
+
+PARENT/GROUP - if your research or the evidence above genuinely reveals this organisation is a subsidiary/project vehicle of a wider group, set parent_group with the parent's name, its own type (one of the categories above, or "" if the parent's own type is not reliably known), confidence, and evidence_refs. Worked example: "ABC Manchester Developments Ltd" is evidenced as a project-specific vehicle of "XYZ Homes plc" (itself a housebuilder) - primary_type is SPV, parent_group.name is "XYZ Homes plc", parent_group.type is "HOUSEBUILDER". This is preferable to calling the SPV itself a housebuilder.
 
 RULES - follow every one of these exactly:
-1. You may assert MULTIPLE roles for this organisation (e.g. LAND_PROMOTER and DEVELOPER together) if the evidence genuinely supports more than one - never force a single label.
-2. Every role you assert (other than UNKNOWN) MUST cite at least one evidence_ref from the refs shown in brackets above, and/or an "evidence:<index>" ref into the `evidence` array you return - a hallucinated or unlisted ref is an automatic rejection. UNKNOWN needs no evidence_refs and is the correct, expected output when nothing above supports a confident role.
-3. Confidence is categorical only: HIGH, MEDIUM, or LOW - never a numeric percentage, never invented precision. HIGH requires direct, official/reliable evidence (internal facts about planning ACTIVITY alone, e.g. a bare name or an application count, can never alone support HIGH or MEDIUM - only LOW). MEDIUM requires either one reliable indirect source or multiple converging weaker ones. Do not use HIGH merely because you feel certain - use it only when the evidence cited genuinely is that strong.
-4. is_spv (Special Purpose Vehicle) is a SEPARATE corporate-structure question from role - having "Limited"/"Ltd" in a name is NEVER by itself evidence of SPV status; "Developments" in a name is NEVER by itself evidence of LAND_PROMOTER; "Homes" in a name is NEVER by itself evidence of HOUSEBUILDER; "Land"/"Properties" in a name is NEVER by itself evidence of LAND_PROMOTER or LANDOWNER_PRIVATE. Return UNKNOWN for is_spv unless the evidence above or your research genuinely supports TRUE or FALSE.
+1. primary_type is EXACTLY ONE value from the list above - never a list, never invented, never left blank.
+2. primary_type_evidence_refs MUST cite at least one evidence_ref from the refs shown in brackets above, and/or an "evidence:<index>" ref into the `evidence` array you return, UNLESS primary_type is NOT_DETERMINED (which needs none - it is the correct, expected output when nothing above supports a confident category). A hallucinated or unlisted ref is an automatic rejection. The same rule applies to every entry in secondary_roles.
+3. Confidence is categorical only: HIGH, MEDIUM, or LOW - never a numeric percentage, never invented precision. HIGH requires direct, official/reliable evidence (internal facts about planning ACTIVITY alone, e.g. a bare name or an application count, can never alone support HIGH or MEDIUM - only LOW). MEDIUM requires either one reliable indirect source or multiple converging weaker ones. Do not use HIGH merely because you feel certain - use it only when the evidence cited genuinely is that strong. primary_type_confidence for NOT_DETERMINED must be LOW - there is nothing to be confident about when the type itself could not be determined.
+4. is_spv (Special Purpose Vehicle) is a SEPARATE, INDEPENDENT question from primary_type - an entity can be primary_type=HOUSEBUILDER and ALSO is_spv=TRUE (a housebuilder operating through its own corporate-vehicle structure), or primary_type=SPV with is_spv left UNKNOWN if you are not confident either way. Having "Limited"/"Ltd" in a name is NEVER by itself evidence of SPV status; "Developments" in a name is NEVER by itself evidence of PROMOTER or DEVELOPER; "Homes" in a name is NEVER by itself evidence of HOUSEBUILDER; "Land"/"Properties"/"Estate" in a name is NEVER by itself evidence of PROMOTER, LANDOWNER_PROPERTY_COMPANY, or ESTATE. Return UNKNOWN for is_spv unless the evidence above or your research genuinely supports TRUE or FALSE.
 5. parent_group is null unless the evidence above or your research genuinely names a parent/group relationship - never invented from a name resembling a larger group.
-6. NEVER assert, or let your summary imply: that this site or any site above is for sale or available; that this organisation owns any site solely because it is the applicant; that a promoter will sell after permission; that an SPV means a site is being flipped; that Certificate A evidence means current disposal intent; that any Application/Site above is an "acquisition opportunity"; that being an applicant establishes ownership, control, or exclusivity. Ownership/control evidence above is SEPARATE, SITE-SPECIFIC evidence - never merge it with your own role classification into a single stronger claim (e.g. never write "promoter-owned site for sale"). Gate 2A intelligence should generally avoid site-specific commercial conclusions entirely.
+6. NEVER assert, or let your summary imply: that this site or any site above is for sale or available; that this organisation owns any site solely because it is the applicant; that a promoter will sell after permission; that an SPV means a site is being flipped; that Certificate A evidence means current disposal intent; that any Application/Site above is an "acquisition opportunity"; that being an applicant establishes ownership, control, or exclusivity. Ownership/control evidence above is SEPARATE, SITE-SPECIFIC evidence - never merge it with your own type classification into a single stronger claim. Applicant type is also NOT the same thing as a planning agent, consultant, mortgagee, or development partner named elsewhere - classify only the organisation named as APPLICANT here. Gate 2A intelligence should generally avoid site-specific commercial conclusions entirely.
 7. summary must be plain, evidence-only prose (2-4 sentences) - state only what the facts above and your research actually show; frame genuine gaps as investigation signals, never as a real-world absence (an application with no ownership evidence here means Property AIgent has not identified any, not that none exists).
 8. unresolved_questions: 0-3 short, specific open questions the evidence above cannot yet answer (empty list if genuinely none) - never a generic instruction.
-9. Every evidence_ref you cite anywhere (roles[].evidence_refs, parent_group.evidence_refs) must be an EXACT string from the bracketed refs shown above, or a valid "evidence:<index>" into your own `evidence` array - never invent, abbreviate, or paraphrase a ref.
+9. Every evidence_ref you cite anywhere (primary_type_evidence_refs, secondary_roles[].evidence_refs, parent_group.evidence_refs) must be an EXACT string from the bracketed refs shown above, or a valid "evidence:<index>" into your own `evidence` array - never invent, abbreviate, or paraphrase a ref.
 10. evidence: one entry per EXTERNAL fact you found via web search and relied on (empty array if you did not search, or found nothing usable) - each with source_type (from the list above), title, url (the real page you found), publisher (the site/organisation name), and a concise claim (one sentence - never a copied passage). Leave accessed_date as an empty string - Property AIgent records the real access date itself. Never fabricate a URL or title - if you are not confident a source is real and inspectable, do not include it.
-11. CRITICAL - LINK EVERY ROLE TO THE EXACT EVIDENCE THAT SUPPORTS IT. If you found external evidence via web search that supports a role, that role's evidence_refs MUST include the matching "evidence:<index>" ref for it - a raw_name:* or occurrence:* ref only ever establishes IDENTITY or ACTIVITY, never the commercial-role claim itself, and citing only those when stronger evidence exists in your own `evidence` array wastes the research you just did and produces an artificially low confidence.
-    WORKED EXAMPLE - do exactly this: you search and find "Example Homes Ltd" is a UK housebuilder building and selling residential homes on their own official website. You add {{"source_type": "OFFICIAL_COMPANY_WEBSITE", "title": "...", "url": "https://example.com", ...}} as evidence[0]. Your HOUSEBUILDER role entry must then be {{"role": "HOUSEBUILDER", "confidence": "HIGH", "evidence_refs": ["evidence:0"]}} - NOT {{"role": "HOUSEBUILDER", "confidence": "HIGH", "evidence_refs": ["raw_name:Example Homes Ltd"]}}, which cites only the name and will be treated as if you found nothing beyond the name itself, regardless of how strong your actual research was.
-    A role may cite BOTH an internal ref (for context/identity) AND an "evidence:<index>" ref (for the actual role support) together, e.g. ["raw_name:Example Homes Ltd", "evidence:0"] - but at least one "evidence:<index>" ref must be present whenever your OWN research is what actually justifies the role and its confidence.
+11. CRITICAL - LINK primary_type (and every secondary role) TO THE EXACT EVIDENCE THAT SUPPORTS IT. If you found external evidence via web search that supports your chosen type, primary_type_evidence_refs MUST include the matching "evidence:<index>" ref for it - a raw_name:* or occurrence:* ref only ever establishes IDENTITY or ACTIVITY, never the commercial-type claim itself, and citing only those when stronger evidence exists in your own `evidence` array wastes the research you just did and produces an artificially low confidence.
+    WORKED EXAMPLE - do exactly this: you search and find "Example Homes Ltd" is a UK housebuilder building and selling residential homes on their own official website. You add {{"source_type": "OFFICIAL_COMPANY_WEBSITE", "title": "...", "url": "https://example.com", ...}} as evidence[0]. Your primary_type entry must then be primary_type="HOUSEBUILDER", primary_type_confidence="HIGH", primary_type_evidence_refs=["evidence:0"] - NOT primary_type_evidence_refs=["raw_name:Example Homes Ltd"], which cites only the name and will be treated as if you found nothing beyond the name itself, regardless of how strong your actual research was.
+    You may cite BOTH an internal ref (for context/identity) AND an "evidence:<index>" ref (for the actual type support) together, e.g. ["raw_name:Example Homes Ltd", "evidence:0"] - but at least one "evidence:<index>" ref must be present whenever your OWN research is what actually justifies the type and its confidence.
 """
 
 
@@ -796,12 +880,21 @@ APPLICANT_INTELLIGENCE_SCHEMA = {
     "schema": {
         "type": "object",
         "properties": {
-            "roles": {
+            # Gate 2A final taxonomy amendment - the SINGLE primary,
+            # user-facing classification (Section 1/4: "the primary
+            # user-facing output should be a single PRIMARY APPLICANT
+            # TYPE"). Grounded exactly like every other classification
+            # here - primary_type_evidence_refs feeds the SAME
+            # evidence_supported_confidence_ceiling as secondary roles.
+            "primary_type": {"type": "string", "enum": list(PRIMARY_TYPE_TAXONOMY)},
+            "primary_type_confidence": {"type": "string", "enum": list(CONFIDENCE_LEVELS)},
+            "primary_type_evidence_refs": {"type": "array", "items": {"type": "string"}},
+            "secondary_roles": {
                 "type": "array",
                 "items": {
                     "type": "object",
                     "properties": {
-                        "role": {"type": "string", "enum": list(ROLE_TAXONOMY)},
+                        "role": {"type": "string", "enum": list(SECONDARY_ROLE_TAXONOMY)},
                         "confidence": {"type": "string", "enum": list(CONFIDENCE_LEVELS)},
                         "evidence_refs": {"type": "array", "items": {"type": "string"}},
                     },
@@ -814,10 +907,13 @@ APPLICANT_INTELLIGENCE_SCHEMA = {
                 "type": ["object", "null"],
                 "properties": {
                     "name": {"type": "string"},
+                    # "" when the parent's own type is not reliably known -
+                    # see PARENT_TYPE_UNKNOWN's own docstring.
+                    "type": {"type": "string", "enum": list(PARENT_TYPE_OPTIONS)},
                     "confidence": {"type": "string", "enum": list(CONFIDENCE_LEVELS)},
                     "evidence_refs": {"type": "array", "items": {"type": "string"}},
                 },
-                "required": ["name", "confidence", "evidence_refs"],
+                "required": ["name", "type", "confidence", "evidence_refs"],
                 "additionalProperties": False,
             },
             "summary": {"type": "string"},
@@ -845,7 +941,10 @@ APPLICANT_INTELLIGENCE_SCHEMA = {
                 },
             },
         },
-        "required": ["roles", "is_spv", "parent_group", "summary", "unresolved_questions", "evidence"],
+        "required": [
+            "primary_type", "primary_type_confidence", "primary_type_evidence_refs", "secondary_roles",
+            "is_spv", "parent_group", "summary", "unresolved_questions", "evidence",
+        ],
         "additionalProperties": False,
     },
 }
@@ -866,11 +965,12 @@ def _evidence_ref_pool(context: ApplicantIdentityContext, structured_evidence: l
 def validate_applicant_intelligence_output(context: ApplicantIdentityContext, structured: dict) -> tuple[bool, list[str]]:
     """Rejects any output citing an evidence_ref not present in this
     response's own ref pool (internal context refs + this response's own
-    `evidence` array indices), any role/confidence/spv_status/source_type
-    outside the fixed enums (defensive - already enforced by the strict
-    JSON schema, but checked again here so this function is a complete,
-    independently-correct grounding gate on its own), a non-UNKNOWN role
-    with zero evidence_refs, a malformed/missing evidence URL, or a summary
+    `evidence` array indices), a primary_type/secondary role/confidence/
+    spv_status/source_type/parent_type outside the fixed enums (defensive
+    - already enforced by the strict JSON schema, but checked again here
+    so this function is a complete, independently-correct grounding gate
+    on its own), a non-NOT_DETERMINED primary_type with zero primary_type_
+    evidence_refs, a malformed/missing evidence URL, or a summary
     containing one of the banned commercial-overreach phrases (Gate 2A
     Section 13/23).
 
@@ -891,18 +991,30 @@ def validate_applicant_intelligence_output(context: ApplicantIdentityContext, st
         if not _URL_PATTERN.match(url):
             problems.append(f"evidence[{i}] has a missing or malformed URL: {url!r}")
 
-    for entry in structured.get("roles", []):
+    primary_type = structured.get("primary_type")
+    if primary_type not in PRIMARY_TYPE_TAXONOMY:
+        problems.append(f"primary_type outside taxonomy: {primary_type}")
+    if structured.get("primary_type_confidence") not in CONFIDENCE_LEVELS:
+        problems.append(f"primary_type_confidence outside allowed levels: {structured.get('primary_type_confidence')}")
+    primary_refs = structured.get("primary_type_evidence_refs", [])
+    if primary_type != PRIMARY_TYPE_NOT_DETERMINED and not primary_refs:
+        problems.append(f"primary_type {primary_type} asserted with no primary_type_evidence_refs")
+    for ref in primary_refs:
+        if ref not in allowed:
+            problems.append(f"unsupported evidence_ref for primary_type: {ref}")
+
+    for entry in structured.get("secondary_roles", []):
         role = entry.get("role")
-        if role not in ROLE_TAXONOMY:
-            problems.append(f"role outside taxonomy: {role}")
+        if role not in SECONDARY_ROLE_TAXONOMY:
+            problems.append(f"secondary role outside taxonomy: {role}")
         if entry.get("confidence") not in CONFIDENCE_LEVELS:
-            problems.append(f"confidence outside allowed levels: {entry.get('confidence')}")
+            problems.append(f"secondary role confidence outside allowed levels: {entry.get('confidence')}")
         refs = entry.get("evidence_refs", [])
-        if role != ROLE_UNKNOWN and not refs:
-            problems.append(f"role {role} asserted with no evidence_refs")
+        if not refs:
+            problems.append(f"secondary role {role} asserted with no evidence_refs")
         for ref in refs:
             if ref not in allowed:
-                problems.append(f"unsupported evidence_ref for role {role}: {ref}")
+                problems.append(f"unsupported evidence_ref for secondary role {role}: {ref}")
 
     if structured.get("is_spv") not in SPV_STATUSES:
         problems.append(f"is_spv outside allowed values: {structured.get('is_spv')}")
@@ -911,6 +1023,8 @@ def validate_applicant_intelligence_output(context: ApplicantIdentityContext, st
     if parent_group is not None:
         if parent_group.get("confidence") not in CONFIDENCE_LEVELS:
             problems.append(f"parent_group confidence outside allowed levels: {parent_group.get('confidence')}")
+        if parent_group.get("type") not in PARENT_TYPE_OPTIONS:
+            problems.append(f"parent_group type outside allowed values: {parent_group.get('type')}")
         for ref in parent_group.get("evidence_refs", []):
             if ref not in allowed:
                 problems.append(f"unsupported evidence_ref for parent_group: {ref}")
@@ -974,28 +1088,45 @@ def apply_evidence_sufficiency_ceiling(structured: dict) -> tuple[dict, list[str
     applied AFTER validate_applicant_intelligence_output passes (never
     instead of it - ref-existence and semantic-sufficiency are two
     independent checks). Deterministically DOWNGRADES (never upgrades,
-    never rejects) each non-UNKNOWN role's confidence to the ceiling its
-    OWN cited evidence can support - "evidence exists" is already proven
-    by validation; this proves "evidence exists AT THIS STRENGTH". Returns
-    the (possibly adjusted) structured dict plus a list of human-readable
-    adjustment notes for observability/tests - the notes are NEVER
-    persisted as intelligence fact, only used for reporting/audit."""
+    never rejects) primary_type_confidence and every secondary role's own
+    confidence to the ceiling its OWN cited evidence can support -
+    "evidence exists" is already proven by validation; this proves
+    "evidence exists AT THIS STRENGTH". NOT_DETERMINED is always forced to
+    LOW regardless of what the model claimed (Gate 2A final taxonomy
+    amendment Section 3/8 - "do not invent fake precision" for a result
+    that is itself "could not be determined"). Returns the (possibly
+    adjusted) structured dict plus a list of human-readable adjustment
+    notes for observability/tests - the notes are NEVER persisted as
+    intelligence fact, only used for reporting/audit."""
     adjustments: list[str] = []
     evidence_list = structured.get("evidence", [])
-    new_roles = []
-    for entry in structured.get("roles", []):
-        role = dict(entry)
-        if role["role"] != ROLE_UNKNOWN:
-            ceiling = evidence_supported_confidence_ceiling(role.get("evidence_refs", []), evidence_list)
-            if _CONFIDENCE_RANK[role["confidence"]] > _CONFIDENCE_RANK[ceiling]:
-                adjustments.append(
-                    f"{role['role']}: downgraded {role['confidence']} -> {ceiling} "
-                    f"(cited evidence does not support the higher confidence claimed)"
-                )
-                role["confidence"] = ceiling
-        new_roles.append(role)
     adjusted = dict(structured)
-    adjusted["roles"] = new_roles
+
+    if adjusted["primary_type"] == PRIMARY_TYPE_NOT_DETERMINED:
+        if adjusted["primary_type_confidence"] != CONFIDENCE_LOW:
+            adjustments.append(f"primary_type NOT_DETERMINED: confidence forced {adjusted['primary_type_confidence']} -> LOW")
+            adjusted["primary_type_confidence"] = CONFIDENCE_LOW
+    else:
+        ceiling = evidence_supported_confidence_ceiling(adjusted.get("primary_type_evidence_refs", []), evidence_list)
+        if _CONFIDENCE_RANK[adjusted["primary_type_confidence"]] > _CONFIDENCE_RANK[ceiling]:
+            adjustments.append(
+                f"primary_type {adjusted['primary_type']}: downgraded {adjusted['primary_type_confidence']} -> {ceiling} "
+                f"(cited evidence does not support the higher confidence claimed)"
+            )
+            adjusted["primary_type_confidence"] = ceiling
+
+    new_secondary = []
+    for entry in adjusted.get("secondary_roles", []):
+        role = dict(entry)
+        ceiling = evidence_supported_confidence_ceiling(role.get("evidence_refs", []), evidence_list)
+        if _CONFIDENCE_RANK[role["confidence"]] > _CONFIDENCE_RANK[ceiling]:
+            adjustments.append(
+                f"secondary role {role['role']}: downgraded {role['confidence']} -> {ceiling} "
+                f"(cited evidence does not support the higher confidence claimed)"
+            )
+            role["confidence"] = ceiling
+        new_secondary.append(role)
+    adjusted["secondary_roles"] = new_secondary
     return adjusted, adjustments
 
 
@@ -1007,7 +1138,9 @@ class ApplicantIntelligenceResult:
     regenerated: bool
     rejected: bool
     rejection_reason: list[str] | None
-    roles: list[dict] | None
+    primary_type: str | None
+    primary_type_confidence: str | None
+    secondary_roles: list[dict] | None
     is_spv: str | None
     parent_group: dict | None
     summary: str | None
@@ -1024,7 +1157,9 @@ class ApplicantIntelligenceResult:
 def _persisted_result(row: ApplicantIntelligence | None, *, regenerated: bool, rejected: bool, rejection_reason) -> ApplicantIntelligenceResult:
     return ApplicantIntelligenceResult(
         regenerated=regenerated, rejected=rejected, rejection_reason=rejection_reason,
-        roles=json.loads(row.roles) if row and row.roles else None,
+        primary_type=row.primary_type if row else None,
+        primary_type_confidence=row.primary_type_confidence if row else None,
+        secondary_roles=json.loads(row.secondary_roles) if row and row.secondary_roles else None,
         is_spv=row.is_spv if row else None,
         parent_group=json.loads(row.parent_group) if row and row.parent_group else None,
         summary=row.summary if row else None,
@@ -1058,11 +1193,13 @@ def generate_applicant_intelligence(
     failed (Gate 2A Section 19: "if validation fails, retain last known
     good intelligence").
 
-    PERSON-SHAPED IDENTITY FAST PATH (Gate 2A amendment Section 12): an
-    identity whose every raw name variant looks like a named individual
-    never reaches the model at all - `client` is never called, zero AI
-    cost - and is instead persisted directly as a fixed, honest
-    not_researched result. Still subject to the SAME should_regenerate
+    PERSON-SHAPED IDENTITY FAST PATH (Gate 2A amendment Section 12,
+    taxonomy amendment Section 3): an identity whose every raw name
+    variant looks like a named individual never reaches the model at all -
+    `client` is never called, zero AI cost - and is instead persisted
+    directly as primary_type=PRIVATE (deliberately DISTINCT from
+    NOT_DETERMINED - "PRIVATE and NOT_DETERMINED mean different things"),
+    status=not_researched. Still subject to the SAME should_regenerate
     staleness gate, so an unchanged person-shaped identity is not
     needlessly re-written on every run either."""
     fingerprint = compute_context_fingerprint(context)
@@ -1084,8 +1221,9 @@ def generate_applicant_intelligence(
         row.display_name = context.display_name
 
     if is_person_shaped_identity(context):
-        not_researched_roles = [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_LOW, "evidence_refs": []}]
-        row.roles = json.dumps(not_researched_roles)
+        row.primary_type = PRIMARY_TYPE_PRIVATE
+        row.primary_type_confidence = CONFIDENCE_LOW
+        row.secondary_roles = json.dumps([])
         row.is_spv = SPV_UNKNOWN
         row.parent_group = None
         row.summary = _NOT_RESEARCHED_SUMMARY
@@ -1101,7 +1239,8 @@ def generate_applicant_intelligence(
         session.commit()
         return ApplicantIntelligenceResult(
             regenerated=True, rejected=False, rejection_reason=None,
-            roles=not_researched_roles, is_spv=SPV_UNKNOWN, parent_group=None,
+            primary_type=PRIMARY_TYPE_PRIVATE, primary_type_confidence=CONFIDENCE_LOW, secondary_roles=[],
+            is_spv=SPV_UNKNOWN, parent_group=None,
             summary=_NOT_RESEARCHED_SUMMARY, unresolved_questions=[], evidence=[], web_research_performed=False,
             confidence_adjustments=None, model=None, prompt_version=PROMPT_VERSION, status="not_researched", generation_error=None,
         )
@@ -1148,7 +1287,9 @@ def generate_applicant_intelligence(
         item["accessed_date"] = today_str
 
     now = dt.datetime.now(dt.timezone.utc)
-    row.roles = json.dumps(structured["roles"])
+    row.primary_type = structured["primary_type"]
+    row.primary_type_confidence = structured["primary_type_confidence"]
+    row.secondary_roles = json.dumps(structured["secondary_roles"])
     row.is_spv = structured["is_spv"]
     row.parent_group = json.dumps(structured["parent_group"]) if structured["parent_group"] else None
     row.summary = structured["summary"]
@@ -1165,7 +1306,8 @@ def generate_applicant_intelligence(
 
     return ApplicantIntelligenceResult(
         regenerated=True, rejected=False, rejection_reason=None,
-        roles=structured["roles"], is_spv=structured["is_spv"], parent_group=structured["parent_group"],
+        primary_type=structured["primary_type"], primary_type_confidence=structured["primary_type_confidence"],
+        secondary_roles=structured["secondary_roles"], is_spv=structured["is_spv"], parent_group=structured["parent_group"],
         summary=structured["summary"], unresolved_questions=structured["unresolved_questions"],
         evidence=structured["evidence"], web_research_performed=web_research_performed,
         confidence_adjustments=confidence_adjustments,

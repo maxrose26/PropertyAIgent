@@ -60,11 +60,12 @@ def test_official_evidence_found_and_correctly_linked_survives_at_high():
         "accessed_date": "2026-09-08",
     }]
     structured = {
-        "roles": [{"role": ROLE_HOUSEBUILDER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["evidence:0"]}],
+        "primary_type": ROLE_HOUSEBUILDER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": ["evidence:0"],
+        "secondary_roles": [],
         "is_spv": "UNKNOWN", "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": evidence,
     }
     adjusted, notes = apply_evidence_sufficiency_ceiling(structured)
-    assert adjusted["roles"][0]["confidence"] == CONFIDENCE_HIGH
+    assert adjusted["primary_type_confidence"] == CONFIDENCE_HIGH
     assert notes == []
 
 
@@ -83,11 +84,12 @@ def test_official_evidence_found_but_not_linked_stays_capped():
         "accessed_date": "2026-09-08",
     }]
     structured = {
-        "roles": [{"role": ROLE_HOUSEBUILDER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["raw_name:Example Homes Ltd"]}],
+        "primary_type": ROLE_HOUSEBUILDER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": ["raw_name:Example Homes Ltd"],
+        "secondary_roles": [],
         "is_spv": "UNKNOWN", "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": evidence,
     }
     adjusted, notes = apply_evidence_sufficiency_ceiling(structured)
-    assert adjusted["roles"][0]["confidence"] == CONFIDENCE_LOW
+    assert adjusted["primary_type_confidence"] == CONFIDENCE_LOW
     assert len(notes) == 1
 
 

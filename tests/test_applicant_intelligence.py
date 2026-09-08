@@ -152,8 +152,12 @@ def test_control_evidence_is_kept_separate_from_role_facts(session):
     ctx = next(c for c in contexts.values() if c.display_name == "Owner Evidenced Ltd")
     assert len(ctx.control_evidence) == 1
     assert ctx.control_evidence[0].role == "OWNER"
-    # Separate from, never merged into, the (currently empty) role classification.
-    assert ctx.roles is None if hasattr(ctx, "roles") else True
+    # Separate from, never merged into, the AI's own primary_type
+    # classification - ApplicantIdentityContext itself carries no
+    # classification field at all (that only ever exists on the
+    # persisted ApplicantIntelligence row), so control_evidence here can
+    # never be confused with a role/type assertion.
+    assert not hasattr(ctx, "primary_type")
 
 
 def test_control_evidence_for_unrelated_organisation_is_not_attached(session):
@@ -212,7 +216,8 @@ def test_valid_grounded_output_passes(session):
     ctx = _minimal_context(session)
     ref = next(iter(allowed_evidence_refs(ctx)))
     structured = {
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_MEDIUM, "primary_type_evidence_refs": [ref],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None,
         "summary": "Named as applicant on one application, still pending.",
         "unresolved_questions": [], "evidence": [],
@@ -224,7 +229,8 @@ def test_valid_grounded_output_passes(session):
 def test_unknown_role_needs_no_evidence(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
+        "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Insufficient evidence to classify.",
         "unresolved_questions": [], "evidence": [],
     }
@@ -235,7 +241,8 @@ def test_unknown_role_needs_no_evidence(session):
 def test_hallucinated_evidence_ref_is_rejected(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_HOUSEBUILDER, "confidence": CONFIDENCE_HIGH, "evidence_refs": ["occurrence:DOES-NOT-EXIST"]}],
+        "primary_type": ROLE_HOUSEBUILDER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": ["occurrence:DOES-NOT-EXIST"],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
@@ -246,19 +253,21 @@ def test_hallucinated_evidence_ref_is_rejected(session):
 def test_non_unknown_role_with_no_evidence_is_rejected(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_HOUSEBUILDER, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
+        "primary_type": ROLE_HOUSEBUILDER, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
     }
     ok, problems = validate_applicant_intelligence_output(ctx, structured)
     assert not ok
-    assert any("no evidence_refs" in p for p in problems)
+    assert any("no primary_type_evidence_refs" in p for p in problems)
 
 
 def test_banned_commercial_overreach_phrase_is_rejected(session):
     ctx = _minimal_context(session)
     ref = next(iter(allowed_evidence_refs(ctx)))
     structured = {
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_MEDIUM, "primary_type_evidence_refs": [ref],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None,
         "summary": "This site is for sale and represents an acquisition opportunity.",
         "unresolved_questions": [], "evidence": [],
@@ -271,7 +280,8 @@ def test_banned_commercial_overreach_phrase_is_rejected(session):
 def test_parent_group_evidence_ref_must_also_be_grounded(session):
     ctx = _minimal_context(session)
     structured = {
-        "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
+        "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN,
         "parent_group": {"name": "Big Group PLC", "confidence": CONFIDENCE_MEDIUM, "evidence_refs": ["company:not_a_real_ref"]},
         "summary": "x", "unresolved_questions": [], "evidence": [],
@@ -303,7 +313,7 @@ def test_new_application_changes_fingerprint(session):
 
 def test_should_regenerate_triggers(session):
     assert should_regenerate(None, "abc") is True
-    row = ApplicantIntelligence(identity_type="name", identity_key="x", display_name="X", roles=json.dumps([]), context_fingerprint="abc", prompt_version=PROMPT_VERSION)
+    row = ApplicantIntelligence(identity_type="name", identity_key="x", display_name="X", primary_type="NOT_DETERMINED", context_fingerprint="abc", prompt_version=PROMPT_VERSION)
     assert should_regenerate(row, "abc") is False
     assert should_regenerate(row, "different") is True
     assert should_regenerate(row, "abc", force=True) is True
@@ -344,7 +354,8 @@ def test_successful_generation_persists_and_reuses(session):
     ctx = _minimal_context(session)
     ref = next(iter(allowed_evidence_refs(ctx)))
     client = _FakeClient({
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_MEDIUM, "primary_type_evidence_refs": [ref],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Named as applicant, still pending.",
         "unresolved_questions": [], "evidence": [],
     })
@@ -355,7 +366,7 @@ def test_successful_generation_persists_and_reuses(session):
     row = get_applicant_intelligence(session, ctx.identity_ref)
     assert row is not None
     assert row.status == "ok"
-    assert json.loads(row.roles)[0]["role"] == ROLE_LAND_PROMOTER
+    assert row.primary_type == ROLE_LAND_PROMOTER
 
     # Re-running with an unchanged context and no force must NOT call OpenAI again.
     result2 = generate_applicant_intelligence(session, client, ctx)
@@ -367,21 +378,23 @@ def test_rejected_output_does_not_destroy_last_good_result(session):
     ctx = _minimal_context(session)
     ref = next(iter(allowed_evidence_refs(ctx)))
     good_client = _FakeClient({
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_MEDIUM, "primary_type_evidence_refs": [ref],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [], "evidence": [],
     })
     generate_applicant_intelligence(session, good_client, ctx)
     row = get_applicant_intelligence(session, ctx.identity_ref)
-    original_roles = row.roles
+    original_primary_type = row.primary_type
 
     bad_client = _FakeClient({
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": ["occurrence:FAKE"]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_MEDIUM, "primary_type_evidence_refs": ["occurrence:FAKE"],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [], "evidence": [],
     })
     result = generate_applicant_intelligence(session, bad_client, ctx, force=True)
     assert result.rejected
     row2 = get_applicant_intelligence(session, ctx.identity_ref)
-    assert row2.roles == original_roles  # unchanged
+    assert row2.primary_type == original_primary_type  # unchanged
     assert row2.status == "error"
 
 
@@ -389,17 +402,18 @@ def test_client_exception_does_not_destroy_last_good_result(session):
     ctx = _minimal_context(session)
     ref = next(iter(allowed_evidence_refs(ctx)))
     good_client = _FakeClient({
-        "roles": [{"role": ROLE_LAND_PROMOTER, "confidence": CONFIDENCE_MEDIUM, "evidence_refs": [ref]}],
+        "primary_type": ROLE_LAND_PROMOTER, "primary_type_confidence": CONFIDENCE_MEDIUM, "primary_type_evidence_refs": [ref],
+        "secondary_roles": [],
         "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "Fine.", "unresolved_questions": [], "evidence": [],
     })
     generate_applicant_intelligence(session, good_client, ctx)
-    original = get_applicant_intelligence(session, ctx.identity_ref).roles
+    original = get_applicant_intelligence(session, ctx.identity_ref).primary_type
 
     failing_client = _FakeClient(RuntimeError("network error"))
     result = generate_applicant_intelligence(session, failing_client, ctx, force=True)
     assert not result.regenerated
     row = get_applicant_intelligence(session, ctx.identity_ref)
-    assert row.roles == original
+    assert row.primary_type == original
     assert row.status == "error"
 
 
@@ -438,7 +452,8 @@ def test_bounded_processing_respects_limit_and_isolates_failures(session):
         if call_count["n"] == 2:
             return _FakeClient(RuntimeError("simulated failure"))
         return _FakeClient({
-            "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
+            "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
             "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
         })
 
@@ -464,7 +479,8 @@ def test_rerun_with_unchanged_backlog_is_idempotent(session):
 
     def factory():
         return _FakeClient({
-            "roles": [{"role": ROLE_UNKNOWN, "confidence": CONFIDENCE_HIGH, "evidence_refs": []}],
+            "primary_type": ROLE_UNKNOWN, "primary_type_confidence": CONFIDENCE_HIGH, "primary_type_evidence_refs": [],
+        "secondary_roles": [],
             "is_spv": SPV_UNKNOWN, "parent_group": None, "summary": "x", "unresolved_questions": [], "evidence": [],
         })
 

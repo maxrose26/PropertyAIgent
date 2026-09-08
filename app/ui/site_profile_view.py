@@ -357,10 +357,15 @@ def _render_ownership_control(session, site: Site, apps: list[Application]) -> N
     st.caption(SOURCE_NOTE)
 
 
+# Gate 2A final taxonomy amendment - the approved V1 primary applicant
+# taxonomy's own display labels (app.reporting.applicant_intelligence.
+# PRIMARY_TYPE_TAXONOMY, reused verbatim for secondary_roles too).
 _ROLE_LABELS = {
-    "HOUSEBUILDER": "Housebuilder", "LAND_PROMOTER": "Land promoter", "HOUSING_ASSOCIATION": "Housing association",
-    "LANDOWNER_PRIVATE": "Private landowner", "PUBLIC_SECTOR": "Public sector", "CONSULTANT_AGENT": "Consultant / agent",
-    "DEVELOPER": "Developer", "OTHER": "Other", "UNKNOWN": "Unknown",
+    "HOUSEBUILDER": "Housebuilder", "DEVELOPER": "Developer", "PROMOTER": "Promoter",
+    "PUBLIC_SECTOR": "Public sector", "HOUSING_ASSOCIATION": "Housing association", "ESTATE": "Estate",
+    "SPV": "Special Purpose Vehicle (SPV)", "PRIVATE": "Private", "FUND_INVESTOR": "Fund / investor",
+    "LANDOWNER_PROPERTY_COMPANY": "Landowner / property company", "CONTRACTOR": "Contractor",
+    "CHARITY_INSTITUTION": "Charity / institution", "NOT_DETERMINED": "Not determined",
 }
 _CONFIDENCE_BADGES = {"HIGH": "🟢 High confidence", "MEDIUM": "🟡 Medium confidence", "LOW": "🟠 Low confidence"}
 
@@ -415,24 +420,35 @@ def _render_applicant_intelligence(session, apps: list[Application]) -> None:
             else:
                 st.caption("Name-based identity - no verified company record has been matched yet.")
 
-            if row is None or row.status not in ("ok", "not_researched") or not row.roles:
+            if row is None or row.status not in ("ok", "not_researched") or not row.primary_type:
                 st.caption("Applicant Intelligence not yet generated for this organisation.")
                 continue
-            if row.status == "not_researched":
-                st.caption(row.summary or "This applicant identity appears to be a named individual - not researched.")
-                continue
 
-            roles = json.loads(row.roles)
-            if roles:
-                for r in roles:
-                    label = _ROLE_LABELS.get(r["role"], r["role"])
-                    badge = _CONFIDENCE_BADGES.get(r["confidence"], r["confidence"])
-                    st.markdown(f"**{label}** — {badge}")
+            # Gate 2A final taxonomy amendment (Section 11) - Type/
+            # Confidence is the primary, always-shown line; PRIVATE and
+            # NOT_DETERMINED each render their own honest, distinct
+            # explanation rather than a generic "not available" message
+            # (Section 3: "PRIVATE and NOT_DETERMINED mean different
+            # things" - never collapsed into the same UI treatment).
+            type_label = _ROLE_LABELS.get(row.primary_type, row.primary_type)
+            confidence_badge = _CONFIDENCE_BADGES.get(row.primary_type_confidence, row.primary_type_confidence)
+            st.markdown(f"**Type: {type_label}** — {confidence_badge}")
+            if row.status == "not_researched" or row.primary_type == "PRIVATE":
+                st.caption("Research: Not researched — private individual.")
+                continue
+            if row.primary_type == "NOT_DETERMINED":
+                st.caption("Reason: Insufficient reliable evidence to determine a commercial applicant type.")
+
+            secondary_roles = json.loads(row.secondary_roles) if row.secondary_roles else []
+            if secondary_roles:
+                labels = ", ".join(_ROLE_LABELS.get(r["role"], r["role"]) for r in secondary_roles)
+                st.caption(f"Secondary roles: {labels}")
             if row.is_spv and row.is_spv != "UNKNOWN":
                 st.caption(f"Special Purpose Vehicle: {row.is_spv.title()}")
             if row.parent_group:
                 parent = json.loads(row.parent_group)
-                st.caption(f"Possible parent/group: {parent['name']} ({_CONFIDENCE_BADGES.get(parent['confidence'], parent['confidence'])})")
+                parent_type_bit = f" — {_ROLE_LABELS.get(parent['type'], parent['type'])}" if parent.get("type") else ""
+                st.caption(f"Parent/group: {parent['name']}{parent_type_bit} ({_CONFIDENCE_BADGES.get(parent['confidence'], parent['confidence'])})")
             if row.summary:
                 st.markdown(f"*Why Property AIgent believes this:* {row.summary}")
             # Gate 2A amendment ("Evidence-Grounded Applicant Web Research")

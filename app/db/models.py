@@ -2723,17 +2723,54 @@ class ApplicantIntelligence(Base):
     # ever updates status/generation_error below, never these fields, so a
     # reader always sees the last genuinely successful classification.
     #
-    # roles: JSON list of {"role": ..., "confidence": "HIGH|MEDIUM|LOW",
-    # "evidence_refs": [...]} - MULTIPLE roles may apply (Gate 2A Section
-    # 9), never forced into one label.
-    roles: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Gate 2A final taxonomy amendment ("Final Taxonomy Amendment") -
+    # PRIMARY user-facing classification: exactly ONE value from the
+    # approved V1 taxonomy (app.reporting.applicant_intelligence.
+    # PRIMARY_TYPE_TAXONOMY) answering "what kind of party is behind this
+    # planning application" - never a list, never left to a caller to pick
+    # "the most important" entry out of several roles. NOT_DETERMINED is a
+    # valid, expected, non-degraded result (Section 3) - it means the
+    # approved taxonomy's categories are not reliably supported, never
+    # that the opportunity or applicant is unimportant. PRIVATE is the
+    # dedicated value for a confidently-identified individual (see
+    # is_person_shaped_identity) - deliberately distinct from
+    # NOT_DETERMINED (Section 3: "PRIVATE and NOT_DETERMINED mean
+    # different things").
+    primary_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # HIGH | MEDIUM | LOW - grounded the same way as every other confidence
+    # value on this row (evidence_supported_confidence_ceiling applies to
+    # this exactly like any other classification claim); NOT_DETERMINED is
+    # deterministically forced to LOW in code (Section 8: "do not invent
+    # fake precision" - there is nothing to be confident ABOUT when the
+    # result itself is "could not be determined").
+    primary_type_confidence: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Renamed from the original Gate 2A "roles" column (production never
+    # held a row under the old name - no migration/data-loss concern, see
+    # Section 9's own "optimise for clean initial production deployment"
+    # instruction) - now holds every ADDITIONAL, genuinely-evidenced role
+    # beyond primary_type, same JSON shape as before: list of {"role":
+    # ..., "confidence": "HIGH|MEDIUM|LOW", "evidence_refs": [...]},
+    # drawn from the SAME approved taxonomy (Section 4 - "do not throw
+    # useful information away": a HOUSEBUILDER's own DEVELOPER activity,
+    # or a HOUSING_ASSOCIATION's own development arm, stays visible here
+    # even though it is no longer the PRIMARY classification).
+    secondary_roles: Mapped[str | None] = mapped_column(Text, nullable=True)
     # TRUE | FALSE | UNKNOWN (Gate 2A Section 10) - a corporate-structure
-    # characteristic, deliberately never a peer entry inside roles above.
+    # characteristic, deliberately never a peer entry inside secondary_
+    # roles above, and deliberately independent of primary_type == SPV
+    # above (Section 2/9 of the final taxonomy amendment): an entity can
+    # be primary_type=HOUSEBUILDER with is_spv=TRUE (a housebuilder that
+    # itself operates through a corporate-vehicle structure), or
+    # primary_type=SPV or is_spv=UNKNOWN, independently.
     is_spv: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    # JSON {"name": ..., "confidence": ..., "evidence_refs": [...]} or NULL
-    # when no parent/group evidence exists - never a bare string, so
-    # confidence/evidence stay attached to this claim exactly like every
-    # other one.
+    # JSON {"name": ..., "type": ... (one of PRIMARY_TYPE_TAXONOMY, or ""
+    # when the parent's own type is not reliably known - Gate 2A final
+    # taxonomy amendment Section 3's own SPV worked example: "ABC
+    # Manchester Developments Ltd" / primary_type=SPV / parent="XYZ Homes
+    # plc" / parent type=HOUSEBUILDER), "confidence": ...,
+    # "evidence_refs": [...]} or NULL when no parent/group evidence
+    # exists - never a bare string, so confidence/evidence stay attached
+    # to this claim exactly like every other one.
     parent_group: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON list of strings - open questions the evidence cannot yet answer.
