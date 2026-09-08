@@ -365,7 +365,8 @@ _ROLE_LABELS = {
     "PUBLIC_SECTOR": "Public sector", "HOUSING_ASSOCIATION": "Housing association", "ESTATE": "Estate",
     "SPV": "Special Purpose Vehicle (SPV)", "PRIVATE": "Private", "FUND_INVESTOR": "Fund / investor",
     "LANDOWNER_PROPERTY_COMPANY": "Landowner / property company", "CONTRACTOR": "Contractor",
-    "CHARITY_INSTITUTION": "Charity / institution", "NOT_DETERMINED": "Not determined",
+    "CHARITY_INSTITUTION": "Charity / institution", "PROFESSIONAL_CONSULTANT": "Professional consultant",
+    "NOT_DETERMINED": "Not determined",
 }
 _CONFIDENCE_BADGES = {"HIGH": "🟢 High confidence", "MEDIUM": "🟡 Medium confidence", "LOW": "🟠 Low confidence"}
 

@@ -87,7 +87,12 @@ MODEL = "gpt-4o-mini"  # matches every other OpenAI call already made across thi
 # own docstring - production never held a row under the old name, so no
 # migration/data-loss concern). Every v1/v2/v3 row is correctly treated as
 # stale by should_regenerate's own prompt_version check.
-PROMPT_VERSION = "applicant-intelligence-v4-primary-type-taxonomy"
+# v5 (Gate 2A taxonomy hotfix, pre-merge) - adds PROFESSIONAL_CONSULTANT to
+# the approved primary taxonomy, closing the real "Stantec UK Limited"
+# false-DEVELOPER-fallback gap the controlled validation found. Every
+# v1-v4 row is correctly treated as stale by should_regenerate's own
+# prompt_version check.
+PROMPT_VERSION = "applicant-intelligence-v5-professional-consultant"
 
 # Gate 2A amendment Section 20 - the native OpenAI Responses API hosted
 # web_search tool (confirmed against the ACTUALLY INSTALLED openai SDK,
@@ -150,12 +155,26 @@ PRIMARY_TYPE_FUND_INVESTOR = "FUND_INVESTOR"
 PRIMARY_TYPE_LANDOWNER_PROPERTY_COMPANY = "LANDOWNER_PROPERTY_COMPANY"
 PRIMARY_TYPE_CONTRACTOR = "CONTRACTOR"
 PRIMARY_TYPE_CHARITY_INSTITUTION = "CHARITY_INSTITUTION"
+# Gate 2A taxonomy hotfix (pre-merge) - the ONE genuine taxonomy gap the
+# real controlled validation exposed: "Stantec UK Limited" is evidenced as
+# a professional planning/engineering/masterplanning/environmental
+# consultancy - the approved V1 taxonomy had no honest category for this,
+# so the model defaulted to DEVELOPER (exactly the "inappropriate
+# fallback" pattern Section 4/3 already warned against, now closed by
+# giving consultancy its own real category rather than relying on
+# NOT_DETERMINED to catch every non-fitting case). Describes WHAT THE
+# ORGANISATION IS (its own business), never WHAT ROLE IT HAS on one
+# specific Application (that stays ApplicationCompany's own "agent" role,
+# ControlRelationship, etc. - see this constant's own class-level
+# reasoning in ApplicantIntelligence's docstring for why these never
+# collapse into one concept).
+PRIMARY_TYPE_PROFESSIONAL_CONSULTANT = "PROFESSIONAL_CONSULTANT"
 PRIMARY_TYPE_NOT_DETERMINED = "NOT_DETERMINED"
 PRIMARY_TYPE_TAXONOMY = (
     PRIMARY_TYPE_HOUSEBUILDER, PRIMARY_TYPE_DEVELOPER, PRIMARY_TYPE_PROMOTER, PRIMARY_TYPE_PUBLIC_SECTOR,
     PRIMARY_TYPE_HOUSING_ASSOCIATION, PRIMARY_TYPE_ESTATE, PRIMARY_TYPE_SPV, PRIMARY_TYPE_PRIVATE,
     PRIMARY_TYPE_FUND_INVESTOR, PRIMARY_TYPE_LANDOWNER_PROPERTY_COMPANY, PRIMARY_TYPE_CONTRACTOR,
-    PRIMARY_TYPE_CHARITY_INSTITUTION, PRIMARY_TYPE_NOT_DETERMINED,
+    PRIMARY_TYPE_CHARITY_INSTITUTION, PRIMARY_TYPE_PROFESSIONAL_CONSULTANT, PRIMARY_TYPE_NOT_DETERMINED,
 )
 # Categories a role never legitimately appears as a SECONDARY entry for -
 # PRIVATE/NOT_DETERMINED are terminal, whole-identity outcomes, never a
@@ -835,7 +854,7 @@ all you can find, treat the evidence as insufficient rather than citing it.
 
 PRIMARY APPLICANT TYPE - choose EXACTLY ONE value that best answers "what kind of party is behind this planning application", from this closed list (never invent another category):
 - HOUSEBUILDER: evidenced as building residential homes, normally for sale, as a material part of its business. NEVER inferred merely from "Homes" in the name, submitting a residential application, or residential development activity alone - you need an explicit description/portfolio of homes built and sold.
-- DEVELOPER: evidenced as undertaking property development where no MORE SPECIFIC category (HOUSEBUILDER/PROMOTER/HOUSING_ASSOCIATION/PUBLIC_SECTOR/...) is better supported. NEVER the automatic fallback for "submitted a planning application" - if development activity itself cannot be established, prefer NOT_DETERMINED.
+- DEVELOPER: evidenced as undertaking ACTUAL property development itself (buying/controlling sites and building schemes for its own account) where no MORE SPECIFIC category (HOUSEBUILDER/PROMOTER/HOUSING_ASSOCIATION/PUBLIC_SECTOR/...) is better supported. NEVER the automatic fallback for "submitted a planning application", and NEVER correct for an organisation whose own evidenced business is professional advisory/consultancy services (planning, engineering, architecture, masterplanning, environmental, surveying) - that is PROFESSIONAL_CONSULTANT below, however development-adjacent the advisory work sounds. If neither genuine development activity nor professional-consultancy activity can be established, prefer NOT_DETERMINED.
 - PROMOTER: evidenced as undertaking land promotion / strategic land promotion / planning-led value creation (promotes land through planning on behalf of landowners, controls strategic land, seeks consent before sale/partnership/disposal). NEVER inferred merely from "Land" in the name, having planning applications, or owning/controlling land.
 - PUBLIC_SECTOR: a local authority, government body, NHS/public health body, or other public authority.
 - HOUSING_ASSOCIATION: a housing association, registered provider, or equivalent affordable-housing organisation - prefer official/regulatory/government evidence.
@@ -846,7 +865,8 @@ PRIMARY APPLICANT TYPE - choose EXACTLY ONE value that best answers "what kind o
 - LANDOWNER_PROPERTY_COMPANY: a corporate landowner/property company where evidence supports ownership/management/investment in land/property but does NOT sufficiently establish HOUSEBUILDER/DEVELOPER/PROMOTER/FUND_INVESTOR or another more specific type. Applicant status alone never establishes ownership of THIS site - that is a separate, site-specific question (see ownership/control evidence above).
 - CONTRACTOR: a construction/building contractor, where that is the best-supported identity - never a housebuilder merely because it undertakes construction.
 - CHARITY_INSTITUTION: a charity, university, school, religious institution, foundation, or similar institutional body that does not better fit PUBLIC_SECTOR. NEVER inferred from name alone.
-- NOT_DETERMINED: reliable evidence is insufficient to place this organisation in any category above. This is a VALID, EXPECTED, IMPORTANT result - never force a guess. It does NOT mean the opportunity is unimportant or the applicant is irrelevant, only that the evidence available does not reliably support a specific commercial type.
+- PROFESSIONAL_CONSULTANT: an organisation whose evidenced commercial activity is PRIMARILY the provision of professional property, planning, design, engineering, or development-related advisory services (e.g. a planning consultancy, engineering consultancy, architecture practice, surveying/property consultancy, environmental consultancy, masterplanning/urban-design practice, or multidisciplinary built-environment consultancy). This describes WHAT THE ORGANISATION IS as a business - never confuse it with WHAT ROLE it happens to have on one specific Application (a genuine housebuilder or promoter that merely appears as a "planning agent" on one application here is still HOUSEBUILDER or PROMOTER, not PROFESSIONAL_CONSULTANT, unless its OWN business is genuinely consultancy). Providing planning advice, engineering, architecture, masterplanning, environmental services, surveying, or project consultancy does NOT by itself establish DEVELOPER - if the evidence describes this kind of professional-services business, PROFESSIONAL_CONSULTANT is the correct category, not DEVELOPER.
+- NOT_DETERMINED: reliable evidence is insufficient to place this organisation in any category above. This is a VALID, EXPECTED, IMPORTANT result - never force a guess. It does NOT mean the opportunity is unimportant or the applicant is irrelevant, only that the evidence available does not reliably support a specific commercial type. If the evidence establishes neither genuine development activity NOR genuine professional-consultancy activity NOR any other category above, choose NOT_DETERMINED rather than defaulting to DEVELOPER or PROFESSIONAL_CONSULTANT.
 
 PRIMARY TYPE SELECTION - the correct choice is the MOST COMMERCIALLY DESCRIPTIVE category the evidence genuinely supports, never a fixed hierarchy applied blindly:
 - A more specific category (HOUSEBUILDER, PROMOTER, HOUSING_ASSOCIATION, PUBLIC_SECTOR, ...) is preferred over generic DEVELOPER whenever it is genuinely, independently evidenced - do not default to DEVELOPER just because it is broader and easier.
@@ -872,6 +892,7 @@ RULES - follow every one of these exactly:
 11. CRITICAL - LINK primary_type (and every secondary role) TO THE EXACT EVIDENCE THAT SUPPORTS IT. If you found external evidence via web search that supports your chosen type, primary_type_evidence_refs MUST include the matching "evidence:<index>" ref for it - a raw_name:* or occurrence:* ref only ever establishes IDENTITY or ACTIVITY, never the commercial-type claim itself, and citing only those when stronger evidence exists in your own `evidence` array wastes the research you just did and produces an artificially low confidence.
     WORKED EXAMPLE - do exactly this: you search and find "Example Homes Ltd" is a UK housebuilder building and selling residential homes on their own official website. You add {{"source_type": "OFFICIAL_COMPANY_WEBSITE", "title": "...", "url": "https://example.com", ...}} as evidence[0]. Your primary_type entry must then be primary_type="HOUSEBUILDER", primary_type_confidence="HIGH", primary_type_evidence_refs=["evidence:0"] - NOT primary_type_evidence_refs=["raw_name:Example Homes Ltd"], which cites only the name and will be treated as if you found nothing beyond the name itself, regardless of how strong your actual research was.
     You may cite BOTH an internal ref (for context/identity) AND an "evidence:<index>" ref (for the actual type support) together, e.g. ["raw_name:Example Homes Ltd", "evidence:0"] - but at least one "evidence:<index>" ref must be present whenever your OWN research is what actually justifies the type and its confidence.
+12. PROFESSIONAL_CONSULTANT describes WHAT THE ORGANISATION IS as a business, never WHAT ROLE it happens to have on one Application here. Do not assign PROFESSIONAL_CONSULTANT merely because this organisation appears as, or is associated with, a planning agent/consultant relationship on an Application - you need actual evidence that the organisation's OWN business is professional advisory/consultancy services (e.g. its official website describing itself as a planning/engineering/architecture/surveying/environmental/masterplanning consultancy). Equally, do not assign HOUSEBUILDER/PROMOTER/DEVELOPER to a genuine consultancy just because it filed the application - classify the organisation's own evidenced business, not the administrative fact that it submitted a form.
 """
 
 
