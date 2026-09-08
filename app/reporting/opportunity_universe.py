@@ -54,6 +54,26 @@ correctness-affecting size limit at all:
     functions exactly as they already exist - no modification, no
     redesign - while genuinely disabling only the final truncation this
     module never wants.
+
+GATE 1C ("Recent Permission Opportunity Candidate Detection") adds a
+fourth detection route, recent_permission, filling the structural gap
+Gate 1B measured: a site with exactly one granted application (or several,
+but none yet forming a detected "phase") has NO route into the
+opportunity universe at all for up to ~2.5 years, regardless of scale or
+commercial relevance. The detector itself lives in app.reporting.
+dashboard._recent_permission_cards, alongside its two siblings
+(_approaching_lapse_cards/_undeveloped_phase_cards) - this module's own
+_recent_permission_candidate_sites is a thin wrapper, never a second
+implementation. RECENT_PERMISSION_WINDOW_MONTHS below is the evidence-
+based window (12 months - see this gate's own implementation report for
+the full marginal-value analysis across 6/12/18/24-month windows that
+justified it) shared by both this module and that function, so the two
+can never drift apart. A recent_permission card means ONLY "a qualifying
+residential permission was granted within the window, and no delivery/
+commencement evidence has been identified" - never that the site is for
+sale, that the applicant owns it, or any claim about promoter/
+housebuilder/ownership status (Gate 1C brief, Section 12/13 - Applicant
+Intelligence is explicitly out of scope here).
 """
 from __future__ import annotations
 
@@ -83,6 +103,31 @@ from app.ui.common import pick_representative_application
 # loop itself without needing thousands of real rows.
 DEFAULT_STRATEGIC_LAND_PAGE_SIZE = 500
 
+# Gate 1C - the evidence-based recency boundary for the recent_permission
+# detector. A read-only comparison across 6/12/18/24-month windows against
+# production data (see this gate's own implementation report) found the
+# marginal STRONG_FIT signal (summed across all four pilot Buyer Profiles)
+# rises sharply from 6 to 12 months (+5 STRONG_FIT for +44 candidates),
+# rises only marginally from 12 to 18 months (+2 for +23), and adds ZERO
+# further STRONG_FIT from 18 to 24 months (+0 for +21) - i.e. by 18-24
+# months this detector is adding candidate volume with no further
+# commercial signal, while 6 months would discard genuine, real STRONG_FIT
+# results that 12 months captures. 12 months is therefore the narrowest
+# boundary that does not sacrifice measured commercial signal - not an
+# arbitrary anniversary of Gate 1B's own analytical cohort.
+RECENT_PERMISSION_WINDOW_MONTHS = 12
+_AVG_DAYS_PER_MONTH = 30.44
+
+# Gate 1C, Section 7: a scheme already demonstrably being delivered must
+# never become a recent_permission candidate merely because its decision
+# is recent - reuses app.pipeline.lapse_tracking.compute_lapse_status's
+# own build_status classification verbatim (never a second, competing
+# build-status algorithm). "unknown" is deliberately NOT excluded here -
+# see _recent_permission_candidate_sites' own docstring for why absence of
+# commencement evidence must never be conflated with verified non-
+# commencement.
+_EXCLUDED_BUILD_STATUSES_FOR_RECENT_PERMISSION = ("underway", "partially_complete", "complete")
+
 
 def strategic_land_opportunity_id(allocation_id: int) -> str:
     return f"strategic_land:allocation:{allocation_id}"
@@ -94,6 +139,10 @@ def planning_delivery_site_opportunity_id(site_id: int) -> str:
 
 def planning_delivery_phase_opportunity_id(site_id: int, phase_code: str) -> str:
     return f"planning_delivery:phase:{site_id}:{phase_code}"
+
+
+def planning_delivery_recent_permission_opportunity_id(site_id: int) -> str:
+    return f"planning_delivery:recent_permission:{site_id}"
 
 
 @dataclass(frozen=True)
@@ -204,6 +253,19 @@ def _strategic_land_universe(session, page_size: int) -> list[OpportunityRecord]
     return records
 
 
+def _recent_permission_candidate_sites(session, *, exclude_site_ids: set[int]) -> list[dict]:
+    """Thin wrapper around app.reporting.dashboard._recent_permission_
+    cards - the single canonical implementation of the Gate 1C detector,
+    living alongside its two siblings (_approaching_lapse_cards/
+    _undeveloped_phase_cards) for the same reason this module already
+    reuses those two rather than re-deriving "granted"/"build status" a
+    second time. `limit=None` for the same completeness reason this
+    module's own docstring already explains for the other two detectors."""
+    from app.reporting.dashboard import _recent_permission_cards
+
+    return _recent_permission_cards(session, None, exclude_site_ids=frozenset(exclude_site_ids))
+
+
 def _planning_delivery_universe(session) -> list[OpportunityRecord]:
     # Local import: avoids a circular import, exactly the same reason
     # app.reporting.opportunity_feed.build_opportunity_feed's own local
@@ -222,6 +284,14 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
     lapse_cards = _approaching_lapse_cards(session, None)
     undeveloped_cards = _undeveloped_phase_cards(session, None)
     tagged = [(c, "site") for c in lapse_cards] + [(c, "phase") for c in undeveloped_cards]
+
+    # Gate 1C - recent_permission never duplicates a site the two
+    # detectors above already cover (see _recent_permission_candidate_
+    # sites' own docstring for the precedence rule).
+    already_covered_site_ids = {int(c["params"]["site_id"]) for c, _ in tagged}
+    recent_permission_cards = _recent_permission_candidate_sites(session, exclude_site_ids=already_covered_site_ids)
+    tagged += [(c, "recent_permission") for c in recent_permission_cards]
+
     if not tagged:
         return []
 
@@ -288,13 +358,24 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
 
         if kind == "site":
             opportunity_id = planning_delivery_site_opportunity_id(site_id)
-        else:
+        elif kind == "phase":
             # card["id"] is "opp-phase-{site_id}-{phase_code}" - reuse the
             # existing construction's own trailing segment rather than
             # re-deriving a phase code a second, possibly-inconsistent way.
             phase_code = card["id"].rsplit("-", 1)[-1]
             opportunity_id = planning_delivery_phase_opportunity_id(site_id, phase_code)
             fingerprint_fields["phase_code"] = phase_code
+        else:  # "recent_permission" (Gate 1C)
+            opportunity_id = planning_delivery_recent_permission_opportunity_id(site_id)
+            # The grant date itself is a STABLE fact (never a live
+            # countdown, unlike a formatted "N days left" string) -
+            # included so a genuinely different, later grant on the same
+            # site (e.g. a fresh full permission superseding an earlier
+            # one) registers as a material change, never merely the
+            # passage of time. card["when"] is the same grant-date-derived
+            # datetime _recent_permission_cards already built - reused,
+            # not re-parsed a second way.
+            fingerprint_fields["decision_date"] = card.get("when")
 
         records.append(OpportunityRecord(
             opportunity_id=opportunity_id,

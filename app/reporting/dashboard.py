@@ -1115,6 +1115,103 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
     return cards[:limit]
 
 
+def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: frozenset[int] = frozenset()) -> list[dict]:
+    """Gate 1C ("Recent Permission Opportunity Candidate Detection") - the
+    fourth planning/delivery signal, filling the structural gap Gate 1B
+    measured between a fresh grant and the two signals above: approaching
+    lapse needs the commencement deadline within ~180 days (i.e. ~2.5+
+    years after grant); undeveloped permission needs 2+ applications AND a
+    detected "approved_not_started" phase. A site with exactly one granted
+    application - or several, but none yet forming a detected phase - has
+    NO route into the opportunity universe at all without this signal,
+    regardless of scale or commercial relevance.
+
+    A card here means ONLY: "a qualifying residential permission was
+    granted within RECENT_PERMISSION_WINDOW_MONTHS, and no delivery/
+    commencement evidence has been identified in this platform's current
+    records" - never that the site is for sale, that the applicant owns
+    it, or any claim about promoter/housebuilder/ownership status (out of
+    scope for this gate - see app.reporting.opportunity_universe's own
+    module docstring).
+
+    `exclude_site_ids` is the set of sites already represented by
+    _approaching_lapse_cards/_undeveloped_phase_cards above - this
+    function never produces a duplicate candidate for a site those two
+    already cover (Gate 1C: "ONE COMMERCIAL SITE/PHASE CANDIDATE may have
+    MULTIPLE DETECTION REASONS... do not blindly duplicate"); the two
+    established, more specific signals always take precedence. Same
+    query/eligibility shape as _approaching_lapse_cards immediately above
+    (one broad SQL scan for granted site_ids, then batched Application
+    fetch, then compute_lapse_status per site) - reused deliberately, not
+    a parallel interpretation of "granted"/"build status".
+
+    Recency boundary (RECENT_PERMISSION_WINDOW_MONTHS) and the excluded
+    build-status set both live in app.reporting.opportunity_universe -
+    the single source of truth for both this function and that module's
+    own canonical opportunity read model, so the two can never drift
+    apart. Build status "unknown" is deliberately NOT excluded here -
+    absence of commencement evidence must never be conflated with
+    verified non-commencement (Gate 1C Section 7)."""
+    from app.reporting.opportunity_universe import (
+        _AVG_DAYS_PER_MONTH,
+        _EXCLUDED_BUILD_STATUSES_FOR_RECENT_PERMISSION,
+        RECENT_PERMISSION_WINDOW_MONTHS,
+    )
+
+    granted_filter = or_(*(Application.decision.ilike(f"%{kw}%") for kw in GRANTED_KEYWORDS))
+    granted_site_ids = list(session.execute(
+        select(Application.site_id).where(
+            Application.site_id.is_not(None), Application.decision_issued_date.is_not(None), granted_filter,
+        ).distinct()
+    ).scalars())
+    candidate_site_ids = [sid for sid in granted_site_ids if sid not in exclude_site_ids]
+    if not candidate_site_ids:
+        return []
+    sites = session.execute(
+        select(Site).where(Site.id.in_(candidate_site_ids), Site.excluded.is_not(True))
+    ).scalars().all()
+    apps = session.execute(
+        select(Application).where(Application.site_id.in_([s.id for s in sites]))
+    ).scalars().all() if sites else []
+    apps_by_site: dict[int, list[Application]] = {}
+    for a in apps:
+        apps_by_site.setdefault(a.site_id, []).append(a)
+
+    today = dt.date.today()
+    scored: list[tuple[float, dict]] = []
+    for site in sites:
+        result = compute_lapse_status(apps_by_site.get(site.id, []), site)
+        if result["build_status"] in _EXCLUDED_BUILD_STATUSES_FOR_RECENT_PERMISSION:
+            continue
+        granted_app = result["granted_app"]
+        if granted_app is None:
+            continue
+        grant_date = parse_portal_date(granted_app.decision_issued_date)
+        if grant_date == dt.date.min:
+            continue
+        months_ago = (today - grant_date).days / _AVG_DAYS_PER_MONTH
+        if months_ago > RECENT_PERMISSION_WINDOW_MONTHS:
+            continue
+
+        scored.append((months_ago, {
+            "id": f"opp-recent-permission-{site.id}",
+            "title": site.display_address, "subtitle": site.council_code,
+            # Evidence-safe wording (Gate 1C Section 19) - states exactly
+            # what is known (a grant date) and exactly what is unknown (no
+            # commencement evidence identified), never "available",
+            # "for sale", or "promoter opportunity".
+            "reason": (
+                f"Residential permission granted {grant_date.strftime('%d %b %Y')} - no commencement "
+                f"evidence has been identified in Property AIgent's current records."
+            ),
+            "metric": f"Granted {grant_date.strftime('%d %b %Y')}",
+            "when": dt.datetime.combine(grant_date, dt.time.min),
+            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+        }))
+    scored.sort(key=lambda pair: pair[0])  # most recently granted first
+    return [card for _, card in scored[:limit]]
+
+
 def _allocations_without_application_cards(session: Session, limit: int) -> list[dict]:
     rows = session.execute(
         select(LocalPlanSite).where(
