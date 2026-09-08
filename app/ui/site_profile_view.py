@@ -13,6 +13,8 @@ re-implementing any of them.
 """
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import streamlit as st
 
@@ -23,6 +25,8 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
+from app.reporting.applicant_identity import clean_organisation_name, resolve_applicant_identity
+from app.reporting.applicant_intelligence import get_applicant_intelligence
 from app.reporting.ownership_control import EMPTY_STATE_APPLICATION, EMPTY_STATE_SITE, SOURCE_NOTE, get_site_control_detail
 from app.reporting.residential_mix import format_affordable_tile
 from app.reporting.site_profile import build_site_profile
@@ -353,6 +357,92 @@ def _render_ownership_control(session, site: Site, apps: list[Application]) -> N
     st.caption(SOURCE_NOTE)
 
 
+_ROLE_LABELS = {
+    "HOUSEBUILDER": "Housebuilder", "LAND_PROMOTER": "Land promoter", "HOUSING_ASSOCIATION": "Housing association",
+    "LANDOWNER_PRIVATE": "Private landowner", "PUBLIC_SECTOR": "Public sector", "CONSULTANT_AGENT": "Consultant / agent",
+    "DEVELOPER": "Developer", "OTHER": "Other", "UNKNOWN": "Unknown",
+}
+_CONFIDENCE_BADGES = {"HIGH": "🟢 High confidence", "MEDIUM": "🟡 Medium confidence", "LOW": "🟠 Low confidence"}
+
+
+def _render_applicant_intelligence(session, apps: list[Application]) -> None:
+    """Gate 2A ("Applicant Intelligence") - a MINIMAL, READ-ONLY validation
+    surface (Section 27: "add only the minimum UI needed to validate
+    Applicant Intelligence... the primary deliverable is the intelligence
+    substrate"). Never triggers a generation on page load (Section 35 -
+    AI processing is background/bounded, never synchronous with a
+    Dashboard/Scheme Detail view) - this only resolves identity (a cheap,
+    read-only DB lookup, no AI-model call of any kind) and reads whatever
+    has already been persisted by the bounded processing stage, if anything.
+
+    One expander per distinct organisation named as applicant/developer on
+    any of this Site's Applications - deliberately NOT a single flattened
+    card, since an applicant and a developer are commonly genuinely
+    different organisations (Gate 2A Section 6/14)."""
+    section_header("Applicant Intelligence", icon="🏢")
+
+    seen_refs: dict[str, dict] = {}
+    for app in apps:
+        si = app.scheme_intelligence
+        for label, raw in (
+            ("Applicant", si.applicant_company if si else None),
+            ("Developer", si.developer if si else None),
+            ("Applicant (portal record)", app.applicant_name_raw),
+        ):
+            cleaned = clean_organisation_name(raw)
+            if not cleaned:
+                continue
+            identity = resolve_applicant_identity(session, cleaned)
+            if identity is None:
+                continue
+            entry = seen_refs.setdefault(identity.ref, {"identity": identity, "labels": set(), "raw_names": set()})
+            entry["labels"].add(label)
+            entry["raw_names"].add(cleaned)
+
+    if not seen_refs:
+        st.info("No applicant/developer organisation identified from this Site's linked Applications.")
+        return
+
+    for entry in seen_refs.values():
+        identity = entry["identity"]
+        row = get_applicant_intelligence(session, identity.ref)
+        with st.expander(f"{identity.display_name} ({', '.join(sorted(entry['labels']))})", expanded=True):
+            other_names = entry["raw_names"] - {identity.display_name}
+            if other_names:
+                st.caption(f"Also known as: {', '.join(sorted(other_names))}")
+            if identity.identity_type == "company":
+                st.caption("Companies House-resolved entity - see Ownership & Control above for site-specific evidence.")
+            else:
+                st.caption("Name-based identity - no verified company record has been matched yet.")
+
+            if row is None or row.status != "ok" or not row.roles:
+                st.caption("Applicant Intelligence not yet generated for this organisation.")
+                continue
+
+            roles = json.loads(row.roles)
+            if roles:
+                for r in roles:
+                    label = _ROLE_LABELS.get(r["role"], r["role"])
+                    badge = _CONFIDENCE_BADGES.get(r["confidence"], r["confidence"])
+                    st.markdown(f"**{label}** — {badge}")
+            if row.is_spv and row.is_spv != "UNKNOWN":
+                st.caption(f"Special Purpose Vehicle: {row.is_spv.title()}")
+            if row.parent_group:
+                parent = json.loads(row.parent_group)
+                st.caption(f"Possible parent/group: {parent['name']} ({_CONFIDENCE_BADGES.get(parent['confidence'], parent['confidence'])})")
+            if row.summary:
+                st.markdown(f"*{row.summary}*")
+            if row.unresolved_questions:
+                questions = json.loads(row.unresolved_questions)
+                if questions:
+                    st.caption("Unresolved: " + "; ".join(questions))
+            st.caption(
+                f"Generated {row.generated_at.strftime('%d %b %Y') if row.generated_at else 'unknown date'} "
+                "- an AI-assisted classification, not a verified legal or commercial fact. Never implies the site "
+                "is for sale or that this organisation owns it."
+            )
+
+
 def render_site_profile(session, settings, site: Site, apps: list[Application]) -> None:
     """The flagship Site Profile entry point (Sprint 4.4) - called only
     from app/ui/pages/1_Scheme_Detail.py."""
@@ -426,6 +516,8 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
 
     with tab_ownership:
         _render_ownership_control(session, site, apps)
+        st.divider()
+        _render_applicant_intelligence(session, apps)
 
     with tab_mix:
         _render_residential_mix(view["residential_mix"])
