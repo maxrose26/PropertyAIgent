@@ -1,15 +1,28 @@
-# Render Blueprint - Pilot Readiness PR-2 ("Production Scheduling").
+# Render Blueprint - Pilot Readiness PR-2 ("Production Scheduling"),
+# extended by Gate 1C ("Controlled Merge, Production Baseline & Weekly
+# Opportunity Sync Activation").
 #
-# This file adds TWO Cron Job services, deliberately separate (Pilot
-# Readiness PR-2 final pre-merge amendment, "Automated Intelligence
-# Cadence" / "Render Architecture" - Product Owner review: "do not couple
-# them so tightly that a scraping failure prevents existing queued
-# intelligence work from being processed... prefer separate jobs/services
-# if this provides better fault isolation"):
+# This file adds THREE permanent, standing Cron Job services, deliberately
+# separate (Pilot Readiness PR-2 final pre-merge amendment, "Automated
+# Intelligence Cadence" / "Render Architecture" - Product Owner review: "do
+# not couple them so tightly that a scraping failure prevents existing
+# queued intelligence work from being processed... prefer separate jobs/
+# services if this provides better fault isolation" - the same principle
+# Gate 1C's own weekly opportunity sync job below extends: opportunity
+# eligibility can change purely because time passes, independent of
+# whether scraping or AI processing ran or succeeded that day, so it must
+# never be coupled to either):
 #   1. propertyaigent-daily-scrape         - Daily Discovery (deterministic
 #      scraping/document-collection only, scripts/run_daily_councils.py)
 #   2. propertyaigent-intelligence-processing - bounded AI extraction/
 #      summary generation (scripts/run_intelligence_processing.py)
+#   3. propertyaigent-weekly-opportunity-sync - Gate 1C: weekly Monday
+#      re-evaluation of the Opportunity Candidate Universe
+#      (scripts/sync_opportunity_monitoring.py) - deterministic, no
+#      OpenAI call, independent of both jobs above.
+# (A fourth, TEMPORARY one-off job - propertyaigent-historical-rebuild-
+# overnight - is defined further below; it is explicitly not part of this
+# standing count and carries its own removal instructions.)
 # It does not define the existing Streamlit web service, which - per this
 # sprint's own PR-2 architecture audit - was almost certainly created
 # manually in the Render dashboard rather than from a Blueprint (no
@@ -71,6 +84,20 @@
 #     EPC_API_KEY     NOT required. This job never calls
 #                     stage_check_build_status or anything else that
 #                     touches EPC data.
+#   Weekly Opportunity Sync (propertyaigent-weekly-opportunity-sync, Gate
+#   1C):
+#     DATABASE_URL    REQUIRED, same reason as above - the only thing this
+#                     job genuinely needs. scripts/sync_opportunity_
+#                     monitoring.py calls app.reporting.opportunity_change.
+#                     sync_opportunity_monitoring_state, which is pure
+#                     read/reconcile logic over already-scraped data - no
+#                     network scraping, no browser, no AI call of any kind.
+#     OPENAI_API_KEY  NOT required and deliberately NOT declared - Gate 1C
+#                     opportunity detection/monitoring must remain fully
+#                     deterministic (Gate 1C brief: "no OpenAI call, no
+#                     opportunity scoring").
+#     PLAYWRIGHT_BROWSERS_PATH / EPC_API_KEY  NOT required - this job never
+#                     launches a browser or calls EPC enrichment.
 # No secret's actual value is ever declared below (sync: false everywhere
 # a real secret is required) - requiring a secret a job does not genuinely
 # need is itself a safety risk (unnecessary exposure, unnecessary operator
@@ -242,6 +269,34 @@ services:
       # required configuration - an operator can add them later via the
       # Render dashboard (or --max-extractions/--max-summaries) without
       # needing a Blueprint change first.
+
+  - type: cron
+    name: propertyaigent-weekly-opportunity-sync
+    runtime: python
+    # Lightest available plan - this job only issues read queries against
+    # the existing Site/Application/LocalPlanSite/SchemeIntelligence tables
+    # and reconciles OpportunityMonitoringState (app.reporting.
+    # opportunity_change.sync_opportunity_monitoring_state) - no browser,
+    # no AI call, no meaningfully large in-memory working set.
+    plan: starter
+    # Weekly, Monday morning UK time. Render Cron Job schedules are UTC
+    # only (confirmed against Render's own Blueprint/Cron Job docs, same
+    # constraint already noted above for Daily Discovery/Intelligence
+    # Processing) - there is no native UK/Europe-London timezone option.
+    # 06:00 UTC is exactly 06:00 GMT (UK winter) and 07:00 BST (UK summer,
+    # clocks forward) - "Monday morning UK time" either way, never crossing
+    # into the working day proper. Gate 1C's own brief explicitly asks not
+    # to overengineer daylight-saving handling in this gate: this fixed UTC
+    # value is the stable, documented choice, not a DST-aware schedule - an
+    # operator revisiting this later could tighten it to a genuinely fixed
+    # UK-local time via a timezone-aware scheduler if that one-hour seasonal
+    # drift ever actually matters operationally.
+    schedule: "0 6 * * 1"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -m scripts.sync_opportunity_monitoring"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
 
   # ==========================================================================
   # TEMPORARY ONE-OFF HISTORICAL BACKFILL JOB - NOT PERMANENT INFRASTRUCTURE
