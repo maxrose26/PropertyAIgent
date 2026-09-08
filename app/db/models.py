@@ -2652,3 +2652,106 @@ class OpportunityMonitoringState(Base):
     # opportunity has nothing to compare against, so no reason code is
     # invented for it).
     last_change_reasons: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class ApplicantIntelligence(Base):
+    """Gate 2A ("Applicant Intelligence") - the GENERATED INTERPRETATION
+    layer answering "who is behind this planning application or scheme,
+    and in what commercial capacity" for ONE ORGANISATION-LEVEL identity,
+    reused across every Application/Site/Opportunity Candidate that
+    identity appears on. Same "source facts stay separate from AI-
+    generated interpretation" architecture as AllocationIntelligenceSummary
+    (this table's direct structural precedent) - never bolted onto
+    Application, SchemeIntelligence, Company, or ControlRelationship.
+
+    GLOBAL, NOT WORKSPACE-SCOPED (Gate 2A Section 22): "XYZ Ltd appears to
+    be a land promoter" is shared platform intelligence about an
+    organisation, not one buyer's private interpretation - mirrors
+    OpportunityMonitoringState's own "objective fact is global; buyer
+    INTERPRETATION is workspace-specific" boundary. Buyer-specific
+    commercial judgement about what an applicant's role MEANS for one
+    buyer's mandate is explicitly a later, separate concern (Gate 2B).
+
+    IDENTITY (Gate 2A Section 7) - EXACTLY ONE of company_id/identity_key
+    is ever set, enforced by the writer (app.reporting.applicant_identity),
+    never a DB constraint (mirrors ControlRelationship's own "at least one
+    of these two is always set - enforced by the writer helper" precedent,
+    inverted to "exactly one" here since these two are mutually exclusive
+    identity KINDS, not independent scope dimensions):
+      - company_id set: a VERIFIED/RESOLVED entity - this raw applicant/
+        developer name was matched, by app.enrichment.control_entities.
+        resolve_existing_company's own existing conservative resolver
+        (exact normalised-name match, or fuzzy score >= 92, against
+        ALREADY-EXISTING Company rows only - never auto-created here), to
+        a real Company row this platform already holds. `unique=True` on a
+        nullable column: SQL treats multiple NULLs as distinct, so this
+        enforces "at most one ApplicantIntelligence row per Company"
+        without blocking every name-based row (identity_key NULL) from
+        coexisting.
+      - identity_key set (company_id NULL): a NAME-BASED identity - no
+        Company row could be confidently resolved. identity_key is
+        app.enrichment.companies_house.normalise_name's own DETERMINISTIC
+        normalisation (lowercase, punctuation stripped, legal suffix
+        stripped) of the best-available raw name - never a fuzzy semantic
+        merge (e.g. "Peel L&P" and "Peel Land and Property" are NEVER
+        silently unified this way - see app.reporting.applicant_identity's
+        own docstring for exactly what "deterministic" means and does not
+        mean here). Same `unique=True`-on-nullable mechanism as company_id.
+
+    NEVER a per-Site or per-Application row (Section 6) - SITE-SPECIFIC
+    relationship/evidence facts (a role on ONE Application, ControlRelationship
+    evidence) stay exactly where they already live; this table only ever
+    holds the cross-application, entity-level classification."""
+
+    __tablename__ = "applicant_intelligences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    identity_type: Mapped[str] = mapped_column(String(10))  # company | name
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), unique=True, nullable=True)
+    identity_key: Mapped[str | None] = mapped_column(String(300), unique=True, nullable=True)
+    # Best available human-readable name for display - the Company's own
+    # name_raw when company_id is set, otherwise the most complete raw
+    # name variant seen for this identity_key. Never itself part of the
+    # identity/uniqueness boundary - purely presentational.
+    display_name: Mapped[str] = mapped_column(String(300))
+
+    # AI-generated interpretation - ONLY ever written by a SUCCESSFUL,
+    # validated generation (see generate_applicant_intelligence's own
+    # docstring), mirroring AllocationIntelligenceSummary's own "last-
+    # successful-summary invariant" exactly: a failed/rejected attempt only
+    # ever updates status/generation_error below, never these fields, so a
+    # reader always sees the last genuinely successful classification.
+    #
+    # roles: JSON list of {"role": ..., "confidence": "HIGH|MEDIUM|LOW",
+    # "evidence_refs": [...]} - MULTIPLE roles may apply (Gate 2A Section
+    # 9), never forced into one label.
+    roles: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # TRUE | FALSE | UNKNOWN (Gate 2A Section 10) - a corporate-structure
+    # characteristic, deliberately never a peer entry inside roles above.
+    is_spv: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # JSON {"name": ..., "confidence": ..., "evidence_refs": [...]} or NULL
+    # when no parent/group evidence exists - never a bare string, so
+    # confidence/evidence stay attached to this claim exactly like every
+    # other one.
+    parent_group: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON list of strings - open questions the evidence cannot yet answer.
+    unresolved_questions: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    generated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # sha256 of the narrative-relevant subset of ApplicantIdentityContext -
+    # see app.reporting.applicant_intelligence.compute_context_fingerprint's
+    # own docstring. A routine check that finds nothing new never forces a
+    # regeneration/AI-cost event (Gate 2A Section 20).
+    context_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # ok | error - null means "never attempted".
+    status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    company: Mapped["Company | None"] = relationship(foreign_keys=[company_id])

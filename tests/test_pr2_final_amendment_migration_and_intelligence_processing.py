@@ -437,15 +437,17 @@ def test_render_yaml_declares_exactly_three_cron_jobs_no_web_service():
     """Updated by the Historical B3 Rebuild Unattended Overnight Runner task
     - adds a third, deliberately temporary, deliberately separate Cron Job
     (propertyaigent-historical-rebuild-overnight) for the one-off historical
-    backlog. Still exactly cron jobs, still no web service declared here."""
+    backlog - and by Gate 1C, which adds a fourth, PERMANENT standing job
+    (propertyaigent-weekly-opportunity-sync). Still exactly cron jobs, still
+    no web service declared here."""
     config = yaml.safe_load(RENDER_YAML.read_text(encoding="utf-8"))
     services = config["services"]
-    assert len(services) == 3
+    assert len(services) == 4
     assert all(s["type"] == "cron" for s in services)
     names = {s["name"] for s in services}
     assert names == {
         "propertyaigent-daily-scrape", "propertyaigent-intelligence-processing",
-        "propertyaigent-historical-rebuild-overnight",
+        "propertyaigent-weekly-opportunity-sync", "propertyaigent-historical-rebuild-overnight",
     }
 
 
