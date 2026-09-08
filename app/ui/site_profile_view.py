@@ -13,6 +13,8 @@ re-implementing any of them.
 """
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import streamlit as st
 
@@ -23,6 +25,8 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
+from app.reporting.applicant_identity import clean_organisation_name, resolve_applicant_identity
+from app.reporting.applicant_intelligence import get_applicant_intelligence
 from app.reporting.ownership_control import EMPTY_STATE_APPLICATION, EMPTY_STATE_SITE, SOURCE_NOTE, get_site_control_detail
 from app.reporting.residential_mix import format_affordable_tile
 from app.reporting.site_profile import build_site_profile
@@ -353,6 +357,125 @@ def _render_ownership_control(session, site: Site, apps: list[Application]) -> N
     st.caption(SOURCE_NOTE)
 
 
+# Gate 2A final taxonomy amendment - the approved V1 primary applicant
+# taxonomy's own display labels (app.reporting.applicant_intelligence.
+# PRIMARY_TYPE_TAXONOMY, reused verbatim for secondary_roles too).
+_ROLE_LABELS = {
+    "HOUSEBUILDER": "Housebuilder", "DEVELOPER": "Developer", "PROMOTER": "Promoter",
+    "PUBLIC_SECTOR": "Public sector", "HOUSING_ASSOCIATION": "Housing association", "ESTATE": "Estate",
+    "SPV": "Special Purpose Vehicle (SPV)", "PRIVATE": "Private", "FUND_INVESTOR": "Fund / investor",
+    "LANDOWNER_PROPERTY_COMPANY": "Landowner / property company", "CONTRACTOR": "Contractor",
+    "CHARITY_INSTITUTION": "Charity / institution", "PROFESSIONAL_CONSULTANT": "Professional consultant",
+    "NOT_DETERMINED": "Not determined",
+}
+_CONFIDENCE_BADGES = {"HIGH": "🟢 High confidence", "MEDIUM": "🟡 Medium confidence", "LOW": "🟠 Low confidence"}
+
+
+def _render_applicant_intelligence(session, apps: list[Application]) -> None:
+    """Gate 2A ("Applicant Intelligence") - a MINIMAL, READ-ONLY validation
+    surface (Section 27: "add only the minimum UI needed to validate
+    Applicant Intelligence... the primary deliverable is the intelligence
+    substrate"). Never triggers a generation on page load (Section 35 -
+    AI processing is background/bounded, never synchronous with a
+    Dashboard/Scheme Detail view) - this only resolves identity (a cheap,
+    read-only DB lookup, no AI-model call of any kind) and reads whatever
+    has already been persisted by the bounded processing stage, if anything.
+
+    One expander per distinct organisation named as applicant/developer on
+    any of this Site's Applications - deliberately NOT a single flattened
+    card, since an applicant and a developer are commonly genuinely
+    different organisations (Gate 2A Section 6/14)."""
+    section_header("Applicant Intelligence", icon="🏢")
+
+    seen_refs: dict[str, dict] = {}
+    for app in apps:
+        si = app.scheme_intelligence
+        for label, raw in (
+            ("Applicant", si.applicant_company if si else None),
+            ("Developer", si.developer if si else None),
+            ("Applicant (portal record)", app.applicant_name_raw),
+        ):
+            cleaned = clean_organisation_name(raw)
+            if not cleaned:
+                continue
+            identity = resolve_applicant_identity(session, cleaned)
+            if identity is None:
+                continue
+            entry = seen_refs.setdefault(identity.ref, {"identity": identity, "labels": set(), "raw_names": set()})
+            entry["labels"].add(label)
+            entry["raw_names"].add(cleaned)
+
+    if not seen_refs:
+        st.info("No applicant/developer organisation identified from this Site's linked Applications.")
+        return
+
+    for entry in seen_refs.values():
+        identity = entry["identity"]
+        row = get_applicant_intelligence(session, identity.ref)
+        with st.expander(f"{identity.display_name} ({', '.join(sorted(entry['labels']))})", expanded=True):
+            other_names = entry["raw_names"] - {identity.display_name}
+            if other_names:
+                st.caption(f"Also known as: {', '.join(sorted(other_names))}")
+            if identity.identity_type == "company":
+                st.caption("Companies House-resolved entity - see Ownership & Control above for site-specific evidence.")
+            else:
+                st.caption("Name-based identity - no verified company record has been matched yet.")
+
+            if row is None or row.status not in ("ok", "not_researched") or not row.primary_type:
+                st.caption("Applicant Intelligence not yet generated for this organisation.")
+                continue
+
+            # Gate 2A final taxonomy amendment (Section 11) - Type/
+            # Confidence is the primary, always-shown line; PRIVATE and
+            # NOT_DETERMINED each render their own honest, distinct
+            # explanation rather than a generic "not available" message
+            # (Section 3: "PRIVATE and NOT_DETERMINED mean different
+            # things" - never collapsed into the same UI treatment).
+            type_label = _ROLE_LABELS.get(row.primary_type, row.primary_type)
+            confidence_badge = _CONFIDENCE_BADGES.get(row.primary_type_confidence, row.primary_type_confidence)
+            st.markdown(f"**Type: {type_label}** — {confidence_badge}")
+            if row.status == "not_researched" or row.primary_type == "PRIVATE":
+                st.caption("Research: Not researched — private individual.")
+                continue
+            if row.primary_type == "NOT_DETERMINED":
+                st.caption("Reason: Insufficient reliable evidence to determine a commercial applicant type.")
+
+            secondary_roles = json.loads(row.secondary_roles) if row.secondary_roles else []
+            if secondary_roles:
+                labels = ", ".join(_ROLE_LABELS.get(r["role"], r["role"]) for r in secondary_roles)
+                st.caption(f"Secondary roles: {labels}")
+            if row.is_spv and row.is_spv != "UNKNOWN":
+                st.caption(f"Special Purpose Vehicle: {row.is_spv.title()}")
+            if row.parent_group:
+                parent = json.loads(row.parent_group)
+                parent_type_bit = f" — {_ROLE_LABELS.get(parent['type'], parent['type'])}" if parent.get("type") else ""
+                st.caption(f"Parent/group: {parent['name']}{parent_type_bit} ({_CONFIDENCE_BADGES.get(parent['confidence'], parent['confidence'])})")
+            if row.summary:
+                st.markdown(f"*Why Property AIgent believes this:* {row.summary}")
+            # Gate 2A amendment ("Evidence-Grounded Applicant Web Research")
+            # Section 28 - external sources, minimal read-only display. Only
+            # ever populated when web research was actually performed (see
+            # app.reporting.applicant_intelligence.generate_applicant_
+            # intelligence's own web_research_performed flag) - never shown
+            # as "sources" for a purely internal-evidence classification.
+            evidence = json.loads(row.evidence) if row.evidence else []
+            if evidence:
+                st.markdown("**Sources:**")
+                for item in evidence:
+                    publisher_bit = f" ({item['publisher']})" if item.get("publisher") else ""
+                    st.markdown(f"- [{item.get('title') or item.get('url')}]({item['url']}){publisher_bit} — {item.get('claim', '')}")
+            if row.unresolved_questions:
+                questions = json.loads(row.unresolved_questions)
+                if questions:
+                    st.caption("Unresolved: " + "; ".join(questions))
+            st.caption(
+                f"Generated {row.generated_at.strftime('%d %b %Y') if row.generated_at else 'unknown date'} "
+                + ("(web research used) " if row.web_research_performed else "(internal evidence only) ")
+                + "- an AI-assisted classification, not a verified legal or commercial fact. Never implies the site "
+                "is for sale or that this organisation owns it."
+            )
+
+
 def render_site_profile(session, settings, site: Site, apps: list[Application]) -> None:
     """The flagship Site Profile entry point (Sprint 4.4) - called only
     from app/ui/pages/1_Scheme_Detail.py."""
@@ -426,6 +549,8 @@ def render_site_profile(session, settings, site: Site, apps: list[Application]) 
 
     with tab_ownership:
         _render_ownership_control(session, site, apps)
+        st.divider()
+        _render_applicant_intelligence(session, apps)
 
     with tab_mix:
         _render_residential_mix(view["residential_mix"])

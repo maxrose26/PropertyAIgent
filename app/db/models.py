@@ -2652,3 +2652,172 @@ class OpportunityMonitoringState(Base):
     # opportunity has nothing to compare against, so no reason code is
     # invented for it).
     last_change_reasons: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+class ApplicantIntelligence(Base):
+    """Gate 2A ("Applicant Intelligence") - the GENERATED INTERPRETATION
+    layer answering "who is behind this planning application or scheme,
+    and in what commercial capacity" for ONE ORGANISATION-LEVEL identity,
+    reused across every Application/Site/Opportunity Candidate that
+    identity appears on. Same "source facts stay separate from AI-
+    generated interpretation" architecture as AllocationIntelligenceSummary
+    (this table's direct structural precedent) - never bolted onto
+    Application, SchemeIntelligence, Company, or ControlRelationship.
+
+    GLOBAL, NOT WORKSPACE-SCOPED (Gate 2A Section 22): "XYZ Ltd appears to
+    be a land promoter" is shared platform intelligence about an
+    organisation, not one buyer's private interpretation - mirrors
+    OpportunityMonitoringState's own "objective fact is global; buyer
+    INTERPRETATION is workspace-specific" boundary. Buyer-specific
+    commercial judgement about what an applicant's role MEANS for one
+    buyer's mandate is explicitly a later, separate concern (Gate 2B).
+
+    IDENTITY (Gate 2A Section 7) - EXACTLY ONE of company_id/identity_key
+    is ever set, enforced by the writer (app.reporting.applicant_identity),
+    never a DB constraint (mirrors ControlRelationship's own "at least one
+    of these two is always set - enforced by the writer helper" precedent,
+    inverted to "exactly one" here since these two are mutually exclusive
+    identity KINDS, not independent scope dimensions):
+      - company_id set: a VERIFIED/RESOLVED entity - this raw applicant/
+        developer name was matched, by app.enrichment.control_entities.
+        resolve_existing_company's own existing conservative resolver
+        (exact normalised-name match, or fuzzy score >= 92, against
+        ALREADY-EXISTING Company rows only - never auto-created here), to
+        a real Company row this platform already holds. `unique=True` on a
+        nullable column: SQL treats multiple NULLs as distinct, so this
+        enforces "at most one ApplicantIntelligence row per Company"
+        without blocking every name-based row (identity_key NULL) from
+        coexisting.
+      - identity_key set (company_id NULL): a NAME-BASED identity - no
+        Company row could be confidently resolved. identity_key is
+        app.enrichment.companies_house.normalise_name's own DETERMINISTIC
+        normalisation (lowercase, punctuation stripped, legal suffix
+        stripped) of the best-available raw name - never a fuzzy semantic
+        merge (e.g. "Peel L&P" and "Peel Land and Property" are NEVER
+        silently unified this way - see app.reporting.applicant_identity's
+        own docstring for exactly what "deterministic" means and does not
+        mean here). Same `unique=True`-on-nullable mechanism as company_id.
+
+    NEVER a per-Site or per-Application row (Section 6) - SITE-SPECIFIC
+    relationship/evidence facts (a role on ONE Application, ControlRelationship
+    evidence) stay exactly where they already live; this table only ever
+    holds the cross-application, entity-level classification."""
+
+    __tablename__ = "applicant_intelligences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    identity_type: Mapped[str] = mapped_column(String(10))  # company | name
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), unique=True, nullable=True)
+    identity_key: Mapped[str | None] = mapped_column(String(300), unique=True, nullable=True)
+    # Best available human-readable name for display - the Company's own
+    # name_raw when company_id is set, otherwise the most complete raw
+    # name variant seen for this identity_key. Never itself part of the
+    # identity/uniqueness boundary - purely presentational.
+    display_name: Mapped[str] = mapped_column(String(300))
+
+    # AI-generated interpretation - ONLY ever written by a SUCCESSFUL,
+    # validated generation (see generate_applicant_intelligence's own
+    # docstring), mirroring AllocationIntelligenceSummary's own "last-
+    # successful-summary invariant" exactly: a failed/rejected attempt only
+    # ever updates status/generation_error below, never these fields, so a
+    # reader always sees the last genuinely successful classification.
+    #
+    # Gate 2A final taxonomy amendment ("Final Taxonomy Amendment") -
+    # PRIMARY user-facing classification: exactly ONE value from the
+    # approved V1 taxonomy (app.reporting.applicant_intelligence.
+    # PRIMARY_TYPE_TAXONOMY) answering "what kind of party is behind this
+    # planning application" - never a list, never left to a caller to pick
+    # "the most important" entry out of several roles. NOT_DETERMINED is a
+    # valid, expected, non-degraded result (Section 3) - it means the
+    # approved taxonomy's categories are not reliably supported, never
+    # that the opportunity or applicant is unimportant. PRIVATE is the
+    # dedicated value for a confidently-identified individual (see
+    # is_person_shaped_identity) - deliberately distinct from
+    # NOT_DETERMINED (Section 3: "PRIVATE and NOT_DETERMINED mean
+    # different things").
+    primary_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # HIGH | MEDIUM | LOW - grounded the same way as every other confidence
+    # value on this row (evidence_supported_confidence_ceiling applies to
+    # this exactly like any other classification claim); NOT_DETERMINED is
+    # deterministically forced to LOW in code (Section 8: "do not invent
+    # fake precision" - there is nothing to be confident ABOUT when the
+    # result itself is "could not be determined").
+    primary_type_confidence: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Renamed from the original Gate 2A "roles" column (production never
+    # held a row under the old name - no migration/data-loss concern, see
+    # Section 9's own "optimise for clean initial production deployment"
+    # instruction) - now holds every ADDITIONAL, genuinely-evidenced role
+    # beyond primary_type, same JSON shape as before: list of {"role":
+    # ..., "confidence": "HIGH|MEDIUM|LOW", "evidence_refs": [...]},
+    # drawn from the SAME approved taxonomy (Section 4 - "do not throw
+    # useful information away": a HOUSEBUILDER's own DEVELOPER activity,
+    # or a HOUSING_ASSOCIATION's own development arm, stays visible here
+    # even though it is no longer the PRIMARY classification).
+    secondary_roles: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # TRUE | FALSE | UNKNOWN (Gate 2A Section 10) - a corporate-structure
+    # characteristic, deliberately never a peer entry inside secondary_
+    # roles above, and deliberately independent of primary_type == SPV
+    # above (Section 2/9 of the final taxonomy amendment): an entity can
+    # be primary_type=HOUSEBUILDER with is_spv=TRUE (a housebuilder that
+    # itself operates through a corporate-vehicle structure), or
+    # primary_type=SPV or is_spv=UNKNOWN, independently.
+    is_spv: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # JSON {"name": ..., "type": ... (one of PRIMARY_TYPE_TAXONOMY, or ""
+    # when the parent's own type is not reliably known - Gate 2A final
+    # taxonomy amendment Section 3's own SPV worked example: "ABC
+    # Manchester Developments Ltd" / primary_type=SPV / parent="XYZ Homes
+    # plc" / parent type=HOUSEBUILDER), "confidence": ...,
+    # "evidence_refs": [...]} or NULL when no parent/group evidence
+    # exists - never a bare string, so confidence/evidence stay attached
+    # to this claim exactly like every other one.
+    parent_group: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON list of strings - open questions the evidence cannot yet answer.
+    unresolved_questions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Gate 2A amendment ("Evidence-Grounded Applicant Web Research") - JSON
+    # list of {"source_type": ..., "title": ..., "url": ..., "publisher": ...,
+    # "claim": ..., "accessed_date": ...} - concise, attributable supporting
+    # evidence ONLY (never a copied passage of source text), embedded on this
+    # SAME row rather than a separate table (mirrors roles/parent_group/
+    # unresolved_questions' own established "JSON-in-Text sub-field of one
+    # entity-level row" convention - Section 17's own "do not over-normalise
+    # prematurely" instruction). May include BOTH internal-context references
+    # (see app.reporting.applicant_intelligence.allowed_evidence_refs) and
+    # NEW, model-discovered external evidence found via bounded web research -
+    # each role's own evidence_refs may cite either kind (an "evidence:<i>"
+    # ref points into THIS array). Never populated for a not-researched
+    # (person-shaped) identity - see web_research_performed below.
+    evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Observability only (Gate 2A amendment Section 19) - True only when the
+    # model's own response actually included a completed web_search_call
+    # item (never inferred from the prompt merely OFFERING the tool - the
+    # native Responses API web_search tool is model-invoked, not forced, so
+    # an eligible identity with sufficient internal evidence may legitimately
+    # skip searching). False for every not-researched (person-shaped)
+    # identity and every identity classified before this amendment.
+    web_research_performed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    generated_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # sha256 of the narrative-relevant subset of ApplicantIdentityContext -
+    # see app.reporting.applicant_intelligence.compute_context_fingerprint's
+    # own docstring. A routine check that finds nothing new never forces a
+    # regeneration/AI-cost event (Gate 2A Section 20) - deliberately does
+    # NOT include today's date or any other time-based value (Gate 2A
+    # amendment Section 18: "do not make Applicant Intelligence stale simply
+    # because today's date changed" - the weekly Opportunity Engine must
+    # never trigger a re-search purely from time passing).
+    context_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # ok | error | not_researched - null means "never attempted".
+    # not_researched (Gate 2A amendment Section 12) is a DELIBERATE,
+    # zero-AI-cost terminal state for a person-shaped applicant identity -
+    # never a failure, never retried merely because time has passed.
+    status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    company: Mapped["Company | None"] = relationship(foreign_keys=[company_id])
