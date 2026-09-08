@@ -157,6 +157,16 @@ def is_likely_individual_name(name: str) -> bool:
     return all(w[:1].isupper() for w in words if w[:1].isalpha())
 
 
+def has_individual_title_prefix(name: str) -> bool:
+    """True only for the strongest, most specific individual signal (a
+    title prefix) - exported so app.reporting.applicant_intelligence.
+    classify_identity_shape can treat it as its OWN standalone, never-
+    overridden signal, distinct from is_likely_individual_name's wider
+    bare-name-shape heuristic (see that function's own docstring for why
+    the two are deliberately kept separate)."""
+    return bool(_INDIVIDUAL_TITLE_PREFIX.match(name))
+
+
 def best_organisation_name_candidates(
     *, si_applicant_company: str | None, si_developer: str | None, raw_applicant_name: str | None,
 ) -> list[str]:

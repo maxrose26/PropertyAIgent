@@ -51,7 +51,8 @@ from app.pipeline.material_change import (
     STATE_GRANTED, STATE_REFUSED, STATE_WITHDRAWN, _classify_planning_state,
 )
 from app.reporting.applicant_identity import (
-    ApplicantIdentity, IDENTITY_COMPANY, clean_organisation_name, is_likely_individual_name, resolve_applicant_identity,
+    ApplicantIdentity, IDENTITY_COMPANY, clean_organisation_name, has_individual_title_prefix,
+    is_likely_individual_name, resolve_applicant_identity,
 )
 from app.reporting.opportunity_universe import build_current_opportunity_universe
 
@@ -63,7 +64,22 @@ MODEL = "gpt-4o-mini"  # matches every other OpenAI call already made across thi
 # from v1, so every v1-generated row is correctly treated as stale by
 # should_regenerate's own existing prompt_version check, with NO other
 # staleness mechanism needed.
-PROMPT_VERSION = "applicant-intelligence-v2-web-research"
+#
+# v3 (Gate 2A final pre-merge hardening, "External Evidence -> Role
+# Linkage") - Rule 11 added, with a concrete worked example, instructing
+# the model to cite the matching "evidence:<index>" ref on a role whenever
+# ITS OWN research (not merely a raw_name/occurrence ref) is what actually
+# justifies that role and its confidence - real controlled validation
+# (Bloor Homes/Onward Homes/Hollins Strategic Land) found the model
+# sometimes finding strong external evidence but citing only an internal
+# ref, so evidence_supported_confidence_ceiling correctly (but avoidably)
+# capped the confidence low. The ceiling logic ITSELF is UNCHANGED - this
+# is a prompt-only fix, deliberately never a validator-side inference of
+# "which evidence the model probably meant" (Product Owner's own explicit
+# instruction). Schema unchanged from v2, so this bump exists purely to
+# mark the prompt-contract change and force a fresh classification for
+# any row generated under v2.
+PROMPT_VERSION = "applicant-intelligence-v3-evidence-linkage"
 
 # Gate 2A amendment Section 20 - the native OpenAI Responses API hosted
 # web_search tool (confirmed against the ACTUALLY INSTALLED openai SDK,
@@ -434,16 +450,85 @@ def is_planning_opportunity_linked(context: ApplicantIdentityContext) -> bool:
     return any(o.is_opportunity_candidate for o in context.occurrences)
 
 
-def is_person_shaped_identity(context: ApplicantIdentityContext) -> bool:
-    """Gate 2A amendment Section 12 - True only when EVERY raw name variant
-    seen for this identity looks like a named individual (app.reporting.
-    applicant_identity.is_likely_individual_name) - conservative toward
-    treating an identity as a real organisation: a single organisation-
-    shaped variant among several is enough to disqualify this check, so a
-    genuine company is never silently skipped merely because one raw
-    portal field happened to record a person's name for it too."""
+# Gate 2A final pre-merge hardening ("Harden Person vs Organisation
+# Eligibility") - the original is_person_shaped_identity relied on bare
+# name-shape alone (app.reporting.applicant_identity.is_likely_individual_
+# name), which real controlled validation proved wrong for "Bankfoot APAM"
+# - a genuine, Companies-House-resolved company incorrectly skipped
+# because its name happens to read as two capitalised words. Root cause:
+# the check never consulted evidence this platform ALREADY holds about the
+# identity - only its name. classify_identity_shape below fixes this with
+# a three-way outcome, using available organisational signals BEFORE ever
+# falling back to name shape (Product Owner's own explicit instruction:
+# "absence of an obvious corporate suffix must NOT by itself make an
+# identity a private person").
+IDENTITY_SHAPE_ORGANISATION = "ORGANISATION"
+IDENTITY_SHAPE_PERSON = "PERSON"
+IDENTITY_SHAPE_UNCERTAIN = "UNCERTAIN"
+
+
+def classify_identity_shape(context: ApplicantIdentityContext) -> str:
+    """Three-way classification, evidence-first:
+
+    1. ORGANISATION, DEFINITIVELY, whenever this platform already holds
+       structured evidence the identity is a real organisation - a
+       resolved Company row (context.identity_type == IDENTITY_COMPANY,
+       which is exactly how app.reporting.applicant_identity.
+       resolve_existing_company's own conservative matcher, and therefore
+       every real ApplicationCompany relationship too, since that table's
+       own company_id always points to an existing Company row - already
+       expresses "this platform independently verified this is a
+       company"), Companies House/domain evidence (company_evidence), or
+       a site-specific ControlRelationship (control_evidence - a real,
+       evidenced relationship, never present for a bare individual name).
+       This override NEVER falls back to name shape once any of these is
+       present - fixes the exact "Bankfoot APAM" false positive.
+    2. PERSON, DEFINITIVELY, when EITHER (a) any raw name variant carries
+       an individual title prefix (Mr/Mrs/Miss/Ms/Mx/Dr/Prof) - the
+       strongest, most specific available signal, never overridden by a
+       co-occurring bare variant, or (b) NO structural evidence exists
+       (step 1 didn't match) AND EVERY raw name variant independently
+       matches the bare person-name shape (app.reporting.applicant_
+       identity.is_likely_individual_name) - i.e. nothing anywhere
+       contradicts reading this as a private individual.
+    3. UNCERTAIN otherwise - genuinely mixed signals (e.g. one raw
+       variant reads as organisation-shaped, another as a bare personal
+       name, with no structural evidence either way) - Product Owner's
+       own explicit instruction: "an ambiguous identity should not be
+       silently treated as a person merely because it consists of 2-3
+       capitalised words". UNCERTAIN is a real, distinct, REPORTED state,
+       never silently merged into PERSON."""
+    if context.identity_type == IDENTITY_COMPANY or context.company_evidence is not None or context.control_evidence:
+        return IDENTITY_SHAPE_ORGANISATION
+
     names = context.raw_name_variants or [context.display_name]
-    return all(is_likely_individual_name(n) for n in names)
+    if any(has_individual_title_prefix(n) for n in names):
+        return IDENTITY_SHAPE_PERSON
+
+    org_shaped = [not is_likely_individual_name(n) for n in names]
+    if all(org_shaped):
+        return IDENTITY_SHAPE_ORGANISATION
+    if not any(org_shaped):
+        return IDENTITY_SHAPE_PERSON
+    return IDENTITY_SHAPE_UNCERTAIN
+
+
+def is_person_shaped_identity(context: ApplicantIdentityContext) -> bool:
+    """Gate 2A amendment Section 12, HARDENED - True only for a
+    CONFIDENT PERSON classification (see classify_identity_shape above for
+    the full three-way semantics). An UNCERTAIN identity is deliberately
+    NOT routed to the not_researched fast path - only a confident PERSON
+    determination is safe enough to skip evidence-grounded research
+    entirely (Product Owner's own explicit instruction: "only identities
+    confidently identified as private individuals should take the
+    deterministic NOT_RESEARCHED privacy path"); an ORGANISATION or
+    UNCERTAIN identity proceeds to the normal, bounded, evidence-only
+    research pipeline exactly like any other eligible identity - the
+    model's own prompt-level instructions (never profile an individual,
+    never assert a role without evidence) remain the backstop for a
+    genuinely mis-shaped UNCERTAIN case, exactly as they already are for
+    every other identity."""
+    return classify_identity_shape(context) == IDENTITY_SHAPE_PERSON
 
 
 def select_priority_identity_refs(
@@ -700,6 +785,9 @@ RULES - follow every one of these exactly:
 8. unresolved_questions: 0-3 short, specific open questions the evidence above cannot yet answer (empty list if genuinely none) - never a generic instruction.
 9. Every evidence_ref you cite anywhere (roles[].evidence_refs, parent_group.evidence_refs) must be an EXACT string from the bracketed refs shown above, or a valid "evidence:<index>" into your own `evidence` array - never invent, abbreviate, or paraphrase a ref.
 10. evidence: one entry per EXTERNAL fact you found via web search and relied on (empty array if you did not search, or found nothing usable) - each with source_type (from the list above), title, url (the real page you found), publisher (the site/organisation name), and a concise claim (one sentence - never a copied passage). Leave accessed_date as an empty string - Property AIgent records the real access date itself. Never fabricate a URL or title - if you are not confident a source is real and inspectable, do not include it.
+11. CRITICAL - LINK EVERY ROLE TO THE EXACT EVIDENCE THAT SUPPORTS IT. If you found external evidence via web search that supports a role, that role's evidence_refs MUST include the matching "evidence:<index>" ref for it - a raw_name:* or occurrence:* ref only ever establishes IDENTITY or ACTIVITY, never the commercial-role claim itself, and citing only those when stronger evidence exists in your own `evidence` array wastes the research you just did and produces an artificially low confidence.
+    WORKED EXAMPLE - do exactly this: you search and find "Example Homes Ltd" is a UK housebuilder building and selling residential homes on their own official website. You add {{"source_type": "OFFICIAL_COMPANY_WEBSITE", "title": "...", "url": "https://example.com", ...}} as evidence[0]. Your HOUSEBUILDER role entry must then be {{"role": "HOUSEBUILDER", "confidence": "HIGH", "evidence_refs": ["evidence:0"]}} - NOT {{"role": "HOUSEBUILDER", "confidence": "HIGH", "evidence_refs": ["raw_name:Example Homes Ltd"]}}, which cites only the name and will be treated as if you found nothing beyond the name itself, regardless of how strong your actual research was.
+    A role may cite BOTH an internal ref (for context/identity) AND an "evidence:<index>" ref (for the actual role support) together, e.g. ["raw_name:Example Homes Ltd", "evidence:0"] - but at least one "evidence:<index>" ref must be present whenever your OWN research is what actually justifies the role and its confidence.
 """
 
 
