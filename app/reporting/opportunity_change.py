@@ -29,21 +29,26 @@ genuine change there (e.g. a later refusal-on-appeal) is still caught even
 though it wouldn't move MatchingFacts.planning_state itself.
 
 BASELINE ESTABLISHMENT vs. ONGOING DISCOVERY (Gate 1 amendment, Product
-Owner review): the very first time monitoring is ever established
-against an already-populated Property AIgent database, every opportunity
-already in the current universe is HISTORICAL/EXISTING baseline - it must
-never be persisted, or later read by Gate 2, as if it had just been
-"discovered". `BASELINE_EXISTING` is the distinct, persisted classification
-for exactly this - never NEW. This is not derived from timestamp ordering
-or from which script happened to run first ("do NOT rely solely on
-ordering/timestamp luck" per the amendment brief): sync_opportunity_
-monitoring_state below determines whether THIS call is a baseline-
-establishing run by checking whether OpportunityMonitoringState currently
-holds ANY row at all before it starts - an empty table unambiguously means
-"monitoring has never been established before", regardless of what order
-scripts.bootstrap_acquisition_monitoring/scripts.sync_opportunity_
-monitoring happen to be invoked in. Once at least one row exists, every
-subsequent call is ordinary ongoing monitoring, where a genuinely new
+Owner review; refined by Gate 1C, Section 16): the very first time
+monitoring is ever established against an already-populated Property
+AIgent database, every opportunity already in the current universe is
+HISTORICAL/EXISTING baseline - it must never be persisted, or later read
+by Gate 2, as if it had just been "discovered". `BASELINE_EXISTING` is the
+distinct, persisted classification for exactly this - never NEW. This is
+not derived from timestamp ordering or from which script happened to run
+first ("do NOT rely solely on ordering/timestamp luck"): sync_opportunity_
+monitoring_state below determines, PER DETECTOR KIND (see
+_opportunity_kind_prefix), whether THIS call is establishing that kind's
+own baseline for the first time - has ANY opportunity of that exact
+detector kind ever been tracked before, regardless of whether OTHER kinds
+already have. An empty table trivially means every kind is untracked
+(the original Gate 1 case, unchanged); Gate 1C's own recent_permission
+detector being added LATER to an already-populated table is the second,
+genuinely different case this scoping exists for - see sync_opportunity_
+monitoring_state's own "DETECTOR-EXPANSION BASELINING" docstring section
+for why a single whole-table flag cannot safely handle that case. Once a
+detector kind has at least one tracked row, every subsequent call is
+ordinary ongoing monitoring for that kind, where a genuinely new
 opportunity_id correctly becomes NEW.
 """
 from __future__ import annotations
@@ -52,7 +57,7 @@ import json
 
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.db.models import OpportunityMonitoringState, utcnow
 from app.reporting.opportunity_universe import (
@@ -169,6 +174,20 @@ def classify_opportunity_change(
     return OpportunityChangeResult(classification=MATERIALLY_CHANGED, reasons=reasons, fingerprint=fingerprint)
 
 
+def _opportunity_kind_prefix(opportunity_id: str) -> str:
+    """The detector-FAMILY portion of a stable identity string - e.g.
+    "strategic_land:allocation", "planning_delivery:site",
+    "planning_delivery:phase", "planning_delivery:recent_permission" (the
+    numeric/site-specific final segment stripped). Used ONLY to answer
+    "has ANY opportunity this detector kind ever produced been tracked
+    before" - see sync_opportunity_monitoring_state's own "DETECTOR-
+    EXPANSION BASELINING" docstring section for why this, not a single
+    whole-table flag, is the correct baseline signal. Never persisted as
+    its own column - always recomputed from opportunity_id, which already
+    carries this information verbatim."""
+    return opportunity_id.rsplit(":", 1)[0]
+
+
 def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) -> dict[str, int]:
     """Rebuilds the COMPLETE current opportunity universe (see app.
     reporting.opportunity_universe's own "COMPLETENESS" docstring section -
@@ -183,23 +202,44 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
     simply stops being refreshed, which is the correct, non-destructive
     behaviour here).
 
-    Self-detects whether THIS call is establishing the baseline for the
-    first time ever (OpportunityMonitoringState holds zero rows before
-    this call starts) versus ongoing monitoring - see classify_
-    opportunity_change's own docstring and this module's own top-level
-    "BASELINE ESTABLISHMENT vs. ONGOING DISCOVERY" section. This makes
-    scripts.bootstrap_acquisition_monitoring's own canonical sequencing
-    (global baseline before buyer onboarding) a safety-in-depth measure,
-    never the ONLY thing preventing a false NEW - correct regardless of
-    which order the deployment scripts are actually invoked in.
+    DETECTOR-EXPANSION BASELINING (Gate 1C, Section 16 - release-critical):
+    baseline detection is scoped PER DETECTOR KIND (see
+    _opportunity_kind_prefix above), never a single whole-table flag. The
+    original Gate 1 mechanism ("is OpportunityMonitoringState currently
+    empty") only ever correctly handles the very first sync against a
+    brand-new table - it does NOT handle a genuinely different later
+    scenario: a NEW detector (e.g. Gate 1C's own recent_permission) being
+    added to an ALREADY-populated table. Without this refinement, every
+    one of that new detector's own first-ever candidates would have
+    `previous_state is None` while the table itself is non-empty, and
+    would be misclassified NEW - exactly the false-discovery bug this
+    section exists to prevent. Scoping "has this been established before"
+    to the detector-kind prefix instead (has ANY "planning_delivery:
+    recent_permission:*" row ever existed, independent of whether
+    "planning_delivery:site:*"/"strategic_land:allocation:*" rows already
+    have) fixes this for both the original Gate 1 case (an empty table -
+    every kind prefix is untracked, identical prior behaviour, verified by
+    test) AND Gate 1C's own detector-expansion case, using only data
+    opportunity_id already carries - no schema change, no new column, a
+    pure code-level fix (Section 16's own "prefer a code-level baseline
+    mechanism if safe").
 
     Returns a plain counts dict (never a numeric score) - one line an
     operator or a future cron log can print, mirroring app.pipeline.
     material_change.MaterialChangeStats.summary_line's own convention."""
     kwargs = {} if page_size is None else {"page_size": page_size}
-    is_baseline_run = session.execute(select(func.count()).select_from(OpportunityMonitoringState)).scalar() == 0
 
     universe = build_current_opportunity_universe(session, **kwargs)
+
+    # Every opportunity_id ever tracked (lightweight - id strings only,
+    # not full rows) - the pre-sync state this run's baseline detection is
+    # scoped against. At current/near-term scale (hundreds of rows) this
+    # is a trivial single query; a future high-volume gate could narrow
+    # this to distinct kind-prefixes directly if it ever needs to.
+    tracked_kind_prefixes = {
+        _opportunity_kind_prefix(oid)
+        for oid in session.execute(select(OpportunityMonitoringState.opportunity_id)).scalars()
+    }
 
     existing_by_id = {
         s.opportunity_id: s
@@ -213,7 +253,8 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
     counts = {BASELINE_EXISTING: 0, NEW: 0, MATERIALLY_CHANGED: 0, UNCHANGED: 0}
     for record in universe:
         previous = existing_by_id.get(record.opportunity_id)
-        result = classify_opportunity_change(record, previous, is_baseline_run=is_baseline_run)
+        is_baseline_run_for_this_kind = _opportunity_kind_prefix(record.opportunity_id) not in tracked_kind_prefixes
+        result = classify_opportunity_change(record, previous, is_baseline_run=is_baseline_run_for_this_kind)
         counts[result.classification] += 1
 
         if previous is None:

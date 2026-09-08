@@ -344,25 +344,72 @@ def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None
     time-bound - before undeveloped phase); scale (capacity/hectares,
     already the tie-break within each source query) is never used to rank
     ACROSS types, only within one."""
-    from app.reporting.dashboard import _approaching_lapse_cards, _undeveloped_phase_cards  # local import: avoids a circular import (dashboard.py may grow a reason to import this module later)
+    from app.reporting.dashboard import (  # local import: avoids a circular import (dashboard.py may grow a reason to import this module later)
+        _approaching_lapse_cards,
+        _long_pending_application_cards,
+        _recent_permission_cards,
+        _undeveloped_phase_cards,
+    )
 
     # Buyer mode needs a materially larger pool to select FROM (the
     # brief's own "Critical Feed Requirement") - a fixed, documented
-    # ceiling, not the display limit itself and not unbounded.
+    # ceiling, not the display limit itself and not unbounded. This
+    # bounded-feed pool is a deliberately DIFFERENT, narrower concern from
+    # app.reporting.opportunity_universe's own ALWAYS-complete canonical
+    # read model (Gate 1) - the Dashboard's own UI feed stays intentionally
+    # bounded exactly as before Gate 1C, now just with a fourth type also
+    # drawing from the same bounded pool.
     pool_limit = limit if buyer_key is None else max(limit * 8, 40)
 
     strategic = _strategic_land_cards(session, pool_limit)
     lapse_raw = _approaching_lapse_cards(session, pool_limit)
     undeveloped_raw = _undeveloped_phase_cards(session, pool_limit)
+    # Gate 1C - recent_permission never duplicates a site the two
+    # established signals above already cover (same precedence rule as
+    # app.reporting.opportunity_universe's own canonical read model).
+    already_covered_site_ids = frozenset(
+        int(c["params"]["site_id"]) for c in (*lapse_raw, *undeveloped_raw)
+    )
+    recent_permission_raw = _recent_permission_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids)
+    # Gate 1C amendment - long_pending_application is the lowest-precedence,
+    # earliest-lifecycle-stage route of all four (see app.reporting.
+    # dashboard._long_pending_application_cards's own "IDENTITY" docstring
+    # section for the full precedence chain) - excludes every site already
+    # covered by any of the three more specific/mature signals above.
+    already_covered_site_ids = already_covered_site_ids | frozenset(
+        int(c["params"]["site_id"]) for c in recent_permission_raw
+    )
+    long_pending_raw = _long_pending_application_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids)
 
     lapse = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Approaching lapse"]) for c in lapse_raw]
     undeveloped = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Undeveloped permission"]) for c in undeveloped_raw]
-    delivery = [*lapse, *undeveloped]  # already sorted within each source query - lapse (time-bound) first
+    recent_permission = [
+        _reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Recent permission"])
+        for c in recent_permission_raw
+    ]
+    long_pending = [
+        _reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Long-pending application"])
+        for c in long_pending_raw
+    ]
+    # Already sorted within each source query - lapse (time-bound) and
+    # undeveloped permission (an already-detected phase) are the more
+    # established, higher-confidence signals and are listed first;
+    # recent_permission - the newest, broadest-window signal - next; then
+    # long_pending_application - the earliest-lifecycle-stage, potentially
+    # highest-volume signal - deliberately LAST, only filling a reserved
+    # delivery slot once the three more specific signals above have been
+    # exhausted (Gate 1C amendment: "do NOT let one high-volume detector
+    # overwhelm all other types"). Buyer mode's own selection (below) still
+    # finds a genuine long_pending_application STRONG_FIT regardless of
+    # this ordering, since it buckets by classification, not list position.
+    delivery = [*lapse, *undeveloped, *recent_permission, *long_pending]
 
     counts = {
         "strategic_land": len(strategic),
         "approaching_lapse": len(lapse_raw),
         "undeveloped_phase": len(undeveloped_raw),
+        "recent_permission": len(recent_permission_raw),
+        "long_pending_application": len(long_pending_raw),
     }
 
     if buyer_key is None:

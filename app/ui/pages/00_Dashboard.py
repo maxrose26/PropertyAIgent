@@ -151,12 +151,16 @@ with main_col:
     if buyer_key is None:
         st.caption(
             f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
-            f"{counts['undeveloped_phase']} undeveloped permission identified across the platform."
+            f"{counts['undeveloped_phase']} undeveloped permission · "
+            f"{counts.get('recent_permission', 0)} recent permission · "
+            f"{counts.get('long_pending_application', 0)} long-pending application identified across the platform."
         )
     else:
         st.caption(
             f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
-            f"{counts['undeveloped_phase']} undeveloped permission considered · "
+            f"{counts['undeveloped_phase']} undeveloped permission · "
+            f"{counts.get('recent_permission', 0)} recent permission · "
+            f"{counts.get('long_pending_application', 0)} long-pending application considered · "
             f"{counts.get('excluded_not_suitable', 0)} excluded as not suitable for this buyer."
         )
     if not opportunity_feed["cards"]:

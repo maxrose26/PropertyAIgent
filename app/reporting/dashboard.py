@@ -1115,6 +1115,278 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
     return cards[:limit]
 
 
+def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: frozenset[int] = frozenset()) -> list[dict]:
+    """Gate 1C ("Recent Permission Opportunity Candidate Detection") - the
+    fourth planning/delivery signal, filling the structural gap Gate 1B
+    measured between a fresh grant and the two signals above: approaching
+    lapse needs the commencement deadline within ~180 days (i.e. ~2.5+
+    years after grant); undeveloped permission needs 2+ applications AND a
+    detected "approved_not_started" phase. A site with exactly one granted
+    application - or several, but none yet forming a detected phase - has
+    NO route into the opportunity universe at all without this signal,
+    regardless of scale or commercial relevance.
+
+    A card here means ONLY: "a qualifying residential permission was
+    granted within RECENT_PERMISSION_WINDOW_MONTHS, and no delivery/
+    commencement evidence has been identified in this platform's current
+    records" - never that the site is for sale, that the applicant owns
+    it, or any claim about promoter/housebuilder/ownership status (out of
+    scope for this gate - see app.reporting.opportunity_universe's own
+    module docstring).
+
+    `exclude_site_ids` is the set of sites already represented by
+    _approaching_lapse_cards/_undeveloped_phase_cards above - this
+    function never produces a duplicate candidate for a site those two
+    already cover (Gate 1C: "ONE COMMERCIAL SITE/PHASE CANDIDATE may have
+    MULTIPLE DETECTION REASONS... do not blindly duplicate"); the two
+    established, more specific signals always take precedence. Same
+    query/eligibility shape as _approaching_lapse_cards immediately above
+    (one broad SQL scan for granted site_ids, then batched Application
+    fetch, then compute_lapse_status per site) - reused deliberately, not
+    a parallel interpretation of "granted"/"build status".
+
+    Recency boundary (RECENT_PERMISSION_WINDOW_MONTHS - 3 CALENDAR months
+    as of the Gate 1C amendment, Section 4) and the excluded build-status
+    set both live in app.reporting.opportunity_universe - the single
+    source of truth for both this function and that module's own
+    canonical opportunity read model, so the two can never drift apart.
+    Build status "unknown" is deliberately NOT excluded here - absence of
+    commencement evidence must never be conflated with verified non-
+    commencement (Gate 1C Section 7).
+
+    TIME-DRIVEN EVALUATION (Gate 1C amendment, Section 14): eligibility is
+    recalculated from the stable grant date against `dt.date.today()`
+    every call - never a fixed day-count baked into anything persisted.
+    The boundary itself is EXCLUSIVE (qualifies while `today <
+    add_calendar_months(grant_date, 3)`) - the calendar date exactly 3
+    months after grant is the FIRST date this stops qualifying, matching
+    the brief's own "ages BEYOND 3 months -> no automatic signal" wording
+    verbatim."""
+    from app.reporting.opportunity_universe import (
+        _EXCLUDED_BUILD_STATUSES_FOR_RECENT_PERMISSION,
+        RECENT_PERMISSION_WINDOW_MONTHS,
+        add_calendar_months,
+    )
+
+    granted_filter = or_(*(Application.decision.ilike(f"%{kw}%") for kw in GRANTED_KEYWORDS))
+    granted_site_ids = list(session.execute(
+        select(Application.site_id).where(
+            Application.site_id.is_not(None), Application.decision_issued_date.is_not(None), granted_filter,
+        ).distinct()
+    ).scalars())
+    candidate_site_ids = [sid for sid in granted_site_ids if sid not in exclude_site_ids]
+    if not candidate_site_ids:
+        return []
+    sites = session.execute(
+        select(Site).where(Site.id.in_(candidate_site_ids), Site.excluded.is_not(True))
+    ).scalars().all()
+    apps = session.execute(
+        select(Application).where(Application.site_id.in_([s.id for s in sites]))
+    ).scalars().all() if sites else []
+    apps_by_site: dict[int, list[Application]] = {}
+    for a in apps:
+        apps_by_site.setdefault(a.site_id, []).append(a)
+
+    today = dt.date.today()
+    scored: list[tuple[dt.date, dict]] = []
+    for site in sites:
+        result = compute_lapse_status(apps_by_site.get(site.id, []), site)
+        if result["build_status"] in _EXCLUDED_BUILD_STATUSES_FOR_RECENT_PERMISSION:
+            continue
+        granted_app = result["granted_app"]
+        if granted_app is None:
+            continue
+        grant_date = parse_portal_date(granted_app.decision_issued_date)
+        if grant_date == dt.date.min:
+            continue
+        if today >= add_calendar_months(grant_date, RECENT_PERMISSION_WINDOW_MONTHS):
+            continue
+
+        scored.append((grant_date, {
+            "id": f"opp-recent-permission-{site.id}",
+            "title": site.display_address, "subtitle": site.council_code,
+            # Evidence-safe wording (Gate 1C Section 19) - states exactly
+            # what is known (a grant date) and exactly what is unknown (no
+            # commencement evidence identified), never "available",
+            # "for sale", or "promoter opportunity".
+            "reason": (
+                f"Residential permission granted {grant_date.strftime('%d %b %Y')} - no commencement "
+                f"evidence has been identified in Property AIgent's current records."
+            ),
+            "metric": f"Granted {grant_date.strftime('%d %b %Y')}",
+            "when": dt.datetime.combine(grant_date, dt.time.min),
+            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+        }))
+    scored.sort(key=lambda pair: pair[0], reverse=True)  # most recently granted first
+    return [card for _, card in scored[:limit]]
+
+
+def _long_pending_application_cards(
+    session: Session, limit: int | None, *, exclude_site_ids: frozenset[int] = frozenset()
+) -> list[dict]:
+    """Gate 1C amendment's new detector: "a qualifying residential
+    application has been awaiting determination for at least
+    LONG_PENDING_APPLICATION_WINDOW_MONTHS (6 calendar months) with no
+    decision yet". This is the EARLIEST lifecycle stage of the four
+    planning/delivery routes - before any grant exists at all - filling
+    the gap ahead of _recent_permission_cards above (see this module's
+    revised lifecycle: long_pending -> (granted) -> recent_permission ->
+    (ages out) -> nothing -> (approaches deadline) -> approaching_lapse).
+
+    This route detects ONLY the planning CONDITION (submitted, still
+    undetermined, aged past the threshold) - never a commercial
+    characterisation. It must NOT infer or imply land-promoter status,
+    an intent to sell, or any applicant motivation - that classification
+    is explicitly out of scope (Gate 2A, Applicant Intelligence).
+
+    STILL PENDING (Gate 1C amendment Section 7) is deliberately NOT
+    app.pipeline.lapse_tracking.classify_decision_status's coarser 4-way
+    bucket - that function would wrongly treat "Decided"/"Decision Made"
+    rows with an ambiguous outcome, and recommendation-stage rows, as
+    simple buckets that don't match what "still awaiting determination"
+    actually needs. Instead this reuses app.pipeline.material_change.
+    _classify_planning_state (the platform's own richer, production-
+    audited planning-state classifier) and excludes every terminal/
+    ambiguous state: STATE_GRANTED, STATE_REFUSED, STATE_WITHDRAWN, and
+    STATE_DECISION_OUTCOME_UNKNOWN (a "Decided"-labelled row whose actual
+    outcome text doesn't parse as granted/refused - safer to exclude than
+    to guess, per the brief's "where ambiguous, prefer exclusion").
+    Recommendation-stage states (STATE_RECOMMENDATION_MADE/
+    STATE_RECOMMENDED_FOR_APPROVAL/STATE_RECOMMENDED_FOR_REFUSAL) and
+    STATE_NOT_YET_DECIDED are correctly INCLUDED - none of those is a
+    formal decision yet.
+
+    Administrative/non-substantive filings (app.scrapers.unit_filter.
+    EXCLUDE_CATEGORIES - variations, condition-discharge requests, minor/
+    admin filings, external consultations, screening/scoping opinions -
+    plus "unknown", since an uncategorised filing has no confirmed
+    substantive proposal) are excluded - neither classifier above
+    recognises council-specific "Closed"-type status text used for these,
+    which would otherwise wrongly read as still pending.
+
+    AGE CLOCK (Gate 1C amendment Section 8): application_received is the
+    canonical application-start date - confirmed by direct production
+    coverage measurement (99% populated among genuine candidates, vs. 60%
+    for application_validated) and already used as the platform's own
+    "time in pipeline" sort key (see app.ui.common.
+    pick_representative_application). Never decision date or scrape date -
+    this must reflect time actually spent in the planning process.
+
+    IDENTITY (Gate 1C amendment Section 10): one card per SITE (not per
+    application) - `exclude_site_ids` already covers every site claimed
+    by a higher-precedence route (approaching_lapse/undeveloped_
+    permission/recent_permission - see _planning_delivery_universe's
+    precedence chain). Where a site has MORE THAN ONE genuinely separate,
+    currently-pending qualifying application, the OLDEST (by
+    application_received) is used as the single triggering "card" -
+    deliberately NOT app.ui.common.pick_representative_application's own
+    selection (which favours completeness of AI extraction, then most
+    RECENT received date - the opposite priority to what this detector's
+    "how long has this been pending" question needs). This is a real,
+    observed edge case in production (a small number of sites do carry
+    two independently-pending residential applications at once, e.g. a
+    full and an outline application filed separately) - the older
+    application's own submission date drives eligibility/fingerprinting
+    here, while `_planning_delivery_universe`'s separate `rep`/`facts`
+    selection (used for buyer-matching context) is untouched and keeps
+    its own existing, different selection logic. This does not attempt
+    to represent both applications as separate opportunities - doing so
+    would require Site/Application model changes explicitly out of scope
+    for this gate.
+
+    TIME-DRIVEN EVALUATION (Section 14, same principle as
+    _recent_permission_cards above): eligibility is recalculated from the
+    stable application_received date against `dt.date.today()` on every
+    call. The boundary is INCLUSIVE (qualifies once `today >=
+    add_calendar_months(submitted_date, 6)`) - matching the brief's own
+    "AT LEAST six months" / "AT/AFTER six months" wording verbatim
+    (deliberately the opposite direction to recent_permission's exclusive
+    boundary, since each matches its own brief wording, not a shared
+    symmetric rule).
+
+    Wording is deliberately commercially neutral (Gate 1C amendment
+    Section 23) - states only what is verified (submission date, still
+    undetermined) and never "promoter", "likely to sell", or any
+    applicant-motivation claim."""
+    from app.pipeline.material_change import (
+        STATE_DECISION_OUTCOME_UNKNOWN,
+        STATE_GRANTED,
+        STATE_REFUSED,
+        STATE_WITHDRAWN,
+        _classify_planning_state,
+    )
+    from app.reporting.opportunity_universe import (
+        LONG_PENDING_APPLICATION_WINDOW_MONTHS,
+        add_calendar_months,
+    )
+    from app.scrapers.unit_filter import EXCLUDE_CATEGORIES
+
+    _TERMINAL_OR_AMBIGUOUS = (STATE_GRANTED, STATE_REFUSED, STATE_WITHDRAWN, STATE_DECISION_OUTCOME_UNKNOWN)
+    _EXCLUDED_CATEGORIES = EXCLUDE_CATEGORIES | {"unknown"}
+
+    candidate_apps = session.execute(
+        select(Application).where(
+            Application.site_id.is_not(None),
+            Application.application_received.is_not(None),
+        )
+    ).scalars().all()
+
+    by_site: dict[int, list[Application]] = {}
+    for a in candidate_apps:
+        if a.site_id in exclude_site_ids:
+            continue
+        if a.application_category in _EXCLUDED_CATEGORIES:
+            continue
+        if _classify_planning_state(a.decision, a.status) in _TERMINAL_OR_AMBIGUOUS:
+            continue
+        by_site.setdefault(a.site_id, []).append(a)
+    if not by_site:
+        return []
+
+    sites = {
+        s.id: s for s in session.execute(
+            select(Site).where(Site.id.in_(by_site.keys()), Site.excluded.is_not(True))
+        ).scalars()
+    }
+
+    today = dt.date.today()
+    scored: list[tuple[dt.date, dict]] = []
+    for site_id, pending_apps in by_site.items():
+        site = sites.get(site_id)
+        if site is None:
+            continue
+        # Oldest still-pending qualifying application on this site - see
+        # this function's own docstring ("IDENTITY") for why this is
+        # deliberately NOT pick_representative_application's selection.
+        dated = [
+            (parse_portal_date(a.application_received), a) for a in pending_apps
+        ]
+        dated = [(d, a) for d, a in dated if d != dt.date.min]
+        if not dated:
+            continue
+        submitted_date, oldest_app = min(dated, key=lambda pair: pair[0])
+        if today < add_calendar_months(submitted_date, LONG_PENDING_APPLICATION_WINDOW_MONTHS):
+            continue
+
+        scored.append((submitted_date, {
+            "id": f"opp-long-pending-{site.id}",
+            "title": site.display_address, "subtitle": site.council_code,
+            # Evidence-safe, commercially neutral wording (Gate 1C
+            # amendment Section 23) - states only the verified submission
+            # date and the fact that no decision has been made, never any
+            # promoter/motivation claim.
+            "reason": (
+                f"Planning application submitted {submitted_date.strftime('%d %b %Y')} has remained "
+                f"awaiting determination for more than six months."
+            ),
+            "metric": f"Submitted {submitted_date.strftime('%d %b %Y')}",
+            "when": dt.datetime.combine(submitted_date, dt.time.min),
+            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+        }))
+    scored.sort(key=lambda pair: pair[0])  # longest-pending (oldest submission) first
+    return [card for _, card in scored[:limit]]
+
+
 def _allocations_without_application_cards(session: Session, limit: int) -> list[dict]:
     rows = session.execute(
         select(LocalPlanSite).where(
