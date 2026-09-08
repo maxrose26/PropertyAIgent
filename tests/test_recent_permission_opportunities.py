@@ -162,6 +162,49 @@ def test_grant_within_window_boundary_is_included(session):
     assert any(c["params"]["site_id"] == str(site.id) for c in cards)
 
 
+def _make_granted_site_on_exact_date(session, *, grant_date: dt.date, address: str = "Exact Date Site") -> Site:
+    """Precise calendar-month-boundary variant of _make_granted_site above -
+    that helper's `months_ago * 30.44` day-approximation is appropriate for
+    "well inside/outside the window" fixtures but is NOT precise enough to
+    exercise the exact calendar-month boundary itself (Gate 1C amendment
+    Section 29's own explicit requirement for a boundary test built from
+    real calendar-month arithmetic, not an approximation)."""
+    site = Site(council_code="testcouncil", canonical_address=f"{address}-{grant_date.isoformat()}", display_address=address)
+    session.add(site)
+    session.flush()
+    session.add(Application(
+        council_code="testcouncil", reference=f"REF-{site.id}", site_id=site.id,
+        decision="Granted", decision_issued_date=grant_date.strftime("%a %d %b %Y"),
+        first_seen_at=dt.datetime.now(dt.timezone.utc),
+    ))
+    session.commit()
+    return site
+
+
+def test_exact_calendar_month_boundary_is_deterministic_and_exclusive(session):
+    """The boundary itself (Gate 1C amendment Section 4/14): a grant dated
+    EXACTLY RECENT_PERMISSION_WINDOW_MONTHS calendar months before today is
+    EXCLUDED (the boundary is exclusive - matches the brief's own "ages
+    BEYOND N months -> no automatic signal" wording); one calendar day
+    earlier is INCLUDED. Built from add_calendar_months itself (the same
+    helper the production code uses), not a day-count approximation - this
+    is the precise boundary proof, distinct from the coarser "well within/
+    without the window" tests above."""
+    from app.reporting.opportunity_universe import add_calendar_months
+
+    today = dt.date.today()
+    exactly_at_boundary = add_calendar_months(today, -RECENT_PERMISSION_WINDOW_MONTHS)
+    one_day_inside = exactly_at_boundary + dt.timedelta(days=1)
+
+    excluded_site = _make_granted_site_on_exact_date(session, grant_date=exactly_at_boundary, address="Exactly At Boundary")
+    included_site = _make_granted_site_on_exact_date(session, grant_date=one_day_inside, address="One Day Inside Boundary")
+
+    cards = _recent_permission_cards(session, None)
+    card_site_ids = {c["params"]["site_id"] for c in cards}
+    assert str(excluded_site.id) not in card_site_ids
+    assert str(included_site.id) in card_site_ids
+
+
 # --- Identity ------------------------------------------------------------
 
 def test_stable_site_level_identity_format(session):

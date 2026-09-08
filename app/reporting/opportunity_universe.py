@@ -61,22 +61,59 @@ Gate 1B measured: a site with exactly one granted application (or several,
 but none yet forming a detected "phase") has NO route into the
 opportunity universe at all for up to ~2.5 years, regardless of scale or
 commercial relevance. The detector itself lives in app.reporting.
-dashboard._recent_permission_cards, alongside its two siblings
-(_approaching_lapse_cards/_undeveloped_phase_cards) - this module's own
-_recent_permission_candidate_sites is a thin wrapper, never a second
-implementation. RECENT_PERMISSION_WINDOW_MONTHS below is the evidence-
-based window (12 months - see this gate's own implementation report for
-the full marginal-value analysis across 6/12/18/24-month windows that
-justified it) shared by both this module and that function, so the two
-can never drift apart. A recent_permission card means ONLY "a qualifying
-residential permission was granted within the window, and no delivery/
-commencement evidence has been identified" - never that the site is for
-sale, that the applicant owns it, or any claim about promoter/
-housebuilder/ownership status (Gate 1C brief, Section 12/13 - Applicant
-Intelligence is explicitly out of scope here).
+dashboard._recent_permission_cards, alongside its siblings
+(_approaching_lapse_cards/_undeveloped_phase_cards/_long_pending_
+application_cards) - this module's own wrapper functions are thin, never
+a second implementation. A recent_permission card means ONLY "a
+qualifying residential permission was granted within the window, and no
+delivery/commencement evidence has been identified" - never that the site
+is for sale, that the applicant owns it, or any claim about promoter/
+housebuilder/ownership status (Applicant Intelligence is Gate 2A, out of
+scope here).
+
+GATE 1C AMENDMENT (Product Owner review, revised planning opportunity
+lifecycle) adds a FIFTH detection route, long_pending_application, and
+changes RECENT_PERMISSION_WINDOW_MONTHS from an original 12 down to 3 -
+see each constant's own comment below for the evidence behind both
+numbers. The revised lifecycle these two routes together represent:
+
+    application submitted -> normal determination period
+        -> still pending >= 6 calendar months -> LONG_PENDING_APPLICATION
+        -> (decision granted) -> first 3 calendar months after grant
+            -> RECENT_PERMISSION
+        -> ages beyond 3 months -> no automatic signal
+        -> (later reaches the existing lapse threshold) -> APPROACHING_LAPSE
+
+CALENDAR-MONTH SEMANTICS (Gate 1C amendment, Section 5): both new windows
+are evaluated in calendar months (add_calendar_months below), never an
+approximated fixed day-count (e.g. "3*30 days") - a boundary date is
+computed once (submitted_date/grant_date + N calendar months) and compared
+directly against the current evaluation date, so a 31-day month is treated
+identically to a 28-day one, exactly as a human reading "6 months" would
+expect. Mirrors app.pipeline.lapse_tracking's own existing "add N years,
+clamp on a Feb-29 overflow" pattern (COMMENCEMENT_YEARS) applied to months
+instead of years - not a new interpretation of "N months from now", the
+first one this codebase has needed.
+
+TIME-DRIVEN ELIGIBILITY (Gate 1C amendment, Section 14/16): eligibility
+for both new routes is recalculated from stable dates (submitted_date/
+grant_date, never re-derived) against THE CURRENT EVALUATION DATE every
+time build_current_opportunity_universe runs - never a fixed day-count
+"days_pending"/"days_since_grant" value baked into the fingerprint (which
+would change every single day and falsely register as a material change,
+exactly the mistake this module's own fingerprints have always avoided
+for lapse "days left"). This is deliberately NOT a cadence assumption -
+core opportunity logic contains no reference to "Monday" or any schedule;
+it produces the objectively correct universe whenever invoked, whether
+that is daily, weekly, or on any other operator-chosen cadence (see
+scripts.sync_opportunity_monitoring's own docstring for the recommended
+weekly production cadence - a purely operational decision, never encoded
+here).
 """
 from __future__ import annotations
 
+import calendar
+import datetime as dt
 import hashlib
 import json
 from dataclasses import dataclass
@@ -103,20 +140,50 @@ from app.ui.common import pick_representative_application
 # loop itself without needing thousands of real rows.
 DEFAULT_STRATEGIC_LAND_PAGE_SIZE = 500
 
-# Gate 1C - the evidence-based recency boundary for the recent_permission
-# detector. A read-only comparison across 6/12/18/24-month windows against
-# production data (see this gate's own implementation report) found the
-# marginal STRONG_FIT signal (summed across all four pilot Buyer Profiles)
-# rises sharply from 6 to 12 months (+5 STRONG_FIT for +44 candidates),
-# rises only marginally from 12 to 18 months (+2 for +23), and adds ZERO
-# further STRONG_FIT from 18 to 24 months (+0 for +21) - i.e. by 18-24
-# months this detector is adding candidate volume with no further
-# commercial signal, while 6 months would discard genuine, real STRONG_FIT
-# results that 12 months captures. 12 months is therefore the narrowest
-# boundary that does not sacrifice measured commercial signal - not an
-# arbitrary anniversary of Gate 1B's own analytical cohort.
-RECENT_PERMISSION_WINDOW_MONTHS = 12
-_AVG_DAYS_PER_MONTH = 30.44
+
+def add_calendar_months(d: dt.date, months: int) -> dt.date:
+    """`d` plus exactly `months` CALENDAR months - e.g. 31 Jan + 1 month =
+    28/29 Feb (clamped to the target month's own last day, never rolling
+    over into March), 30 Jun + 3 months = 30 Sep. The one calendar-month
+    arithmetic helper in this codebase (Gate 1C amendment, Section 5) -
+    every RECENT_PERMISSION/LONG_PENDING_APPLICATION boundary goes through
+    this, never a `days=N*30`-style approximation."""
+    month_index = d.month - 1 + months
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return dt.date(year, month, day)
+
+
+# Gate 1C amendment - the Product Owner's revised RECENT_PERMISSION window.
+# The original Gate 1C implementation (12 months) is superseded: the
+# approved commercial model is now a short, immediate post-grant
+# acquisition window (Section 4) - a permission stops being a
+# RECENT_PERMISSION candidate once it ages beyond 3 CALENDAR months,
+# specifically to represent "before the scheme progresses into delivery or
+# other commercial arrangements crystallise", not the broader "hasn't yet
+# been picked up by a later signal" gap-filling role the original 12-month
+# figure was evidence-optimised for. Qualifies while
+# `today < add_calendar_months(grant_date, 3)` - i.e. the boundary date
+# itself (exactly 3 calendar months after grant) is the first date this NO
+# LONGER qualifies, matching the brief's own "ages BEYOND 3 months -> no
+# automatic signal" wording (see tests/test_recent_permission_
+# opportunities.py's own test_exact_calendar_month_boundary_is_
+# deterministic_and_exclusive for the exact tested boundary).
+RECENT_PERMISSION_WINDOW_MONTHS = 3
+
+# Gate 1C amendment, Section 8 - the Product Owner's approved V1 threshold
+# for the new LONG_PENDING_APPLICATION route: a qualifying residential
+# application still awaiting determination at least 6 calendar months
+# after it was submitted. Qualifies while
+# `today >= add_calendar_months(submitted_date, 6)` - i.e. the boundary
+# date itself (exactly 6 calendar months after submission) is the FIRST
+# date this candidate becomes eligible, matching the brief's own "AT/AFTER
+# six months -> LONG_PENDING_APPLICATION" wording (inclusive at the
+# boundary - deliberately the opposite inequality direction from
+# RECENT_PERMISSION's own exclusive-at-boundary rule above, each matching
+# its own literal wording in the brief).
+LONG_PENDING_APPLICATION_WINDOW_MONTHS = 6
 
 # Gate 1C, Section 7: a scheme already demonstrably being delivered must
 # never become a recent_permission candidate merely because its decision
@@ -135,6 +202,10 @@ def strategic_land_opportunity_id(allocation_id: int) -> str:
 
 def planning_delivery_site_opportunity_id(site_id: int) -> str:
     return f"planning_delivery:site:{site_id}"
+
+
+def planning_delivery_long_pending_application_opportunity_id(site_id: int) -> str:
+    return f"planning_delivery:long_pending_application:{site_id}"
 
 
 def planning_delivery_phase_opportunity_id(site_id: int, phase_code: str) -> str:
@@ -256,14 +327,27 @@ def _strategic_land_universe(session, page_size: int) -> list[OpportunityRecord]
 def _recent_permission_candidate_sites(session, *, exclude_site_ids: set[int]) -> list[dict]:
     """Thin wrapper around app.reporting.dashboard._recent_permission_
     cards - the single canonical implementation of the Gate 1C detector,
-    living alongside its two siblings (_approaching_lapse_cards/
-    _undeveloped_phase_cards) for the same reason this module already
-    reuses those two rather than re-deriving "granted"/"build status" a
-    second time. `limit=None` for the same completeness reason this
-    module's own docstring already explains for the other two detectors."""
+    living alongside its siblings (_approaching_lapse_cards/
+    _undeveloped_phase_cards/_long_pending_application_cards) for the same
+    reason this module already reuses those rather than re-deriving
+    "granted"/"build status" a second time. `limit=None` for the same
+    completeness reason this module's own docstring already explains for
+    the other detectors."""
     from app.reporting.dashboard import _recent_permission_cards
 
     return _recent_permission_cards(session, None, exclude_site_ids=frozenset(exclude_site_ids))
+
+
+def _long_pending_application_candidate_sites(session, *, exclude_site_ids: set[int]) -> list[dict]:
+    """Thin wrapper around app.reporting.dashboard._long_pending_
+    application_cards - the single canonical implementation of the Gate 1C
+    amendment's new detector, living alongside its siblings for the same
+    reason the other planning/delivery detectors do. `limit=None` for the
+    same completeness reason this module's own docstring explains for
+    every other detector."""
+    from app.reporting.dashboard import _long_pending_application_cards
+
+    return _long_pending_application_cards(session, None, exclude_site_ids=frozenset(exclude_site_ids))
 
 
 def _planning_delivery_universe(session) -> list[OpportunityRecord]:
@@ -285,12 +369,24 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
     undeveloped_cards = _undeveloped_phase_cards(session, None)
     tagged = [(c, "site") for c in lapse_cards] + [(c, "phase") for c in undeveloped_cards]
 
-    # Gate 1C - recent_permission never duplicates a site the two
-    # detectors above already cover (see _recent_permission_candidate_
-    # sites' own docstring for the precedence rule).
+    # Precedence chain (Gate 1C amendment, Section 13): each later detector
+    # is the EARLIER lifecycle stage / broader-window fallback and never
+    # duplicates a site any more-specific, higher-precedence detector
+    # already covers - approaching_lapse/undeveloped_permission (most
+    # specific, established signals) > recent_permission (a fresh grant,
+    # narrower now at 3 months) > long_pending_application (the earliest,
+    # pre-grant stage, and the lowest precedence of all four planning/
+    # delivery routes). A normal site lifecycle therefore shows AT MOST one
+    # planning/delivery card at a time as it moves through: long_pending ->
+    # (granted) -> recent_permission -> (ages out) -> nothing ->
+    # (approaches its deadline) -> approaching_lapse.
     already_covered_site_ids = {int(c["params"]["site_id"]) for c, _ in tagged}
     recent_permission_cards = _recent_permission_candidate_sites(session, exclude_site_ids=already_covered_site_ids)
     tagged += [(c, "recent_permission") for c in recent_permission_cards]
+
+    already_covered_site_ids = already_covered_site_ids | {int(c["params"]["site_id"]) for c in recent_permission_cards}
+    long_pending_cards = _long_pending_application_candidate_sites(session, exclude_site_ids=already_covered_site_ids)
+    tagged += [(c, "long_pending_application") for c in long_pending_cards]
 
     if not tagged:
         return []
@@ -365,7 +461,7 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             phase_code = card["id"].rsplit("-", 1)[-1]
             opportunity_id = planning_delivery_phase_opportunity_id(site_id, phase_code)
             fingerprint_fields["phase_code"] = phase_code
-        else:  # "recent_permission" (Gate 1C)
+        elif kind == "recent_permission":
             opportunity_id = planning_delivery_recent_permission_opportunity_id(site_id)
             # The grant date itself is a STABLE fact (never a live
             # countdown, unlike a formatted "N days left" string) -
@@ -376,6 +472,18 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             # datetime _recent_permission_cards already built - reused,
             # not re-parsed a second way.
             fingerprint_fields["decision_date"] = card.get("when")
+        else:  # "long_pending_application" (Gate 1C amendment)
+            opportunity_id = planning_delivery_long_pending_application_opportunity_id(site_id)
+            # The submission date of the specific application that
+            # triggered eligibility (card["when"], from _long_pending_
+            # application_cards' own selection - see that function's own
+            # docstring for why this is deliberately NOT the same
+            # application `rep`/`facts` above uses) - a STABLE fact, never
+            # a live "days pending" counter. A genuinely different
+            # application later becoming the long-pending trigger for this
+            # site (e.g. the current one is withdrawn/decided and an older
+            # co-pending one takes over) registers as a material change.
+            fingerprint_fields["submitted_date"] = card.get("when")
 
         records.append(OpportunityRecord(
             opportunity_id=opportunity_id,
