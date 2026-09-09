@@ -52,7 +52,7 @@ from app.db.models import Application, ApplicationCompany, Council, Document, Lo
 from app.db.session import get_session, init_db
 from app.diagnostics.memory import log_memory
 from app.enrichment.contact_pipeline import enrich_company, upsert_company_from_enrichment
-from app.ui.common import aggregate_scheme_fields
+from app.ui.common import aggregate_scheme_fields, pick_representative_application
 from app.enrichment.epc_lookup import NOMINATIM_MIN_INTERVAL_SECONDS, check_build_status, geocode_address, geocode_postcode
 from app.extraction.pdf_text import (
     USEFUL_DOC_TYPES,
@@ -91,6 +91,7 @@ from app.pipeline.lapse_tracking import (
 from app.pipeline.phase_tracking import build_phase_breakdown
 from app.reporting.scheme_summary import MIN_APPLICATIONS_FOR_SUMMARY, generate_scheme_summary
 from app.pipeline.site_linking import extract_parent_reference, link_application_to_site
+from app.pipeline.status_verification import build_opportunity_kinds_by_site, run_status_verification
 from app.scrapers.documents import discover_documents
 from app.scrapers.arcus_portal import fetch_application_by_reference as fetch_application_by_reference_arcus
 from app.scrapers.arcus_portal import fetch_application_detail as fetch_application_detail_arcus
@@ -584,11 +585,36 @@ def stage_fetch_missing_parents(
 
 def stage_fetch_related_applications(
     session: Session, page, council: CouncilConfig, breaker: CouncilPortalCircuitBreaker | None = None,
+    opportunity_kinds_by_site: dict[int, frozenset[str]] | None = None,
 ) -> int:
     """Search the portal for every application that names a given reference
     by number (see app.scrapers.idox_portal.search_related_applications),
     for every site's most senior granted application - not just citation-
     verified parents (site_link_method == "parent_reference").
+
+    Gate 2B-0 ("Planning Freshness Remediation") amendment - ELIGIBILITY
+    ONLY, the search/fetch mechanics below this docstring are completely
+    unchanged. The Gate 2B-A investigation found a second structural blind
+    spot alongside the one Gate 2B-0's status-verification stage fixes: a
+    site with NO granted application and NO parent_reference-verified link
+    was previously never eligible for related-application discovery
+    either - meaning a genuinely unresolved acquisition opportunity (e.g.
+    a long_pending_application) could never have a later, amending or
+    superseding filing discovered for it at all. Anchor selection now adds
+    a THIRD fallback, after the two existing ones: if the site is a
+    current planning-application opportunity (per app.reporting.
+    opportunity_universe - a pure-DB, no-AI read, the same mechanism
+    app.pipeline.status_verification's own tiering already relies on),
+    its own pick_representative_application becomes the anchor, using the
+    SAME related_search_checked_at cooldown field as every other anchor
+    (Section 21: "Do not use status_verified_at as the related-discovery
+    timestamp... Do not use last_seen_at"). Status verification and
+    related-application discovery remain two independently eligible,
+    independently cadenced stages - this extension does not call, and is
+    not called by, app.pipeline.status_verification in any way; the two
+    modules only happen to read the same Opportunity Universe snapshot
+    when both run in the same invocation (an optional, injectable
+    parameter here, exactly for that reuse - see run_weekly.main()).
 
     That narrower version left a real gap: a genuinely single-application
     site, by definition, has never been CITED by anything else yet, so it
@@ -637,6 +663,8 @@ def stage_fetch_related_applications(
     portal on every single weekly run."""
     cutoff = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=30)
     sites = session.execute(select(Site).where(Site.council_code == council.code)).scalars().all()
+    if opportunity_kinds_by_site is None:
+        opportunity_kinds_by_site = build_opportunity_kinds_by_site(session)
 
     to_search: list[Application] = []
     for site in sites:
@@ -653,9 +681,26 @@ def stage_fetch_related_applications(
             anchor = verified[0]
         else:
             granted = [a for a in apps if is_granted_decision(a.decision)]
-            if not granted:
-                continue  # nothing granted yet on this site - nothing to search from
-            anchor = min(granted, key=lambda a: parse_portal_date(a.application_received))
+            if granted:
+                anchor = min(granted, key=lambda a: parse_portal_date(a.application_received))
+            elif opportunity_kinds_by_site.get(site.id):
+                # Gate 2B-0 amendment (Section 21) - no granted anchor
+                # exists, but this site is a CURRENT planning-application
+                # opportunity (most commonly long_pending_application - an
+                # already-granted site would already have matched the
+                # `granted` branch above, since every other planning-
+                # delivery opportunity kind is itself gated on a granted
+                # decision - see app.reporting.dashboard's own card
+                # builders). pick_representative_application is the same
+                # "one application best represents this site" choice the
+                # rest of the platform already makes (Site Profile,
+                # Buyer Matching) - never a new selection rule invented
+                # here.
+                anchor = pick_representative_application(apps)
+                if anchor is None:
+                    continue
+            else:
+                continue  # nothing granted, not a current opportunity - nothing to search from
 
         checked_at = anchor.related_search_checked_at
         if checked_at and checked_at.replace(tzinfo=None) > cutoff:
@@ -2276,6 +2321,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-scrape", action="store_true")
     parser.add_argument("--skip-parent-lookup", action="store_true")
     parser.add_argument("--skip-site-link", action="store_true")
+    parser.add_argument(
+        "--skip-status-verification", action="store_true",
+        help="Gate 2B-0: skip the direct-reference status-verification stage for already-known pending "
+             "applications. Deliberately independent of --skip-related-applications - see "
+             "app.pipeline.status_verification's own module docstring for why the two are separate stages.",
+    )
     parser.add_argument("--skip-related-applications", action="store_true")
     parser.add_argument("--skip-confirm-units", action="store_true")
     parser.add_argument("--skip-documents", action="store_true")
@@ -2459,6 +2510,40 @@ def main() -> None:
             stage_link_sites(session, council)
             log_memory("stage_link_sites.after", council=council.code)
 
+        # Gate 2B-0 ("Planning Freshness Remediation") - one Opportunity
+        # Universe snapshot, built at most once per council run and shared
+        # by both stages below (never rebuilt per-application, never
+        # rebuilt a second time if both stages run in the same
+        # invocation) - a pure-DB, no-AI, no-network read (see
+        # app.pipeline.status_verification.build_opportunity_kinds_by_site's
+        # own docstring). Only built if at least one of the two stages
+        # will actually run this invocation.
+        opportunity_kinds_by_site = (
+            build_opportunity_kinds_by_site(session)
+            if not (args.skip_status_verification and args.skip_related_applications) else None
+        )
+
+        if not args.skip_status_verification:
+            if breaker.is_open:
+                print(f"[circuit] council={council.code} skipping stage_verify_application_status - circuit open")
+            else:
+                # Deliberately its own stage, run AFTER stage_link_sites
+                # (DB-only, so a freshly-verified application's site_id is
+                # already settled) and BEFORE stage_fetch_related_
+                # applications (Section 25's own preferred order: "status
+                # verification -> related application discovery"), but
+                # NEVER folded into either - see app.pipeline.
+                # status_verification's own module docstring for why the
+                # two responsibilities stay separate (independently
+                # eligible, independently cadenced, independently
+                # observable, per the approved spec's own Section 2/11
+                # instruction).
+                log_memory("stage_verify_application_status.before", council=council.code)
+                run_status_verification(
+                    session, page, council, breaker=breaker, opportunity_kinds_by_site=opportunity_kinds_by_site,
+                )
+                log_memory("stage_verify_application_status.after", council=council.code)
+
         if not args.skip_related_applications:
             if breaker.is_open:
                 print(f"[circuit] council={council.code} skipping stage_fetch_related_applications - circuit open")
@@ -2467,7 +2552,9 @@ def main() -> None:
                 # After stage_link_sites, not before - needs a parent's site_id
                 # already set (site_link_method == "parent_reference") to know
                 # what to search for and where to attach anything it finds.
-                stage_fetch_related_applications(session, page, council, breaker=breaker)
+                stage_fetch_related_applications(
+                    session, page, council, breaker=breaker, opportunity_kinds_by_site=opportunity_kinds_by_site,
+                )
                 log_memory("stage_fetch_related_applications.after", council=council.code)
 
         if not args.skip_confirm_units:
