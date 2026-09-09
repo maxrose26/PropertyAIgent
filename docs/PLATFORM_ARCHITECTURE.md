@@ -212,9 +212,37 @@ A specific consequence of keeping these distinct: **the absence of a linked plan
 
 **Buyer Profiles / the Buyer Analyst.** A later personalisation layer — the deterministic substrate (Buyer Profiles V1, `assess_buyer_fit`) is now built and closed (Gate 1, see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)); the agentic Buyer Analyst / Acquisition Agent interpretation above it is not. The architecture this document commits to is **buyer profile → deterministic suitability → agent interpretation**, never an opaque LLM-generated buyer score: a structured buyer profile (geography, scale, planning-risk appetite, development type, tenure, delivery horizon, brownfield/greenfield preference) is matched against an opportunity's own deterministic facts first, and only the *interpretation* of that match — why it fits, what the risks are — is agentic. An opportunity may legitimately be highly suitable for one buyer profile and unsuitable for another; there is no universal ranking underneath this. **Buyer Mandate V2** (see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)) extends this existing Buyer Profile domain with further acquisition-mandate criteria — it does not rebuild it.
 
-### Operative Scheme Intelligence & Acquisition Position Intelligence — future concepts (Gate 2B / Gate 2C, NEXT-after)
+### Trusted Opportunity Data — Application Lifecycle Watch, Operative Planning Reconciliation & the Monitoring Agent (Gate 2B, three sub-gates)
 
-*(Added at the Acquisition-First Roadmap Alignment. Conceptual only — the technical shape of both is deliberately undecided here; Gate 2B's own repository investigation, not this document, determines what entity/table/module design is actually needed. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence.)*
+*(Added at the Acquisition-First Roadmap Alignment; revised at Gate 2B-0A. Gate 2B is "Trusted Opportunity Data" — three deliberately separate responsibilities, never collapsed into one system, in this order:)*
+
+```
+Council portals + planning documents
+        ↓
+APPLICATION LIFECYCLE WATCH        detects and records meaningful change
+        ↓
+OPERATIVE PLANNING RECONCILIATION  interprets what current evidence means for the scheme
+        ↓
+Trusted Opportunity Data
+        ↓
+Buyer/Acquisition Intelligence
+        ↓
+MONITORING AGENT / ALERTS          communicates commercially relevant changes to users/buyers
+```
+
+- **Application Lifecycle Watch** (Gate 2B-0A + 2B-0B) — does an already-known application's own record still match what PropertyAIgent last saw, and has it progressed through a commercially meaningful transition (awaiting decision → officer recommendation → committee resolution → permission granted → conditions discharged → commencement evidence)? **2B-0A (freshness) is built** — see "Planning Status Verification" below. **2B-0B (lifecycle history)** — preserving and exposing those transitions, rather than 2B-0A's own current-value refresh silently overwriting them — is not yet built; its own design inputs are the Gate 2B-0A controlled-validation report's lifecycle-coverage observations, not invented ahead of that evidence.
+- **Operative Planning Reconciliation** (Gate 2B-1) — what does the CURRENT evidence, once Lifecycle Watch has kept it fresh, actually mean for the scheme? This is the raw-evidence-vs-operative-position reconciliation this section already described before Gate 2B-0A existed — unchanged below, just now correctly positioned as consuming Lifecycle Watch's output rather than being the whole of Gate 2B.
+- **Monitoring Agent** (roadmap only, sequenced after both — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Later") — the only one of the three that is genuinely agentic. It must never itself scrape a portal or decide planning truth; it consumes Lifecycle Watch's changes and Reconciliation's trusted facts and answers "what changed this week that matters" (later, buyer-specifically). Same "agent reads, deterministic layers write" discipline as every other agentic capability in this document (§7).
+
+Conceptual only for 2B-1/2B-0B/the Monitoring Agent — the technical shape of each is deliberately undecided here beyond what's stated; Gate 2B's own repository investigation (complete) and the Gate 2B-0A controlled validation (in progress) are what determine further design, not this document. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence.
+
+#### Planning Status Verification — BUILT (Gate 2B-0A, feature branch, awaiting production validation)
+
+`app.pipeline.status_verification` (feature branch `feature/gate-2b0-planning-freshness`, not yet merged to master) directly re-fetches an already-known Application's own authoritative portal record by exact reference — reusing, unmodified, `app.scrapers.{idox,arcus}_portal.fetch_application_by_reference` and `app.pipeline.run_weekly._upsert_scraped_application` (already generic, already runs `app.pipeline.material_change` detection) — rather than the existing month-range search, which can never revisit a past month, or the existing related-application search, which requires a granted anchor. Root cause this closes (Gate 2B-A investigation, production-confirmed): 173 pending applications >6 months old with zero refresh activity of any kind; 100% of `long_pending_application` opportunities >90 days unverified.
+
+Deterministic, 4-tier eligibility (contradiction signal — a decision notice or an `approval` recommendation already sits unreconciled internally; long-pending opportunity; other opportunity; other pending), 7/14/30/60-day cadence measured from **freshness** (`Application.status_verified_at`, a new additive field), never from application age, with a starvation-protection fairness rule and a 10-per-council-per-run bound. `status_verified_at` is deliberately distinct from `last_seen_at` (proven, by production data, to advance on any unrelated ORM update — never a proof of verification), `related_search_checked_at` (a different portal call — citation search, not a re-fetch) and `evidence_refresh_last_checked_at` (document refresh only, never touches status/decision). Never added to the opportunity fingerprint (`app.reporting.opportunity_universe`) — a verification *event* is not a planning *change*, and must never manufacture a false `MATERIALLY_CHANGED`.
+
+Related-application discovery (`stage_fetch_related_applications`) gained one new, narrow anchor-selection fallback in the same change: a site with no granted application, but which the current Opportunity Universe already recognises as an unresolved planning-application opportunity, now also qualifies — closing a second structural blind spot (an unresolved opportunity could previously never have a later/superseding filing discovered for it at all) — using the same existing `related_search_checked_at` cooldown, never a new timestamp, and never conflated with status verification's own eligibility.
 
 Acquisition qualification needs the platform to distinguish **raw/historic evidence** (every application, phase, document version and revision the platform has ever seen, preserved in full — never destructively overwritten) from the **current operative position** (what the evidence, reconciled, actually establishes right now). Conceptually:
 
@@ -226,7 +254,7 @@ RECONCILIATION
 OPERATIVE OPPORTUNITY FACTS  (homes, affordable housing, planning status — with source, evidence date, confidence, conflicts/provenance)
 ```
 
-A scheme that proposed 210 homes, was revised to 196, and was granted permission for 184 has three genuine, non-conflicting historical facts and one **operative** fact (184) — the platform must be able to state the operative figure *and* show its own reconciliation trail, never silently pick a number without recording why. **Where the evidence does not justify stating an operative value, the system must explicitly decline to state one rather than silently choose between conflicting evidence** — this is the Gate 2B exit condition (see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)).
+A scheme that proposed 210 homes, was revised to 196, and was granted permission for 184 has three genuine, non-conflicting historical facts and one **operative** fact (184) — the platform must be able to state the operative figure *and* show its own reconciliation trail, never silently pick a number without recording why. **Where the evidence does not justify stating an operative value, the system must explicitly decline to state one rather than silently choose between conflicting evidence** — this is the Gate 2B-1 exit condition (see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)).
 
 **Acquisition Position Intelligence** (Gate 2C, after Gate 2B) is the next layer up: what the evidence establishes about whether/how an opportunity could realistically be acquired — known owner, applicant, developer/controller, promoter, delivery-partner and option/promotional-control evidence, construction/commencement evidence, disposal/marketing evidence, JV/partnership and funding signals. **Availability must never be inferred from silence** — see "Unknown Must Remain Unknown," [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md), which governs this capability directly. Potential future acquisition-position states (names provisional, not an implementation commitment): `AVAILABLE / POTENTIALLY_AVAILABLE / UNKNOWN / CONTROLLED / COMMITTED` — kept as a conceptually distinct state model from opportunity *type* (strategic land, long-pending application, …) and from a future buyer *recommendation* (`PURSUE / VERIFY / MONITOR / NOT RELEVANT`); these three concepts must never be collapsed into one enum.
 

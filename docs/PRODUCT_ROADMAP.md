@@ -98,17 +98,32 @@ Recent acquisition-focused validation of the live platform found PropertyAIgent 
 
 ### Next
 
-**Gate 2B — Operative Scheme Intelligence & Planning Reconciliation V1.**
+**Gate 2B — Trusted Opportunity Data.**
 
-**Objective:** Make the decision-driving planning facts sufficiently defensible for acquisition qualification — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md), "Operative Scheme Intelligence & Acquisition Position Intelligence," for the conceptual raw-evidence-vs-operative-position distinction this gate implements.
+*(Product Owner decision, Gate 2B-0A: Gate 2B is now understood as three sequenced sub-gates, not one monolithic build — the read-only investigation and the Gate 2B-0 implementation both found the underlying problem has two genuinely separate dimensions (freshness of evidence vs. reconciliation of evidence), and the Product Owner has since formalised a third, ongoing concern — observing a known application's lifecycle for as long as it stays commercially relevant, not just re-verifying it once. None of the three sub-gates below is Gate 2C, Buyer Mandate V2, or the Acquisition Agent — all of those remain sequenced strictly after Gate 2B closes, unchanged from before.)*
 
-**Likely scope to investigate/design** (not yet decided — this gate requires a read-only repository investigation first, see below): current operative planning state; latest meaningful planning milestone; decision date; proposed vs. approved units; operative residential quantum; proposed vs. approved affordable housing; operative AH units/%; application/phase/version relationships; superseded values; conflict detection; source provenance; evidence date; confidence; unresolved conflicts.
+```
+Council portals + planning documents
+        ↓
+Application Lifecycle Watch          (2B-0A: freshness: re-verify a known application's own record
+                                       2B-0B: lifecycle: preserve/expose its meaningful transitions)
+        ↓
+Lifecycle changes / fresh evidence
+        ↓
+Operative Planning Reconciliation    (2B-1: what does the current evidence mean for the scheme)
+        ↓
+Trusted Opportunity Data
+        ↓
+Buyer/Acquisition Intelligence       (Gate 2C onward, unchanged sequencing - see "After 2B" below)
+        ↓
+Monitoring Agent / Alerts            (Weekly Planning/Acquisition Monitoring Agent - see "Later" below)
+```
 
-**Critical principle:** the system must explicitly decline to state an operative value when evidence does not justify one — it must never silently choose between conflicting evidence.
+**2B-0A — Planning Freshness Infrastructure.** *(IMPLEMENTED on `feature/gate-2b0-planning-freshness`, commit `b9a50d0` — AWAITING CONTROLLED PRODUCTION VALIDATION, not yet merged.)* Ensures an already-known unresolved application is periodically and truthfully re-verified against its own authoritative portal record, and that later/related planning activity can continue to be discovered even for a site with no granted anchor yet. `Application.status_verified_at` (additive schema field), deterministic verification tiers (contradiction signal / long-pending opportunity / other opportunity / other pending) at 7/14/30/60-day cadence, a 10-per-council-per-run bound, and an extended (never rewritten) related-application-discovery eligibility — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the full architecture and the Gate 2B-A investigation's own root-cause findings this closes (173 pending applications >6 months old with zero refresh activity; 100% of long_pending_application opportunities >90 days unverified).
 
-**Provisional exit condition:** *"For every planning-application opportunity, PropertyAIgent can state — or explicitly decline to state — the current operative planning status, residential quantum and affordable-housing position, with provenance, evidence date, confidence and visible unresolved conflicts."*
+**2B-0B — Application Lifecycle Intelligence.** *(NOT YET IMPLEMENTED — design inputs pending the Gate 2B-0A controlled validation's own lifecycle-coverage observations.)* Preserves and exposes commercially meaningful planning transitions (awaiting decision → officer recommendation → committee resolution → permission granted → conditions discharged → commencement evidence) rather than merely overwriting the current field values 2B-0A's own verification already refreshes. Expected concerns: a lifecycle event/history representation distinct from the current-value fields; previous-state → new-state pairs; detected-at timestamps; source/provenance per transition; materiality; downstream invalidation/reprocessing triggers; the evidence base a future acquisition alert would read from. Depends on 2B-0A's own fresh-evidence signal as its trigger, never re-implementing verification itself.
 
-**Prerequisite:** a read-only Gate 2B repository & architecture investigation (Site/Application/SchemeIntelligence/phase/document/extraction/reconciliation infrastructure that already exists) must run before the Product Owner approves this gate's technical design — see "Recommended Next Task" at the foot of this document.
+**2B-1 — Operative Planning Reconciliation.** *(NOT YET IMPLEMENTED.)* The gate previously named simply "Gate 2B" in this document — determines the best current interpretation of planning evidence, distinguishing **current consented position** from **current active proposal/planning activity** (units, affordable housing, provenance, freshness, evidence confidence, relationship confidence, unresolved conflicts — never one combined score, see [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md)). See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md), "Operative Scheme Intelligence & Acquisition Position Intelligence," for the conceptual raw-evidence-vs-operative-position distinction. **Likely scope to investigate/design** (not yet decided): current operative planning state; latest meaningful planning milestone; decision date; proposed vs. approved units; operative residential quantum; proposed vs. approved affordable housing; operative AH units/%; application/phase/version relationships; superseded values; conflict detection; source provenance; evidence date; confidence; unresolved conflicts. **Critical principle:** the system must explicitly decline to state an operative value when evidence does not justify one — it must never silently choose between conflicting evidence. **Provisional exit condition:** *"For every planning-application opportunity, PropertyAIgent can state — or explicitly decline to state — the current operative planning status, residential quantum and affordable-housing position, with provenance, evidence date, confidence and visible unresolved conflicts."* **Prerequisite:** the read-only Gate 2B repository & architecture investigation already completed remains the design basis; this sub-gate's own technical design is not yet approved.
 
 ### After 2B
 
@@ -119,6 +134,8 @@ Recent acquisition-focused validation of the live platform found PropertyAIgent 
 - **Acquisition Workflow & Monitoring.** Persistent buyer opportunity state, saved shortlists, comparison, preserved Explore/filter context, evidence-rich exports, change-driven reassessment, new-match acquisition briefs, material-change alerts, committed/closed-opportunity handling, an action-oriented dashboard — built on the existing Gate 1/1C change-detection infrastructure, not a rebuild of it.
 
 ### Later
+
+**Weekly Planning/Acquisition Monitoring Agent.** *(ROADMAP ONLY — not designed, not scheduled, not to be implemented ahead of the Trusted Opportunity Data gates it depends on.)* Consumes 2B-0B's lifecycle changes and 2B-1's reconciled opportunity data to answer "what changed this week that matters?" — and, once Buyer Mandate V2 exists, "what changed this week that matters to Buyer X?" Potential output: newly granted opportunities, committee progression, S106 progression, revised schemes, newly discovered related applications, approaching-lapse changes, commencement indicators, buyer-fit changes, priority acquisition actions. **The agent must never itself scrape or determine planning truth** — it is a consumer of the deterministic lifecycle/reconciliation layers beneath it, the same "agent reads, deterministic layers write" discipline as every other agentic capability in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7.
 
 **Comparable Evidence Agent**, then **Development Appraisal Agent** — unchanged from the existing "Phase 2" sequencing below: detailed valuation/appraisal (GDV, cost plans, residual land value, development finance, IRR, profit-on-cost) is not the near-term commercial priority. The near-term priority remains **identify → qualify → match → monitor**, not full development appraisal; establishing whether a genuine acquisition route exists comes first.
 
@@ -309,7 +326,9 @@ Maturity is reported against real repository evidence, not against whether a fun
 | Buyer profiles | **Built, CLOSED** | Gate 1 | Four pilot profiles (Buyer Profiles V1), now persistent and Workspace-owned (Gate 1) — geography/tenure/brownfield-greenfield preference remain future work under Buyer Mandate V2 |
 | Buyer fit | **Built** | Gate 1 (extends Buyer Profiles V1) | `app.policy.buyer_matching.assess_buyer_fit` — deterministic, no LLM, no numeric score |
 | Applicant Intelligence | **Built, CLOSED** | Gate 2A | Entity-level, evidence-grounded organisation classification for planning-application-linked identities; full eligible production population (188 identities) bootstrapped and validated; known V1 limitations documented in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2 |
-| Operative Scheme Intelligence | **Not yet built** | Gate 2B (NEXT) | Raw evidence → reconciled operative planning facts, with provenance/confidence/conflicts — see "Acquisition-First Gate Sequence" above |
+| Planning freshness infrastructure | **Implemented on feature branch, awaiting production validation** | Gate 2B-0A (NEXT) | `Application.status_verified_at`, tiered direct re-verification, extended related-discovery eligibility — `feature/gate-2b0-planning-freshness`, not yet merged |
+| Application lifecycle intelligence | **Not yet built** | Gate 2B-0B | Preserves/exposes meaningful planning transitions, not just current-value overwrites — depends on 2B-0A |
+| Operative Scheme Intelligence | **Not yet built** | Gate 2B-1 | Raw evidence → reconciled operative planning facts, with provenance/confidence/conflicts — see "Acquisition-First Gate Sequence" above |
 | Acquisition Position Intelligence | **Not yet built** | Gate 2C | Depends on Gate 2B; availability must never be inferred from silence |
 | Opportunity Analyst | **Not yet built** | 1.5 / superseded by Acquisition Agent V1 | Depends on Phase 1 Opportunity Validation's findings; not built ahead of it |
 | Planning due diligence | **Not yet built** | 1.5 | A deeper mode of the Opportunity Analyst, not a separate agent |
@@ -322,4 +341,4 @@ Maturity is reported against real repository evidence, not against whether a fun
 
 ## Recommended Next Task
 
-**Read-only Gate 2B repository & architecture investigation.** Before the Product Owner approves Gate 2B's technical design, a dedicated investigation should determine what existing Site/Application/SchemeIntelligence/phase/document/extraction/reconciliation infrastructure already exists — reusing it wherever possible rather than inventing a new entity ahead of that evidence (per `CLAUDE.md`, "Reuse existing architecture where possible"). Read-only: no schema, no migration, no implementation.
+**Controlled production validation of Gate 2B-0A**, then a Product Owner merge decision, before Gate 2B-0B's own design begins in earnest — the read-only Gate 2B repository & architecture investigation this once pointed to is complete, and its findings are recorded in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md).
