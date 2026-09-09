@@ -23,6 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from app.config import CouncilConfig
@@ -139,6 +140,47 @@ def test_requests_connection_error_counts_as_host_failure():
 
 def test_playwright_timeout_error_counts_as_host_failure():
     assert is_portal_host_failure(PlaywrightTimeoutError("Timeout 30000ms exceeded")) is True
+
+
+# --- Gate 2B-0A portal-failure hardening amendment ---------------------------
+# Confirmed real production case (Brixham Road / Trafford, Gate 2B-0A live
+# controlled validation): a synchronous ERR_CONNECTION_TIMED_OUT reported by
+# Chromium during page.goto() raises the BASE playwright.sync_api.Error, not
+# the TimeoutError subclass already covered above - Playwright's own
+# operation-timeout budget was never reached, since Chromium itself reported
+# the connection failure first. See app.pipeline.portal_circuit_breaker's own
+# module-level comment for the full reasoning and the exact allow-listed
+# network-error codes.
+
+
+def test_playwright_error_with_connection_timed_out_counts_as_host_failure():
+    """The exact real production shape: Page.goto: net::ERR_CONNECTION_TIMED_OUT ..."""
+    exc = PlaywrightError(
+        "Page.goto: net::ERR_CONNECTION_TIMED_OUT at https://pa.trafford.gov.uk/online-applications/search.do"
+        "?action=advanced&searchType=Application\nCall log:\n  - navigating to \"...\", waiting until \"networkidle\""
+    )
+    assert is_portal_host_failure(exc) is True
+
+
+def test_playwright_error_with_name_not_resolved_counts_as_host_failure():
+    """A second, distinct representative network-level Chromium error code -
+    proves this isn't a special case hard-coded for ERR_CONNECTION_TIMED_OUT
+    alone."""
+    exc = PlaywrightError("Page.goto: net::ERR_NAME_NOT_RESOLVED at https://unreachable.invalid/search.do")
+    assert is_portal_host_failure(exc) is True
+
+
+def test_generic_playwright_error_without_network_evidence_is_not_host_failure():
+    """A plain Playwright Error with no recognised net::ERR_* code (e.g. a
+    selector never appearing) must NOT open the circuit for an otherwise-
+    healthy portal - the exact over-broad behaviour explicitly rejected."""
+    exc = PlaywrightError("Locator.click: Target closed")
+    assert is_portal_host_failure(exc) is False
+
+
+def test_playwright_error_mentioning_unrelated_text_is_not_host_failure():
+    exc = PlaywrightError("Page.fill: Timeout 5000ms exceeded waiting for selector")
+    assert is_portal_host_failure(exc) is False
 
 
 def test_http_429_does_not_open_host_unavailable_circuit():

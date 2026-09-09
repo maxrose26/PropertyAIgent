@@ -30,7 +30,42 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import requests
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+# Gate 2B-0A portal-failure hardening - confirmed real production case
+# (Brixham Road / Trafford, live controlled validation): a genuine
+# ERR_CONNECTION_TIMED_OUT reported synchronously by Chromium during
+# page.goto() surfaces as the BASE playwright.sync_api.Error, not the
+# TimeoutError subclass already matched above - TimeoutError only fires
+# when PLAYWRIGHT'S OWN operation-level timeout budget is exhausted
+# waiting for something that never happens; a definitive network-level
+# failure Chromium itself reports (before that budget elapses) is a
+# plain Error whose message names the underlying net::ERR_* code.
+#
+# Deliberately a narrow, explicit allow-list of Chromium's own network-
+# error codes, not "any playwright.sync_api.Error" - the base Error class
+# is also raised for a huge range of application-level conditions
+# (a selector never appearing, an assertion failing, a malformed action)
+# that are not evidence of a host/network outage. Matching all of them
+# would make a single flaky page interaction able to open the circuit
+# for an otherwise-healthy portal - the exact over-broad behaviour the
+# Product Owner's own review explicitly rejected.
+#
+# The six codes below are exactly the ones named in the Gate 2B-0A
+# portal-failure hardening review as safe, positive evidence of a real
+# connectivity condition (Chromium's own stable net-error-code naming
+# convention, never portal-content-dependent): a timed-out connection
+# attempt, a refused connection, unresolvable DNS, a reset connection, a
+# changed network interface, or no network access at all.
+_CHROMIUM_NETWORK_ERROR_CODES = (
+    "ERR_CONNECTION_TIMED_OUT",
+    "ERR_CONNECTION_REFUSED",
+    "ERR_NAME_NOT_RESOLVED",
+    "ERR_CONNECTION_RESET",
+    "ERR_NETWORK_CHANGED",
+    "ERR_INTERNET_DISCONNECTED",
+)
 
 # Small enough to fail fast (stop burning run time on an unreachable host),
 # large enough not to react to one transient request - matches the Product
@@ -62,6 +97,18 @@ def is_portal_host_failure(exc: BaseException) -> bool:
     - playwright.sync_api.TimeoutError - a Playwright navigation timeout
       (ERR_CONNECTION_TIMED_OUT and equivalent), the same exception
       _goto_with_retry already retries internally.
+    - playwright.sync_api.Error (the base class TimeoutError itself
+      subclasses) whose own message names one of _CHROMIUM_NETWORK_ERROR_
+      CODES - Gate 2B-0A portal-failure hardening amendment, confirmed
+      real production case: a synchronous ERR_CONNECTION_TIMED_OUT from
+      Chromium during page.goto() (Brixham Road / Trafford, live
+      controlled validation) raises the base Error, not TimeoutError,
+      since Playwright's own operation-timeout budget was never reached -
+      Chromium itself reported the connection failure first. Deliberately
+      checked by exact, positive network-error-code evidence in the
+      message text, never "isinstance(exc, PlaywrightError)" alone - see
+      that constant's own module-level comment for why a bare Error
+      isinstance check would be unsafely broad.
 
     Deliberately does NOT match:
     - requests.exceptions.HTTPError (429, 404, 500, ...) - a real HTTP
@@ -70,13 +117,17 @@ def is_portal_host_failure(exc: BaseException) -> bool:
       pacing in get_with_retry already handles this, unchanged), and a
       404/500 is a permanent, application-level error, not evidence of a
       host outage.
+    - a playwright.sync_api.Error with no recognised network-error code in
+      its message (a selector timeout, an assertion, a malformed action) -
+      real, but not evidence the host/network itself is down.
     - any other exception (e.g. a parsing/extraction error on one
       malformed document) - not host-level evidence either way."""
-    return isinstance(exc, (
-        requests.exceptions.ConnectTimeout,
-        requests.exceptions.ConnectionError,
-        PlaywrightTimeoutError,
-    ))
+    if isinstance(exc, (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError, PlaywrightTimeoutError)):
+        return True
+    if isinstance(exc, PlaywrightError):
+        message = str(exc)
+        return any(code in message for code in _CHROMIUM_NETWORK_ERROR_CODES)
+    return False
 
 
 @dataclass

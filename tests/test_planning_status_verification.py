@@ -35,6 +35,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from app.config import CouncilConfig
@@ -304,6 +305,31 @@ def test_playwright_timeout_counts_as_portal_unavailable(session):
         outcome = verify_application_status(session, MagicMock(), _council_config(), app)
     assert outcome.outcome == OUTCOME_PORTAL_UNAVAILABLE
     assert app.status_verified_at is None
+
+
+def test_real_trafford_connection_timeout_shape_counts_as_portal_unavailable(session):
+    """Gate 2B-0A portal-failure hardening amendment - the exact real
+    production exception shape (Brixham Road / Trafford, live controlled
+    validation): a base playwright.sync_api.Error naming net::
+    ERR_CONNECTION_TIMED_OUT, not the TimeoutError subclass. Confirms the
+    hardened is_portal_host_failure() now routes this through
+    verify_application_status() to PORTAL_UNAVAILABLE, notifies the
+    circuit breaker via the existing record_failure() call, and leaves
+    status_verified_at/Application facts completely untouched - the exact
+    same safety guarantees as every other failure outcome."""
+    app = _add_application(session, reference="114228/FUL/24", status="Awaiting decision", decision=None)
+    breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
+    real_shaped_exc = PlaywrightError(
+        "Page.goto: net::ERR_CONNECTION_TIMED_OUT at https://pa.trafford.gov.uk/online-applications/search.do"
+        "?action=advanced&searchType=Application\nCall log:\n  - navigating to \"...\", waiting until \"networkidle\""
+    )
+    with patch("app.scrapers.idox_portal.fetch_application_by_reference", side_effect=real_shaped_exc):
+        outcome = verify_application_status(session, MagicMock(), _council_config(), app, breaker=breaker)
+    assert outcome.outcome == OUTCOME_PORTAL_UNAVAILABLE
+    assert app.status_verified_at is None
+    assert app.status == "Awaiting decision"  # untouched
+    assert app.decision is None  # never fabricated
+    assert breaker.consecutive_host_failures == 1  # circuit breaker WAS notified this time
 
 
 def test_unrelated_field_update_does_not_advance_status_verified_at(session):
