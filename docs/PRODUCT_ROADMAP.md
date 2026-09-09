@@ -23,9 +23,11 @@ What exists today, in production, verified against the repository (see [PLATFORM
 
 **Opportunity product** — Site Selection & Reporting (Shortlist, CSV/PDF export, AI Executive Intelligence); Opportunity Experience V2 (unified Dashboard discovery feed across strategic-land and planning/delivery opportunities, restructured Opportunity Profile).
 
+**Acquisition Monitoring Substrate** (Gate 1, Gate 1C, Gate 2A — all merged to master, all **CLOSED**) — Workspace ownership boundary; persistent Buyer Profiles and deterministic buyer fit; a stable, deterministic opportunity universe across five opportunity types (strategic land, long-pending application, recent permission, undeveloped permission, approaching lapse) with fingerprinting and change detection; entity-level, evidence-grounded Applicant Intelligence for planning-application-linked organisations, production-validated across the full eligible population. See "Acquisition-First Gate Sequence" below for what's next.
+
 **Production deployment** — live at `propertyaigent.onrender.com`, on Render, deployed from `master`.
 
-The platform has therefore reached: *planning intelligence → structured Local Plan/allocation intelligence → planning activity analysis → opportunity identification → opportunity discovery → opportunity investigation/profile → shortlist.* Local Plans, strategic allocations and opportunity identification are no longer future concepts in this document — they are shipped capability, referenced as such throughout the sections below.
+The platform has therefore reached: *planning intelligence → structured Local Plan/allocation intelligence → planning activity analysis → opportunity identification → opportunity discovery → opportunity investigation/profile → shortlist → buyer-matched, monitored, entity-enriched acquisition substrate.* Local Plans, strategic allocations, opportunity identification, buyer profiles/fit, opportunity monitoring and Applicant Intelligence are no longer future concepts in this document — they are shipped capability, referenced as such throughout the sections below. The platform's stated commercial outcome is now acquisition-first — see "The Acquisition-First Direction" below.
 
 ## Current Validation Milestone — Phase 1 Opportunity Validation
 
@@ -74,7 +76,51 @@ The next implementation workstream is chosen **after** Phase 1 Opportunity Valid
 
 This is a genuine decision gate, not a formality — if the validation sample shows a different, unlisted gap most often, that gap is what gets built next, not whichever of the above looks most appealing in the abstract.
 
-**Factual update, post-refresh (Product Owner decision, recorded here without rewriting the gate structure above):** "Buyer Profiles + Deterministic Fit V1" was subsequently chosen and implemented - four pilot profiles (Nesten Homes, Strategic Land Buyer, National Housebuilder, Housing Association), deterministic `assess_buyer_fit` (`STRONG_FIT`/`NOT_SUITABLE`/`INSUFFICIENT_EVIDENCE` + an orthogonal investigative-exception flag, no LLM, no numeric score), and a personalised Dashboard/Opportunity Profile feed built on the widened-candidate-pool architecture described in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7 - merged to master (commit `0d1b564`). A follow-on **Gate 1: Acquisition Monitoring Substrate** has since been implemented on a feature branch (Workspace ownership boundary, persistent Buyer Profiles, stable opportunity identity, deterministic opportunity fingerprinting/change detection, and a buyer onboarding baseline) as the prerequisite substrate for a future Selective Acquisition Agent (Opportunity Analyst / Buyer Analyst, §7 below) - **awaiting Product Owner review, not yet merged or deployed.** The Opportunity Analyst/Buyer Analyst agentic capabilities themselves remain unbuilt; see §7's own status table.
+**Factual update, post-refresh (Product Owner decision, recorded here without rewriting the gate structure above):** "Buyer Profiles + Deterministic Fit V1" was subsequently chosen and implemented - four pilot profiles (Nesten Homes, Strategic Land Buyer, National Housebuilder, Housing Association), deterministic `assess_buyer_fit` (`STRONG_FIT`/`NOT_SUITABLE`/`INSUFFICIENT_EVIDENCE` + an orthogonal investigative-exception flag, no LLM, no numeric score), and a personalised Dashboard/Opportunity Profile feed built on the widened-candidate-pool architecture described in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7 - merged to master (commit `0d1b564`). This decision gate is now **resolved and superseded** by the Acquisition-First direction below: **Gate 1 (Acquisition Monitoring Substrate)**, **Gate 1C (Planning Opportunity Trigger Expansion)** and **Gate 2A (Applicant Intelligence V1)** have since all been implemented and merged to master, closing the substrate this decision gate was pointing toward. See "Acquisition-First Gate Sequence" below for what's built, what's next, and the Opportunity Analyst/Buyer Analyst agentic capabilities' own current status.
+
+## The Acquisition-First Direction
+
+*(Product Owner decision, Acquisition-First Roadmap Alignment.)* The commercial outcome this roadmap now serves is stated explicitly in [PRODUCT_VISION.md](PRODUCT_VISION.md), "The Acquisition-First Commercial Outcome": PropertyAIgent continuously turns fragmented planning, ownership and development evidence into ranked acquisition opportunities matched to a buyer's strategy. Planning intelligence — everything in the capability stack above and the sections below — remains the trusted evidence layer; it is no longer the end product. The **primary unit of product value is the qualified buyer-specific acquisition opportunity**, not the planning application or the search result. This does not discard anything already built — every gate below extends existing architecture (Buyer Profiles, the opportunity universe, Applicant Intelligence) rather than replacing it.
+
+### Live Acquisition-Focused Product Review — findings behind Gate 2B
+
+Recent acquisition-focused validation of the live platform found PropertyAIgent is currently **stronger at identifying planning activity than at identifying genuinely actionable acquisition opportunities**: scheme-level values can conflict across applications/phases/versions; proposed and approved units/affordable-housing figures can be mixed; planning statuses can go stale; an externally-approved scheme can still show as awaiting decision; a planning-fit site may already be committed to a developer; availability/control is materially less clear than planning status; current Explore filtering does not fully represent a real acquisition mandate; and Dashboard emphasis remains more data/coverage-oriented than acquisition-action-oriented. These findings are the direct evidence behind sequencing Gate 2B (Operative Scheme Intelligence) next.
+
+## Acquisition-First Gate Sequence
+
+### Completed Foundation
+
+| Gate | Status | What it built |
+|---|---|---|
+| **Gate 1** — Acquisition Monitoring Substrate | **CLOSED** (merged to master) | Workspace ownership boundary; persistent, Workspace-owned Buyer Profiles (extending, not replacing, Buyer Profiles V1); stable opportunity identity (`app.reporting.opportunity_universe`); deterministic opportunity fingerprinting and change detection (`app.reporting.opportunity_change`: `BASELINE_EXISTING` / `NEW` / `MATERIALLY_CHANGED` / `UNCHANGED`); a buyer onboarding baseline. |
+| **Gate 1C** — Planning Opportunity Trigger Expansion | **CLOSED** (merged to master) | Expanded the opportunity universe's planning/delivery detectors to `RECENT_PERMISSION` and `LONG_PENDING_APPLICATION`, alongside the existing `STRATEGIC_LAND`, `UNDEVELOPED_PERMISSION` and `APPROACHING_LAPSE` — five opportunity types, one deterministic universe, a standing weekly production cron. |
+| **Gate 2A** — Applicant Intelligence V1 | **CLOSED** (merged to master; production bootstrap complete) | Entity-level, evidence-grounded organisation classification for planning-application-linked identities (see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2). **Production validation record:** full eligible population processed — 188 identities (170 organisation-shaped, 18 private-person-shaped); 169/170 organisations successfully classified, 1 in a safe, persistent validation-rejected state (not forced); all 18 private identities received deterministic no-web-research protection; zero duplicate identities; zero strategic-land-only research violations; live Applicant Intelligence UI verified in production; Opportunity Universe and Buyer Profiles unaffected. Known V1 limitations (parent/group completeness, confidence/evidence-ref linkage, source authority vs. claim support, source-type mistagging, backlog overfetch behaviour) are recorded in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2, not fixed as part of closing this gate. |
+
+### Next
+
+**Gate 2B — Operative Scheme Intelligence & Planning Reconciliation V1.**
+
+**Objective:** Make the decision-driving planning facts sufficiently defensible for acquisition qualification — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md), "Operative Scheme Intelligence & Acquisition Position Intelligence," for the conceptual raw-evidence-vs-operative-position distinction this gate implements.
+
+**Likely scope to investigate/design** (not yet decided — this gate requires a read-only repository investigation first, see below): current operative planning state; latest meaningful planning milestone; decision date; proposed vs. approved units; operative residential quantum; proposed vs. approved affordable housing; operative AH units/%; application/phase/version relationships; superseded values; conflict detection; source provenance; evidence date; confidence; unresolved conflicts.
+
+**Critical principle:** the system must explicitly decline to state an operative value when evidence does not justify one — it must never silently choose between conflicting evidence.
+
+**Provisional exit condition:** *"For every planning-application opportunity, PropertyAIgent can state — or explicitly decline to state — the current operative planning status, residential quantum and affordable-housing position, with provenance, evidence date, confidence and visible unresolved conflicts."*
+
+**Prerequisite:** a read-only Gate 2B repository & architecture investigation (Site/Application/SchemeIntelligence/phase/document/extraction/reconciliation infrastructure that already exists) must run before the Product Owner approves this gate's technical design — see "Recommended Next Task" at the foot of this document.
+
+### After 2B
+
+- **Gate 2C — Acquisition Position Intelligence.** What the evidence establishes about whether/how an opportunity could realistically be acquired (owner, applicant, developer/controller, promoter, delivery partner, option/promotional control, construction/commencement, disposal/marketing, JV/funding signals). Availability must never be inferred from silence — see [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md), "Unknown Must Remain Unknown." Potential states (`AVAILABLE` / `POTENTIALLY_AVAILABLE` / `UNKNOWN` / `CONTROLLED` / `COMMITTED`) are provisional, not locked — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md).
+- **Buyer Mandate V2.** *Extends* the existing Buyer Profile domain (Gate 1) — geography, min/max units, maximum AH, product preference, planning-stage appetite, BTR/build-for-sale, brownfield/greenfield, and other acquisition criteria where evidence exists — into a reusable acquisition mandate driving filtering, matching, agent reasoning, monitoring and alerts. Not solved solely through an advanced-filter UI; natural-language interpretation may eventually create/edit the structured mandate (see [PRODUCT_VISION.md](PRODUCT_VISION.md), "The same discipline applies to interpreting what a user is asking for").
+- **Acquisition Agent V1.** One reusable acquisition-reasoning capability parameterised by **Buyer Profile × Opportunity** — not a separately engineered agent per buyer. Reasons over Buyer Mandate, Operative Scheme Intelligence, Applicant Intelligence, Acquisition Position, deterministic Buyer Fit and opportunity-change evidence. Potential recommendation states (provisional): `PURSUE / VERIFY / MONITOR / NOT RELEVANT`. This is the acquisition-first evolution of the Buyer Analyst already scoped in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7, not a second, separate agent.
+- **Acquisition Prioritisation.** Explainable dimensions/bands first (Buyer Fit, Planning Readiness, Acquisition Readiness, Evidence Confidence) — no premature numeric score. Any future score belongs to **buyer × opportunity**, never to the opportunity universally (see [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md), "No Opaque Scoring").
+- **Acquisition Workflow & Monitoring.** Persistent buyer opportunity state, saved shortlists, comparison, preserved Explore/filter context, evidence-rich exports, change-driven reassessment, new-match acquisition briefs, material-change alerts, committed/closed-opportunity handling, an action-oriented dashboard — built on the existing Gate 1/1C change-detection infrastructure, not a rebuild of it.
+
+### Later
+
+**Comparable Evidence Agent**, then **Development Appraisal Agent** — unchanged from the existing "Phase 2" sequencing below: detailed valuation/appraisal (GDV, cost plans, residual land value, development finance, IRR, profit-on-cost) is not the near-term commercial priority. The near-term priority remains **identify → qualify → match → monitor**, not full development appraisal; establishing whether a genuine acquisition route exists comes first.
 
 ---
 
@@ -209,15 +255,12 @@ Candidates the Roadmap Decision Gate chooses between — **not** a committed seq
 - Opportunity Discovery/Search V3 (a genuine cross-type "all opportunities" browse experience, and allocation-aware global search — both identified but deferred by Opportunity Experience V2's own final report)
 - NPPF as a versioned reference layer
 
-## Phase 1.5 — Buyer-Fit
-
-Sequenced after Phase 1 opportunities are individually well understood, not before:
+## Phase 1.5 — Buyer-Fit (historical record — superseded by the Acquisition-First Gate Sequence above)
 
 - ~~Structured Buyer Profiles~~ (geography, scale, planning-risk appetite, development type, tenure, delivery horizon, brownfield/greenfield preference) - **implemented as Buyer Profiles V1** (four pilot profiles; unit/affordable-unit scale, planning appetite, development-type and wholly-affordable exclusion polarity - geography/tenure/brownfield-greenfield preference were explicitly out of scope for the pilot and remain future work)
 - ~~Deterministic buyer-fit logic against those profiles~~ - **implemented** (`app.policy.buyer_matching.assess_buyer_fit`)
-- Buyer Profiles are now **persistent and Workspace-owned** (Gate 1: Acquisition Monitoring Substrate, feature branch, awaiting Product Owner review) rather than code/config-only, as the substrate for a future selective agent
-- **Opportunity Analyst V1**, if validation shows the underlying intelligence is already rich enough that interpretation is the main remaining burden - **not yet built**
-- **Buyer Analyst V1**, once deterministic fit exists to interpret — never before it, and never as an opaque LLM-generated score - deterministic fit now exists (above); the agentic interpretation layer itself is **not yet built**
+- ~~Buyer Profiles persistent and Workspace-owned~~ - **implemented and closed** (Gate 1: Acquisition Monitoring Substrate, merged to master)
+- Opportunity Analyst V1 / Buyer Analyst V1 - see "Acquisition-First Gate Sequence" above (**Acquisition Agent V1**, after Gate 2B/2C/Buyer Mandate V2) for their current sequencing; neither is built yet
 
 ## Phase 2 — Market, Comparables & Investment Intelligence
 
@@ -259,13 +302,24 @@ Maturity is reported against real repository evidence, not against whether a fun
 | Opportunity Profile | **Built** | 1 | Restructured around why/evidence/unknowns, ahead of detailed investigation |
 | Shortlist | **Built** | 1 | Session-scoped selection → CSV/PDF report, AI Executive Intelligence |
 | Delivery/phasing intelligence | **Not yet built** | 1 (candidate) | Validation hypothesis, not yet confirmed as the priority |
-| Ownership/control intelligence | **Foundation exists** | 1 (candidate) | `ControlRelationship` is Site/Application-scoped; no title/registry resolution |
-| Monitoring | **Foundation exists** | 1 (candidate) | Deterministic source/content-change detection exists for policy; no opportunity-level "does this change matter" reasoning |
+| Ownership/control intelligence | **Foundation exists** | 1 (candidate) | `ControlRelationship` is Site/Application-scoped; no title/registry resolution. Strengthened by Applicant Intelligence (below) at the organisation level, though this remains distinct from title/registry ownership resolution. |
+| Opportunity identity & change detection | **Built, CLOSED** | Gate 1 / 1C | `app.reporting.opportunity_universe` (5 opportunity types, deterministic fingerprinting) + `app.reporting.opportunity_change` (`BASELINE_EXISTING`/`NEW`/`MATERIALLY_CHANGED`/`UNCHANGED`), weekly production cron |
+| Monitoring (opportunity-level "does this matter" reasoning) | **Foundation built (deterministic); agentic interpretation not yet built** | Gate 1/1C built; agentic layer NEXT-after-2B | Opportunity-level change detection is now built and closed (above); an agent answering "does this change matter for this buyer's mandate" is not yet built |
 | NPPF/policy-led opportunity intelligence | **Not yet built** | 1 (candidate) / 1.5 | Only `buffer_percentage` exists today; no versioned national-policy layer |
-| Buyer profiles | **Not yet built** | 1.5 | Conceptually scoped ([PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7); not designed |
-| Buyer fit | **Not yet built** | 1.5 | Depends on buyer profiles existing first |
-| Opportunity Analyst | **Not yet built** | 1.5 | Depends on Phase 1 Opportunity Validation's findings; not built ahead of it |
+| Buyer profiles | **Built, CLOSED** | Gate 1 | Four pilot profiles (Buyer Profiles V1), now persistent and Workspace-owned (Gate 1) — geography/tenure/brownfield-greenfield preference remain future work under Buyer Mandate V2 |
+| Buyer fit | **Built** | Gate 1 (extends Buyer Profiles V1) | `app.policy.buyer_matching.assess_buyer_fit` — deterministic, no LLM, no numeric score |
+| Applicant Intelligence | **Built, CLOSED** | Gate 2A | Entity-level, evidence-grounded organisation classification for planning-application-linked identities; full eligible production population (188 identities) bootstrapped and validated; known V1 limitations documented in [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2 |
+| Operative Scheme Intelligence | **Not yet built** | Gate 2B (NEXT) | Raw evidence → reconciled operative planning facts, with provenance/confidence/conflicts — see "Acquisition-First Gate Sequence" above |
+| Acquisition Position Intelligence | **Not yet built** | Gate 2C | Depends on Gate 2B; availability must never be inferred from silence |
+| Opportunity Analyst | **Not yet built** | 1.5 / superseded by Acquisition Agent V1 | Depends on Phase 1 Opportunity Validation's findings; not built ahead of it |
 | Planning due diligence | **Not yet built** | 1.5 | A deeper mode of the Opportunity Analyst, not a separate agent |
+| Acquisition Agent V1 | **Not yet built** | After Gate 2B/2C/Buyer Mandate V2 | One reusable Buyer Profile × Opportunity reasoning capability — the acquisition-first evolution of the Buyer/Opportunity Analyst concepts above |
 | Market/comparables | **Not started** | 2 | No sales, rental or comparable data flows into the platform today |
 | Development appraisal | **Not started** | 2 | Hard-blocked on Market Intelligence existing first |
 | Market/Investment Analyst | **Not started** | 2 | Depends on structured market evidence + deterministic appraisal existing first |
+
+---
+
+## Recommended Next Task
+
+**Read-only Gate 2B repository & architecture investigation.** Before the Product Owner approves Gate 2B's technical design, a dedicated investigation should determine what existing Site/Application/SchemeIntelligence/phase/document/extraction/reconciliation infrastructure already exists — reusing it wherever possible rather than inventing a new entity ahead of that evidence (per `CLAUDE.md`, "Reuse existing architecture where possible"). Read-only: no schema, no migration, no implementation.

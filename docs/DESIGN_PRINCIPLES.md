@@ -96,7 +96,19 @@ A conclusion is never expressed as a number or ranking unless the platform can a
 
 An opportunity's value is relative to who's asking — it should never be reduced to one universal ranking that pretends otherwise.
 
-*In practice:* not yet built (Buyer Profiles, Phase 1.5 — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)), but architecturally committed in advance: an opportunity may legitimately be highly suitable for one buyer profile and unsuitable for another, and any future buyer-fit output must show that difference, not average it into one number.
+*In practice:* built — Buyer Profiles V1 and `app.policy.buyer_matching.assess_buyer_fit` (Gate 1, closed — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)): an opportunity may legitimately be `STRONG_FIT` for one buyer profile and `NOT_SUITABLE` for another, and the platform shows that difference per buyer, never averaging it into one universal number. The same discipline governs the future Acquisition Agent and Acquisition Prioritisation (see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §7): any future score belongs to a buyer × opportunity pair, never to the opportunity universally.
+
+## Unknown Must Remain Unknown
+
+The absence of evidence must never be converted into positive evidence — for anything, in either direction.
+
+*In practice:* this is the concrete, general form of "Preserve Uncertainty" above, restated for acquisition reasoning specifically: no construction evidence does not mean a site is available; no `parent_group` does not mean an entity is independent (Applicant Intelligence's own structural completeness gap makes this a real, present-day case, not a hypothetical — see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2); no identified owner does not mean a site is unowned or uncontrolled; no known developer does not mean a site is available; no transaction evidence does not mean a site isn't being marketed; no evidence of a constraint does not mean the constraint is absent. Every one of these must render as an explicit `UNKNOWN` / `INSUFFICIENT EVIDENCE` state, never silently collapsed into whichever answer happens to be more convenient. This governs the future Acquisition Position Intelligence (Gate 2C) directly — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md).
+
+## Source Authority Is Not Claim Support
+
+A source being authoritative in general does not mean every specific claim attributed to it is strongly evidenced — the two are separate questions, and conflating them lets an unsupported claim inherit a confidence it hasn't earned.
+
+*In practice:* Applicant Intelligence's deterministic confidence ceiling reasons about evidence-*source-type* tier (e.g. a Companies House record is authoritative), not about whether a specific cited fact's *content* actually supports the specific claim made from it — production validation found one isolated case where a company's own registered SIC classification did not support the commercial role asserted from it, yet its source-type tier alone let a HIGH confidence through (see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) §2). This is a general reconciliation-safety principle, not a one-off bug, and matters even more for the future Operative Scheme Intelligence (Gate 2B), which must reconcile a similar mix of authoritative-but-not-always-conclusive planning sources — a decision notice being an authoritative document type does not, by itself, mean every figure a professional might read off it is the operative one.
 
 ## Build Only Where Validated
 

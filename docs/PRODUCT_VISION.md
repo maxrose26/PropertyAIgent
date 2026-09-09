@@ -12,6 +12,22 @@ Property AIgent is an AI-native residential land and development opportunity int
 
 *(Product Vision & Roadmap Refresh, post–Opportunity Experience V2: this restates, rather than replaces, the platform's founding mission below. The original wording described building understanding of an opportunity; the platform has since shipped the first real instance of *identifying* one — deterministic opportunity signals, a Dashboard discovery feed, and an Opportunity Profile — so the mission now says what the product actually does, not only what it will eventually understand. Every substantive commitment in the original mission is preserved: evidence-backed, Site-centred, serving the same four user groups, judged by the same "faster, better-evidenced decisions" standard.)*
 
+## The Acquisition-First Commercial Outcome
+
+*(Product Owner decision, Acquisition-First Roadmap Alignment: the platform's product direction has been sharpened, not replaced. Planning intelligence — everything above — remains the trusted evidence layer the rest of this section depends on; it is no longer treated as the end product.)*
+
+> **PropertyAIgent continuously turns fragmented planning, ownership and development evidence into ranked acquisition opportunities matched to a buyer's strategy.**
+
+The platform's evolution reads as one continuous chain, each stage depending on the trustworthiness of the one before it:
+
+```
+trusted evidence → opportunity detection → opportunity qualification →
+buyer-specific acquisition intelligence → prioritisation →
+monitoring/workflow → human acquisition decision
+```
+
+**The primary unit of product value is the QUALIFIED BUYER-SPECIFIC ACQUISITION OPPORTUNITY** — not the planning application, not the planning record, and not a search result. A planning application matters because of what it establishes about an opportunity; an opportunity matters because of what it means for a specific buyer's mandate. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence this now drives, and [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the revised conceptual architecture.
+
 ## Vision
 
 Today, understanding a single development opportunity means separately searching a council planning portal, a GIS constraints viewer, Companies House, a policy document library, and a market-data provider — then manually holding all of it in your head at once. PropertyAIgent's vision is that this synthesis happens once, automatically, and continuously, and is presented back as a single coherent picture of the Site — not a pile of documents the user still has to read and reconcile themselves.
@@ -84,14 +100,20 @@ DISCOVER → UNDERSTAND → INVESTIGATE → MATCH → MONITOR → CONTACT → AS
 |---|---|---|
 | Discover | Where are opportunities worth looking at? | **Built** — Dashboard Opportunities feed (Opportunity Experience V2), Allocation Discovery, Explore |
 | Understand | What is this opportunity, in plain terms? | **Built** — Opportunity Profile / Site Profile, deterministic why-it-matters and key metrics |
-| Investigate | Why does it matter, and what's uncertain? | **Partially built** — deterministic reasons and evidence gaps exist; agentic synthesis (Opportunity Analyst) does not yet |
-| Match | Who is this opportunity valuable to? | **Not built** — no buyer profiles or fit logic yet |
-| Monitor | Has anything material changed? | **Foundation exists** — deterministic source/content monitoring exists for policy; not yet opportunity-level change significance |
-| Contact | Who do I need to reach, and how? | **Foundation exists** — Companies House/contact enrichment exists per-company, on demand; no ownership/control resolution or recommended-route reasoning yet |
-| Assess | Does this stack up commercially? | **Not built** — Market Intelligence and Development Economics (Phase 2) |
+| Investigate | Why does it matter, and what's uncertain? | **Partially built** — deterministic reasons, evidence gaps and entity-level Applicant Intelligence (Gate 2A, closed) exist; the decision-defensible *operative* planning position (Gate 2B, next) and agentic synthesis (Opportunity Analyst) do not yet |
+| Match | Who is this opportunity valuable to? | **Built (deterministic)** — persistent Buyer Profiles and deterministic `assess_buyer_fit` (Gate 1: Acquisition Monitoring Substrate, closed); the agentic Buyer Analyst / Acquisition Agent interpretation layer above it does not yet exist |
+| Monitor | Has anything material changed? | **Built (deterministic, opportunity-level)** — stable opportunity identity, fingerprinting and NEW/MATERIALLY_CHANGED/UNCHANGED/BASELINE_EXISTING change detection exist platform-wide (Gate 1 + Gate 1C, closed); agentic "does this change matter for this buyer" interpretation does not yet |
+| Contact | Who do I need to reach, and how? | **Foundation strengthened** — Companies House/contact enrichment per-company, on demand, now paired with entity-level Applicant Intelligence organisation classification (Gate 2A, closed); ownership/control resolution beyond Site/Application scope and recommended-route reasoning do not yet exist |
+| Assess | Does this stack up commercially? | **Not built** — Market Intelligence and Development Economics (Phase 2); acquisition qualification (Gate 2B/2C) comes first, see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) |
 | Decide | Should I pursue this? | **Always human** — see "Evidence-First, Agent-Assisted, Human-Decided" below; the platform is not designed to ever answer this on a professional's behalf |
 
 This table is a map of gaps, not a committed build order — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for how the next stage to invest in is actually chosen.
+
+### Acquisition-First UX Direction (not a redesign — direction for future work)
+
+A future primary scheme overview should be answerable against five acquisition questions, in this order: *does it fit the buyer; how close is it to planning/delivery; can it realistically be acquired; what known risks/evidence gaps could affect the opportunity; what is the next useful acquisition action?* The corresponding information hierarchy — **Fit** (operative homes, affordable housing, product mix, Buyer Fit) → **Planning** (operative planning position, milestone/decision, next milestone, blockers, planning readiness) → **Control/Acquisition** (owner, developer/controller, delivery status, transaction/availability evidence, acquisition readiness) → **Risks/Evidence Gaps** (conflicting metrics, missing documents, control uncertainty, commencement uncertainty) → **Next Action** (specific evidence to obtain, party to investigate, milestone to monitor) — depends on capability not yet built (Operative Scheme Intelligence, Acquisition Position Intelligence — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)), so it is recorded here as direction, not implemented now.
+
+The same reorientation applies to the Dashboard: its long-term job is increasingly to answer *what new opportunities match my buyer mandate; what changed; which opportunities need verification; which should I pursue; which planning decisions changed; which existing leads now look committed/closed; what needs action today* — not to lead with aggregate database/coverage metrics, which remain useful operationally but should not dominate the eventual acquisition experience.
 
 ## The Capability Stack
 
