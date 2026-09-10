@@ -111,7 +111,7 @@ def build_site_header(
 def build_headline_metrics(
     merged: dict, lapse: dict, decision_status: str | None, affordable_headline: dict,
     *, operative_total: int | None = None, operative_total_is_estimated: bool = False,
-    operative_total_basis: str | None = None,
+    operative_total_basis: str | None = None, operative_total_not_determined: bool = False,
 ) -> list[dict]:
     """Four consistent headline tiles (Part 3) - the same set, same order,
     on every Site Profile, never swapped per site depending on which
@@ -131,14 +131,23 @@ def build_headline_metrics(
     # Gate 2B-1: prefer the fact-level operative total (approved where
     # consent exists, else proposed) over aggregate_scheme_fields's
     # first-non-null `total_units_final`, which can be sourced from a
-    # non-substantive or superseded application. Fall back to `merged`
-    # only when reconciliation could not determine an operative figure.
+    # non-substantive or superseded application.
+    #   - operative_total set                -> use it.
+    #   - operative_total_not_determined     -> reconciliation RAN and
+    #     deliberately found no operative residential quantum (Gate 2B-1
+    #     Defect 2 - e.g. Stockport Rugby Club, only substantive
+    #     application withdrawn + specialist accommodation present). Show
+    #     the unresolved state; do NOT fall back to legacy `merged` facts.
+    #   - neither                            -> reconciliation could not
+    #     run at all; the legacy `merged` fallback stands.
     if operative_total is not None:
         total_display = _fmt_units(operative_total)
         if total_display and operative_total_is_estimated:
             total_display += " (est.)"
         if total_display and operative_total_basis:
             total_display += f" ({operative_total_basis})"
+    elif operative_total_not_determined:
+        total_display = None
     else:
         total = merged.get("total_units_final")
         total_display = _fmt_units(total)
@@ -598,10 +607,22 @@ def build_site_profile(
     elif _proposed.state == FACT_RESOLVED:
         operative_total, operative_total_basis = _proposed.value, "proposed"
         operative_total_is_estimated = _proposed.confidence == "low"
+    # Reconciliation ran (there were applications to resolve) and reached a
+    # deliberate not_determined for BOTH approved and proposed residential
+    # quantum -> the headline must reflect that, never fall back to
+    # aggregate_scheme_fields (Gate 2B-1 Defect 2). all_use_total is also
+    # not_determined whenever both of those are, so there is nothing to
+    # prefer over "not yet verified" for a residential "Total homes" tile.
+    operative_total_not_determined = (
+        bool(reconciliation.resolved_applications)
+        and _approved.state != FACT_RESOLVED
+        and _proposed.state != FACT_RESOLVED
+    )
     headline_metrics = build_headline_metrics(
         merged, lapse, decision_status, residential_mix["affordable_headline"],
         operative_total=operative_total, operative_total_is_estimated=operative_total_is_estimated,
         operative_total_basis=operative_total_basis,
+        operative_total_not_determined=operative_total_not_determined,
     )
 
     return {

@@ -150,6 +150,49 @@ def _proposal_norm(app: Application) -> str:
     return f"{app.proposal or ''} {app.application_type or ''}".lower()
 
 
+# EIA screening / scoping recognition (Gate 2B-1 Defect 1 remediation).
+# Deterministic only - explicit screening/scoping REQUEST/OPINION wording
+# (never the bare word "screening", which also appears in unrelated
+# condition-discharge filings such as "Television Reception Screening" /
+# "Window Screening"), plus the formal screening/scoping DECISION values a
+# substantive application never receives. Every phrase/value below is
+# confirmed present in production data. Not a new taxonomy, no inference,
+# no numeric parsing - it completes resolve_planning_role's existing EIA
+# recognition for phrasing variants (e.g. "Screening Request",
+# "EIA Not Required") the portal's own opinion-only classifier misses.
+_EIA_SCOPING_WORDING = (
+    "scoping opinion", "scoping request", "eia scoping",
+    "environmental impact assessment scoping", "request for a scoping opinion",
+    "request for scoping opinion", "request for a scoping",
+)
+_EIA_SCREENING_WORDING = (
+    "screening opinion", "screening request", "eia screening",
+    "environmental impact assessment screening", "request for a screening opinion",
+    "request for screening opinion", "request for a screening",
+)
+_EIA_SCOPING_DECISIONS = ("scoping opinion issued", "scoping opinion")
+_EIA_SCREENING_DECISIONS = (
+    "eia not required", "eia required",
+    "environmental impact assessment not required", "environmental impact assessment required",
+    "screening opinion issued", "environmental statement not required",
+    "environmental assessment not required",
+)
+
+
+def _eia_role(app: Application) -> str | None:
+    """ROLE_EIA_SCOPING / ROLE_EIA_SCREENING / None. Scoping is checked
+    first (its wording is the more specific of the two); an application
+    mentioning both is treated as scoping - it makes no difference to the
+    non-substantive guardrail, both are barred from substantive facts."""
+    text = _proposal_norm(app)
+    decision = (app.decision or "").strip().lower()
+    if any(w in text for w in _EIA_SCOPING_WORDING) or decision in _EIA_SCOPING_DECISIONS:
+        return ROLE_EIA_SCOPING
+    if any(w in text for w in _EIA_SCREENING_WORDING) or decision in _EIA_SCREENING_DECISIONS:
+        return ROLE_EIA_SCREENING
+    return None
+
+
 def resolve_planning_role(app: Application) -> str:
     """Deterministic planning role for one application, from evidence this
     platform already holds: the portal's own Application Type field
@@ -167,6 +210,14 @@ def resolve_planning_role(app: Application) -> str:
 
     # EIA screening vs scoping - distinct roles (scoping is a later,
     # more detailed pre-application step, but neither is ever substantive).
+    # Checked before every other branch: an EIA screening/scoping request
+    # must never fall through to `full`/`outline` on its residential
+    # wording (Gate 2B-1 Defect 1 - Pennington's Stables, DC/091435:
+    # "... Regulations 2017 Screening Request: Residential development of
+    # up to 68 dwellings", decision "EIA Not Required").
+    eia = _eia_role(app)
+    if eia is not None:
+        return eia
     category = classify_application_category(app.proposal)
     if category == "screening_or_scoping_opinion" or "screening opinion" in app_type or "scoping opinion" in app_type:
         if "scoping" in text:

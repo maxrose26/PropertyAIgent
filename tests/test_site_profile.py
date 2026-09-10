@@ -87,6 +87,71 @@ def test_headline_metrics_estimated_units_labelled_not_silently_shown_as_confirm
     assert "(est.)" in metrics[0]["value"]
 
 
+def test_headline_metrics_operative_total_prefers_reconciled_figure():
+    merged = {"total_units_final": 90}  # legacy first-non-null (e.g. from a superseded application)
+    affordable_headline = compute_affordable_headline(None)
+    metrics = build_headline_metrics(
+        merged, {"build_status": None}, None, affordable_headline, operative_total=76, operative_total_basis="approved"
+    )
+    assert metrics[0]["value"] == "76 (approved)"
+
+
+def test_headline_metrics_not_determined_does_not_fall_back_to_legacy_merged():
+    """Gate 2B-1 Defect 2 - Stockport Rugby Club: reconciliation RAN and
+    deliberately found no operative residential quantum (only substantive
+    application withdrawn + specialist accommodation). The tile must show
+    the unresolved state, never the legacy aggregate_scheme_fields 90."""
+    merged = {"total_units_final": 90}
+    affordable_headline = compute_affordable_headline(None)
+    metrics = build_headline_metrics(
+        merged, {"build_status": None}, None, affordable_headline, operative_total_not_determined=True
+    )
+    assert metrics[0]["value"] == "Not yet verified"
+
+
+def test_headline_metrics_legacy_fallback_only_when_reconciliation_could_not_run():
+    """When reconciliation produced nothing (operative_total_not_determined
+    is False), the legacy merged fallback still stands - no behaviour
+    change for that path."""
+    merged = {"total_units_final": 55}
+    affordable_headline = compute_affordable_headline(None)
+    metrics = build_headline_metrics(merged, {"build_status": None}, None, affordable_headline)
+    assert metrics[0]["value"] == "55"
+
+
+def test_build_site_profile_withdrawn_only_site_shows_not_verified_total(session):
+    """Gate 2B-1 Defect 2 end-to-end - a site whose only substantive
+    application is withdrawn (and carries a specialist component) must not
+    surface that application's unit figure as the headline Total homes."""
+    site = _make_site(session)
+    a = _make_app(
+        session, site.id, "DC/089037",
+        proposal="Hybrid application comprising full planning permission for a clubhouse and outline for "
+                 "residential development and a residential care facility",
+        status="Withdrawn", decision="Application Withdrawn", decision_issued_date="Tue 22 Oct 2024",
+        application_received="Tue 20 Jun 2023",
+    )
+    session.add(SchemeIntelligence(
+        application_id=a.id, total_units_final=90, affordable_units_final=45, affordable_percentage_final=50.0,
+        specialist_housing_type="residential care facility", core_intelligence_complete=True,
+    ))
+    session.commit()
+    apps = [a]
+    merged = aggregate_scheme_fields(apps)
+    rep_app = pick_representative_application(apps)
+    lapse = compute_lapse_status(site.applications, site)
+    view = build_site_profile(
+        session, site, apps, merged=merged, rep_app=rep_app, lapse=lapse, phase_breakdown=[],
+        decision_status=classify_decision_status(rep_app.decision, rep_app.status),
+    )
+    total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
+    assert total_tile["value"] == "Not yet verified"
+    rec = view["scheme_reconciliation"]
+    assert rec["approved_residential_units"]["state"] == "not_determined"
+    assert rec["proposed_residential_units"]["state"] == "not_determined"
+    assert rec["operative_planning_status"]["value"] == "Withdrawn"
+
+
 def test_headline_metrics_affordable_tile_sourced_from_single_scheme_version(session):
     """The Affordable homes tile must come from affordable_headline (one
     scheme version), never merged['affordable_units_final'] (which can be

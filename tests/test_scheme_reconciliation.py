@@ -29,6 +29,7 @@ from app.reporting.scheme_reconciliation import (
     FACT_NOT_DETERMINED,
     FACT_RESOLVED,
     ROLE_CONDITION_DISCHARGE,
+    ROLE_EIA_SCOPING,
     ROLE_EIA_SCREENING,
     ROLE_FULL,
     ROLE_NMC_AMENDMENT,
@@ -86,6 +87,72 @@ def test_planning_role_covers_the_lifecycle_vocabulary(session):
     for ref, (proposal, at, expected) in cases.items():
         a = _app(session, site.id, ref, proposal=proposal, application_type=at)
         assert resolve_planning_role(a) == expected, ref
+
+
+def test_eia_screening_recognised_from_screening_request_wording(session):
+    """Gate 2B-1 Defect 1 - Pennington's Stables (DC/091435): the proposal
+    says 'Screening Request', not 'Screening Opinion', so the portal's own
+    opinion-only classifier misses it and the residential wording would
+    otherwise make it `full`."""
+    site = _site(session)
+    a = _app(session, site.id, "DC/091435",
+             proposal="Town and Country Planning (Environmental Impact Assessment) Regulations 2017 "
+                      "Screening Request: Residential development of up to 68 dwellings",
+             decision="EIA Not Required", status="Decided")
+    assert resolve_planning_role(a) == ROLE_EIA_SCREENING
+
+
+def test_eia_screening_recognised_from_decision_value_alone(session):
+    """A residential-worded proposal with no screening/scoping wording, but
+    the formal decision 'EIA Not Required' - a value a substantive
+    application never receives."""
+    site = _site(session)
+    a = _app(session, site.id, "DC/097770",
+             proposal="Residential development for up to 250 dwellings with associated access, open space "
+                      "and biodiversity net gain",
+             decision="EIA Not Required", status="Decided")
+    assert resolve_planning_role(a) == ROLE_EIA_SCREENING
+
+
+def test_eia_scoping_recognised_and_distinguished_from_screening(session):
+    site = _site(session)
+    a = _app(session, site.id, "DC/086169",
+             proposal="Environmental Impact Assessment (EIA) Scoping Opinion request - Development of a "
+                      "24.12ha site comprising maximum 180 dwellings",
+             decision="Scoping Opinion", status="Decided")
+    assert resolve_planning_role(a) == ROLE_EIA_SCOPING
+
+
+def test_non_eia_screening_word_is_not_misclassified(session):
+    """The bare word 'screening' in an unrelated condition-discharge
+    filing ('Television Reception Screening') must NOT be read as EIA
+    screening."""
+    site = _site(session)
+    a = _app(session, site.id, "26/00082/PLCOND",
+             proposal="Full Discharge Of Condition 22 (Television Reception Screening) Of Planning "
+                      "Reference 24/00655/FUL",
+             application_type="Approval of details reserved by a condition", status="Awaiting decision")
+    assert resolve_planning_role(a) == ROLE_CONDITION_DISCHARGE
+
+
+def test_penningtons_stables_screening_barred_from_all_substantive_facts(session):
+    """The full Pennington's Stables shape: the screening request must not
+    supply an operative permission, planning status, or residential
+    quantum."""
+    site = _site(session)
+    scr = _app(session, site.id, "DC/091435",
+               proposal="Town and Country Planning (Environmental Impact Assessment) Regulations 2017 "
+                        "Screening Request: Residential development of up to 68 dwellings - Pennington's Stables",
+               decision="EIA Not Required", status="Decided", decision_issued_date="Fri 03 May 2024")
+    _intel(session, scr, total_units_final=68, core_intelligence_complete=True)
+    r = reconcile_scheme([scr])
+    assert [ra.role for ra in r.resolved_applications] == [ROLE_EIA_SCREENING]
+    assert r.lead_application.state == FACT_NOT_DETERMINED
+    assert r.operative_planning_status.state == FACT_NOT_DETERMINED
+    assert r.operative_permission.state == FACT_NOT_DETERMINED
+    assert r.residential.approved.state == FACT_NOT_DETERMINED
+    assert r.residential.proposed.state == FACT_NOT_DETERMINED
+    assert r.residential.residential_only.state == FACT_NOT_DETERMINED
 
 
 def test_portal_application_type_field_is_authoritative(session):
