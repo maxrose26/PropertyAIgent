@@ -533,11 +533,20 @@ def build_site_profile(
     # header and headline-metric boundary. Computed here (this module is
     # pure, no Streamlit) rather than passed in, since no existing caller
     # produces it.
-    reconciliation = reconcile_scheme(apps)
+    #
+    # site.applications (the raw relationship), NOT the display-filtered
+    # `apps` - load_site_applications drops condition-discharge and
+    # S73/variation filings as "not a qualifying scheme", but those are
+    # exactly the records the non-substantive guardrail and the
+    # S73-fact-specific safeguard need to see (same reasoning as
+    # compute_lapse_status / build_phase_breakdown, which also read the raw
+    # relationship - see app.ui.common.render_scheme_detail's own note).
+    all_apps = list(site.applications)
+    reconciliation = reconcile_scheme(all_apps)
     operative_app = None
     if reconciliation.lead_application.state == FACT_RESOLVED and reconciliation.lead_application.source is not None:
         operative_app = next(
-            (a for a in apps if a.id == reconciliation.lead_application.source.application_id), None
+            (a for a in all_apps if a.id == reconciliation.lead_application.source.application_id), None
         )
     # The application whose coherent scheme_intelligence record represents
     # the scheme for residential-mix / affordable-headline purposes - the
