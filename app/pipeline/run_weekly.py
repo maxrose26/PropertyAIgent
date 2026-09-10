@@ -91,7 +91,11 @@ from app.pipeline.lapse_tracking import (
 from app.pipeline.phase_tracking import build_phase_breakdown
 from app.reporting.scheme_summary import MIN_APPLICATIONS_FOR_SUMMARY, generate_scheme_summary
 from app.pipeline.site_linking import extract_parent_reference, link_application_to_site
-from app.pipeline.status_verification import build_opportunity_kinds_by_site, run_status_verification
+from app.pipeline.status_verification import (
+    build_opportunity_kinds_by_site,
+    run_status_verification,
+    status_verification_stage_should_run,
+)
 from app.scrapers.documents import discover_documents
 from app.scrapers.arcus_portal import fetch_application_by_reference as fetch_application_by_reference_arcus
 from app.scrapers.arcus_portal import fetch_application_detail as fetch_application_detail_arcus
@@ -2325,7 +2329,15 @@ def parse_args() -> argparse.Namespace:
         "--skip-status-verification", action="store_true",
         help="Gate 2B-0: skip the direct-reference status-verification stage for already-known pending "
              "applications. Deliberately independent of --skip-related-applications - see "
-             "app.pipeline.status_verification's own module docstring for why the two are separate stages.",
+             "app.pipeline.status_verification's own module docstring for why the two are separate stages. "
+             "Always wins if combined with --include-status-verification.",
+    )
+    parser.add_argument(
+        "--include-status-verification", action="store_true",
+        help="Gate 2B-0A production activation control: deliberately run the status-verification stage for "
+             "THIS invocation only, without setting PLANNING_STATUS_VERIFICATION_ENABLED platform-wide - "
+             "the approved controlled/manual Phase 2 rollout path. Ignored if --skip-status-verification "
+             "is also given. With neither this flag nor the environment variable, the stage stays dormant.",
     )
     parser.add_argument("--skip-related-applications", action="store_true")
     parser.add_argument("--skip-confirm-units", action="store_true")
@@ -2510,6 +2522,20 @@ def main() -> None:
             stage_link_sites(session, council)
             log_memory("stage_link_sites.after", council=council.code)
 
+        # Gate 2B-0A production activation control - the status-verification
+        # stage is fail-closed: deployed does NOT mean active. It runs this
+        # invocation only if explicitly activated (PLANNING_STATUS_
+        # VERIFICATION_ENABLED for the scheduled/default path, or
+        # --include-status-verification for a deliberate one-off controlled
+        # run), and never if --skip-status-verification was passed. See
+        # app.pipeline.status_verification.status_verification_stage_
+        # should_run for the exact precedence.
+        run_status_verification_stage = status_verification_stage_should_run(
+            skip_requested=args.skip_status_verification,
+            include_requested=args.include_status_verification,
+        )
+        run_related_applications_stage = not args.skip_related_applications
+
         # Gate 2B-0 ("Planning Freshness Remediation") - one Opportunity
         # Universe snapshot, built at most once per council run and shared
         # by both stages below (never rebuilt per-application, never
@@ -2520,10 +2546,10 @@ def main() -> None:
         # will actually run this invocation.
         opportunity_kinds_by_site = (
             build_opportunity_kinds_by_site(session)
-            if not (args.skip_status_verification and args.skip_related_applications) else None
+            if (run_status_verification_stage or run_related_applications_stage) else None
         )
 
-        if not args.skip_status_verification:
+        if run_status_verification_stage:
             if breaker.is_open:
                 print(f"[circuit] council={council.code} skipping stage_verify_application_status - circuit open")
             else:
@@ -2543,8 +2569,19 @@ def main() -> None:
                     session, page, council, breaker=breaker, opportunity_kinds_by_site=opportunity_kinds_by_site,
                 )
                 log_memory("stage_verify_application_status.after", council=council.code)
+        elif not args.skip_status_verification:
+            # Not an explicit skip - the Gate 2B-0A fail-closed activation
+            # boundary: the capability is deployed but dormant because
+            # neither PLANNING_STATUS_VERIFICATION_ENABLED nor
+            # --include-status-verification is set. Logged explicitly so a
+            # production run's own output shows the stage was deliberately
+            # not run, not silently missing.
+            print(
+                f"[status-verification] council={council.code} stage dormant - not activated "
+                f"(PLANNING_STATUS_VERIFICATION_ENABLED not set and --include-status-verification not passed)"
+            )
 
-        if not args.skip_related_applications:
+        if run_related_applications_stage:
             if breaker.is_open:
                 print(f"[circuit] council={council.code} skipping stage_fetch_related_applications - circuit open")
             else:

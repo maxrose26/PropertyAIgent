@@ -50,6 +50,7 @@ one score.
 from __future__ import annotations
 
 import datetime as dt
+import os
 from dataclasses import dataclass, field
 
 import requests
@@ -60,6 +61,65 @@ from app.config import CouncilConfig
 from app.db.models import Application, Document, SchemeIntelligence
 from app.pipeline.material_change import ApplicationState, MaterialChangeStats, detect_material_application_change
 from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker, is_portal_host_failure
+
+# --- Production activation boundary (Gate 2B-0A production activation control) ---
+# CAPABILITY DEPLOYMENT is deliberately separated from CAPABILITY
+# ACTIVATION: merging/deploying this stage must NOT, on its own, cause the
+# scheduled daily council pipeline to start re-verifying the broad
+# eligible application population. That only happens once an operator
+# explicitly turns it on.
+#
+# Fail-closed by design: the stage is DORMANT for any normal/scheduled
+# run unless PLANNING_STATUS_VERIFICATION_ENABLED is explicitly set to a
+# recognised truthy value. Absent, empty, or unrecognised => disabled.
+# Do NOT rely on operators remembering to pass --skip-status-verification
+# to cron commands - this environment flag is the boundary, and its
+# default (unset) is safe.
+#
+# A single deliberate, controlled run (the approved Phase 2 one-authority
+# rollout) does NOT need this flag set platform-wide - it uses
+# run_weekly's own --include-status-verification override for that one
+# invocation only. See status_verification_stage_should_run below for the
+# exact precedence.
+#
+# This is intentionally the smallest possible boundary: one environment
+# variable and one explicit CLI override. It is NOT a generic feature-flag
+# framework and NOT a database-backed flag - neither is warranted for a
+# single stage's activation.
+_STATUS_VERIFICATION_ENABLED_ENV = "PLANNING_STATUS_VERIFICATION_ENABLED"
+_ENABLED_TRUTHY_VALUES = frozenset({"1", "true", "yes", "on"})
+
+
+def planning_status_verification_enabled() -> bool:
+    """True only if PLANNING_STATUS_VERIFICATION_ENABLED is explicitly set
+    to one of 1/true/yes/on (case-insensitive, surrounding whitespace
+    ignored). Absent / empty / any other value => False (fail-closed)."""
+    raw = os.environ.get(_STATUS_VERIFICATION_ENABLED_ENV, "")
+    return raw.strip().lower() in _ENABLED_TRUTHY_VALUES
+
+
+def status_verification_stage_should_run(*, skip_requested: bool, include_requested: bool) -> bool:
+    """The one canonical precedence for whether run_weekly.main() runs the
+    status-verification stage this invocation (Gate 2B-0A production
+    activation control):
+
+    1. skip_requested (--skip-status-verification) -> always False. The
+       existing explicit-skip flag keeps its existing meaning and always
+       wins, for backwards compatibility.
+    2. otherwise, run only if the capability is actually activated:
+       planning_status_verification_enabled() (the scheduled/default
+       production path) OR include_requested (--include-status-
+       verification, the deliberate one-off controlled/manual path).
+    3. otherwise -> False. Deployed-but-dormant is the default state: the
+       flag is unset and no deliberate override was passed.
+
+    Circuit-breaker state is handled separately by the caller (an open
+    circuit still skips the stage even when this returns True), unchanged.
+    """
+    if skip_requested:
+        return False
+    return planning_status_verification_enabled() or include_requested
+
 
 # --- Outcome vocabulary (Section 8/16 of the approved spec) -----------------
 # Mirrors app.pipeline.evidence_refresh's own OUTCOME_* naming convention

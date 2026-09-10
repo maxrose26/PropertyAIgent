@@ -56,8 +56,10 @@ from app.pipeline.status_verification import (
     TIER_OTHER_OPPORTUNITY_PENDING,
     TIER_OTHER_PENDING,
     classify_verification_tier,
+    planning_status_verification_enabled,
     run_status_verification,
     select_verification_candidates,
+    status_verification_stage_should_run,
     verify_application_status,
 )
 from app.reporting.opportunity_universe import build_current_opportunity_universe, compute_opportunity_fingerprint
@@ -367,6 +369,89 @@ def test_run_status_verification_records_material_changes(session):
         stats = run_status_verification(session, MagicMock(), _council_config(), opportunity_kinds_by_site={})
     assert stats.material_changes == 1
     assert stats.outcome_counts[OUTCOME_VERIFIED_CHANGED] == 1
+
+
+# --- 4b. Production activation boundary (Gate 2B-0A production activation control) ---
+
+_ENABLE_ENV = "PLANNING_STATUS_VERIFICATION_ENABLED"
+
+
+def test_activation_flag_absent_is_fail_closed(monkeypatch):
+    monkeypatch.delenv(_ENABLE_ENV, raising=False)
+    assert planning_status_verification_enabled() is False
+
+
+def test_activation_flag_falsey_or_unrecognised_is_disabled(monkeypatch):
+    for value in ("false", "FALSE", "0", "no", "off", "", "   ", "disabled", "enabled", "true-ish"):
+        monkeypatch.setenv(_ENABLE_ENV, value)
+        assert planning_status_verification_enabled() is False, value
+
+
+def test_activation_flag_recognised_truthy_values_enable(monkeypatch):
+    for value in ("true", "TRUE", "True", "1", "yes", "on", "  on  "):
+        monkeypatch.setenv(_ENABLE_ENV, value)
+        assert planning_status_verification_enabled() is True, value
+
+
+def test_scheduled_default_execution_does_not_run_stage(monkeypatch):
+    """Requirements 1 & 2: with the environment variable absent or false,
+    the scheduled/default pipeline path must NOT run status verification."""
+    monkeypatch.delenv(_ENABLE_ENV, raising=False)
+    assert status_verification_stage_should_run(skip_requested=False, include_requested=False) is False
+    monkeypatch.setenv(_ENABLE_ENV, "false")
+    assert status_verification_stage_should_run(skip_requested=False, include_requested=False) is False
+
+
+def test_env_enabled_allows_scheduled_execution(monkeypatch):
+    """Requirement 3: with the environment variable true, the normal
+    pipeline may run status verification."""
+    monkeypatch.setenv(_ENABLE_ENV, "true")
+    assert status_verification_stage_should_run(skip_requested=False, include_requested=False) is True
+
+
+def test_explicit_cli_skip_always_wins(monkeypatch):
+    """Requirement 4: --skip-status-verification keeps its existing
+    meaning and suppresses the stage even when it is otherwise active."""
+    monkeypatch.setenv(_ENABLE_ENV, "true")
+    assert status_verification_stage_should_run(skip_requested=True, include_requested=False) is False
+    assert status_verification_stage_should_run(skip_requested=True, include_requested=True) is False
+
+
+def test_manual_include_runs_stage_without_platform_wide_activation(monkeypatch):
+    """Requirement 5: the deliberate controlled/manual path
+    (--include-status-verification) runs the stage for that one invocation
+    without the environment flag being set - so it can never turn on
+    scheduled platform-wide execution as a side effect."""
+    monkeypatch.delenv(_ENABLE_ENV, raising=False)
+    assert status_verification_stage_should_run(skip_requested=False, include_requested=True) is True
+    assert planning_status_verification_enabled() is False  # environment untouched
+
+
+def test_daily_council_command_stays_dormant_and_unrelated_flags_unchanged(session, monkeypatch):
+    """Requirement 6 + Sections 5/11: the scheduled daily-council command
+    (scripts.run_daily_councils.run_one_council) never opts into the
+    manual override, and its existing unrelated flags are unchanged - so
+    with the environment variable at its production default (absent) the
+    new stage is dormant while every other daily stage is untouched."""
+    from scripts import run_daily_councils
+
+    captured: dict = {}
+
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+        captured["command"] = list(command)
+        return 0
+
+    monkeypatch.setattr(run_daily_councils, "_run_council_subprocess", _fake_subprocess)
+    monkeypatch.delenv(_ENABLE_ENV, raising=False)
+
+    run_daily_councils.run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="scheduled")
+
+    cmd = captured["command"]
+    assert "app.pipeline.run_weekly" in cmd
+    assert "--include-status-verification" not in cmd
+    assert "--skip-extraction" in cmd and "--skip-scheme-summary" in cmd  # unrelated daily behaviour unchanged
+    # And in that exact environment, the gate evaluates to dormant:
+    assert status_verification_stage_should_run(skip_requested=False, include_requested=False) is False
 
 
 # --- 5. Monitoring / fingerprint safety --------------------------------------
