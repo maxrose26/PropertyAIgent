@@ -36,6 +36,7 @@ from app.pipeline.lapse_tracking import (
 )
 from app.policy.site_view import build_site_policy_intelligence
 from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, reconcile_scheme
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_site_visual_evidence
 
@@ -107,7 +108,11 @@ def build_site_header(
 # --- Headline metrics -----------------------------------------------------
 
 
-def build_headline_metrics(merged: dict, lapse: dict, decision_status: str | None, affordable_headline: dict) -> list[dict]:
+def build_headline_metrics(
+    merged: dict, lapse: dict, decision_status: str | None, affordable_headline: dict,
+    *, operative_total: int | None = None, operative_total_is_estimated: bool = False,
+    operative_total_basis: str | None = None,
+) -> list[dict]:
     """Four consistent headline tiles (Part 3) - the same set, same order,
     on every Site Profile, never swapped per site depending on which
     evidence happens to be available. "Evidence" is deliberately not one
@@ -123,10 +128,22 @@ def build_headline_metrics(merged: dict, lapse: dict, decision_status: str | Non
     they're a percentage of must never come from two different scheme
     versions (Part 5's "never mix affordable units from one scheme
     version with total homes from another")."""
-    total = merged.get("total_units_final")
-    total_display = _fmt_units(total)
-    if total_display and merged.get("total_units_is_estimated"):
-        total_display += " (est.)"
+    # Gate 2B-1: prefer the fact-level operative total (approved where
+    # consent exists, else proposed) over aggregate_scheme_fields's
+    # first-non-null `total_units_final`, which can be sourced from a
+    # non-substantive or superseded application. Fall back to `merged`
+    # only when reconciliation could not determine an operative figure.
+    if operative_total is not None:
+        total_display = _fmt_units(operative_total)
+        if total_display and operative_total_is_estimated:
+            total_display += " (est.)"
+        if total_display and operative_total_basis:
+            total_display += f" ({operative_total_basis})"
+    else:
+        total = merged.get("total_units_final")
+        total_display = _fmt_units(total)
+        if total_display and merged.get("total_units_is_estimated"):
+            total_display += " (est.)"
 
     affordable_value, affordable_caption = format_affordable_tile(affordable_headline)
 
@@ -509,13 +526,41 @@ def build_site_profile(
     council_supply = _council_five_year_supply(session, site.council_code, policy_rows)
     has_missing = has_significant_missing_evidence(merged, lapse, policy_rows)
 
+    # Gate 2B-1 - deterministic fact-level reconciliation over this Site's
+    # applications. Replaces "primary_reference / planning_status_label =
+    # whatever pick_representative_application picked" (which had no
+    # awareness of application role, decided state or supersession) at the
+    # header and headline-metric boundary. Computed here (this module is
+    # pure, no Streamlit) rather than passed in, since no existing caller
+    # produces it.
+    reconciliation = reconcile_scheme(apps)
+    operative_app = None
+    if reconciliation.lead_application.state == FACT_RESOLVED and reconciliation.lead_application.source is not None:
+        operative_app = next(
+            (a for a in apps if a.id == reconciliation.lead_application.source.application_id), None
+        )
+    # The application whose coherent scheme_intelligence record represents
+    # the scheme for residential-mix / affordable-headline purposes - the
+    # reconciled operative application, not pick_representative_application's
+    # "most complete + most recent" pick. Falls back to rep_app only when
+    # reconciliation could not identify a substantive operative application.
+    mix_rep_app = operative_app or rep_app
+
     header = build_site_header(
         site=site, merged=merged, lapse=lapse, decision_status=decision_status,
         policy_rows=policy_rows, last_ai_summary_at=ai_summary["generated_at"],
         latest_visual_evidence_at=latest_visual_evidence_at,
     )
-    header["primary_reference"] = rep_app.reference if rep_app else None
-    header["planning_status_label"] = rep_app.status if rep_app else None
+    _status = reconciliation.operative_planning_status
+    _perm = reconciliation.operative_permission
+    _lead = reconciliation.lead_application
+    header["primary_reference"] = (
+        _lead.value if _lead.state == FACT_RESOLVED else (rep_app.reference if rep_app else None)
+    )
+    header["planning_status_label"] = (
+        str(_status.value) if _status.state == FACT_RESOLVED else (rep_app.status if rep_app else None)
+    )
+    header["operative_permission_reference"] = _perm.value if _perm.state == FACT_RESOLVED else None
 
     opportunity_position = build_opportunity_position(
         merged=merged, lapse=lapse, phase_breakdown=phase_breakdown, policy_rows=policy_rows,
@@ -527,8 +572,28 @@ def build_site_profile(
         latest_visual_evidence_at, visual_evidence_count,
     )
     evidence_gaps = build_evidence_gaps(merged, lapse, policy_rows, visual_evidence, ai_summary)
-    residential_mix = build_residential_mix(site, apps, rep_app=rep_app)
-    headline_metrics = build_headline_metrics(merged, lapse, decision_status, residential_mix["affordable_headline"])
+    residential_mix = build_residential_mix(site, apps, rep_app=mix_rep_app)
+
+    # Operative total for the "Total homes" headline tile: approved where a
+    # consent exists, else the current proposed figure. Reconciliation
+    # returns not_determined (not a guess) when no substantive application
+    # supplies one - in which case build_headline_metrics falls back to
+    # `merged`.
+    _approved = reconciliation.residential.approved
+    _proposed = reconciliation.residential.proposed
+    operative_total = None
+    operative_total_basis = None
+    operative_total_is_estimated = False
+    if _approved.state == FACT_RESOLVED:
+        operative_total, operative_total_basis = _approved.value, "approved"
+    elif _proposed.state == FACT_RESOLVED:
+        operative_total, operative_total_basis = _proposed.value, "proposed"
+        operative_total_is_estimated = _proposed.confidence == "low"
+    headline_metrics = build_headline_metrics(
+        merged, lapse, decision_status, residential_mix["affordable_headline"],
+        operative_total=operative_total, operative_total_is_estimated=operative_total_is_estimated,
+        operative_total_basis=operative_total_basis,
+    )
 
     return {
         "header": header,
@@ -541,4 +606,64 @@ def build_site_profile(
         "evidence_gaps": evidence_gaps,
         "policy_rows": policy_rows,
         "residential_mix": residential_mix,
+        "scheme_reconciliation": _reconciliation_view(reconciliation),
+    }
+
+
+def _reconciliation_view(r) -> dict:
+    """Compact, presentation-ready summary of the Gate 2B-1 reconciliation
+    - the operative fact selections, their provenance/reason, and any
+    unresolved same-scope conflicts. A read-only trail the UI can surface;
+    a fuller operative-facts layer is Gate 2B-2."""
+    def fact(f) -> dict:
+        return {
+            "state": f.state, "value": f.value, "confidence": f.confidence, "reason": f.reason,
+            "source_reference": f.source.application_reference if f.source else None,
+            "source_role": f.source.planning_role if f.source else None,
+            "conflicts": [
+                {"reference": p.application_reference, "value": p.value, "role": p.planning_role,
+                 "scope": p.scope_label}
+                for p in f.conflicts
+            ],
+        }
+
+    ah = r.affordable_housing
+    return {
+        "lead_application": fact(r.lead_application),
+        "operative_planning_status": fact(r.operative_planning_status),
+        "operative_permission": fact(r.operative_permission),
+        "approved_residential_units": fact(r.residential.approved),
+        "proposed_residential_units": fact(r.residential.proposed),
+        "residential_only_units": fact(r.residential.residential_only),
+        "all_use_total_units": fact(r.residential.all_use_total),
+        "superseded_unit_figures": [
+            {"reference": p.application_reference, "value": p.value, "role": p.planning_role}
+            for p in r.residential.superseded
+        ],
+        "unit_mix": fact(r.unit_mix),
+        "affordable_housing": {
+            "whole_site": _ah_position(ah.whole_site),
+            "phases": [_ah_position(p) for p in ah.phases],
+            "conflicts": [
+                {"scope": c.scope_label,
+                 "positions": [_ah_position(p) for p in c.positions]}
+                for c in ah.conflicts
+            ],
+        },
+        "roles": [
+            {"reference": ra.reference, "role": ra.role, "decided_state": ra.decided_state,
+             "scope": ra.scope_label}
+            for ra in r.resolved_applications
+        ],
+        "scope_note": r.scope_note,
+    }
+
+
+def _ah_position(p) -> dict | None:
+    if p is None:
+        return None
+    return {
+        "reference": p.application_reference, "scope": p.scope_label, "scope_type": p.scope_type,
+        "percentage": p.percentage, "units": p.units, "tenure": p.tenure, "status": p.status,
+        "notes": p.notes,
     }

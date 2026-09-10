@@ -190,6 +190,17 @@ def _classify_planning_state(decision: str | None, status: str | None) -> str:
     return STATE_NOT_YET_DECIDED
 
 
+def classify_planning_state(decision: str | None, status: str | None) -> str:
+    """Public entry point to this module's canonical planning-state
+    classifier (see `_classify_planning_state` above for the full rationale
+    behind every branch). Returns one of the STATE_* constants. Added for
+    Gate 2B-1 (app.pipeline.scheme_reconciliation), which needs the same
+    richer state set - a distinct concern from B1's old-vs-new comparison,
+    so it consumes the classifier directly rather than a MaterialChangeResult.
+    The classification logic itself stays defined in exactly one place."""
+    return _classify_planning_state(decision, status)
+
+
 @dataclass(frozen=True)
 class ApplicationState:
     """The narrow slice of Application state B1 ever compares old-vs-new
