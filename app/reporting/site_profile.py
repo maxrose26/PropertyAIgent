@@ -572,12 +572,27 @@ def build_site_profile(
     _status = reconciliation.operative_planning_status
     _perm = reconciliation.operative_permission
     _lead = reconciliation.lead_application
+    _reconciliation_ran = bool(reconciliation.resolved_applications)
+    # primary_reference is a navigational identifier, not a substantive
+    # scheme fact - keep the rep_app fallback so a site whose only record
+    # is (e.g.) an EIA screening request still has a reference to open.
     header["primary_reference"] = (
         _lead.value if _lead.state == FACT_RESOLVED else (rep_app.reference if rep_app else None)
     )
-    header["planning_status_label"] = (
-        str(_status.value) if _status.state == FACT_RESOLVED else (rep_app.status if rep_app else None)
-    )
+    # planning_status_label IS a substantive scheme fact. When
+    # reconciliation ran and deliberately returned not_determined (e.g. the
+    # only application is an EIA screening request, or all substantive
+    # applications are withdrawn), do NOT fall back to rep_app.status - a
+    # screening request's own "Decided" must never read as the scheme's
+    # planning status (Gate 2B-1 Defect 2, same principle as the headline
+    # total). The legacy fallback stands only if reconciliation could not
+    # run at all.
+    if _status.state == FACT_RESOLVED:
+        header["planning_status_label"] = str(_status.value)
+    elif _reconciliation_ran:
+        header["planning_status_label"] = None
+    else:
+        header["planning_status_label"] = rep_app.status if rep_app else None
     header["operative_permission_reference"] = _perm.value if _perm.state == FACT_RESOLVED else None
 
     opportunity_position = build_opportunity_position(

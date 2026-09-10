@@ -150,6 +150,41 @@ def test_build_site_profile_withdrawn_only_site_shows_not_verified_total(session
     assert rec["approved_residential_units"]["state"] == "not_determined"
     assert rec["proposed_residential_units"]["state"] == "not_determined"
     assert rec["operative_planning_status"]["value"] == "Withdrawn"
+    # a withdrawn scheme still HAS a resolved planning status
+    assert view["header"]["planning_status_label"] == "Withdrawn"
+
+
+def test_build_site_profile_eia_screening_only_site_has_no_substantive_headline(session):
+    """Gate 2B-1 Defect 1/2 end-to-end - Pennington's Stables shape: the
+    only record is an EIA screening request. It must not supply an
+    operative planning status, permission, or unit headline; its own
+    "Decided" status must never read as the scheme's planning status."""
+    site = _make_site(session)
+    a = _make_app(
+        session, site.id, "DC/091435",
+        proposal="Town and Country Planning (Environmental Impact Assessment) Regulations 2017 Screening "
+                 "Request: Residential development of up to 68 dwellings",
+        status="Decided", decision="EIA Not Required", decision_issued_date="Fri 03 May 2024",
+        application_received="Fri 08 Mar 2024",
+    )
+    session.add(SchemeIntelligence(application_id=a.id, total_units_final=68, core_intelligence_complete=True))
+    session.commit()
+    apps = [a]
+    merged = aggregate_scheme_fields(apps)
+    rep_app = pick_representative_application(apps)
+    lapse = compute_lapse_status(site.applications, site)
+    view = build_site_profile(
+        session, site, apps, merged=merged, rep_app=rep_app, lapse=lapse, phase_breakdown=[],
+        decision_status=classify_decision_status(rep_app.decision, rep_app.status),
+    )
+    total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
+    assert total_tile["value"] == "Not yet verified"
+    assert view["header"]["planning_status_label"] is None  # NOT "Decided"
+    assert view["header"]["operative_permission_reference"] is None
+    rec = view["scheme_reconciliation"]
+    assert rec["roles"][0]["role"] == "eia_screening"
+    assert rec["operative_planning_status"]["state"] == "not_determined"
+    assert rec["proposed_residential_units"]["state"] == "not_determined"
 
 
 def test_headline_metrics_affordable_tile_sourced_from_single_scheme_version(session):
