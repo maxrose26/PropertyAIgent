@@ -1715,6 +1715,43 @@ class Application(Base):
     # own docstring for the exact atomic-replacement contract.
     intelligence_evidence_processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Gate 2B-0 ("Planning Freshness Remediation") - the timestamp of the
+    # most recent successful DIRECT retrieval AND parsing of this
+    # application's own authoritative portal record, via a targeted
+    # exact-reference lookup (app.pipeline.status_verification), never a
+    # date-range search. Deliberately a NEW field, not a repurposing of an
+    # existing one - the Gate 2B-A investigation confirmed none of the
+    # existing timestamps mean this:
+    #   - last_seen_at advances on ANY ORM UPDATE to this row (onupdate=
+    #     utcnow, below), for any reason, and is proven NOT to correlate
+    #     with a genuine portal re-check (confirmed real cases: 173 pending
+    #     applications >6 months old, zero refresh activity, yet last_
+    #     seen_at recency of 29-62 days from unrelated writes).
+    #   - related_search_checked_at means "searched for OTHER applications
+    #     citing this one", a citation search, never a re-fetch of this
+    #     application's own detail page.
+    #   - evidence_refresh_last_checked_at means "checked for new
+    #     DOCUMENTS" (app.pipeline.evidence_refresh.refresh_material_
+    #     evidence is explicitly AI-free and explicitly never mutates
+    #     status/decision from document content, per that function's own
+    #     docstring) - a different portal call entirely.
+    # NULL means exactly "no successful direct status verification has
+    # ever been recorded by this mechanism" - never fabricated, never
+    # backfilled for existing rows (see scripts.migrate_schema - this is a
+    # plain additive column, every pre-existing row starts and stays NULL
+    # until genuinely verified). Set ONLY by app.pipeline.status_
+    # verification's own verify_application_status, ONLY on a completed
+    # direct retrieval (VERIFIED_UNCHANGED or VERIFIED_CHANGED) - never on
+    # APPLICATION_NOT_FOUND, PORTAL_UNAVAILABLE, or FETCH_FAILED (see that
+    # module's own OUTCOME_* semantics), and never touched by related-
+    # application discovery, document refresh, or an unrelated field
+    # update elsewhere. Deliberately NOT included in app.reporting.
+    # opportunity_universe's fingerprint_fields (Gate 2B-0 Section 17/25's
+    # own explicit instruction: a verification EVENT is not a planning
+    # CHANGE, and must never make an unchanged re-check look like
+    # MATERIALLY_CHANGED to Gate 1/1C's monitoring).
+    status_verified_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])
     suggested_site: Mapped["Site | None"] = relationship(foreign_keys=[suggested_site_id])
