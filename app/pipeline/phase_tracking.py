@@ -183,6 +183,84 @@ def _phase_unit_count(apps: list[Application]) -> dict:
     return {"unit_count": None, "unit_count_source": None, "unit_count_application": None}
 
 
+def is_material_development_parcel(applications: list[Application], *, threshold: int = 10) -> bool:
+    """Gate 2B-2A - the deterministic test for whether a named "plot"
+    group represents a material development parcel (a peer acquisition-
+    level scope) rather than an individual dwelling plot (which must not
+    become one). True only if a role-eligible application scoped to
+    exactly this ONE named group independently states its own
+    qualifying-scale (>= threshold - the same qualifying bar app.
+    scrapers.unit_filter applies platform-wide, default 10) residential
+    unit count - reusing _phase_unit_count's own EXCLUDE_CATEGORIES +
+    single-label discipline completely unchanged, never a new inference.
+
+    Read-only production investigation (Gate 2B-2A) confirmed the plot
+    token's own shape cannot safely distinguish the two cases: genuine
+    individual-dwelling-plot citations ("plots 45, 46, 49 and 67" gas-
+    validation discharges against Wigan A/12/76665; "plots 212, 213, 215,
+    236..." roof-type non-material amendments against Stockport
+    DC/060928) and a real development-parcel use of the SAME word
+    ("Plots 1, 2 and 3" in Stockport DC/094376's own Hybrid full-
+    permission application) both use bare small numbers as their token -
+    no regex over the token itself can tell them apart. What DOES
+    distinguish them, using only evidence already extracted: a genuine
+    development parcel's own single-plot-labelled application typically
+    states a real, qualifying-scale unit count for that one parcel; an
+    individual dwelling-plot citation (almost always a condition-
+    discharge or non-material-amendment filing, i.e. already excluded as
+    a unit-count source by _phase_unit_count's own EXCLUDE_CATEGORIES
+    filter, and/or naming several plots at once, already excluded by its
+    single-label filter) never does. No LLM, no token-shape guessing."""
+    result = _phase_unit_count(applications)
+    return result["unit_count"] is not None and result["unit_count"] >= threshold
+
+
+def group_applications_by_operative_scope(
+    applications: list[Application], *, material_parcel_unit_threshold: int = 10,
+) -> dict[tuple[str, str], list[Application]]:
+    """Gate 2B-2A - the SAME grouping as group_applications_by_phase,
+    except a named "plot" group is kept as its own peer acquisition-level
+    scope ONLY if is_material_development_parcel confirms it - otherwise
+    its applications are folded into the unphased/whole-site bucket,
+    exactly as if no plot had been named at all.
+
+    This is a PRESENTATION/RESOLUTION rule for acquisition-level operative
+    scope only (app.reporting.scheme_reconciliation, app.reporting.
+    affordable_housing_scope) - it never deletes an application from the
+    result and does NOT change group_applications_by_phase or
+    build_phase_breakdown themselves, whose existing "Phase Breakdown" UI
+    legitimately continues to show individual-plot filing activity as
+    detailed planning evidence (Gate 2B-2A Section 13: "individual dwelling
+    plots may remain relevant as underlying application evidence,
+    provenance, detailed planning activity... this is a resolution/
+    presentation rule, not destructive data cleansing").
+
+    Root cause this fixes: read-only production investigation confirmed
+    "plot" labels are overwhelmingly individual dwelling-plot citations in
+    condition-discharge/non-material-amendment filings - each would
+    otherwise become its own "peer" acquisition scope/affordable-housing
+    position for a single house, fragmenting whole-site/phase intelligence
+    into meaningless slivers (confirmed real defect: app.reporting.
+    affordable_housing_scope previously gave a 1-unit "Plot 5" its own AH
+    scope entry - see that module's own Gate 2B-2A regression test)."""
+    groups = group_applications_by_phase(applications)
+    resolved: dict[tuple[str, str], list[Application]] = {}
+    unphased_key = (UNPHASED_LABEL, "phase")
+    for key, apps in groups.items():
+        code, kind = key
+        if (
+            kind == "plot" and code != UNPHASED_LABEL
+            and not is_material_development_parcel(apps, threshold=material_parcel_unit_threshold)
+        ):
+            target = resolved.setdefault(unphased_key, [])
+        else:
+            target = resolved.setdefault(key, [])
+        for a in apps:
+            if a not in target:
+                target.append(a)
+    return resolved
+
+
 def build_phase_breakdown(applications: list[Application]) -> list[dict]:
     """One row per detected phase/plot, sorted with the unphased bucket
     last. Returns [] when the site has no more than one group - a single

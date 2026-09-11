@@ -36,7 +36,7 @@ from app.pipeline.lapse_tracking import (
 )
 from app.policy.site_view import build_site_policy_intelligence
 from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
-from app.reporting.scheme_reconciliation import FACT_RESOLVED, reconcile_scheme
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts, resolve_canonical_decision_status
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_site_visual_evidence
 
@@ -551,17 +551,39 @@ def build_site_profile(
     # compute_lapse_status / build_phase_breakdown, which also read the raw
     # relationship - see app.ui.common.render_scheme_detail's own note).
     all_apps = list(site.applications)
-    reconciliation = reconcile_scheme(all_apps)
-    operative_app = None
-    if reconciliation.lead_application.state == FACT_RESOLVED and reconciliation.lead_application.source is not None:
-        operative_app = next(
-            (a for a in all_apps if a.id == reconciliation.lead_application.source.application_id), None
-        )
+    facts = build_operative_planning_facts(all_apps)
+    consented = facts.consented_position
+    active_positions = facts.active_positions
+    _reconciliation_ran = bool(facts.resolved_applications)
+
+    # Gate 2B-2A Section 20 (Stage A) - the "Decision status" headline tile
+    # and the Planning Position tab's own decision-status line both read
+    # this SAME `decision_status` value; overriding it here, once, with the
+    # reconciled answer is what stops this page from saying "Permission
+    # granted" in one place and "Awaiting decision" in another for the
+    # SAME site (the Former Burnage Cricket Club regression - the caller's
+    # unreconciled decision_status parameter previously came from
+    # pick_representative_application's pick, e.g. a newer condition-
+    # discharge filing with no decision of its own, while other reconciled
+    # facts elsewhere on the page already reflected the granted permission).
+    # The caller-supplied `decision_status` is used only as the final
+    # fallback, when reconciliation could not run at all.
+    decision_status = resolve_canonical_decision_status(consented, active_positions, _reconciliation_ran, decision_status)
+
     # The application whose coherent scheme_intelligence record represents
     # the scheme for residential-mix / affordable-headline purposes - the
-    # reconciled operative application, not pick_representative_application's
-    # "most complete + most recent" pick. Falls back to rep_app only when
-    # reconciliation could not identify a substantive operative application.
+    # CONSENTED position if one exists, else the first ACTIVE position (an
+    # arbitrary but stable choice among possibly several - see
+    # header["planning_status_label"] below for how multiple active
+    # positions are represented honestly rather than silently reduced to
+    # one). Falls back to rep_app only when reconciliation identified
+    # neither a consented nor any active operative application.
+    operative_app = None
+    if consented.reference.state == FACT_RESOLVED and consented.reference.source is not None:
+        operative_app = next((a for a in all_apps if a.id == consented.reference.source.application_id), None)
+    elif active_positions and active_positions[0].reference.state == FACT_RESOLVED:
+        src = active_positions[0].reference.source
+        operative_app = next((a for a in all_apps if a.id == src.application_id), None) if src else None
     mix_rep_app = operative_app or rep_app
 
     header = build_site_header(
@@ -569,31 +591,37 @@ def build_site_profile(
         policy_rows=policy_rows, last_ai_summary_at=ai_summary["generated_at"],
         latest_visual_evidence_at=latest_visual_evidence_at,
     )
-    _status = reconciliation.operative_planning_status
-    _perm = reconciliation.operative_permission
-    _lead = reconciliation.lead_application
-    _reconciliation_ran = bool(reconciliation.resolved_applications)
     # primary_reference is a navigational identifier, not a substantive
     # scheme fact - keep the rep_app fallback so a site whose only record
     # is (e.g.) an EIA screening request still has a reference to open.
-    header["primary_reference"] = (
-        _lead.value if _lead.state == FACT_RESOLVED else (rep_app.reference if rep_app else None)
-    )
-    # planning_status_label IS a substantive scheme fact. When
-    # reconciliation ran and deliberately returned not_determined (e.g. the
-    # only application is an EIA screening request, or all substantive
-    # applications are withdrawn), do NOT fall back to rep_app.status - a
-    # screening request's own "Decided" must never read as the scheme's
-    # planning status (Gate 2B-1 Defect 2, same principle as the headline
-    # total). The legacy fallback stands only if reconciliation could not
-    # run at all.
-    if _status.state == FACT_RESOLVED:
-        header["planning_status_label"] = str(_status.value)
+    if consented.reference.state == FACT_RESOLVED:
+        header["primary_reference"] = consented.reference.value
+    elif active_positions and active_positions[0].reference.state == FACT_RESOLVED:
+        header["primary_reference"] = active_positions[0].reference.value
+    else:
+        header["primary_reference"] = rep_app.reference if rep_app else None
+    # planning_status_label IS a substantive scheme fact - CONSENTED vs
+    # ACTIVE are never collapsed (Gate 2B-2A Sections 5-7). A single clear
+    # active position is shown as-is; several simultaneous active
+    # positions are represented honestly as a count rather than one of
+    # them being silently picked as "the" status. When reconciliation ran
+    # and deliberately found neither a consented nor an active position
+    # (e.g. the only application is an EIA screening request, or every
+    # substantive application is withdrawn/refused), the label is None -
+    # a screening request's own "Decided" must never read as the scheme's
+    # planning status. The legacy rep_app fallback stands only if
+    # reconciliation could not run at all.
+    if consented.planning_status.state == FACT_RESOLVED:
+        header["planning_status_label"] = str(consented.planning_status.value)
+    elif len(active_positions) == 1 and active_positions[0].planning_status.state == FACT_RESOLVED:
+        header["planning_status_label"] = str(active_positions[0].planning_status.value)
+    elif len(active_positions) > 1:
+        header["planning_status_label"] = f"{len(active_positions)} active planning proposals"
     elif _reconciliation_ran:
         header["planning_status_label"] = None
     else:
         header["planning_status_label"] = rep_app.status if rep_app else None
-    header["operative_permission_reference"] = _perm.value if _perm.state == FACT_RESOLVED else None
+    header["operative_permission_reference"] = consented.reference.value if consented.reference.state == FACT_RESOLVED else None
 
     opportunity_position = build_opportunity_position(
         merged=merged, lapse=lapse, phase_breakdown=phase_breakdown, policy_rows=policy_rows,
@@ -607,32 +635,23 @@ def build_site_profile(
     evidence_gaps = build_evidence_gaps(merged, lapse, policy_rows, visual_evidence, ai_summary)
     residential_mix = build_residential_mix(site, apps, rep_app=mix_rep_app)
 
-    # Operative total for the "Total homes" headline tile: approved where a
-    # consent exists, else the current proposed figure. Reconciliation
-    # returns not_determined (not a guess) when no substantive application
-    # supplies one - in which case build_headline_metrics falls back to
-    # `merged`.
-    _approved = reconciliation.residential.approved
-    _proposed = reconciliation.residential.proposed
+    # Operative total for the "Total homes" headline tile: the CONSENTED
+    # approved figure where a consent exists; otherwise, ONLY when there is
+    # exactly one active position (several active positions must never be
+    # silently reduced to a single headline number - Section 7), that
+    # position's proposed figure. Reconciliation returns not_determined
+    # (never a guess) when neither exists - the headline must reflect that,
+    # never fall back to aggregate_scheme_fields (Gate 2B-1 Defect 2).
     operative_total = None
     operative_total_basis = None
     operative_total_is_estimated = False
-    if _approved.state == FACT_RESOLVED:
-        operative_total, operative_total_basis = _approved.value, "approved"
-    elif _proposed.state == FACT_RESOLVED:
-        operative_total, operative_total_basis = _proposed.value, "proposed"
-        operative_total_is_estimated = _proposed.confidence == "low"
-    # Reconciliation ran (there were applications to resolve) and reached a
-    # deliberate not_determined for BOTH approved and proposed residential
-    # quantum -> the headline must reflect that, never fall back to
-    # aggregate_scheme_fields (Gate 2B-1 Defect 2). all_use_total is also
-    # not_determined whenever both of those are, so there is nothing to
-    # prefer over "not yet verified" for a residential "Total homes" tile.
-    operative_total_not_determined = (
-        bool(reconciliation.resolved_applications)
-        and _approved.state != FACT_RESOLVED
-        and _proposed.state != FACT_RESOLVED
-    )
+    if consented.approved_units.state == FACT_RESOLVED:
+        operative_total, operative_total_basis = consented.approved_units.value, "approved"
+    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
+        operative_total = active_positions[0].proposed_units.value
+        operative_total_basis = "proposed"
+        operative_total_is_estimated = active_positions[0].proposed_units.confidence == "low"
+    operative_total_not_determined = bool(_reconciliation_ran and operative_total is None)
     headline_metrics = build_headline_metrics(
         merged, lapse, decision_status, residential_mix["affordable_headline"],
         operative_total=operative_total, operative_total_is_estimated=operative_total_is_estimated,
@@ -651,44 +670,68 @@ def build_site_profile(
         "evidence_gaps": evidence_gaps,
         "policy_rows": policy_rows,
         "residential_mix": residential_mix,
-        "scheme_reconciliation": _reconciliation_view(reconciliation),
+        "scheme_reconciliation": _reconciliation_view(facts),
     }
 
 
-def _reconciliation_view(r) -> dict:
-    """Compact, presentation-ready summary of the Gate 2B-1 reconciliation
-    - the operative fact selections, their provenance/reason, and any
-    unresolved same-scope conflicts. A read-only trail the UI can surface;
-    a fuller operative-facts layer is Gate 2B-2."""
-    def fact(f) -> dict:
-        return {
-            "state": f.state, "value": f.value, "confidence": f.confidence, "reason": f.reason,
-            "source_reference": f.source.application_reference if f.source else None,
-            "source_role": f.source.planning_role if f.source else None,
-            "conflicts": [
-                {"reference": p.application_reference, "value": p.value, "role": p.planning_role,
-                 "scope": p.scope_label}
-                for p in f.conflicts
-            ],
-        }
-
-    ah = r.affordable_housing
+def _fact_view(f) -> dict:
     return {
-        "lead_application": fact(r.lead_application),
-        "operative_planning_status": fact(r.operative_planning_status),
-        "operative_permission": fact(r.operative_permission),
-        "approved_residential_units": fact(r.residential.approved),
-        "proposed_residential_units": fact(r.residential.proposed),
-        "residential_only_units": fact(r.residential.residential_only),
-        "all_use_total_units": fact(r.residential.all_use_total),
-        "superseded_unit_figures": [
-            {"reference": p.application_reference, "value": p.value, "role": p.planning_role}
-            for p in r.residential.superseded
+        "state": f.state, "value": f.value, "confidence": f.confidence, "reason": f.reason,
+        "source_reference": f.source.application_reference if f.source else None,
+        "source_role": f.source.planning_role if f.source else None,
+        # Gate 2B-2A - relationship confidence and evidence freshness, kept
+        # explicitly distinct from `confidence` (evidence confidence) above
+        # (Section 18) - never combined into one score.
+        "relationship_level": f.source.relationship_level if f.source else None,
+        "status_verified_at": f.source.status_verified_at.isoformat() if f.source and f.source.status_verified_at else None,
+        "independently_verified": f.source.independently_verified if f.source else None,
+        "conflicts": [
+            {"reference": p.application_reference, "value": p.value, "role": p.planning_role,
+             "scope": p.scope_label}
+            for p in f.conflicts
         ],
-        "unit_mix": fact(r.unit_mix),
+    }
+
+
+def _reconciliation_view(facts) -> dict:
+    """Compact, presentation-ready summary of the Gate 2B-2A trusted
+    operative planning facts - CONSENTED position, ACTIVE position(s)
+    (zero, one or several, never collapsed), affordable housing
+    (consented / active / historical), and any unresolved same-scope
+    conflicts. A read-only trail the UI can surface; a fuller,
+    persisted/versioned operative-facts layer remains an open Gate 2B-2
+    architecture question (see docs/PRODUCT_ROADMAP.md)."""
+    consented = facts.consented_position
+    ah = facts.affordable_housing
+    return {
+        "consented_position": {
+            "reference": _fact_view(consented.reference),
+            "planning_status": _fact_view(consented.planning_status),
+            "approved_units": _fact_view(consented.approved_units),
+            "residential_only_units": _fact_view(consented.residential_only_units),
+            "all_use_total_units": _fact_view(consented.all_use_total_units),
+            "unit_mix": _fact_view(consented.unit_mix),
+            "superseded_units": [
+                {"reference": p.application_reference, "value": p.value, "role": p.planning_role}
+                for p in consented.superseded_units
+            ],
+        },
+        "active_positions": [
+            {
+                "scope_type": p.scope_type, "scope_label": p.scope_label,
+                "reference": _fact_view(p.reference), "planning_status": _fact_view(p.planning_status),
+                "proposed_units": _fact_view(p.proposed_units),
+                "residential_only_units": _fact_view(p.residential_only_units),
+                "all_use_total_units": _fact_view(p.all_use_total_units), "unit_mix": _fact_view(p.unit_mix),
+            }
+            for p in facts.active_positions
+        ],
         "affordable_housing": {
             "whole_site": _ah_position(ah.whole_site),
             "phases": [_ah_position(p) for p in ah.phases],
+            "active_whole_site": _ah_position(ah.active_whole_site),
+            "active_phases": [_ah_position(p) for p in ah.active_phases],
+            "historical": [_ah_position(p) for p in ah.historical],
             "conflicts": [
                 {"scope": c.scope_label,
                  "positions": [_ah_position(p) for p in c.positions]}
@@ -698,9 +741,9 @@ def _reconciliation_view(r) -> dict:
         "roles": [
             {"reference": ra.reference, "role": ra.role, "decided_state": ra.decided_state,
              "scope": ra.scope_label}
-            for ra in r.resolved_applications
+            for ra in facts.resolved_applications
         ],
-        "scope_note": r.scope_note,
+        "scope_note": facts.scope_note,
     }
 
 
@@ -710,5 +753,5 @@ def _ah_position(p) -> dict | None:
     return {
         "reference": p.application_reference, "scope": p.scope_label, "scope_type": p.scope_type,
         "percentage": p.percentage, "units": p.units, "tenure": p.tenure, "status": p.status,
-        "notes": p.notes,
+        "notes": p.notes, "decided_state": p.decided_state,
     }

@@ -4,8 +4,8 @@
 1. Site 519 production regression: a technical/condition child application
    (0% / 0 / unknown) must never suppress a credible positive
    affordable-housing position evidenced by a sibling application.
-2. Different scopes (whole-site vs named phase/plot) coexist rather than
-   being treated as conflicting values.
+2. Different scopes (whole-site vs named phase/material-development-
+   parcel) coexist rather than being treated as conflicting values.
 3. Genuine same-scope conflicts (two credible, equally-authoritative,
    disagreeing positions for the SAME scope) are surfaced, never silently
    resolved.
@@ -17,6 +17,18 @@
 6. app.reporting.scheme_summary.build_summary_prompt receives the new
    structured, scope-aware facts, and non-affordable-housing prompt
    sections are unaffected.
+7. (Gate 2B-2A) CONSENTED / ACTIVE / HISTORICAL decided-state partition -
+   a withdrawn/refused application's position never appears as the
+   current (whole_site/phases or active_whole_site/active_phases) answer,
+   only as `historical`.
+8. (Gate 2B-2A) an individual dwelling plot never gets its own AH scope;
+   a genuine material development parcel does.
+
+Unless a test is specifically about decided-state, every fixture
+application here is explicitly GRANTED (decision="Approve", status=
+"Decided") so it resolves as the CONSENTED position - preserving each
+test's original, decided-state-independent intent under the Gate 2B-2A
+partition.
 
 Uses the same in-memory-SQLite `session` fixture as the rest of this suite
 (tests/conftest.py). No OpenAI call anywhere.
@@ -47,6 +59,8 @@ def _make_site(session, **kwargs) -> Site:
 
 def _make_app(session, site_id: int, reference: str, **kwargs) -> Application:
     kwargs.setdefault("application_received", "Mon 01 Jan 2024")
+    kwargs.setdefault("decision", "Approve")
+    kwargs.setdefault("status", "Decided")
     app = Application(council_code="testcouncil", reference=reference, site_id=site_id, **kwargs)
     session.add(app)
     session.commit()
@@ -263,20 +277,97 @@ def test_application_with_no_ah_evidence_at_all_yields_no_position(session):
     assert summary.conflicts == ()
 
 
-# --- Plot scope distinct from phase ------------------------------------------
+# --- Plot scope distinct from phase (Gate 2B-2A: individual dwelling ------
+# plots never get their own AH scope; a genuine development parcel does) --
 
 
-def test_plot_scope_type_distinct_from_phase(session):
+def test_individual_dwelling_plot_does_not_fragment_ah_into_its_own_scope(session):
+    """Gate 2B-2A regression - the ORIGINAL Site 519-shaped defect this
+    test used to encode (a 1-unit "Plot 5" getting its own AH scope entry)
+    is exactly what group_applications_by_operative_scope now prevents:
+    an individual dwelling-plot citation in a condition-discharge filing
+    must fold into the whole-site position, never its own scope."""
     site = _make_site(session)
+    whole = _make_app(session, site.id, "APP/OUTLINE", proposal="Outline permission for up to 60 dwellings")
+    _make_intel(session, whole, affordable_percentage_final=20.0, affordable_units_final=12, affordable_housing_status="conditioned")
     plot_app = _make_app(session, site.id, "APP/PLOT5", proposal="Discharge of conditions for Plot 5")
-    _make_intel(session, plot_app, affordable_percentage_final=0, affordable_units_final=0, affordable_housing_status="agreed", affordable_housing_notes="Plot 5 is a private market dwelling.")
-    other_app = _make_app(session, site.id, "APP/OTHER", proposal="Discharge of conditions for Plot 9")
-    _make_intel(session, other_app, affordable_percentage_final=100, affordable_units_final=1, affordable_housing_status="agreed")
+    _make_intel(session, plot_app, affordable_percentage_final=0, affordable_units_final=0, affordable_housing_status="unknown")
 
-    summary = compute_affordable_housing_scope_summary([plot_app, other_app])
+    summary = compute_affordable_housing_scope_summary([whole, plot_app])
 
-    plot5 = next(p for p in summary.phases if p.scope_label == "Plot 5")
-    assert plot5.scope_type == SCOPE_PLOT
+    assert not any(p.scope_label == "Plot 5" for p in summary.phases)
+    assert summary.whole_site.units == 12  # the technical plot filing's 0 never contaminates the whole-site position
+
+
+def test_material_development_parcel_keeps_its_own_ah_scope(session):
+    """A "plot" backed by its own genuine, qualifying-scale unit count (a
+    real development parcel, not an individual house) DOES remain its own
+    peer AH scope - Gate 2B-2A must not exclude every use of the word
+    "plot" indiscriminately."""
+    site = _make_site(session)
+    parcel = _make_app(session, site.id, "HYB/1", proposal="Hybrid application for the redevelopment of Plot 1 comprising 45 dwellings")
+    _make_intel(session, parcel, total_units_final=45, affordable_percentage_final=20.0, affordable_units_final=9, affordable_housing_status="conditioned")
+
+    summary = compute_affordable_housing_scope_summary([parcel])
+
+    plot1 = next(p for p in summary.phases if p.scope_label == "Plot 1")
+    assert plot1.scope_type == SCOPE_PLOT
+    assert plot1.units == 9
+
+
+# --- Gate 2B-2A: CONSENTED / ACTIVE / HISTORICAL decided-state partition ----
+
+
+def test_stockport_rugby_club_withdrawn_ah_is_historical_not_operative(session):
+    """Required regression case. A withdrawn application's AH position
+    must not appear as the current operative answer merely because it
+    exists - it is retained as HISTORICAL, and the current answer (both
+    consented and active) is NOT_DETERMINED (None) when nothing else
+    exists."""
+    site = _make_site(session)
+    withdrawn = _make_app(
+        session, site.id, "DC/089037",
+        proposal="Hybrid application comprising full planning permission for a clubhouse and outline for "
+                 "residential development and a residential care facility",
+        status="Withdrawn", decision="Application Withdrawn",
+    )
+    _make_intel(session, withdrawn, affordable_percentage_final=50.0, affordable_units_final=45, affordable_housing_status="proposed")
+
+    summary = compute_affordable_housing_scope_summary([withdrawn])
+
+    assert summary.whole_site is None
+    assert summary.active_whole_site is None
+    assert len(summary.historical) == 1
+    assert summary.historical[0].application_reference == "DC/089037"
+    assert summary.historical[0].units == 45
+    assert summary.historical[0].decided_state == "withdrawn"
+
+
+def test_consented_and_active_ah_positions_coexist_for_the_same_scope(session):
+    site = _make_site(session)
+    granted = _make_app(session, site.id, "FUL/2019", proposal="Erection of 50 dwellings")
+    _make_intel(session, granted, affordable_percentage_final=20.0, affordable_units_final=10, affordable_housing_status="legally_secured")
+    live = _make_app(session, site.id, "FUL/2025", proposal="Erection of 62 dwellings (resubmission)",
+                     status="Awaiting decision", decision=None)
+    _make_intel(session, live, affordable_percentage_final=40.0, affordable_units_final=25, affordable_housing_status="proposed")
+
+    summary = compute_affordable_housing_scope_summary([granted, live])
+
+    assert summary.whole_site.units == 10
+    assert summary.active_whole_site.units == 25
+    assert summary.historical == ()
+
+
+def test_refused_ah_position_also_becomes_historical(session):
+    site = _make_site(session)
+    refused = _make_app(session, site.id, "FUL/1", proposal="Erection of 80 dwellings",
+                        status="Decided", decision="Refused")
+    _make_intel(session, refused, affordable_percentage_final=30.0, affordable_units_final=24, affordable_housing_status="proposed")
+    summary = compute_affordable_housing_scope_summary([refused])
+    assert summary.whole_site is None
+    assert summary.active_whole_site is None
+    assert len(summary.historical) == 1
+    assert summary.historical[0].decided_state == "refused"
 
 
 # --- Prospective-override atomicity parity -----------------------------------

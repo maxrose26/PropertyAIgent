@@ -1,4 +1,4 @@
-"""Gate 2B-1 - Scheme / Application / Phase Reconciliation (V1).
+"""Gate 2B-1/2B-2A - Trusted Operative Planning Facts.
 
 Answers exactly one question, deliberately separate from every other
 question this codebase already answers about a scheme:
@@ -8,6 +8,9 @@ question this codebase already answers about a scheme:
     scheme fact - and where the evidence does not support a definitive
     choice, say so rather than picking one."
 
+Public entry point: build_operative_planning_facts(applications) ->
+OperativePlanningFacts. (Gate 2B-2A rename - see "Naming" below.)
+
 This replaces, at the scheme-fact boundary, the generic selection done
 today by:
   - app.ui.common.pick_representative_application - "most complete
@@ -16,9 +19,11 @@ today by:
   - app.ui.common.aggregate_scheme_fields - first-non-null value per
     field, scanning in that same order.
 Both remain available and unchanged for their other callers (the
-opportunity universe / fingerprints, review pages, allocation coverage);
-this module is a NEW, deterministic layer consulted where scheme facts are
-presented to a user (see app.reporting.site_profile).
+opportunity universe / fingerprints, buyer matching, allocation coverage -
+Gate 2B-2A deliberately does NOT migrate these, see docs/PRODUCT_ROADMAP.md
+Gate 2B-2A "explicitly deferred consumers"); this module is a
+deterministic layer consulted where scheme facts are presented to a user
+(app.reporting.site_profile, and Gate 2B-2A's Stage A/B consumers).
 
 Deliberately NOT an extraction gate:
   - adds no scraper, no NLP heuristic, no AI pass, no new regex-for-
@@ -26,19 +31,69 @@ Deliberately NOT an extraction gate:
   - reuses, unmodified: app.scrapers.unit_filter.classify_application_
     category / is_administrative_application_type (application typing),
     app.pipeline.material_change.classify_planning_state (planning-state
-    vocabulary), app.pipeline.phase_tracking.group_applications_by_phase
-    (phase/plot scope), app.reporting.affordable_housing_scope.compute_
-    affordable_housing_scope_summary (affordable-housing scope/authority
-    reconciliation - a working prototype of exactly this pattern, kept as
-    the single source of AH reconciliation rather than re-implemented).
+    vocabulary), app.pipeline.phase_tracking.group_applications_by_
+    operative_scope (phase/material-parcel scope - Gate 2B-2A, see
+    "Phase vs plot" below), app.reporting.affordable_housing_scope.
+    compute_affordable_housing_scope_summary (affordable-housing scope/
+    authority reconciliation, now decided-state-aware - Gate 2B-2A
+    Section 16).
 
 Deliberately NOT persisted: everything here is computed fresh on every
 call, exactly like affordable_housing_scope.py's own throwaway objects and
-aggregate_scheme_fields's own `merged` dict. No schema change. Persistence
-and versioning of the reconciled fact layer are Gate 2B-2, not this gate.
+aggregate_scheme_fields's own `merged` dict. No schema change. No Scheme/
+OperativeScheme table - Site remains the sole persisted identity anchor
+(Gate 2B-2 architecture investigation, Section E: a Scheme's boundaries
+are not independently evidenced by source data, so none is fabricated
+here). Request/run-level memoisation of a call to this function is a
+legitimate performance optimisation for a caller to add; this module
+itself caches nothing.
 
-Two Product-Owner safeguards enforced here (see docs/PRODUCT_ROADMAP.md,
-Gate 2B-1):
+Naming (Gate 2B-2A Section 4): app.extraction.reconcile.reconcile_scheme
+is a DIFFERENT function - intra-application reconciliation (merging one
+application's own regex/LLM/portal signals into SchemeIntelligence.
+*_final). This module's public entry point is deliberately NOT also named
+reconcile_scheme (the Gate 2B-1 name), to remove that collision -
+build_operative_planning_facts is the cross-application, fact-level
+reconciliation this module has always done.
+
+CONSENTED vs ACTIVE (Gate 2B-2A Sections 5-7): the contract never
+collapses "current consented position" and "current active planning
+position(s)" into one "current scheme". The consented position is
+computed independently and is None-shaped (every field individually
+not_determined) when nothing is granted - never manufactured from a
+pending or ancillary application. Active positions are a TUPLE - zero,
+one, or several - one per distinct scope carrying live substantive
+planning activity. "Latest application wins" is never replaced with
+"latest ACTIVE application wins" globally; the previous "single most
+recent live application" answer only exists as one active position among
+possibly several, or as a tie-break WITHIN one already-identified scope.
+
+Phase vs plot (Gate 2B-2A Sections 9-14): a WHOLE_SITE or PHASE scope may
+legitimately be a peer acquisition-level operative scope. An individual
+DWELLING PLOT normally must not. See app.pipeline.phase_tracking.
+group_applications_by_operative_scope / is_material_development_parcel
+for the deterministic rule (a named "plot" group is a peer scope only if
+a role-eligible, single-plot-labelled application in that group
+independently states its own qualifying-scale unit count - never by the
+plot token's own shape, which real production data confirms cannot
+reliably distinguish an individual dwelling from a development parcel).
+
+Relationship confidence (Gate 2B-2A Section 15, "essential now"): every
+resolved fact's provenance (FactPosition) carries the source
+Application's own site_link_method/site_link_confidence, translated to a
+level (high / review_required / unknown) - no new numeric score is
+invented; `suggested_fuzzy` links are marked review_required, never
+silently equivalent to an exact-address or parent-reference link.
+
+Freshness (Gate 2B-2A Section 18): every resolved fact's provenance also
+carries the source Application's own status_verified_at (Gate 2B-0A) and
+an explicit independently_verified flag. last_seen_at is NEVER read here
+or treated as freshness - see app.pipeline.status_verification's own
+module docstring for why (last_seen_at advances on ANY unrelated ORM
+write, never a proof of a genuine portal re-check).
+
+Safeguards enforced here (Product Owner, Gate 2B-1 final approval,
+carried into Gate 2B-2A unchanged):
   - RESIDENTIAL-ONLY QUANTUM IS NOT A NEW INFERENCE. A residential-only
     operative figure is resolved ONLY where existing evidence already
     supports a deterministic distinction between general residential
@@ -58,17 +113,11 @@ import datetime as dt
 from dataclasses import dataclass
 
 from app.db.models import Application
-from app.pipeline.material_change import (
-    STATE_GRANTED,
-    STATE_RECOMMENDATION_MADE,
-    STATE_RECOMMENDED_FOR_APPROVAL,
-    STATE_RECOMMENDED_FOR_REFUSAL,
-    STATE_REFUSED,
-    STATE_WITHDRAWN,
-    classify_planning_state,
-)
-from app.pipeline.lapse_tracking import parse_portal_date
-from app.pipeline.phase_tracking import UNPHASED_LABEL, group_applications_by_phase
+from app.pipeline.material_change import DECIDED_GRANTED, DECIDED_RECOMMENDATION_ONLY, DECIDED_REFUSED
+from app.pipeline.material_change import DECIDED_UNDETERMINED, DECIDED_WITHDRAWN
+from app.pipeline.material_change import resolve_decided_state as _resolve_decided_state_from_fields
+from app.pipeline.lapse_tracking import DECISION_STATUS_LABELS, parse_portal_date
+from app.pipeline.phase_tracking import UNPHASED_LABEL, group_applications_by_operative_scope
 from app.reporting.affordable_housing_scope import (
     AffordableHousingSummary,
     compute_affordable_housing_scope_summary,
@@ -116,23 +165,10 @@ NON_SUBSTANTIVE_ROLES = frozenset({
 })
 
 # --- Decided-state overlay ----------------------------------------------
-# Derived from app.pipeline.material_change.classify_planning_state (the
-# one canonical planning-state classifier - see that module), collapsed to
-# the 5 buckets 2B-1 ranking needs.
-DECIDED_GRANTED = "granted"
-DECIDED_REFUSED = "refused"
-DECIDED_WITHDRAWN = "withdrawn"
-DECIDED_RECOMMENDATION_ONLY = "recommendation_only"
-DECIDED_UNDETERMINED = "undetermined"
-
-_DECIDED_BY_STATE = {
-    STATE_GRANTED: DECIDED_GRANTED,
-    STATE_REFUSED: DECIDED_REFUSED,
-    STATE_WITHDRAWN: DECIDED_WITHDRAWN,
-    STATE_RECOMMENDATION_MADE: DECIDED_RECOMMENDATION_ONLY,
-    STATE_RECOMMENDED_FOR_APPROVAL: DECIDED_RECOMMENDATION_ONLY,
-    STATE_RECOMMENDED_FOR_REFUSAL: DECIDED_RECOMMENDATION_ONLY,
-}
+# DECIDED_* constants and the resolver now live in app.pipeline.
+# material_change (Gate 2B-2A) - shared, unmodified, with app.reporting.
+# affordable_housing_scope's own decided-state-aware AH partition, rather
+# than duplicated here.
 
 # --- Fact-resolution states -------------------------------------------
 FACT_RESOLVED = "resolved"
@@ -143,7 +179,41 @@ FACT_CONFLICT = "conflict"
 SCOPE_WHOLE_SITE = "whole_site"
 SCOPE_UNCLEAR = "unclear"
 SCOPE_PHASE = "phase"
+# A "plot" scope here is ALWAYS a confirmed material development parcel
+# (Gate 2B-2A) - group_applications_by_operative_scope has already folded
+# every individual-dwelling-plot grouping into whole_site/unclear before
+# this module ever sees it. Kept as "plot" (not renamed to e.g.
+# "development_parcel") to match app.reporting.affordable_housing_scope's
+# existing, tested public constant of the same name - see that module's
+# own Gate 2B-2A docstring update for the identical reasoning.
 SCOPE_PLOT = "plot"
+
+# --- Relationship confidence (Gate 2B-2A Section 15, "essential now") ----
+# Reuses Application.site_link_method/site_link_confidence UNCHANGED - no
+# new numeric score is invented. `suggested_fuzzy` (a human-reviewable,
+# non-deterministic address-similarity match) is marked review_required,
+# never silently equivalent to exact_address/parent_reference/created
+# (all deterministic, evidence-driven links). An application with no
+# site_link_method recorded at all (should not normally occur, but legacy
+# rows or test fixtures may lack it) is UNKNOWN, never assumed high.
+RELATIONSHIP_HIGH = "high"
+RELATIONSHIP_REVIEW_REQUIRED = "review_required"
+RELATIONSHIP_UNKNOWN = "unknown"
+
+_HIGH_CONFIDENCE_LINK_METHODS = frozenset({"exact_address", "parent_reference", "created"})
+
+
+def resolve_relationship_confidence(app: Application) -> tuple[str, str | None, float | None]:
+    """(level, method, numeric_confidence). `numeric_confidence` is only
+    ever meaningful for suggested_fuzzy (Application.site_link_confidence's
+    own documented scope) - carried through unchanged, never fabricated
+    for a deterministic link method."""
+    method = app.site_link_method
+    if method in _HIGH_CONFIDENCE_LINK_METHODS:
+        return RELATIONSHIP_HIGH, method, None
+    if method == "suggested_fuzzy":
+        return RELATIONSHIP_REVIEW_REQUIRED, method, app.site_link_confidence
+    return RELATIONSHIP_UNKNOWN, method, None
 
 
 def _proposal_norm(app: Application) -> str:
@@ -277,14 +347,18 @@ def resolve_planning_role(app: Application) -> str:
 
 
 def resolve_decided_state(app: Application) -> str:
-    return _DECIDED_BY_STATE.get(classify_planning_state(app.decision, app.status), DECIDED_UNDETERMINED)
+    """One of the DECIDED_* constants (app.pipeline.material_change) -
+    thin Application-shaped wrapper kept here for this module's own
+    call sites/tests; the classification itself lives in exactly one
+    place (material_change.resolve_decided_state)."""
+    return _resolve_decided_state_from_fields(app.decision, app.status)
 
 
 @dataclass(frozen=True)
 class ResolvedApplication:
     """One application, with its resolved planning role, decided state and
     phase scope - the unit every downstream eligibility/ranking rule
-    operates on. Computed once per reconcile_scheme() call."""
+    operates on. Computed once per build_operative_planning_facts() call."""
 
     application: Application
     role: str
@@ -316,11 +390,20 @@ class ResolvedApplication:
     def scheme(self):
         return self.application.scheme_intelligence
 
+    @property
+    def relationship(self) -> tuple[str, str | None, float | None]:
+        return resolve_relationship_confidence(self.application)
+
 
 @dataclass(frozen=True)
 class FactPosition:
     """One application's stated value for one scheme fact, with the
-    provenance needed to explain (or contest) the selection."""
+    provenance needed to explain (or contest) the selection - including,
+    since Gate 2B-2A, the three explicitly distinct trust dimensions:
+    evidence confidence (the OperativeFact's own `confidence`), evidence
+    freshness (`status_verified_at`/`independently_verified` here), and
+    relationship confidence (`relationship_level`/`relationship_method`
+    here) - never combined into one score (Section 18)."""
 
     value: object
     application_id: int
@@ -329,6 +412,18 @@ class FactPosition:
     decided_state: str
     scope_type: str
     scope_label: str
+    decision_date: dt.date | None
+    # Evidence freshness (Section 18) - status_verified_at is the ONLY
+    # signal treated as "independently freshness-verified" (Gate 2B-0A).
+    # last_seen_at is never read here and never substituted - a fact whose
+    # source has no status_verified_at is honestly marked unverified,
+    # never silently presented as "checked".
+    status_verified_at: dt.datetime | None
+    independently_verified: bool
+    # Relationship confidence (Section 15) - reused from Application.
+    # site_link_method/site_link_confidence, never a new numeric score.
+    relationship_level: str
+    relationship_method: str | None
 
 
 @dataclass(frozen=True)
@@ -357,73 +452,69 @@ class OperativeFact:
 
 
 @dataclass(frozen=True)
-class ResidentialQuantum:
-    """Residential unit count, with approved / proposed / superseded held
-    separately - never collapsed into one number (Product Owner
-    requirement). `residential_only` is subject to the "no new inference"
-    safeguard; `all_use_total` is the wider figure preserved alongside it."""
+class ConsentedPosition:
+    """Gate 2B-2A - the CURRENT CONSENTED POSITION, kept structurally
+    separate from any active proposal (Sections 5-6). Never manufactured
+    from a pending or ancillary application - every field is independently
+    an OperativeFact, so a granted permission with no extracted unit
+    figure still resolves `reference`/`planning_status` while
+    `approved_units` alone reads not_determined; nothing here is
+    all-or-nothing. When NOTHING is granted, every field reads
+    not_determined with its own reason - there is no separate top-level
+    "consented position exists" flag to fall out of sync with the facts
+    themselves."""
 
-    approved: OperativeFact
-    proposed: OperativeFact
-    residential_only: OperativeFact
-    all_use_total: OperativeFact
-    superseded: tuple[FactPosition, ...] = ()
+    reference: OperativeFact
+    planning_status: OperativeFact
+    approved_units: OperativeFact
+    residential_only_units: OperativeFact
+    all_use_total_units: OperativeFact
+    unit_mix: OperativeFact
+    superseded_units: tuple[FactPosition, ...] = ()
+
+    @property
+    def exists(self) -> bool:
+        return self.reference.state == FACT_RESOLVED
 
 
 @dataclass(frozen=True)
-class SchemeReconciliation:
+class ActivePosition:
+    """Gate 2B-2A - ONE of possibly SEVERAL current active planning
+    positions (Section 7). One ActivePosition per distinct scope carrying
+    live (undetermined / recommendation-only) substantive planning
+    activity - a Site may legitimately have zero, one, or several of
+    these coexisting (an extant permission plus a fresh resubmission; two
+    independent live applications on different phases; a competing
+    proposal). "Latest application wins" is never applied ACROSS scopes to
+    collapse these into one; within one scope, recency is used only as a
+    tie-break between multiple filings that already share that scope."""
+
+    scope_type: str
+    scope_label: str
+    reference: OperativeFact
+    planning_status: OperativeFact
+    proposed_units: OperativeFact
+    residential_only_units: OperativeFact
+    all_use_total_units: OperativeFact
+    unit_mix: OperativeFact
+
+
+@dataclass(frozen=True)
+class OperativePlanningFacts:
+    """Gate 2B-2A public contract - the trusted, computed, non-persisted
+    planning-fact read model for one Site (see build_operative_planning_
+    facts). CURRENT CONSENTED POSITION and CURRENT ACTIVE PLANNING
+    POSITION(S) are always structurally separate (Sections 5-7);
+    affordable housing is exposed once, scope-labelled, decided-state-
+    aware (Section 16), cross-referenced by scope_label to whichever
+    consented/active position shares that scope - never duplicated or
+    rebuilt per position."""
+
     resolved_applications: tuple[ResolvedApplication, ...]
-    lead_application: OperativeFact          # value = reference string
-    operative_planning_status: OperativeFact
-    operative_permission: OperativeFact      # value = granted permission reference, or not_determined
-    residential: ResidentialQuantum
-    unit_mix: OperativeFact                  # value = narrative typology / specialist string
+    consented_position: ConsentedPosition
+    active_positions: tuple[ActivePosition, ...]
     affordable_housing: AffordableHousingSummary
     scope_note: str
-
-
-# --- Scope resolution ---------------------------------------------------
-
-
-def _resolve_scopes(applications: list[Application]) -> dict[int, tuple[str, str]]:
-    """{application_id: (scope_type, scope_label)} using the SAME regex
-    phase/plot grouping app.pipeline.phase_tracking already powers the Site
-    Summary phase breakdown with. An application naming several phases is
-    treated as whole-site for reconciliation purposes (it spans them);
-    only an application naming exactly one phase/plot is scoped to it."""
-    groups = group_applications_by_phase(applications)
-    named = {k: v for k, v in groups.items() if k[0] != UNPHASED_LABEL}
-    per_app_named: dict[int, list[tuple[str, str]]] = {}
-    for (code, kind), apps in named.items():
-        for a in apps:
-            per_app_named.setdefault(a.id, []).append((code, kind))
-
-    out: dict[int, tuple[str, str]] = {}
-    for a in applications:
-        labels = per_app_named.get(a.id, [])
-        if len(labels) == 1:
-            code, kind = labels[0]
-            stype = SCOPE_PHASE if kind == "phase" else SCOPE_PLOT
-            out[a.id] = (stype, f"{'Phase' if kind == 'phase' else 'Plot'} {code}")
-        elif named:
-            out[a.id] = (SCOPE_WHOLE_SITE, "Whole site")
-        else:
-            # No application on the site names any phase at all - no
-            # positive evidence of whole-site vs one unnamed part.
-            out[a.id] = (SCOPE_UNCLEAR, "Whole site (scope not confirmed by phase evidence)")
-    return out
-
-
-def resolve_applications(applications: list[Application]) -> list[ResolvedApplication]:
-    scopes = _resolve_scopes(applications)
-    resolved = []
-    for a in applications:
-        stype, slabel = scopes.get(a.id, (SCOPE_UNCLEAR, "Whole site (scope not confirmed by phase evidence)"))
-        resolved.append(ResolvedApplication(
-            application=a, role=resolve_planning_role(a), decided_state=resolve_decided_state(a),
-            scope_type=stype, scope_label=slabel,
-        ))
-    return resolved
 
 
 # --- Ranking helpers --------------------------------------------------
@@ -432,16 +523,22 @@ def resolve_applications(applications: list[Application]) -> list[ResolvedApplic
 def _by_grant_then_recency(rs: ResolvedApplication) -> tuple:
     """Sort key: granted-with-a-date first, then latest decision date,
     then latest received date (RECENCY IS A TIE-BREAK ONLY - never the
-    primary signal; that is the defect 2B-1 exists to fix)."""
+    primary signal; that is the defect Gate 2B-1 exists to fix)."""
     d = rs.decision_date or dt.date.min
     return (rs.decided_state == DECIDED_GRANTED, d, rs.received, rs.id)
 
 
-def _position(fact: str, rs: ResolvedApplication, value: object) -> FactPosition:
+def _position(rs: ResolvedApplication, value: object) -> FactPosition:
+    level, method, numeric = rs.relationship
+    app = rs.application
     return FactPosition(
         value=value, application_id=rs.id, application_reference=rs.reference,
         planning_role=rs.role, decided_state=rs.decided_state,
         scope_type=rs.scope_type, scope_label=rs.scope_label,
+        decision_date=rs.decision_date,
+        status_verified_at=app.status_verified_at,
+        independently_verified=app.status_verified_at is not None,
+        relationship_level=level, relationship_method=method,
     )
 
 
@@ -466,119 +563,87 @@ def _s73_addresses_units(rs: ResolvedApplication) -> bool:
     return rs.role == ROLE_S73_VARIATION and _scheme_total_units(rs) is not None
 
 
-# --- Fact resolvers -------------------------------------------------
+# --- Fact resolvers - CONSENTED position -------------------------------
 
 
-def _resolve_lead_application(resolved: list[ResolvedApplication]) -> OperativeFact:
-    """The single application whose reference/status best represents the
-    scheme for headline display - replaces pick_representative_application
-    at that boundary. A granted substantive permission if one exists (the
-    latest); else the most senior substantive pending application; else
-    (nothing substantive at all) explicit not_determined."""
+def _resolve_reference_and_status(resolved: list[ResolvedApplication]) -> tuple[OperativeFact, OperativeFact]:
+    """Consented reference + planning status together (Gate 2B-2A) - a
+    granted substantive application, latest by decision date.
+
+    A permission is never manufactured from a pending or ancillary
+    application (Section 6). Three genuinely different "nothing granted"
+    shapes are distinguished, never conflated:
+      - a live substantive application exists (handled separately as an
+        ACTIVE position, never here) -> both reference and status stay
+        not_determined for the CONSENTED position specifically;
+      - every substantive application that exists is refused/withdrawn -
+        there is no consented PERMISSION, but the scheme's terminal
+        status IS genuinely determinable from that evidence, so
+        `planning_status` (and its source reference) resolve to
+        "Refused"/"Withdrawn" - this is not a fabricated permission, it
+        is an honestly negative, evidenced outcome;
+      - no substantive application exists at all - both stay
+        not_determined."""
     substantive = [r for r in resolved if r.is_substantive]
-    if not substantive:
-        return OperativeFact(
-            fact="lead_application", state=FACT_NOT_DETERMINED,
-            reason="no substantive planning application (outline/full/hybrid/reserved-matters) linked to this site",
-        )
     granted = [r for r in substantive if r.decided_state == DECIDED_GRANTED]
     if granted:
         lead = max(granted, key=_by_grant_then_recency)
-        return OperativeFact(
-            fact="lead_application", state=FACT_RESOLVED, value=lead.reference,
-            source=_position("lead_application", lead, lead.reference), confidence="high",
-            reason=f"latest granted substantive application ({lead.role})",
+        superseded = [g for g in granted if g.id != lead.id]
+        reason = f"latest granted substantive application ({lead.role})"
+        if superseded:
+            reason += f"; supersedes {', '.join(g.reference for g in superseded)}"
+        ref_fact = OperativeFact(
+            fact="consented_reference", state=FACT_RESOLVED, value=lead.reference,
+            source=_position(lead, lead.reference), confidence="high", reason=reason,
         )
-    # No grant - the most senior (earliest received) still-live substantive
-    # application anchors the scheme; a refused/withdrawn one only if
-    # nothing is live.
-    live = [r for r in substantive if r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)]
-    pool = live or substantive
-    lead = min(pool, key=lambda r: (r.received, r.id))
-    return OperativeFact(
-        fact="lead_application", state=FACT_RESOLVED, value=lead.reference,
-        source=_position("lead_application", lead, lead.reference), confidence="medium",
-        reason=("most senior live substantive application (no grant yet)" if live
-                else "most senior substantive application (all refused/withdrawn)"),
-    )
-
-
-def _resolve_planning_status(resolved: list[ResolvedApplication]) -> OperativeFact:
-    substantive = [r for r in resolved if r.is_substantive]
-    if not substantive:
-        return OperativeFact(
-            fact="operative_planning_status", state=FACT_NOT_DETERMINED,
-            reason="no substantive application; non-substantive filings (screening/discharge/etc.) "
-                   "cannot establish an operative planning status",
-        )
-    granted = [r for r in substantive if r.decided_state == DECIDED_GRANTED]
-    if granted:
-        lead = max(granted, key=_by_grant_then_recency)
-        return OperativeFact(
-            fact="operative_planning_status", state=FACT_RESOLVED, value="Permission granted",
-            source=_position("operative_planning_status", lead, "Permission granted"), confidence="high",
+        status_fact = OperativeFact(
+            fact="consented_planning_status", state=FACT_RESOLVED, value="Permission granted",
+            source=_position(lead, "Permission granted"), confidence="high",
             reason=f"granted substantive application {lead.reference} ({lead.role})"
                    + (f", decision {lead.application.decision_issued_date}" if lead.application.decision_issued_date else ""),
         )
-    recommendation = [r for r in substantive if r.decided_state == DECIDED_RECOMMENDATION_ONLY]
-    if recommendation:
-        lead = max(recommendation, key=lambda r: (r.received, r.id))
-        return OperativeFact(
-            fact="operative_planning_status", state=FACT_RESOLVED,
-            value="Awaiting decision (officer recommendation made)",
-            source=_position("operative_planning_status", lead, lead.application.status), confidence="medium",
-            reason=f"substantive application {lead.reference} has an officer recommendation but no formal decision "
-                   f"- recommendation is never treated as permission",
+        return ref_fact, status_fact
+
+    live = [r for r in substantive if r.decided_state in (DECIDED_RECOMMENDATION_ONLY, DECIDED_UNDETERMINED)]
+    if not live and substantive:
+        # Every substantive application is refused/withdrawn - a genuine,
+        # evidenced terminal outcome, not a fabricated permission.
+        lead = max(substantive, key=lambda r: (r.decision_date or dt.date.min, r.received, r.id))
+        label = "Refused" if lead.decided_state == DECIDED_REFUSED else "Withdrawn"
+        return (
+            OperativeFact(
+                fact="consented_reference", state=FACT_NOT_DETERMINED,
+                reason=f"no permission was ever granted - the last substantive application ({lead.reference}) was {label.lower()}",
+            ),
+            OperativeFact(
+                fact="consented_planning_status", state=FACT_RESOLVED, value=label,
+                source=_position(lead, label), confidence="medium",
+                reason=f"all substantive applications refused/withdrawn; latest is {lead.reference}",
+            ),
         )
-    live = [r for r in substantive if r.decided_state == DECIDED_UNDETERMINED]
-    if live:
-        lead = min(live, key=lambda r: (r.received, r.id))
-        return OperativeFact(
-            fact="operative_planning_status", state=FACT_RESOLVED, value="Awaiting decision",
-            source=_position("operative_planning_status", lead, lead.application.status), confidence="medium",
-            reason=f"substantive application {lead.reference} pending",
-        )
-    # All substantive applications refused/withdrawn.
-    lead = max(substantive, key=lambda r: (r.decision_date or dt.date.min, r.received, r.id))
-    label = "Refused" if lead.decided_state == DECIDED_REFUSED else "Withdrawn"
-    return OperativeFact(
-        fact="operative_planning_status", state=FACT_RESOLVED, value=label,
-        source=_position("operative_planning_status", lead, label), confidence="medium",
-        reason=f"all substantive applications refused/withdrawn; latest is {lead.reference}",
+
+    reason = (
+        "a substantive application is live but not yet granted - see the active planning position(s)"
+        if live else
+        "no substantive planning application (outline/full/hybrid/reserved-matters) linked to this site"
     )
-
-
-def _resolve_operative_permission(resolved: list[ResolvedApplication]) -> OperativeFact:
-    granted = [r for r in resolved if r.is_substantive and r.decided_state == DECIDED_GRANTED]
-    if not granted:
-        return OperativeFact(
-            fact="operative_permission", state=FACT_NOT_DETERMINED,
-            reason="no granted substantive application - there is no operative planning permission yet",
-        )
-    lead = max(granted, key=_by_grant_then_recency)
-    superseded = [g for g in granted if g.id != lead.id]
-    reason = f"latest granted substantive application ({lead.role})"
-    if superseded:
-        reason += f"; supersedes {', '.join(g.reference for g in superseded)}"
-    return OperativeFact(
-        fact="operative_permission", state=FACT_RESOLVED, value=lead.reference,
-        source=_position("operative_permission", lead, lead.reference), confidence="high", reason=reason,
+    return (
+        OperativeFact(fact="consented_reference", state=FACT_NOT_DETERMINED, reason=reason),
+        OperativeFact(fact="consented_planning_status", state=FACT_NOT_DETERMINED, reason=reason),
     )
 
 
 def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[OperativeFact, tuple[FactPosition, ...]]:
     """Approved residential units, where consent exists. Eligible sources:
     granted substantive applications, plus an S73/variation ONLY where it
-    demonstrably addresses units (safeguard). Reserved matters is eligible
-    at its own phase scope. Returns (operative fact, superseded positions)."""
+    demonstrably addresses units (safeguard). Returns (operative fact,
+    superseded positions)."""
     eligible = [
         r for r in resolved
         if (r.is_substantive and r.decided_state == DECIDED_GRANTED and _scheme_total_units(r) is not None)
         or _s73_addresses_units(r)
     ]
     if not eligible:
-        # A granted permission with no extracted unit figure at all -> we
-        # know it's approved but not for how many homes.
         any_grant = any(r.is_substantive and r.decided_state == DECIDED_GRANTED for r in resolved)
         return (
             OperativeFact(
@@ -590,16 +655,12 @@ def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[Operat
         )
 
     def rank(r: ResolvedApplication) -> tuple:
-        # S73 that varies units outranks the base grant it varies; else
-        # latest decision date; recency tie-break only.
         return (r.role == ROLE_S73_VARIATION, r.decision_date or dt.date.min, r.received, r.id)
 
     ranked = sorted(eligible, key=rank, reverse=True)
     operative = ranked[0]
     op_value = _scheme_total_units(operative)
 
-    # Same-scope conflict: two eligible sources at the same scope, same
-    # top rank tier, different figures, neither superseding the other.
     same_scope_top = [
         r for r in ranked
         if r.scope_type == operative.scope_type and r.scope_label == operative.scope_label
@@ -608,7 +669,7 @@ def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[Operat
     ]
     distinct = {_scheme_total_units(r) for r in same_scope_top}
     if len(distinct) > 1:
-        positions = tuple(_position("approved_residential_units", r, _scheme_total_units(r)) for r in same_scope_top)
+        positions = tuple(_position(r, _scheme_total_units(r)) for r in same_scope_top)
         return (
             OperativeFact(
                 fact="approved_residential_units", state=FACT_CONFLICT, conflicts=positions,
@@ -619,7 +680,7 @@ def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[Operat
         )
 
     superseded = tuple(
-        _position("approved_residential_units", r, _scheme_total_units(r))
+        _position(r, _scheme_total_units(r))
         for r in ranked[1:]
         if _scheme_total_units(r) is not None and _scheme_total_units(r) != op_value
     )
@@ -631,66 +692,9 @@ def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[Operat
     return (
         OperativeFact(
             fact="approved_residential_units", state=FACT_RESOLVED, value=op_value,
-            source=_position("approved_residential_units", operative, op_value),
-            confidence="high", reason=reason,
+            source=_position(operative, op_value), confidence="high", reason=reason,
         ),
         superseded,
-    )
-
-
-def _resolve_proposed_units(resolved: list[ResolvedApplication]) -> OperativeFact:
-    """Current proposed residential units - the live (undetermined /
-    recommendation) substantive application's own figure. Where a
-    permission is already granted, the approved figure is the acquisition
-    fact; this is only meaningful while something is still in play."""
-    live = [
-        r for r in resolved
-        if r.is_substantive and r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)
-    ]
-    with_fig = [r for r in live if _scheme_total_units(r) is not None or _portal_estimated_units(r) is not None]
-    if not with_fig:
-        if live:
-            return OperativeFact(
-                fact="proposed_residential_units", state=FACT_NOT_DETERMINED,
-                reason="a substantive application is live but no residential unit figure has been extracted or "
-                       "estimated for it yet",
-            )
-        return OperativeFact(
-            fact="proposed_residential_units", state=FACT_NOT_DETERMINED,
-            reason="no live substantive application - nothing is currently proposed",
-        )
-    lead = max(with_fig, key=lambda r: (r.received, r.id))
-    extracted = _scheme_total_units(lead)
-    value = extracted if extracted is not None else _portal_estimated_units(lead)
-    return OperativeFact(
-        fact="proposed_residential_units", state=FACT_RESOLVED, value=value,
-        source=_position("proposed_residential_units", lead, value),
-        confidence="high" if extracted is not None else "low",
-        reason=(f"most recent live substantive application {lead.reference}"
-                + ("" if extracted is not None else " (portal-listing estimate only - not document-verified)")),
-    )
-
-
-def _resolve_all_use_total(resolved: list[ResolvedApplication], approved: OperativeFact, proposed: OperativeFact) -> OperativeFact:
-    """The wider / all-use total to preserve alongside a residential-only
-    figure. Simply the operative substantive figure (approved if consent
-    exists, else proposed) - labelled as all-use because 2B-1 does not
-    attempt to net out specialist accommodation (see residential-only)."""
-    if approved.state == FACT_RESOLVED:
-        return OperativeFact(
-            fact="all_use_total_units", state=FACT_RESOLVED, value=approved.value,
-            source=approved.source, confidence=approved.confidence,
-            reason="operative approved total (all uses, before any residential-only split)",
-        )
-    if proposed.state == FACT_RESOLVED:
-        return OperativeFact(
-            fact="all_use_total_units", state=FACT_RESOLVED, value=proposed.value,
-            source=proposed.source, confidence=proposed.confidence,
-            reason="operative proposed total (all uses, before any residential-only split)",
-        )
-    return OperativeFact(
-        fact="all_use_total_units", state=FACT_NOT_DETERMINED,
-        reason="no operative approved or proposed total to report",
     )
 
 
@@ -717,29 +721,12 @@ def _has_specialist_component(resolved: list[ResolvedApplication], operative_sou
 
 
 def _resolve_residential_only(
-    resolved: list[ResolvedApplication], approved: OperativeFact, proposed: OperativeFact
+    resolved: list[ResolvedApplication], operative: OperativeFact,
 ) -> OperativeFact:
-    """SAFEGUARD - residential-only quantum is NOT a new inference.
-
-    Resolve a residential-only figure ONLY where existing evidence already
-    supports a deterministic distinction:
-      - the operative source has NO specialist component evidence at all
-        -> its total IS the residential-only figure; OR
-      - the operative source's SchemeIntelligence carries an explicit
-        private_units_final AND affordable_units_final whose sum is the
-        general-residential total, with a specialist type recorded
-        separately -> not attempted in V1 (the platform does not currently
-        extract a clean specialist unit count to subtract), so this path
-        returns not_determined.
-    Otherwise: not_determined, and the wider all-use figure is preserved
-    by _resolve_all_use_total. NEVER a derived/parsed split.
-    """
-    operative = approved if approved.state == FACT_RESOLVED else proposed
+    """SAFEGUARD - residential-only quantum is NOT a new inference. See
+    module docstring."""
     if operative.state != FACT_RESOLVED:
-        return OperativeFact(
-            fact="residential_only_units", state=FACT_NOT_DETERMINED,
-            reason="no operative total to assess",
-        )
+        return OperativeFact(fact="residential_only_units", state=FACT_NOT_DETERMINED, reason="no operative total to assess")
     source_id = operative.source.application_id if operative.source else None
     if _has_specialist_component(resolved, source_id):
         return OperativeFact(
@@ -758,10 +745,8 @@ def _resolve_residential_only(
 
 def _resolve_unit_mix(resolved: list[ResolvedApplication], lead: OperativeFact) -> OperativeFact:
     """House/apartment/specialist/other-use mix - read as one coherent
-    record from the lead operative application's own SchemeIntelligence
-    (never assembled across applications). Reserved-matters detail for a
-    phase would refine this, but V1 reports the whole-site operative
-    application's typology; a phase-level mix is a 2B-2 concern."""
+    record from the lead application's own SchemeIntelligence (never
+    assembled across applications)."""
     if lead.state != FACT_RESOLVED or lead.source is None:
         return OperativeFact(fact="unit_mix", state=FACT_NOT_DETERMINED, reason="no operative application")
     rs = next((r for r in resolved if r.id == lead.source.application_id), None)
@@ -785,64 +770,383 @@ def _resolve_unit_mix(resolved: list[ResolvedApplication], lead: OperativeFact) 
         )
     return OperativeFact(
         fact="unit_mix", state=FACT_RESOLVED, value="; ".join(parts),
-        source=_position("unit_mix", rs, "; ".join(parts)), confidence="medium",
+        source=_position(rs, "; ".join(parts)), confidence="medium",
         reason=f"read as one coherent record from operative application {lead.value}",
+    )
+
+
+def _resolve_all_use_total(approved_or_proposed: OperativeFact, basis: str) -> OperativeFact:
+    """The wider / all-use total to preserve alongside a residential-only
+    figure - simply the operative figure (approved or proposed, per
+    caller), labelled as all-use because this module does not attempt to
+    net out specialist accommodation (see residential-only)."""
+    if approved_or_proposed.state != FACT_RESOLVED:
+        return OperativeFact(fact="all_use_total_units", state=FACT_NOT_DETERMINED, reason=f"no operative {basis} total to report")
+    return OperativeFact(
+        fact="all_use_total_units", state=FACT_RESOLVED, value=approved_or_proposed.value,
+        source=approved_or_proposed.source, confidence=approved_or_proposed.confidence,
+        reason=f"operative {basis} total (all uses, before any residential-only split)",
+    )
+
+
+def _resolve_consented_position(resolved: list[ResolvedApplication]) -> ConsentedPosition:
+    reference, status = _resolve_reference_and_status(resolved)
+    approved, superseded = _resolve_approved_units(resolved)
+    all_use = _resolve_all_use_total(approved, "approved")
+    residential_only = _resolve_residential_only(resolved, approved)
+    unit_mix = _resolve_unit_mix(resolved, reference)
+    return ConsentedPosition(
+        reference=reference, planning_status=status, approved_units=approved,
+        residential_only_units=residential_only, all_use_total_units=all_use,
+        unit_mix=unit_mix, superseded_units=superseded,
+    )
+
+
+# --- Fact resolvers - ACTIVE position(s) --------------------------------
+
+
+def _build_active_position(group: list[ResolvedApplication], scope_type: str, scope_label: str) -> ActivePosition:
+    """ONE active position for one scope, from the live substantive
+    application(s) sharing that scope. Recency is used only as a
+    tie-break WITHIN this already-identified scope - never across scopes
+    (see ActivePosition's own docstring)."""
+    with_fig = [r for r in group if _scheme_total_units(r) is not None or _portal_estimated_units(r) is not None]
+    pool = with_fig or group
+    lead = max(pool, key=lambda r: (r.received, r.id))
+
+    ref_fact = OperativeFact(
+        fact="active_reference", state=FACT_RESOLVED, value=lead.reference,
+        source=_position(lead, lead.reference), confidence="high",
+        reason=f"live substantive application in scope {scope_label}",
+    )
+    status_label = "Awaiting decision (officer recommendation made)" if lead.decided_state == DECIDED_RECOMMENDATION_ONLY else "Awaiting decision"
+    status_fact = OperativeFact(
+        fact="active_planning_status", state=FACT_RESOLVED, value=status_label,
+        source=_position(lead, status_label), confidence="medium",
+        reason=f"substantive application {lead.reference} pending in scope {scope_label}"
+               + (" - recommendation is never treated as permission" if lead.decided_state == DECIDED_RECOMMENDATION_ONLY else ""),
+    )
+
+    if lead not in with_fig:
+        proposed = OperativeFact(
+            fact="proposed_residential_units", state=FACT_NOT_DETERMINED,
+            reason=f"a substantive application is live in scope {scope_label} but no residential unit figure has "
+                   f"been extracted or estimated for it yet",
+        )
+    else:
+        extracted = _scheme_total_units(lead)
+        value = extracted if extracted is not None else _portal_estimated_units(lead)
+        proposed = OperativeFact(
+            fact="proposed_residential_units", state=FACT_RESOLVED, value=value,
+            source=_position(lead, value), confidence="high" if extracted is not None else "low",
+            reason=(f"most recent live substantive application in scope {scope_label}: {lead.reference}"
+                    + ("" if extracted is not None else " (portal-listing estimate only - not document-verified)")),
+        )
+
+    all_use = _resolve_all_use_total(proposed, "proposed")
+    residential_only = _resolve_residential_only([lead], proposed)
+    unit_mix = _resolve_unit_mix([lead], ref_fact)
+
+    return ActivePosition(
+        scope_type=scope_type, scope_label=scope_label, reference=ref_fact, planning_status=status_fact,
+        proposed_units=proposed, residential_only_units=residential_only, all_use_total_units=all_use,
+        unit_mix=unit_mix,
+    )
+
+
+def _resolve_active_positions(resolved: list[ResolvedApplication]) -> tuple[ActivePosition, ...]:
+    """Gate 2B-2A Section 7 - zero, one, or several simultaneous active
+    substantive planning proposals, one per distinct scope. Never reduced
+    to a single "most recent" answer across scopes."""
+    live = [r for r in resolved if r.is_substantive and r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)]
+    if not live:
+        return ()
+    by_scope: dict[tuple[str, str], list[ResolvedApplication]] = {}
+    for r in live:
+        by_scope.setdefault((r.scope_type, r.scope_label), []).append(r)
+    return tuple(
+        _build_active_position(group, stype, slabel)
+        for (stype, slabel), group in sorted(by_scope.items(), key=lambda kv: kv[0][1])
     )
 
 
 # --- Public entry point ------------------------------------------------
 
 
-def reconcile_scheme(applications: list[Application]) -> SchemeReconciliation:
+def build_operative_planning_facts(applications: list[Application]) -> OperativePlanningFacts:
     """Deterministic, computed, non-persisted reconciliation of one
-    consolidated Site's applications into fact-level operative positions.
+    consolidated Site's applications into the trusted operative planning
+    facts contract (Gate 2B-2A). Formerly `reconcile_scheme` (Gate 2B-1) -
+    see module docstring, "Naming".
 
-    `applications` is a Site's linked applications (the caller's existing
-    list - e.g. site.applications). Callers must have the .scheme_
-    intelligence relationship available, exactly as aggregate_scheme_
-    fields / affordable_housing_scope already require."""
+    `applications` is a Site's linked applications - callers should pass
+    the RAW `site.applications` relationship, not a display-filtered
+    subset (a display filter can drop condition-discharge/S73 records
+    this function specifically needs to see for the non-substantive
+    guardrail and the S73 fact-specific safeguard - see
+    app.reporting.site_profile's own note on this). Callers must have the
+    .scheme_intelligence relationship available, exactly as aggregate_
+    scheme_fields / affordable_housing_scope already require."""
     resolved = resolve_applications(list(applications))
 
-    lead = _resolve_lead_application(resolved)
-    status = _resolve_planning_status(resolved)
-    permission = _resolve_operative_permission(resolved)
-    approved, superseded = _resolve_approved_units(resolved)
-    proposed = _resolve_proposed_units(resolved)
-    all_use = _resolve_all_use_total(resolved, approved, proposed)
-    residential_only = _resolve_residential_only(resolved, approved, proposed)
-    unit_mix = _resolve_unit_mix(resolved, lead)
+    consented = _resolve_consented_position(resolved)
+    active_positions = _resolve_active_positions(resolved)
 
-    # Affordable housing: reuse the existing scope/authority reconciliation
-    # UNCHANGED, but only over applications a substantive/S73 role permits
-    # to speak to it - a non-substantive filing's affordable_*_final = 0
-    # must never enter the pool (the Site 519 / Burnage defect). S73 is
-    # included: affordable_housing_scope's own _has_no_independent_
-    # affordable_position guard drops it if it carries no AH evidence.
-    ah_eligible = [
-        r.application for r in resolved
-        if r.is_substantive or r.role == ROLE_S73_VARIATION
-    ]
+    # Affordable housing: reuse the existing scope/authority reconciliation,
+    # now decided-state-aware (Gate 2B-2A Section 16), over only the
+    # applications a substantive/S73 role permits to speak to it - a
+    # non-substantive filing's affordable_*_final = 0 must never enter the
+    # pool (the Site 519 / Burnage defect). S73 is included:
+    # affordable_housing_scope's own _has_no_independent_affordable_
+    # position guard drops it if it carries no AH evidence.
+    ah_eligible = [r.application for r in resolved if r.is_substantive or r.role == ROLE_S73_VARIATION]
     affordable = compute_affordable_housing_scope_summary(ah_eligible)
 
     scope_note = _scope_note(resolved)
 
-    return SchemeReconciliation(
+    return OperativePlanningFacts(
         resolved_applications=tuple(resolved),
-        lead_application=lead,
-        operative_planning_status=status,
-        operative_permission=permission,
-        residential=ResidentialQuantum(
-            approved=approved, proposed=proposed, residential_only=residential_only,
-            all_use_total=all_use, superseded=superseded,
-        ),
-        unit_mix=unit_mix,
+        consented_position=consented,
+        active_positions=active_positions,
         affordable_housing=affordable,
         scope_note=scope_note,
     )
 
 
+# --- Scope resolution ---------------------------------------------------
+
+
+def _resolve_scopes(applications: list[Application]) -> dict[int, tuple[str, str]]:
+    """{application_id: (scope_type, scope_label)}. Gate 2B-2A: uses
+    app.pipeline.phase_tracking.group_applications_by_operative_scope,
+    NOT the raw group_applications_by_phase - a named "plot" group only
+    becomes its own peer scope here if it is a confirmed material
+    development parcel (see that function's own docstring for the
+    deterministic rule and the real production evidence behind it).
+    Everything else about this resolution is unchanged from Gate 2B-1:
+    an application naming several peer scopes at once is WHOLE_SITE (it
+    spans them); an application naming none, on a site with no peer
+    scopes at all, is UNCLEAR (no positive evidence of whole-site vs one
+    unnamed part)."""
+    groups = group_applications_by_operative_scope(applications)
+    named = {k: v for k, v in groups.items() if k[0] != UNPHASED_LABEL}
+    per_app_named: dict[int, list[tuple[str, str]]] = {}
+    for (code, kind), apps in named.items():
+        for a in apps:
+            per_app_named.setdefault(a.id, []).append((code, kind))
+
+    out: dict[int, tuple[str, str]] = {}
+    for a in applications:
+        labels = per_app_named.get(a.id, [])
+        if len(labels) == 1:
+            code, kind = labels[0]
+            stype = SCOPE_PHASE if kind == "phase" else SCOPE_PLOT
+            out[a.id] = (stype, f"{'Phase' if kind == 'phase' else 'Plot'} {code}")
+        elif named:
+            out[a.id] = (SCOPE_WHOLE_SITE, "Whole site")
+        else:
+            out[a.id] = (SCOPE_UNCLEAR, "Whole site (scope not confirmed by phase evidence)")
+    return out
+
+
+def resolve_applications(applications: list[Application]) -> list[ResolvedApplication]:
+    scopes = _resolve_scopes(applications)
+    resolved = []
+    for a in applications:
+        stype, slabel = scopes.get(a.id, (SCOPE_UNCLEAR, "Whole site (scope not confirmed by phase evidence)"))
+        resolved.append(ResolvedApplication(
+            application=a, role=resolve_planning_role(a), decided_state=resolve_decided_state(a),
+            scope_type=stype, scope_label=slabel,
+        ))
+    return resolved
+
+
 def _scope_note(resolved: list[ResolvedApplication]) -> str:
     named = sorted({r.scope_label for r in resolved if r.scope_type in (SCOPE_PHASE, SCOPE_PLOT)})
     if not named:
-        return "single-scope scheme (no distinct phases/plots evidenced)"
+        return "single-scope scheme (no distinct phases/material development parcels evidenced)"
     return "multi-scope scheme; distinct scopes: " + ", ".join(named)
+
+
+# --- Gate 2B-2A pre-merge remediation - Explore discovery-surface facts --
+
+# The SAME 4-key vocabulary app.pipeline.lapse_tracking.DECISION_STATUS_LABELS
+# already defines for the natural-language search's structured "statuses"
+# filter (app.search.query_parser) - reused, not duplicated, so a NL query
+# for "granted"/"refused"/"withdrawn"/"awaiting decision" keeps matching the
+# exact same machine values it always has. NOT_DETERMINED is the one
+# genuinely new value: reconciliation ran and found no substantive
+# consented or active position at all (e.g. an EIA-screening-only site) -
+# distinct from "not_yet_decided", which now specifically means "a live
+# substantive proposal exists and is pending", never "we don't know".
+NOT_DETERMINED_DECISION_STATUS = "not_determined"
+OPERATIVE_DECISION_STATUS_LABELS: dict[str, str] = {
+    **DECISION_STATUS_LABELS,
+    NOT_DETERMINED_DECISION_STATUS: "Not yet verified",
+}
+
+
+def resolve_canonical_decision_status(
+    consented: ConsentedPosition, active_positions: tuple[ActivePosition, ...],
+    reconciliation_ran: bool, fallback: str | None = None,
+) -> str | None:
+    """ONE of DECISION_STATUS_LABELS's own 4 keys (granted/refused/
+    withdrawn/not_yet_decided), derived from the SAME reconciliation every
+    other trusted fact already uses - never a second, independently-derived
+    status taxonomy. Shared verbatim by app.reporting.site_profile's
+    Decision Status tile and app.ui.pages.0_Explore's table/filter column,
+    so the two surfaces can no longer disagree about a Site's status by
+    construction (they call the same function with the same facts) - Gate
+    2B-2A pre-merge remediation requirement 1/2.
+
+    `fallback` (a caller-supplied legacy value) is used ONLY when
+    reconciliation could not run at all (e.g. zero linked applications) -
+    never when it ran and found nothing determinable, which returns None
+    (every consumer already renders that as "Not yet verified"/omitted,
+    same as any other not_determined fact; see
+    OPERATIVE_DECISION_STATUS_LABELS/NOT_DETERMINED_DECISION_STATUS above
+    for callers that want a concrete string key instead of None)."""
+    if consented.planning_status.state == FACT_RESOLVED:
+        value = consented.planning_status.value
+        if value == "Permission granted":
+            return "granted"
+        if value == "Refused":
+            return "refused"
+        if value == "Withdrawn":
+            return "withdrawn"
+    if len(active_positions) >= 1:
+        return "not_yet_decided"
+    if reconciliation_ran:
+        return None
+    return fallback
+
+
+@dataclass(frozen=True)
+class OperativeFilterFacts:
+    """Gate 2B-2A pre-merge remediation - the trusted, machine-readable
+    facts Explore's table/filters (and any future list-scale consumer)
+    should search/sort/filter on, separate from the human-readable label a
+    UI chooses to print (OPERATIVE_DECISION_STATUS_LABELS /
+    format_operative_units_display below). Built from the SAME
+    OperativePlanningFacts every other Gate 2B-2A surface already uses -
+    never a second, independently-derived selection of "which application
+    matters"."""
+
+    decision_status: str  # one of OPERATIVE_DECISION_STATUS_LABELS's keys
+    has_active_proposal: bool
+    active_proposal_count: int
+    units: int | None
+    units_source: str | None  # "consented" | "active" | None
+    units_kind: str | None  # "residential" | "all_use" | None
+    units_is_estimated: bool
+    units_not_determined: bool
+    active_units: int | None
+    active_units_kind: str | None  # "residential" | "all_use" | None
+
+
+def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
+    """Prefers the residential-only quantum (Gate 2B-2A pre-merge
+    remediation: "min/max unit filtering must use the trusted operative
+    RESIDENTIAL quantum, not a raw representative-application total") -
+    falls back to the all-use total ONLY when residential-only genuinely
+    cannot be determined (case E/F: a mixed/specialist scheme where the
+    existing Gate 2B-1 "no new inference" safeguard correctly withholds a
+    residential-only figure) - never fabricates a residential split that
+    isn't there. Returns (value, kind, is_estimated)."""
+    if residential.state == FACT_RESOLVED:
+        return residential.value, "residential", residential.confidence == "low"
+    if all_use.state == FACT_RESOLVED:
+        return all_use.value, "all_use", all_use.confidence == "low"
+    return None, None, False
+
+
+def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFilterFacts:
+    """The single deterministic rule Explore's Total Units/Decision Status
+    columns, min/max unit filters, and status filter all read from - see
+    this module's own docstring cases A-F (Gate 2B-2A pre-merge
+    remediation report, Section C):
+
+    A/B. A resolvable quantum (consented, else - only when there is
+         exactly ONE active substantive proposal - that proposal's own
+         quantum) is used for filtering; residential-only preferred, all-
+         use total as a flagged fallback (see _resolve_units_from_units_
+         facts).
+    C.   When a consent AND an active proposal both exist, the CONSENTED
+         quantum remains the primary `units` value (it is the established,
+         evidenced position) - the active proposal's own figure is never
+         discarded, only carried separately as `active_units` /
+         `has_active_proposal` / `active_proposal_count`, so a consumer can
+         still see and act on it without a single-valued filter column
+         being forced to pick a winner.
+    D.   Multiple active substantive proposals with no consent -> `units`
+         stays None/not_determined (no arbitrary "latest wins" or summed
+         figure); `active_proposal_count` still reports how many exist.
+    E/F. Residential-only NOT_DETERMINED but an all-use/mixed-use total IS
+         resolved -> that all-use total is used, flagged `units_kind=
+         "all_use"` rather than silently presented as a residential count.
+    """
+    consented = facts.consented_position
+    active_positions = facts.active_positions
+    reconciliation_ran = bool(facts.resolved_applications)
+
+    decision_status = resolve_canonical_decision_status(consented, active_positions, reconciliation_ran)
+    if decision_status is None:
+        decision_status = NOT_DETERMINED_DECISION_STATUS
+
+    units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
+        consented.residential_only_units, consented.all_use_total_units,
+    )
+    units_source: str | None = "consented" if units is not None else None
+    if units is None and len(active_positions) == 1:
+        units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
+            active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
+        )
+        units_source = "active" if units is not None else None
+    units_not_determined = bool(reconciliation_ran and units is None)
+
+    active_units: int | None = None
+    active_units_kind: str | None = None
+    if len(active_positions) == 1:
+        active_units, active_units_kind, _ = _resolve_units_from_units_facts(
+            active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
+        )
+
+    return OperativeFilterFacts(
+        decision_status=decision_status,
+        has_active_proposal=len(active_positions) >= 1,
+        active_proposal_count=len(active_positions),
+        units=units, units_source=units_source, units_kind=units_kind, units_is_estimated=units_is_estimated,
+        units_not_determined=units_not_determined,
+        active_units=active_units, active_units_kind=active_units_kind,
+    )
+
+
+def format_operative_decision_status_label(filter_facts: OperativeFilterFacts) -> str:
+    """The human-facing label for OperativeFilterFacts.decision_status -
+    kept separate from the canonical machine key it is derived from (Gate
+    2B-2A pre-merge remediation: "separate CANONICAL MACHINE-READABLE
+    PLANNING STATE from USER-FACING DISPLAY LABEL"). A single active
+    proposal shows the same "Awaiting decision" wording the label map
+    already gives every not_yet_decided site; several simultaneous active
+    proposals say so explicitly, rather than the label silently implying
+    there is only one - reused verbatim by every Explore surface (table,
+    map tooltip, exported report) that shows a Site's decision status, so
+    they can never print different words for the same trusted fact."""
+    if filter_facts.decision_status == "not_yet_decided" and filter_facts.active_proposal_count > 1:
+        return f"{filter_facts.active_proposal_count} active planning proposals"
+    return OPERATIVE_DECISION_STATUS_LABELS[filter_facts.decision_status]
+
+
+def format_operative_units_basis_label(filter_facts: OperativeFilterFacts) -> str | None:
+    """Short provenance string for OperativeFilterFacts.units - "Residential
+    - consented", "All-use - active proposal", etc. - so a reviewer can see
+    WHY a number is what it is without opening the Site itself. None only
+    when `units` is also None (nothing to attribute)."""
+    if filter_facts.units is None:
+        return None
+    bits = []
+    if filter_facts.units_kind:
+        bits.append("Residential" if filter_facts.units_kind == "residential" else "All-use")
+    if filter_facts.units_source:
+        bits.append("consented" if filter_facts.units_source == "consented" else "active proposal")
+    return " - ".join(bits) if bits else None

@@ -48,6 +48,7 @@ from app.pipeline.lapse_tracking import (
 from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown, summarize_phase_units
 from app.policy.site_view import build_site_policy_intelligence
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts
 from app.scrapers.unit_filter import classify_application_category, qualify
 from app.ui.shell import ai_summary_card, review_badge
 from app.visuals import IMAGE_TYPE_LABELS
@@ -199,6 +200,40 @@ def load_applications_for_sites(session, site_ids: list[int]) -> dict[int, list[
         threshold = council.unit_threshold if council else 10
         result[site_id] = _filter_visible_applications(site_apps, threshold)
     return result
+
+
+def load_all_applications_for_sites(session, site_ids: list[int]) -> dict[int, list[Application]]:
+    """Batched sibling of load_applications_for_sites returning the RAW,
+    unfiltered application set per site (every linked Application, not just
+    the display-filtered qualifying ones) - the input shape
+    app.reporting.scheme_reconciliation.build_operative_planning_facts and
+    app.pipeline.lapse_tracking.compute_lapse_status both need, since role-
+    aware reconciliation and lapse detection depend on evidence
+    (condition-discharge filings, NMAs, EIA screenings...) the visibility
+    filter deliberately drops from the display list.
+
+    Before this existed, callers read the ORM's own lazy `site.applications`
+    relationship per Site for this same purpose - one query per Site with no
+    scheme_intelligence eager-loading, confirmed by the Gate 2B-2A Stage B
+    benchmark to cost ~1 query per Site for the relationship itself, PLUS a
+    further lazy query per Application whenever reconciliation went on to
+    read .scheme_intelligence (only the display-filtered subset already
+    carries that eager-loaded from load_applications_for_sites). This
+    collapses both to the same 2-query shape load_applications_for_sites
+    already uses, reusing one query rather than adding a second: pass this
+    function's result straight to any per-Site loop that used to call
+    `site.applications` for lapse tracking, operative-facts reconciliation,
+    or both - the identity map means a Site's Applications need only be
+    fetched once per request either way."""
+    if not site_ids:
+        return {}
+    apps = session.execute(
+        select(Application).where(Application.site_id.in_(site_ids)).options(selectinload(Application.scheme_intelligence))
+    ).scalars().all()
+    by_site: dict[int, list[Application]] = {site_id: [] for site_id in site_ids}
+    for a in apps:
+        by_site.setdefault(a.site_id, []).append(a)
+    return by_site
 
 
 def load_watchlist_applications(session) -> list[Application]:
@@ -356,6 +391,51 @@ def render_visual_evidence(evidence: dict, *, missing_message: str, expander_lab
                     st.caption(other_label + (" ✓" if image.review_status == "confirmed" else " (unreviewed)"))
 
 
+def _operative_status_decision_display(facts) -> str:
+    """Gate 2B-2A - the reconciled "Status / Decision" line for
+    render_scheme_detail: the CONSENTED position where one exists; else,
+    if there is exactly one active position, that position's status;
+    else, several simultaneous active positions are named honestly rather
+    than one being silently shown as "the" status; else (nothing
+    determined at all) an explicit "Not yet verified" - never rep_app's
+    own raw .status/.decision, which can belong to a non-substantive or
+    superseded application (see app.reporting.site_profile's identical
+    reasoning for the Site Profile page this block is kept consistent
+    with)."""
+    consented = facts.consented_position
+    if consented.planning_status.state == FACT_RESOLVED:
+        return str(consented.planning_status.value)
+    if len(facts.active_positions) == 1 and facts.active_positions[0].planning_status.state == FACT_RESOLVED:
+        return str(facts.active_positions[0].planning_status.value)
+    if len(facts.active_positions) > 1:
+        return f"{len(facts.active_positions)} active planning proposals"
+    return "Not yet verified"
+
+
+def _operative_units_display(facts) -> tuple[bool, str | int | None]:
+    """Gate 2B-2A - the reconciled unit-count figure for render_scheme_
+    detail's "Total / Affordable / Private units" line: (determined, value).
+    `determined=True` means reconciliation genuinely ran and resolved a
+    figure (the CONSENTED approved figure, else a single active position's
+    proposed figure) or genuinely found none - in BOTH cases the caller
+    must show this answer directly and NOT fall back to the legacy
+    aggregate_scheme_fields figure (Gate 2B-1 Defect 2's own discipline:
+    a valid not_determined must never be silently replaced by a
+    convenient application's figure). `determined=False` only when there
+    were no applications to reconcile at all (not reachable from this
+    function in practice, since it is only called once has_scheme is
+    already confirmed) - the caller's legacy fallback stands for that
+    case alone."""
+    if not facts.resolved_applications:
+        return False, None
+    consented = facts.consented_position
+    if consented.approved_units.state == FACT_RESOLVED:
+        return True, consented.approved_units.value
+    if len(facts.active_positions) == 1 and facts.active_positions[0].proposed_units.state == FACT_RESOLVED:
+        return True, facts.active_positions[0].proposed_units.value
+    return True, None
+
+
 def render_scheme_detail(session, settings, site: Site, apps: list[Application]) -> None:
     """Full scheme detail block - application history, proposal/scheme
     fields, evidence, companies & contacts with on-demand unlock. Shared
@@ -365,6 +445,17 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     rep_app = pick_representative_application(apps)
     merged = aggregate_scheme_fields(apps)
     has_scheme = any(a.scheme_intelligence for a in apps)
+    # Gate 2B-2A Stage A - the trusted operative planning position for this
+    # Site's "Status / Decision" and unit-count lines below, so this shared
+    # block (the dedicated Scheme Detail page AND the home page's inline
+    # row expansion) never shows a different planning status/quantum than
+    # the (Gate 2B-1/2B-2A-reconciled) Site Profile page for the same Site.
+    # Reads site.applications (raw), not the display-filtered `apps`
+    # parameter, for the same reason app.reporting.site_profile does (the
+    # non-substantive guardrail and S73 safeguard need to see condition-
+    # discharge/variation records this display filter would otherwise
+    # drop).
+    operative_facts = build_operative_planning_facts(list(site.applications))
 
     st.subheader(site.display_address)
     st.caption(f"{site.council_code} — {len(apps)} linked application(s)")
@@ -661,10 +752,14 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         with col1:
             st.markdown(f"**Address:** {site.display_address}")
             st.markdown(f"**Proposal:** {rep_app.proposal}")
-            st.markdown(f"**Status / Decision:** {rep_app.status} / {rep_app.decision}")
-            total_units_display = merged["total_units_final"]
-            if merged.get("total_units_is_estimated") and total_units_display is not None:
-                total_units_display = f"~{total_units_display} (est.)"
+            st.markdown(f"**Status / Decision:** {_operative_status_decision_display(operative_facts)}")
+            _units_determined, total_units_display = _operative_units_display(operative_facts)
+            if total_units_display is None and not _units_determined:
+                total_units_display = merged["total_units_final"]
+                if merged.get("total_units_is_estimated") and total_units_display is not None:
+                    total_units_display = f"~{total_units_display} (est.)"
+            elif total_units_display is None:
+                total_units_display = "Not yet verified"
             st.markdown(f"**Total / Affordable / Private units:** {total_units_display} / "
                         f"{merged['affordable_units_final']} / {merged['private_units_final']}")
             if merged.get("total_units_is_estimated"):

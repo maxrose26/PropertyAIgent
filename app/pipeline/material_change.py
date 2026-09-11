@@ -201,6 +201,40 @@ def classify_planning_state(decision: str | None, status: str | None) -> str:
     return _classify_planning_state(decision, status)
 
 
+# --- Decided-state overlay (Gate 2B-1/2B-2A) --------------------------
+# A coarser, 5-value collapse of the STATE_* vocabulary above, used by
+# app.reporting.scheme_reconciliation (cross-application role/eligibility
+# ranking) AND app.reporting.affordable_housing_scope (Gate 2B-2A's
+# decided-state-aware affordable-housing partition - consented / active /
+# historical). Centralised HERE, not duplicated in either caller, and not
+# defined in affordable_housing_scope itself, specifically to avoid a
+# circular import (scheme_reconciliation already imports affordable_
+# housing_scope for AH reconciliation) - this module sits below both and
+# already owns the STATE_* vocabulary these values are derived from.
+DECIDED_GRANTED = "granted"
+DECIDED_REFUSED = "refused"
+DECIDED_WITHDRAWN = "withdrawn"
+DECIDED_RECOMMENDATION_ONLY = "recommendation_only"
+DECIDED_UNDETERMINED = "undetermined"
+
+_DECIDED_BY_STATE = {
+    STATE_GRANTED: DECIDED_GRANTED,
+    STATE_REFUSED: DECIDED_REFUSED,
+    STATE_WITHDRAWN: DECIDED_WITHDRAWN,
+    STATE_RECOMMENDATION_MADE: DECIDED_RECOMMENDATION_ONLY,
+    STATE_RECOMMENDED_FOR_APPROVAL: DECIDED_RECOMMENDATION_ONLY,
+    STATE_RECOMMENDED_FOR_REFUSAL: DECIDED_RECOMMENDATION_ONLY,
+}
+
+
+def resolve_decided_state(decision: str | None, status: str | None) -> str:
+    """One of the DECIDED_* constants above - granted / refused / withdrawn
+    / recommendation_only / undetermined. A recommendation is NEVER
+    collapsed into granted/refused (the same invariant classify_planning_
+    state itself enforces)."""
+    return _DECIDED_BY_STATE.get(_classify_planning_state(decision, status), DECIDED_UNDETERMINED)
+
+
 @dataclass(frozen=True)
 class ApplicationState:
     """The narrow slice of Application state B1 ever compares old-vs-new
