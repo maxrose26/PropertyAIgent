@@ -173,24 +173,41 @@ def build_strategic_land_matching_facts(allocation, coverage, phasing) -> Matchi
     )
 
 
-def build_planning_delivery_matching_facts(scheme_intelligence) -> MatchingFacts:
+def build_planning_delivery_matching_facts(scheme_intelligence, *, planning_state: str = OTHER_OR_UNKNOWN) -> MatchingFacts:
     """scheme_intelligence: a SchemeIntelligence ORM row for the
     representative application behind a planning/delivery opportunity
     card (already selected by app.ui.common.pick_representative_application
     elsewhere in the platform - this function does not pick one itself).
     May be None (no SchemeIntelligence extracted yet for this application) -
-    every fact then reads as genuinely unknown, never guessed."""
+    every fact then reads as genuinely unknown, never guessed.
+
+    Gate 2B-2B.1 pre-merge remediation - `planning_state` is now an
+    explicit, caller-supplied argument, never a hardcoded PERMISSION_
+    GRANTED. This function's OTHER fields (unit_count/affordable_unit_
+    count/development_type_raw/is_specialist_development) are still read
+    from this ONE representative application's own SchemeIntelligence
+    verbatim - unchanged from before this remediation, because app.
+    reporting.opportunity_universe's fingerprint_fields dict reads exactly
+    those four fields from this function's output, and this gate is
+    forbidden from changing opportunity fingerprints. `planning_state`
+    itself is confirmed NOT one of those fingerprinted fields (see
+    opportunity_universe.py's own fingerprint_fields construction), so it
+    is free to be corrected without any fingerprint impact - callers
+    (app.reporting.opportunity_universe) now compute it from
+    app.reporting.scheme_reconciliation.build_operative_planning_facts via
+    resolve_operative_planning_state below, the same trusted resolution
+    app.policy.buyer_matching.build_planning_delivery_matching_facts_from_
+    operative already uses for the live Buyer Fit path - never a second,
+    independently-derived planning-state rule. Defaults to the existing,
+    honest OTHER_OR_UNKNOWN (never PERMISSION_GRANTED) for any caller that
+    doesn't supply real evidence, so this function can no longer assert a
+    grant it hasn't actually checked."""
     if scheme_intelligence is None:
         return MatchingFacts(
             opportunity_type=PLANNING_DELIVERY, unit_count=None, development_type_raw=None,
             is_specialist_development=None, affordable_percentage=None, affordable_percentage_trusted=False,
             affordable_unit_count=None,
-            # Every planning/delivery opportunity card in this platform is
-            # already sourced from a granted decision (see app.reporting.
-            # dashboard's _approaching_lapse_cards/_undeveloped_phase_cards,
-            # both gated on is_granted_decision before a card is ever built) -
-            # this is a fact already established upstream, not re-derived here.
-            planning_state=PERMISSION_GRANTED, has_identified_planning_activity=True,
+            planning_state=planning_state, has_identified_planning_activity=True,
             has_phasing_evidence=False, matched_to_site=True,
         )
 
@@ -232,11 +249,39 @@ def build_planning_delivery_matching_facts(scheme_intelligence) -> MatchingFacts
         affordable_percentage=affordable_pct if affordable_trusted else None,
         affordable_percentage_trusted=affordable_trusted,
         affordable_unit_count=affordable_unit_count,
-        planning_state=PERMISSION_GRANTED,
+        planning_state=planning_state,
         has_identified_planning_activity=True,
         has_phasing_evidence=False,
         matched_to_site=True,
     )
+
+
+def resolve_operative_planning_state(operative_facts) -> str:
+    """Gate 2B-2B.1 pre-merge remediation - the single deterministic
+    planning_state rule, extracted so both build_planning_delivery_
+    matching_facts_from_operative (the live Buyer Fit path) and app.
+    reporting.opportunity_universe's fingerprint-compatible construction
+    (build_planning_delivery_matching_facts above) resolve planning_state
+    identically, from the SAME app.reporting.scheme_reconciliation.
+    OperativePlanningFacts - never two independently-written rules that
+    could silently drift apart.
+
+    A. an operative consent exists -> PERMISSION_GRANTED (the primary
+       planning-position basis whenever one exists - a coexisting active
+       proposal never cancels it; see has_active_proposal/
+       active_proposal_count on MatchingFacts instead).
+    B/C. no consent, but one or more active substantive proposals exist
+       -> PLANNING_ACTIVE_PROPOSAL (never "granted"; multiplicity is
+       carried separately, never collapsed by "latest wins").
+    D/E. refused/withdrawn-only, or genuinely NOT_DETERMINED -> the
+       existing generic OTHER_OR_UNKNOWN (never a fabricated third state)."""
+    consented = operative_facts.consented_position
+    active_positions = operative_facts.active_positions
+    if consented.planning_status.state == FACT_RESOLVED and consented.planning_status.value == "Permission granted":
+        return PERMISSION_GRANTED
+    if len(active_positions) >= 1:
+        return PLANNING_ACTIVE_PROPOSAL
+    return OTHER_OR_UNKNOWN
 
 
 def _operative_source_scheme_intelligence(operative_facts, applications_by_id: dict):
@@ -280,37 +325,25 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     the exact consumer Astra's "Strong Fit because permission granted"
     report traced to (Former Pendlebury Miners Club: an outline
     application still 'Under Consultation', with no decision at all).
-    Deliberately NOT used by app.reporting.opportunity_universe's
-    fingerprint-field construction, which keeps calling the legacy
-    build_planning_delivery_matching_facts above completely unchanged -
-    Gate 2B-2B.1 is explicitly forbidden from changing opportunity
-    fingerprints, and unit_count/affordable_unit_count/development_type_raw/
-    is_specialist_development all feed that fingerprint today. See this
-    gate's own implementation report Section C for the full reasoning."""
+
+    NOT used by app.reporting.opportunity_universe's fingerprint-field
+    construction (unit_count/affordable_unit_count/development_type_raw/
+    is_specialist_development still come from build_planning_delivery_
+    matching_facts above, reading one representative application's own
+    SchemeIntelligence verbatim, unchanged - Gate 2B-2B.1 is forbidden
+    from changing opportunity fingerprints, and those four fields feed it
+    today). planning_state itself is NOT one of those fingerprinted
+    fields, so opportunity_universe.py now ALSO resolves it correctly, via
+    the shared resolve_operative_planning_state helper below - the same
+    resolution this function uses - passed into build_planning_delivery_
+    matching_facts's own `planning_state` argument at that call site. See
+    this gate's pre-merge remediation report Section C/D for the full
+    fingerprint-safety reasoning."""
     consented = operative_facts.consented_position
     active_positions = operative_facts.active_positions
     ah = operative_facts.affordable_housing
 
-    # --- planning_state: cases A-E from the Gate 2B-2B.1 brief ----------
-    # A. an operative consent exists -> PERMISSION_GRANTED (consent is
-    #    always the primary planning-position basis when it exists, per
-    #    Section 9 - a coexisting active proposal never cancels it, see
-    #    has_active_proposal/active_proposal_count below instead).
-    # B/C. no consent, but one or more active substantive proposals exist
-    #    -> PLANNING_ACTIVE_PROPOSAL (never "granted"; multiplicity is
-    #    carried separately, never collapsed by "latest wins").
-    # D/E. refused/withdrawn-only, or genuinely NOT_DETERMINED -> neither
-    #    is a classifiable planning stage this buyer vocabulary already
-    #    has a positive name for; reuses the existing generic
-    #    OTHER_OR_UNKNOWN constant rather than inventing two more (Section
-    #    7: "if compatibility requires an existing generic/unknown state,
-    #    use it").
-    if consented.planning_status.state == FACT_RESOLVED and consented.planning_status.value == "Permission granted":
-        planning_state = PERMISSION_GRANTED
-    elif len(active_positions) >= 1:
-        planning_state = PLANNING_ACTIVE_PROPOSAL
-    else:
-        planning_state = OTHER_OR_UNKNOWN
+    planning_state = resolve_operative_planning_state(operative_facts)
 
     # --- units: consented preferred, else (only when exactly one active
     # proposal exists) that proposal's own figure - the same A/B/C/D rule

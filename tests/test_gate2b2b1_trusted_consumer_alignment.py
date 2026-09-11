@@ -191,6 +191,87 @@ def test_consent_and_active_proposal_remain_distinguishable(session):
     assert any("further active planning application" in i.lower() for i in assessment.investigate)
 
 
+def test_legacy_builder_never_defaults_to_permission_granted(session):
+    """Product Owner pre-merge remediation - build_planning_delivery_
+    matching_facts (the function app.reporting.opportunity_universe still
+    calls for fingerprint-compatible construction) must never assert
+    PERMISSION_GRANTED unless a caller explicitly supplies it as evidence.
+    Its default (no planning_state argument at all) must be the existing,
+    honest OTHER_OR_UNKNOWN."""
+    from app.policy.buyer_matching import build_planning_delivery_matching_facts
+
+    site = _site(session)
+    app = _app(session, site.id, "23/81450/OUT", proposal="Outline application for 63 dwellings",
+               status="Under Consultation", decision=None)
+    si = _intel(session, app, total_units_final=63)
+
+    facts_no_arg = build_planning_delivery_matching_facts(si)
+    assert facts_no_arg.planning_state == OTHER_OR_UNKNOWN
+
+    facts_none_si = build_planning_delivery_matching_facts(None)
+    assert facts_none_si.planning_state == OTHER_OR_UNKNOWN
+
+    # Explicit evidence-based planning_state is honoured verbatim.
+    facts_explicit = build_planning_delivery_matching_facts(si, planning_state=PLANNING_ACTIVE_PROPOSAL)
+    assert facts_explicit.planning_state == PLANNING_ACTIVE_PROPOSAL
+
+
+def test_opportunity_universe_fingerprint_fields_never_include_planning_state():
+    """Structural regression guard (Product Owner pre-merge remediation) -
+    proves, by inspecting the actual source, that app.reporting.
+    opportunity_universe's PLANNING_DELIVERY fingerprint_fields
+    construction has no 'planning_state' key - the exact fact that makes
+    it safe to correct planning_state there without altering any
+    fingerprint. If a future change ever adds 'planning_state' to that
+    dict, this test must be revisited before doing so."""
+    import inspect
+
+    import app.reporting.opportunity_universe as opportunity_universe
+
+    source = inspect.getsource(opportunity_universe._planning_delivery_universe)
+    # The PLANNING_DELIVERY fingerprint_fields block (unit_count/
+    # affordable_unit_count/development_type_raw/is_specialist_development/
+    # decision/status/lapse_status/deadline/build_status/
+    # ownership_evidence_count) must not itself assign a "planning_state"
+    # dict key anywhere in this function.
+    assert '"planning_state"' not in source
+    assert "'planning_state'" not in source
+
+
+def test_opportunity_universe_resolves_real_operative_planning_state(session):
+    """End-to-end proof that app.reporting.opportunity_universe's own
+    MatchingFacts construction (used for both fingerprinting AND
+    app.policy.buyer_profile_store's onboarding-baseline Buyer Fit count)
+    now derives planning_state from build_operative_planning_facts, not a
+    hardcoded literal - mirroring exactly what that module's real call
+    site does, without needing the full candidate-detection query stack."""
+    from app.policy.buyer_matching import build_planning_delivery_matching_facts, resolve_operative_planning_state
+
+    site = _site(session)
+    app = _app(session, site.id, "23/81450/OUT",
+               proposal="Outline planning application for demolition and redevelopment for residential "
+                        "(up to 63 no. dwellings)",
+               status="Under Consultation", decision=None)
+    si = _intel(session, app, total_units_final=63)
+
+    # Mirrors opportunity_universe.py's own call site exactly: unit_count/
+    # affordable_unit_count/development_type_raw/is_specialist_development
+    # still come from `si` (fingerprint-compatible, unchanged); only
+    # planning_state is corrected.
+    operative_facts = build_operative_planning_facts([app])
+    planning_state = resolve_operative_planning_state(operative_facts)
+    facts = build_planning_delivery_matching_facts(si, planning_state=planning_state)
+
+    assert facts.planning_state == PLANNING_ACTIVE_PROPOSAL
+    assert facts.planning_state != PERMISSION_GRANTED
+    # the fingerprint-relevant fields are untouched - still sourced from
+    # `si` exactly as build_planning_delivery_matching_facts always has.
+    assert facts.unit_count == 63
+
+    assessment = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert not any("permission granted" in m.lower() for m in assessment.matches)
+
+
 def test_multiple_active_proposals_do_not_latest_win(session):
     """No consent exists; two simultaneous active substantive proposals
     exist - unit_count/affordable figures must stay None (never pick the
@@ -318,6 +399,29 @@ def test_unknown_ah_stays_unknown_on_explore(session):
     assert ff.affordable_source is None
 
 
+def test_brixham_explore_row_cannot_pair_54_units_with_unqualified_40_percent(session):
+    """(item 7) Explore's own resolved display value for Affordable % must
+    be withheld (None) for Brixham's shape, even though the unit count
+    (54) is still shown - so the row can never present '54 affordable
+    units, 40%' as an unqualified same-basis pair. An 'Unreconciled' flag
+    is available so this is discoverable, not silently dropped."""
+    from app.reporting.scheme_reconciliation import resolve_explore_affordable_percentage_display
+
+    site = _site(session)
+    app = _app(session, site.id, "114228/FUL/24", proposal="Residential development of 145 units",
+               status="Awaiting decision")
+    _intel(session, app, total_units_final=145, affordable_units_final=54, affordable_percentage_final=40.0,
+           affordable_tenure_split_final="37% on-site, 3% financial contribution")
+
+    facts = build_operative_planning_facts([app])
+    ff = resolve_operative_filter_facts(facts)
+    assert ff.affordable_units == 54  # the unit count is never withheld
+    assert ff.affordable_percentage_reconciles is False
+
+    display_percentage = resolve_explore_affordable_percentage_display(ff)
+    assert display_percentage is None  # the percentage IS withheld
+
+
 def test_trusted_ah_propagates_identically_for_table_and_export(session):
     """The exact same resolve_operative_filter_facts call is reused for
     Explore's on-screen table and its exported report row - proven here by
@@ -340,11 +444,13 @@ def test_trusted_ah_propagates_identically_for_table_and_export(session):
 
 
 def test_brixham_percentage_conflict_never_renders_as_one_combined_figure(session):
-    """Brixham Road shape - 54/145 =~37.2% on-site, but the stored
-    affordable_percentage_final is 40.0% (the wider policy position).
-    Both figures must be surfaced distinctly with an explicit
-    non-reconciliation flag, never combined into '54 affordable homes
-    representing 40%'."""
+    """Brixham Road shape - 54/145 =~37.2% units-implied percentage, but
+    the stored affordable_percentage_final is 40.0%. Both figures must be
+    surfaced distinctly with an explicit non-reconciliation flag, never
+    combined into '54 affordable homes representing 40%'. The explicit
+    'on-site'/'financial contribution' labels come ONLY from this
+    application's own recorded tenure text, never from the arithmetic
+    figure itself."""
     site = _site(session)
     app = _app(session, site.id, "114228/FUL/24",
                proposal="Residential development of 145 units", status="Awaiting decision")
@@ -357,16 +463,77 @@ def test_brixham_percentage_conflict_never_renders_as_one_combined_figure(sessio
     assert position is not None
     assert position.percentage == 40.0
     assert position.units == 54
-    assert position.onsite_percentage == 37.2
+    # (item 4) the generic arithmetic figure is a neutral units-implied
+    # ratio - it is NOT itself labelled "onsite" anywhere in its own name.
+    assert position.units_implied_percentage == 37.2
+    assert not hasattr(position, "onsite_percentage")
     assert position.percentage_reconciles is False
+    # (item 6) explicit on-site/financial-contribution labels are
+    # supported ONLY because this application's own text states them.
+    assert position.explicit_onsite_percentage == 37.0
+    assert position.explicit_financial_contribution_percentage == 3.0
 
     lines = format_affordable_housing_lines(summary)
     reconciliation_lines = [line for line in lines if "DOES NOT RECONCILE" in line]
     assert reconciliation_lines
+    line = reconciliation_lines[0]
     # both figures are named explicitly and distinctly in the same line -
     # never silently combined into one unqualified "N affordable homes
     # representing P%" statement with no caveat.
-    assert "40.0%" in reconciliation_lines[0] and "37.2%" in reconciliation_lines[0]
+    assert "40.0%" in line and "37.2%" in line
+    # (item 6) the explicit source-evidence bases are named distinctly.
+    assert "explicitly states 37.0% on-site" in line
+    assert "explicitly states a 3.0% financial contribution" in line
+    # never a bare, unqualified claim that the units-implied figure IS the
+    # on-site basis - that label only appears attached to "the source
+    # evidence explicitly states", never as this module's own inference.
+    assert "37.2% on-site" not in line
+
+
+def test_generic_percentage_mismatch_never_infers_a_basis_without_evidence(session):
+    """(item 5) A scheme whose unit-derived percentage disagrees with its
+    stored percentage, but whose tenure text says nothing about on-site/
+    financial-contribution bases, must be flagged as non-reconciling
+    WITHOUT inventing an on-site/off-site/policy-equivalent explanation."""
+    site = _site(session)
+    app = _app(session, site.id, "FUL/2", proposal="Residential development of 100 units",
+               status="Decided", decision="Approve with Conditions")
+    _intel(session, app, total_units_final=100, affordable_units_final=20, affordable_percentage_final=30.0,
+           affordable_tenure_split_final="Shared ownership and affordable rent")  # no explicit basis wording
+
+    summary = compute_affordable_housing_scope_summary([app])
+    position = summary.whole_site
+    assert position is not None
+    assert position.units_implied_percentage == 20.0
+    assert position.percentage_reconciles is False
+    assert position.explicit_onsite_percentage is None
+    assert position.explicit_financial_contribution_percentage is None
+
+    lines = format_affordable_housing_lines(summary)
+    line = next(l for l in lines if "DOES NOT RECONCILE" in l)
+    # the neutral disclaimer is present (no basis inferred)...
+    assert "no source evidence states what physical basis" in line.lower()
+    # ...and no basis-specific figure (e.g. "20.0% on-site") was invented -
+    # "on-site"/"off-site" only ever appear inside that same neutral
+    # disclaimer sentence, never attached to a percentage of their own.
+    assert "% on-site" not in line and "% off-site" not in line and "financial contribution" not in line.split("do not invent one.")[0].split("No source evidence")[0]
+
+
+def test_ordinary_reconciled_ah_schemes_render_normally(session):
+    """(item 8) A ordinary scheme whose stored percentage already agrees
+    with its unit-derived percentage must render exactly as before -
+    percentage_reconciles True, no DOES NOT RECONCILE line at all."""
+    site = _site(session)
+    app = _app(session, site.id, "FUL/3", proposal="Residential development of 40 units",
+               status="Decided", decision="Approve with Conditions")
+    _intel(session, app, total_units_final=40, affordable_units_final=8, affordable_percentage_final=20.0)
+
+    summary = compute_affordable_housing_scope_summary([app])
+    position = summary.whole_site
+    assert position is not None
+    assert position.percentage_reconciles is True
+    lines = format_affordable_housing_lines(summary)
+    assert not any("DOES NOT RECONCILE" in line for line in lines)
 
 
 def test_pending_legal_agreement_status_is_not_promoted_to_secured(session):

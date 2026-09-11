@@ -54,6 +54,7 @@ every call, exactly like app.ui.common.aggregate_scheme_fields's own
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from app.db.models import Application
@@ -107,8 +108,8 @@ _AH_FIELDS = (
     # is already a fully-reconciled, existing field (app.extraction.
     # reconcile), read here ONLY to detect when the stored `affordable_
     # percentage_final` and the affordable/total unit-derived percentage
-    # materially disagree - see _onsite_percentage_reconciliation below.
-    # Not a new persisted field; no schema change.
+    # materially disagree - see _units_implied_percentage_reconciliation
+    # below. Not a new persisted field; no schema change.
     "total_units_final",
 )
 
@@ -119,9 +120,42 @@ _AH_FIELDS = (
 # applications with both an affordable and a total unit count, 558
 # (~96%) agree with the stored percentage to within 2.0pp, and the
 # remaining ~4% are genuine discrepancies worth surfacing rather than
-# silently combining (confirmed live: Brixham Road's 54/145 =~37.2%
-# on-site figure differs from its own stored 40.0% by ~2.76pp).
+# silently combining (confirmed live: Brixham Road's 54/145 units-implied
+# ~37.2% figure differs from its own stored 40.0% by ~2.76pp).
 _PERCENTAGE_RECONCILIATION_TOLERANCE = 2.0
+
+# Gate 2B-2B.1 pre-merge remediation (Product Owner correction) - the
+# GENERIC arithmetic check above (affordable_units_final / total_units_
+# final) establishes ONLY that a percentage was implied by the unit count;
+# it must never be labelled "on-site" or any other basis, since arithmetic
+# alone cannot establish what the affordable_units_final figure physically
+# represents. A SEPARATE, narrow, deterministic reading of explicit
+# wording already present in the existing affordable_tenure_split_final
+# free-text field (never a new persisted column, never an LLM, never
+# fuzzy matching) is used ONLY when the source text itself states a
+# specific basis - confirmed real case: Brixham Road's stored
+# affordable_tenure_split_final is literally "37% on-site, 3% financial
+# contribution". These two patterns are deliberately narrow (exactly the
+# two bases evidenced in a real record) - not a general on-site/off-site/
+# policy-equivalent parser speculatively built ahead of evidence.
+_EXPLICIT_ONSITE_PCT_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*%\s*on-?\s*site", re.IGNORECASE)
+_EXPLICIT_FINANCIAL_CONTRIBUTION_PCT_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*%\s*financial contribution", re.IGNORECASE)
+
+
+def _explicit_evidence_percentages(tenure_text: str | None) -> tuple[float | None, float | None]:
+    """(explicit_onsite_percentage, explicit_financial_contribution_
+    percentage) - both None unless the source text itself literally states
+    that basis (e.g. "37% on-site, 3% financial contribution"). Never
+    inferred from the generic unit-derived percentage or from the stored
+    affordable_percentage_final - only from this application's own
+    recorded wording."""
+    if not tenure_text:
+        return None, None
+    onsite_match = _EXPLICIT_ONSITE_PCT_PATTERN.search(tenure_text)
+    contribution_match = _EXPLICIT_FINANCIAL_CONTRIBUTION_PCT_PATTERN.search(tenure_text)
+    onsite = float(onsite_match.group(1)) if onsite_match else None
+    contribution = float(contribution_match.group(1)) if contribution_match else None
+    return onsite, contribution
 
 
 @dataclass(frozen=True)
@@ -141,22 +175,31 @@ class AffordablePosition:
     status: str | None
     notes: str | None
     decided_state: str = DECIDED_UNDETERMINED
-    # Gate 2B-2B.1 (Brixham Road) - the affordable/total unit-derived
-    # percentage, computed purely arithmetically from two already-trusted
-    # fields (affordable_units_final / total_units_final) - None whenever
-    # either figure is unavailable, never guessed. `percentage_reconciles`
-    # is False exactly when this figure and `percentage` above (the
-    # STORED percentage - which may legitimately be a broader "policy-
-    # equivalent" position including e.g. an off-site/financial
-    # contribution, not necessarily an error) disagree by more than
+    # Gate 2B-2B.1 (Brixham Road; renamed from `onsite_percentage` in the
+    # Product Owner's pre-merge remediation - arithmetic alone never
+    # establishes a physical basis) - PURELY the ratio affordable_units_
+    # final / total_units_final, computed from two already-trusted fields.
+    # None whenever either figure is unavailable, never guessed. Carries
+    # NO claim about what physical provision the affordable unit count
+    # represents (on-site, off-site, or anything else) - it is a units-to-
+    # total ratio, nothing more.
+    units_implied_percentage: float | None = None
+    # False exactly when units_implied_percentage and `percentage` above
+    # (the STORED percentage) disagree by more than
     # _PERCENTAGE_RECONCILIATION_TOLERANCE - a signal to show BOTH figures
-    # distinctly and flag them as not reconciling, never to silently
-    # combine them into one false "N affordable homes representing P%"
-    # statement, and never to assume WHY they differ (a genuine on-site/
-    # policy split, a genuine data error, or something else - this module
-    # does not guess which).
-    onsite_percentage: float | None = None
+    # distinctly and flag them as not reconciling. Never asserts WHY they
+    # differ (an on-site/policy split, a genuine data error, or something
+    # else) - see explicit_onsite_percentage/explicit_financial_
+    # contribution_percentage below for the ONLY basis-specific claims this
+    # module makes, and only when the source text itself states them.
     percentage_reconciles: bool = True
+    # Gate 2B-2B.1 pre-merge remediation - set ONLY when this application's
+    # own affordable_tenure_split_final text explicitly states an on-site/
+    # financial-contribution percentage (see _explicit_evidence_
+    # percentages) - never inferred, never defaulted from the generic
+    # units_implied_percentage above.
+    explicit_onsite_percentage: float | None = None
+    explicit_financial_contribution_percentage: float | None = None
 
 
 @dataclass(frozen=True)
@@ -276,12 +319,15 @@ def _order_candidates(candidates: list[tuple[Application, dict]]) -> list[tuple[
     return sorted(candidates, key=sort_key, reverse=True)
 
 
-def _onsite_percentage_reconciliation(fields: dict) -> tuple[float | None, bool]:
-    """Gate 2B-2B.1 (Brixham Road) - purely arithmetic, from two already-
-    trusted fields (affordable_units_final / total_units_final), never a
-    new persisted field and never a guess at WHY the two figures might
-    differ. Returns (onsite_percentage, percentage_reconciles).
-    onsite_percentage is None whenever either input is unavailable.
+def _units_implied_percentage_reconciliation(fields: dict) -> tuple[float | None, bool]:
+    """Gate 2B-2B.1 (Brixham Road; renamed per Product Owner pre-merge
+    remediation) - purely arithmetic, from two already-trusted fields
+    (affordable_units_final / total_units_final), never a new persisted
+    field and never a guess at WHY the two figures might differ - the
+    result is a units-to-total RATIO, never labelled with any physical
+    basis (on-site, off-site, or otherwise). Returns
+    (units_implied_percentage, percentage_reconciles).
+    units_implied_percentage is None whenever either input is unavailable.
     percentage_reconciles is True whenever there is nothing to compare
     (either figure missing) OR the two agree within
     _PERCENTAGE_RECONCILIATION_TOLERANCE - calibrated against the real
@@ -292,21 +338,26 @@ def _onsite_percentage_reconciliation(fields: dict) -> tuple[float | None, bool]
     stored_pct = fields["affordable_percentage_final"]
     if units is None or not total:
         return None, True
-    onsite_percentage = round(units / total * 100, 1)
+    units_implied_percentage = round(units / total * 100, 1)
     if stored_pct is None:
-        return onsite_percentage, True
-    return onsite_percentage, abs(onsite_percentage - stored_pct) <= _PERCENTAGE_RECONCILIATION_TOLERANCE
+        return units_implied_percentage, True
+    return units_implied_percentage, abs(units_implied_percentage - stored_pct) <= _PERCENTAGE_RECONCILIATION_TOLERANCE
 
 
 def _position(scope_type: str, scope_label: str, app: Application, fields: dict) -> AffordablePosition:
-    onsite_percentage, percentage_reconciles = _onsite_percentage_reconciliation(fields)
+    units_implied_percentage, percentage_reconciles = _units_implied_percentage_reconciliation(fields)
+    explicit_onsite_percentage, explicit_financial_contribution_percentage = _explicit_evidence_percentages(
+        fields["affordable_tenure_split_final"],
+    )
     return AffordablePosition(
         scope_type=scope_type, scope_label=scope_label,
         application_id=app.id, application_reference=app.reference,
         percentage=fields["affordable_percentage_final"], units=fields["affordable_units_final"],
         tenure=fields["affordable_tenure_split_final"], status=fields["affordable_housing_status"],
         notes=fields["affordable_housing_notes"], decided_state=resolve_decided_state(app.decision, app.status),
-        onsite_percentage=onsite_percentage, percentage_reconciles=percentage_reconciles,
+        units_implied_percentage=units_implied_percentage, percentage_reconciles=percentage_reconciles,
+        explicit_onsite_percentage=explicit_onsite_percentage,
+        explicit_financial_contribution_percentage=explicit_financial_contribution_percentage,
     )
 
 
@@ -503,23 +554,43 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
         )
 
     def _reconciliation_note(label: str, p: AffordablePosition) -> str | None:
-        # Gate 2B-2B.1 (Brixham Road, Section 20) - a stored percentage
-        # that does not arithmetically reconcile with the affordable/total
-        # unit count is never silently combined into one "N affordable
-        # homes representing P%" statement - both figures are surfaced,
-        # neither is assumed to be the error, and no reason for the
-        # discrepancy (on-site vs policy-equivalent, a genuine data issue,
-        # or something else) is invented.
-        if p.percentage_reconciles or p.onsite_percentage is None or p.percentage is None:
+        # Gate 2B-2B.1 (Brixham Road, Product Owner pre-merge remediation) -
+        # a stored percentage that does not arithmetically reconcile with
+        # the affordable/total unit count is never silently combined into
+        # one "N affordable homes representing P%" statement - both
+        # figures are surfaced, neither is assumed to be the error, and no
+        # basis (on-site, off-site, policy-equivalent, or a genuine data
+        # issue) is invented for the generic units-implied figure. If (and
+        # only if) this application's own tenure text explicitly states an
+        # on-site/financial-contribution basis, that explicit evidence is
+        # named separately and distinctly, never as an inference from the
+        # arithmetic figure.
+        if p.percentage_reconciles or p.units_implied_percentage is None or p.percentage is None:
             return None
+        explicit_bits = []
+        if p.explicit_onsite_percentage is not None:
+            explicit_bits.append(f"the source evidence explicitly states {_fmt_pct(p.explicit_onsite_percentage)} on-site")
+        if p.explicit_financial_contribution_percentage is not None:
+            explicit_bits.append(
+                f"the source evidence explicitly states a {_fmt_pct(p.explicit_financial_contribution_percentage)} "
+                f"financial contribution"
+            )
+        explicit_sentence = (
+            f" The application's own recorded evidence distinguishes these bases: {'; '.join(explicit_bits)} - "
+            f"use these exact figures/labels if you state a basis, never invent one for a scheme without this "
+            f"explicit wording."
+            if explicit_bits else
+            " No source evidence states what physical basis (on-site, off-site, or otherwise) either figure "
+            "represents - do not invent one."
+        )
         return (
             f"{label} PERCENTAGE DOES NOT RECONCILE: the recorded affordable percentage ({_fmt_pct(p.percentage)}) "
-            f"does not match the percentage implied by the {_fmt_units(p.units)} alone against the scheme's total "
-            f"units (~{_fmt_pct(p.onsite_percentage)} on-site-equivalent). Both figures are evidenced; state both "
-            f"distinctly, never as one combined figure (e.g. never state '{_fmt_units(p.units)} representing "
-            f"{_fmt_pct(p.percentage)}' as if they describe the same denominator), and do not assume which one "
-            f"(if either) reflects a broader position such as an off-site or financial contribution - MANUAL "
-            f"REVIEW RECOMMENDED."
+            f"does not match the units-implied percentage from the {_fmt_units(p.units)} alone against the "
+            f"scheme's total units (~{_fmt_pct(p.units_implied_percentage)}, a plain ratio, not a claim about "
+            f"on-site/off-site provision). Both the {_fmt_units(p.units)} and the {_fmt_pct(p.percentage)} figure "
+            f"are evidenced; state them distinctly, never as one combined figure (e.g. never state "
+            f"'{_fmt_units(p.units)} representing {_fmt_pct(p.percentage)}' as if they describe the same "
+            f"denominator).{explicit_sentence} MANUAL REVIEW RECOMMENDED."
         )
 
     if summary.whole_site is not None:

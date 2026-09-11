@@ -1071,6 +1071,16 @@ class OperativeFilterFacts:
     affordable_units: int | None = None
     affordable_percentage: float | None = None
     affordable_source: str | None = None  # "consented" | "active" | None
+    # Gate 2B-2B.1 pre-merge remediation (Brixham Road) - False exactly
+    # when the resolved AH position's own affordable_percentage_final does
+    # NOT arithmetically reconcile with its affordable/total unit-derived
+    # ratio (app.reporting.affordable_housing_scope.AffordablePosition.
+    # percentage_reconciles) - a signal for a list-scale consumer (Explore)
+    # to withhold/qualify the percentage rather than pairing it unqualified
+    # with the unit count, exactly as Site Profile's own reconciliation
+    # note already does. True (the default) for the ordinary, reconciled
+    # case, so normal schemes are completely unaffected.
+    affordable_percentage_reconciles: bool = True
 
 
 def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
@@ -1151,16 +1161,20 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFi
     affordable_units: int | None = None
     affordable_percentage: float | None = None
     affordable_source: str | None = None
+    affordable_percentage_reconciles = True
     if ah.whole_site is not None:
         affordable_units, affordable_percentage, affordable_source = ah.whole_site.units, ah.whole_site.percentage, "consented"
+        affordable_percentage_reconciles = ah.whole_site.percentage_reconciles
     elif len(active_positions) == 1 and ah.active_whole_site is not None:
         affordable_units, affordable_percentage, affordable_source = ah.active_whole_site.units, ah.active_whole_site.percentage, "active"
+        affordable_percentage_reconciles = ah.active_whole_site.percentage_reconciles
 
     return OperativeFilterFacts(
         decision_status=decision_status,
         has_active_proposal=len(active_positions) >= 1,
         active_proposal_count=len(active_positions),
         affordable_units=affordable_units, affordable_percentage=affordable_percentage, affordable_source=affordable_source,
+        affordable_percentage_reconciles=affordable_percentage_reconciles,
         units=units, units_source=units_source, units_kind=units_kind, units_is_estimated=units_is_estimated,
         units_not_determined=units_not_determined,
         active_units=active_units, active_units_kind=active_units_kind,
@@ -1196,3 +1210,23 @@ def format_operative_units_basis_label(filter_facts: OperativeFilterFacts) -> st
     if filter_facts.units_source:
         bits.append("consented" if filter_facts.units_source == "consented" else "active proposal")
     return " - ".join(bits) if bits else None
+
+
+def resolve_explore_affordable_percentage_display(filter_facts: OperativeFilterFacts) -> float | None:
+    """Gate 2B-2B.1 pre-merge remediation (Brixham Road, Explore safety) -
+    the affordable PERCENTAGE to actually show alongside
+    OperativeFilterFacts.affordable_units in a list-scale table. Withheld
+    (None) exactly when `affordable_percentage_reconciles` is False - i.e.
+    when the recorded percentage does not arithmetically reconcile with
+    the affordable/total unit count - so Explore can never pair an
+    unqualified unit count with a percentage that describes a different
+    basis (confirmed real case: Brixham Road's 54 affordable units next to
+    an unqualified 40% reads as "54 units = 40%", which the underlying
+    evidence does not support - 54/145 is only ~37.2%, and the stored 40%
+    may include e.g. a financial contribution the unit count alone doesn't
+    capture). The unit COUNT itself is never withheld - only the paired
+    percentage, and only in this one non-reconciling case; an ordinary
+    reconciled scheme's percentage is returned unchanged."""
+    if not filter_facts.affordable_percentage_reconciles:
+        return None
+    return filter_facts.affordable_percentage
