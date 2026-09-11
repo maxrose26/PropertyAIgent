@@ -45,11 +45,13 @@ from app.policy.buyer_profiles import (
     EMERGING_ALLOCATION,
     OTHER_OR_UNKNOWN,
     PERMISSION_GRANTED,
+    PLANNING_ACTIVE_PROPOSAL,
     SPECIALIST_DEVELOPMENT_TYPES,
     WHOLLY_AFFORDABLE_THRESHOLD,
     BuyerProfile,
 )
 from app.reporting.allocation_development_coverage import NO_IDENTIFIED_ACTIVITY
+from app.reporting.scheme_reconciliation import FACT_RESOLVED
 
 STRATEGIC_LAND = "strategic_land"
 PLANNING_DELIVERY = "planning_delivery"
@@ -89,10 +91,22 @@ class MatchingFacts:
     # never estimated from a Local Plan/NPPF affordable-housing policy
     # percentage applied to allocation capacity).
     affordable_unit_count: int | None
-    planning_state: str  # one of app.policy.buyer_profiles' four planning-state constants
+    planning_state: str  # one of app.policy.buyer_profiles' five planning-state constants
     has_identified_planning_activity: bool | None  # None = not applicable/not determined
     has_phasing_evidence: bool
     matched_to_site: bool  # allocations only - whether AllocationSiteRelationship/matched_site_id exists at all
+    # Gate 2B-2B.1 - whether OperativePlanningFacts resolved one or more
+    # live `active_positions` for this opportunity, independent of
+    # `planning_state` above. This is what lets a consented permission and
+    # a separately-live active proposal (e.g. Hazelhurst Farm's 400-unit
+    # consent plus its own 176-unit active phase) coexist in Buyer Fit
+    # reasoning without either fact silently disappearing - see assess_
+    # buyer_fit's own use of these two fields. Always False/0 for
+    # STRATEGIC_LAND and for the legacy (pre-2B-2B.1) representative-
+    # application builder below, neither of which has any concept of
+    # "active positions" to report.
+    has_active_proposal: bool = False
+    active_proposal_count: int = 0
 
 
 def build_strategic_land_matching_facts(allocation, coverage, phasing) -> MatchingFacts:
@@ -225,6 +239,136 @@ def build_planning_delivery_matching_facts(scheme_intelligence) -> MatchingFacts
     )
 
 
+def _operative_source_scheme_intelligence(operative_facts, applications_by_id: dict):
+    """The SchemeIntelligence row behind whichever operative unit figure
+    build_planning_delivery_matching_facts_from_operative used (the
+    consented position's source application, else - only when exactly one
+    active proposal exists - that proposal's own source) - never a second,
+    independently-selected representative application, and never inferred
+    from OperativePlanningFacts.unit_mix's own free text (Gate 2B-2B.1
+    brief Section 10: "do not infer numerical house/apartment dominance
+    from free text"). Returns None when no such source can be identified
+    (e.g. genuinely NOT_DETERMINED, or multiple simultaneous active
+    proposals with no single one to attribute development type to)."""
+    consented = operative_facts.consented_position
+    source = None
+    if consented.approved_units.state == FACT_RESOLVED and consented.approved_units.source is not None:
+        source = consented.approved_units.source
+    elif len(operative_facts.active_positions) == 1:
+        proposed = operative_facts.active_positions[0].proposed_units
+        if proposed.state == FACT_RESOLVED and proposed.source is not None:
+            source = proposed.source
+    if source is None:
+        return None
+    app = applications_by_id.get(source.application_id)
+    return app.scheme_intelligence if app else None
+
+
+def build_planning_delivery_matching_facts_from_operative(operative_facts, applications: list) -> MatchingFacts:
+    """Gate 2B-2B.1 - the trusted-facts-aware counterpart to
+    build_planning_delivery_matching_facts above, consuming
+    app.reporting.scheme_reconciliation.OperativePlanningFacts (already
+    computed once by the caller over the Site's full application list)
+    instead of independently selecting one representative Application via
+    app.ui.common.pick_representative_application. `applications` is that
+    same Site's full application list, used only to look up the
+    SchemeIntelligence row behind whichever operative fact this function
+    reads (see _operative_source_scheme_intelligence) - never to pick a
+    representative application itself.
+
+    Used by app.reporting.opportunity_feed's live Buyer Fit rendering -
+    the exact consumer Astra's "Strong Fit because permission granted"
+    report traced to (Former Pendlebury Miners Club: an outline
+    application still 'Under Consultation', with no decision at all).
+    Deliberately NOT used by app.reporting.opportunity_universe's
+    fingerprint-field construction, which keeps calling the legacy
+    build_planning_delivery_matching_facts above completely unchanged -
+    Gate 2B-2B.1 is explicitly forbidden from changing opportunity
+    fingerprints, and unit_count/affordable_unit_count/development_type_raw/
+    is_specialist_development all feed that fingerprint today. See this
+    gate's own implementation report Section C for the full reasoning."""
+    consented = operative_facts.consented_position
+    active_positions = operative_facts.active_positions
+    ah = operative_facts.affordable_housing
+
+    # --- planning_state: cases A-E from the Gate 2B-2B.1 brief ----------
+    # A. an operative consent exists -> PERMISSION_GRANTED (consent is
+    #    always the primary planning-position basis when it exists, per
+    #    Section 9 - a coexisting active proposal never cancels it, see
+    #    has_active_proposal/active_proposal_count below instead).
+    # B/C. no consent, but one or more active substantive proposals exist
+    #    -> PLANNING_ACTIVE_PROPOSAL (never "granted"; multiplicity is
+    #    carried separately, never collapsed by "latest wins").
+    # D/E. refused/withdrawn-only, or genuinely NOT_DETERMINED -> neither
+    #    is a classifiable planning stage this buyer vocabulary already
+    #    has a positive name for; reuses the existing generic
+    #    OTHER_OR_UNKNOWN constant rather than inventing two more (Section
+    #    7: "if compatibility requires an existing generic/unknown state,
+    #    use it").
+    if consented.planning_status.state == FACT_RESOLVED and consented.planning_status.value == "Permission granted":
+        planning_state = PERMISSION_GRANTED
+    elif len(active_positions) >= 1:
+        planning_state = PLANNING_ACTIVE_PROPOSAL
+    else:
+        planning_state = OTHER_OR_UNKNOWN
+
+    # --- units: consented preferred, else (only when exactly one active
+    # proposal exists) that proposal's own figure - the same A/B/C/D rule
+    # app.reporting.scheme_reconciliation.resolve_operative_filter_facts
+    # already implements for Explore, reused conceptually rather than
+    # re-derived from scratch. Multiple simultaneous active proposals with
+    # no consent leave unit_count None/not-determined - never summed,
+    # never "latest wins".
+    unit_count = None
+    if consented.approved_units.state == FACT_RESOLVED:
+        unit_count = consented.approved_units.value
+    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
+        unit_count = active_positions[0].proposed_units.value
+
+    # --- development type / specialist flag - read from the SAME
+    # application the unit figure above came from; never inferred from
+    # unit_mix's own joined free-text string (Section 10). -------------
+    applications_by_id = {a.id: a for a in applications}
+    source_si = _operative_source_scheme_intelligence(operative_facts, applications_by_id)
+    dev_type = source_si.development_type if source_si else None
+    is_specialist = (dev_type in SPECIALIST_DEVELOPMENT_TYPES) if dev_type else None
+
+    # --- affordable housing: consented AH preferred, else (exactly one
+    # active proposal) that proposal's own AH - ah.historical (withdrawn/
+    # refused positions) is never read here, so a withdrawn scheme's AH
+    # figure structurally cannot influence Buyer Fit (Section 8: "withdrawn/
+    # refused AH must NOT influence current Buyer Fit").
+    affordable_pct = None
+    affordable_units = None
+    if ah.whole_site is not None:
+        affordable_pct, affordable_units = ah.whole_site.percentage, ah.whole_site.units
+    elif len(active_positions) == 1 and ah.active_whole_site is not None:
+        affordable_pct, affordable_units = ah.active_whole_site.percentage, ah.active_whole_site.units
+    # A trusted, explicitly-evidenced 0% is preserved as 0 (never
+    # discarded) - affordable_trusted is about WHETHER a position was
+    # resolved at all (ah.whole_site/ah.active_whole_site is None whenever
+    # nothing genuinely evidenced was found - see affordable_housing_
+    # scope.py's own _has_no_independent_affordable_position), never about
+    # the resolved value happening to be zero.
+    affordable_trusted = affordable_pct is not None
+
+    return MatchingFacts(
+        opportunity_type=PLANNING_DELIVERY,
+        unit_count=unit_count,
+        development_type_raw=dev_type,
+        is_specialist_development=is_specialist,
+        affordable_percentage=affordable_pct if affordable_trusted else None,
+        affordable_percentage_trusted=affordable_trusted,
+        affordable_unit_count=affordable_units,
+        planning_state=planning_state,
+        has_identified_planning_activity=True,
+        has_phasing_evidence=False,
+        matched_to_site=True,
+        has_active_proposal=len(active_positions) >= 1,
+        active_proposal_count=len(active_positions),
+    )
+
+
 @dataclass(frozen=True)
 class BuyerFitAssessment:
     classification: str  # STRONG_FIT | NOT_SUITABLE | INSUFFICIENT_EVIDENCE
@@ -241,6 +385,7 @@ def _planning_state_label(state: str) -> str:
         ADOPTED_ALLOCATION: "an adopted residential allocation",
         EMERGING_ALLOCATION: "an emerging residential allocation",
         OTHER_OR_UNKNOWN: "an unclassified planning position",
+        PLANNING_ACTIVE_PROPOSAL: "an active planning application, not yet decided",
     }.get(state, state)
 
 
@@ -320,6 +465,22 @@ def assess_buyer_fit(profile: BuyerProfile, facts: MatchingFacts) -> BuyerFitAss
         unknown.append("Planning position could not be classified with confidence against this buyer's stated appetite.")
     else:
         unknown.append(f"This opportunity is {_planning_state_label(facts.planning_state)}, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.")
+
+    # --- Consent + active proposal coexistence (Gate 2B-2B.1, Section 9) -
+    #
+    # A live active proposal alongside an operative consent (e.g.
+    # Hazelhurst Farm's 400-unit whole-site consent plus its own separate
+    # 176-unit active phase) is never allowed to disappear merely because
+    # `planning_state` above already resolved to PERMISSION_GRANTED - it is
+    # surfaced as its own investigate-worthy note instead, never fabricated
+    # into a second "current application" and never treated as cancelling
+    # the consent.
+    if facts.planning_state == PERMISSION_GRANTED and facts.has_active_proposal:
+        proposal_noun = "a further active planning application is" if facts.active_proposal_count == 1 else f"{facts.active_proposal_count} further active planning applications are"
+        investigate.append(
+            f"An operative planning permission exists for this opportunity, and {proposal_noun} also live and "
+            f"not yet decided - review whether this represents an additional phase or a proposed variation."
+        )
 
     # --- Strategic Land Buyer's own risk-appetite framing -------------------
     if profile.treats_no_activity_as_positive and facts.opportunity_type == STRATEGIC_LAND:

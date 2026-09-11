@@ -19,6 +19,12 @@ from app.db.models import Application, Site
 from app.pipeline.lapse_tracking import BUILD_STATUS_LABELS, LAPSE_STATUS_LABELS, get_expected_decision, parse_portal_date
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, summarize_phase_units
 from app.reporting.affordable_housing_scope import compute_affordable_housing_scope_summary, format_affordable_housing_lines
+from app.reporting.scheme_reconciliation import (
+    NOT_DETERMINED_DECISION_STATUS,
+    OPERATIVE_DECISION_STATUS_LABELS,
+    build_operative_planning_facts,
+    resolve_operative_filter_facts,
+)
 
 MODEL = "gpt-4o-mini"
 
@@ -127,6 +133,42 @@ def build_summary_prompt(
     intelligence_lines.extend(format_affordable_housing_lines(affordable_summary))
     intelligence_block = "\n".join(intelligence_lines)
 
+    # Gate 2B-2B.1 (Section 26-27) - the deterministic, site-level "what is
+    # the current operative planning position" fact fed to the model comes
+    # from app.reporting.scheme_reconciliation.build_operative_planning_
+    # facts (the SAME reconciliation Site Profile/Explore already use), not
+    # `merged`'s legacy first-non-null aggregate_scheme_fields figure -
+    # `applications` here is already the Site's full, unfiltered
+    # application list (see app.pipeline.run_weekly.stage_generate_scheme_
+    # summaries's own `site.applications` read), exactly what reconciliation
+    # needs; no new query. Reconciliation is only consulted for the ONE
+    # scope-level fact it genuinely improves on (the operative unit/status
+    # position) - the model is never asked to reconcile the underlying,
+    # already-contradictory raw application data itself; that reconciliation
+    # happens here, deterministically, before the prompt is built.
+    operative_facts = build_operative_planning_facts(applications)
+    filter_facts = resolve_operative_filter_facts(operative_facts)
+    if filter_facts.decision_status == "not_yet_decided" and filter_facts.active_proposal_count > 1:
+        operative_status_text = (
+            f"{filter_facts.active_proposal_count} separate active applications are proposing development on "
+            f"this site, none yet decided - do not combine, average, or pick one of their figures as THE site total."
+        )
+    elif filter_facts.decision_status == NOT_DETERMINED_DECISION_STATUS:
+        operative_status_text = "not yet determined from the evidence held - do not state a planning outcome that isn't shown above."
+    else:
+        operative_status_text = OPERATIVE_DECISION_STATUS_LABELS[filter_facts.decision_status]
+    if filter_facts.units is not None:
+        scope_units_text = f"{filter_facts.units} total units ({filter_facts.units_source} position)"
+    elif filter_facts.units_not_determined:
+        scope_units_text = "not yet determined from the evidence held - do not state a unit total that isn't shown above"
+    else:
+        # Reconciliation could not run at all (e.g. genuinely no linked
+        # applications) - the only case the legacy merged figure still
+        # stands in for, per the "no fallback after NOT_DETERMINED" rule
+        # (this fallback is for "never ran", never for "ran and found
+        # nothing").
+        scope_units_text = f"{merged.get('total_units_final')} total units (not yet reconciled)"
+
     return f"""
 You are writing an internal status note for a UK residential land/planning
 acquisition professional, synthesising everything currently known about ONE
@@ -135,7 +177,8 @@ below is already verified - restate and synthesise it, never invent a
 figure, phase, or status that isn't listed here.
 
 SITE: {site.display_address} ({site.council_code})
-SCHEME SCOPE: {merged.get('total_units_final')} total units, developer {merged.get('developer') or 'not identified'}
+SCHEME SCOPE: {scope_units_text}, developer {merged.get('developer') or 'not identified'}
+OPERATIVE PLANNING POSITION: {operative_status_text}
 OVERALL COMMENCEMENT STATUS: {lapse_label}
 OVERALL BUILD STATUS: {build_label}
 
@@ -156,12 +199,19 @@ or soften them):
 '''}
 Write a short status note (2-5 sentences, plain text, no markdown headers)
 covering:
-1. Where this scheme currently stands overall - if nothing is granted yet,
-   say so plainly and state the actual portal status of its live
-   application(s) (e.g. "Under Consultation", "Registered", "Awaiting
-   decision" - use the exact status shown against each application above,
-   never invent a generic "pending"). If something is granted, say roughly
-   how much of it has confirmed activity versus how much doesn't yet.
+1. Where this scheme currently stands overall - the OPERATIVE PLANNING
+   POSITION line above is the authoritative, already-reconciled answer to
+   this; never override it or assert a different overall outcome (e.g.
+   never say "permission granted" unless that line itself says so, even if
+   an individual application in the list below shows a different or more
+   recent-looking status - a newer administrative filing on the same site
+   is not automatically the current position). You may still cite an
+   individual application's own portal status (e.g. "Under Consultation",
+   "Registered", "Awaiting decision" - use the exact status shown against
+   it above, never invent a generic "pending") for colour, clearly as that
+   ONE application's own status, not as a restatement of the overall
+   position. If something is granted, say roughly how much of it has
+   confirmed activity versus how much doesn't yet.
 2. If any application above is still undecided and shows an "expected
    decision" figure, state it - and say plainly whether it's confirmed by
    the council or a statutory estimate (the wording in brackets tells you

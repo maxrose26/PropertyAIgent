@@ -46,6 +46,12 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.pipeline.phase_tracking import build_phase_breakdown
+from app.reporting.scheme_reconciliation import (
+    NOT_DETERMINED_DECISION_STATUS,
+    OPERATIVE_DECISION_STATUS_LABELS,
+    build_operative_planning_facts,
+    resolve_operative_filter_facts,
+)
 from app.visuals import IMAGE_TYPE_LABELS
 
 # LocalPlan.status values (app.policy.status.PLAN_STATUSES) that represent a
@@ -853,30 +859,87 @@ def build_ai_summary_carousel_items(session: Session, limit: int = 8) -> list[di
 SCHEME_STACK_TAB_ORDER = ("New Applications", "Scheme Updates", "Decision Changes", "Build Progress", "Needs Attention")
 
 
-def _scheme_card(app: Application, *, why: str, when, page: str | None = None, params: dict | None = None) -> dict:
+def _scheme_card(
+    app: Application, *, why: str, when, page: str | None = None, params: dict | None = None,
+    operative_facts=None,
+) -> dict:
+    """Gate 2B-2B.1 (Section 24) - `why`/`when`/`reference`/`address`/
+    `planning_status` (app.status, raw portal text) stay EVENT-LEVEL,
+    naming the one Application that actually triggered this card - never
+    erased. But `total_units`/`affordable_units`/`affordable_percentage`/
+    `decision_status` are SITE-LEVEL conclusions about the scheme's
+    current planning position, and are read from `operative_facts`
+    (app.reporting.scheme_reconciliation.OperativePlanningFacts, computed
+    ONCE per distinct site by build_scheme_stack below and passed in here)
+    when available - never independently re-derived from this one
+    triggering application's own SchemeIntelligence row, which is exactly
+    what let e.g. a site's Dashboard card show a different current
+    position than its own Site Profile page. `operative_facts=None` (no
+    linked Site at all - the "Needs Attention" suggested-match tab's own
+    unlinked applications, or a legacy caller) falls back to this
+    application's own SchemeIntelligence, honestly labelled as this one
+    application's own evidence, not a site-level claim - there is no site
+    to reconcile against in that case."""
     si = app.scheme_intelligence
     site = app.site
     resolved_page, resolved_params = (page, params if params is not None else {}) if page else (
         ("pages/1_Scheme_Detail.py", {"site_id": str(app.site_id)}) if app.site_id else (None, None)
     )
-    decision_status = classify_decision_status(app.decision, app.status)
     build_status_raw = site.build_status if site else None
+
+    if operative_facts is not None:
+        filter_facts = resolve_operative_filter_facts(operative_facts)
+        total_units = filter_facts.units
+        affordable_units = filter_facts.affordable_units
+        affordable_percentage = filter_facts.affordable_percentage
+        decision_status_label = (
+            None if filter_facts.decision_status in ("not_yet_decided", NOT_DETERMINED_DECISION_STATUS)
+            else OPERATIVE_DECISION_STATUS_LABELS.get(filter_facts.decision_status)
+        )
+    else:
+        total_units = si.total_units_final if si else None
+        affordable_units = si.affordable_units_final if si else None
+        affordable_percentage = si.affordable_percentage_final if si else None
+        decision_status = classify_decision_status(app.decision, app.status)
+        decision_status_label = DECISION_STATUS_LABELS.get(decision_status) if decision_status != "not_yet_decided" else None
+
     return {
         "id": f"scheme-{app.id}",
         "reference": app.reference,
         "council_code": app.council_code,
         "address": app.address,
-        "total_units": si.total_units_final if si else None,
-        "affordable_units": si.affordable_units_final if si else None,
-        "affordable_percentage": si.affordable_percentage_final if si else None,
+        "total_units": total_units,
+        "affordable_units": affordable_units,
+        "affordable_percentage": affordable_percentage,
         "planning_status": app.status,
-        "decision_status": DECISION_STATUS_LABELS.get(decision_status) if decision_status != "not_yet_decided" else None,
+        "decision_status": decision_status_label,
         "build_status": BUILD_STATUS_LABELS.get(build_status_raw) if build_status_raw else None,
         "developer": si.developer if si else None,
         "why": why,
         "when": when,
         "page": resolved_page, "params": resolved_params,
     }
+
+
+def _operative_facts_by_site_id(session: Session, site_ids: set[int]) -> dict[int, object]:
+    """Gate 2B-2B.1 - one batched query (not one per card, not one per
+    tab) computing app.reporting.scheme_reconciliation.
+    OperativePlanningFacts once per distinct Site referenced anywhere in
+    this Dashboard render, reused by every _scheme_card call for that
+    Site regardless of which tab(s) it appears in. Request-scoped only
+    (never persisted, never cached across renders) - see this gate's own
+    architecture note on when memoisation is/isn't justified."""
+    site_ids = {sid for sid in site_ids if sid is not None}
+    if not site_ids:
+        return {}
+    apps = session.execute(
+        select(Application).where(Application.site_id.in_(site_ids))
+        .options(selectinload(Application.scheme_intelligence))
+    ).scalars().all()
+    apps_by_site: dict[int, list[Application]] = {}
+    for a in apps:
+        apps_by_site.setdefault(a.site_id, []).append(a)
+    return {site_id: build_operative_planning_facts(site_apps) for site_id, site_apps in apps_by_site.items()}
 
 
 def _load_primary_application_by_site(session: Session, site_ids: list[int]) -> dict[int, Application]:
@@ -908,16 +971,12 @@ def build_scheme_stack(session: Session, limit_per_tab: int = 8) -> dict[str, li
         select(Application).options(*load_opts)
         .order_by(Application.first_seen_at.desc(), Application.id.desc()).limit(limit_per_tab)
     ).scalars().all()
-    if new_apps:
-        tabs["New Applications"] = [_scheme_card(a, why="New application scraped", when=a.first_seen_at) for a in new_apps]
 
     updated = session.execute(
         select(Application).options(*load_opts)
         .where(Application.site_id.is_not(None))
         .order_by(Application.last_seen_at.desc(), Application.id.desc()).limit(limit_per_tab)
     ).scalars().all()
-    if updated:
-        tabs["Scheme Updates"] = [_scheme_card(a, why="Application details refreshed", when=a.last_seen_at) for a in updated]
 
     # decision_issued_date is free text (portal-native formats), not a real
     # date column - fetched a little wider then re-sorted by the same
@@ -929,19 +988,46 @@ def build_scheme_stack(session: Session, limit_per_tab: int = 8) -> dict[str, li
         .order_by(Application.last_seen_at.desc(), Application.id.desc()).limit(limit_per_tab * 3)
     ).scalars().all()
     decided = sorted(decided_candidates, key=lambda a: parse_portal_date(a.decision_issued_date), reverse=True)[:limit_per_tab]
-    if decided:
-        tabs["Decision Changes"] = [_scheme_card(a, why=f"Decision issued: {a.decision}", when=a.last_seen_at) for a in decided]
 
     build_sites = session.execute(
         select(Site).where(Site.build_status.is_not(None), Site.excluded.is_not(True))
         .order_by(Site.build_status_checked_at.desc(), Site.id.desc()).limit(limit_per_tab)
     ).scalars().all()
+    apps_by_site = _load_primary_application_by_site(session, [s.id for s in build_sites]) if build_sites else {}
+
+    # Gate 2B-2B.1 (Section 24) - ONE batched query/computation of
+    # OperativePlanningFacts per distinct Site referenced by any card in
+    # this render, reused across every tab - never one query per card, and
+    # never a query per tab either.
+    all_site_ids = {
+        a.site_id for a in (*new_apps, *updated, *decided) if a.site_id is not None
+    } | {s.id for s in build_sites}
+    operative_facts_by_site = _operative_facts_by_site_id(session, all_site_ids)
+
+    if new_apps:
+        tabs["New Applications"] = [
+            _scheme_card(a, why="New application scraped", when=a.first_seen_at, operative_facts=operative_facts_by_site.get(a.site_id))
+            for a in new_apps
+        ]
+
+    if updated:
+        tabs["Scheme Updates"] = [
+            _scheme_card(a, why="Application details refreshed", when=a.last_seen_at, operative_facts=operative_facts_by_site.get(a.site_id))
+            for a in updated
+        ]
+
+    if decided:
+        tabs["Decision Changes"] = [
+            _scheme_card(a, why=f"Decision issued: {a.decision}", when=a.last_seen_at, operative_facts=operative_facts_by_site.get(a.site_id))
+            for a in decided
+        ]
+
     if build_sites:
-        apps_by_site = _load_primary_application_by_site(session, [s.id for s in build_sites])
         rows = [
             _scheme_card(
                 apps_by_site[s.id],
                 why=f"Build status: {BUILD_STATUS_LABELS.get(s.build_status, s.build_status)}",
+                operative_facts=operative_facts_by_site.get(s.id),
                 when=s.build_status_checked_at,
             )
             for s in build_sites if s.id in apps_by_site

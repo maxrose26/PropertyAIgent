@@ -103,7 +103,25 @@ SCOPE_PLOT = "plot"
 _AH_FIELDS = (
     "affordable_percentage_final", "affordable_units_final", "affordable_tenure_split_final",
     "affordable_housing_status", "affordable_housing_notes",
+    # Gate 2B-2B.1 (Brixham Road AH semantic hardening) - total_units_final
+    # is already a fully-reconciled, existing field (app.extraction.
+    # reconcile), read here ONLY to detect when the stored `affordable_
+    # percentage_final` and the affordable/total unit-derived percentage
+    # materially disagree - see _onsite_percentage_reconciliation below.
+    # Not a new persisted field; no schema change.
+    "total_units_final",
 )
+
+# Gate 2B-2B.1 - the tolerance (percentage points) below which a stored
+# affordable_percentage_final and the affordable/total unit-derived
+# percentage are treated as the same figure (ordinary rounding in the
+# source document), grounded in the real stored data: of 582 real
+# applications with both an affordable and a total unit count, 558
+# (~96%) agree with the stored percentage to within 2.0pp, and the
+# remaining ~4% are genuine discrepancies worth surfacing rather than
+# silently combining (confirmed live: Brixham Road's 54/145 =~37.2%
+# on-site figure differs from its own stored 40.0% by ~2.76pp).
+_PERCENTAGE_RECONCILIATION_TOLERANCE = 2.0
 
 
 @dataclass(frozen=True)
@@ -123,6 +141,22 @@ class AffordablePosition:
     status: str | None
     notes: str | None
     decided_state: str = DECIDED_UNDETERMINED
+    # Gate 2B-2B.1 (Brixham Road) - the affordable/total unit-derived
+    # percentage, computed purely arithmetically from two already-trusted
+    # fields (affordable_units_final / total_units_final) - None whenever
+    # either figure is unavailable, never guessed. `percentage_reconciles`
+    # is False exactly when this figure and `percentage` above (the
+    # STORED percentage - which may legitimately be a broader "policy-
+    # equivalent" position including e.g. an off-site/financial
+    # contribution, not necessarily an error) disagree by more than
+    # _PERCENTAGE_RECONCILIATION_TOLERANCE - a signal to show BOTH figures
+    # distinctly and flag them as not reconciling, never to silently
+    # combine them into one false "N affordable homes representing P%"
+    # statement, and never to assume WHY they differ (a genuine on-site/
+    # policy split, a genuine data error, or something else - this module
+    # does not guess which).
+    onsite_percentage: float | None = None
+    percentage_reconciles: bool = True
 
 
 @dataclass(frozen=True)
@@ -175,6 +209,32 @@ def _effective_fields(app: Application, prospective_overrides: dict[int, dict] |
     }
 
 
+# Gate 2B-2B.1 (Section 23, Pinfold/Edenfield production defect) - a note
+# that itself says "we found nothing" must never count as affirmative
+# evidence of a genuine zero-AH position. Confirmed live: Pinfold/
+# Edenfield's cross-boundary consultation-response record has
+# affordable_percentage_final=0.0/affordable_units_final=0/status="unknown"
+# (none of which alone establish independent evidence) PLUS the note "No
+# affordable housing provision mentioned in the decision notice..." - a
+# statement of absent information, not a statement of a confirmed zero -
+# which the old has_notes check (any non-empty text) incorrectly treated
+# as genuine evidence. Deliberately narrow and literal (no fuzzy/LLM
+# matching, Section 22/23's own "do not add an LLM" instruction) - matches
+# only the small set of explicit absence-of-information phrasings named in
+# the Gate 2B-2B.1 brief; a note that says something substantive (e.g.
+# Brixham's "...remains unclear as legal agreements are pending", which
+# co-occurs with a real evidenced percentage/unit count independent of
+# this check entirely) is unaffected, since has_percentage/has_units below
+# never depend on notes content at all.
+_ABSENCE_OF_INFORMATION_NOTE_PHRASES = (
+    "no affordable housing provision mentioned",
+    "not mentioned in the decision notice",
+    "no mention of affordable housing",
+    "no information",
+    "not identified",
+)
+
+
 def _has_no_independent_affordable_position(fields: dict) -> bool:
     """True means this application carries no independent affordable-housing
     evidence of its own - a technical/condition-discharge/drainage/highways
@@ -184,10 +244,14 @@ def _has_no_independent_affordable_position(fields: dict) -> bool:
     trace beyond a bare zero: either a non-"unknown" status (B3 only sets one
     when it found evidence to classify), or explanatory notes (e.g. "No
     affordable housing is provided within Phase 2"), or a non-zero
-    percentage/unit figure."""
+    percentage/unit figure. Gate 2B-2B.1 (Section 23): notes that themselves
+    state an ABSENCE of information (see _ABSENCE_OF_INFORMATION_NOTE_
+    PHRASES) never count as that "some trace" on their own."""
     status = fields["affordable_housing_status"]
     has_real_status = status not in (None, "unknown")
-    has_notes = bool(fields["affordable_housing_notes"] and fields["affordable_housing_notes"].strip())
+    notes_text = (fields["affordable_housing_notes"] or "").strip()
+    notes_lower = notes_text.lower()
+    has_notes = bool(notes_text) and not any(phrase in notes_lower for phrase in _ABSENCE_OF_INFORMATION_NOTE_PHRASES)
     has_percentage = fields["affordable_percentage_final"] not in (None, 0)
     has_units = fields["affordable_units_final"] not in (None, 0)
     return not (has_real_status or has_notes or has_percentage or has_units)
@@ -212,13 +276,37 @@ def _order_candidates(candidates: list[tuple[Application, dict]]) -> list[tuple[
     return sorted(candidates, key=sort_key, reverse=True)
 
 
+def _onsite_percentage_reconciliation(fields: dict) -> tuple[float | None, bool]:
+    """Gate 2B-2B.1 (Brixham Road) - purely arithmetic, from two already-
+    trusted fields (affordable_units_final / total_units_final), never a
+    new persisted field and never a guess at WHY the two figures might
+    differ. Returns (onsite_percentage, percentage_reconciles).
+    onsite_percentage is None whenever either input is unavailable.
+    percentage_reconciles is True whenever there is nothing to compare
+    (either figure missing) OR the two agree within
+    _PERCENTAGE_RECONCILIATION_TOLERANCE - calibrated against the real
+    stored data (96% of applications with both figures agree to within
+    2.0pp; see that constant's own docstring)."""
+    units = fields["affordable_units_final"]
+    total = fields["total_units_final"]
+    stored_pct = fields["affordable_percentage_final"]
+    if units is None or not total:
+        return None, True
+    onsite_percentage = round(units / total * 100, 1)
+    if stored_pct is None:
+        return onsite_percentage, True
+    return onsite_percentage, abs(onsite_percentage - stored_pct) <= _PERCENTAGE_RECONCILIATION_TOLERANCE
+
+
 def _position(scope_type: str, scope_label: str, app: Application, fields: dict) -> AffordablePosition:
+    onsite_percentage, percentage_reconciles = _onsite_percentage_reconciliation(fields)
     return AffordablePosition(
         scope_type=scope_type, scope_label=scope_label,
         application_id=app.id, application_reference=app.reference,
         percentage=fields["affordable_percentage_final"], units=fields["affordable_units_final"],
         tenure=fields["affordable_tenure_split_final"], status=fields["affordable_housing_status"],
         notes=fields["affordable_housing_notes"], decided_state=resolve_decided_state(app.decision, app.status),
+        onsite_percentage=onsite_percentage, percentage_reconciles=percentage_reconciles,
     )
 
 
@@ -414,6 +502,26 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
             else " - exact scheme/phase scope not established by linked evidence; state this figure but flag the scope as unconfirmed/needing manual review, do not assert it covers the whole site with confidence"
         )
 
+    def _reconciliation_note(label: str, p: AffordablePosition) -> str | None:
+        # Gate 2B-2B.1 (Brixham Road, Section 20) - a stored percentage
+        # that does not arithmetically reconcile with the affordable/total
+        # unit count is never silently combined into one "N affordable
+        # homes representing P%" statement - both figures are surfaced,
+        # neither is assumed to be the error, and no reason for the
+        # discrepancy (on-site vs policy-equivalent, a genuine data issue,
+        # or something else) is invented.
+        if p.percentage_reconciles or p.onsite_percentage is None or p.percentage is None:
+            return None
+        return (
+            f"{label} PERCENTAGE DOES NOT RECONCILE: the recorded affordable percentage ({_fmt_pct(p.percentage)}) "
+            f"does not match the percentage implied by the {_fmt_units(p.units)} alone against the scheme's total "
+            f"units (~{_fmt_pct(p.onsite_percentage)} on-site-equivalent). Both figures are evidenced; state both "
+            f"distinctly, never as one combined figure (e.g. never state '{_fmt_units(p.units)} representing "
+            f"{_fmt_pct(p.percentage)}' as if they describe the same denominator), and do not assume which one "
+            f"(if either) reflects a broader position such as an off-site or financial contribution - MANUAL "
+            f"REVIEW RECOMMENDED."
+        )
+
     if summary.whole_site is not None:
         p = summary.whole_site
         lines.append(
@@ -423,6 +531,9 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
         )
         if p.notes:
             lines.append(f"WHOLE SITE AFFORDABLE HOUSING NOTES: {p.notes}")
+        note = _reconciliation_note("WHOLE SITE AFFORDABLE HOUSING (CONSENTED)", p)
+        if note:
+            lines.append(note)
 
     if summary.active_whole_site is not None:
         p = summary.active_whole_site
@@ -433,6 +544,9 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
         )
         if p.notes:
             lines.append(f"WHOLE SITE AFFORDABLE HOUSING NOTES: {p.notes}")
+        note = _reconciliation_note("WHOLE SITE AFFORDABLE HOUSING (ACTIVE PROPOSAL)", p)
+        if note:
+            lines.append(note)
 
     for p in summary.phases:
         lines.append(
@@ -442,6 +556,9 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
         )
         if p.notes:
             lines.append(f"{p.scope_label.upper()} AFFORDABLE HOUSING NOTES: {p.notes}")
+        note = _reconciliation_note(f"{p.scope_label.upper()} AFFORDABLE HOUSING (CONSENTED)", p)
+        if note:
+            lines.append(note)
 
     for p in summary.active_phases:
         lines.append(
@@ -451,6 +568,9 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
         )
         if p.notes:
             lines.append(f"{p.scope_label.upper()} AFFORDABLE HOUSING NOTES: {p.notes}")
+        note = _reconciliation_note(f"{p.scope_label.upper()} AFFORDABLE HOUSING (ACTIVE PROPOSAL)", p)
+        if note:
+            lines.append(note)
 
     for p in summary.historical:
         lines.append(
