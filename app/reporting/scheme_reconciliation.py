@@ -278,6 +278,26 @@ def resolve_planning_role(app: Application) -> str:
     text = _proposal_norm(app)
     app_type = (app.application_type or "").lower()
 
+    # Cross-boundary statutory consultation response (Gate 2B-2B.1 Section
+    # 22, Pinfold/Edenfield production defect) - checked before every other
+    # branch, same reasoning as the EIA check immediately below: a record
+    # of ANOTHER authority's Article 18 (Town and Country Planning
+    # (Development Management Procedure) Order) consultation reply must
+    # never fall through to `full`/`outline` on its own residential
+    # wording (confirmed real case: reference 71149, proposal text "Article
+    # 18 consultation from Rossendale Borough Council (2023/0396); Full
+    # application for residential development comprising no. 50 units...",
+    # decision "Raise No Objection" - a neighbouring authority's own
+    # consultee response, not the determining authority's substantive
+    # decision on its own application). Reuses the existing
+    # ROLE_EXTERNAL_CONSULTATION role (already in NON_SUBSTANTIVE_ROLES,
+    # already excluded from consented/active resolution and AH
+    # reconciliation) rather than inventing a new one - deliberately a
+    # narrow, literal phrase match on the specific statutory mechanism
+    # name, not a speculative rewrite of the category classifier.
+    if "article 18 consultation" in text:
+        return ROLE_EXTERNAL_CONSULTATION
+
     # EIA screening vs scoping - distinct roles (scoping is a later,
     # more detailed pre-application step, but neither is ever substantive).
     # Checked before every other branch: an EIA screening/scoping request
@@ -1042,6 +1062,25 @@ class OperativeFilterFacts:
     units_not_determined: bool
     active_units: int | None
     active_units_kind: str | None  # "residential" | "all_use" | None
+    # Gate 2B-2B.1 - the trusted, decided-state-aware affordable-housing
+    # figures for this same consented/single-active resolution (never the
+    # withdrawn/refused/technical-zero-tainted legacy aggregate_scheme_
+    # fields merge that produced the Burnage 0%/Stockport Rugby leakage
+    # defects). None/not-determined whenever no genuine consented or
+    # single-active AH position was resolved - never a fabricated zero.
+    affordable_units: int | None = None
+    affordable_percentage: float | None = None
+    affordable_source: str | None = None  # "consented" | "active" | None
+    # Gate 2B-2B.1 pre-merge remediation (Brixham Road) - False exactly
+    # when the resolved AH position's own affordable_percentage_final does
+    # NOT arithmetically reconcile with its affordable/total unit-derived
+    # ratio (app.reporting.affordable_housing_scope.AffordablePosition.
+    # percentage_reconciles) - a signal for a list-scale consumer (Explore)
+    # to withhold/qualify the percentage rather than pairing it unqualified
+    # with the unit count, exactly as Site Profile's own reconciliation
+    # note already does. True (the default) for the ordinary, reconciled
+    # case, so normal schemes are completely unaffected.
+    affordable_percentage_reconciles: bool = True
 
 
 def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
@@ -1111,10 +1150,31 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFi
             active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
         )
 
+    # Gate 2B-2B.1 - affordable housing, same consented-then-single-active
+    # priority as units above. `facts.affordable_housing.historical`
+    # (withdrawn/refused positions) is never read here, so that evidence
+    # structurally cannot leak into Explore's current AH columns - this is
+    # the fix for the confirmed Stockport Rugby Club (withdrawn AH shown
+    # as current) and Burnage (an ancillary technical zero outranking the
+    # real 13/19.7% consented position) production defects.
+    ah = facts.affordable_housing
+    affordable_units: int | None = None
+    affordable_percentage: float | None = None
+    affordable_source: str | None = None
+    affordable_percentage_reconciles = True
+    if ah.whole_site is not None:
+        affordable_units, affordable_percentage, affordable_source = ah.whole_site.units, ah.whole_site.percentage, "consented"
+        affordable_percentage_reconciles = ah.whole_site.percentage_reconciles
+    elif len(active_positions) == 1 and ah.active_whole_site is not None:
+        affordable_units, affordable_percentage, affordable_source = ah.active_whole_site.units, ah.active_whole_site.percentage, "active"
+        affordable_percentage_reconciles = ah.active_whole_site.percentage_reconciles
+
     return OperativeFilterFacts(
         decision_status=decision_status,
         has_active_proposal=len(active_positions) >= 1,
         active_proposal_count=len(active_positions),
+        affordable_units=affordable_units, affordable_percentage=affordable_percentage, affordable_source=affordable_source,
+        affordable_percentage_reconciles=affordable_percentage_reconciles,
         units=units, units_source=units_source, units_kind=units_kind, units_is_estimated=units_is_estimated,
         units_not_determined=units_not_determined,
         active_units=active_units, active_units_kind=active_units_kind,
@@ -1150,3 +1210,23 @@ def format_operative_units_basis_label(filter_facts: OperativeFilterFacts) -> st
     if filter_facts.units_source:
         bits.append("consented" if filter_facts.units_source == "consented" else "active proposal")
     return " - ".join(bits) if bits else None
+
+
+def resolve_explore_affordable_percentage_display(filter_facts: OperativeFilterFacts) -> float | None:
+    """Gate 2B-2B.1 pre-merge remediation (Brixham Road, Explore safety) -
+    the affordable PERCENTAGE to actually show alongside
+    OperativeFilterFacts.affordable_units in a list-scale table. Withheld
+    (None) exactly when `affordable_percentage_reconciles` is False - i.e.
+    when the recorded percentage does not arithmetically reconcile with
+    the affordable/total unit count - so Explore can never pair an
+    unqualified unit count with a percentage that describes a different
+    basis (confirmed real case: Brixham Road's 54 affordable units next to
+    an unqualified 40% reads as "54 units = 40%", which the underlying
+    evidence does not support - 54/145 is only ~37.2%, and the stored 40%
+    may include e.g. a financial contribution the unit count alone doesn't
+    capture). The unit COUNT itself is never withheld - only the paired
+    percentage, and only in this one non-reconciling case; an ordinary
+    reconciled scheme's percentage is returned unchanged."""
+    if not filter_facts.affordable_percentage_reconciles:
+        return None
+    return filter_facts.affordable_percentage

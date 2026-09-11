@@ -60,7 +60,6 @@ from app.reporting.allocation_discovery import (
 from app.policy.buyer_matching import (
     NOT_SUITABLE,
     STRONG_FIT,
-    build_planning_delivery_matching_facts,
     build_strategic_land_matching_facts,
 )
 
@@ -201,20 +200,30 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
 
 def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None:
     """Buyer Profiles V1 - batched, additive enrichment of already-built
-    planning/delivery cards with a MatchingFacts reader over
-    SchemeIntelligence, mutating each card's own "matching_facts" key in
-    place. Never touches app.reporting.dashboard's own card-building
-    functions - this reads the same site_id every one of their cards
-    already carries in "params", via one batched query for every card in
-    the list, not one query per card. The representative application per
-    Site is chosen by the SAME app.ui.common.pick_representative_application
-    every other part of the platform already uses - never a second,
-    parallel "which application matters" rule invented here."""
+    planning/delivery cards with a MatchingFacts reader, mutating each
+    card's own "matching_facts" key in place. Never touches app.reporting.
+    dashboard's own card-building functions - this reads the same site_id
+    every one of their cards already carries in "params", via one batched
+    query for every card in the list, not one query per card.
+
+    Gate 2B-2B.1 - this is the live Buyer Fit rendering path Astra's
+    "Strong Fit because permission granted" report traced to (Former
+    Pendlebury Miners Club - an outline application still 'Under
+    Consultation', never decided). MatchingFacts here is now built from
+    app.reporting.scheme_reconciliation.build_operative_planning_facts
+    (the same trusted, role-aware, decided-state-aware reconciliation
+    Site Profile/Explore already use), NOT app.ui.common.
+    pick_representative_application's single arbitrary application pick -
+    see app.policy.buyer_matching.build_planning_delivery_matching_facts_
+    from_operative's own docstring for why app.reporting.opportunity_
+    universe's separate, fingerprint-affecting MatchingFacts construction
+    is deliberately left on the legacy path instead."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
     from app.db.models import Application
-    from app.ui.common import pick_representative_application
+    from app.policy.buyer_matching import build_planning_delivery_matching_facts_from_operative
+    from app.reporting.scheme_reconciliation import build_operative_planning_facts
 
     site_ids = {int(c["params"]["site_id"]) for c in cards if c.get("params", {}).get("site_id")}
     if not site_ids:
@@ -231,9 +240,8 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
 
     facts_by_site_id = {}
     for site_id, site_apps in apps_by_site.items():
-        rep = pick_representative_application(site_apps)
-        si = rep.scheme_intelligence if rep else None
-        facts_by_site_id[site_id] = build_planning_delivery_matching_facts(si)
+        operative_facts = build_operative_planning_facts(site_apps)
+        facts_by_site_id[site_id] = build_planning_delivery_matching_facts_from_operative(operative_facts, site_apps)
 
     for card in cards:
         site_id_raw = card.get("params", {}).get("site_id")

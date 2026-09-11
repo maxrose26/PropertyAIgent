@@ -36,10 +36,23 @@ from dataclasses import dataclass, field
 #   - OTHER_OR_UNKNOWN: anything else (a plan status bucketed "other", or
 #     a case this module cannot classify with confidence) - always reads
 #     as missing evidence, never as a silent exclusion.
+#   - PLANNING_ACTIVE_PROPOSAL (Gate 2B-2B.1): a live, substantive planning
+#     application exists for this opportunity but has not yet been
+#     decided (app.reporting.scheme_reconciliation.OperativePlanningFacts
+#     resolved one or more `active_positions`, with no operative consent).
+#     Distinct from OTHER_OR_UNKNOWN - "we know there is a pending
+#     application" is real, positive information, not "we couldn't
+#     classify this" - but membership in no pilot profile's own
+#     accepted_planning_states today, so it behaves exactly like
+#     OTHER_OR_UNKNOWN does for classification purposes (an honest
+#     "outside this buyer's stated appetite, not disqualifying" note,
+#     never a fabricated match, never a hard exclusion) until a future
+#     profile explicitly opts in.
 PERMISSION_GRANTED = "permission_granted"
 ADOPTED_ALLOCATION = "adopted_allocation"
 EMERGING_ALLOCATION = "emerging_allocation"
 OTHER_OR_UNKNOWN = "other_or_unknown"
+PLANNING_ACTIVE_PROPOSAL = "planning_active_proposal"
 
 # --- Specialist/non-general-needs development types -------------------------
 #

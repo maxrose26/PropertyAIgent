@@ -462,6 +462,10 @@ def test_non_affordable_prompt_sections_unchanged(session):
     phase_breakdown = build_phase_breakdown([app])
     prompt = build_summary_prompt(site, [app], merged, lapse, phase_breakdown)
 
-    assert "SCHEME SCOPE: 45 total units, developer Example Developer Ltd" in prompt
+    # Gate 2B-2B.1 - SCHEME SCOPE now states the trusted operative
+    # (consented) unit figure explicitly, not merged's legacy figure, and
+    # a new OPERATIVE PLANNING POSITION line states the reconciled status.
+    assert "SCHEME SCOPE: 45 total units (consented position), developer Example Developer Ltd" in prompt
+    assert "OPERATIVE PLANNING POSITION: Granted" in prompt
     assert "RECOMMENDATION DIRECTION: approval" in prompt
     assert "ALL 1 LINKED APPLICATIONS ON THIS SITE" in prompt

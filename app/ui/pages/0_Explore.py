@@ -39,6 +39,7 @@ from app.reporting.scheme_reconciliation import (
     build_operative_planning_facts,
     format_operative_decision_status_label,
     format_operative_units_basis_label,
+    resolve_explore_affordable_percentage_display,
     resolve_operative_filter_facts,
 )
 from app.ui.common import (
@@ -268,6 +269,13 @@ for site in sites:
     # different words for the same trusted fact.
     decision_status_label = format_operative_decision_status_label(filter_facts)
     units_basis_label = format_operative_units_basis_label(filter_facts)
+    # Gate 2B-2B.1 pre-merge remediation (Brixham Road) - the affordable
+    # percentage is withheld (None) whenever it does not arithmetically
+    # reconcile with the affordable/total unit count, so this table can
+    # never pair "54 affordable units" with an unqualified "40%" that
+    # actually describes a different basis - see Site Profile's own
+    # Planning Position tab for the full evidence and both figures.
+    explore_affordable_percentage = resolve_explore_affordable_percentage_display(filter_facts)
 
     # Reuses the merged/lapse/filter_facts already computed above for the
     # table row and the tooltip - zero additional queries or aggregation
@@ -318,9 +326,20 @@ for site in sites:
         "Has Active Proposal": filter_facts.has_active_proposal,
         "Active Proposals": filter_facts.active_proposal_count,
         "Active Proposal Units": filter_facts.active_units,
-        "Affordable Units": merged["affordable_units_final"],
+        # Gate 2B-2B.1 - the same trusted, decided-state-aware AH position
+        # already used for Site Profile's Planning Position tab, not the
+        # legacy first-non-null aggregate_scheme_fields merge that let a
+        # withdrawn/ancillary-technical-zero application outrank a real
+        # consented AH position (the confirmed Burnage/Stockport Rugby
+        # Club production defects). None when no consented or single
+        # active AH position was resolved - never a fabricated zero.
+        "Affordable Units": filter_facts.affordable_units,
         "Private Units": merged["private_units_final"],
-        "Affordable %": merged["affordable_percentage_final"],
+        "Affordable %": explore_affordable_percentage,
+        # True whenever a percentage was withheld above because it does
+        # not reconcile with the unit count - a reviewer can filter/sort
+        # on this without needing to already know a figure is missing.
+        "Affordable % Unreconciled": not filter_facts.affordable_percentage_reconciles,
         "Tenure Split": merged["affordable_tenure_split_final"],
         "Development Type": merged["development_type"],
         "Housing Type": HOUSING_TYPE_LABELS[housing_type],
@@ -567,6 +586,7 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
         report_facts = build_operative_planning_facts(all_report_apps)
         report_filter_facts = resolve_operative_filter_facts(report_facts)
         report_decision_label = format_operative_decision_status_label(report_filter_facts)
+        report_affordable_percentage = resolve_explore_affordable_percentage_display(report_filter_facts)
         rows_out.append({
             "Council": site.council_code,
             "Region": council_regions.get(site.council_code),
@@ -577,9 +597,13 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
             "Has Active Proposal": report_filter_facts.has_active_proposal,
             "Active Proposals": report_filter_facts.active_proposal_count,
             "Active Proposal Units": report_filter_facts.active_units,
-            "Affordable Units": merged["affordable_units_final"],
+            # Gate 2B-2B.1 - same trusted AH resolution as the main table
+            # above, so the exported report can never show a different AH
+            # figure than what a user just filtered by on-screen.
+            "Affordable Units": report_filter_facts.affordable_units,
             "Private Units": merged["private_units_final"],
-            "Affordable %": merged["affordable_percentage_final"],
+            "Affordable %": report_affordable_percentage,
+            "Affordable % Unreconciled": not report_filter_facts.affordable_percentage_reconciles,
             "Tenure Split": merged["affordable_tenure_split_final"],
             "Development Type": merged["development_type"],
             "Housing Type": HOUSING_TYPE_LABELS[classify_housing_type(merged["development_type"], merged["housing_typology"])],

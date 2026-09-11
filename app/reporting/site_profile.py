@@ -576,15 +576,32 @@ def build_site_profile(
     # arbitrary but stable choice among possibly several - see
     # header["planning_status_label"] below for how multiple active
     # positions are represented honestly rather than silently reduced to
-    # one). Falls back to rep_app only when reconciliation identified
-    # neither a consented nor any active operative application.
+    # one).
+    #
+    # Gate 2B-2B.1 (Sections 12-13, 29 "no fallback after NOT_DETERMINED"):
+    # this used to fall back to the raw `rep_app` (pick_representative_
+    # application's own, role/decided-state-blind pick) whenever
+    # reconciliation resolved neither a consented nor an active position -
+    # exactly the bug behind two confirmed production defects: Stockport
+    # Rugby Club's withdrawn 45/50% AH figure resurfacing on the Overview
+    # tab's "Affordable homes" tile, and Pennington's Stables' EIA-screening
+    # 68-home figure resurfacing on the Residential Mix tab as "Total
+    # homes: 68", both while the SAME page's Overview tab correctly said
+    # "Not yet verified" one tab over. `mix_rep_app` is now None in exactly
+    # that case - app.reporting.residential_mix.build_residential_mix (and
+    # every helper it calls) already handles rep_app=None honestly
+    # (build_current_version returns has_scheme_intelligence=False/no
+    # alternatives; compute_affordable_headline/build_overview_totals
+    # already accept scheme=None and produce their own "not
+    # identified"/"not yet verified" states) - no new fallback logic was
+    # needed, only removing the old one.
     operative_app = None
     if consented.reference.state == FACT_RESOLVED and consented.reference.source is not None:
         operative_app = next((a for a in all_apps if a.id == consented.reference.source.application_id), None)
     elif active_positions and active_positions[0].reference.state == FACT_RESOLVED:
         src = active_positions[0].reference.source
         operative_app = next((a for a in all_apps if a.id == src.application_id), None) if src else None
-    mix_rep_app = operative_app or rep_app
+    mix_rep_app = operative_app
 
     header = build_site_header(
         site=site, merged=merged, lapse=lapse, decision_status=decision_status,

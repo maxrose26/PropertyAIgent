@@ -511,6 +511,7 @@ def test_buyer_mode_selects_from_a_larger_pool_than_the_generic_feed(session):
         session.flush()
         session.add(Application(
             council_code="testcouncil", reference=f"REF-{label}", site_id=site.id, status="Decided", decision="Granted",
+            proposal="Full planning application for the erection of residential dwellings.",
             decision_issued_date=decision_date.strftime("%a %d %b %Y"), first_seen_at=dt.datetime.now(dt.timezone.utc),
         ))
         session.flush()
