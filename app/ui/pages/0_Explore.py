@@ -37,6 +37,7 @@ from app.pipeline.lapse_tracking import (
     parse_portal_date,
 )
 from app.search.query_parser import SearchFilters, compute_aggregate_answer, parse_query
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts
 from app.ui.common import (
     BUILD_STATUS_LABELS,
     LAPSE_STATUS_LABELS,
@@ -46,6 +47,7 @@ from app.ui.common import (
     compute_lapse_status,
     credits_sidebar,
     get_db,
+    load_all_applications_for_sites,
     load_applications_for_sites,
     load_watchlist_applications,
     pick_representative_application,
@@ -185,6 +187,13 @@ if not sites:
 # on a single load).
 site_ids = [s.id for s in sites]
 apps_by_site = load_applications_for_sites(session, site_ids)
+# Gate 2B-2A Stage B - the RAW (unfiltered) application set, batched the
+# same way as apps_by_site above. Both lapse tracking and the reconciled
+# operative-facts computation below need the full evidence set (condition
+# discharges, NMAs, EIA screenings...) the display filter deliberately
+# drops - see load_all_applications_for_sites's own docstring for why this
+# replaces the old per-Site `site.applications` lazy-load.
+all_apps_by_site = load_all_applications_for_sites(session, site_ids)
 
 local_plan_by_site: dict[int, list[LocalPlanSite]] = {}
 for entry in session.execute(
@@ -218,28 +227,57 @@ for site in sites:
 
     rep_app = pick_representative_application(apps)
     merged = aggregate_scheme_fields(apps)
-    # site.applications (the raw relationship), not the display-filtered
-    # `apps` from load_site_applications - that filter drops administrative
-    # applications (condition discharge, variation of condition) as noise
-    # for the "Application history" list, but those are exactly the
-    # evidence classify_build_status's portal-filing signal depends on to
-    # detect "underway". Confirmed a real case: a site with 30 linked
-    # applications (10+ real condition-discharge filings spanning years)
-    # showed "Permission may have lapsed" here because compute_lapse_status
-    # never saw any of that evidence - only the 3 applications that survived
-    # the qualifying-scheme filter.
-    lapse = compute_lapse_status(site.applications, site)
+    all_apps = all_apps_by_site.get(site.id, [])
+    # all_apps_by_site (batched, eager-loaded), not the display-filtered
+    # `apps` from load_applications_for_sites - that filter drops
+    # administrative applications (condition discharge, variation of
+    # condition) as noise for the "Application history" list, but those are
+    # exactly the evidence classify_build_status's portal-filing signal
+    # depends on to detect "underway". Confirmed a real case: a site with 30
+    # linked applications (10+ real condition-discharge filings spanning
+    # years) showed "Permission may have lapsed" here because
+    # compute_lapse_status never saw any of that evidence - only the 3
+    # applications that survived the qualifying-scheme filter.
+    lapse = compute_lapse_status(all_apps, site)
     housing_type = classify_housing_type(merged["development_type"], merged["housing_typology"])
     housing_note = housing_type_note(merged["development_type"], merged["housing_typology"])
     decision_status = classify_decision_status(rep_app.decision if rep_app else None, rep_app.status if rep_app else None)
 
-    # Reuses the merged/lapse/decision_status already computed above for
-    # the table row - zero additional queries or aggregation per marker
+    # Gate 2B-2A Stage A/B - the same trusted operative-facts read model
+    # app.reporting.site_profile's headline tile and app.ui.common's shared
+    # render_scheme_detail block already use, over the full (unfiltered)
+    # evidence set. Stage B's benchmark confirmed this costs no additional
+    # queries here (all_apps was already batched above) and adds only a few
+    # ms/site of compute - see the Stage B benchmark note in the Gate 2B-2A
+    # implementation report.
+    facts = build_operative_planning_facts(all_apps)
+    consented = facts.consented_position
+    active_positions = facts.active_positions
+    reconciliation_ran = bool(facts.resolved_applications)
+    operative_total_units: int | None = None
+    if consented.approved_units.state == FACT_RESOLVED:
+        operative_total_units = consented.approved_units.value
+    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
+        operative_total_units = active_positions[0].proposed_units.value
+    operative_total_units_not_determined = bool(reconciliation_ran and operative_total_units is None)
+    operative_decision_status: str | None = None
+    if consented.planning_status.state == FACT_RESOLVED:
+        operative_decision_status = str(consented.planning_status.value)
+    elif len(active_positions) == 1 and active_positions[0].planning_status.state == FACT_RESOLVED:
+        operative_decision_status = str(active_positions[0].planning_status.value)
+    elif len(active_positions) > 1:
+        operative_decision_status = f"{len(active_positions)} active planning proposals"
+
+    # Reuses the merged/lapse/decision_status/facts already computed above
+    # for the table row - zero additional queries or aggregation per marker
     # (Sprint 3A Part 5: "avoid additional per-marker queries", Part 6).
     headline = build_site_headline(
         site_id=site.id, address=site.display_address, council_label=council_names.get(site.council_code, site.council_code),
         merged=merged, lapse=lapse, decision_status=decision_status,
         local_plan_status=_local_plan_headline_text(local_plan_by_site.get(site.id, [])),
+        operative_total_units=operative_total_units,
+        operative_total_units_not_determined=operative_total_units_not_determined,
+        operative_decision_status=operative_decision_status,
     )
     tooltip_text = format_site_tooltip(headline)
 
@@ -493,7 +531,7 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
         apps = site_applications[site_id]
         rep_app = pick_representative_application(apps)
         merged = aggregate_scheme_fields(apps)
-        lapse = compute_lapse_status(site.applications, site)  # see main loop above for why not the filtered `apps`
+        lapse = compute_lapse_status(all_apps_by_site.get(site_id, []), site)  # see main loop above for why not the filtered `apps`
         decision_status = classify_decision_status(rep_app.decision if rep_app else None, rep_app.status if rep_app else None)
         rows_out.append({
             "Council": site.council_code,

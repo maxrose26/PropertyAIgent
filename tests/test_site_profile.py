@@ -147,11 +147,66 @@ def test_build_site_profile_withdrawn_only_site_shows_not_verified_total(session
     total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
     assert total_tile["value"] == "Not yet verified"
     rec = view["scheme_reconciliation"]
-    assert rec["approved_residential_units"]["state"] == "not_determined"
-    assert rec["proposed_residential_units"]["state"] == "not_determined"
-    assert rec["operative_planning_status"]["value"] == "Withdrawn"
+    assert rec["consented_position"]["approved_units"]["state"] == "not_determined"
+    assert rec["active_positions"] == []  # withdrawn is neither consented nor active
+    assert rec["consented_position"]["planning_status"]["value"] == "Withdrawn"
     # a withdrawn scheme still HAS a resolved planning status
     assert view["header"]["planning_status_label"] == "Withdrawn"
+
+
+def test_burnage_regression_decision_status_tile_and_tab_agree_with_header(session):
+    """Gate 2B-2A Stage A required regression case - Former Burnage
+    Cricket Club. A granted Full permission plus a newer condition-
+    discharge filing (no decision of its own) must not let the SAME page
+    say "Permission granted" in one place and "Awaiting decision" in
+    another. The old defect: `decision_status` was computed by the caller
+    from pick_representative_application's pick (the condition-discharge
+    filing) and fed BOTH the headline tile and the Planning Position tab,
+    while the header's own reconciled planning_status_label said
+    something different."""
+    site = _make_site(session)
+    granted = _make_app(
+        session, site.id, "142311/FO/2025",
+        proposal="Erection of up to 66 no. dwellings (53 no. dwellinghouses and 13 no. apartments) with "
+                 "associated access, car parking, infrastructure and landscaping",
+        status="Final", decision="Approve", decision_issued_date="Mon 23 Mar 2026",
+        application_received="Wed 04 Mar 2025",
+    )
+    session.add(SchemeIntelligence(
+        application_id=granted.id, total_units_final=66, affordable_units_final=13,
+        affordable_percentage_final=19.7, affordable_housing_status="officer_recommended",
+        core_intelligence_complete=True,
+    ))
+    bng_discharge = _make_app(
+        session, site.id, "OTH-2026-001269",
+        proposal="Discharge of Biodiversity Net Gain Plan statutory condition attached to "
+                 "Planning Permission 142311/FO/2025.",
+        status="Under Consultation", decision=None, application_received="Fri 07 Aug 2026",
+    )
+    session.add(SchemeIntelligence(
+        application_id=bng_discharge.id, total_units_final=66, affordable_units_final=0,
+        affordable_percentage_final=0.0, core_intelligence_complete=True,
+    ))
+    session.commit()
+
+    apps = [granted, bng_discharge]
+    merged = aggregate_scheme_fields(apps)
+    rep_app = pick_representative_application(apps)  # picks the newer, fully-extracted bng_discharge
+    lapse = compute_lapse_status(site.applications, site)
+    legacy_decision_status = classify_decision_status(rep_app.decision, rep_app.status)
+    assert legacy_decision_status == "not_yet_decided"  # confirms the OLD defect's own root cause
+
+    view = build_site_profile(
+        session, site, apps, merged=merged, rep_app=rep_app, lapse=lapse, phase_breakdown=[],
+        decision_status=legacy_decision_status,
+    )
+
+    decision_tile = next(m for m in view["headline_metrics"] if m["label"] == "Decision status")
+    assert decision_tile["value"] == "Granted"
+    assert view["header"]["decision_status_label"] == "Granted"
+    assert view["header"]["planning_status_label"] == "Permission granted"
+    # no more "Granted" in one place and "Awaiting decision" in another
+    assert decision_tile["value"] != "Awaiting decision"
 
 
 def test_build_site_profile_eia_screening_only_site_has_no_substantive_headline(session):
@@ -183,8 +238,8 @@ def test_build_site_profile_eia_screening_only_site_has_no_substantive_headline(
     assert view["header"]["operative_permission_reference"] is None
     rec = view["scheme_reconciliation"]
     assert rec["roles"][0]["role"] == "eia_screening"
-    assert rec["operative_planning_status"]["state"] == "not_determined"
-    assert rec["proposed_residential_units"]["state"] == "not_determined"
+    assert rec["consented_position"]["planning_status"]["state"] == "not_determined"
+    assert rec["active_positions"] == []
 
 
 def test_headline_metrics_affordable_tile_sourced_from_single_scheme_version(session):

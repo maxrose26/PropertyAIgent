@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.db.models import Application
 from app.pipeline.site_linking import confirm_suggested_link, extract_postcode_district, reject_suggested_link
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts
 from app.ui.common import (
     aggregate_scheme_fields,
     bootstrap,
@@ -78,7 +79,26 @@ for app in suggested:
         if candidate_rep and candidate_rep.summary_url:
             st.markdown(f"[Open on planning portal]({candidate_rep.summary_url})")
         merged = aggregate_scheme_fields(candidate_apps)
-        st.caption(f"Total units: {merged['total_units_final'] or 'not yet extracted'} | "
+        # Gate 2B-2A - the same trusted operative total the Site Profile
+        # page would show for this site (consented, else a single active
+        # proposal), not a raw first-non-null merged figure - a reviewer
+        # deciding whether a new filing belongs to this site should see the
+        # same "current total" the rest of the platform trusts. Falls back
+        # to merged's own figure only when candidate_apps is empty or
+        # reconciliation hasn't run (e.g. an all-non-substantive candidate).
+        candidate_facts = build_operative_planning_facts(candidate_apps) if candidate_apps else None
+        candidate_total: int | str | None = None
+        if candidate_facts is not None:
+            if candidate_facts.consented_position.approved_units.state == FACT_RESOLVED:
+                candidate_total = candidate_facts.consented_position.approved_units.value
+            elif (
+                len(candidate_facts.active_positions) == 1
+                and candidate_facts.active_positions[0].proposed_units.state == FACT_RESOLVED
+            ):
+                candidate_total = candidate_facts.active_positions[0].proposed_units.value
+        if candidate_total is None:
+            candidate_total = merged["total_units_final"]
+        st.caption(f"Total units: {candidate_total or 'not yet extracted'} | "
                    f"Development type: {merged['development_type'] or 'unknown'}")
 
     btn_col1, btn_col2, _ = st.columns([1, 1, 3])

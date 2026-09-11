@@ -39,6 +39,9 @@ def build_site_headline(
     lapse: dict,
     decision_status: str | None,
     local_plan_status: str | None = None,
+    operative_total_units: int | None = None,
+    operative_total_units_not_determined: bool = False,
+    operative_decision_status: str | None = None,
 ) -> dict:
     """Pure - shapes already-computed values into a stable headline dict.
     Every field is either a real value or None - never a placeholder string
@@ -56,17 +59,48 @@ def build_site_headline(
         any Local Plan allocation - callers build this string themselves
         (see app.ui.streamlit_app) since it depends on Policy Intelligence
         data this module has no business reaching into directly.
+    operative_total_units / operative_total_units_not_determined /
+        operative_decision_status: Gate 2B-2A optional overrides carrying
+        the reconciled operative-facts answer (from
+        app.reporting.scheme_reconciliation.build_operative_planning_facts),
+        the same trusted read model app.reporting.site_profile's headline
+        tile uses. When operative_total_units is given it wins over
+        merged["total_units_final"]; when operative_total_units_not_determined
+        is True the total is shown as unresolved (None) rather than falling
+        back to merged; when operative_decision_status is given it wins over
+        the legacy decision_status label. All three default to "not supplied"
+        so existing callers keep today's (Gate 2B-1) behaviour unchanged
+        until a caller is deliberately migrated to pass them - see Stage B
+        of Gate 2B-2A for when app.ui.pages.0_Explore's per-Site loop, the
+        only real caller, may start passing these.
     """
     build_status = lapse.get("build_status")
+    # Gate 2B-2A - prefer the reconciled operative total/decision status
+    # (computed once by the caller via app.reporting.scheme_reconciliation,
+    # the same pattern app.reporting.site_profile's headline tile already
+    # uses) over the legacy first-non-null `merged`/rep_app-derived values.
+    # `operative_total_units_not_determined=True` means reconciliation ran
+    # and deliberately found no operative quantum - show that honestly,
+    # never fall back to `merged` (Gate 2B-1 Defect 2's own discipline).
+    if operative_total_units is not None:
+        total_units = operative_total_units
+    elif operative_total_units_not_determined:
+        total_units = None
+    else:
+        total_units = merged.get("total_units_final")
+    decision_label = (
+        operative_decision_status if operative_decision_status is not None
+        else (DECISION_STATUS_LABELS.get(decision_status) if decision_status else None)
+    )
     return {
         "site_id": site_id,
         "address": address or None,
         "council": council_label or None,
-        "total_units": merged.get("total_units_final"),
-        "units_estimated": bool(merged.get("total_units_is_estimated")),
+        "total_units": total_units,
+        "units_estimated": bool(merged.get("total_units_is_estimated")) if operative_total_units is None else False,
         "affordable_units": merged.get("affordable_units_final"),
         "affordable_percentage": merged.get("affordable_percentage_final"),
-        "decision_status_label": DECISION_STATUS_LABELS.get(decision_status) if decision_status else None,
+        "decision_status_label": decision_label,
         "developer": merged.get("developer") or merged.get("applicant_company") or None,
         # "unknown" carries no information over omitting the field entirely
         # (Part 2) - every other build_status value (including

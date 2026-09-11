@@ -139,3 +139,48 @@ def test_long_address_does_not_break_the_tooltip():
     tooltip = format_site_tooltip(headline)
     first_line = tooltip.split("\n")[0]
     assert len(first_line) <= 70
+
+
+def test_omitting_operative_overrides_keeps_legacy_behaviour_unchanged():
+    # Gate 2B-2A: existing callers that don't pass the new operative_*
+    # kwargs must see exactly today's (Gate 2B-1) merged-based behaviour.
+    headline = build_site_headline(
+        site_id=1, address=None, council_label=None,
+        merged=COMPLETE_MERGED, lapse=COMPLETE_LAPSE, decision_status="granted",
+    )
+    assert headline["total_units"] == 150
+    assert headline["units_estimated"] is False
+    assert headline["decision_status_label"] == "Granted"
+
+
+def test_operative_total_units_overrides_merged_total():
+    headline = build_site_headline(
+        site_id=1, address=None, council_label=None,
+        merged=COMPLETE_MERGED, lapse=COMPLETE_LAPSE, decision_status="granted",
+        operative_total_units=66,
+    )
+    assert headline["total_units"] == 66
+    # a reconciled operative figure is never marked "estimated" the way a
+    # raw first-non-null merged figure can be.
+    assert headline["units_estimated"] is False
+
+
+def test_operative_total_units_not_determined_shows_honest_unresolved_total():
+    # Reconciliation ran and deliberately found no operative quantum (e.g.
+    # a withdrawn-only site) - must show unresolved, never fall back to
+    # merged's own (possibly stale/misleading) total_units_final.
+    headline = build_site_headline(
+        site_id=1, address=None, council_label=None,
+        merged=COMPLETE_MERGED, lapse=COMPLETE_LAPSE, decision_status="granted",
+        operative_total_units_not_determined=True,
+    )
+    assert headline["total_units"] is None
+
+
+def test_operative_decision_status_overrides_legacy_decision_status_label():
+    headline = build_site_headline(
+        site_id=1, address=None, council_label=None,
+        merged=COMPLETE_MERGED, lapse=COMPLETE_LAPSE, decision_status="granted",
+        operative_decision_status="2 active planning proposals",
+    )
+    assert headline["decision_status_label"] == "2 active planning proposals"
