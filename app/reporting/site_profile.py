@@ -36,7 +36,7 @@ from app.pipeline.lapse_tracking import (
 )
 from app.policy.site_view import build_site_policy_intelligence
 from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
-from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts, resolve_canonical_decision_status
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_site_visual_evidence
 
@@ -568,7 +568,7 @@ def build_site_profile(
     # facts elsewhere on the page already reflected the granted permission).
     # The caller-supplied `decision_status` is used only as the final
     # fallback, when reconciliation could not run at all.
-    decision_status = _reconciled_decision_status(consented, active_positions, _reconciliation_ran, decision_status)
+    decision_status = resolve_canonical_decision_status(consented, active_positions, _reconciliation_ran, decision_status)
 
     # The application whose coherent scheme_intelligence record represents
     # the scheme for residential-mix / affordable-headline purposes - the
@@ -672,31 +672,6 @@ def build_site_profile(
         "residential_mix": residential_mix,
         "scheme_reconciliation": _reconciliation_view(facts),
     }
-
-
-def _reconciled_decision_status(consented, active_positions, reconciliation_ran: bool, fallback: str | None) -> str | None:
-    """Gate 2B-2A Section 20 - one of app.pipeline.lapse_tracking.
-    DECISION_STATUS_LABELS's own 4 keys (granted/refused/withdrawn/
-    not_yet_decided), derived from the SAME reconciliation every other
-    fact on the page already uses, instead of the caller's own unreconciled
-    pick_representative_application-based value. `fallback` (the legacy
-    caller-supplied value) is used ONLY when reconciliation could not run
-    at all - never when it ran and found nothing (that case returns None,
-    which every consumer of this value already renders as "Not yet
-    verified"/omitted, exactly like every other not_determined fact)."""
-    if consented.planning_status.state == FACT_RESOLVED:
-        value = consented.planning_status.value
-        if value == "Permission granted":
-            return "granted"
-        if value == "Refused":
-            return "refused"
-        if value == "Withdrawn":
-            return "withdrawn"
-    if len(active_positions) >= 1:
-        return "not_yet_decided"
-    if reconciliation_ran:
-        return None
-    return fallback
 
 
 def _fact_view(f) -> dict:

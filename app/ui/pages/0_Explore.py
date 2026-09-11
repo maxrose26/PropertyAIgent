@@ -31,13 +31,16 @@ from sqlalchemy import func, select
 
 from app.db.models import Application, LocalPlanSite, Site
 from app.pipeline.lapse_tracking import (
-    DECISION_STATUS_LABELS,
     LAPSE_STATUS_COLORS,
-    classify_decision_status,
     parse_portal_date,
 )
 from app.search.query_parser import SearchFilters, compute_aggregate_answer, parse_query
-from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts
+from app.reporting.scheme_reconciliation import (
+    build_operative_planning_facts,
+    format_operative_decision_status_label,
+    format_operative_units_basis_label,
+    resolve_operative_filter_facts,
+)
 from app.ui.common import (
     BUILD_STATUS_LABELS,
     LAPSE_STATUS_LABELS,
@@ -241,43 +244,42 @@ for site in sites:
     lapse = compute_lapse_status(all_apps, site)
     housing_type = classify_housing_type(merged["development_type"], merged["housing_typology"])
     housing_note = housing_type_note(merged["development_type"], merged["housing_typology"])
-    decision_status = classify_decision_status(rep_app.decision if rep_app else None, rep_app.status if rep_app else None)
 
-    # Gate 2B-2A Stage A/B - the same trusted operative-facts read model
-    # app.reporting.site_profile's headline tile and app.ui.common's shared
-    # render_scheme_detail block already use, over the full (unfiltered)
-    # evidence set. Stage B's benchmark confirmed this costs no additional
-    # queries here (all_apps was already batched above) and adds only a few
-    # ms/site of compute - see the Stage B benchmark note in the Gate 2B-2A
-    # implementation report.
+    # Gate 2B-2A pre-merge remediation - Explore's own Total Units/Decision
+    # Status (table AND filters AND map tooltip) all read from ONE call to
+    # the trusted operative-facts resolver, not three independent
+    # pick_representative_application/aggregate_scheme_fields/
+    # classify_decision_status selections that could each pick a different
+    # application. See app.reporting.scheme_reconciliation.
+    # resolve_operative_filter_facts's own docstring for the A-F unit-
+    # resolution rule and resolve_canonical_decision_status for why this is
+    # the exact same function app.reporting.site_profile's Decision Status
+    # tile calls - the two surfaces cannot disagree by construction.
     facts = build_operative_planning_facts(all_apps)
-    consented = facts.consented_position
-    active_positions = facts.active_positions
-    reconciliation_ran = bool(facts.resolved_applications)
-    operative_total_units: int | None = None
-    if consented.approved_units.state == FACT_RESOLVED:
-        operative_total_units = consented.approved_units.value
-    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
-        operative_total_units = active_positions[0].proposed_units.value
-    operative_total_units_not_determined = bool(reconciliation_ran and operative_total_units is None)
-    operative_decision_status: str | None = None
-    if consented.planning_status.state == FACT_RESOLVED:
-        operative_decision_status = str(consented.planning_status.value)
-    elif len(active_positions) == 1 and active_positions[0].planning_status.state == FACT_RESOLVED:
-        operative_decision_status = str(active_positions[0].planning_status.value)
-    elif len(active_positions) > 1:
-        operative_decision_status = f"{len(active_positions)} active planning proposals"
+    filter_facts = resolve_operative_filter_facts(facts)
+    # Canonical (filterable) status stays a single 4/5-way key even when a
+    # consent and an active proposal coexist (filter_facts.has_active_
+    # proposal / .active_proposal_count carry that fact separately, see
+    # "Active Proposal Units"/"Has Active Proposal" columns below) - but the
+    # human-facing label is allowed to say more than the filter key can, the
+    # same "canonical machine state vs display label" split used everywhere
+    # else in this gate. Both label helpers are shared with build_report_rows
+    # below so the on-screen table and the exported report can never print
+    # different words for the same trusted fact.
+    decision_status_label = format_operative_decision_status_label(filter_facts)
+    units_basis_label = format_operative_units_basis_label(filter_facts)
 
-    # Reuses the merged/lapse/decision_status/facts already computed above
-    # for the table row - zero additional queries or aggregation per marker
-    # (Sprint 3A Part 5: "avoid additional per-marker queries", Part 6).
+    # Reuses the merged/lapse/filter_facts already computed above for the
+    # table row and the tooltip - zero additional queries or aggregation
+    # per marker (Sprint 3A Part 5: "avoid additional per-marker queries",
+    # Part 6), and both surfaces now read the identical resolved values.
     headline = build_site_headline(
         site_id=site.id, address=site.display_address, council_label=council_names.get(site.council_code, site.council_code),
-        merged=merged, lapse=lapse, decision_status=decision_status,
+        merged=merged, lapse=lapse, decision_status=None,
         local_plan_status=_local_plan_headline_text(local_plan_by_site.get(site.id, [])),
-        operative_total_units=operative_total_units,
-        operative_total_units_not_determined=operative_total_units_not_determined,
-        operative_decision_status=operative_decision_status,
+        operative_total_units=filter_facts.units,
+        operative_total_units_not_determined=filter_facts.units_not_determined,
+        operative_decision_status=decision_status_label,
     )
     tooltip_text = format_site_tooltip(headline)
 
@@ -289,14 +291,33 @@ for site in sites:
         "Address": site.display_address,
         "Applications": len(apps),
         "References": ", ".join(sorted(a.reference for a in apps)),
-        "Total Units": merged["total_units_final"],
-        # Kept as a separate flag rather than folding into "Total Units"
-        # itself (e.g. "~200 (est.)") - the min/max unit filters below
-        # compare "Total Units" numerically, so it needs to stay a plain
-        # number. True whenever the figure came from the portal search
-        # listing's own regex estimate (see aggregate_scheme_fields) rather
-        # than AI-verified against the actual application documents.
-        "Units Estimated": merged.get("total_units_is_estimated", False),
+        # Gate 2B-2A pre-merge remediation - the trusted operative quantum
+        # (residential-only preferred; see resolve_operative_filter_facts's
+        # own A-F rule), not a raw first-non-null merge - this is also what
+        # the min/max unit filters below compare numerically, so it stays a
+        # plain number, None when reconciliation ran and genuinely found
+        # none (never a fabricated figure).
+        "Total Units": filter_facts.units,
+        # True when the resolved figure came from a lower-confidence source
+        # (an active proposal's own extraction, not yet AI-verified to the
+        # same standard as a granted consent) - same boolean shape as
+        # before, now sourced from the trusted fact's own confidence rather
+        # than aggregate_scheme_fields's portal-regex flag.
+        "Units Estimated": filter_facts.units_is_estimated,
+        # Provenance for the figure above - "Residential - consented",
+        # "All-use - active proposal", etc. - so a reviewer can see WHY a
+        # number is what it is without opening the Site itself. None only
+        # when Total Units is also None (nothing to attribute).
+        "Units Basis": units_basis_label,
+        # Gate 2B-2A pre-merge remediation requirement C/D - a consented
+        # position's own Total Units above is never destroyed or averaged
+        # with a coexisting active proposal's figure; that figure (when
+        # exactly one active proposal exists) is preserved here instead,
+        # and the raw count of active proposals whenever there is more than
+        # one (so "latest wins" is never silently applied to Total Units).
+        "Has Active Proposal": filter_facts.has_active_proposal,
+        "Active Proposals": filter_facts.active_proposal_count,
+        "Active Proposal Units": filter_facts.active_units,
         "Affordable Units": merged["affordable_units_final"],
         "Private Units": merged["private_units_final"],
         "Affordable %": merged["affordable_percentage_final"],
@@ -315,8 +336,14 @@ for site in sites:
         "Housing Association": merged["housing_association"],
         "Registered Provider": merged["registered_provider"],
         "Latest Status": rep_app.status if rep_app else None,
-        "Decision Status": DECISION_STATUS_LABELS[decision_status],
-        "decision_status": decision_status,
+        # Gate 2B-2A pre-merge remediation - both the display label and the
+        # machine-readable filter key below now come from the SAME trusted
+        # resolver app.reporting.site_profile's Decision Status tile uses
+        # (resolve_canonical_decision_status), not an independent
+        # pick_representative_application-based selection - see
+        # resolve_operative_filter_facts's own docstring.
+        "Decision Status": decision_status_label,
+        "decision_status": filter_facts.decision_status,
         "Decision Date": lapse["granted_app"].decision_issued_date if lapse["granted_app"] else None,
         "Build Status": BUILD_STATUS_LABELS[lapse["build_status"]],
         "build_status": lapse["build_status"],
@@ -531,15 +558,25 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
         apps = site_applications[site_id]
         rep_app = pick_representative_application(apps)
         merged = aggregate_scheme_fields(apps)
-        lapse = compute_lapse_status(all_apps_by_site.get(site_id, []), site)  # see main loop above for why not the filtered `apps`
-        decision_status = classify_decision_status(rep_app.decision if rep_app else None, rep_app.status if rep_app else None)
+        all_report_apps = all_apps_by_site.get(site_id, [])
+        lapse = compute_lapse_status(all_report_apps, site)  # see main loop above for why not the filtered `apps`
+        # Gate 2B-2A pre-merge remediation - same trusted resolver as the
+        # main table/map loop above, so an exported report can never show a
+        # different Total Units/Decision Status than what a user just
+        # filtered by on-screen.
+        report_facts = build_operative_planning_facts(all_report_apps)
+        report_filter_facts = resolve_operative_filter_facts(report_facts)
+        report_decision_label = format_operative_decision_status_label(report_filter_facts)
         rows_out.append({
             "Council": site.council_code,
             "Region": council_regions.get(site.council_code),
             "Address": site.display_address,
             "References": ", ".join(sorted(a.reference for a in apps)),
-            "Total Units": merged["total_units_final"],
-            "Units Estimated": merged.get("total_units_is_estimated", False),
+            "Total Units": report_filter_facts.units,
+            "Units Estimated": report_filter_facts.units_is_estimated,
+            "Has Active Proposal": report_filter_facts.has_active_proposal,
+            "Active Proposals": report_filter_facts.active_proposal_count,
+            "Active Proposal Units": report_filter_facts.active_units,
             "Affordable Units": merged["affordable_units_final"],
             "Private Units": merged["private_units_final"],
             "Affordable %": merged["affordable_percentage_final"],
@@ -556,8 +593,8 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
             "RP Status": merged["registered_provider_status"],
             "Latest Status": rep_app.status if rep_app else None,
             "Decision": rep_app.decision if rep_app else None,
-            "Decision Status": DECISION_STATUS_LABELS[decision_status],
-            "decision_status": decision_status,
+            "Decision Status": report_decision_label,
+            "decision_status": report_filter_facts.decision_status,
             "Decision Date": lapse["granted_app"].decision_issued_date if lapse["granted_app"] else None,
             "Build Status": BUILD_STATUS_LABELS[lapse["build_status"]],
             "build_status": lapse["build_status"],

@@ -116,7 +116,7 @@ from app.db.models import Application
 from app.pipeline.material_change import DECIDED_GRANTED, DECIDED_RECOMMENDATION_ONLY, DECIDED_REFUSED
 from app.pipeline.material_change import DECIDED_UNDETERMINED, DECIDED_WITHDRAWN
 from app.pipeline.material_change import resolve_decided_state as _resolve_decided_state_from_fields
-from app.pipeline.lapse_tracking import parse_portal_date
+from app.pipeline.lapse_tracking import DECISION_STATUS_LABELS, parse_portal_date
 from app.pipeline.phase_tracking import UNPHASED_LABEL, group_applications_by_operative_scope
 from app.reporting.affordable_housing_scope import (
     AffordableHousingSummary,
@@ -966,3 +966,187 @@ def _scope_note(resolved: list[ResolvedApplication]) -> str:
     if not named:
         return "single-scope scheme (no distinct phases/material development parcels evidenced)"
     return "multi-scope scheme; distinct scopes: " + ", ".join(named)
+
+
+# --- Gate 2B-2A pre-merge remediation - Explore discovery-surface facts --
+
+# The SAME 4-key vocabulary app.pipeline.lapse_tracking.DECISION_STATUS_LABELS
+# already defines for the natural-language search's structured "statuses"
+# filter (app.search.query_parser) - reused, not duplicated, so a NL query
+# for "granted"/"refused"/"withdrawn"/"awaiting decision" keeps matching the
+# exact same machine values it always has. NOT_DETERMINED is the one
+# genuinely new value: reconciliation ran and found no substantive
+# consented or active position at all (e.g. an EIA-screening-only site) -
+# distinct from "not_yet_decided", which now specifically means "a live
+# substantive proposal exists and is pending", never "we don't know".
+NOT_DETERMINED_DECISION_STATUS = "not_determined"
+OPERATIVE_DECISION_STATUS_LABELS: dict[str, str] = {
+    **DECISION_STATUS_LABELS,
+    NOT_DETERMINED_DECISION_STATUS: "Not yet verified",
+}
+
+
+def resolve_canonical_decision_status(
+    consented: ConsentedPosition, active_positions: tuple[ActivePosition, ...],
+    reconciliation_ran: bool, fallback: str | None = None,
+) -> str | None:
+    """ONE of DECISION_STATUS_LABELS's own 4 keys (granted/refused/
+    withdrawn/not_yet_decided), derived from the SAME reconciliation every
+    other trusted fact already uses - never a second, independently-derived
+    status taxonomy. Shared verbatim by app.reporting.site_profile's
+    Decision Status tile and app.ui.pages.0_Explore's table/filter column,
+    so the two surfaces can no longer disagree about a Site's status by
+    construction (they call the same function with the same facts) - Gate
+    2B-2A pre-merge remediation requirement 1/2.
+
+    `fallback` (a caller-supplied legacy value) is used ONLY when
+    reconciliation could not run at all (e.g. zero linked applications) -
+    never when it ran and found nothing determinable, which returns None
+    (every consumer already renders that as "Not yet verified"/omitted,
+    same as any other not_determined fact; see
+    OPERATIVE_DECISION_STATUS_LABELS/NOT_DETERMINED_DECISION_STATUS above
+    for callers that want a concrete string key instead of None)."""
+    if consented.planning_status.state == FACT_RESOLVED:
+        value = consented.planning_status.value
+        if value == "Permission granted":
+            return "granted"
+        if value == "Refused":
+            return "refused"
+        if value == "Withdrawn":
+            return "withdrawn"
+    if len(active_positions) >= 1:
+        return "not_yet_decided"
+    if reconciliation_ran:
+        return None
+    return fallback
+
+
+@dataclass(frozen=True)
+class OperativeFilterFacts:
+    """Gate 2B-2A pre-merge remediation - the trusted, machine-readable
+    facts Explore's table/filters (and any future list-scale consumer)
+    should search/sort/filter on, separate from the human-readable label a
+    UI chooses to print (OPERATIVE_DECISION_STATUS_LABELS /
+    format_operative_units_display below). Built from the SAME
+    OperativePlanningFacts every other Gate 2B-2A surface already uses -
+    never a second, independently-derived selection of "which application
+    matters"."""
+
+    decision_status: str  # one of OPERATIVE_DECISION_STATUS_LABELS's keys
+    has_active_proposal: bool
+    active_proposal_count: int
+    units: int | None
+    units_source: str | None  # "consented" | "active" | None
+    units_kind: str | None  # "residential" | "all_use" | None
+    units_is_estimated: bool
+    units_not_determined: bool
+    active_units: int | None
+    active_units_kind: str | None  # "residential" | "all_use" | None
+
+
+def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
+    """Prefers the residential-only quantum (Gate 2B-2A pre-merge
+    remediation: "min/max unit filtering must use the trusted operative
+    RESIDENTIAL quantum, not a raw representative-application total") -
+    falls back to the all-use total ONLY when residential-only genuinely
+    cannot be determined (case E/F: a mixed/specialist scheme where the
+    existing Gate 2B-1 "no new inference" safeguard correctly withholds a
+    residential-only figure) - never fabricates a residential split that
+    isn't there. Returns (value, kind, is_estimated)."""
+    if residential.state == FACT_RESOLVED:
+        return residential.value, "residential", residential.confidence == "low"
+    if all_use.state == FACT_RESOLVED:
+        return all_use.value, "all_use", all_use.confidence == "low"
+    return None, None, False
+
+
+def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFilterFacts:
+    """The single deterministic rule Explore's Total Units/Decision Status
+    columns, min/max unit filters, and status filter all read from - see
+    this module's own docstring cases A-F (Gate 2B-2A pre-merge
+    remediation report, Section C):
+
+    A/B. A resolvable quantum (consented, else - only when there is
+         exactly ONE active substantive proposal - that proposal's own
+         quantum) is used for filtering; residential-only preferred, all-
+         use total as a flagged fallback (see _resolve_units_from_units_
+         facts).
+    C.   When a consent AND an active proposal both exist, the CONSENTED
+         quantum remains the primary `units` value (it is the established,
+         evidenced position) - the active proposal's own figure is never
+         discarded, only carried separately as `active_units` /
+         `has_active_proposal` / `active_proposal_count`, so a consumer can
+         still see and act on it without a single-valued filter column
+         being forced to pick a winner.
+    D.   Multiple active substantive proposals with no consent -> `units`
+         stays None/not_determined (no arbitrary "latest wins" or summed
+         figure); `active_proposal_count` still reports how many exist.
+    E/F. Residential-only NOT_DETERMINED but an all-use/mixed-use total IS
+         resolved -> that all-use total is used, flagged `units_kind=
+         "all_use"` rather than silently presented as a residential count.
+    """
+    consented = facts.consented_position
+    active_positions = facts.active_positions
+    reconciliation_ran = bool(facts.resolved_applications)
+
+    decision_status = resolve_canonical_decision_status(consented, active_positions, reconciliation_ran)
+    if decision_status is None:
+        decision_status = NOT_DETERMINED_DECISION_STATUS
+
+    units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
+        consented.residential_only_units, consented.all_use_total_units,
+    )
+    units_source: str | None = "consented" if units is not None else None
+    if units is None and len(active_positions) == 1:
+        units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
+            active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
+        )
+        units_source = "active" if units is not None else None
+    units_not_determined = bool(reconciliation_ran and units is None)
+
+    active_units: int | None = None
+    active_units_kind: str | None = None
+    if len(active_positions) == 1:
+        active_units, active_units_kind, _ = _resolve_units_from_units_facts(
+            active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
+        )
+
+    return OperativeFilterFacts(
+        decision_status=decision_status,
+        has_active_proposal=len(active_positions) >= 1,
+        active_proposal_count=len(active_positions),
+        units=units, units_source=units_source, units_kind=units_kind, units_is_estimated=units_is_estimated,
+        units_not_determined=units_not_determined,
+        active_units=active_units, active_units_kind=active_units_kind,
+    )
+
+
+def format_operative_decision_status_label(filter_facts: OperativeFilterFacts) -> str:
+    """The human-facing label for OperativeFilterFacts.decision_status -
+    kept separate from the canonical machine key it is derived from (Gate
+    2B-2A pre-merge remediation: "separate CANONICAL MACHINE-READABLE
+    PLANNING STATE from USER-FACING DISPLAY LABEL"). A single active
+    proposal shows the same "Awaiting decision" wording the label map
+    already gives every not_yet_decided site; several simultaneous active
+    proposals say so explicitly, rather than the label silently implying
+    there is only one - reused verbatim by every Explore surface (table,
+    map tooltip, exported report) that shows a Site's decision status, so
+    they can never print different words for the same trusted fact."""
+    if filter_facts.decision_status == "not_yet_decided" and filter_facts.active_proposal_count > 1:
+        return f"{filter_facts.active_proposal_count} active planning proposals"
+    return OPERATIVE_DECISION_STATUS_LABELS[filter_facts.decision_status]
+
+
+def format_operative_units_basis_label(filter_facts: OperativeFilterFacts) -> str | None:
+    """Short provenance string for OperativeFilterFacts.units - "Residential
+    - consented", "All-use - active proposal", etc. - so a reviewer can see
+    WHY a number is what it is without opening the Site itself. None only
+    when `units` is also None (nothing to attribute)."""
+    if filter_facts.units is None:
+        return None
+    bits = []
+    if filter_facts.units_kind:
+        bits.append("Residential" if filter_facts.units_kind == "residential" else "All-use")
+    if filter_facts.units_source:
+        bits.append("consented" if filter_facts.units_source == "consented" else "active proposal")
+    return " - ".join(bits) if bits else None
