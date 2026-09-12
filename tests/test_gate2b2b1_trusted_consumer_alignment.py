@@ -314,6 +314,11 @@ def test_withdrawn_only_site_does_not_fall_back_to_current_mix(session):
     mix = build_residential_mix(site, [app], rep_app=None)
     assert mix["overview_totals"]["total_homes"] is None
     assert mix["affordable_headline"]["state"] == "not_identified"
+    # (Section 8, item 7 - final closure micro-fix) current AH remains
+    # "Not identified" and no Structured Summary sentence resurrects the
+    # withdrawn 45/50% figure.
+    assert mix["affordable_headline"]["headline_units"] == "Not identified"
+    assert mix["structured_summary"] is None
 
 
 def test_eia_screening_only_site_does_not_become_current_mix(session):
@@ -332,6 +337,53 @@ def test_eia_screening_only_site_does_not_become_current_mix(session):
 
     mix = build_residential_mix(site, [app], rep_app=None)
     assert mix["overview_totals"]["total_homes"] is None
+    # (Section 8, item 8 - final closure micro-fix) remains NOT_DETERMINED
+    # end to end - no Structured Summary line at all.
+    assert mix["affordable_headline"]["state"] == "not_identified"
+    assert mix["structured_summary"] is None
+
+
+def test_burnage_residential_mix_keeps_concise_reconciled_summary(session):
+    """(Section 8, item 9 - final closure micro-fix) Former Burnage
+    Cricket Club shape - a genuinely reconciled 13/19.7% consented AH
+    position must keep the original, concise Structured Summary wording -
+    this fix must not make an ordinary reconciled scheme's summary more
+    verbose."""
+    site = _site(session)
+    app = _app(session, site.id, "142311/FO/2025", proposal="Erection of up to 66 no. dwellings",
+               status="Final", decision="Approve", decision_issued_date="Mon 23 Mar 2026",
+               application_received="Wed 04 Mar 2025")
+    _intel(session, app, total_units_final=66, affordable_units_final=13, affordable_percentage_final=19.7,
+           affordable_housing_status="officer_recommended", core_intelligence_complete=True)
+
+    mix = build_residential_mix(site, [app], rep_app=app)
+    assert mix["affordable_headline"]["headline_units"] == "13 affordable homes"
+    assert "13 homes, representing" in mix["structured_summary"]
+    assert "does not reconcile" not in mix["structured_summary"]
+
+
+def test_pinfold_residential_mix_never_shows_a_false_zero(session):
+    """(Section 8, item 10 - final closure micro-fix) Pinfold/Edenfield
+    shape - resolves fully NOT_DETERMINED, so Residential Mix must show
+    'Not identified', never a fabricated 0%/0-unit position from the
+    absence-of-information note."""
+    site = _site(session)
+    app = _app(session, site.id, "71149",
+               proposal="Article 18 consultation from Rossendale Borough Council (2023/0396); Full application "
+                        "for residential development comprising no. 50 units (Use Class C3)",
+               status="Decided", decision="Raise No Objection")
+    _intel(session, app, total_units_final=50, affordable_units_final=0, affordable_percentage_final=0.0,
+           affordable_housing_status="unknown",
+           affordable_housing_notes="No affordable housing provision mentioned in the decision notice. "
+                                     "The application raises no objections to the overall development proposal.")
+
+    facts = build_operative_planning_facts([app])
+    assert facts.consented_position.reference.state != "resolved"
+    assert len(facts.active_positions) == 0
+
+    mix = build_residential_mix(site, [app], rep_app=None)
+    assert mix["affordable_headline"]["headline_units"] == "Not identified"
+    assert mix["structured_summary"] is None
 
 
 def test_not_determined_does_not_invoke_legacy_fallback_in_site_profile_mix_resolution(session):

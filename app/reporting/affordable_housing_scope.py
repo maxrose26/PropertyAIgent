@@ -344,6 +344,54 @@ def _units_implied_percentage_reconciliation(fields: dict) -> tuple[float | None
     return units_implied_percentage, abs(units_implied_percentage - stored_pct) <= _PERCENTAGE_RECONCILIATION_TOLERANCE
 
 
+def compute_percentage_reconciliation(scheme) -> dict:
+    """Gate 2B-2B.1 final closure micro-fix - the single public entry
+    point for ANY consumer that already has one, already-selected
+    SchemeIntelligence row (not a full multi-application AffordablePosition
+    resolution) and needs to know whether ITS OWN recorded
+    affordable_percentage_final reconciles with its own affordable/total
+    unit count, without re-deriving the check or re-parsing tenure text a
+    second time. Reuses the exact same _units_implied_percentage_
+    reconciliation / _explicit_evidence_percentages helpers
+    AffordablePosition itself is built from (see _position above) - no
+    second implementation, no new regex, no schema change.
+
+    Used by app.reporting.residential_mix's Structured Summary (the
+    confirmed Brixham Road production defect: that consumer independently
+    read affordable_units_final/affordable_percentage_final straight off a
+    SchemeIntelligence row and combined them into "54 homes, representing
+    40%" with no awareness that the two figures do not reconcile).
+
+    `scheme` is a SchemeIntelligence row or None (mirrors every other
+    function in this module's own scheme-shaped helpers). Returns a dict:
+        units_implied_percentage: float | None
+        percentage_reconciles: bool (True when there is nothing to
+            compare, or the two figures agree within the existing
+            tolerance - see _units_implied_percentage_reconciliation)
+        explicit_onsite_percentage: float | None
+        explicit_financial_contribution_percentage: float | None
+    identical in meaning to AffordablePosition's own same-named fields."""
+    if scheme is None:
+        return {
+            "units_implied_percentage": None, "percentage_reconciles": True,
+            "explicit_onsite_percentage": None, "explicit_financial_contribution_percentage": None,
+        }
+    fields = {
+        "affordable_units_final": scheme.affordable_units_final,
+        "total_units_final": scheme.total_units_final,
+        "affordable_percentage_final": scheme.affordable_percentage_final,
+    }
+    units_implied_percentage, percentage_reconciles = _units_implied_percentage_reconciliation(fields)
+    explicit_onsite_percentage, explicit_financial_contribution_percentage = _explicit_evidence_percentages(
+        scheme.affordable_tenure_split_final,
+    )
+    return {
+        "units_implied_percentage": units_implied_percentage, "percentage_reconciles": percentage_reconciles,
+        "explicit_onsite_percentage": explicit_onsite_percentage,
+        "explicit_financial_contribution_percentage": explicit_financial_contribution_percentage,
+    }
+
+
 def _position(scope_type: str, scope_label: str, app: Application, fields: dict) -> AffordablePosition:
     units_implied_percentage, percentage_reconciles = _units_implied_percentage_reconciliation(fields)
     explicit_onsite_percentage, explicit_financial_contribution_percentage = _explicit_evidence_percentages(
