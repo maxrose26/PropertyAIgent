@@ -151,15 +151,19 @@ def _render_policy_position(view: dict) -> None:
                 st.caption(f"[Open plan page {row['source_page']}]({row['source_document_url']}#page={row['source_page']})")
 
 
-def affordable_headline_tile(headline: dict) -> None:
+def affordable_headline_tile(headline: dict, percentage_reconciliation: dict | None = None) -> None:
     """The Affordable Homes headline tile (Sprint 4.4 Amendment, Part 4) -
     value first, evidence state secondary (Part 16). value/caption come
     from format_affordable_tile, the one shared implementation of "which
     line is primary" per state - also used by app.reporting.site_profile.
     build_headline_metrics, so the Overview headline tile and every use of
     this same tile inside the Residential Mix Intelligence tab can never
-    disagree with each other."""
-    value, caption = format_affordable_tile(headline)
+    disagree with each other. Gate 2B-2B.1 final closure (tile alignment) -
+    `percentage_reconciliation` (the caller's own mix["percentage_
+    reconciliation"]) is passed straight through so this tile never shows
+    an unreconciled percentage as if it were the unit count's own
+    percentage (the confirmed Brixham Road defect)."""
+    value, caption = format_affordable_tile(headline, percentage_reconciliation)
     stat_tile("Affordable homes", value, caption=caption)
 
 
@@ -193,7 +197,7 @@ def _residential_mix_overview_section(mix: dict) -> None:
     with cols[0]:
         stat_tile("Total homes", f"{totals['total_homes']:,}" if totals["total_homes"] is not None else "Not yet verified")
     with cols[1]:
-        affordable_headline_tile(mix["affordable_headline"])
+        affordable_headline_tile(mix["affordable_headline"], mix["percentage_reconciliation"])
     with cols[2]:
         density = mix["density"]
         stat_tile("Density", f"{density['density_dph']:g} dwellings/ha" if density["available"] else "Not yet verified")
@@ -227,7 +231,7 @@ def _affordable_housing_section(mix: dict) -> None:
     section_header("Affordable Housing", icon="🏡")
     scheme = mix["scheme"]
     headline = mix["affordable_headline"]
-    affordable_headline_tile(headline)
+    affordable_headline_tile(headline, mix["percentage_reconciliation"])
     if headline["percentage_is_calculated"]:
         st.caption(
             "Percentage calculated from affordable homes ÷ total homes for this scheme version - "

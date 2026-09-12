@@ -37,6 +37,7 @@ aggregate_scheme_fields/pick_representative_application already relies on.
 from __future__ import annotations
 
 from app.db.models import Application, SchemeIntelligence, Site
+from app.reporting.affordable_housing_scope import compute_percentage_reconciliation
 
 # --- Evidence/review states (Part 16) ---------------------------------------
 # The vocabulary every section below reports against - deliberately reused
@@ -195,19 +196,37 @@ def compute_affordable_headline(scheme: SchemeIntelligence | None) -> dict:
     return empty
 
 
-def format_affordable_tile(headline: dict) -> tuple[str, str | None]:
+def format_affordable_tile(headline: dict, percentage_reconciliation: dict | None = None) -> tuple[str, str | None]:
     """(value, caption) for the Affordable Homes headline tile (Part 4) -
     the one shared implementation of "which line is primary" for every
     state, used identically by the Site Profile headline metrics
     (app.reporting.site_profile.build_headline_metrics) and the dedicated
-    Residential Mix Intelligence tab (app.ui.shell.affordable_headline_tile),
-    so the two can never drift out of sync with each other. Case C
-    ("percentage_only") is the one state where the percentage is primary
-    and the unit-count gap is the caption - every other state is unit-count
-    primary, percentage (or nothing) as caption."""
+    Residential Mix Intelligence tab (app.ui.site_profile_view.
+    affordable_headline_tile), so the two can never drift out of sync with
+    each other. Case C ("percentage_only") is the one state where the
+    percentage is primary and the unit-count gap is the caption - every
+    other state is unit-count primary, percentage (or nothing) as caption.
+
+    Gate 2B-2B.1 final closure (tile alignment) - `percentage_reconciliation`
+    is app.reporting.affordable_housing_scope.compute_percentage_
+    reconciliation's own output for the SAME scheme this headline was
+    built from (build_residential_mix's responsibility; None is treated as
+    "nothing to check against" and preserves this function's original,
+    unqualified caption for every existing caller that hasn't been
+    updated). When the recorded percentage does NOT arithmetically
+    reconcile with the affordable/total unit count (the confirmed Brixham
+    Road defect: "54 affordable homes" / "40% affordable" invites reading
+    54/145 as 40%, which it is not), the caption becomes an honest
+    qualifier instead of the raw percentage - the unit count itself is
+    never withheld, only the percentage's implied same-basis pairing. The
+    full on-site/financial-contribution breakdown belongs in the
+    Structured Summary, not this compact tile (Section 2's own "do not put
+    the full explanation into the headline tile")."""
     if headline["state"] == "percentage_only":
         return headline["headline_percentage"], headline["headline_units"]
     if headline["state"] in ("verified", "calculated"):
+        if percentage_reconciliation is not None and not percentage_reconciliation["percentage_reconciles"]:
+            return headline["headline_units"], "Recorded percentage requires review"
         return headline["headline_units"], headline["headline_percentage"]
     return headline["headline_units"], None
 
@@ -392,17 +411,59 @@ def build_overview_totals(scheme: SchemeIntelligence | None, affordable_headline
 
 def build_structured_summary(
     affordable_headline: dict, tenure: dict, current_version: dict, unit_reconciliation_status: str | None,
+    percentage_reconciliation: dict | None = None,
 ) -> str | None:
     """Part 15's deterministic, clearly-NOT-AI "Structured summary" -
     direct observations only, built from Python string formatting of
     already-computed facts, no LLM call. Returns None when there's
     genuinely nothing supported to say (e.g. no affordable evidence and no
     reconciliation issue - an empty structured summary would just be noise
-    on top of the headline tile that already says "Not identified")."""
+    on top of the headline tile that already says "Not identified").
+
+    Gate 2B-2B.1 final closure micro-fix - `percentage_reconciliation` is
+    app.reporting.affordable_housing_scope.compute_percentage_reconciliation's
+    own output for the SAME scheme this headline was built from (the
+    caller's responsibility, build_residential_mix below), reusing the
+    exact trusted AH reconciliation semantics rather than a second,
+    independent affordable_units/affordable_percentage pairing (the
+    confirmed Brixham Road defect: this function used to combine the two
+    unconditionally into "N homes, representing P%" even when they do not
+    describe the same denominator). None (the default) is treated as
+    "nothing to check against" and preserves this function's original,
+    unqualified behaviour - every existing caller that hasn't been updated
+    to pass it keeps working unchanged."""
     sentences: list[str] = []
+    reconciles = percentage_reconciliation is None or percentage_reconciliation["percentage_reconciles"]
 
     state = affordable_headline["state"]
-    if state in ("verified", "calculated"):
+    if state in ("verified", "calculated") and not reconciles and affordable_headline["percentage_display"]:
+        # The recorded percentage does NOT arithmetically reconcile with
+        # the affordable/total unit count - never pair them as if they
+        # describe the same denominator. Explicit on-site/financial-
+        # contribution evidence (when the source text itself states it) is
+        # named distinctly; otherwise a concise, honest fallback is used -
+        # this function does not need to explain the whole AH model in one
+        # sentence.
+        units = affordable_headline["affordable_units"]
+        onsite = percentage_reconciliation["explicit_onsite_percentage"]
+        contribution = percentage_reconciliation["explicit_financial_contribution_percentage"]
+        if onsite is not None or contribution is not None:
+            basis_bits = []
+            if onsite is not None:
+                basis_bits.append(f"{format_affordable_percentage(onsite)} on-site")
+            if contribution is not None:
+                basis_bits.append(f"a {format_affordable_percentage(contribution)} financial contribution")
+            sentences.append(
+                f"Affordable provision records {units:,} homes. The source separately records "
+                f"{affordable_headline['percentage_display']} overall; the recorded evidence identifies "
+                f"{' plus '.join(basis_bits)}."
+            )
+        else:
+            sentences.append(
+                f"Affordable provision is recorded at {units:,} homes; the recorded percentage "
+                f"({affordable_headline['percentage_display']}) does not reconcile directly with the unit count."
+            )
+    elif state in ("verified", "calculated"):
         units = affordable_headline["affordable_units"]
         pct_bit = f", representing {affordable_headline['percentage_display']} of the reconciled scheme total" if affordable_headline["percentage_display"] else ""
         sentences.append(f"Affordable provision is recorded at {units:,} homes{pct_bit}.")
@@ -490,9 +551,18 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
     density = build_density(scheme)
     overview_totals = build_overview_totals(scheme, affordable_headline)
     ai_commentary = build_ai_commentary_view(site)
+    # Gate 2B-2B.1 final closure micro-fix - the SAME trusted arithmetic-
+    # reconciliation/explicit-evidence check app.reporting.scheme_
+    # reconciliation's AH positions already use, reused here (not
+    # reimplemented) so the Structured Summary below can never combine a
+    # non-reconciling affordable_units_final/affordable_percentage_final
+    # pair into one false "N homes, representing P%" statement (Brixham
+    # Road).
+    percentage_reconciliation = compute_percentage_reconciliation(scheme)
     structured_summary = build_structured_summary(
         affordable_headline, tenure, current_version,
         scheme.unit_reconciliation_status if scheme else None,
+        percentage_reconciliation,
     )
     evidence_gaps = build_evidence_gaps(current_version, affordable_headline, tenure, bedroom_mix, housing_type)
 
@@ -508,4 +578,11 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
         "structured_summary": structured_summary,
         "evidence_gaps": evidence_gaps,
         "scheme": scheme,
+        # Gate 2B-2B.1 final closure (tile alignment) - exposed so every
+        # consumer of this view model that renders the Affordable Homes
+        # headline tile (app.reporting.site_profile.build_headline_metrics,
+        # app.ui.site_profile_view.affordable_headline_tile) can share the
+        # SAME trusted reconciliation state format_affordable_tile below
+        # already accepts, rather than each re-deriving or omitting it.
+        "percentage_reconciliation": percentage_reconciliation,
     }

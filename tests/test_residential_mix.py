@@ -9,6 +9,7 @@ import inspect
 
 from app.db.models import Application, SchemeIntelligence, Site
 from app.reporting import residential_mix as rm
+from app.reporting.affordable_housing_scope import compute_percentage_reconciliation
 from app.reporting.residential_mix import (
     build_affordable_tenure,
     build_ai_commentary_view,
@@ -355,6 +356,152 @@ def test_structured_summary_none_when_nothing_supported():
     tenure = build_affordable_tenure(None, headline)
     summary = build_structured_summary(headline, tenure, {"version_conflict": False}, None)
     assert summary is None
+
+
+def test_structured_summary_brixham_shape_never_pairs_units_and_percentage_as_same_basis():
+    """Gate 2B-2B.1 final closure micro-fix - Brixham Road's real stored
+    evidence (54/145 affordable units against a total, stored percentage
+    40%, tenure text explicitly stating '37% on-site, 3% financial
+    contribution') must never render as 'Affordable provision is recorded
+    at 54 homes, representing 40% of the reconciled scheme total.' - the
+    exact confirmed production defect."""
+    scheme = SchemeIntelligence(
+        application_id=1, total_units_final=145, affordable_units_final=54, affordable_percentage_final=40.0,
+        affordable_tenure_split_final="37% on-site, 3% financial contribution",
+    )
+    headline = compute_affordable_headline(scheme)
+    tenure = build_affordable_tenure(scheme, headline)
+    reconciliation = compute_percentage_reconciliation(scheme)
+    assert reconciliation["percentage_reconciles"] is False
+
+    summary = build_structured_summary(headline, tenure, {"version_conflict": False}, "OK", reconciliation)
+
+    # (item 1) the exact banned same-basis pairing never appears.
+    assert "54 homes, representing 40" not in summary
+    assert "representing 40" not in summary
+    # (item 2) the 54-unit figure remains visible.
+    assert "54 homes" in summary
+    # (item 3) 40% may appear only clearly separated from the unit count -
+    # confirmed here by it appearing after "separately records", never
+    # directly bound to "54 homes" by "representing".
+    assert "separately records 40%" in summary
+    # (item 4) explicit on-site/financial-contribution evidence is named
+    # because the source text itself states it.
+    assert "37% on-site" in summary
+    assert "3% financial contribution" in summary
+
+
+def test_structured_summary_generic_mismatch_without_explicit_evidence_uses_safe_fallback():
+    """(item 5) A scheme whose recorded percentage does not reconcile with
+    its unit count, but whose tenure text states no explicit on-site/
+    financial-contribution basis, must fall back to a concise, honest
+    statement - never inventing an on-site/off-site/contribution split
+    that isn't there."""
+    scheme = SchemeIntelligence(
+        application_id=1, total_units_final=100, affordable_units_final=20, affordable_percentage_final=35.0,
+        affordable_tenure_split_final="Shared ownership and affordable rent",
+    )
+    headline = compute_affordable_headline(scheme)
+    tenure = build_affordable_tenure(scheme, headline)
+    reconciliation = compute_percentage_reconciliation(scheme)
+    assert reconciliation["percentage_reconciles"] is False
+    assert reconciliation["explicit_onsite_percentage"] is None
+    assert reconciliation["explicit_financial_contribution_percentage"] is None
+
+    summary = build_structured_summary(headline, tenure, {"version_conflict": False}, "OK", reconciliation)
+    assert "20 homes" in summary
+    assert "does not reconcile directly with the unit count" in summary
+    assert "on-site" not in summary.lower()
+    assert "financial contribution" not in summary.lower()
+
+
+def test_structured_summary_ordinary_reconciled_scheme_keeps_concise_headline():
+    """(item 6) An ordinary scheme whose recorded percentage already
+    matches its unit-derived percentage must keep the original, concise
+    'N homes, representing P%' wording - this fix changes behaviour ONLY
+    when percentage_reconciles is False."""
+    scheme = SchemeIntelligence(application_id=1, total_units_final=140, affordable_units_final=42, affordable_percentage_final=30.0)
+    headline = compute_affordable_headline(scheme)
+    tenure = build_affordable_tenure(scheme, headline)
+    reconciliation = compute_percentage_reconciliation(scheme)
+    assert reconciliation["percentage_reconciles"] is True
+
+    summary = build_structured_summary(headline, tenure, {"version_conflict": False}, "OK", reconciliation)
+    assert "42 homes, representing 30% of the reconciled scheme total" in summary
+
+
+def test_structured_summary_omitted_reconciliation_argument_preserves_legacy_behaviour():
+    """Every pre-existing caller that hasn't been updated to pass
+    percentage_reconciliation must keep working exactly as before -
+    confirmed by calling with the argument omitted entirely."""
+    scheme = SchemeIntelligence(application_id=1, total_units_final=140, affordable_units_final=42, affordable_percentage_final=30.0)
+    headline = compute_affordable_headline(scheme)
+    tenure = build_affordable_tenure(scheme, headline)
+    summary = build_structured_summary(headline, tenure, {"version_conflict": False}, "OK")
+    assert "42 homes, representing 30% of the reconciled scheme total" in summary
+
+
+# --- Affordable Homes headline tile alignment (Gate 2B-2B.1 final closure) -
+
+
+def test_brixham_tile_cannot_render_an_unqualified_54_and_40_percent_pair():
+    """(item 1/2/3) Brixham Road's real stored evidence must not produce
+    an ordinary '54 affordable homes' / '40% affordable' tile pair - the
+    caption must clearly withhold/qualify the unreconciled percentage
+    while the unit count stays visible."""
+    scheme = SchemeIntelligence(
+        application_id=1, total_units_final=145, affordable_units_final=54, affordable_percentage_final=40.0,
+        affordable_tenure_split_final="37% on-site, 3% financial contribution",
+    )
+    headline = compute_affordable_headline(scheme)
+    reconciliation = compute_percentage_reconciliation(scheme)
+    assert reconciliation["percentage_reconciles"] is False
+
+    value, caption = format_affordable_tile(headline, reconciliation)
+    assert value == "54 affordable homes"
+    assert caption != "40% affordable"
+    assert "40%" not in caption
+    assert caption == "Recorded percentage requires review"
+
+
+def test_burnage_tile_keeps_the_normal_concise_pairing():
+    """(item 6) An ordinary reconciled scheme (Former Burnage Cricket
+    Club shape) must keep the normal '13 affordable homes' / '~19.7%
+    affordable' tile pairing - this fix changes the caption ONLY when
+    percentage_reconciles is False."""
+    scheme = SchemeIntelligence(application_id=1, total_units_final=66, affordable_units_final=13, affordable_percentage_final=19.7)
+    headline = compute_affordable_headline(scheme)
+    reconciliation = compute_percentage_reconciliation(scheme)
+    assert reconciliation["percentage_reconciles"] is True
+
+    value, caption = format_affordable_tile(headline, reconciliation)
+    assert value == "13 affordable homes"
+    assert caption == "20% affordable"  # format_affordable_percentage's own whole-number rounding rule
+
+
+def test_tile_omitted_reconciliation_argument_preserves_legacy_behaviour():
+    """Every pre-existing caller that hasn't been updated to pass
+    percentage_reconciliation must keep working exactly as before."""
+    scheme = SchemeIntelligence(application_id=1, total_units_final=145, affordable_units_final=54, affordable_percentage_final=40.0)
+    headline = compute_affordable_headline(scheme)
+    value, caption = format_affordable_tile(headline)
+    assert value == "54 affordable homes"
+    assert caption == "40% affordable"
+
+
+def test_stockport_stables_pinfold_shapes_produce_not_identified_tile():
+    """(item 7) Stockport Rugby Club / Pennington's Stables / Pinfold-
+    Edenfield-shaped 'no scheme' inputs (rep_app=None upstream, so
+    compute_affordable_headline(None)) must keep showing 'Not identified'
+    with no caption - the tile alignment fix must never invent a
+    reconciliation caption where there is no headline value at all."""
+    headline = compute_affordable_headline(None)
+    reconciliation = compute_percentage_reconciliation(None)
+    assert reconciliation["percentage_reconciles"] is True  # nothing to compare
+
+    value, caption = format_affordable_tile(headline, reconciliation)
+    assert value == "Not identified"
+    assert caption is None
 
 
 def test_structured_summary_never_makes_viability_market_or_permission_claims():

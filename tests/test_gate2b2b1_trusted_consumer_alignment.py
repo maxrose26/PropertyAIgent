@@ -34,7 +34,7 @@ from app.policy.buyer_profiles import (
 )
 from app.reporting.affordable_housing_scope import compute_affordable_housing_scope_summary, format_affordable_housing_lines
 from app.reporting.dashboard import _scheme_card
-from app.reporting.residential_mix import build_residential_mix
+from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
 from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
 from app.reporting.scheme_summary import build_summary_prompt
 from app.ui.common import aggregate_scheme_fields, compute_lapse_status
@@ -314,6 +314,11 @@ def test_withdrawn_only_site_does_not_fall_back_to_current_mix(session):
     mix = build_residential_mix(site, [app], rep_app=None)
     assert mix["overview_totals"]["total_homes"] is None
     assert mix["affordable_headline"]["state"] == "not_identified"
+    # (Section 8, item 7 - final closure micro-fix) current AH remains
+    # "Not identified" and no Structured Summary sentence resurrects the
+    # withdrawn 45/50% figure.
+    assert mix["affordable_headline"]["headline_units"] == "Not identified"
+    assert mix["structured_summary"] is None
 
 
 def test_eia_screening_only_site_does_not_become_current_mix(session):
@@ -332,6 +337,53 @@ def test_eia_screening_only_site_does_not_become_current_mix(session):
 
     mix = build_residential_mix(site, [app], rep_app=None)
     assert mix["overview_totals"]["total_homes"] is None
+    # (Section 8, item 8 - final closure micro-fix) remains NOT_DETERMINED
+    # end to end - no Structured Summary line at all.
+    assert mix["affordable_headline"]["state"] == "not_identified"
+    assert mix["structured_summary"] is None
+
+
+def test_burnage_residential_mix_keeps_concise_reconciled_summary(session):
+    """(Section 8, item 9 - final closure micro-fix) Former Burnage
+    Cricket Club shape - a genuinely reconciled 13/19.7% consented AH
+    position must keep the original, concise Structured Summary wording -
+    this fix must not make an ordinary reconciled scheme's summary more
+    verbose."""
+    site = _site(session)
+    app = _app(session, site.id, "142311/FO/2025", proposal="Erection of up to 66 no. dwellings",
+               status="Final", decision="Approve", decision_issued_date="Mon 23 Mar 2026",
+               application_received="Wed 04 Mar 2025")
+    _intel(session, app, total_units_final=66, affordable_units_final=13, affordable_percentage_final=19.7,
+           affordable_housing_status="officer_recommended", core_intelligence_complete=True)
+
+    mix = build_residential_mix(site, [app], rep_app=app)
+    assert mix["affordable_headline"]["headline_units"] == "13 affordable homes"
+    assert "13 homes, representing" in mix["structured_summary"]
+    assert "does not reconcile" not in mix["structured_summary"]
+
+
+def test_pinfold_residential_mix_never_shows_a_false_zero(session):
+    """(Section 8, item 10 - final closure micro-fix) Pinfold/Edenfield
+    shape - resolves fully NOT_DETERMINED, so Residential Mix must show
+    'Not identified', never a fabricated 0%/0-unit position from the
+    absence-of-information note."""
+    site = _site(session)
+    app = _app(session, site.id, "71149",
+               proposal="Article 18 consultation from Rossendale Borough Council (2023/0396); Full application "
+                        "for residential development comprising no. 50 units (Use Class C3)",
+               status="Decided", decision="Raise No Objection")
+    _intel(session, app, total_units_final=50, affordable_units_final=0, affordable_percentage_final=0.0,
+           affordable_housing_status="unknown",
+           affordable_housing_notes="No affordable housing provision mentioned in the decision notice. "
+                                     "The application raises no objections to the overall development proposal.")
+
+    facts = build_operative_planning_facts([app])
+    assert facts.consented_position.reference.state != "resolved"
+    assert len(facts.active_positions) == 0
+
+    mix = build_residential_mix(site, [app], rep_app=None)
+    assert mix["affordable_headline"]["headline_units"] == "Not identified"
+    assert mix["structured_summary"] is None
 
 
 def test_not_determined_does_not_invoke_legacy_fallback_in_site_profile_mix_resolution(session):
@@ -438,6 +490,37 @@ def test_trusted_ah_propagates_identically_for_table_and_export(session):
     ff_export = resolve_operative_filter_facts(facts)
     assert ff_table.affordable_units == ff_export.affordable_units == 25
     assert ff_table.affordable_percentage == ff_export.affordable_percentage == 25.0
+
+
+# --- Affordable Homes tile alignment (Gate 2B-2B.1 final closure) ----------
+
+
+def test_brixham_end_to_end_tile_and_structured_summary_agree(session):
+    """Full build_residential_mix integration - Brixham Road's Overview
+    headline tile (used by BOTH app.reporting.site_profile.
+    build_headline_metrics and app.ui.site_profile_view.
+    affordable_headline_tile via the SAME format_affordable_tile call) and
+    its Structured Summary sentence must never disagree: neither may
+    present 54 affordable homes and the stored 40% as an ordinary
+    same-basis pair, while both keep the 54-unit figure visible."""
+    site = _site(session)
+    app = _app(session, site.id, "114228/FUL/24", proposal="Residential development of 145 units",
+               status="Awaiting decision")
+    _intel(session, app, total_units_final=145, affordable_units_final=54, affordable_percentage_final=40.0,
+           affordable_tenure_split_final="37% on-site, 3% financial contribution")
+
+    mix = build_residential_mix(site, [app], rep_app=app)
+    assert mix["percentage_reconciliation"]["percentage_reconciles"] is False
+
+    value, caption = format_affordable_tile(mix["affordable_headline"], mix["percentage_reconciliation"])
+    assert value == "54 affordable homes"
+    assert caption == "Recorded percentage requires review"
+    assert "40%" not in caption
+
+    assert "54 homes" in mix["structured_summary"]
+    assert "37% on-site" in mix["structured_summary"]
+    assert "3% financial contribution" in mix["structured_summary"]
+    assert "representing 40" not in mix["structured_summary"]
 
 
 # --- 14-17: AH semantics -----------------------------------------------------
