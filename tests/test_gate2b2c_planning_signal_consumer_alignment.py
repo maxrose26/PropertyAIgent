@@ -420,3 +420,79 @@ def test_long_pending_application_detector_is_unaffected_by_this_gate(session):
          application_category="primary_residential", application_received=submitted.strftime("%a %d %b %Y"))
     cards = _long_pending_application_cards(session, None)
     assert any(c["params"]["site_id"] == str(site.id) for c in cards)
+
+
+# --- Pre-merge semantic review: NOT_GRANTED vs NOT_DETERMINED --------------
+#
+# Root cause of the ~125-site regression this review fixes: resolve_
+# operative_lapse_anchor originally collapsed "zero granted applications at
+# all" and "granted applications exist but none is substantive" into the
+# SAME FACT_NOT_DETERMINED outcome, so compute_lapse_status could not tell
+# them apart and reported both as "not_determined" - relabelling the
+# ordinary, common "nothing has been granted yet" case (a positive, stable
+# fact) as if it were a genuine uncertainty. Fixed via OperativeLapseAnchor.
+# any_granted.
+
+
+def test_zero_granted_applications_reports_not_granted(session):
+    site = _site(session)
+    _app(session, site.id, "FUL/1", proposal="Erection of 40 dwellings", decision=None,
+         status="Under consideration", application_category="primary_residential")
+    apps = list(site.applications)
+    result = compute_lapse_status(apps, site)
+    assert result["status"] == "not_granted"
+    assert result["deadline"] is None
+    assert result["granted_app"] is None
+
+
+def test_only_nma_granted_reports_not_determined_not_not_granted(session):
+    site = _site(session)
+    _app(session, site.id, "NMA/1", application_category="variation_or_amendment",
+         proposal="Non-material amendment to an unspecified permission",
+         decision="Approve with Conditions", decision_issued_date="Mon 01 Jan 2024")
+    apps = list(site.applications)
+    result = compute_lapse_status(apps, site)
+    assert result["status"] == "not_determined"
+    assert result["deadline"] is None
+
+
+def test_only_condition_discharge_granted_reports_not_determined(session):
+    # "Details Approved" (unlike the far more common "Full discharge of
+    # conditions"/"Agreed" wording) IS classified DECIDED_GRANTED by
+    # resolve_decided_state - this isolates the test to the role guardrail
+    # (condition_discharge is never substantive) rather than the decided-
+    # state classification, which is unrelated to this gate.
+    site = _site(session)
+    _app(session, site.id, "CND/1", application_category="condition_discharge_or_details",
+         proposal="Approval of details reserved by condition", decision="Details Approved",
+         decision_issued_date="Mon 01 Jan 2024")
+    apps = list(site.applications)
+    result = compute_lapse_status(apps, site)
+    assert result["status"] == "not_determined"
+    assert result["deadline"] is None
+
+
+def test_only_ineligible_prior_approval_grant_reports_not_determined(session):
+    site = _site(session)
+    _app(session, site.id, "PA/1", proposal="Application to determine if prior approval is required for a change of use",
+         decision="Prior Approval Approved", decision_issued_date="Mon 01 Jan 2024")
+    apps = list(site.applications)
+    result = compute_lapse_status(apps, site)
+    assert result["status"] == "not_determined"
+    assert result["deadline"] is None
+
+
+def test_long_pending_site_with_no_grant_has_stable_not_granted_fingerprint(session):
+    """A genuinely still-pending, never-granted site's fingerprint must
+    read "not_granted", never "not_determined" - the fingerprint-stability
+    case this review exists to protect (production: ~125 such sites)."""
+    site = _site(session)
+    _app(session, site.id, "FUL/1", proposal="Erection of 40 dwellings", decision=None,
+         status="Under consideration", application_category="primary_residential",
+         application_received="Mon 01 Jan 2020")
+    universe = build_current_opportunity_universe(session)
+    site_opp = next(
+        (r for r in universe if r.opportunity_id == f"planning_delivery:long_pending_application:{site.id}"), None,
+    )
+    assert site_opp is not None
+    assert site_opp.fingerprint_fields["lapse_status"] == "not_granted"

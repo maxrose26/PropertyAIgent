@@ -689,12 +689,31 @@ class OperativeLapseAnchor:
     exactly as both of those functions already receive a pre-scoped
     `applications` argument today - so a sibling phase's or an individual
     plot's own applications can never contribute to (or reset) another
-    scope's anchor, since they are never in the list being ranked."""
+    scope's anchor, since they are never in the list being ranked.
+
+    `any_granted` (Gate 2B-2C pre-merge semantic review) - True whenever
+    at least one GRANTED application of ANY role exists among
+    `applications`, even when none is substantive-role-eligible to be the
+    anchor itself (`state` stays FACT_NOT_DETERMINED either way). Exists
+    so a caller can distinguish two genuinely different NOT_DETERMINED
+    situations that this dataclass's `state` field alone cannot tell
+    apart: "nothing has been granted here at all" (a positive, stable
+    fact - no lapse clock can exist yet because there is nothing for one
+    to arise from) versus "something WAS granted, but it cannot be
+    trusted as the operative substantive permission" (a genuine
+    uncertainty about which application is operative). Confirmed a real
+    production defect without this field: compute_lapse_status could not
+    tell these apart and reported the former, far more common case
+    (~125 sites with zero granted applications at all, entirely ordinary
+    for a still-pending, undetermined scheme) as if it were the latter
+    (uncertainty) - see that function's own "not_granted" vs
+    "not_determined" branching."""
     state: str  # FACT_RESOLVED | FACT_NOT_DETERMINED
     application: Application | None
     planning_role: str | None
     decision_date: dt.date | None
     reason: str
+    any_granted: bool
 
 
 def resolve_operative_lapse_anchor(applications: list[Application]) -> OperativeLapseAnchor:
@@ -705,16 +724,22 @@ def resolve_operative_lapse_anchor(applications: list[Application]) -> Operative
         )
         for a in applications
     ]
+    any_granted = any(r.decided_state == DECIDED_GRANTED for r in candidates)
     substantive_granted = [r for r in candidates if r.is_substantive and r.decided_state == DECIDED_GRANTED]
     if not substantive_granted:
         return OperativeLapseAnchor(
             state=FACT_NOT_DETERMINED, application=None, planning_role=None, decision_date=None,
-            reason="no substantive granted application in this scope (see SUBSTANTIVE_ROLES)",
+            reason=(
+                "no granted application exists in this scope" if not any_granted
+                else "a granted application exists in this scope but none is substantive-role-eligible "
+                     "(see SUBSTANTIVE_ROLES) - the operative permission cannot safely be determined"
+            ),
+            any_granted=any_granted,
         )
     lead = max(substantive_granted, key=_by_grant_then_recency)
     return OperativeLapseAnchor(
         state=FACT_RESOLVED, application=lead.application, planning_role=lead.role, decision_date=lead.decision_date,
-        reason=f"latest granted substantive application ({lead.role})",
+        reason=f"latest granted substantive application ({lead.role})", any_granted=True,
     )
 
 

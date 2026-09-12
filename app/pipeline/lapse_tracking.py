@@ -269,17 +269,32 @@ def compute_lapse_status(applications: list[Application], site: Site) -> dict:
     hybrid/full/reserved_matters/other_substantive) can ever start or
     reset this clock - an NMA, condition discharge, EIA screening/
     scoping, prior approval, or S73/variation cannot, regardless of how
-    recent its own decision is. Where NO substantive granted application
-    exists at all (e.g. only a Prior Approval or a non-residential
-    change-of-use application has been granted), this returns
-    "not_determined" rather than silently anchoring to whatever WAS
-    granted - "unknown is preferable to confidently wrong" (Gate 2B-2C
-    Product Owner principle)."""
+    recent its own decision is.
+
+    Gate 2B-2C pre-merge semantic review - TWO genuinely different
+    "nothing to anchor on" situations are now distinguished, never
+    collapsed into one label:
+      - "not_granted": no application has been granted at all (of ANY
+        role) - the ordinary, common, entirely expected state for a
+        still-pending or undetermined scheme (confirmed the overwhelming
+        majority - ~125 of ~132 production sites originally affected by
+        this distinction - the very case this status value already
+        existed for, before this gate ever touched compute_lapse_status).
+      - "not_determined": something WAS granted, but no SUBSTANTIVE-role
+        application is among the granted ones (e.g. only a Prior
+        Approval or a non-residential change-of-use application has been
+        granted) - a genuine uncertainty about the operative permission,
+        never silently anchored to whatever WAS granted ("unknown is
+        preferable to confidently wrong", Gate 2B-2C Product Owner
+        principle) - kept as its own distinct value rather than folded
+        into "not_granted", since a real (if untrustworthy) grant does
+        exist here, unlike the first case."""
     from app.reporting.scheme_reconciliation import FACT_RESOLVED, resolve_operative_lapse_anchor
 
     anchor = resolve_operative_lapse_anchor(applications)
     if anchor.state != FACT_RESOLVED:
-        return {"status": "not_determined", "deadline": None, "granted_app": None, "build_status": "unknown"}
+        status = "not_determined" if anchor.any_granted else "not_granted"
+        return {"status": status, "deadline": None, "granted_app": None, "build_status": "unknown"}
 
     decision_date = anchor.decision_date
     if decision_date is None or decision_date == dt.date.min:
