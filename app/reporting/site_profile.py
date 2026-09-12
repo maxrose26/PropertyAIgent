@@ -112,6 +112,7 @@ def build_headline_metrics(
     merged: dict, lapse: dict, decision_status: str | None, affordable_headline: dict,
     *, operative_total: int | None = None, operative_total_is_estimated: bool = False,
     operative_total_basis: str | None = None, operative_total_not_determined: bool = False,
+    affordable_percentage_reconciliation: dict | None = None,
 ) -> list[dict]:
     """Four consistent headline tiles (Part 3) - the same set, same order,
     on every Site Profile, never swapped per site depending on which
@@ -154,7 +155,7 @@ def build_headline_metrics(
         if total_display and merged.get("total_units_is_estimated"):
             total_display += " (est.)"
 
-    affordable_value, affordable_caption = format_affordable_tile(affordable_headline)
+    affordable_value, affordable_caption = format_affordable_tile(affordable_headline, affordable_percentage_reconciliation)
 
     build_status = lapse.get("build_status")
     build_display = BUILD_STATUS_LABELS.get(build_status) if build_status not in (None, "unknown") else "Not yet verified"
@@ -674,6 +675,7 @@ def build_site_profile(
         operative_total=operative_total, operative_total_is_estimated=operative_total_is_estimated,
         operative_total_basis=operative_total_basis,
         operative_total_not_determined=operative_total_not_determined,
+        affordable_percentage_reconciliation=residential_mix["percentage_reconciliation"],
     )
 
     return {

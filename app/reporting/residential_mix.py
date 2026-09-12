@@ -196,19 +196,37 @@ def compute_affordable_headline(scheme: SchemeIntelligence | None) -> dict:
     return empty
 
 
-def format_affordable_tile(headline: dict) -> tuple[str, str | None]:
+def format_affordable_tile(headline: dict, percentage_reconciliation: dict | None = None) -> tuple[str, str | None]:
     """(value, caption) for the Affordable Homes headline tile (Part 4) -
     the one shared implementation of "which line is primary" for every
     state, used identically by the Site Profile headline metrics
     (app.reporting.site_profile.build_headline_metrics) and the dedicated
-    Residential Mix Intelligence tab (app.ui.shell.affordable_headline_tile),
-    so the two can never drift out of sync with each other. Case C
-    ("percentage_only") is the one state where the percentage is primary
-    and the unit-count gap is the caption - every other state is unit-count
-    primary, percentage (or nothing) as caption."""
+    Residential Mix Intelligence tab (app.ui.site_profile_view.
+    affordable_headline_tile), so the two can never drift out of sync with
+    each other. Case C ("percentage_only") is the one state where the
+    percentage is primary and the unit-count gap is the caption - every
+    other state is unit-count primary, percentage (or nothing) as caption.
+
+    Gate 2B-2B.1 final closure (tile alignment) - `percentage_reconciliation`
+    is app.reporting.affordable_housing_scope.compute_percentage_
+    reconciliation's own output for the SAME scheme this headline was
+    built from (build_residential_mix's responsibility; None is treated as
+    "nothing to check against" and preserves this function's original,
+    unqualified caption for every existing caller that hasn't been
+    updated). When the recorded percentage does NOT arithmetically
+    reconcile with the affordable/total unit count (the confirmed Brixham
+    Road defect: "54 affordable homes" / "40% affordable" invites reading
+    54/145 as 40%, which it is not), the caption becomes an honest
+    qualifier instead of the raw percentage - the unit count itself is
+    never withheld, only the percentage's implied same-basis pairing. The
+    full on-site/financial-contribution breakdown belongs in the
+    Structured Summary, not this compact tile (Section 2's own "do not put
+    the full explanation into the headline tile")."""
     if headline["state"] == "percentage_only":
         return headline["headline_percentage"], headline["headline_units"]
     if headline["state"] in ("verified", "calculated"):
+        if percentage_reconciliation is not None and not percentage_reconciliation["percentage_reconciles"]:
+            return headline["headline_units"], "Recorded percentage requires review"
         return headline["headline_units"], headline["headline_percentage"]
     return headline["headline_units"], None
 
@@ -560,4 +578,11 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
         "structured_summary": structured_summary,
         "evidence_gaps": evidence_gaps,
         "scheme": scheme,
+        # Gate 2B-2B.1 final closure (tile alignment) - exposed so every
+        # consumer of this view model that renders the Affordable Homes
+        # headline tile (app.reporting.site_profile.build_headline_metrics,
+        # app.ui.site_profile_view.affordable_headline_tile) can share the
+        # SAME trusted reconciliation state format_affordable_tile below
+        # already accepts, rather than each re-deriving or omitting it.
+        "percentage_reconciliation": percentage_reconciliation,
     }

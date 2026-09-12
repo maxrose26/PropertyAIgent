@@ -34,7 +34,7 @@ from app.policy.buyer_profiles import (
 )
 from app.reporting.affordable_housing_scope import compute_affordable_housing_scope_summary, format_affordable_housing_lines
 from app.reporting.dashboard import _scheme_card
-from app.reporting.residential_mix import build_residential_mix
+from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
 from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
 from app.reporting.scheme_summary import build_summary_prompt
 from app.ui.common import aggregate_scheme_fields, compute_lapse_status
@@ -490,6 +490,37 @@ def test_trusted_ah_propagates_identically_for_table_and_export(session):
     ff_export = resolve_operative_filter_facts(facts)
     assert ff_table.affordable_units == ff_export.affordable_units == 25
     assert ff_table.affordable_percentage == ff_export.affordable_percentage == 25.0
+
+
+# --- Affordable Homes tile alignment (Gate 2B-2B.1 final closure) ----------
+
+
+def test_brixham_end_to_end_tile_and_structured_summary_agree(session):
+    """Full build_residential_mix integration - Brixham Road's Overview
+    headline tile (used by BOTH app.reporting.site_profile.
+    build_headline_metrics and app.ui.site_profile_view.
+    affordable_headline_tile via the SAME format_affordable_tile call) and
+    its Structured Summary sentence must never disagree: neither may
+    present 54 affordable homes and the stored 40% as an ordinary
+    same-basis pair, while both keep the 54-unit figure visible."""
+    site = _site(session)
+    app = _app(session, site.id, "114228/FUL/24", proposal="Residential development of 145 units",
+               status="Awaiting decision")
+    _intel(session, app, total_units_final=145, affordable_units_final=54, affordable_percentage_final=40.0,
+           affordable_tenure_split_final="37% on-site, 3% financial contribution")
+
+    mix = build_residential_mix(site, [app], rep_app=app)
+    assert mix["percentage_reconciliation"]["percentage_reconciles"] is False
+
+    value, caption = format_affordable_tile(mix["affordable_headline"], mix["percentage_reconciliation"])
+    assert value == "54 affordable homes"
+    assert caption == "Recorded percentage requires review"
+    assert "40%" not in caption
+
+    assert "54 homes" in mix["structured_summary"]
+    assert "37% on-site" in mix["structured_summary"]
+    assert "3% financial contribution" in mix["structured_summary"]
+    assert "representing 40" not in mix["structured_summary"]
 
 
 # --- 14-17: AH semantics -----------------------------------------------------
