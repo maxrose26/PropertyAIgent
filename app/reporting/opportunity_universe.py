@@ -116,13 +116,14 @@ import calendar
 import datetime as dt
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Application, ControlRelationship, LocalPlan, LocalPlanSite, Site
 from app.pipeline.lapse_tracking import compute_lapse_status
+from app.pipeline.phase_tracking import UNPHASED_LABEL
 from app.policy.buyer_matching import (
     MatchingFacts,
     build_planning_delivery_matching_facts,
@@ -481,6 +482,24 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             phase_code = card["id"].rsplit("-", 1)[-1]
             opportunity_id = planning_delivery_phase_opportunity_id(site_id, phase_code)
             fingerprint_fields["phase_code"] = phase_code
+            # Gate 2B-2B.2 - a named phase or material development parcel
+            # (phase_code != UNPHASED_LABEL) must carry ITS OWN
+            # deterministically supported unit_count, never the whole
+            # site's rep-derived total set above. card["phase_unit_count"]
+            # is that scope's own app.pipeline.phase_tracking._phase_
+            # unit_count result, already computed once by
+            # build_acquisition_scope_breakdown inside _undeveloped_phase_
+            # cards - reused here verbatim rather than re-grouping this
+            # site's applications a second time. None (genuinely not
+            # determined) is a valid, expected outcome and is never
+            # backfilled from the whole-site figure. A "Whole site /
+            # unphased" card has only one scope on the site, so it keeps
+            # the existing rep-derived unit_count unchanged - there is no
+            # separate "whole site" figure to prefer it over.
+            if phase_code != UNPHASED_LABEL:
+                phase_unit_count = card.get("phase_unit_count")
+                facts = replace(facts, unit_count=phase_unit_count)
+                fingerprint_fields["unit_count"] = phase_unit_count
         elif kind == "recent_permission":
             opportunity_id = planning_delivery_recent_permission_opportunity_id(site_id)
             # The grant date itself is a STABLE fact (never a live

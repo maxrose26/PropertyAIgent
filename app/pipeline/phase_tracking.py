@@ -286,6 +286,68 @@ def build_phase_breakdown(applications: list[Application]) -> list[dict]:
     return breakdown
 
 
+def build_acquisition_scope_breakdown(applications: list[Application]) -> list[dict]:
+    """Acquisition-level counterpart to build_phase_breakdown (Gate 2B-2B.2)
+    - identical row shape (label/code/kind/progress/unit_count), but grouped
+    by group_applications_by_operative_scope (Gate 2B-2A) rather than raw
+    group_applications_by_phase, so an individual dwelling plot that fails
+    is_material_development_parcel is folded into the whole-site/unphased
+    bucket before a row is ever produced for it - it can never surface as
+    its own standalone row here, and therefore never as its own standalone
+    acquisition opportunity card downstream (app.reporting.dashboard.
+    _undeveloped_phase_cards).
+
+    Reuses group_applications_by_operative_scope/compute_phase_progress/
+    _phase_unit_count completely unchanged - no new grouping, no new
+    material-parcel test, no duplicated regex/threshold logic. Only a
+    named "plot" group that INDEPENDENTLY survives group_applications_by_
+    operative_scope's own materiality test (i.e. a genuine material
+    development parcel) ever reaches this function's output with
+    kind == "plot" - every non-material plot citation is already folded
+    into the unphased bucket upstream, so this function's own unit_count
+    scoping (any named code, not just kind == "phase") is safe: a survivor
+    already proved it has its own qualifying-scale figure.
+
+    build_phase_breakdown itself is NOT changed and is not called by this
+    function - the Scheme Detail "Phase Breakdown" evidence view keeps
+    showing every named plot's own filing activity in full, unresolved
+    detail, exactly as before (Gate 2B-2B.2 Section 5: this is a
+    presentation/resolution rule for acquisition-opportunity generation
+    only, not a change to planning evidence display).
+
+    The "worth a breakdown at all" gate below deliberately checks the RAW
+    group_applications_by_phase count, not the resolved (post-fold) one.
+    Read-only Gate 2B-2B.2 production investigation confirmed a real
+    regression from gating on the resolved count instead: a site with
+    exactly one genuine whole-site scope plus one non-material plot
+    citation (e.g. "Land North Of Mosley Common", "Land Off Crabtree
+    Lane") has 2 RAW groups (so a genuine, pre-existing "approved, not
+    started" whole-site card was already being generated for it), but
+    folds down to a single RESOLVED group once the non-material plot is
+    absorbed - gating on the resolved count would then silently drop that
+    site's own legitimate whole-site opportunity entirely, purely as a
+    side effect of correctly suppressing an unrelated false plot, which
+    is not this gate's purpose. Gating on the raw count instead preserves
+    exactly the same "does this site have any phase/plot activity worth
+    resolving at all" bar build_phase_breakdown already applies, while
+    still folding/resolving the groups that make it through."""
+    if len(group_applications_by_phase(applications)) <= 1:
+        return []
+    groups = group_applications_by_operative_scope(applications)
+
+    breakdown = []
+    for (code, kind), apps in groups.items():
+        progress = compute_phase_progress(apps)
+        label = code if code == UNPHASED_LABEL else f"{'Phase' if kind == 'phase' else 'Plot'} {code}"
+        row = {"label": label, "code": code, "kind": kind, "applications": apps, **progress}
+        if code != UNPHASED_LABEL:
+            row.update(_phase_unit_count(apps))
+        breakdown.append(row)
+
+    breakdown.sort(key=lambda row: (row["code"] == UNPHASED_LABEL, row["kind"] != "phase", row["code"]))
+    return breakdown
+
+
 def summarize_phase_units(breakdown: list[dict]) -> dict:
     """Roll named phases (not plots, not the unphased bucket - see
     build_phase_breakdown's own unit-count scoping) up into three buckets by
