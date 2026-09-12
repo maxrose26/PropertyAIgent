@@ -235,6 +235,9 @@ def test_site_already_recent_permission_never_also_becomes_long_pending(session)
         application_received=submitted.strftime("%a %d %b %Y"),
         decision_issued_date=(dt.date.today() - dt.timedelta(days=10)).strftime("%a %d %b %Y"),
         first_seen_at=dt.datetime.now(dt.timezone.utc),
+        # Gate 2B-2C: resolve_planning_role needs real substantive proposal
+        # wording to trust this as the lapse/recent-permission anchor.
+        proposal="Erection of 40 dwellings",
     ))
     session.commit()
 
@@ -317,6 +320,9 @@ def test_detector_expansion_after_recent_permission_already_baselined_is_baselin
         council_code="testcouncil", reference=f"REF-{granted_site.id}", site_id=granted_site.id,
         decision="Granted", decision_issued_date=grant_date.strftime("%a %d %b %Y"),
         first_seen_at=dt.datetime.now(dt.timezone.utc),
+        # Gate 2B-2C: resolve_planning_role needs real substantive proposal
+        # wording to trust this as the lapse/recent-permission anchor.
+        proposal="Erection of 40 dwellings",
     ))
     session.commit()
     first = sync_opportunity_monitoring_state(session)

@@ -45,6 +45,9 @@ def _granted_site(session, *, decision_date: dt.date) -> Site:
         council_code="testcouncil", reference=f"APP-{site.id}", site_id=site.id,
         decision="Granted", decision_issued_date=decision_date.strftime("%a %d %b %Y"),
         first_seen_at=dt.datetime.now(dt.timezone.utc),
+        # Gate 2B-2C: resolve_planning_role needs real substantive proposal
+        # wording to trust this as the lapse anchor.
+        proposal="Erection of 40 dwellings",
     ))
     session.commit()
     return site

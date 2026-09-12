@@ -24,12 +24,7 @@ from __future__ import annotations
 import re
 
 from app.db.models import Application
-from app.pipeline.lapse_tracking import (
-    PROGRESS_SIGNAL_CATEGORIES,
-    find_progress_signal_filing,
-    is_granted_decision,
-    parse_portal_date,
-)
+from app.pipeline.lapse_tracking import PROGRESS_SIGNAL_CATEGORIES, find_progress_signal_filing
 from app.scrapers.unit_filter import EXCLUDE_CATEGORIES, extract_unit_counts
 
 PHASE_TOKEN = r"(?:part\s+)?[A-Za-z]{0,4}\d+[A-Za-z]?"
@@ -99,19 +94,38 @@ def compute_phase_progress(applications: list[Application]) -> dict:
     lapse_tracking.compute_lapse_status's shape but scoped to a single phase
     rather than the whole site, and without a lapse clock (the whole-site
     commencement deadline already covers that; a phase adds "has this
-    specific part actually started" instead)."""
-    granted = [a for a in applications if is_granted_decision(a.decision) and a.decision_issued_date]
-    if granted:
-        latest_grant = max(granted, key=lambda a: parse_portal_date(a.decision_issued_date))
-        grant_date = parse_portal_date(latest_grant.decision_issued_date)
+    specific part actually started" instead).
 
-        progress_filing = find_progress_signal_filing(applications, grant_date, exclude=latest_grant)
+    Gate 2B-2C: the operative anchor within this scope's own `applications`
+    is now app.reporting.scheme_reconciliation.resolve_operative_lapse_
+    anchor's trusted, SUBSTANTIVE-role-only selection, never this
+    function's own former naive "latest application whose decision text
+    says approve/grant" scan - a later NMA/condition-discharge/S73 within
+    this same scope can no longer become the "grant" that determines
+    whether it has started, and - just as importantly - can no longer be
+    EXCLUDED from also counting as valid progress evidence merely because
+    it wrongly became the anchor itself (confirmed real defect: World of
+    Pets' own Reserved Matters grant, followed by several later NMA/
+    condition-discharge filings, previously read "approved_not_started"
+    because the LATEST NMA became `latest_grant` and therefore excluded
+    itself from the progress-filing search - correctly reads "underway"
+    once the TRUE Reserved Matters grant is used as the anchor and the
+    later NMA is evaluated as progress evidence against it instead).
+    Local import for the same circular-import reason app.pipeline.
+    lapse_tracking.compute_lapse_status already documents."""
+    from app.reporting.scheme_reconciliation import FACT_RESOLVED, resolve_operative_lapse_anchor
+
+    anchor = resolve_operative_lapse_anchor(applications)
+    if anchor.state == FACT_RESOLVED:
+        grant_date = anchor.decision_date
+        progress_filing = find_progress_signal_filing(applications, grant_date, exclude=anchor.application)
         if progress_filing:
-            return {"status": "underway", "latest_grant": latest_grant, "progress_filing": progress_filing}
+            return {"status": "underway", "latest_grant": anchor.application, "progress_filing": progress_filing}
 
-        return {"status": "approved_not_started", "latest_grant": latest_grant, "progress_filing": None}
+        return {"status": "approved_not_started", "latest_grant": anchor.application, "progress_filing": None}
 
-    # No grant WITHIN this phase/plot's own applications - but if it has a
+    # No TRUSTED substantive grant WITHIN this phase/plot's own applications -
+    # but if it has a
     # real progress-signal filing (discharge of conditions, amendment)
     # anyway, that's still unambiguous evidence of active, approved work: a
     # discharge-of-conditions application cannot exist without an underlying

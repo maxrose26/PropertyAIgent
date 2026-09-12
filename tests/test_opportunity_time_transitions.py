@@ -60,6 +60,9 @@ def _add_granted_application(session, site: Site, grant_date: real_datetime.date
         council_code="testcouncil", reference=ref, site_id=site.id,
         decision="Granted", decision_issued_date=grant_date.strftime("%a %d %b %Y"),
         first_seen_at=real_datetime.datetime.now(real_datetime.timezone.utc),
+        # Gate 2B-2C: resolve_planning_role needs real substantive proposal
+        # wording to trust this as the lapse anchor.
+        proposal="Erection of 40 dwellings",
     ))
 
 

@@ -35,6 +35,9 @@ def _make_granted_site(session, *, months_ago: float, build_status: str | None =
             council_code="testcouncil", reference=f"REF-{site.id}-{i}", site_id=site.id,
             decision="Granted", decision_issued_date=decision_date.strftime("%a %d %b %Y"),
             first_seen_at=dt.datetime.now(dt.timezone.utc),
+            # Gate 2B-2C: resolve_planning_role needs real substantive
+            # proposal wording to trust this as the lapse anchor.
+            proposal="Erection of 40 dwellings",
         ))
     session.commit()
     return site
@@ -176,6 +179,9 @@ def _make_granted_site_on_exact_date(session, *, grant_date: dt.date, address: s
         council_code="testcouncil", reference=f"REF-{site.id}", site_id=site.id,
         decision="Granted", decision_issued_date=grant_date.strftime("%a %d %b %Y"),
         first_seen_at=dt.datetime.now(dt.timezone.utc),
+        # Gate 2B-2C: resolve_planning_role needs real substantive proposal
+        # wording to trust this as the lapse anchor.
+        proposal="Erection of 40 dwellings",
     ))
     session.commit()
     return site
@@ -222,22 +228,48 @@ def test_multiple_applications_on_one_site_produce_one_candidate(session):
     assert len(matching) == 1
 
 
-def test_reserved_matters_style_second_grant_does_not_duplicate_the_candidate(session):
-    """A second granted application on the same site (e.g. reserved
-    matters/Section 73) must not create a second candidate - it may
-    refresh the SAME site-level candidate's recency (inherits compute_
-    lapse_status's own existing "latest granted application" convention,
-    per Gate 1C Section 10 - flagged explicitly, not silently assumed)."""
+def test_genuine_second_substantive_grant_refreshes_the_single_candidate(session):
+    """A second GENUINE SUBSTANTIVE grant on the same site (e.g. a real
+    Reserved Matters approval following an earlier outline) must not
+    create a second candidate - it correctly refreshes the SAME site-level
+    candidate's recency, since it is itself trusted-anchor-eligible
+    (app.reporting.scheme_reconciliation.SUBSTANTIVE_ROLES)."""
     site = _make_granted_site(session, months_ago=10)
     session.add(Application(
-        council_code="testcouncil", reference=f"REF-{site.id}-S73", site_id=site.id,
+        council_code="testcouncil", reference=f"REF-{site.id}-RM", site_id=site.id,
         decision="Granted", decision_issued_date=(dt.date.today() - dt.timedelta(days=30)).strftime("%a %d %b %Y"),
         first_seen_at=dt.datetime.now(dt.timezone.utc),
+        proposal="Reserved matters application for the erection of 40 dwellings",
     ))
     session.commit()
     cards = _recent_permission_cards(session, None)
     matching = [c for c in cards if c["params"]["site_id"] == str(site.id)]
     assert len(matching) == 1
+
+
+def test_non_substantive_second_grant_does_not_refresh_or_fabricate_recency(session):
+    """Gate 2B-2C - a later NON-SUBSTANTIVE grant (S73/variation, NMA,
+    condition discharge) on the same site must NOT refresh the site's
+    recent-permission recency, and must NOT itself make an old
+    substantive permission look recently granted. The genuine substantive
+    grant here is 10 months old (well outside the 3-month window) - this
+    site must NOT appear as recent_permission at all, even though a
+    later-decided S73 exists on the same site (this is the exact defect
+    class the Gate 2B-2C investigation confirmed in production - e.g. a
+    later NMA/S73 previously became `latest_granted` and made a stale
+    permission look freshly granted)."""
+    site = _make_granted_site(session, months_ago=10)
+    session.add(Application(
+        council_code="testcouncil", reference=f"REF-{site.id}-S73", site_id=site.id,
+        decision="Granted", decision_issued_date=(dt.date.today() - dt.timedelta(days=30)).strftime("%a %d %b %Y"),
+        first_seen_at=dt.datetime.now(dt.timezone.utc),
+        application_category="variation_or_amendment",
+        proposal="Section 73 application to vary condition 2 of planning permission",
+    ))
+    session.commit()
+    cards = _recent_permission_cards(session, None)
+    matching = [c for c in cards if c["params"]["site_id"] == str(site.id)]
+    assert len(matching) == 0
 
 
 # --- Overlap / deduplication with the two existing planning/delivery routes --
@@ -262,6 +294,9 @@ def test_site_already_approaching_lapse_does_not_also_become_recent_permission(s
     session.add(Application(
         council_code="testcouncil", reference=f"REF-{site.id}", site_id=site.id, decision="Granted",
         decision_issued_date=decision_date.strftime("%a %d %b %Y"), first_seen_at=dt.datetime.now(dt.timezone.utc),
+        # Gate 2B-2C: resolve_planning_role needs real substantive proposal
+        # wording to trust this as the lapse anchor.
+        proposal="Erection of 40 dwellings",
     ))
     session.commit()
 

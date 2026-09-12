@@ -99,6 +99,17 @@ LAPSE_STATUS_LABELS = {
     "safe": "OK",
     "not_granted": "Not yet granted",
     "unknown": "Unknown",
+    # Gate 2B-2C - distinct from "not_granted" (nothing has been granted at
+    # all) and "unknown" (a grant exists but its date can't be parsed):
+    # here a grant DOES exist on record, but no SUBSTANTIVE-role
+    # application (see app.reporting.scheme_reconciliation.SUBSTANTIVE_
+    # ROLES / resolve_operative_lapse_anchor) is among the granted ones -
+    # e.g. only a Prior Approval or a non-residential change-of-use
+    # application has ever been granted on this site/scope. Never
+    # silently treated as if a real planning permission's lapse could be
+    # "approaching" - Product Owner principle: "unknown is preferable to
+    # confidently wrong".
+    "not_determined": "❔ Operative permission not determined",
 }
 
 # RGBA fill colours for the map - one per planning-status bucket above.
@@ -111,6 +122,7 @@ LAPSE_STATUS_COLORS: dict[str, list[int]] = {
     "lapsed": [220, 20, 60, 220],         # crimson - may have lapsed
     "underway": [138, 43, 226, 220],      # blue violet - build underway
     "unknown": [150, 150, 150, 220],      # grey - no decision data
+    "not_determined": [150, 150, 150, 220],  # grey - same as unknown, genuinely no trustworthy answer
 }
 
 
@@ -211,28 +223,73 @@ def classify_decision_status(decision: str | None, status: str | None) -> str:
     return "not_yet_decided"
 
 
-def compute_lapse_status(applications: list[Application], site: Site) -> dict:
-    """Uses the most recently granted application on the site - a site can
-    have several linked applications (screening opinions, reserved matters,
-    variations...), only the granted full/outline one(s) actually start this
-    clock."""
-    granted_apps = [a for a in applications if is_granted_decision(a.decision) and a.decision_issued_date]
-    if not granted_apps:
-        return {"status": "not_granted", "deadline": None, "granted_app": None, "build_status": "unknown"}
+def _resolve_lapse_deadline(decision_date: dt.date) -> dt.date:
+    """Gate 2B-2C - deliberately thin "lapse basis" step, kept structurally
+    separate from anchor resolution (app.reporting.scheme_reconciliation.
+    resolve_operative_lapse_anchor) per the Product Owner's own
+    architectural distinction: WHICH application is the trusted operative
+    permission is a different question from WHAT governs its
+    implementation/lapse period. V1 answer: a uniform COMMENCEMENT_YEARS
+    (3) from the anchor's own decision date - the same platform-wide
+    default already in use before this gate, now at least applied to the
+    TRUSTED anchor's own date rather than an arbitrary later application's.
 
-    latest_granted = max(granted_apps, key=lambda a: parse_portal_date(a.decision_issued_date))
-    decision_date = parse_portal_date(latest_granted.decision_issued_date)
-    if decision_date == dt.date.min:
-        return {"status": "unknown", "deadline": None, "granted_app": latest_granted, "build_status": "unknown"}
-
+    This is NOT a complete statutory model - a genuine outline permission's
+    own condition can instead run from the LATEST reserved matters
+    approval, not the outline's own decision date, which this does not
+    model. The Gate 2B-2C investigation found this already resolves
+    correctly today by coincidence for every production case checked: a
+    later Reserved Matters approval naturally becomes the anchor itself
+    under resolve_operative_lapse_anchor's own grant-then-recency ranking
+    (it is substantive and later than its own outline), so no separate
+    outline/RM-specific basis logic exists or was found to be needed for
+    this V1."""
     try:
-        deadline = decision_date.replace(year=decision_date.year + COMMENCEMENT_YEARS)
+        return decision_date.replace(year=decision_date.year + COMMENCEMENT_YEARS)
     except ValueError:  # 29 Feb decision date, target year isn't a leap year
-        deadline = decision_date.replace(year=decision_date.year + COMMENCEMENT_YEARS, day=28)
+        return decision_date.replace(year=decision_date.year + COMMENCEMENT_YEARS, day=28)
+
+
+def compute_lapse_status(applications: list[Application], site: Site) -> dict:
+    """Gate 2B-2C - the operative anchor is now resolve_operative_lapse_
+    anchor's own trusted, SUBSTANTIVE-role-only selection (app.reporting.
+    scheme_reconciliation), never this module's own former naive "latest
+    application whose decision text says approve/grant" scan - a later
+    NMA, condition discharge, or S73/variation can no longer become the
+    permission that starts this clock merely because it happens to be the
+    most recently decided (confirmed real production defect: World of
+    Pets, and 56 further sites, had their commencement deadline anchored
+    to a non-substantive follow-on filing - see the Gate 2B-2C
+    investigation report). Local import - app.reporting.scheme_
+    reconciliation already imports from this module (parse_portal_date/
+    DECISION_STATUS_LABELS), so a module-level import here would be
+    circular.
+
+    Local rule: only granted, SUBSTANTIVE-role applications (outline/
+    hybrid/full/reserved_matters/other_substantive) can ever start or
+    reset this clock - an NMA, condition discharge, EIA screening/
+    scoping, prior approval, or S73/variation cannot, regardless of how
+    recent its own decision is. Where NO substantive granted application
+    exists at all (e.g. only a Prior Approval or a non-residential
+    change-of-use application has been granted), this returns
+    "not_determined" rather than silently anchoring to whatever WAS
+    granted - "unknown is preferable to confidently wrong" (Gate 2B-2C
+    Product Owner principle)."""
+    from app.reporting.scheme_reconciliation import FACT_RESOLVED, resolve_operative_lapse_anchor
+
+    anchor = resolve_operative_lapse_anchor(applications)
+    if anchor.state != FACT_RESOLVED:
+        return {"status": "not_determined", "deadline": None, "granted_app": None, "build_status": "unknown"}
+
+    decision_date = anchor.decision_date
+    if decision_date is None or decision_date == dt.date.min:
+        return {"status": "unknown", "deadline": None, "granted_app": anchor.application, "build_status": "unknown"}
+
+    deadline = _resolve_lapse_deadline(decision_date)
 
     build_status = classify_build_status(applications, site, decision_date)
     if build_status in ("underway", "partially_complete", "complete"):
-        return {"status": "underway", "deadline": deadline, "granted_app": latest_granted, "build_status": build_status}
+        return {"status": "underway", "deadline": deadline, "granted_app": anchor.application, "build_status": build_status}
 
     days_left = (deadline - dt.date.today()).days
     if days_left < 0:
@@ -241,4 +298,4 @@ def compute_lapse_status(applications: list[Application], site: Site) -> dict:
         status = "approaching"
     else:
         status = "safe"
-    return {"status": status, "deadline": deadline, "granted_app": latest_granted, "build_status": build_status}
+    return {"status": status, "deadline": deadline, "granted_app": anchor.application, "build_status": build_status}
