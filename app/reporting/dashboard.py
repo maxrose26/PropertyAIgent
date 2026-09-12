@@ -45,7 +45,7 @@ from app.pipeline.lapse_tracking import (
     compute_lapse_status,
     parse_portal_date,
 )
-from app.pipeline.phase_tracking import build_phase_breakdown
+from app.pipeline.phase_tracking import build_acquisition_scope_breakdown
 from app.reporting.scheme_reconciliation import (
     NOT_DETERMINED_DECISION_STATUS,
     OPERATIVE_DECISION_STATUS_LABELS,
@@ -1065,7 +1065,7 @@ def build_scheme_stack(session: Session, limit_per_tab: int = 8) -> dict[str, li
 # never redefined) - only approaching_lapse and undeveloped_phase are
 # genuinely new, and both are built entirely from existing, already-tested
 # deterministic modules (app.pipeline.lapse_tracking.compute_lapse_status,
-# app.pipeline.phase_tracking.build_phase_breakdown) rather than new
+# app.pipeline.phase_tracking.build_acquisition_scope_breakdown) rather than new
 # ranking/scoring logic of their own.
 
 _OPPORTUNITY_SECTION_ORDER = (
@@ -1156,12 +1156,21 @@ def _low_supply_cards(session: Session, limit: int) -> list[dict]:
 
 
 def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
-    """Bounded to Sites with 2+ linked applications - build_phase_breakdown
-    needs multiple filings to detect a phase at all, and returns [] for a
-    single-application site by its own definition. One batched query for
-    every Application/Site involved; phase detection itself
-    (app.pipeline.phase_tracking) is pure Python over already-fetched rows,
-    never a further query per site."""
+    """Bounded to Sites with 2+ linked applications -
+    build_acquisition_scope_breakdown needs multiple filings to detect a
+    phase at all, and returns [] for a single-application site by its own
+    definition. One batched query for every Application/Site involved;
+    phase detection itself (app.pipeline.phase_tracking) is pure Python
+    over already-fetched rows, never a further query per site.
+
+    Gate 2B-2B.2: uses build_acquisition_scope_breakdown (Gate 2B-2A's
+    group_applications_by_operative_scope) rather than build_phase_
+    breakdown (raw group_applications_by_phase), so an individual dwelling
+    plot that fails is_material_development_parcel is folded into the
+    whole-site/unphased bucket before a card is ever generated for it -
+    it can no longer become its own standalone acquisition opportunity.
+    A genuine development phase or material development parcel is
+    unaffected and still produces a card exactly as before."""
     apps = session.execute(
         select(Application).where(Application.site_id.is_not(None))
         .join(Site, Application.site_id == Site.id).where(Site.excluded.is_not(True))
@@ -1181,7 +1190,7 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
         site = sites.get(site_id)
         if site is None:
             continue
-        breakdown = build_phase_breakdown(by_site[site_id])
+        breakdown = build_acquisition_scope_breakdown(by_site[site_id])
         undeveloped = [row for row in breakdown if row["status"] == "approved_not_started"]
         if not undeveloped:
             continue
@@ -1196,6 +1205,15 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
             "metric": f"{len(undeveloped)} phase(s) not yet started" if len(undeveloped) > 1 else "Not yet started",
             "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else site.updated_at,
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+            # Gate 2B-2B.2 - this scope's OWN deterministically supported
+            # unit count (None if genuinely unknown), never the whole
+            # site's total. Consumed by app.reporting.opportunity_universe.
+            # _planning_delivery_universe so a named phase/material-parcel
+            # opportunity's unit_count reflects its own scope rather than
+            # inheriting an unrelated whole-site figure - see that
+            # module's own Gate 2B-2B.2 remediation for why this can't
+            # simply be recomputed there from the card alone.
+            "phase_unit_count": phase.get("unit_count"),
         })
     cards.sort(key=lambda c: _naive(c["when"]), reverse=True)
     return cards[:limit]
