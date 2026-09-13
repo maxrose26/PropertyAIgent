@@ -653,6 +653,96 @@ def _resolve_reference_and_status(resolved: list[ResolvedApplication]) -> tuple[
     )
 
 
+@dataclass(frozen=True)
+class OperativeLapseAnchor:
+    """Gate 2B-2C - the trusted "which application governs implementation/
+    lapse for this scope" answer: the latest GRANTED, SUBSTANTIVE-role
+    application among the given `applications` (SUBSTANTIVE_ROLES exactly -
+    an NMA, condition discharge, EIA screening/scoping, prior approval, or
+    S73/variation is never eligible here, regardless of how recent or how
+    its own decision reads). Reuses resolve_planning_role/
+    resolve_decided_state/_by_grant_then_recency exactly as
+    _resolve_reference_and_status's own consented-position ranking already
+    does - never a second, independently-written selection rule (the
+    two-independently-written-rules drift this module's own docstring
+    already warns against, Gate 2B-2B.1's "Naming" section).
+
+    `state` is FACT_NOT_DETERMINED - never a fallback to a non-substantive
+    grant - whenever no substantive granted application exists among
+    `applications` (Gate 2B-2C Product Owner principle: "unknown is
+    preferable to confidently wrong"). S73/variation's own V1 lapse
+    behaviour falls out of this for free, with no bespoke branch: it is
+    simply never in SUBSTANTIVE_ROLES, so it is transparently skipped in
+    favour of whichever substantive application it varies (or
+    NOT_DETERMINED if none exists) - it can never itself start a fresh
+    lapse clock, and it never needs special-casing to "inherit" the
+    underlying permission's basis, because it was never a candidate to
+    override that basis in the first place.
+
+    `applications` may be a Site's FULL application list (the whole-site
+    anchor - app.pipeline.lapse_tracking.compute_lapse_status's own use)
+    or one already-scoped phase/material-parcel group's own application
+    list (app.pipeline.phase_tracking.group_applications_by_operative_
+    scope's own grouping - app.pipeline.phase_tracking.compute_phase_
+    progress's own use). This function has no scope concept of its own;
+    the caller decides what "this scope's own applications" means,
+    exactly as both of those functions already receive a pre-scoped
+    `applications` argument today - so a sibling phase's or an individual
+    plot's own applications can never contribute to (or reset) another
+    scope's anchor, since they are never in the list being ranked.
+
+    `any_granted` (Gate 2B-2C pre-merge semantic review) - True whenever
+    at least one GRANTED application of ANY role exists among
+    `applications`, even when none is substantive-role-eligible to be the
+    anchor itself (`state` stays FACT_NOT_DETERMINED either way). Exists
+    so a caller can distinguish two genuinely different NOT_DETERMINED
+    situations that this dataclass's `state` field alone cannot tell
+    apart: "nothing has been granted here at all" (a positive, stable
+    fact - no lapse clock can exist yet because there is nothing for one
+    to arise from) versus "something WAS granted, but it cannot be
+    trusted as the operative substantive permission" (a genuine
+    uncertainty about which application is operative). Confirmed a real
+    production defect without this field: compute_lapse_status could not
+    tell these apart and reported the former, far more common case
+    (~125 sites with zero granted applications at all, entirely ordinary
+    for a still-pending, undetermined scheme) as if it were the latter
+    (uncertainty) - see that function's own "not_granted" vs
+    "not_determined" branching."""
+    state: str  # FACT_RESOLVED | FACT_NOT_DETERMINED
+    application: Application | None
+    planning_role: str | None
+    decision_date: dt.date | None
+    reason: str
+    any_granted: bool
+
+
+def resolve_operative_lapse_anchor(applications: list[Application]) -> OperativeLapseAnchor:
+    candidates = [
+        ResolvedApplication(
+            application=a, role=resolve_planning_role(a), decided_state=resolve_decided_state(a),
+            scope_type=SCOPE_UNCLEAR, scope_label="",
+        )
+        for a in applications
+    ]
+    any_granted = any(r.decided_state == DECIDED_GRANTED for r in candidates)
+    substantive_granted = [r for r in candidates if r.is_substantive and r.decided_state == DECIDED_GRANTED]
+    if not substantive_granted:
+        return OperativeLapseAnchor(
+            state=FACT_NOT_DETERMINED, application=None, planning_role=None, decision_date=None,
+            reason=(
+                "no granted application exists in this scope" if not any_granted
+                else "a granted application exists in this scope but none is substantive-role-eligible "
+                     "(see SUBSTANTIVE_ROLES) - the operative permission cannot safely be determined"
+            ),
+            any_granted=any_granted,
+        )
+    lead = max(substantive_granted, key=_by_grant_then_recency)
+    return OperativeLapseAnchor(
+        state=FACT_RESOLVED, application=lead.application, planning_role=lead.role, decision_date=lead.decision_date,
+        reason=f"latest granted substantive application ({lead.role})", any_granted=True,
+    )
+
+
 def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[OperativeFact, tuple[FactPosition, ...]]:
     """Approved residential units, where consent exists. Eligible sources:
     granted substantive applications, plus an S73/variation ONLY where it
