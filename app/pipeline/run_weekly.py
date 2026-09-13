@@ -75,11 +75,18 @@ from app.extraction.run_extraction import (
 )
 from app.pipeline.acquisition_health import AcquisitionHealth
 from app.pipeline.evidence import document_identity_key, is_evidence_sufficient
+from app.policy.change_detection import compute_content_hash
 from app.pipeline.material_change import (
     TRIGGER_MATERIAL_CHANGE,
     ApplicationState,
     MaterialChangeStats,
     detect_material_application_change,
+)
+from app.pipeline.lifecycle_events import (
+    LifecycleEventStats,
+    SOURCE_SCRAPE,
+    record_material_change_events,
+    record_related_application_discovery_event,
 )
 from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker, is_portal_host_failure
 from app.pipeline.lapse_tracking import (
@@ -268,7 +275,10 @@ def _scrape_month_for_council(page, council: CouncilConfig, date_from: str, date
     return scrape_month_idox(page, council, date_from, date_to)
 
 
-def stage_scrape(session: Session, page, council: CouncilConfig, date_from: str, date_to: str, batch_id: str) -> int:
+def stage_scrape(
+    session: Session, page, council: CouncilConfig, date_from: str, date_to: str, batch_id: str,
+    lifecycle_event_stats: LifecycleEventStats | None = None,
+) -> int:
     print(f"\n[scrape] {council.code} {date_from} -> {date_to}")
     scraped = _scrape_month_for_council(page, council, date_from, date_to)
     qualifying = [a for a in scraped if a.qualifies and a.reference]
@@ -325,6 +335,7 @@ def stage_scrape(session: Session, page, council: CouncilConfig, date_from: str,
         _upsert_scraped_application(
             session, council, app, batch_id, unit_confirmation_status=status,
             material_change_stats=material_change_stats,
+            lifecycle_event_stats=lifecycle_event_stats,
         )
 
     session.commit()
@@ -336,11 +347,24 @@ def stage_scrape(session: Session, page, council: CouncilConfig, date_from: str,
 def _upsert_scraped_application(
     session: Session, council: CouncilConfig, app, batch_id: str | None, unit_confirmation_status: str | None = None,
     material_change_stats: MaterialChangeStats | None = None,
+    authoritative_source: str = SOURCE_SCRAPE,
+    lifecycle_event_stats: LifecycleEventStats | None = None,
 ) -> Application:
     """Shared by stage_scrape and stage_fetch_missing_parents - both end up
     writing the same shape of scraper result (idox_portal/arcus_portal's
     ScrapedApplication) into an applications row, just discovered via a
     different search (date-range vs a single targeted reference lookup).
+
+    Gate 2B-0B ("Application Lifecycle Intelligence") amendment -
+    `authoritative_source`/`lifecycle_event_stats` are new, optional,
+    additive parameters only: every existing call site that doesn't pass
+    them keeps its previous behaviour exactly (authoritative_source
+    defaults to SOURCE_SCRAPE, matching what every pre-existing caller
+    actually was; lifecycle_event_stats defaults to None, so no event is
+    ever written unless a caller opts in). Only the caller knows WHICH
+    mechanism produced this upsert (an ordinary monthly scrape, a
+    status-verification targeted re-fetch, or a missing-parent lookup) -
+    this function itself never guesses.
 
     PR B1 ("Material Application-State Detection + Persisted Refresh
     Signal") - an application that ALREADY existed before this call has
@@ -411,6 +435,16 @@ def _upsert_scraped_application(
                 f"old_status={old_state.status!r} new_status={new_state.status!r} "
                 f"old_decision={old_state.decision!r} new_decision={new_state.decision!r} "
                 f"old_units={old_state.estimated_unit_count} new_units={new_state.estimated_unit_count}"
+            )
+            # Gate 2B-0B ("Application Lifecycle Intelligence") - records
+            # the SAME already-computed `result` as append-only lifecycle
+            # history; never re-derives or duplicates B1's own detection
+            # above. existing.id is always set here (this branch only
+            # runs when `existing` was already a persisted row, per
+            # old_state being non-None).
+            record_material_change_events(
+                session, application_id=existing.id, result=result,
+                authoritative_source=authoritative_source, stats=lifecycle_event_stats,
             )
 
     return existing
@@ -590,6 +624,7 @@ def stage_fetch_missing_parents(
 def stage_fetch_related_applications(
     session: Session, page, council: CouncilConfig, breaker: CouncilPortalCircuitBreaker | None = None,
     opportunity_kinds_by_site: dict[int, frozenset[str]] | None = None,
+    lifecycle_event_stats: LifecycleEventStats | None = None,
 ) -> int:
     """Search the portal for every application that names a given reference
     by number (see app.scrapers.idox_portal.search_related_applications),
@@ -788,6 +823,18 @@ def stage_fetch_related_applications(
                 )
                 application.site_id = parent.site_id
                 application.site_link_method = "related_search"
+                # Gate 2B-0B - `application` is guaranteed brand-new here
+                # (the existing-reference check above this loop already
+                # skipped anything already known), so record_material_
+                # change_events never fires for it via _upsert_scraped_
+                # application above; the genuinely new fact worth
+                # recording is the discovery itself. flush() (not commit)
+                # first - application.id is only populated once the
+                # pending INSERT is actually sent to the database.
+                session.flush()
+                record_related_application_discovery_event(
+                    session, application_id=application.id, category=category, stats=lifecycle_event_stats,
+                )
                 session.commit()
 
                 new_this_parent += 1
@@ -859,6 +906,16 @@ def stage_fetch_related_applications(
             )
             application.site_id = parent.site_id
             application.site_link_method = "related_search"
+            # Gate 2B-0B - `application` is guaranteed brand-new here (the
+            # existing-reference/keyval check above this loop already
+            # skipped anything already known). flush() (not commit) first -
+            # application.id is only populated once the pending INSERT this
+            # row's own _upsert_scraped_application call queued is actually
+            # sent to the database.
+            session.flush()
+            record_related_application_discovery_event(
+                session, application_id=application.id, category=category, stats=lifecycle_event_stats,
+            )
             session.commit()
 
             new_this_parent += 1
@@ -1352,6 +1409,18 @@ def discover_and_store_documents_for_application(
                 text_extracted=bool(text),
                 extracted_text=clean_document_text(text) if text else None,
                 downloaded_at=dt.datetime.now(dt.timezone.utc),
+                # Gate 2B-0B ("Application Lifecycle Intelligence") Phase C
+                # - the SAME whitespace-normalised sha256 MonitoredReport.
+                # content_hash already uses (app.policy.change_detection.
+                # compute_content_hash), computed from extracted text, not
+                # raw file bytes, so a PDF re-saved with different internal
+                # metadata but identical wording still hashes the same
+                # (avoiding false positives once a future re-check loop
+                # compares this against a fresh fetch). None when there is
+                # no text at all - see Document.content_hash's own comment
+                # for why this only establishes the baseline for NEW
+                # documents, not yet an active revision-recheck loop.
+                content_hash=compute_content_hash(text) if text else None,
             )
         )
         existing_identities.add(identity)
@@ -2349,6 +2418,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-build-status", action="store_true")
     parser.add_argument("--skip-scheme-summary", action="store_true")
     parser.add_argument(
+        "--skip-lifecycle-reassessment", action="store_true",
+        help="Gate 2B-0B 'P0 - Bounded downstream reassessment' - skip the targeted "
+             "sync_opportunity_monitoring_state() call this run would otherwise trigger if any "
+             "genuine ApplicationLifecycleEvent was written. The standing weekly full-universe "
+             "sync (scripts.sync_opportunity_monitoring) is unaffected either way.",
+    )
+    parser.add_argument(
         "--enrich", action="store_true",
         help="Also run contact enrichment (Companies House/website/Apollo/Hunter) for every scheme found. "
              "Off by default - enrichment is meant to be triggered on demand from the Streamlit "
@@ -2400,6 +2476,15 @@ def main() -> None:
     # scheduler. See app.pipeline.portal_circuit_breaker's own module
     # docstring.
     breaker = CouncilPortalCircuitBreaker(council_code=council.code)
+
+    # Gate 2B-0B ("Application Lifecycle Intelligence") "P0 - Bounded
+    # downstream reassessment" - one LifecycleEventStats for this whole
+    # council run (same lifetime as `health`/`breaker` above), shared by
+    # every stage below that can genuinely detect a lifecycle change
+    # (stage_scrape, run_status_verification, stage_fetch_related_
+    # applications). See this function's own final lines for what it's
+    # used for - never consulted mid-run, only once, at the very end.
+    lifecycle_event_stats = LifecycleEventStats()
 
     month_ranges = _resolve_month_ranges(args)
     batch_id = f"{council.code}_{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
@@ -2490,7 +2575,10 @@ def main() -> None:
                     print(f"[circuit] council={council.code} skipping stage_scrape for {date_from}->{date_to} - circuit open")
                 else:
                     try:
-                        stage_scrape(session, page, council, date_from, date_to, batch_id)
+                        stage_scrape(
+                            session, page, council, date_from, date_to, batch_id,
+                            lifecycle_event_stats=lifecycle_event_stats,
+                        )
                         if i == 0:
                             health.record_primary_scrape_completed()
                     except Exception as e:
@@ -2567,6 +2655,7 @@ def main() -> None:
                 log_memory("stage_verify_application_status.before", council=council.code)
                 run_status_verification(
                     session, page, council, breaker=breaker, opportunity_kinds_by_site=opportunity_kinds_by_site,
+                    lifecycle_event_stats=lifecycle_event_stats,
                 )
                 log_memory("stage_verify_application_status.after", council=council.code)
         elif not args.skip_status_verification:
@@ -2591,6 +2680,7 @@ def main() -> None:
                 # what to search for and where to attach anything it finds.
                 stage_fetch_related_applications(
                     session, page, council, breaker=breaker, opportunity_kinds_by_site=opportunity_kinds_by_site,
+                    lifecycle_event_stats=lifecycle_event_stats,
                 )
                 log_memory("stage_fetch_related_applications.after", council=council.code)
 
@@ -2669,6 +2759,49 @@ def main() -> None:
             session, council, ch_key,
             os.getenv("SERPAPI_KEY"), os.getenv("APOLLO_API_KEY"), os.getenv("HUNTER_API_KEY"),
             openai_client=OpenAI(api_key=openai_key) if openai_key else None,
+        )
+
+    # Gate 2B-0B ("Application Lifecycle Intelligence") "P0 - Bounded
+    # downstream reassessment" - amends the architecture investigation's own
+    # recommendation to leave ALL downstream propagation to the standing
+    # Monday weekly sync (up to ~6 days of lag even when every upstream
+    # stage worked correctly). No new event bus/queue/microservice/agent:
+    # this calls the SAME, unmodified app.reporting.opportunity_change.
+    # sync_opportunity_monitoring_state the weekly cron already calls -
+    # only the TRIGGER is new (same-day, only when this run's own
+    # lifecycle_event_stats proves something genuinely changed), not the
+    # reassessment logic itself. Deliberately a full-universe resync, not a
+    # site-scoped one - app.reporting.opportunity_universe.
+    # build_current_opportunity_universe has no site-scoping parameter, and
+    # adding one was judged larger than "the smallest safe mechanism" this
+    # amendment calls for (see the implementation report's own "Downstream
+    # reassessment mechanism" section for the full reasoning); at current
+    # production scale (~389 opportunities, pure DB reads, no AI/network
+    # call - confirmed by the investigation's own Section T) a full resync
+    # is cheap, and genuine material changes are rare (confirmed:
+    # evidence_refresh_required=True on zero Applications at investigation
+    # time), so this never runs on a normal no-change day. Safe against
+    # concurrent runs - scripts.run_daily_councils runs councils
+    # sequentially, one subprocess at a time (never in parallel), so at
+    # most one council's run ever calls this at once. The weekly full sync
+    # remains completely unchanged and continues to run every Monday
+    # regardless - this is a same-day supplement, never a replacement,
+    # per Section 14 of the Product Owner's implementation prompt.
+    if lifecycle_event_stats.any_written and not args.skip_lifecycle_reassessment:
+        from app.reporting.opportunity_change import sync_opportunity_monitoring_state  # local import: avoids a
+        # module-level cycle risk between app.pipeline.run_weekly and app.reporting (neither currently imports the
+        # other at module level; kept local here so this new call site never becomes the first to introduce one).
+        log_memory("lifecycle_reassessment.before", council=council.code)
+        reassessment_result = sync_opportunity_monitoring_state(session)
+        print(
+            f"[lifecycle-reassessment] council={council.code} lifecycle_events_written={lifecycle_event_stats.written} "
+            f"triggered_downstream_reassessment=true result={reassessment_result}"
+        )
+        log_memory("lifecycle_reassessment.after", council=council.code)
+    elif lifecycle_event_stats.any_written:
+        print(
+            f"[lifecycle-reassessment] council={council.code} lifecycle_events_written={lifecycle_event_stats.written} "
+            f"triggered_downstream_reassessment=false (--skip-lifecycle-reassessment passed)"
         )
 
     # Circuit breaker -> health integration (Hotfix second pre-merge
