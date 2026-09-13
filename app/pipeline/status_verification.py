@@ -59,6 +59,7 @@ from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig
 from app.db.models import Application, Document, SchemeIntelligence
+from app.pipeline.lifecycle_events import LifecycleEventStats, SOURCE_STATUS_VERIFICATION
 from app.pipeline.material_change import ApplicationState, MaterialChangeStats, detect_material_application_change
 from app.pipeline.portal_circuit_breaker import CouncilPortalCircuitBreaker, is_portal_host_failure
 
@@ -401,6 +402,7 @@ def verify_application_status(
     session: Session, page, council: CouncilConfig, application: Application, *,
     material_change_stats: MaterialChangeStats | None = None,
     breaker: CouncilPortalCircuitBreaker | None = None,
+    lifecycle_event_stats: LifecycleEventStats | None = None,
 ) -> VerificationOutcome:
     """Directly re-fetches ONE already-known Application by its exact
     reference (never a date-range search) and, only on a successfully
@@ -449,6 +451,7 @@ def verify_application_status(
 
     updated = _upsert_scraped_application(
         session, council, result, batch_id=None, material_change_stats=material_change_stats,
+        authoritative_source=SOURCE_STATUS_VERIFICATION, lifecycle_event_stats=lifecycle_event_stats,
     )
     session.commit()
 
@@ -473,6 +476,7 @@ def run_status_verification(
     breaker: CouncilPortalCircuitBreaker | None = None,
     limit: int = MAX_STATUS_VERIFICATIONS_PER_COUNCIL_PER_RUN,
     opportunity_kinds_by_site: dict[int, frozenset[str]] | None = None,
+    lifecycle_event_stats: LifecycleEventStats | None = None,
 ) -> VerificationRunStats:
     """The one stage entry point (mirrors app.pipeline.run_weekly.
     stage_evidence_refresh's own shape) - called as a NEW, independent
@@ -501,6 +505,7 @@ def run_status_verification(
         outcome = verify_application_status(
             session, page, council, candidate.application,
             material_change_stats=material_change_stats, breaker=breaker,
+            lifecycle_event_stats=lifecycle_event_stats,
         )
         stats.record(candidate.tier, outcome)
         print(

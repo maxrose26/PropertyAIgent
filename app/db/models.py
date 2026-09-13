@@ -1764,6 +1764,68 @@ class Application(Base):
     )
 
 
+class ApplicationLifecycleEvent(Base):
+    """Gate 2B-0B ("Application Lifecycle Intelligence") - a narrow,
+    append-only factual change history for Application, deliberately
+    modelled as a close structural sibling of LocalPlanFieldHistory (the
+    smallest existing precedent in this codebase for "old value -> new
+    value -> when -> why") plus PolicyChangeEvent's own evidence_document_
+    id/never-overwritten discipline - not a new history-modelling pattern,
+    and NOT generic event sourcing: Application itself remains the sole
+    current-state record (see its own fields above); this table only ever
+    answers "what changed, when, and on what authority", never replaces a
+    read of Application/SchemeIntelligence.
+
+    Written ONLY where an existing, already-proven deterministic detector
+    already established a genuine change - see app.pipeline.
+    lifecycle_events, the one shared writer module every call site goes
+    through (mirrors app.policy.history's own "one shared helper module"
+    precedent). Never written for a mere re-check that found nothing new
+    (VERIFIED_UNCHANGED, a failed/unavailable fetch, or an ordinary scrape
+    resurfacing with no material change) - a verification EVENT is not a
+    lifecycle CHANGE, the same distinction Application.status_verified_at's
+    own docstring already draws.
+
+    Bounded, deterministic event_type vocabulary (see app.pipeline.
+    lifecycle_events.EVENT_* constants) - a plain string column, not a DB
+    enum, so the vocabulary can grow (e.g. the committee/S106 events
+    recorded as future extensibility in docs/PRODUCT_ROADMAP.md's Gate
+    2B-0B section) without a schema migration, the same "plain string,
+    not an enum" precedent Application.evidence_refresh_trigger already
+    established for exactly this reason."""
+
+    __tablename__ = "application_lifecycle_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    application_id: Mapped[int] = mapped_column(ForeignKey("applications.id"))
+
+    event_type: Mapped[str] = mapped_column(String(50))
+    # Which Application field this event describes a transition of - e.g.
+    # "status", "decision", "estimated_unit_count". Nullable because not
+    # every event is a field mutation (e.g. NEW_RELATED_APPLICATION
+    # describes a new row appearing, not an existing field changing).
+    field_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    old_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    detected_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Which mechanism detected this - a plain string (e.g. "scrape",
+    # "status_verification", "related_application_discovery"), not an
+    # enum, matching evidence_refresh_trigger's own established precedent
+    # for a provenance field that must be able to grow without a
+    # migration.
+    authoritative_source: Mapped[str] = mapped_column(String(50))
+    # Optional supporting evidence - the Document (if any) whose discovery
+    # or content this event is grounded in. Mirrors ControlRelationship.
+    # evidence_document_id's own existing precedent; deliberately not a
+    # required field, since a status/decision change detected via direct
+    # portal re-verification (Gate 2B-0A) has no associated Document at all.
+    evidence_document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), nullable=True)
+
+    application: Mapped["Application"] = relationship()
+    evidence_document: Mapped["Document | None"] = relationship(foreign_keys=[evidence_document_id])
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -1801,6 +1863,31 @@ class Document(Base):
     # so a simple NULL-check is sufficient; no content-hash comparison is
     # needed unless that assumption is later found to be wrong.
     allocation_evidence_scanned_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Gate 2B-0B ("Application Lifecycle Intelligence", Phase C - "Document
+    # Content Hash") - whitespace-normalised sha256 of extracted_text
+    # (app.policy.change_detection.compute_content_hash, the SAME function
+    # MonitoredReport.content_hash already uses - no second hashing
+    # implementation). Investigation finding this closes: document_
+    # identity_key (app.pipeline.evidence) is source_url-or-document_name
+    # ONLY - a council republishing a REVISED document at the same URL/
+    # name was previously completely invisible to this codebase (no
+    # content hash, version, or uniqueness constraint existed at all).
+    # NULL means "no hash computed" - always true for every document that
+    # existed before this field, and never backfilled (same "plain
+    # additive column, legacy rows stay NULL forever" precedent as
+    # Application.status_verified_at) since there is no reliable way to
+    # retroactively prove what a historical document's content was at
+    # capture time. Populated only at Document creation (see
+    # app.pipeline.run_weekly.discover_and_store_documents_for_application)
+    # - this establishes the trusted baseline hash for every NEW document
+    # going forward; it does not, on its own, re-check an ALREADY-KNOWN
+    # document for a since-published revision (existing_identities' own
+    # url-or-name dedup still skips a known identity before a hash could
+    # ever be compared) - see that function's own docstring for why an
+    # active "re-visit known documents to detect revision" loop is a
+    # separate, not-yet-authorised follow-on, not solved by this field.
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     application: Mapped["Application"] = relationship(back_populates="documents")
 

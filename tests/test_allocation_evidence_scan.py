@@ -691,6 +691,12 @@ def test_only_the_one_new_document_column_added():
     expected_document_columns = {
         "id", "application_id", "doc_type", "document_name", "source_url", "local_path",
         "text_extracted", "extracted_text", "downloaded_at", "allocation_evidence_scanned_at",
+        # content_hash - Gate 2B-0B ("Application Lifecycle Intelligence"),
+        # a later, separately-authorised gate's own additive column (see
+        # tests/test_gate2b0b_application_lifecycle_intelligence.py) - not
+        # a regression of THIS gate's own "no unrelated schema change"
+        # guarantee, which this test otherwise still fully protects.
+        "content_hash",
     }
     assert {c.name for c in Document.__table__.columns} == expected_document_columns
 
