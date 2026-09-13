@@ -177,6 +177,58 @@ def test_certificate_a_same_form_applicant_eligible(session):
     assert rows[0].confidence == "medium"  # a self-declaration, not S106-grade legal evidence
 
 
+def test_certificate_a_company_shaped_name_resolves_entity_type_company_even_with_no_existing_company_row(session):
+    """Gate 2C V1 ('narrow entity-type resolution improvement') - real
+    production regression: 'Ropley Properties Limited' / 'Triple Jersey
+    Limited' (Certificate A, same_form_company_name) previously landed as
+    entity_type='unknown' purely because no EXISTING, Companies-House-
+    enriched Company row happened to match them. The form's own 'Company
+    Name' field already told us this is a company - that classification
+    must never be discarded just because resolve_existing_company (which
+    only ever matches against ALREADY-enriched rows, and must never create
+    one) finds nothing. entity_type='company' is now retained regardless;
+    company_id stays None (never fabricated) when no existing Company row
+    matches - this is the explicitly-approved 'establish entity_type=
+    company without establishing company_id' distinction."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
+    _make_form(session, app.id, _form_with_applicant("Ropley Properties Limited"))
+    session.commit()
+
+    assert session.execute(select(Company)).scalars().all() == []  # no existing Company row to match against
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].entity_name_raw == "Ropley Properties Limited"
+    assert rows[0].entity_type == "company"  # the fix - was "unknown" before
+    assert rows[0].company_id is None  # never fabricated - no existing Company row matched
+    assert report.unresolved_entity_count == 0  # this is no longer counted as unresolved
+
+
+def test_certificate_a_company_shaped_name_still_resolves_company_id_when_an_existing_row_matches(session):
+    """The fix must not weaken conservative company_id resolution - an
+    exact-matching existing Company row is still attached exactly as
+    before."""
+    _make_council(session, "testcouncil")
+    company = Company(name_raw="ABC Developments Limited", name_normalized="abc developments limited")
+    session.add(company)
+    session.flush()
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited"))
+    session.commit()
+
+    run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].entity_type == "company"
+    assert rows[0].company_id == company.id
+
+
 def test_certificate_a_applicant_name_raw_absent_from_form_creates_nothing(session):
     """applicant_name_raw is present but does NOT appear anywhere in the
     form's Applicant Details section at all - and the form itself names
@@ -333,9 +385,13 @@ def test_no_scheme_intelligence_used_for_certificate_a_identity():
     assert not hasattr(cp_module, "SchemeIntelligence")
 
 
-def test_certificate_b_without_named_owner_creates_no_fake_owner(session):
-    """Certificate B/C/D are ALWAYS report-only - no B/C/D named-owner
-    extractor exists, so this must never invent an entity."""
+def test_certificate_b_conflicting_raw_and_form_applicant_creates_nothing(session):
+    """Gate 2C V1 amendment: Certificate B/C/D now reuse the EXACT SAME
+    applicant-identity-confirmation algorithm as Certificate A, including
+    its conflict rule - a form name that disagrees with applicant_name_raw
+    resolves to unresolved and creates nothing, exactly as it would for A.
+    This must never invent a NAMED OTHER OWNER either way - no B/C/D
+    named-owner extractor exists in this codebase."""
     _make_council(session, "testcouncil")
     app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="Should Not Be Used Ltd")
     _make_form(session, app.id, _CERT_B_BODY)
@@ -345,7 +401,84 @@ def test_certificate_b_without_named_owner_creates_no_fake_owner(session):
     session.commit()
 
     assert report.certificate_b_count == 1
+    assert report.certificate_bcd_identity_unresolved == 1
     assert report.certificate_bcd_reported_no_entity == 1
+    assert report.relationships_created == 0
+    assert session.execute(select(ControlRelationship)).scalars().all() == []
+
+
+def test_certificate_b_resolvable_applicant_creates_applicant_role_fact(session):
+    """Gate 2C V1 ('Certificate B/C/D structured evidence') - Certificate B
+    means the applicant declares they are NOT the sole owner. When the
+    applicant's own identity IS safely resolvable (same algorithm as
+    Certificate A), this becomes a real, evidence-specific fact about the
+    APPLICANT - never an OWNER row (Certificate B explicitly means NOT
+    sole owner), and never a fabricated name for whichever OTHER owner
+    the certificate implies exists (no extractor for that exists)."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="ABC Developments Limited")
+    _make_form(session, app.id, _CERT_B_BODY)
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_b_count == 1
+    assert report.certificate_bcd_relationships_eligible == 1
+    assert report.relationships_created == 1
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].role == "APPLICANT"  # never OWNER - Certificate B means NOT sole owner
+    assert rows[0].entity_name_raw == "ABC Developments Limited"  # the applicant, never an invented other owner
+    assert rows[0].evidence_basis == "certificate_b_declaration"
+    assert rows[0].evidence_category == "CERTIFICATE_B_OTHER_OWNER_INTEREST_DECLARED"
+    assert rows[0].confidence == "medium"
+
+
+def test_certificate_c_resolvable_applicant_creates_applicant_role_fact(session):
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="ABC Developments Limited")
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited", certificate_letter="C"))
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_c_count == 1
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].role == "APPLICANT"
+    assert rows[0].evidence_category == "CERTIFICATE_C_PARTIAL_OWNERSHIP_IDENTIFICATION"
+
+
+def test_certificate_d_resolvable_applicant_creates_applicant_role_fact(session):
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw="ABC Developments Limited")
+    _make_form(session, app.id, _form_with_applicant("ABC Developments Limited", certificate_letter="D"))
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_d_count == 1
+    rows = session.execute(select(ControlRelationship)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].role == "APPLICANT"
+    assert rows[0].evidence_category == "CERTIFICATE_D_OWNERSHIP_NOT_FULLY_KNOWN"
+
+
+def test_certificate_b_unresolvable_identity_creates_nothing(session):
+    """No Applicant Details section at all, and no applicant_name_raw -
+    genuinely nothing to tie an identity to, for B exactly as for A."""
+    _make_council(session, "testcouncil")
+    app = _make_application(session, "testcouncil", "APP/1", applicant_name_raw=None)
+    _make_form(session, app.id, _form_with_applicant(None, certificate_letter="B", include_applicant_details=False))
+    session.commit()
+
+    report = run_control_relationship_population(session, dry_run=False)
+    session.commit()
+
+    assert report.certificate_bcd_identity_unresolved == 1
     assert report.relationships_created == 0
     assert session.execute(select(ControlRelationship)).scalars().all() == []
 
