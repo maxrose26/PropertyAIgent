@@ -2616,16 +2616,30 @@ class Workspace(Base):
 
 
 class BuyerProfile(Base):
-    """Gate 1 (Acquisition Monitoring Substrate) - the persistent,
-    Workspace-owned counterpart of the existing app.policy.buyer_profiles.
-    BuyerProfile dataclass (deliberately kept as a SEPARATE class under a
-    different module path, never renamed/merged - see app.policy.
-    buyer_profile_store's own module docstring for exactly why and how the
-    two convert between each other). Every matching-relevant field here
-    mirrors that dataclass's own fields one-for-one; app.policy.
-    buyer_matching.assess_buyer_fit itself is completely unchanged by this
+    """LEGACY / TRANSITIONAL (Buyer Mandate V2, Phase A - Buyer/Mandate
+    Domain Separation). Superseded by the Buyer + BuyerMandate pair below,
+    which is now the sole source of truth for buyer identity and
+    acquisition strategy. This table and class are retained, UNCHANGED,
+    purely for rollback safety and historical read access during the
+    transition - see app.policy.buyer_profile_store's own module docstring
+    for the one-time, idempotent migration that copied every row here into
+    an equivalent Buyer + BuyerMandate pair. Nothing in the codebase writes
+    a NEW row here any more (seed_default_buyer_profiles/
+    run_buyer_onboarding_baseline now operate on Buyer/BuyerMandate only) -
+    this class exists to read, never to write, from Phase A onward. Do not
+    add fields here, and do not resurrect it as a second live source of
+    truth alongside Buyer/BuyerMandate. See PRODUCT_ROADMAP.md's own "Buyer
+    Mandate V2 - Phase A" entry for the removal criteria and recommended
+    cleanup point.
+
+    Gate 1 (Acquisition Monitoring Substrate) - originally the persistent,
+    Workspace-owned counterpart of the (also now superseded) app.policy.
+    buyer_profiles.BuyerProfile dataclass. Every matching-relevant field
+    here mirrors that dataclass's own fields one-for-one; app.policy.
+    buyer_matching.assess_buyer_fit itself was completely unchanged by that
     gate - it is only ever handed a dataclass instance built FROM one of
-    these rows, never a row directly.
+    these rows, never a row directly. This same "never hand the matching
+    function a database row" boundary is preserved by BuyerMandate below.
 
     accepted_planning_states is stored as a comma-joined string (mirrors
     Application.evidence_refresh_reason's own "comma-joined reason codes,
@@ -2706,6 +2720,155 @@ class BuyerProfile(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     workspace: Mapped["Workspace"] = relationship(foreign_keys=[workspace_id])
+
+
+class Buyer(Base):
+    """Buyer Mandate V2, Phase A (Buyer/Mandate Domain Separation) - the
+    commercial IDENTITY half of what the legacy BuyerProfile row used to
+    carry as one indivisible thing. A Buyer is a company/organisation
+    ("Nesten Homes"); it owns zero acquisition-strategy fields itself -
+    those belong entirely to BuyerMandate below, of which a Buyer may
+    eventually have several (e.g. one strategy for consented Greater
+    Manchester sites, a separate one for strategic land in Cheshire - see
+    BuyerMandate's own docstring). Phase A migrates every legacy
+    BuyerProfile row into exactly one Buyer + one BuyerMandate each; it
+    does not create any buyer with more than one mandate.
+
+    Deliberately minimal, mirroring this schema's own repeated "don't
+    invent identity fields ahead of evidence" convention (see Workspace's
+    own docstring) - no company registration number, contacts, address, or
+    other CRM-shaped data. This is not a CRM.
+
+    buyer_key is the stable identity string the legacy BuyerProfile.
+    profile_key used to be (e.g. "nesten_homes") - never the display name,
+    which may change. display_name/buyer_type are the two legacy fields
+    the Buyer Mandate V2 investigation confirmed describe the BUYER
+    (company category, display label), not any one acquisition strategy -
+    see that investigation's own "primary_requirement"/"buyer_type"
+    sections. primary_requirement itself is NOT here - the investigation
+    found its actual content (e.g. "Affordable residential housing
+    opportunities") describes a strategy, not a company, so it moved to
+    BuyerMandate instead."""
+
+    __tablename__ = "buyers"
+    __table_args__ = (UniqueConstraint("workspace_id", "buyer_key", name="uq_workspace_buyer_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"))
+
+    buyer_key: Mapped[str] = mapped_column(String(100))
+    display_name: Mapped[str] = mapped_column(String(200))
+    buyer_type: Mapped[str] = mapped_column(String(200))
+
+    # active | archived - never hard-deleted, mirrors Workspace's own
+    # status field convention exactly.
+    status: Mapped[str] = mapped_column(String(20), default="active")
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    workspace: Mapped["Workspace"] = relationship(foreign_keys=[workspace_id])
+    mandates: Mapped[list["BuyerMandate"]] = relationship(back_populates="buyer")
+
+
+class BuyerMandate(Base):
+    """Buyer Mandate V2, Phase A (Buyer/Mandate Domain Separation) - the
+    acquisition-STRATEGY half of what the legacy BuyerProfile row used to
+    carry, now scoped to one Buyer rather than fused with its identity.
+    Every field here is one of the legacy BuyerProfile's own matching-
+    relevant (or matching-adjacent provenance/lifecycle) fields, moved
+    across unchanged in both name and semantics - Phase A is a structural
+    migration, not a behaviour change, and app.policy.buyer_matching.
+    assess_buyer_fit was not touched by it (see app.policy.buyer_profiles.
+    BuyerMandatePolicy, the pure dataclass this row converts to, for
+    exactly what assess_buyer_fit itself still consumes).
+
+    One Buyer may have MANY BuyerMandate rows (mandate_key unique per
+    buyer_id, never per workspace) - e.g. a future "Nesten Homes" Buyer
+    could have both a "gm_consented_50_100" and a "cheshire_strategic_
+    100_250" mandate, each with its own independent unit range/appetite/
+    exclusions, without duplicating the buyer's own identity fields. Phase
+    A itself creates exactly one mandate per migrated buyer, with
+    mandate_key="default" - see scripts.migrate_buyer_profiles_to_mandates
+    for the one-time backfill this came from.
+
+    primary_requirement and notes are here, not on Buyer, because the
+    Buyer Mandate V2 investigation found their actual content in every one
+    of the four existing pilot briefs describes the STRATEGY ("Residential
+    development land", "Affordable residential housing opportunities"),
+    not the company - a buyer with two mandates would plausibly want two
+    different values here, never one shared value.
+
+    specialist_development_is_exclusion/wholly_affordable_is_exclusion/
+    below_minimum_scale_is_exclusion are preserved EXACTLY as their own
+    explicit, individually-named boolean fields - Phase A does NOT
+    generalise them into a generic exclusions list (Product Owner
+    decision, Phase A brief Section 8): each is a specific, tested,
+    brief-derived rule, and collapsing them into an abstraction now would
+    trade real, understood behaviour for speculative flexibility with no
+    current evidence it's needed.
+
+    matching_fingerprint/onboarding_completed_at/onboarding_summary are
+    scoped to the MANDATE, not the Buyer, deliberately: a buyer's own
+    display name or type changing must never make its mandate's baseline
+    stale (see app.policy.buyer_profile_store.compute_buyer_mandate_
+    fingerprint, which reads only fields declared on this class), while a
+    genuine strategy change always should - exactly the distinction the
+    Phase A brief itself requires ("Nesten Homes" -> "Nesten Homes Ltd"
+    must not trigger re-evaluation; a changed unit range must)."""
+
+    __tablename__ = "buyer_mandates"
+    __table_args__ = (UniqueConstraint("buyer_id", "mandate_key", name="uq_buyer_mandate_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    buyer_id: Mapped[int] = mapped_column(ForeignKey("buyers.id"))
+
+    # Stable identity WITHIN this buyer (e.g. "default", or eventually
+    # "gm_consented_50_100") - never the display name.
+    mandate_key: Mapped[str] = mapped_column(String(100))
+    # Phase A sets this equal to the owning Buyer's own display_name for
+    # every migrated mandate (there is nothing more specific to say yet
+    # when a buyer has exactly one mandate) - a future multi-mandate buyer
+    # would give each of its mandates its own distinguishing label here
+    # (e.g. "GM Consented 50-100").
+    display_name: Mapped[str] = mapped_column(String(200))
+    primary_requirement: Mapped[str] = mapped_column(String(300))
+
+    target_unit_min: Mapped[int] = mapped_column(Integer)
+    target_unit_max: Mapped[int] = mapped_column(Integer)
+    # "total_units" | "affordable_units" - app.policy.buyer_profiles.
+    # TOTAL_UNITS/AFFORDABLE_UNITS.
+    scale_metric: Mapped[str] = mapped_column(String(30))
+    # Comma-joined app.policy.buyer_profiles planning-state constants -
+    # see the legacy BuyerProfile class's own docstring for why this is a
+    # plain string, not a table (unchanged reasoning, carried forward).
+    accepted_planning_states: Mapped[str] = mapped_column(String(200))
+    treats_no_activity_as_positive: Mapped[bool] = mapped_column(Boolean, default=False)
+    large_allocation_is_self_qualifying: Mapped[bool] = mapped_column(Boolean, default=False)
+    specialist_development_is_exclusion: Mapped[bool] = mapped_column(Boolean, default=True)
+    wholly_affordable_is_exclusion: Mapped[bool] = mapped_column(Boolean, default=True)
+    below_minimum_scale_is_exclusion: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # active | archived - never hard-deleted, same convention as Buyer/
+    # Workspace.
+    status: Mapped[str] = mapped_column(String(20), default="active")
+
+    # Which app.policy.buyer_profiles code template this row was seeded
+    # from (e.g. "nesten_homes") - purely informational provenance, never
+    # read by matching logic, never re-applied automatically. Carried
+    # forward unchanged from the legacy BuyerProfile row of the same
+    # migrated buyer.
+    source_template_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    matching_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    onboarding_completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    onboarding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    buyer: Mapped["Buyer"] = relationship(back_populates="mandates")
 
 
 class OpportunityMonitoringState(Base):

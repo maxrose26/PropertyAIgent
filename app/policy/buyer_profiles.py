@@ -15,7 +15,21 @@ verbatim in the brief, or a narrow, explained interpretation of it -
 never an invented threshold. See each profile's own `notes` for anything
 that required interpretation, and app/policy/buyer_matching.py's own
 module docstring for the shared decision rules built on top of these.
-"""
+
+Buyer Mandate V2, Phase A (Buyer/Mandate Domain Separation) - the
+dataclass below is renamed from BuyerProfile to BuyerMandatePolicy. The
+repository previously had two unrelated classes both literally named
+BuyerProfile (this pure dataclass, and app.db.models.BuyerProfile, the
+now-legacy persisted row) - a genuine naming collision the Phase A
+investigation was asked to resolve where it could be done safely. This
+class itself is UNCHANGED in every other respect: still a pure, DB-free,
+frozen dataclass; still exactly the same fields app.policy.buyer_matching.
+assess_buyer_fit has always read; still never queried, never persisted
+directly. It is the PURE MATCHING POLICY object in the three-way Buyer
+(identity) / BuyerMandate (persisted strategy) / BuyerMandatePolicy (pure
+matching policy) naming now used consistently across this domain - see
+app.policy.buyer_profile_store's own module docstring for how a
+persisted BuyerMandate row becomes one of these."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -97,7 +111,7 @@ WHOLLY_AFFORDABLE_THRESHOLD = 100.0
 # need AFFORDABLE_UNITS instead: its brief is explicit that "for the
 # Housing Association profile, scale must be assessed using AFFORDABLE
 # residential units" - a 400-home scheme with 120 affordable homes is
-# assessed against 120, not 400. Generic on BuyerProfile rather than a
+# assessed against 120, not 400. Generic on BuyerMandatePolicy rather than a
 # Housing-Association-only branch in app.policy.buyer_matching, per the
 # amendment brief's own "do NOT implement this as a one-off hard-coded
 # exception if the existing structure can safely support a generic
@@ -107,7 +121,7 @@ AFFORDABLE_UNITS = "affordable_units"
 
 
 @dataclass(frozen=True)
-class BuyerProfile:
+class BuyerMandatePolicy:
     key: str
     display_name: str
     buyer_type: str
@@ -177,7 +191,7 @@ class BuyerProfile:
     notes: str
 
 
-NESTEN_HOMES = BuyerProfile(
+NESTEN_HOMES = BuyerMandatePolicy(
     key="nesten_homes",
     display_name="Nesten Homes",
     buyer_type="Regional housebuilder",
@@ -199,7 +213,7 @@ NESTEN_HOMES = BuyerProfile(
     ),
 )
 
-STRATEGIC_LAND_BUYER = BuyerProfile(
+STRATEGIC_LAND_BUYER = BuyerMandatePolicy(
     key="strategic_land_buyer",
     display_name="Strategic Land Buyer",
     buyer_type="Strategic land buyer / promoter",
@@ -222,7 +236,7 @@ STRATEGIC_LAND_BUYER = BuyerProfile(
     ),
 )
 
-NATIONAL_HOUSEBUILDER = BuyerProfile(
+NATIONAL_HOUSEBUILDER = BuyerMandatePolicy(
     key="national_housebuilder",
     display_name="National Housebuilder",
     buyer_type="Large national housebuilder",
@@ -245,7 +259,7 @@ NATIONAL_HOUSEBUILDER = BuyerProfile(
     ),
 )
 
-HOUSING_ASSOCIATION = BuyerProfile(
+HOUSING_ASSOCIATION = BuyerMandatePolicy(
     key="housing_association",
     display_name="Housing Association",
     buyer_type="Housing association / registered provider",
@@ -277,7 +291,7 @@ HOUSING_ASSOCIATION = BuyerProfile(
     # test_buyer_matching.py for the resulting INSUFFICIENT_EVIDENCE (never
     # STRONG_FIT, never NOT_SUITABLE) outcome this produces. Note this flag
     # does NOT reach a genuinely non-residential (employment) allocation -
-    # see BuyerProfile.specialist_development_is_exclusion's own docstring.
+    # see BuyerMandatePolicy.specialist_development_is_exclusion's own docstring.
     specialist_development_is_exclusion=False,
     # Brief, Section 7: "the opposite of the three existing pilot profiles
     # ... 100% affordable is NOT an exclusion. It is potentially highly
@@ -307,7 +321,7 @@ HOUSING_ASSOCIATION = BuyerProfile(
     ),
 )
 
-BUYER_PROFILES: dict[str, BuyerProfile] = {
+BUYER_PROFILES: dict[str, BuyerMandatePolicy] = {
     p.key: p for p in (NESTEN_HOMES, STRATEGIC_LAND_BUYER, NATIONAL_HOUSEBUILDER, HOUSING_ASSOCIATION)
 }
 BUYER_PROFILE_ORDER: tuple[str, ...] = (

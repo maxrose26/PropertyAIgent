@@ -9,11 +9,20 @@ authentication. No account UI.").
 
 Gate 1 (Acquisition Monitoring Substrate) amendment: the list of AVAILABLE
 buyer options now comes from app.policy.buyer_profile_store.
-list_active_buyer_options - persisted, Workspace-owned BuyerProfile rows
-once scripts.bootstrap_acquisition_monitoring has run, falling back to the
-same four in-memory pilot templates (in the same order) otherwise, so this
-selector's own visible behaviour is unchanged in every environment,
-bootstrapped or not.
+list_active_buyer_options - persisted, Workspace-owned Buyer rows (each
+with its own active BuyerMandate) once scripts.bootstrap_acquisition_
+monitoring has run, falling back to the same four in-memory pilot
+templates (in the same order) otherwise, so this selector's own visible
+behaviour is unchanged in every environment, bootstrapped or not.
+
+Buyer Mandate V2, Phase A (Buyer/Mandate Domain Separation): this
+component still selects a BUYER, not a mandate - see list_active_buyer_
+options and get_buyer_profile_dataclass's own docstrings for why that
+remains the right level for as long as every buyer has exactly one
+mandate. ACTIVE_BUYER_SESSION_KEY/active_buyer_key() are UNCHANGED by
+Phase A (still named/shaped exactly as before) - the value they hold was
+already, correctly, "the active buyer's own stable key", which Phase A's
+domain split didn't change the meaning of.
 """
 from __future__ import annotations
 
