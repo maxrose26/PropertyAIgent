@@ -17,26 +17,32 @@ All six sit on top of one shared technical foundation — the **Evidence Platfor
 ```
 PLANNING + OWNERSHIP + DEVELOPMENT EVIDENCE      BUILT   (§0, §1, §2 — Evidence Platform, Planning Intelligence, Policy Intelligence)
         ↓
-OPERATIVE SCHEME INTELLIGENCE                    NEXT    (Gate 2B — not yet built; see PRODUCT_ROADMAP.md)
+TRUSTED OPERATIVE OPPORTUNITY FACTS              BUILT, CLOSED (Gate 2B, all six sub-gates — see "Trusted Opportunity Data" below)
         ↓
-OPPORTUNITY DETECTION                            BUILT   (Gate 1 + Gate 1C — opportunity universe, fingerprinting, change detection)
+OPPORTUNITY DETECTION                            BUILT, CLOSED (Gate 1 + Gate 1C — opportunity universe, fingerprinting, change detection; corrected onto the trusted facts above by Gate 2B-2B.2/2B-2C)
         ↓
-APPLICANT + ACQUISITION POSITION INTELLIGENCE    PARTIAL (Applicant Intelligence built/closed — Gate 2A; Acquisition Position Intelligence NEXT-after-2B — Gate 2C)
+APPLICATION LIFECYCLE INTELLIGENCE               NEXT    (Gate 2B-0B — architecture investigation only, not yet implemented; promoted ahead of Gate 2C)
         ↓
-BUYER MANDATE                                    PARTIAL (Buyer Profiles V1 built/closed — Gate 1; Buyer Mandate V2 extension FUTURE)
+ACQUISITION POSITION INTELLIGENCE                FUTURE  (Gate 2C — after Gate 2B-0B)
+        ↓
+BUYER MANDATE                                    PARTIAL (Buyer Profiles V1 built/closed — Gate 1; Buyer Mandate V2 extension FUTURE, after Gate 2C)
         ↓
 DETERMINISTIC BUYER FIT                          BUILT   (`app.policy.buyer_matching.assess_buyer_fit`)
         ↓
-ACQUISITION AGENT                                FUTURE  (Acquisition Agent V1 — after Gate 2B/2C/Buyer Mandate V2)
+AUTONOMOUS ACQUISITION AGENT                     FUTURE  (Gate 3 — Autonomous Acquisition Agent V1, after Buyer Mandate V2; see "The Autonomy Principle" in §7)
         ↓
-BUYER RECOMMENDATION                             FUTURE  (PURSUE / VERIFY / MONITOR / NOT RELEVANT — names provisional)
+PURSUE / VERIFY / MONITOR / NOT RELEVANT         FUTURE  (Gate 3's own output — names provisional)
         ↓
-PRIORITISED BUYER OPPORTUNITY PIPELINE           FUTURE  (Acquisition Prioritisation — explainable bands, not a premature numeric score)
+PRIORITISED BUYER OPPORTUNITY PIPELINE           FUTURE  (Gate 4 — Acquisition Prioritisation — explainable bands, not a premature numeric score)
         ↓
-MONITORING + ALERTS + WORKFLOW                   PARTIAL (deterministic change detection built — Gate 1/1C; buyer-facing workflow/alerts FUTURE)
+CONTINUOUS MONITORING + ALERTS + WORKFLOW        PARTIAL (deterministic change detection built — Gate 1/1C; Gate 5 — Acquisition Workflow & Monitoring — FUTURE, distinct from Gate 2B-0B's factual change detection)
         ↓
 HUMAN ACQUISITION DECISION                       ALWAYS HUMAN (never automated — see "Evidence-First, Agent-Assisted, Human-Decided", PRODUCT_VISION.md)
 ```
+
+**Buyer-specific opportunity universes (Product Owner architecture decision, post Gate 2B-0B investigation) — reading the diagram above in those terms:** the top three boxes (planning+ownership+development evidence → trusted operative opportunity facts → opportunity detection) together are the **Market Evidence Universe** and, at the "opportunity detection" box specifically, the **Shared Candidate Signal Universe/Layer** — buyer-independent, collected and verified exactly once. Everything from "Buyer Mandate" downward is where a **Buyer Opportunity Universe** (the buyer-specific reinterpretation of that same shared evidence) and, at "Pursue/Verify/Monitor/Not Relevant," the buyer's own **Active Acquisition Pipeline** are produced. PropertyAIgent must never duplicate the top three boxes per buyer — one factual change is detected once and evaluated differently downstream, per buyer. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Buyer-Specific Opportunity Universes," for the full terminology (Market Evidence Universe / Shared Candidate Signal Universe / Buyer Opportunity Universe / Active Acquisition Pipeline) and for why the current 389-record opportunity set must not be described as "the definitive Opportunity Universe." "Lifecycle Watch" (§7, below) is the shared capability family that keeps the top three boxes current for every buyer at once, rather than each Buyer Opportunity Universe re-deriving freshness independently.
+
+The AI agent layer (Gate 3) does not replace this evidence architecture — it orchestrates trusted capabilities and interprets their commercial meaning. See "The Autonomy Principle" (§7) for the architecture this requires: agent decides what to investigate → trusted tool/capability retrieves evidence → deterministic/bounded extraction establishes facts → reconciliation establishes operative position → agent interprets commercial significance.
 
 See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence that closes each NEXT/FUTURE gap, in order.
 
@@ -139,7 +145,7 @@ See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence that closes e
   **Known Applicant Intelligence V1 limitations** (measured during production validation, not fixed in this documentation task — recorded so no downstream system relies on an assumption the evidence doesn't support):
   - **Parent/group structural completeness.** A real parent/group relationship is sometimes correctly identified in the model's own narrative and evidence but not populated into the structured `parent_group` field — production QA found only ~14% of apparent parent relationships captured structurally. **`parent_group = null` must never be read as "this entity has no parent/group relationship" — it means UNKNOWN / NOT ESTABLISHED**, not "independent."
   - **Confidence / evidence-ref under-linking.** The model can find genuinely strong external evidence but cite a weaker internal reference for the primary classification; the deterministic confidence ceiling then conservatively downgrades an otherwise-good classification. Accepted as safe-direction behaviour (a claim is never upgraded beyond what its cited evidence supports).
-  - **Source authority is not the same as claim support.** A source *type* being authoritative (e.g. a Companies House record) does not automatically mean every claim attributed to it is strongly evidenced — production QA found one isolated case where a company's own registered SIC classification did not actually support the commercial role the model asserted from it, yet the confidence ceiling (which reasons about source-type tier, not per-claim semantic content) let a HIGH confidence through. This is a general principle, not a one-off Applicant Intelligence bug: **source authority and claim support are separate questions**, and this matters even more for the future Operative Scheme Intelligence (Gate 2B), which reconciles a similar mix of authoritative-but-not-always-conclusive sources.
+  - **Source authority is not the same as claim support.** A source *type* being authoritative (e.g. a Companies House record) does not automatically mean every claim attributed to it is strongly evidenced — production QA found one isolated case where a company's own registered SIC classification did not actually support the commercial role the model asserted from it, yet the confidence ceiling (which reasons about source-type tier, not per-claim semantic content) let a HIGH confidence through. This is a general principle, not a one-off Applicant Intelligence bug: **source authority and claim support are separate questions**, and this matters even more for Trusted Opportunity Data (Gate 2B, closed), which reconciles a similar mix of authoritative-but-not-always-conclusive sources.
   - **Source-type mistagging.** A small proportion of external sources are tagged a stronger category than warranted (e.g. a general-reference or social-media page tagged as an authoritative government/local-authority source). Future reasoning over this evidence should weigh actual provenance and claim support, not trust `source_type` blindly.
   - **Backlog processor overfetch window.** `process_applicant_intelligence_backlog`'s candidate selection overfetches a fixed multiple (`limit × 3`) of the requested batch size. Called repeatedly with a small `limit` once a large proportion of high-priority identities are already fresh, that fixed window can be entirely consumed by already-processed identities and never reach the remaining lower-priority tail. Worked around operationally during the production bootstrap by calling the same, unmodified function with a sufficiently large `limit`; this should be reviewed before any continuous/scheduled Applicant Intelligence processing is enabled.
   - **`NOT_DETERMINED` is an explicit unresolved state, not a terminal failure** (production population: ~38% of classified identities) — predominantly honest uncertainty (most either have no discoverable public evidence at all, or only a generic company-registry record too thin to support a specific role), not a systematic research failure. See "Unresolved Entity Principle" below for how this should be treated going forward.
@@ -212,35 +218,53 @@ A specific consequence of keeping these distinct: **the absence of a linked plan
 
 **Buyer Profiles / the Buyer Analyst.** A later personalisation layer — the deterministic substrate (Buyer Profiles V1, `assess_buyer_fit`) is now built and closed (Gate 1, see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)); the agentic Buyer Analyst / Acquisition Agent interpretation above it is not. The architecture this document commits to is **buyer profile → deterministic suitability → agent interpretation**, never an opaque LLM-generated buyer score: a structured buyer profile (geography, scale, planning-risk appetite, development type, tenure, delivery horizon, brownfield/greenfield preference) is matched against an opportunity's own deterministic facts first, and only the *interpretation* of that match — why it fits, what the risks are — is agentic. An opportunity may legitimately be highly suitable for one buyer profile and unsuitable for another; there is no universal ranking underneath this. **Buyer Mandate V2** (see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)) extends this existing Buyer Profile domain with further acquisition-mandate criteria — it does not rebuild it.
 
-### Trusted Opportunity Data — Application Lifecycle Watch, Operative Planning Reconciliation & the Monitoring Agent (Gate 2B, three sub-gates)
+### Trusted Opportunity Data — Gate 2B, Core Planning Trust Programme Complete (six sub-gates closed, Gate 2B-0B promoted as the next capability within the same programme)
 
-*(Added at the Acquisition-First Roadmap Alignment; revised at Gate 2B-0A; re-sequenced at Gate 2B-0A closure — reconciliation (2B-1) now precedes lifecycle history (2B-0B). Gate 2B is "Trusted Opportunity Data" — deliberately separate responsibilities, never collapsed into one system, in this order:)*
+*(Added at the Acquisition-First Roadmap Alignment; revised at Gate 2B-0A; re-sequenced at Gate 2B-0A closure; extended through Gate 2B-2A/2B-2B.1/2B-2B.2/2B-2C. Gate 2B is "Trusted Opportunity Data" — deliberately separate responsibilities, never collapsed into one system. All six sub-gates below are now closed, merged and deployed; Gate 2B-0B — originally deferred, now promoted and re-scoped — is the next active gate, ahead of Gate 2C.)*
 
 ```
 Council portals + planning documents
         ↓
-2B-0A  APPLICATION FRESHNESS VERIFICATION   re-verify a known application's own record          [CLOSED]
+2B-0A     APPLICATION FRESHNESS VERIFICATION      re-verify a known application's own record            [CLOSED]
         ↓
-2B-1   SCHEME/APPLICATION/PHASE RECONCILIATION  which application/phase/version controls each fact [CLOSED]
+2B-1      SCHEME/APPLICATION/PHASE RECONCILIATION  which application/phase/version controls each fact   [CLOSED]
         ↓
-2B-2   OPERATIVE SCHEME FACTS / EVIDENCE RESOLUTION  resolved operative fact set + provenance/conflicts
+2B-2A     TRUSTED OPERATIVE PLANNING FACTS         computed, scope-aware read layer over 2B-1            [CLOSED]
         ↓
-2B-0B  APPLICATION LIFECYCLE HISTORY        richer previous→new transition history, where useful  [LATER]
+2B-2B.1   TRUSTED CONSUMER ALIGNMENT               downstream buyer-facing consumers migrated onto 2B-2A [CLOSED]
         ↓
-Trusted Opportunity Data
+2B-2B.2   ACQUISITION OPPORTUNITY SCOPE ALIGNMENT  opportunities scoped whole-site/phase/parcel, never a plot [CLOSED]
         ↓
-Buyer/Acquisition Intelligence
+2B-2C     PLANNING SIGNAL CONSUMER ALIGNMENT       lapse/recent-permission/undeveloped signals trusted   [CLOSED]
         ↓
-MONITORING AGENT / ALERTS          communicates commercially relevant changes to users/buyers
+Trusted Opportunity Data                            — production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`
+        ↓
+2B-0B     APPLICATION LIFECYCLE INTELLIGENCE       durable lifecycle-change detection, history, propagation [NEXT]
+        ↓
+Buyer/Acquisition Intelligence                      (Gate 2C onward)
+        ↓
+AUTONOMOUS ACQUISITION AGENT                        (Gate 3 — see §7, "The Autonomy Principle")
 ```
 
-- **Application freshness verification** (Gate 2B-0A) — does an already-known application's own record still match what PropertyAIgent last saw? **CLOSED** — implemented, deployed (`4b98b46`), and production-validated through a bounded Oldham cohort (10 eligible applications selected by the real selector, all `VERIFIED_UNCHANGED`, `status_verified_at` correctly advanced, no facts fabricated, no false material-change event, scope contained). See "Planning Status Verification" below. Capability freshness verification is complete; the broader Application Lifecycle Intelligence vision is not — 2B-0A did **not** solve historical lifecycle transitions, operative scheme reconciliation, or buyer-facing change alerts.
-- **Scheme / Application / Phase Reconciliation** (Gate 2B-1) — **CLOSED** (merged `e51f74b`, 2026-09-10; read-only production-validated against seven Astra Sites). `app.reporting.scheme_reconciliation.reconcile_scheme` — deterministic, fact-level, **computed/read-oriented and non-persisted** (no operative-fact table), non-destructive, provenance-aware, fail-safe. Within an already-consolidated `Site` it resolves a `planning_role` per application (distinct from `application_category`: qualification/filtering vs lifecycle participation + which facts it may control), a decided-state overlay, and phase/scope (reusing `phase_tracking`), then determines per-fact eligibility, ranks eligible sources (recency tie-break only), keeps approved/proposed/superseded separate, surfaces unresolved same-scope conflicts, and delegates affordable-housing scope reconciliation to `affordable_housing_scope`. `app.reporting.site_profile` consumes it for the header (`primary_reference`, `planning_status_label`, `operative_permission_reference`), the "Total homes" tile, and the residential-mix representative application — with no legacy fallback after a valid `not_determined`. `pick_representative_application` / `aggregate_scheme_fields` are unchanged for every other caller (opportunity universe / fingerprints, review pages, allocation coverage). Hard non-substantive guardrail (EIA screening/scoping — recognised from "Screening Request" wording and the "EIA Not Required" decision, not just "opinion" — condition discharge, certificates, external consultations, ancillary/technical amendments cannot establish substantive permission or operative residential quantum); residential-only "no new inference" safeguard; S73 fact-specific safeguard. No `ApplicationRelationship` table was needed. No schema migration. **Carried-forward:** affordable-housing scope reconciliation is not yet decided-state-aware (an AH position can still surface from a withdrawn application); the World of Pets `114619/RES/24` extraction-quality issue (`total_units_final=116` vs its "76 residential dwellings" proposal) is a separate evidence-refresh backlog item. Distinct from `app.pipeline.site_linking`'s existing physical-site consolidation.
-- **Operative Scheme Facts / Evidence Resolution** (Gate 2B-2) — consumes 2B-1's operative-source selection to publish the resolved operative fact set with source, evidence date, confidence and visible conflicts; explicitly declines to state a value the evidence does not justify. After 2B-1; not yet defined.
-- **Application Lifecycle History** (Gate 2B-0B) — **LATER** (re-sequenced after 2B-1/2B-2). Preserves and exposes commercially meaningful planning transitions as previous→new pairs with detected-at timestamps and per-transition provenance, rather than 2B-0A's current-value refresh silently overwriting them. Useful for alerting/audit but not a prerequisite for trustworthy operative facts. Depends on 2B-0A's fresh-evidence signal; never re-implements verification.
-- **Monitoring Agent** (roadmap only, sequenced after the above — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Later") — the only genuinely agentic one. It must never itself scrape a portal or decide planning truth; it consumes reconciliation's trusted facts and lifecycle changes and answers "what changed this week that matters" (later, buyer-specifically). Same "agent reads, deterministic layers write" discipline as every other agentic capability in this document (§7).
+- **Application freshness verification** (Gate 2B-0A) — **CLOSED** — implemented, deployed (`4b98b46`), and production-validated through a bounded Oldham cohort (10 eligible applications selected by the real selector, all `VERIFIED_UNCHANGED`, `status_verified_at` correctly advanced, no facts fabricated, no false material-change event, scope contained). See "Planning Status Verification" below.
+- **Scheme / Application / Phase Reconciliation** (Gate 2B-1) — **CLOSED** (merged `e51f74b`, 2026-09-10; read-only production-validated against seven Astra Sites). `app.reporting.scheme_reconciliation.reconcile_scheme` — deterministic, fact-level, **computed/read-oriented and non-persisted** (no operative-fact table), non-destructive, provenance-aware, fail-safe. Within an already-consolidated `Site` it resolves a `planning_role` per application (distinct from `application_category`: qualification/filtering vs lifecycle participation + which facts it may control), a decided-state overlay, and phase/scope (reusing `phase_tracking`), then determines per-fact eligibility, ranks eligible sources (recency tie-break only), keeps approved/proposed/superseded separate, surfaces unresolved same-scope conflicts, and delegates affordable-housing scope reconciliation to `affordable_housing_scope`. `app.reporting.site_profile` consumes it for the header, the "Total homes" tile, and the residential-mix representative application — with no legacy fallback after a valid `not_determined`. `pick_representative_application` / `aggregate_scheme_fields` remained unchanged for every other caller at this point (opportunity universe/fingerprints — corrected onto the same trusted foundation by 2B-2B.2/2B-2C below; review pages, allocation coverage — still unmigrated). Hard non-substantive guardrail (EIA screening/scoping, condition discharge, certificates, external consultations, ancillary/technical amendments cannot establish substantive permission or operative residential quantum); residential-only "no new inference" safeguard; S73 fact-specific safeguard. No `ApplicationRelationship` table was needed. No schema migration.
+- **Trusted Operative Planning Facts** (Gate 2B-2A) — **CLOSED**. `app.reporting.scheme_reconciliation.build_operative_planning_facts(applications) -> OperativePlanningFacts` — the resolved-facts question 2B-1 left open ("computed service vs persisted") is answered: computed, non-persisted, scope-aware, no Scheme/OperativeScheme table introduced. Structurally separates the **current consented position** (never manufactured from a pending/ancillary application — `exists` reads False rather than guessing) from **current active planning position(s)** (zero, one or several, one per distinct scope, never collapsed by "latest wins"). Scope-aware via `group_applications_by_operative_scope`/`is_material_development_parcel` — a named "plot" group is a peer acquisition-level scope only if it independently states its own qualifying-scale unit count, never inferred from the token's own shape (real production evidence confirmed the token shape alone cannot distinguish an individual dwelling plot from a genuine development parcel). Affordable-housing scope reconciliation made decided-state-aware, closing the 2B-1 carried-forward item (Stockport Rugby Club no longer surfaces a 50%/45-unit AH position sourced from a withdrawn hybrid). Adds **relationship confidence** (site-link method/confidence — `high`/`review_required`/`unknown`, never a new numeric score) and **freshness** (`status_verified_at`/`independently_verified`) as first-class provenance dimensions, kept structurally separate from **evidence confidence** — see "Trust Dimensions," [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). The World of Pets `114619/RES/24` extraction-quality issue remains a separate, still-open backlog item.
+- **Trusted Consumer Alignment** (Gate 2B-2B.1) — **CLOSED**. Migrated downstream buyer-facing consumers (Buyer Fit planning-state resolution, Site Profile Structured Summary, Affordable Homes tile) from the legacy `pick_representative_application`/`aggregate_scheme_fields` selection onto Trusted Operative Planning Facts; removed a hardcoded `PERMISSION_GRANTED` fallback; corrected a live production AH percentage/unit-count conflation defect (Brixham Road), with two closure hotfixes.
+- **Acquisition Opportunity Scope Alignment** (Gate 2B-2B.2) — **CLOSED**. Migrated *acquisition opportunity generation itself* — not just presentation — onto the same operative-scope model 2B-2A introduced: an individual dwelling plot filing can no longer become its own standalone acquisition opportunity inheriting the whole site's unit count (confirmed real defects at Lacy Street, Barton Road and four further production sites, all corrected). Introduced `app.reporting.opportunity_monitoring_transition` — a narrow, dry-run-first, manifest-driven mechanism so a software scope/fact correction is never misreported as a genuine `NEW`/`MATERIALLY_CHANGED` market event to `app.reporting.opportunity_change`. Reused, unmodified, by Gate 2B-2C.
+- **Planning Signal Consumer Alignment** (Gate 2B-2C) — **CLOSED**, production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`. `app.reporting.scheme_reconciliation.resolve_operative_lapse_anchor` — the one trusted, role-aware "which application governs implementation/lapse" answer, reused (never re-derived) by both `compute_lapse_status` (whole-site) and `compute_phase_progress` (phase/parcel-scoped). Fixes a confirmed defect where `compute_lapse_status`/`compute_phase_progress` independently selected the most recently *decided* "approve"/"grant"-worded application with no role awareness — a later NMA, condition discharge or S73/variation could become the lapse-clock anchor, or wrongly suppress genuine post-permission progress evidence, purely by being the most recent grant-worded filing (World of Pets, and 56 further production sites). A pre-merge semantic review distinguished `NOT_GRANTED` (no application granted at all — an ordinary, stable fact) from `NOT_DETERMINED` (something granted, not trustworthy as the operative permission) via `OperativeLapseAnchor.any_granted`, eliminating ~125 spurious fingerprint relabellings the first pass introduced. S73/variation requires no special-cased "never resets the clock" logic — it was already excluded from Gate 2B-2A's substantive-role set. Production impact at closure: 407→389 total opportunities, 178→160 planning_delivery; 11/18 `RECENT_PERMISSION` and 8 `UNDEVELOPED_PERMISSION`/`APPROACHING_LAPSE` opportunities confirmed false and removed; zero unrelated fingerprint fields touched. Comprehensive statutory outline/reserved-matters commencement-period modelling remains explicitly deferred.
+- **Application Lifecycle Intelligence** (Gate 2B-0B) — **NEXT, architecture investigation only**. Promoted ahead of Gate 2C by Product Owner decision, post Gate 2B-2C: the platform can now reliably answer "what does the evidence mean?" but not yet "has it changed since we last checked?" Broadened from the original narrower "Application Lifecycle History" framing — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Gate 2B-0B — Application Lifecycle Intelligence (NEXT)" for the full lifecycle-event list, history requirement, monitoring-cadence principle, and required architecture-investigation scope. Builds on 2B-0A's freshness signal, does not rebuild it. **No schema or implementation is authorised until that investigation is reviewed by the Product Owner.**
+- **Monitoring Agent / Autonomous Acquisition Agent** (Gate 3, roadmap only — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)) — the genuinely agentic capability sitting above Gate 2B-0B. It must never itself scrape a portal or decide planning truth; it consumes 2B-0B's trusted lifecycle changes and answers "what changed that matters" (buyer-specifically, once Buyer Mandate V2 exists). Same "agent reads, deterministic layers write" discipline as every other agentic capability in this document (§7) — see "The Autonomy Principle" there for the specific architecture Gate 2B-0B's own capabilities must expose for this agent to consume.
 
-Conceptual only for 2B-1/2B-2/2B-0B/the Monitoring Agent — the technical shape of each is deliberately undecided here beyond what's stated; Gate 2B's own repository investigation (complete) and the Gate 2B-0A production validation (complete) are what determine further design, not this document. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence.
+Conceptual only for Gate 2B-0B and the Monitoring/Acquisition Agent — the technical shape of each is deliberately undecided here beyond what's stated; Gate 2B-0B's own architecture investigation (not yet run) is what determines further design, not this document. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence.
+
+### Opportunity Dimensions and Trust Dimensions — kept structurally separate
+
+*(Product Owner decision, post Gate 2B-2C — full detail in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Opportunity Dimensions" and "Trust Dimensions.")* Two families of dimension exist, and neither family's members are ever mixed with each other or collapsed into one field or one score:
+
+- **Trust dimensions** (already built, Gate 2B-2A): evidence confidence, evidence freshness, relationship confidence.
+- **Opportunity dimensions** (partially built): Buyer Fit (built, Gate 1), Opportunity Type (built, Gate 1C), Evidence Confidence (built, Gate 2B-2A), Planning Readiness (not yet named as a field), Acquisition Readiness (depends on Gate 2C), Buyer Recommendation (depends on Gate 3).
+
+An opportunity's `Opportunity Type` never encodes its `Acquisition Position`; `Acquisition Position` never encodes a `Buyer Recommendation`; a `Buyer Recommendation` is always specific to one buyer mandate, never a property of the opportunity itself. See "No Opaque Scoring" and "Buyer Suitability Is Contextual, Not Universal," [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md).
 
 #### Planning Status Verification — CLOSED (Gate 2B-0A: implemented, deployed, production-validated), deployed fail-closed
 
@@ -373,7 +397,99 @@ Evidence-backed recommendation
 Human acquisition decision
 ```
 
+### The Autonomy Principle — orchestration vs. fact creation
+
+*(Product Owner decision, post Gate 2B-2C.)* PropertyAIgent should become increasingly autonomous — the intended long-term experience is *"give PropertyAIgent an acquisition strategy and it behaves like an always-on acquisition researcher."* This does **not** mean an unconstrained LLM becomes the system of record. Distinguish:
+
+- **Autonomous orchestration** — an agent may decide which opportunities deserve investigation, which schemes need fresher evidence, when an opportunity should be re-checked, whether a new document deserves analysis, whether additional ownership/control evidence is required, whether a planning change is commercially material, whether an opportunity should be promoted or downgraded, which buyer is likely to care, and what to investigate next.
+- **Authoritative fact creation** — must remain evidence-backed, provenance-aware, reproducible, auditable and confidence-aware, exactly as every deterministic layer in §§0-6 already is.
+
+The resulting architecture, which Gate 2B-0B's own capabilities must be built to support:
+
+```
+Agent decides what to investigate
+     ↓
+Trusted tool/capability retrieves evidence
+     ↓
+Deterministic / bounded extraction establishes facts
+     ↓
+Reconciliation establishes operative position
+     ↓
+Agent interprets commercial significance
+```
+
+Conceptually, the capabilities such an agent invokes (Gate 2B-0B builds these; names are conceptual only, not an API to implement merely because it is named here): `verify_application()`, `discover_related_applications()`, `check_new_documents()`, `extract_changed_facts()`, `reconcile_planning_position()`, `detect_development_progress()`, `emit_change_event()`. Example autonomous reasoning this enables, none of it implemented yet: *"this high-priority opportunity has not been verified recently" → request verification*; *"this committee report is new" → request document extraction*; *"planning position materially improved" → investigate acquisition/control position*; *"this scheme has commenced" → reassess buyer relevance*. Autonomy belongs at the orchestration and commercial-reasoning layers; factual planning states remain evidence-backed — this is the same discipline "Evidence-First, Agent-Assisted, Human-Decided" ([PRODUCT_VISION.md](PRODUCT_VISION.md)) already requires, restated as an explicit architecture for the autonomous-agent era.
+
 Everything above the "Deterministic engines" line is a *consumer* of everything below it. An agent reads facts, evidence and classifications the deterministic layers already established; it reasons over them, cites them, and flags what's missing; it does not write them. See [PRODUCT_VISION.md](PRODUCT_VISION.md), "Evidence-First, Agent-Assisted, Human-Decided," for the governing principle this section implements, including the non-negotiable rule that uncertainty must be preserved, never silently resolved into a false positive or negative (`UNCERTAIN` planning activity must never be restated as "no activity"; unknown ownership must never be restated as "available").
+
+### Lifecycle Watch — a shared capability family, distinct from the Acquisition Agent
+
+*(Product Owner architecture decision, following review of the Gate 2B-0B architecture investigation.)* Do not create a separate autonomous LLM agent for every planning stage, and do not create a separate council-portal-scraping agent per buyer. Instead, distinguish two things kept structurally apart throughout this architecture:
+
+- **Acquisition Agent** — buyer-specific commercial reasoning/orchestration (Gate 3). Answers *"what does this mean for this buyer?"*
+- **Lifecycle Watchers / capabilities** — shared, bounded, buyer-independent monitoring capabilities that establish factual changes (Gate 2B-0B and its future extensions). Answer *"what has happened?"*
+
+The Acquisition Agent invokes or prioritises Lifecycle Watch capabilities; it never re-implements them, and Lifecycle Watch never decides commercial significance. This mirrors, at the monitoring layer, the same "agent reads, deterministic layers write" discipline "The Autonomy Principle" above already establishes for evidence generally.
+
+**Conceptual capability families** (architectural concepts, not authorisation to build five new services or agents — Gate 2B-0B builds the shared infrastructure underneath all of them; each family is populated incrementally, only as evidence and need justify it):
+
+- **Planning Decision Watch** — status, officer recommendation, committee process, formal decision (the awaiting-decision lifecycle, below).
+- **S106 / Legal Agreement Watch** — not currently modelled as discrete lifecycle facts (confirmed by the Gate 2B-0B investigation); recorded here as an important future capability, not built now.
+- **Post-Permission Watch** — discharge of conditions, Reserved Matters, S73, NMA, commencement evidence, revised scheme/phasing, later amendments.
+- **Development / Delivery Watch** — construction/build progress and completion evidence.
+- **Local Plan / Strategic Land Watch** — the pre-application lifecycle (below), owned by the existing Policy Intelligence / Local Plan infrastructure, not forced into an application-centric model.
+
+**State-aware monitoring.** Monitoring strategy should depend on the operative development/planning state, not use one universal refresh cadence forever. The conceptual lifecycle a planning application may move through (not every development follows every state, and this describes monitoring *concerns*, not a database enum or a rigid state machine to be implemented merely because this diagram exists):
+
+```
+APPLICATION SUBMITTED
+        ↓
+AWAITING DECISION
+        ↓
+OFFICER RECOMMENDATION
+        ↓
+COMMITTEE / DECISION PROCESS
+        ↓
+RESOLUTION TO APPROVE
+        ↓
+S106 / LEGAL AGREEMENT
+        ↓
+FORMAL PERMISSION
+        ↓
+CONDITIONS / RESERVED MATTERS / AMENDMENTS
+        ↓
+COMMENCEMENT
+        ↓
+UNDER CONSTRUCTION
+        ↓
+PARTIAL / FULL DELIVERY
+```
+
+**Awaiting-decision monitoring.** For a pending application, relevant monitoring may eventually include: authoritative application status; new/revised documents; officer recommendation; committee date; committee report; committee resolution; formal decision; revised unit numbers; revised affordable-housing position. Monitoring intensity may reasonably increase as an application approaches a decision — e.g. ordinary pending → officer recommendation approve → committee scheduled → committee resolution approve subject to S106 — a progression that may materially increase acquisition relevance for some buyers before formal permission is even issued. Gate 2B-0B's existing four-tier verification cadence (7/14/30/60 days, keyed on contradiction-signal/opportunity-kind) is the first, already-built instance of exactly this state-awareness principle — future tiers extend it, they do not replace it.
+
+**S106 / legal agreement watch, in more detail.** The Gate 2B-0B investigation confirmed committee information and S106/legal-agreement progression are not currently modelled as discrete lifecycle facts. For acquisition purposes, distinguish conceptually between `OFFICER_RECOMMENDATION_TO_APPROVE`, `COMMITTEE_RESOLUTION_TO_APPROVE`, `RESOLUTION_TO_APPROVE_SUBJECT_TO_S106`, `S106_EXECUTED`, and `FORMAL_DECISION_NOTICE_ISSUED` — these can have materially different acquisition significance to different buyers. Do not build a comprehensive legal-agreement subsystem now; Gate 2B-0B's lifecycle-event model must simply not be designed in a way that prevents these events being added later (see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), Gate 2B-0B's "Event-model extensibility" note).
+
+**Post-permission watch, in more detail.** Once permission is formally granted, the monitoring objective changes — repeatedly asking only "has permission been granted?" is no longer sufficient. Relevant future evidence: S106/legal-agreement status where applicable; discharge of conditions; Reserved Matters; S73; NMA; commencement evidence; revised scheme/phasing; later amendments; development progress. This reuses the existing trusted planning-role/reconciliation architecture (`app.reporting.scheme_reconciliation`, §"Trusted Opportunity Data" above) unchanged: a new NMA or S73 must **not** automatically be interpreted as a new substantive acquisition opportunity — already guaranteed today by Gate 2B-2A's `SUBSTANTIVE_ROLES` exclusion and Gate 2B-2C's role-aware anchor resolution, confirmed unaffected by this amendment.
+
+**Development/delivery watch, in more detail.** Development progress is factual evidence — it is **not** universally positive or negative. A traditional land buyer may find `UNDERWAY` materially reduces acquisition relevance; a fund/BTR buyer may find `UNDERWAY` increases it; a Housing Association may find construction progression creates an affordable-unit/package acquisition opportunity. Lifecycle Watch establishes *what has happened*; the Buyer Acquisition Agent determines *what it means for this buyer* — this separation is preserved throughout the architecture, exactly as "The Development/Delivery-State Principle" in [DESIGN_PRINCIPLES.md](DESIGN_PRINCIPLES.md) already requires. `NEARING_COMPLETION` continues to not exist without adequate evidence.
+
+**Strategic land lifecycle.** Strategic land's monitoring lifecycle is different from a planning application's and must not be forced into an application-centric model:
+
+```
+PROMOTED / SUBMITTED SITE
+        ↓
+EMERGING ALLOCATION
+        ↓
+DRAFT ALLOCATION
+        ↓
+EXAMINATION / MODIFICATION
+        ↓
+ADOPTED ALLOCATION
+        ↓
+PLANNING / DELIVERY ACTIVITY
+```
+
+The existing Local Plan / Policy Intelligence infrastructure (§2 below) should eventually function as the trusted watcher for this lifecycle, the same way Gate 2B-0B is the trusted watcher for the application lifecycle above — not a shared engine, two lifecycle-appropriate watchers feeding the same downstream Lifecycle Watch concept.
 
 ### Platform Intelligence vs. Agentic Reasoning
 
@@ -419,11 +535,11 @@ Sits above structured sales/rental comparables, comparable relevance, £/sq ft, 
 
 ### Near/Mid-Term Agent Priority
 
-*(Added at the Acquisition-First Roadmap Alignment — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence this drives.)* Not every one of these needs to be a standalone autonomous agent from day one:
+*(Added at the Acquisition-First Roadmap Alignment; updated post Gate 2B-2C — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence this drives.)* Not every one of these needs to be a standalone autonomous agent from day one:
 
-1. **Planning Verification** — may initially be a bounded evidence/reconciliation *capability* feeding Operative Scheme Intelligence (Gate 2B), not a customer-facing agent in its own right.
-2. **Acquisition Intelligence** — may initially be structured evidence extraction (Applicant Intelligence, now built; Acquisition Position Intelligence, Gate 2C) with agentic reasoning (the Buyer Analyst / Acquisition Agent above) layered on afterward, not built together.
-3. **Opportunity Monitoring** — builds on the existing deterministic change-detection infrastructure (Gate 1/1C, above); only the interpretation of a detected change ("does this matter for this buyer's mandate?") is agentic.
+1. **Planning Verification** — Trusted Opportunity Data (Gate 2B, all six sub-gates) is now **built and closed** — the bounded evidence/reconciliation capability this priority named is done; Gate 2B-0B (Application Lifecycle Intelligence) extends it to durable change detection, still deterministic infrastructure, not a customer-facing agent in its own right.
+2. **Acquisition Intelligence** — structured evidence extraction (Applicant Intelligence, built/closed — Gate 2A; Acquisition Position Intelligence, Gate 2C, sequenced after Gate 2B-0B) with agentic reasoning (the Buyer Analyst / Gate 3 Autonomous Acquisition Agent above) layered on afterward, not built together.
+3. **Opportunity Monitoring** — the deterministic change-detection infrastructure (Gate 1/1C) is built and closed, and Gate 2B-2C corrected the facts it detects changes against; Gate 2B-0B extends detection to durable lifecycle history; only the interpretation of a detected change ("does this matter for this buyer's mandate?") — Gate 3 — is agentic.
 
 Later: the Market & Investment Analyst (§C above) and a future Development Appraisal Agent remain sequenced behind real market data existing — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Phase 2."
 
