@@ -56,12 +56,31 @@ ever persists):
          naturally an owner's own fact - never attached to a Developer/
          Mortgagee row, which would misrepresent whose title it is).
 
-NEVER PERSISTED, by construction (Stage 4B.1 Section 5's own explicit
-exclusion list) - always report-only:
-  - CERTIFICATE_B / CERTIFICATE_C / CERTIFICATE_D (Stage 4B.1 Section 6:
-    "do NOT create named owner relationships unless a named owner has
-    actually been deterministically extracted" - no B/C/D named-owner
-    extractor exists in this codebase, so these are ALWAYS report-only).
+  CERTIFICATE_B / CERTIFICATE_C / CERTIFICATE_D + applicant identity
+  independently confirmed (Gate 2C V1, "Certificate B/C/D structured
+  evidence") -> an APPLICANT relationship (never OWNER - B/C/D each mean
+  something other than sole ownership) for the confirmed applicant, using
+  the EXACT SAME identity-confirmation algorithm as Certificate A
+  (resolve_certificate_a_applicant_identity - its name is certificate-
+  specific for historical reasons only; the algorithm itself reads the
+  form's own "Applicant Details" section regardless of which certificate
+  letter was detected). This deliberately never names a specific OTHER
+  owner - no such extractor exists in this codebase (Acquisition
+  Intelligence Architecture Amendment, "do not invent named owners from
+  B/C/D unless the document actually provides safely extractable names")
+  - only the applicant's own declared ownership-completeness position:
+  evidence_category = CERTIFICATE_B_OTHER_OWNER_INTEREST_DECLARED /
+  CERTIFICATE_C_PARTIAL_OWNERSHIP_IDENTIFICATION /
+  CERTIFICATE_D_OWNERSHIP_NOT_FULLY_KNOWN, confidence "medium" (a self-
+  declaration, same evidential weight as Certificate A).
+
+NEVER PERSISTED, by construction:
+  - CERTIFICATE_B / C / D with no confirmable applicant identity (same
+    fail-closed rule as Certificate A - reported via certificate_bcd_
+    identity_unresolved/certificate_bcd_reported_no_entity, never guessed).
+  - A named, specific OTHER owner implied by Certificate B/C/D (no
+    extractor for this exists - only the applicant's own position is ever
+    recorded, never a fabricated third party).
   - CERTIFICATE_A with no Application.applicant_name_raw available (no
     safe entity name exists - reported, never invented).
   - CERTIFICATE_UNKNOWN / NO_CERTIFICATE_EVIDENCE (Stage 4B's own "fail
@@ -104,6 +123,9 @@ from app.enrichment.control_entities import (
     resolve_existing_company,
 )
 from app.extraction.ownership_control_evidence import (
+    CERTIFICATE_B,
+    CERTIFICATE_C,
+    CERTIFICATE_D,
     CERTIFICATE_UNKNOWN,
     NO_CERTIFICATE_EVIDENCE,
     detect_ownership_certificate,
@@ -113,6 +135,28 @@ from app.extraction.ownership_control_evidence import (
 )
 
 CERTIFICATE_A_EVIDENCE_CATEGORY = "CERTIFICATE_A_APPLICANT_OWNER_DECLARATION"
+
+# Gate 2C V1 ("Certificate B/C/D structured evidence") - evidence_basis/
+# evidence_category for the applicant's own declared ownership-
+# completeness position, per Certificate letter. Deliberately named after
+# what the applicant DECLARED (never a stronger claim - see the Acquisition
+# Intelligence Architecture Amendment, "Ownership semantics"):
+#   B - applicant declares they are NOT the sole owner (other owner
+#       interest exists), no specific other owner named.
+#   C - some but not all owners known/agricultural tenants may exist -
+#       incomplete identification, per the certificate's own wording.
+#   D - the applicant could not identify all the other owners - ownership
+#       not fully known.
+CERTIFICATE_BCD_EVIDENCE_BASIS = {
+    CERTIFICATE_B: "certificate_b_declaration",
+    CERTIFICATE_C: "certificate_c_declaration",
+    CERTIFICATE_D: "certificate_d_declaration",
+}
+CERTIFICATE_BCD_EVIDENCE_CATEGORY = {
+    CERTIFICATE_B: "CERTIFICATE_B_OTHER_OWNER_INTEREST_DECLARED",
+    CERTIFICATE_C: "CERTIFICATE_C_PARTIAL_OWNERSHIP_IDENTIFICATION",
+    CERTIFICATE_D: "CERTIFICATE_D_OWNERSHIP_NOT_FULLY_KNOWN",
+}
 
 
 @dataclass
@@ -128,6 +172,12 @@ class PopulationReport:
     certificate_a_identity_confirmed_via_raw_fallback: int = 0
     certificate_a_identity_unresolved: int = 0
     certificate_a_relationships_eligible: int = 0
+    # Gate 2C V1 - Certificate B/C/D now reuse the same identity-
+    # confirmation algorithm as Certificate A (see CERTIFICATE_BCD_
+    # EVIDENCE_BASIS/CATEGORY above); certificate_bcd_reported_no_entity
+    # now means "identity unresolved", not "always report-only".
+    certificate_bcd_identity_unresolved: int = 0
+    certificate_bcd_relationships_eligible: int = 0
     certificate_bcd_reported_no_entity: int = 0
 
     s106_documents_evaluated: int = 0
@@ -190,6 +240,28 @@ def _persist_or_preview(
         # Companies House resolution is meaningless for a named person -
         # never attempted, never counted as company_resolved/unresolved.
         entity_type, company_id = "individual", None
+    elif known_entity_type == "company":
+        # Gate 2C V1 fix ("narrow entity-type resolution improvement") -
+        # the form's own "Company Name" field ALREADY told us this is a
+        # company (resolve_certificate_a_applicant_identity's own
+        # deterministic parse, entity_type="company") - that classification
+        # must never be discarded just because no EXISTING Company row
+        # happens to match it. Still attempt resolve_existing_company for
+        # company_id (conservative - only an exact/high-confidence match
+        # against an already-enriched row, never creates one), but
+        # entity_type="company" is retained either way - this is exactly
+        # the "establish entity_type=company without establishing
+        # company_id" distinction the investigation called out as safe.
+        # Real production case this fixes: "Ropley Properties Limited" /
+        # "Triple Jersey Limited" (Certificate A, same_form_company_name)
+        # previously landed as entity_type=unknown purely because neither
+        # had an existing, Companies-House-enriched Company row to match.
+        company = resolve_existing_company(session, entity_name_raw)
+        if company is not None:
+            report.company_resolved_count += 1
+            entity_type, company_id = "company", company.id
+        else:
+            entity_type, company_id = "company", None
     else:
         company = resolve_existing_company(session, entity_name_raw)
         if company is not None:
@@ -270,19 +342,56 @@ def run_control_relationship_population(
                         evidence_category=CERTIFICATE_A_EVIDENCE_CATEGORY, confidence="medium",
                         evidence_document_id=doc.id,
                         evidence_snippet=f"{result.snippet or ''} | applicant identity: {identity.snippet or ''}",
-                        known_entity_type=identity.entity_type if identity.entity_type == "individual" else None,
+                        known_entity_type=identity.entity_type if identity.entity_type in ("individual", "company") else None,
                     )
                     report._apps_seen.add(app.id)
                     if app.site_id:
                         report._sites_seen.add(app.site_id)
-            else:  # CERTIFICATE_B / C / D - never persisted, see module docstring
-                if result.certificate_type == "CERTIFICATE_B":
+            elif result.certificate_type in CERTIFICATE_BCD_EVIDENCE_CATEGORY:
+                # Gate 2C V1 ("Certificate B/C/D structured evidence") -
+                # extends the Certificate A pattern to B/C/D. Certificate
+                # B/C/D never name a SPECIFIC other owner safely (Section 6
+                # of the approved amendment: "do not invent named owners
+                # from B/C/D unless the document actually provides safely
+                # extractable names" - no such extractor exists), so this
+                # never creates an OWNER-role row. What IS safe and
+                # genuinely new evidence: the APPLICANT's own declared
+                # ownership-completeness position, resolved by the EXACT
+                # SAME identity-confirmation algorithm Certificate A
+                # already trusts (resolve_certificate_a_applicant_identity
+                # parses the form's own "Applicant Details" section - its
+                # name is certificate-specific for historical reasons, but
+                # the algorithm itself has no dependency on which
+                # certificate letter was detected). Persisted as role=
+                # "APPLICANT" (an existing, bounded ControlRelationship
+                # role that has never been written before this task) -
+                # never "OWNER", since B/C/D each mean something other
+                # than sole ownership.
+                if result.certificate_type == CERTIFICATE_B:
                     report.certificate_b_count += 1
-                elif result.certificate_type == "CERTIFICATE_C":
+                elif result.certificate_type == CERTIFICATE_C:
                     report.certificate_c_count += 1
-                elif result.certificate_type == "CERTIFICATE_D":
+                elif result.certificate_type == CERTIFICATE_D:
                     report.certificate_d_count += 1
-                report.certificate_bcd_reported_no_entity += 1
+
+                identity = resolve_certificate_a_applicant_identity(doc, app)
+                if identity.method == "unresolved":
+                    report.certificate_bcd_identity_unresolved += 1
+                    report.certificate_bcd_reported_no_entity += 1
+                else:
+                    report.certificate_bcd_relationships_eligible += 1
+                    _persist_or_preview(
+                        session, report, dry_run=dry_run, table_exists=table_exists,
+                        application_id=app.id, site_id=app.site_id, entity_name_raw=identity.resolved_name,
+                        role="APPLICANT", evidence_basis=CERTIFICATE_BCD_EVIDENCE_BASIS[result.certificate_type],
+                        evidence_category=CERTIFICATE_BCD_EVIDENCE_CATEGORY[result.certificate_type], confidence="medium",
+                        evidence_document_id=doc.id,
+                        evidence_snippet=f"{result.snippet or ''} | applicant identity: {identity.snippet or ''}",
+                        known_entity_type=identity.entity_type if identity.entity_type in ("individual", "company") else None,
+                    )
+                    report._apps_seen.add(app.id)
+                    if app.site_id:
+                        report._sites_seen.add(app.site_id)
 
             if not dry_run:
                 session.commit()
