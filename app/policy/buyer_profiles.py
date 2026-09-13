@@ -119,6 +119,152 @@ WHOLLY_AFFORDABLE_THRESHOLD = 100.0
 TOTAL_UNITS = "total_units"
 AFFORDABLE_UNITS = "affordable_units"
 
+# --- Buyer Mandate V2, Phase B1 (Structured Mandate Domain Expansion) -------
+#
+# Four new STRUCTURAL dimensions added to BuyerMandatePolicy below. Per the
+# Phase B1 brief's own explicit instruction, none of these is read by
+# app.policy.buyer_matching.assess_buyer_fit yet - that activation is
+# deliberately deferred to Phase B2, so every existing test/production
+# buyer-fit outcome is completely unaffected by their presence. They exist
+# now so BuyerMandate can be fingerprinted, seeded, migrated and tested
+# against their FINAL persisted shape before any matching logic ever reads
+# them - avoiding a second, disruptive schema/fingerprint change in B2.
+
+# --- A. Geography ------------------------------------------------------------
+#
+# Deliberately council_code-based (never a polygon/radius/postcode-sector/
+# travel-time model) - council_code is already the platform's own native
+# administrative geography (Council.code, Application.council_code,
+# LocalPlan.council_code, ...), already populated on every relevant row,
+# and the ten-council Greater Manchester footprint is the platform's entire
+# current evidence coverage. A three-value SCOPE, not a bare set, because
+# "no councils configured" and "every current council is acceptable" are
+# genuinely different commercial facts that must never collapse into each
+# other (Phase B1 brief, Section 5/19 - "unknown/unconfigured geography
+# must not accidentally become 'all councils'"):
+#   - GEOGRAPHY_UNSPECIFIED: no geography decision has been made for this
+#     mandate yet. The safe default for any BRAND NEW mandate a future
+#     Phase B3 creation flow produces before a user has chosen anything -
+#     never silently treated as "everywhere" once geography is actually
+#     wired into matching (Phase B2+).
+#   - GEOGRAPHY_ALL_CURRENT_COVERAGE: an explicit statement that this buyer
+#     has no geographic restriction WITHIN whatever the platform currently
+#     covers - the correct, honest migration value for the four existing
+#     pilot mandates (none of their own original briefs stated ANY
+#     geographic restriction - see each mandate's own notes below), and
+#     genuinely different from GEOGRAPHY_UNSPECIFIED: this is a stated fact
+#     about the buyer's own appetite, not an unanswered question. It is
+#     explicitly NOT "all councils in England and Wales" - it tracks
+#     whatever the platform actually covers today, without needing to be
+#     re-stated every time a new council is onboarded.
+#   - GEOGRAPHY_COUNCILS: an explicit, non-empty set of council_code values
+#     (geography_councils below) - the buyer wants only these.
+GEOGRAPHY_UNSPECIFIED = "UNSPECIFIED"
+GEOGRAPHY_ALL_CURRENT_COVERAGE = "ALL_CURRENT_COVERAGE"
+GEOGRAPHY_COUNCILS = "COUNCILS"
+GEOGRAPHY_SCOPES = frozenset({GEOGRAPHY_UNSPECIFIED, GEOGRAPHY_ALL_CURRENT_COVERAGE, GEOGRAPHY_COUNCILS})
+
+# --- B. Acquisition Type ------------------------------------------------------
+#
+# WHAT THE BUYER IS TRYING TO ACQUIRE - deliberately NOT the same concept
+# as app.policy.buyer_matching.STRATEGIC_LAND/PLANNING_DELIVERY
+# (opportunity_type), which describes the CANDIDATE'S OWN SITUATION and is
+# buyer-independent (see app.reporting.opportunity_universe's own module
+# docstring). One development can be a PLANNING_DELIVERY opportunity to
+# every buyer while three different buyers want three different things
+# from it (land control / the affordable package / the completed homes) -
+# collapsing the two concepts would make that impossible to express.
+#
+# Phase B1 brief, Section 6: the smallest useful V1 vocabulary, not the
+# full long-term taxonomy (forward purchase/forward funding/completed
+# homes/SFH/BTR/portfolio remain future refinements of
+# DEVELOPMENT_HOMES_ACQUISITION, introduced only if a real buyer needs the
+# distinction - never speculatively now).
+LAND_SITE_ACQUISITION = "LAND_SITE_ACQUISITION"
+STRATEGIC_LAND_CONTROL = "STRATEGIC_LAND_CONTROL"
+AFFORDABLE_HOUSING_PACKAGE = "AFFORDABLE_HOUSING_PACKAGE"
+DEVELOPMENT_HOMES_ACQUISITION = "DEVELOPMENT_HOMES_ACQUISITION"
+ACQUISITION_TYPES = frozenset({
+    LAND_SITE_ACQUISITION, STRATEGIC_LAND_CONTROL, AFFORDABLE_HOUSING_PACKAGE, DEVELOPMENT_HOMES_ACQUISITION,
+})
+
+# --- C. Development-State Appetite -------------------------------------------
+#
+# COMMERCIAL PREFERENCE, never a redefinition of the factual development-
+# state source (app.pipeline.lapse_tracking.classify_build_status's own
+# "underway"/"partially_complete"/"complete"/"unknown" vocabulary - inspected
+# directly, not guessed at, before choosing this vocabulary). Note that
+# vocabulary has NO positive "not started" state at all - only "underway or
+# further" vs. "unknown" (no evidence either way), consistent with Unknown
+# Must Remain Unknown; a future Phase B2 mapping of UNCOMMENCED_PREFERRED
+# must therefore match against "no commencement evidence" (unknown), never
+# against a confirmed-not-started fact that the evidence layer cannot
+# actually produce.
+#
+# A single ordered scale (not a multi-select) - the Phase B1 brief's own
+# example land-buyer-vs-institutional-buyer cases described one directional
+# preference per buyer, never "accepts uncommenced AND prefers underway"
+# simultaneously:
+#   - DEVELOPMENT_STATE_UNSPECIFIED: no preference stated yet.
+#   - UNCOMMENCED_PREFERRED: this buyer's own stated brief favours a site
+#     with no development activity yet (Nesten Homes/Strategic Land
+#     Buyer/National Housebuilder - see each mandate's own notes for the
+#     evidence this default is grounded in).
+#   - UNDERWAY_ACCEPTABLE: development progress does not disqualify, but
+#     is not itself a positive signal either (Housing Association - the
+#     affordable package may remain acquirable regardless of who is
+#     delivering the market housing).
+#   - UNDERWAY_PREFERRED: development progress is itself a positive signal
+#     (an institutional/SFH/BTR-style buyer's own forward-funding/
+#     completed-homes interest - not persisted for any pilot buyer in B1,
+#     since no such buyer exists yet; reserved for that future case).
+DEVELOPMENT_STATE_UNSPECIFIED = "UNSPECIFIED"
+UNCOMMENCED_PREFERRED = "UNCOMMENCED_PREFERRED"
+UNDERWAY_ACCEPTABLE = "UNDERWAY_ACCEPTABLE"
+UNDERWAY_PREFERRED = "UNDERWAY_PREFERRED"
+DEVELOPMENT_STATE_APPETITES = frozenset({
+    DEVELOPMENT_STATE_UNSPECIFIED, UNCOMMENCED_PREFERRED, UNDERWAY_ACCEPTABLE, UNDERWAY_PREFERRED,
+})
+
+# --- D. Control / Ownership Appetite -----------------------------------------
+#
+# COMMERCIAL WILLINGNESS-TO-INVESTIGATE vocabulary - deliberately its own
+# words, sharing NO string with Gate 2C's own evidence-coverage/ownership-
+# state vocabulary (app.reporting.acquisition_position's
+# COVERAGE_*/OWNERSHIP_*/CERTIFICATE_* constants). Gate 2C answers "what
+# evidence do we have"; this answers "what situations is this buyer willing
+# to consider" - a buyer's own appetite can never upgrade Gate 2C's
+# genuinely unknown evidence into confirmed control, and Phase B2's future
+# mapping between the two remains free to be designed without either
+# vocabulary constraining the other. A bounded multi-select (not a single
+# scale) - the Phase B1 brief's own examples are independent yes/no
+# willingnesses, not points on one ordered axis:
+#   - DEVELOPER_LED_ACCEPTABLE: a developer/applicant-led situation does not
+#     disqualify this buyer's interest.
+#   - THIRD_PARTY_INTEREST_ACCEPTABLE: evidence of a third-party ownership
+#     interest (e.g. a Certificate B declaration) does not disqualify.
+#   - UNRESOLVED_OWNERSHIP_INVESTIGATABLE: genuinely unknown/unresolved
+#     ownership is worth investigating rather than an automatic pass.
+#   - PARTIAL_SITE_CONTROL_ACCEPTABLE: this buyer's own acquisition type
+#     does not require controlling the whole site (e.g. an affordable-
+#     package or completed-homes acquisition).
+# An empty set means no appetite has been stated - never treated as "any
+# situation is acceptable" once this is wired into matching (Phase B2).
+DEVELOPER_LED_ACCEPTABLE = "DEVELOPER_LED_ACCEPTABLE"
+THIRD_PARTY_INTEREST_ACCEPTABLE = "THIRD_PARTY_INTEREST_ACCEPTABLE"
+UNRESOLVED_OWNERSHIP_INVESTIGATABLE = "UNRESOLVED_OWNERSHIP_INVESTIGATABLE"
+PARTIAL_SITE_CONTROL_ACCEPTABLE = "PARTIAL_SITE_CONTROL_ACCEPTABLE"
+CONTROL_APPETITES = frozenset({
+    DEVELOPER_LED_ACCEPTABLE, THIRD_PARTY_INTEREST_ACCEPTABLE, UNRESOLVED_OWNERSHIP_INVESTIGATABLE,
+    PARTIAL_SITE_CONTROL_ACCEPTABLE,
+})
+
+
+def _require_membership(values: frozenset[str], allowed: frozenset[str], *, field_name: str) -> None:
+    invalid = values - allowed
+    if invalid:
+        raise ValueError(f"{field_name} contains unrecognised value(s): {sorted(invalid)} (allowed: {sorted(allowed)})")
+
 
 @dataclass(frozen=True)
 class BuyerMandatePolicy:
@@ -189,6 +335,30 @@ class BuyerMandatePolicy:
     # an oversight; see this profile's own notes.
     below_minimum_scale_is_exclusion: bool
     notes: str
+    # --- Buyer Mandate V2, Phase B1 fields (Sections A-D above) - NOT read
+    # by app.policy.buyer_matching.assess_buyer_fit yet (Phase B2). Present
+    # here, fingerprinted, seeded, migrated and tested for their final
+    # persisted shape ahead of that activation.
+    geography_scope: str = GEOGRAPHY_UNSPECIFIED
+    geography_councils: frozenset[str] = field(default_factory=frozenset)
+    acquisition_types: frozenset[str] = field(default_factory=frozenset)
+    development_state_appetite: str = DEVELOPMENT_STATE_UNSPECIFIED
+    control_appetite: frozenset[str] = field(default_factory=frozenset)
+
+    def __post_init__(self) -> None:
+        if self.geography_scope not in GEOGRAPHY_SCOPES:
+            raise ValueError(f"geography_scope {self.geography_scope!r} is not one of {sorted(GEOGRAPHY_SCOPES)}")
+        if self.geography_scope == GEOGRAPHY_COUNCILS and not self.geography_councils:
+            raise ValueError("geography_scope=COUNCILS requires at least one council code in geography_councils")
+        if self.geography_scope != GEOGRAPHY_COUNCILS and self.geography_councils:
+            raise ValueError("geography_councils must be empty unless geography_scope=COUNCILS")
+        _require_membership(self.acquisition_types, ACQUISITION_TYPES, field_name="acquisition_types")
+        if self.development_state_appetite not in DEVELOPMENT_STATE_APPETITES:
+            raise ValueError(
+                f"development_state_appetite {self.development_state_appetite!r} is not one of "
+                f"{sorted(DEVELOPMENT_STATE_APPETITES)}"
+            )
+        _require_membership(self.control_appetite, CONTROL_APPETITES, field_name="control_appetite")
 
 
 NESTEN_HOMES = BuyerMandatePolicy(
@@ -211,6 +381,27 @@ NESTEN_HOMES = BuyerMandatePolicy(
         "does not restrict Nesten to adopted-only allocations. No affordable-percentage threshold below "
         "100% is implemented (brief: \"do NOT invent an affordable-percentage threshold below 100%\")."
     ),
+    # Phase B1 defaults - structural only, NOT yet read by assess_buyer_fit.
+    # Geography: the original brief never stated any geographic restriction
+    # at all - ALL_CURRENT_COVERAGE is the honest translation of "no
+    # restriction stated" into the new field, never a fabricated council
+    # list.
+    geography_scope=GEOGRAPHY_ALL_CURRENT_COVERAGE,
+    geography_councils=frozenset(),
+    # Acquisition type: the brief's own primary_requirement ("Residential
+    # development land") is a land/site acquisition, not a strategic-land-
+    # control or affordable-package strategy.
+    acquisition_types=frozenset({LAND_SITE_ACQUISITION}),
+    # Development-state appetite: not stated verbatim in the original
+    # brief, but the Phase B1 brief itself records "Land buyer: uncommenced
+    # tends to be more relevant" as established product direction, and
+    # Nesten's own brief is unambiguously a land/site buyer - extrapolated,
+    # not verbatim, and documented as such.
+    development_state_appetite=UNCOMMENCED_PREFERRED,
+    # Control appetite: the Phase B1 brief's own explicit example for this
+    # buyer ("ownership/control uncertainty may still justify investigation
+    # rather than automatic rejection").
+    control_appetite=frozenset({UNRESOLVED_OWNERSHIP_INVESTIGATABLE}),
 )
 
 STRATEGIC_LAND_BUYER = BuyerMandatePolicy(
@@ -234,6 +425,22 @@ STRATEGIC_LAND_BUYER = BuyerMandatePolicy(
         "opportunity, never a hard exclusion - the brief never asked for permission-granted sites to be "
         "excluded, only that they aren't this buyer's stated focus."
     ),
+    # Phase B1 defaults - structural only, NOT yet read by assess_buyer_fit.
+    geography_scope=GEOGRAPHY_ALL_CURRENT_COVERAGE,
+    geography_councils=frozenset(),
+    acquisition_types=frozenset({STRATEGIC_LAND_CONTROL}),
+    # Development-state appetite: this buyer's own EXISTING
+    # treats_no_activity_as_positive=True flag already states, in effect,
+    # exactly this ("no development activity can be positive context") -
+    # the most directly-evidenced default of any of the four mandates,
+    # not an extrapolation.
+    development_state_appetite=UNCOMMENCED_PREFERRED,
+    # Control appetite: the Phase B1 brief's own explicit example
+    # ("ownership may be unknown early and should not automatically
+    # exclude the opportunity") - also consistent with this buyer's own
+    # existing large_allocation_is_self_qualifying appetite for accepting
+    # uncertainty other buyers would treat as an open question.
+    control_appetite=frozenset({UNRESOLVED_OWNERSHIP_INVESTIGATABLE}),
 )
 
 NATIONAL_HOUSEBUILDER = BuyerMandatePolicy(
@@ -257,6 +464,24 @@ NATIONAL_HOUSEBUILDER = BuyerMandatePolicy(
         "never invented as a match) since the brief does not give National Housebuilder the same "
         "large-allocation-is-self-qualifying appetite it explicitly gives Strategic Land Buyer."
     ),
+    # Phase B1 defaults - structural only, NOT yet read by assess_buyer_fit.
+    geography_scope=GEOGRAPHY_ALL_CURRENT_COVERAGE,
+    geography_councils=frozenset(),
+    # Acquisition type: brief's own primary_requirement ("Large residential
+    # housing sites capable of meaningful delivery scale") is a land/site
+    # acquisition, same as Nesten - not a completed-homes/forward-purchase
+    # strategy, which this buyer's brief never mentions.
+    acquisition_types=frozenset({LAND_SITE_ACQUISITION}),
+    # Development-state appetite: extrapolated from the same "land buyer"
+    # product direction as Nesten (Phase B1 brief) - this buyer is also
+    # unambiguously a land/site buyer, not verbatim in its own brief.
+    development_state_appetite=UNCOMMENCED_PREFERRED,
+    # Control appetite: the Phase B1 brief's own explicit instruction for
+    # this buyer is "do not invent assumptions beyond existing brief" -
+    # its own brief never discussed ownership/control appetite at all,
+    # unlike the other three, so this is left genuinely unconfigured
+    # (empty), never guessed at.
+    control_appetite=frozenset(),
 )
 
 HOUSING_ASSOCIATION = BuyerMandatePolicy(
@@ -319,6 +544,22 @@ HOUSING_ASSOCIATION = BuyerMandatePolicy(
         "percentages to allocation capacity\") - Housing Association fit for a Local Plan allocation is "
         "therefore INSUFFICIENT_EVIDENCE by design, not a gap in this implementation."
     ),
+    # Phase B1 defaults - structural only, NOT yet read by assess_buyer_fit.
+    geography_scope=GEOGRAPHY_ALL_CURRENT_COVERAGE,
+    geography_councils=frozenset(),
+    # Acquisition type: brief's own primary_requirement ("Affordable
+    # residential housing opportunities") is unambiguously an affordable-
+    # package acquisition, not a land/site or strategic-land strategy.
+    acquisition_types=frozenset({AFFORDABLE_HOUSING_PACKAGE}),
+    # Development-state appetite: the Phase B1 brief's own explicit example
+    # for this buyer ("HA: underway may remain acceptable") - ACCEPTABLE,
+    # not PREFERRED, since no evidence states underway is actually
+    # preferred, only that it does not disqualify.
+    development_state_appetite=UNDERWAY_ACCEPTABLE,
+    # Control appetite: the Phase B1 brief's own explicit example
+    # ("developer-led control is clearly not inherently disqualifying
+    # because the acquisition may concern the affordable package").
+    control_appetite=frozenset({DEVELOPER_LED_ACCEPTABLE}),
 )
 
 BUYER_PROFILES: dict[str, BuyerMandatePolicy] = {
