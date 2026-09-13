@@ -1,6 +1,13 @@
-"""Gate 1 (Acquisition Monitoring Substrate) - tests for app.policy.
-buyer_profile_store: Workspace bootstrap, persistent BuyerProfile seeding,
-the matching-relevant fingerprint, and the onboarding baseline.
+"""Buyer Mandate V2, Phase A (Buyer/Mandate Domain Separation) - tests for
+app.policy.buyer_profile_store: Workspace bootstrap, persistent Buyer +
+BuyerMandate seeding, the matching-relevant fingerprint (now scoped to the
+mandate, not the buyer's own identity), the onboarding baseline, and the
+one-time legacy BuyerProfile -> Buyer/BuyerMandate migration.
+
+Every pre-existing Gate 1 behavioural guarantee this file used to assert
+against a single BuyerProfile row is preserved here against the split
+Buyer + BuyerMandate pair - see each test's own docstring for what,
+specifically, is now proven at the mandate level vs the buyer level.
 """
 from __future__ import annotations
 
@@ -8,21 +15,30 @@ import datetime as dt
 
 from sqlalchemy import select
 
-from app.db.models import Application, BuyerProfile as BuyerProfileRecord, LocalPlan, LocalPlanSite, SchemeIntelligence, Site, Workspace
+from app.db.models import Application, Buyer, BuyerMandate, LocalPlan, LocalPlanSite, SchemeIntelligence, Site, Workspace
+from app.db.models import BuyerProfile as LegacyBuyerProfile
 from app.policy.buyer_matching import INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit, build_planning_delivery_matching_facts
 from app.policy.buyer_profiles import BUYER_PROFILE_ORDER, BUYER_PROFILES, NATIONAL_HOUSEBUILDER, NESTEN_HOMES
 from app.policy.buyer_profile_store import (
+    DEFAULT_MANDATE_KEY,
     bootstrap_acquisition_monitoring,
-    compute_buyer_profile_fingerprint,
+    compute_buyer_mandate_fingerprint,
     get_buyer_profile_dataclass,
-    is_buyer_profile_baseline_stale,
+    is_buyer_mandate_baseline_stale,
     list_active_buyer_options,
-    record_to_dataclass,
+    mandate_to_policy,
+    migrate_buyer_profiles_to_mandates,
     resolve_default_workspace,
     run_buyer_onboarding_baseline,
     seed_default_buyer_profiles,
 )
 from app.reporting.opportunity_change import sync_opportunity_monitoring_state
+
+
+def _mandate_for(session, buyer_key: str) -> BuyerMandate:
+    return session.execute(
+        select(BuyerMandate).join(Buyer, BuyerMandate.buyer_id == Buyer.id).where(Buyer.buyer_key == buyer_key)
+    ).scalars().first()
 
 
 # --- Workspace --------------------------------------------------------------
@@ -41,61 +57,83 @@ def test_resolve_default_workspace_is_idempotent(session):
     assert len(session.execute(select(Workspace)).scalars().all()) == 1
 
 
-# --- BuyerProfile seeding ----------------------------------------------------
+# --- Buyer + BuyerMandate seeding --------------------------------------------
 
-def test_seed_default_buyer_profiles_creates_exactly_four(session):
+def test_seed_default_buyer_profiles_creates_exactly_four_buyers_and_mandates(session):
     workspace = resolve_default_workspace(session)
-    records = seed_default_buyer_profiles(session, workspace)
-    assert len(records) == 4
-    assert {r.profile_key for r in records} == set(BUYER_PROFILE_ORDER)
-    assert all(r.workspace_id == workspace.id for r in records)
+    mandates = seed_default_buyer_profiles(session, workspace)
+    assert len(mandates) == 4
+    assert {m.mandate_key for m in mandates} == {DEFAULT_MANDATE_KEY}
+    buyers = session.execute(select(Buyer).where(Buyer.workspace_id == workspace.id)).scalars().all()
+    assert {b.buyer_key for b in buyers} == set(BUYER_PROFILE_ORDER)
+    assert all(m.buyer.workspace_id == workspace.id for m in mandates)
 
 
 def test_seeding_is_idempotent_and_never_duplicates(session):
     workspace = resolve_default_workspace(session)
     seed_default_buyer_profiles(session, workspace)
     seed_default_buyer_profiles(session, workspace)
-    all_records = session.execute(select(BuyerProfileRecord).where(BuyerProfileRecord.workspace_id == workspace.id)).scalars().all()
-    assert len(all_records) == 4
+    buyers = session.execute(select(Buyer).where(Buyer.workspace_id == workspace.id)).scalars().all()
+    mandates = session.execute(select(BuyerMandate)).scalars().all()
+    assert len(buyers) == 4
+    assert len(mandates) == 4
 
 
 def test_seeding_never_overwrites_an_already_edited_value(session):
     workspace = resolve_default_workspace(session)
     seed_default_buyer_profiles(session, workspace)
-    nesten = session.execute(select(BuyerProfileRecord).where(BuyerProfileRecord.profile_key == "nesten_homes")).scalars().first()
+    nesten = _mandate_for(session, "nesten_homes")
     nesten.target_unit_max = 150  # simulate a user edit
     session.commit()
 
     seed_default_buyer_profiles(session, workspace)  # rerun - must not clobber the edit
 
-    reloaded = session.execute(select(BuyerProfileRecord).where(BuyerProfileRecord.profile_key == "nesten_homes")).scalars().first()
+    reloaded = _mandate_for(session, "nesten_homes")
     assert reloaded.target_unit_max == 150
+
+
+def test_seeding_never_overwrites_an_edited_buyer_identity_field(session):
+    """Phase A's own new guarantee: editing the BUYER's identity (e.g. a
+    display-name correction) must be just as durable across a reseed as
+    editing the mandate's own strategy already was."""
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)
+    buyer = session.execute(select(Buyer).where(Buyer.buyer_key == "nesten_homes")).scalars().first()
+    buyer.display_name = "Nesten Homes Ltd"
+    session.commit()
+
+    seed_default_buyer_profiles(session, workspace)
+
+    reloaded = session.execute(select(Buyer).where(Buyer.buyer_key == "nesten_homes")).scalars().first()
+    assert reloaded.display_name == "Nesten Homes Ltd"
 
 
 def test_seeded_fields_match_the_code_template_exactly(session):
     workspace = resolve_default_workspace(session)
     seed_default_buyer_profiles(session, workspace)
-    record = session.execute(select(BuyerProfileRecord).where(BuyerProfileRecord.profile_key == "nesten_homes")).scalars().first()
+    buyer = session.execute(select(Buyer).where(Buyer.buyer_key == "nesten_homes")).scalars().first()
+    mandate = _mandate_for(session, "nesten_homes")
 
-    assert record.display_name == NESTEN_HOMES.display_name
-    assert record.target_unit_min == NESTEN_HOMES.target_unit_min
-    assert record.target_unit_max == NESTEN_HOMES.target_unit_max
-    assert record.scale_metric == NESTEN_HOMES.scale_metric
-    assert set(record.accepted_planning_states.split(",")) == set(NESTEN_HOMES.accepted_planning_states)
-    assert record.specialist_development_is_exclusion == NESTEN_HOMES.specialist_development_is_exclusion
-    assert record.wholly_affordable_is_exclusion == NESTEN_HOMES.wholly_affordable_is_exclusion
-    assert record.below_minimum_scale_is_exclusion == NESTEN_HOMES.below_minimum_scale_is_exclusion
-    assert record.source_template_key == "nesten_homes"
+    assert buyer.display_name == NESTEN_HOMES.display_name
+    assert buyer.buyer_type == NESTEN_HOMES.buyer_type
+    assert mandate.target_unit_min == NESTEN_HOMES.target_unit_min
+    assert mandate.target_unit_max == NESTEN_HOMES.target_unit_max
+    assert mandate.scale_metric == NESTEN_HOMES.scale_metric
+    assert set(mandate.accepted_planning_states.split(",")) == set(NESTEN_HOMES.accepted_planning_states)
+    assert mandate.specialist_development_is_exclusion == NESTEN_HOMES.specialist_development_is_exclusion
+    assert mandate.wholly_affordable_is_exclusion == NESTEN_HOMES.wholly_affordable_is_exclusion
+    assert mandate.below_minimum_scale_is_exclusion == NESTEN_HOMES.below_minimum_scale_is_exclusion
+    assert mandate.source_template_key == "nesten_homes"
+    assert mandate.mandate_key == DEFAULT_MANDATE_KEY
 
 
 # --- Record <-> dataclass round-trip / deterministic matching preserved ----
 
-def test_record_to_dataclass_round_trip_preserves_every_matching_field():
-    from app.policy.buyer_profile_store import _template_to_record_fields
-
-    fields = _template_to_record_fields(NATIONAL_HOUSEBUILDER, workspace_id=1)
-    record = BuyerProfileRecord(**fields)
-    rebuilt = record_to_dataclass(record)
+def test_mandate_to_policy_round_trip_preserves_every_matching_field(session):
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "national_housebuilder")
+    rebuilt = mandate_to_policy(mandate)
 
     assert rebuilt.key == NATIONAL_HOUSEBUILDER.key
     assert rebuilt.target_unit_min == NATIONAL_HOUSEBUILDER.target_unit_min
@@ -110,11 +148,12 @@ def test_record_to_dataclass_round_trip_preserves_every_matching_field():
 
 
 def test_deterministic_matching_is_identical_before_and_after_persistence(session):
-    """The core regression guarantee for all four profiles: assess_buyer_
-    fit's own output must not change one bit merely because the profile
-    now comes from a persisted row instead of the in-memory template -
-    Focus School's own real figures, exactly as used in test_buyer_
-    matching.py's own acceptance case."""
+    """The core regression guarantee for all four profiles, preserved
+    exactly across the Buyer/BuyerMandate split: assess_buyer_fit's own
+    output must not change one bit merely because the policy now comes
+    from a persisted Buyer+BuyerMandate pair instead of the in-memory
+    template - Focus School's own real figures, exactly as used in
+    test_buyer_matching.py's own acceptance case."""
     workspace = resolve_default_workspace(session)
     seed_default_buyer_profiles(session, workspace)
 
@@ -133,10 +172,10 @@ def test_deterministic_matching_is_identical_before_and_after_persistence(sessio
     session.commit()
     facts = build_planning_delivery_matching_facts(si)
 
-    for profile_key in BUYER_PROFILE_ORDER:
-        template = BUYER_PROFILES[profile_key]
-        record = session.execute(select(BuyerProfileRecord).where(BuyerProfileRecord.profile_key == profile_key)).scalars().first()
-        persisted = record_to_dataclass(record)
+    for buyer_key in BUYER_PROFILE_ORDER:
+        template = BUYER_PROFILES[buyer_key]
+        mandate = _mandate_for(session, buyer_key)
+        persisted = mandate_to_policy(mandate)
 
         template_result = assess_buyer_fit(template, facts)
         persisted_result = assess_buyer_fit(persisted, facts)
@@ -155,11 +194,11 @@ def test_get_buyer_profile_dataclass_falls_back_to_template_before_bootstrap(ses
     assert profile.target_unit_min == NESTEN_HOMES.target_unit_min
 
 
-def test_get_buyer_profile_dataclass_prefers_the_persisted_row_once_seeded(session):
+def test_get_buyer_profile_dataclass_prefers_the_persisted_mandate_once_seeded(session):
     workspace = resolve_default_workspace(session)
     seed_default_buyer_profiles(session, workspace)
-    record = session.execute(select(BuyerProfileRecord).where(BuyerProfileRecord.profile_key == "nesten_homes")).scalars().first()
-    record.target_unit_max = 999
+    mandate = _mandate_for(session, "nesten_homes")
+    mandate.target_unit_max = 999
     session.commit()
 
     profile = get_buyer_profile_dataclass(session, "nesten_homes")
@@ -178,22 +217,98 @@ def test_list_active_buyer_options_reads_persisted_rows_after_bootstrap(session)
     assert [key for key, _ in options] == list(BUYER_PROFILE_ORDER)
 
 
-# --- Buyer profile fingerprint ----------------------------------------------
+def test_list_active_buyer_options_sorts_by_canonical_order_not_row_creation_order(session):
+    """Regression test for a real bug this Phase A migration produced and
+    caught during its own production verification: the one-time legacy-
+    BuyerProfile backfill reads the legacy table with no ORDER BY, so the
+    NEW Buyer rows' own auto-incrementing ids do not necessarily land in
+    BUYER_PROFILE_ORDER's own sequence. list_active_buyer_options must sort
+    by each buyer_key's own canonical position, never by Buyer.id, so the
+    selector's visible order survives however the rows were actually
+    created. Built here by creating the four Buyers in the REVERSE of
+    BUYER_PROFILE_ORDER on purpose, proving the fix does not merely happen
+    to work when creation order already matches."""
+    workspace = resolve_default_workspace(session)
+    for key in reversed(BUYER_PROFILE_ORDER):
+        template = BUYER_PROFILES[key]
+        buyer = Buyer(workspace_id=workspace.id, buyer_key=key, display_name=template.display_name, buyer_type=template.buyer_type)
+        session.add(buyer)
+        session.flush()
+        session.add(BuyerMandate(
+            buyer_id=buyer.id, mandate_key=DEFAULT_MANDATE_KEY, display_name=template.display_name,
+            primary_requirement=template.primary_requirement, target_unit_min=template.target_unit_min,
+            target_unit_max=template.target_unit_max, scale_metric=template.scale_metric,
+            accepted_planning_states=",".join(sorted(template.accepted_planning_states)),
+            treats_no_activity_as_positive=template.treats_no_activity_as_positive,
+            large_allocation_is_self_qualifying=template.large_allocation_is_self_qualifying,
+            specialist_development_is_exclusion=template.specialist_development_is_exclusion,
+            wholly_affordable_is_exclusion=template.wholly_affordable_is_exclusion,
+            below_minimum_scale_is_exclusion=template.below_minimum_scale_is_exclusion,
+        ))
+    session.commit()
+
+    options = list_active_buyer_options(session)
+    assert [key for key, _ in options] == list(BUYER_PROFILE_ORDER)  # canonical order, NOT reversed creation order
+
+
+# --- Buyer Mandate fingerprint -----------------------------------------------
 
 def test_fingerprint_changes_when_a_matching_field_changes():
     from dataclasses import replace
-    fp_before = compute_buyer_profile_fingerprint(NESTEN_HOMES)
+    fp_before = compute_buyer_mandate_fingerprint(NESTEN_HOMES)
     changed = replace(NESTEN_HOMES, target_unit_max=150)
-    fp_after = compute_buyer_profile_fingerprint(changed)
+    fp_after = compute_buyer_mandate_fingerprint(changed)
     assert fp_before != fp_after
 
 
 def test_fingerprint_unchanged_by_display_only_metadata():
     from dataclasses import replace
-    fp_before = compute_buyer_profile_fingerprint(NESTEN_HOMES)
+    fp_before = compute_buyer_mandate_fingerprint(NESTEN_HOMES)
     changed = replace(NESTEN_HOMES, display_name="Nesten Homes (renamed)", notes="completely different notes text")
-    fp_after = compute_buyer_profile_fingerprint(changed)
+    fp_after = compute_buyer_mandate_fingerprint(changed)
     assert fp_before == fp_after
+
+
+# --- Architecture test (Phase A brief, Section 33): fingerprint is now
+# genuinely mandate-scoped, not buyer-identity-scoped -------------------------
+
+def test_buyer_identity_change_leaves_mandate_fingerprint_unchanged(session):
+    """Proves Section 33's own required property structurally, not just by
+    convention: changing a Buyer's own display_name/buyer_type (its
+    identity) must never move its BuyerMandate's own matching_fingerprint,
+    because the fingerprint function reads only fields declared on
+    BuyerMandate/consumed by assess_buyer_fit - a Buyer's identity fields
+    are never even passed into it except via BuyerMandatePolicy.key/
+    display_name/buyer_type, all three of which compute_buyer_mandate_
+    fingerprint's own field list (see its source) deliberately excludes."""
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
+    run_buyer_onboarding_baseline(session, mandate)
+    fingerprint_before = mandate.matching_fingerprint
+
+    buyer = session.execute(select(Buyer).where(Buyer.buyer_key == "nesten_homes")).scalars().first()
+    buyer.display_name = "Nesten Homes Ltd"
+    buyer.buyer_type = "Renamed regional housebuilder"
+    session.commit()
+
+    assert is_buyer_mandate_baseline_stale(mandate) is False
+    assert compute_buyer_mandate_fingerprint(mandate_to_policy(mandate)) == fingerprint_before
+
+
+def test_mandate_strategy_change_changes_the_fingerprint(session):
+    """The other half of Section 33: a genuine strategy change on the
+    mandate itself must make the baseline stale, exactly as a legacy
+    BuyerProfile edit always did."""
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
+    run_buyer_onboarding_baseline(session, mandate)
+    assert is_buyer_mandate_baseline_stale(mandate) is False
+
+    mandate.target_unit_max = 40  # a genuine mandate change
+    session.commit()
+    assert is_buyer_mandate_baseline_stale(mandate) is True
 
 
 # --- Onboarding baseline -----------------------------------------------------
@@ -222,31 +337,33 @@ def test_onboarding_reviews_the_current_universe_and_produces_counts(session):
         _make_allocation(session, plan.id, site_name=f"Allocation {i}", policy_reference=f"REF-{i}", minimum_dwellings=60 + i * 10)
 
     workspace = resolve_default_workspace(session)
-    [record] = [r for r in seed_default_buyer_profiles(session, workspace) if r.profile_key == "nesten_homes"]
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
 
-    result = run_buyer_onboarding_baseline(session, record)
+    result = run_buyer_onboarding_baseline(session, mandate)
     assert result.opportunities_reviewed >= 3
     assert result.strong_fit + result.not_suitable + result.insufficient_evidence == result.opportunities_reviewed
-    assert record.onboarding_completed_at is not None
-    assert record.matching_fingerprint == compute_buyer_profile_fingerprint(record_to_dataclass(record))
-    assert record.onboarding_summary == result.summary_line
+    assert mandate.onboarding_completed_at is not None
+    assert mandate.matching_fingerprint == compute_buyer_mandate_fingerprint(mandate_to_policy(mandate))
+    assert mandate.onboarding_summary == result.summary_line
     assert "reviewed=" in result.summary_line and "strong_fit=" in result.summary_line
 
 
 def test_onboarding_baseline_is_not_stale_immediately_after_running(session):
     workspace = resolve_default_workspace(session)
-    [record] = [r for r in seed_default_buyer_profiles(session, workspace) if r.profile_key == "nesten_homes"]
-    assert is_buyer_profile_baseline_stale(record) is True  # never onboarded yet
-    run_buyer_onboarding_baseline(session, record)
-    assert is_buyer_profile_baseline_stale(record) is False
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
+    assert is_buyer_mandate_baseline_stale(mandate) is True  # never onboarded yet
+    run_buyer_onboarding_baseline(session, mandate)
+    assert is_buyer_mandate_baseline_stale(mandate) is False
 
 
-def test_profile_change_makes_the_baseline_stale_without_touching_opportunities(session):
-    """Gate 1 brief, Section 19/20: editing a buyer's own mandate must
-    mark ITS OWN baseline stale, and must NEVER cause any global
-    opportunity to be (re)classified NEW - a profile change is a
-    different trigger from a new opportunity, and this module has no
-    mechanism that could even touch OpportunityMonitoringState."""
+def test_mandate_change_makes_the_baseline_stale_without_touching_opportunities(session):
+    """Gate 1 brief, Section 19/20 (unchanged by Phase A): editing a
+    buyer's own mandate must mark ITS OWN baseline stale, and must NEVER
+    cause any global opportunity to be (re)classified NEW - a mandate
+    change is a different trigger from a new opportunity, and this module
+    has no mechanism that could even touch OpportunityMonitoringState."""
     plan = _make_plan(session)
     _make_allocation(session, plan.id, site_name="Untouched Allocation", minimum_dwellings=80)
     sync_opportunity_monitoring_state(session)
@@ -254,27 +371,25 @@ def test_profile_change_makes_the_baseline_stale_without_touching_opportunities(
     states_before = {s.opportunity_id: s.last_change_classification for s in session.execute(select(OpportunityMonitoringState)).scalars()}
 
     workspace = resolve_default_workspace(session)
-    [record] = [r for r in seed_default_buyer_profiles(session, workspace) if r.profile_key == "nesten_homes"]
-    run_buyer_onboarding_baseline(session, record)
-    assert is_buyer_profile_baseline_stale(record) is False
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
+    run_buyer_onboarding_baseline(session, mandate)
+    assert is_buyer_mandate_baseline_stale(mandate) is False
 
-    record.target_unit_max = 40  # a genuine mandate change
+    mandate.target_unit_max = 40  # a genuine mandate change
     session.commit()
-    assert is_buyer_profile_baseline_stale(record) is True
+    assert is_buyer_mandate_baseline_stale(mandate) is True
 
-    # Global opportunity state is completely untouched by the profile edit.
+    # Global opportunity state is completely untouched by the mandate edit.
     states_after = {s.opportunity_id: s.last_change_classification for s in session.execute(select(OpportunityMonitoringState)).scalars()}
     assert states_before == states_after
 
 
 def test_new_buyer_does_not_report_existing_opportunities_as_new(session):
-    """Required acceptance scenario E: existing opportunities must be
-    HISTORICAL baseline for a newly onboarded buyer, never later reported
-    as newly discovered merely because monitoring has just started.
-    Proven two ways: the definitive persisted signal (last_change_
-    classification == BASELINE_EXISTING, never NEW) from the very first
-    sync, and the timestamp-based query Gate 2's own future "what's new
-    for this buyer" step will use as a secondary check."""
+    """Required acceptance scenario E (unchanged by Phase A): existing
+    opportunities must be HISTORICAL baseline for a newly onboarded
+    mandate, never later reported as newly discovered merely because
+    monitoring has just started."""
     from app.db.models import OpportunityMonitoringState
     from app.reporting.opportunity_change import BASELINE_EXISTING, NEW
 
@@ -289,11 +404,12 @@ def test_new_buyer_does_not_report_existing_opportunities_as_new(session):
     assert not any(s.last_change_classification == NEW for s in states)
 
     workspace = resolve_default_workspace(session)
-    [record] = [r for r in seed_default_buyer_profiles(session, workspace) if r.profile_key == "nesten_homes"]
-    run_buyer_onboarding_baseline(session, record)
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
+    run_buyer_onboarding_baseline(session, mandate)
 
     new_for_buyer = session.execute(
-        select(OpportunityMonitoringState).where(OpportunityMonitoringState.first_seen_at > record.onboarding_completed_at)
+        select(OpportunityMonitoringState).where(OpportunityMonitoringState.first_seen_at > mandate.onboarding_completed_at)
     ).scalars().all()
     assert new_for_buyer == []  # nothing pre-existing is "new for this buyer"
 
@@ -325,32 +441,278 @@ def test_bootstrap_is_idempotent_end_to_end(session):
     assert second["global_opportunity_baseline"]["materially_changed"] == 0
     assert second["profiles_total"] == 4
     assert len(session.execute(select(Workspace)).scalars().all()) == 1
-    assert len(session.execute(select(BuyerProfileRecord)).scalars().all()) == 4
+    assert len(session.execute(select(Buyer)).scalars().all()) == 4
+    assert len(session.execute(select(BuyerMandate)).scalars().all()) == 4
 
 
 def test_a_fifth_buyer_added_later_also_treats_existing_opportunities_as_baseline(session):
     """Scenario E via the real deployment entry point: after first
     deployment has already run (existing opportunities baselined, four
-    profiles onboarded), a fifth Buyer Profile seeded afterward must still
-    review the SAME pre-existing opportunities as historical onboarding
-    context, never as newly discovered - proven by re-running bootstrap
-    after adding a fifth profile row directly."""
+    buyers onboarded), a fifth Buyer + BuyerMandate seeded afterward must
+    still review the SAME pre-existing opportunities as historical
+    onboarding context, never as newly discovered."""
     plan = _make_plan(session)
     _make_allocation(session, plan.id, site_name="Pre-existing For Fifth Buyer", minimum_dwellings=90)
     bootstrap_acquisition_monitoring(session)  # first deployment - baselines everything, onboards the four pilots
 
     workspace = resolve_default_workspace(session)
-    from app.policy.buyer_profiles import NESTEN_HOMES
-    from app.policy.buyer_profile_store import _template_to_record_fields
-    fifth = BuyerProfileRecord(**_template_to_record_fields(NESTEN_HOMES, workspace.id))
-    fifth.profile_key = "fifth_pilot_buyer"
-    fifth.display_name = "Fifth Pilot Buyer"
-    session.add(fifth)
+    fifth_buyer = Buyer(workspace_id=workspace.id, buyer_key="fifth_pilot_buyer", display_name="Fifth Pilot Buyer", buyer_type=NESTEN_HOMES.buyer_type)
+    session.add(fifth_buyer)
+    session.flush()
+    fifth_mandate = BuyerMandate(
+        buyer_id=fifth_buyer.id, mandate_key=DEFAULT_MANDATE_KEY, display_name="Fifth Pilot Buyer",
+        primary_requirement=NESTEN_HOMES.primary_requirement, target_unit_min=NESTEN_HOMES.target_unit_min,
+        target_unit_max=NESTEN_HOMES.target_unit_max, scale_metric=NESTEN_HOMES.scale_metric,
+        accepted_planning_states=",".join(sorted(NESTEN_HOMES.accepted_planning_states)),
+        treats_no_activity_as_positive=NESTEN_HOMES.treats_no_activity_as_positive,
+        large_allocation_is_self_qualifying=NESTEN_HOMES.large_allocation_is_self_qualifying,
+        specialist_development_is_exclusion=NESTEN_HOMES.specialist_development_is_exclusion,
+        wholly_affordable_is_exclusion=NESTEN_HOMES.wholly_affordable_is_exclusion,
+        below_minimum_scale_is_exclusion=NESTEN_HOMES.below_minimum_scale_is_exclusion,
+    )
+    session.add(fifth_mandate)
     session.commit()
-    assert is_buyer_profile_baseline_stale(fifth) is True
+    assert is_buyer_mandate_baseline_stale(fifth_mandate) is True
 
     result = bootstrap_acquisition_monitoring(session)
     assert "fifth_pilot_buyer" in result["profiles_onboarded_this_run"]
     assert result["global_opportunity_baseline"]["new"] == 0  # the pre-existing opportunity is still not "new"
-    assert fifth.onboarding_completed_at is not None
-    assert fifth.onboarding_summary is not None and "reviewed=" in fifth.onboarding_summary
+    assert fifth_mandate.onboarding_completed_at is not None
+    assert fifth_mandate.onboarding_summary is not None and "reviewed=" in fifth_mandate.onboarding_summary
+
+
+# --- Architecture test (Phase A brief, Section 31): one Buyer, two mandates --
+
+def test_one_buyer_can_own_two_mandates(session):
+    """Structural proof the schema allows what the legacy BuyerProfile
+    row (profile_key unique per workspace) never could: a single Buyer
+    owning more than one BuyerMandate, each independently identified and
+    independently matchable, without duplicating the buyer's own identity
+    fields. Phase B fields (geography, acquisition type, ...) are
+    deliberately NOT introduced here - both mandates use only fields that
+    already exist today, differing only in unit range, exactly as the
+    Phase A brief's own example (GM_CONSENTED_50_100 vs CHESHIRE_
+    STRATEGIC_100_250) describes conceptually."""
+    workspace = resolve_default_workspace(session)
+    buyer = Buyer(workspace_id=workspace.id, buyer_key="nesten_homes_test", display_name="Nesten Homes", buyer_type=NESTEN_HOMES.buyer_type)
+    session.add(buyer)
+    session.flush()
+
+    mandate_a = BuyerMandate(
+        buyer_id=buyer.id, mandate_key="gm_consented_50_100", display_name="GM Consented 50-100",
+        primary_requirement=NESTEN_HOMES.primary_requirement, target_unit_min=50, target_unit_max=100,
+        scale_metric=NESTEN_HOMES.scale_metric, accepted_planning_states=",".join(sorted(NESTEN_HOMES.accepted_planning_states)),
+        treats_no_activity_as_positive=False, large_allocation_is_self_qualifying=False,
+        specialist_development_is_exclusion=True, wholly_affordable_is_exclusion=True, below_minimum_scale_is_exclusion=False,
+    )
+    mandate_b = BuyerMandate(
+        buyer_id=buyer.id, mandate_key="cheshire_strategic_100_250", display_name="Cheshire Strategic 100-250",
+        primary_requirement="Large residential strategic-land opportunities", target_unit_min=100, target_unit_max=250,
+        scale_metric=NESTEN_HOMES.scale_metric, accepted_planning_states=",".join(sorted(["adopted_allocation", "emerging_allocation"])),
+        treats_no_activity_as_positive=True, large_allocation_is_self_qualifying=True,
+        specialist_development_is_exclusion=True, wholly_affordable_is_exclusion=True, below_minimum_scale_is_exclusion=False,
+    )
+    session.add_all([mandate_a, mandate_b])
+    session.commit()  # must not raise - both share buyer_id, mandate_key differs
+
+    reloaded = session.execute(select(BuyerMandate).where(BuyerMandate.buyer_id == buyer.id)).scalars().all()
+    assert {m.mandate_key for m in reloaded} == {"gm_consented_50_100", "cheshire_strategic_100_250"}
+    assert all(m.buyer_id == buyer.id for m in reloaded)
+
+    # Independently matchable - policy A's own range excludes a 150-unit
+    # scheme that policy B's own range happily includes.
+    policy_a, policy_b = mandate_to_policy(mandate_a), mandate_to_policy(mandate_b)
+    assert policy_a.target_unit_max == 100
+    assert policy_b.target_unit_max == 250
+
+
+def test_duplicate_mandate_key_within_the_same_buyer_is_rejected(session):
+    """The uniqueness constraint's own other half: mandate_key must still
+    be unique WITHIN one buyer - this is not an unconstrained free-for-all,
+    only no longer constrained at the workspace level."""
+    from sqlalchemy.exc import IntegrityError
+
+    workspace = resolve_default_workspace(session)
+    buyer = Buyer(workspace_id=workspace.id, buyer_key="dup_test_buyer", display_name="Dup Test Buyer", buyer_type="Test")
+    session.add(buyer)
+    session.flush()
+    session.add(BuyerMandate(
+        buyer_id=buyer.id, mandate_key=DEFAULT_MANDATE_KEY, display_name="A", primary_requirement="x",
+        target_unit_min=1, target_unit_max=2, scale_metric="total_units", accepted_planning_states="",
+        treats_no_activity_as_positive=False, large_allocation_is_self_qualifying=False,
+        specialist_development_is_exclusion=True, wholly_affordable_is_exclusion=True, below_minimum_scale_is_exclusion=False,
+    ))
+    session.commit()
+
+    session.add(BuyerMandate(
+        buyer_id=buyer.id, mandate_key=DEFAULT_MANDATE_KEY, display_name="B", primary_requirement="y",
+        target_unit_min=3, target_unit_max=4, scale_metric="total_units", accepted_planning_states="",
+        treats_no_activity_as_positive=False, large_allocation_is_self_qualifying=False,
+        specialist_development_is_exclusion=True, wholly_affordable_is_exclusion=True, below_minimum_scale_is_exclusion=False,
+    ))
+    try:
+        session.commit()
+        assert False, "expected an IntegrityError for a duplicate (buyer_id, mandate_key)"
+    except IntegrityError:
+        session.rollback()
+
+
+# --- Architecture test (Phase A brief, Section 32): workspace isolation -----
+
+def test_equivalent_buyer_and_mandate_keys_coexist_across_workspaces(session):
+    """Workspace A and Workspace B may each have their own "nesten_homes"
+    Buyer with its own "default" BuyerMandate, entirely independently -
+    Buyer.buyer_key is unique per WORKSPACE, and BuyerMandate.mandate_key
+    is unique per BUYER, so two different buyer rows (even sharing the
+    identical key string, in different workspaces) never collide."""
+    ws_a = Workspace(name="Workspace A", status="active")
+    ws_b = Workspace(name="Workspace B", status="active")
+    session.add_all([ws_a, ws_b])
+    session.flush()
+
+    buyer_a = Buyer(workspace_id=ws_a.id, buyer_key="nesten_homes", display_name="Nesten Homes (A)", buyer_type=NESTEN_HOMES.buyer_type)
+    buyer_b = Buyer(workspace_id=ws_b.id, buyer_key="nesten_homes", display_name="Nesten Homes (B)", buyer_type=NESTEN_HOMES.buyer_type)
+    session.add_all([buyer_a, buyer_b])
+    session.flush()
+
+    mandate_a = BuyerMandate(
+        buyer_id=buyer_a.id, mandate_key=DEFAULT_MANDATE_KEY, display_name="Nesten Homes (A)", primary_requirement="x",
+        target_unit_min=50, target_unit_max=100, scale_metric="total_units", accepted_planning_states="",
+        treats_no_activity_as_positive=False, large_allocation_is_self_qualifying=False,
+        specialist_development_is_exclusion=True, wholly_affordable_is_exclusion=True, below_minimum_scale_is_exclusion=False,
+    )
+    mandate_b = BuyerMandate(
+        buyer_id=buyer_b.id, mandate_key=DEFAULT_MANDATE_KEY, display_name="Nesten Homes (B)", primary_requirement="y",
+        target_unit_min=200, target_unit_max=500, scale_metric="total_units", accepted_planning_states="",
+        treats_no_activity_as_positive=False, large_allocation_is_self_qualifying=False,
+        specialist_development_is_exclusion=True, wholly_affordable_is_exclusion=True, below_minimum_scale_is_exclusion=False,
+    )
+    session.add_all([mandate_a, mandate_b])
+    session.commit()  # must not raise
+
+    assert session.execute(select(Buyer).where(Buyer.workspace_id == ws_a.id)).scalars().all() == [buyer_a]
+    assert session.execute(select(Buyer).where(Buyer.workspace_id == ws_b.id)).scalars().all() == [buyer_b]
+    assert mandate_to_policy(mandate_a).target_unit_max == 100
+    assert mandate_to_policy(mandate_b).target_unit_max == 500
+
+
+def test_duplicate_buyer_key_within_the_same_workspace_is_rejected(session):
+    from sqlalchemy.exc import IntegrityError
+
+    workspace = resolve_default_workspace(session)
+    session.add(Buyer(workspace_id=workspace.id, buyer_key="dup_buyer", display_name="A", buyer_type="Test"))
+    session.commit()
+    session.add(Buyer(workspace_id=workspace.id, buyer_key="dup_buyer", display_name="B", buyer_type="Test"))
+    try:
+        session.commit()
+        assert False, "expected an IntegrityError for a duplicate (workspace_id, buyer_key)"
+    except IntegrityError:
+        session.rollback()
+
+
+# --- Legacy BuyerProfile -> Buyer/BuyerMandate migration ---------------------
+
+def _make_legacy_profile(session, workspace_id: int, key: str, **overrides) -> LegacyBuyerProfile:
+    template = BUYER_PROFILES[key]
+    fields = dict(
+        workspace_id=workspace_id, profile_key=key, display_name=template.display_name, buyer_type=template.buyer_type,
+        primary_requirement=template.primary_requirement, target_unit_min=template.target_unit_min,
+        target_unit_max=template.target_unit_max, scale_metric=template.scale_metric,
+        accepted_planning_states=",".join(sorted(template.accepted_planning_states)),
+        treats_no_activity_as_positive=template.treats_no_activity_as_positive,
+        large_allocation_is_self_qualifying=template.large_allocation_is_self_qualifying,
+        specialist_development_is_exclusion=template.specialist_development_is_exclusion,
+        wholly_affordable_is_exclusion=template.wholly_affordable_is_exclusion,
+        below_minimum_scale_is_exclusion=template.below_minimum_scale_is_exclusion,
+        notes=template.notes, source_template_key=key,
+    )
+    fields.update(overrides)
+    record = LegacyBuyerProfile(**fields)
+    session.add(record)
+    session.commit()
+    return record
+
+
+def test_migration_dry_run_makes_zero_database_changes(session):
+    workspace = resolve_default_workspace(session)
+    _make_legacy_profile(session, workspace.id, "nesten_homes")
+
+    report = migrate_buyer_profiles_to_mandates(session, dry_run=True)
+
+    assert report["dry_run"] is True
+    assert report["legacy_rows_found"] == 1
+    assert report["buyers_created"] == 1
+    assert report["mandates_created"] == 1
+    assert session.execute(select(Buyer)).scalars().all() == []
+    assert session.execute(select(BuyerMandate)).scalars().all() == []
+
+
+def test_migration_execute_creates_a_buyer_and_mandate_per_legacy_row(session):
+    workspace = resolve_default_workspace(session)
+    for key in BUYER_PROFILE_ORDER:
+        _make_legacy_profile(session, workspace.id, key)
+
+    report = migrate_buyer_profiles_to_mandates(session, dry_run=False)
+
+    assert report["dry_run"] is False
+    assert report["legacy_rows_found"] == 4
+    assert report["buyers_created"] == 4
+    assert report["mandates_created"] == 4
+    assert report["fingerprint_mismatches"] == []
+    assert len(session.execute(select(Buyer)).scalars().all()) == 4
+    assert len(session.execute(select(BuyerMandate)).scalars().all()) == 4
+    # Legacy rows are completely untouched.
+    assert len(session.execute(select(LegacyBuyerProfile)).scalars().all()) == 4
+
+
+def test_migration_is_idempotent(session):
+    workspace = resolve_default_workspace(session)
+    _make_legacy_profile(session, workspace.id, "nesten_homes")
+
+    first = migrate_buyer_profiles_to_mandates(session, dry_run=False)
+    second = migrate_buyer_profiles_to_mandates(session, dry_run=False)
+
+    assert first["buyers_created"] == 1 and first["mandates_created"] == 1
+    assert second["buyers_created"] == 0 and second["mandates_created"] == 0
+    assert second["buyers_already_present"] == 1 and second["mandates_already_present"] == 1
+    assert len(session.execute(select(Buyer)).scalars().all()) == 1
+    assert len(session.execute(select(BuyerMandate)).scalars().all()) == 1
+
+
+def test_migration_does_not_hardcode_exactly_four_rows(session):
+    """Phase A brief, Section 13: 'Do NOT hard-code the migration to
+    exactly four rows if production data could contain more.' Proven with
+    five legacy rows (the four templates plus one extra, hand-built like a
+    genuinely-onboarded fifth buyer would be)."""
+    workspace = resolve_default_workspace(session)
+    for key in BUYER_PROFILE_ORDER:
+        _make_legacy_profile(session, workspace.id, key)
+    _make_legacy_profile(session, workspace.id, "nesten_homes", profile_key="fifth_pilot_buyer", display_name="Fifth Pilot Buyer")
+
+    report = migrate_buyer_profiles_to_mandates(session, dry_run=False)
+
+    assert report["legacy_rows_found"] == 5
+    assert report["buyers_created"] == 5
+    assert report["mandates_created"] == 5
+
+
+def test_migration_preserves_onboarding_state_and_recomputes_a_matching_fingerprint(session):
+    workspace = resolve_default_workspace(session)
+    onboarded_at = dt.datetime(2026, 9, 7, 19, 11, 42, tzinfo=dt.timezone.utc)
+    legacy = _make_legacy_profile(
+        session, workspace.id, "housing_association",
+        onboarding_completed_at=onboarded_at, onboarding_summary="reviewed=255 strong_fit=1 not_suitable=16 insufficient_evidence=238 investigative_exceptions=0",
+    )
+    # A fingerprint computed the OLD way, over the exact same field set the
+    # new compute_buyer_mandate_fingerprint reads - must round-trip exactly.
+    from app.policy.buyer_profiles import HOUSING_ASSOCIATION
+    legacy.matching_fingerprint = compute_buyer_mandate_fingerprint(HOUSING_ASSOCIATION)
+    session.commit()
+
+    report = migrate_buyer_profiles_to_mandates(session, dry_run=False)
+    assert report["fingerprint_mismatches"] == []
+
+    mandate = _mandate_for(session, "housing_association")
+    assert mandate.onboarding_completed_at.replace(tzinfo=None) == onboarded_at.replace(tzinfo=None)
+    assert mandate.onboarding_summary == legacy.onboarding_summary
+    assert mandate.matching_fingerprint == legacy.matching_fingerprint

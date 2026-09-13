@@ -2,7 +2,7 @@
 pilot). Sits strictly downstream of existing opportunity detection: reads
 already-computed, already-trusted facts (app.reporting.allocation_
 development_coverage, app.reporting.allocation_discovery, SchemeIntelligence)
-and classifies them against a app.policy.buyer_profiles.BuyerProfile - it
+and classifies them against a app.policy.buyer_profiles.BuyerMandatePolicy - it
 never re-derives a fact those modules already own, never calls an LLM, and
 never produces a numeric score.
 
@@ -12,7 +12,7 @@ audit this implements):
     Verified planning/Local Plan intelligence
         -> existing deterministic opportunity detection (unchanged)
         -> MatchingFacts (this module - a thin, safe reader)
-        -> BuyerProfile (app.policy.buyer_profiles - fixed pilot config)
+        -> BuyerMandatePolicy (app.policy.buyer_profiles - fixed pilot config)
         -> assess_buyer_fit (this module - deterministic classification)
         -> BuyerFitAssessment (consumed by opportunity_feed.py / the UI)
 
@@ -27,8 +27,8 @@ a real field this module read - never freeform text, never AI-generated.
 
 Housing Association amendment (fourth pilot profile): every per-buyer
 behavioural difference introduced by this amendment is expressed as an
-explicit, generic BuyerProfile field - never a Housing-Association-only
-branch keyed on profile.key - see app.policy.buyer_profiles.BuyerProfile's
+explicit, generic BuyerMandatePolicy field - never a Housing-Association-only
+branch keyed on profile.key - see app.policy.buyer_profiles.BuyerMandatePolicy's
 own field docstrings (scale_metric, specialist_development_is_exclusion,
 wholly_affordable_is_exclusion, below_minimum_scale_is_exclusion) and the
 matching blocks below for exactly how each one changes assess_buyer_fit's
@@ -48,7 +48,7 @@ from app.policy.buyer_profiles import (
     PLANNING_ACTIVE_PROPOSAL,
     SPECIALIST_DEVELOPMENT_TYPES,
     WHOLLY_AFFORDABLE_THRESHOLD,
-    BuyerProfile,
+    BuyerMandatePolicy,
 )
 from app.reporting.allocation_development_coverage import NO_IDENTIFIED_ACTIVITY
 from app.reporting.scheme_reconciliation import FACT_RESOLVED
@@ -422,14 +422,14 @@ def _planning_state_label(state: str) -> str:
     }.get(state, state)
 
 
-def assess_buyer_fit(profile: BuyerProfile, facts: MatchingFacts) -> BuyerFitAssessment:
+def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts) -> BuyerFitAssessment:
     """The one deterministic decision function every buyer-fit result goes
     through - no LLM, no numeric score. Hard exclusions (development type,
     100% affordable) are checked first and dominate the classification if
     triggered, exactly matching the brief's own "Exclude where trusted
     evidence establishes..." lists, which name only these two grounds -
     planning-state mismatch is deliberately never a hard exclusion (see
-    BuyerProfile.accepted_planning_states' own docstring)."""
+    BuyerMandatePolicy.accepted_planning_states' own docstring)."""
     matches: list[str] = []
     does_not_match: list[str] = []
     unknown: list[str] = []
@@ -469,7 +469,7 @@ def assess_buyer_fit(profile: BuyerProfile, facts: MatchingFacts) -> BuyerFitAss
     #
     # Housing Association amendment: deliberately reversed polarity for a
     # buyer whose own primary requirement IS affordable housing - see
-    # BuyerProfile.wholly_affordable_is_exclusion's own docstring.
+    # BuyerMandatePolicy.wholly_affordable_is_exclusion's own docstring.
     if facts.affordable_percentage is not None and facts.affordable_percentage >= WHOLLY_AFFORDABLE_THRESHOLD:
         if profile.wholly_affordable_is_exclusion:
             does_not_match.append(
