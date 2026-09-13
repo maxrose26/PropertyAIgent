@@ -52,6 +52,34 @@ EXISTING persisted ControlRelationship row is still surfaced separately
 (as `recorded_relationships`), for its own review_status/human-
 confirmation value a live recomputation cannot reproduce.
 
+THIS IS A V1 BRIDGE, APPROVED FOR GATE 2C V1, NOT NECESSARILY THE FINAL
+OPERATING ARCHITECTURE (Product Owner decision, Gate 2C V1 amendment).
+The intended long-term direction, not implemented here:
+
+    DOCUMENT ARRIVES / CHANGES
+            -> SHARED FACT EXTRACTION ONCE
+            -> PERSIST EVIDENCED RELATIONSHIPS
+            -> AcquisitionPositionFacts RECONCILES THEM
+            -> Transaction Signals
+            -> Buyer Agents evaluate many times
+
+Moving to that model requires either scheduling app.enrichment.
+control_population.run_control_relationship_population as a routine
+production stage, or an equivalent persistence trigger - neither is
+implemented or authorised by this module. Until then, live computation
+is the correct, honest V1 answer to "was this genuinely examined."
+
+NO COARSE SUMMARY FIELD (e.g. a "control_position"/"acquisition_status"/
+"availability_status" enum) EXISTS ANYWHERE IN THIS MODULE - Product
+Owner decision, Gate 2C V1 amendment: compressing ownership evidence,
+applicant position, developer indication and control/third-party
+relationships into one summary risks overstating what the evidence
+establishes (a developer/applicant indication does not establish
+developer CONTROL; an absence of relationships does not establish
+CONTROL_UNKNOWN in a legally meaningful sense). The detailed fact lists
+on AcquisitionPositionFacts ARE the trusted source of truth - a consumer
+reads them directly, never a derived label.
+
 DEVELOPMENT STATE IS DELIBERATELY NOT A FIELD HERE - see Gate 2B's own
 app.pipeline.lapse_tracking.compute_lapse_status / app.pipeline.
 phase_tracking.compute_phase_progress for that fact. A consumer wanting
@@ -97,12 +125,6 @@ _CERTIFICATE_TO_OWNERSHIP_STATE = {
     CERTIFICATE_C: OWNERSHIP_PARTIAL_IDENTIFICATION,
     CERTIFICATE_D: OWNERSHIP_NOT_FULLY_KNOWN,
 }
-
-# --- Control/developer facts (Section 10 of the approved amendment) --------
-CONTROL_DEVELOPER_APPLICANT_INDICATED = "DEVELOPER_APPLICANT_INDICATED"
-CONTROL_THIRD_PARTY_INTEREST_IDENTIFIED = "THIRD_PARTY_INTEREST_IDENTIFIED"
-CONTROL_UNKNOWN = "CONTROL_UNKNOWN"
-CONTROL_CONFLICTING_EVIDENCE = "CONFLICTING_CONTROL_EVIDENCE"
 
 # --- Evidence-coverage states (Section 12 - "explicit evidence coverage") --
 COVERAGE_SEARCHED_NO_INDICATION_FOUND = "RELEVANT_EVIDENCE_SEARCHED_NO_CONTROL_INDICATION_FOUND"
@@ -195,7 +217,15 @@ class AcquisitionPositionFacts:
     applicant_positions: tuple[ApplicantPositionFact, ...]
     developer_indications: tuple[DeveloperIndicationFact, ...]
     control_relationships: tuple[ControlRelationshipFact, ...]
-    control_position: str  # one of the CONTROL_* constants - a summary signal, never replacing the detailed facts above
+    # Deliberately NO coarse summary field here (e.g. "control_position") -
+    # Product Owner decision, Gate 2C V1 amendment: compressing ownership
+    # evidence, applicant position, developer indication and control/
+    # third-party relationships into one summary risks overstating what
+    # the evidence establishes (a developer/applicant indication does not
+    # establish developer CONTROL; an absence of relationships does not
+    # establish that control is genuinely unknown in a legally meaningful
+    # sense). The detailed fact lists above ARE the trusted source of
+    # truth - a consumer reads them directly, never a derived label.
     ownership_coverage: str  # one of the COVERAGE_* constants
     conflicts: tuple[str, ...]
     evidence_coverage: EvidenceCoverage
@@ -350,7 +380,7 @@ def build_acquisition_position_facts(session: Session, applications: list[Applic
     if not applications:
         return AcquisitionPositionFacts(
             site_id=None, application_ids=(), ownership_evidence=(), applicant_positions=(),
-            developer_indications=(), control_relationships=(), control_position=CONTROL_UNKNOWN,
+            developer_indications=(), control_relationships=(),
             ownership_coverage=COVERAGE_INSUFFICIENT, conflicts=(),
             evidence_coverage=EvidenceCoverage(False, False, False, False, False, False, False),
         )
@@ -433,23 +463,10 @@ def build_acquisition_position_facts(session: Session, applications: list[Applic
     else:
         ownership_coverage = COVERAGE_SEARCHED_NO_INDICATION_FOUND
 
-    # Control-position summary (Section 10) - a coarse signal alongside
-    # the detailed facts above, never a replacement for them.
-    if len(conflicts) > 0:
-        control_position = CONTROL_CONFLICTING_EVIDENCE
-    elif developer_indications:
-        control_position = CONTROL_DEVELOPER_APPLICANT_INDICATED
-    elif any(f.source == "s106" and f.state != OWNERSHIP_S106_DEFINED_OWNER for f in ownership_evidence) or any(
-        r.role not in ("OWNER", "APPLICANT") for r in control_relationships
-    ):
-        control_position = CONTROL_THIRD_PARTY_INTEREST_IDENTIFIED
-    else:
-        control_position = CONTROL_UNKNOWN
-
     return AcquisitionPositionFacts(
         site_id=site_id, application_ids=app_ids,
         ownership_evidence=tuple(ownership_evidence), applicant_positions=tuple(applicant_positions),
         developer_indications=tuple(developer_indications), control_relationships=control_relationships,
-        control_position=control_position, ownership_coverage=ownership_coverage,
+        ownership_coverage=ownership_coverage,
         conflicts=tuple(conflicts), evidence_coverage=evidence_coverage,
     )

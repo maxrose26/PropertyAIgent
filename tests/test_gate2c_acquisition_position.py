@@ -22,9 +22,6 @@ from app.db.models import (
 )
 from app.reporting import acquisition_position as ap
 from app.reporting.acquisition_position import (
-    CONTROL_CONFLICTING_EVIDENCE,
-    CONTROL_DEVELOPER_APPLICANT_INDICATED,
-    CONTROL_UNKNOWN,
     COVERAGE_INDICATION_FOUND,
     COVERAGE_INSUFFICIENT,
     COVERAGE_SEARCHED_NO_INDICATION_FOUND,
@@ -223,8 +220,8 @@ def test_conflicting_developer_evidence_surfaced_not_silently_resolved(session):
     session.commit()
 
     facts = build_acquisition_position_facts(session, [app1, app2])
-    assert facts.control_position == CONTROL_CONFLICTING_EVIDENCE
     assert len(facts.conflicts) >= 1
+    assert "Housebuilder X" in facts.conflicts[0] and "Housebuilder Y" in facts.conflicts[0]
     developer_names = {d.developer_name for d in facts.developer_indications}
     assert developer_names == {"Housebuilder X", "Housebuilder Y"}  # both preserved, neither dropped
 
@@ -322,7 +319,8 @@ def test_strategic_land_no_application_case_does_not_crash(session):
     assert facts.site_id is None
     assert facts.application_ids == ()
     assert facts.ownership_evidence == ()
-    assert facts.control_position == CONTROL_UNKNOWN
+    assert facts.developer_indications == ()
+    assert facts.control_relationships == ()
     assert facts.ownership_coverage == COVERAGE_INSUFFICIENT
 
 
@@ -334,12 +332,32 @@ def test_developer_applicant_indication_never_claims_ownership(session):
     session.add(SchemeIntelligence(application_id=app.id, developer="Big Housebuilder Ltd"))
     session.commit()
     facts = build_acquisition_position_facts(session, [app])
-    assert facts.control_position == CONTROL_DEVELOPER_APPLICANT_INDICATED
     assert facts.ownership_evidence == ()  # a developer name is never itself an ownership claim
     assert any(d.developer_name == "Big Housebuilder Ltd" for d in facts.developer_indications)
 
 
 # --- Structural guards: buyer-independence / no AVAILABLE / no new events ------
+
+
+def test_control_position_field_and_constants_do_not_exist(session):
+    """Gate 2C V1 amendment (Product Owner decision): the coarse
+    control_position summary field was removed entirely, not replaced by
+    another coarse field - ownership evidence, applicant position,
+    developer indication and control/third-party relationships remain the
+    only source of truth, read directly by any consumer."""
+    app = _make_application(session, reference="APP/1")
+    session.add(SchemeIntelligence(application_id=app.id, developer="Big Housebuilder Ltd"))
+    session.commit()
+    facts = build_acquisition_position_facts(session, [app])
+
+    assert not hasattr(facts, "control_position")
+    for banned in (
+        "control_position", "CONTROL_UNKNOWN", "CONTROL_THIRD_PARTY_INTEREST_IDENTIFIED",
+        "CONTROL_DEVELOPER_APPLICANT_INDICATED", "CONTROL_CONFLICTING_EVIDENCE",
+        "acquisition_status", "control_status", "availability_status",
+        "selling_position", "transaction_probability", "opportunity_status",
+    ):
+        assert not hasattr(ap, banned)
 
 
 def test_module_never_imports_buyer_profile():

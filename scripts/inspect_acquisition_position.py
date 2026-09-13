@@ -35,7 +35,6 @@ def parse_args() -> argparse.Namespace:
 def _print_facts(facts) -> None:
     print(f"site_id: {facts.site_id}")
     print(f"application_ids: {facts.application_ids}")
-    print(f"control_position: {facts.control_position}")
     print(f"ownership_coverage: {facts.ownership_coverage}")
     print()
     print("evidence_coverage:")
