@@ -2815,7 +2815,30 @@ class BuyerMandate(Base):
     fingerprint, which reads only fields declared on this class), while a
     genuine strategy change always should - exactly the distinction the
     Phase A brief itself requires ("Nesten Homes" -> "Nesten Homes Ltd"
-    must not trigger re-evaluation; a changed unit range must)."""
+    must not trigger re-evaluation; a changed unit range must).
+
+    Buyer Mandate V2, Phase B1 (Structured Mandate Domain Expansion) adds
+    geography_scope/geography_councils/acquisition_types/
+    development_state_appetite/control_appetite below - see app.policy.
+    buyer_profiles' own module docstring section for each field's full
+    vocabulary and reasoning. All five are declared NULLABLE (unlike every
+    Phase A field, which had a Python-side default recreated correctly by
+    plain ALTER TABLE ADD COLUMN): these are BRAND NEW dimensions with no
+    single global default that would be correct for every row, including
+    the four pre-existing production mandates this migration must not
+    silently mis-default - see scripts.backfill_buyer_mandate_b1_defaults
+    for the explicit, idempotent, per-buyer-template backfill this requires
+    instead (mirrors this schema's own established "explicit backfill for
+    a NOT-NULL-in-spirit column a bare ADD COLUMN cannot correctly default"
+    convention - app.db.session._backfill_extraction_attempt_count et al -
+    except templated per source_template_key rather than one global value).
+    A row where these are still NULL means "B1 backfill has not run for
+    this row yet", read defensively by app.policy.buyer_profile_store.
+    mandate_to_policy as the safe UNSPECIFIED/empty-set equivalents - never
+    treated as "no restriction"/"any type accepted" once Phase B2 wires
+    these into matching. None of these five fields is read by app.policy.
+    buyer_matching.assess_buyer_fit as of Phase B1 - see app.policy.
+    buyer_profiles.BuyerMandatePolicy's own docstring."""
 
     __tablename__ = "buyer_mandates"
     __table_args__ = (UniqueConstraint("buyer_id", "mandate_key", name="uq_buyer_mandate_key"),)
@@ -2864,6 +2887,27 @@ class BuyerMandate(Base):
     matching_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     onboarding_completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     onboarding_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Buyer Mandate V2, Phase B1 fields - see class docstring above ----
+    # "UNSPECIFIED" | "ALL_CURRENT_COVERAGE" | "COUNCILS" -
+    # app.policy.buyer_profiles.GEOGRAPHY_*. NULL only until the B1
+    # backfill/seed has set a real value for this row.
+    geography_scope: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Comma-joined council_code values - populated only when
+    # geography_scope == "COUNCILS", empty string otherwise (never NULL
+    # once geography_scope itself is set).
+    geography_councils: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Comma-joined, sorted app.policy.buyer_profiles.ACQUISITION_TYPES
+    # values - an empty string is a deliberate, configured "none stated",
+    # distinct from NULL ("B1 backfill has not run yet").
+    acquisition_types: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # "UNSPECIFIED" | "UNCOMMENCED_PREFERRED" | "UNDERWAY_ACCEPTABLE" |
+    # "UNDERWAY_PREFERRED" - app.policy.buyer_profiles.
+    # DEVELOPMENT_STATE_APPETITES.
+    development_state_appetite: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Comma-joined, sorted app.policy.buyer_profiles.CONTROL_APPETITES
+    # values - same NULL-vs-empty-string distinction as acquisition_types.
+    control_appetite: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

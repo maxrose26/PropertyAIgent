@@ -15,12 +15,24 @@ import datetime as dt
 
 from sqlalchemy import select
 
-from app.db.models import Application, Buyer, BuyerMandate, LocalPlan, LocalPlanSite, SchemeIntelligence, Site, Workspace
+from app.db.models import Application, Buyer, BuyerMandate, Council, LocalPlan, LocalPlanSite, SchemeIntelligence, Site, Workspace
 from app.db.models import BuyerProfile as LegacyBuyerProfile
 from app.policy.buyer_matching import INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit, build_planning_delivery_matching_facts
-from app.policy.buyer_profiles import BUYER_PROFILE_ORDER, BUYER_PROFILES, NATIONAL_HOUSEBUILDER, NESTEN_HOMES
+from app.policy.buyer_profiles import (
+    BUYER_PROFILE_ORDER,
+    BUYER_PROFILES,
+    GEOGRAPHY_ALL_CURRENT_COVERAGE,
+    GEOGRAPHY_COUNCILS,
+    GEOGRAPHY_UNSPECIFIED,
+    HOUSING_ASSOCIATION,
+    NATIONAL_HOUSEBUILDER,
+    NESTEN_HOMES,
+    STRATEGIC_LAND_BUYER,
+    UNRESOLVED_OWNERSHIP_INVESTIGATABLE,
+)
 from app.policy.buyer_profile_store import (
     DEFAULT_MANDATE_KEY,
+    backfill_buyer_mandate_b1_defaults,
     bootstrap_acquisition_monitoring,
     compute_buyer_mandate_fingerprint,
     get_buyer_profile_dataclass,
@@ -31,6 +43,7 @@ from app.policy.buyer_profile_store import (
     resolve_default_workspace,
     run_buyer_onboarding_baseline,
     seed_default_buyer_profiles,
+    validate_geography_councils,
 )
 from app.reporting.opportunity_change import sync_opportunity_monitoring_state
 
@@ -703,10 +716,14 @@ def test_migration_preserves_onboarding_state_and_recomputes_a_matching_fingerpr
         session, workspace.id, "housing_association",
         onboarding_completed_at=onboarded_at, onboarding_summary="reviewed=255 strong_fit=1 not_suitable=16 insufficient_evidence=238 investigative_exceptions=0",
     )
-    # A fingerprint computed the OLD way, over the exact same field set the
-    # new compute_buyer_mandate_fingerprint reads - must round-trip exactly.
+    # A fingerprint computed the way Phase A itself would have computed it
+    # (frozen to the pre-Phase-B1 field set) - a REAL legacy row's own
+    # matching_fingerprint predates B1's wider fingerprint schema, so this
+    # must be built from _phase_a_only_fingerprint, never today's full
+    # compute_buyer_mandate_fingerprint.
     from app.policy.buyer_profiles import HOUSING_ASSOCIATION
-    legacy.matching_fingerprint = compute_buyer_mandate_fingerprint(HOUSING_ASSOCIATION)
+    from app.policy.buyer_profile_store import _phase_a_only_fingerprint
+    legacy.matching_fingerprint = _phase_a_only_fingerprint(HOUSING_ASSOCIATION)
     session.commit()
 
     report = migrate_buyer_profiles_to_mandates(session, dry_run=False)
@@ -715,4 +732,237 @@ def test_migration_preserves_onboarding_state_and_recomputes_a_matching_fingerpr
     mandate = _mandate_for(session, "housing_association")
     assert mandate.onboarding_completed_at.replace(tzinfo=None) == onboarded_at.replace(tzinfo=None)
     assert mandate.onboarding_summary == legacy.onboarding_summary
-    assert mandate.matching_fingerprint == legacy.matching_fingerprint
+    # The migrated mandate's own PERSISTED fingerprint is always the
+    # CURRENT, full (post-Phase-B1) value - not literally equal to the
+    # legacy row's pre-B1 value, but internally consistent with the
+    # mandate's own (now B1-populated) fields.
+    assert mandate.matching_fingerprint == compute_buyer_mandate_fingerprint(mandate_to_policy(mandate))
+
+
+# --- Buyer Mandate V2, Phase B1: structured mandate domain expansion -------
+
+def _make_pre_b1_mandate(session, workspace, buyer_key: str) -> BuyerMandate:
+    """Simulates a mandate exactly as Phase A left it - seeded before
+    Phase B1's own columns existed. seed_default_buyer_profiles now always
+    populates B1 fields on creation, so this test helper constructs the
+    Buyer + BuyerMandate directly, leaving the five B1 columns genuinely
+    NULL, to exercise the ADD-COLUMN-then-backfill scenario Phase B1 must
+    actually handle."""
+    template = BUYER_PROFILES[buyer_key]
+    buyer = Buyer(workspace_id=workspace.id, buyer_key=buyer_key, display_name=template.display_name, buyer_type=template.buyer_type)
+    session.add(buyer)
+    session.flush()
+    mandate = BuyerMandate(
+        buyer_id=buyer.id, mandate_key=DEFAULT_MANDATE_KEY, display_name=template.display_name,
+        primary_requirement=template.primary_requirement, target_unit_min=template.target_unit_min,
+        target_unit_max=template.target_unit_max, scale_metric=template.scale_metric,
+        accepted_planning_states=",".join(sorted(template.accepted_planning_states)),
+        treats_no_activity_as_positive=template.treats_no_activity_as_positive,
+        large_allocation_is_self_qualifying=template.large_allocation_is_self_qualifying,
+        specialist_development_is_exclusion=template.specialist_development_is_exclusion,
+        wholly_affordable_is_exclusion=template.wholly_affordable_is_exclusion,
+        below_minimum_scale_is_exclusion=template.below_minimum_scale_is_exclusion,
+        notes=template.notes, source_template_key=buyer_key,
+        # Deliberately omitted: geography_scope/geography_councils/
+        # acquisition_types/development_state_appetite/control_appetite -
+        # stay NULL, exactly like a real pre-B1 row after a bare ALTER
+        # TABLE ADD COLUMN.
+    )
+    session.add(mandate)
+    session.commit()
+    return mandate
+
+
+def test_seeding_backfills_b1_fields_onto_a_pre_existing_mandate(session):
+    workspace = resolve_default_workspace(session)
+    pre_b1 = _make_pre_b1_mandate(session, workspace, "nesten_homes")
+    assert pre_b1.geography_scope is None  # confirms the fixture really simulates a pre-B1 row
+
+    seed_default_buyer_profiles(session, workspace)
+
+    reloaded = _mandate_for(session, "nesten_homes")
+    assert reloaded.geography_scope == GEOGRAPHY_ALL_CURRENT_COVERAGE
+    assert reloaded.acquisition_types == "LAND_SITE_ACQUISITION"
+    assert reloaded.development_state_appetite == "UNCOMMENCED_PREFERRED"
+    assert reloaded.control_appetite == UNRESOLVED_OWNERSHIP_INVESTIGATABLE
+
+
+def test_reseeding_never_overwrites_an_edited_b1_field(session):
+    """Phase B1 brief, Section 32: 'An edited B1 field must survive
+    reseeding.' Simulates a user (or a future Phase B3 UI) editing a
+    mandate's own geography after the B1 backfill has already run once -
+    a second reseed call must leave that edit completely untouched."""
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)  # first seed - B1 fields populated from the template
+
+    mandate = _mandate_for(session, "nesten_homes")
+    mandate.geography_scope = GEOGRAPHY_COUNCILS
+    mandate.geography_councils = "trafford,bury"
+    session.commit()
+
+    seed_default_buyer_profiles(session, workspace)  # rerun - must not clobber the edit
+
+    reloaded = _mandate_for(session, "nesten_homes")
+    assert reloaded.geography_scope == GEOGRAPHY_COUNCILS
+    assert reloaded.geography_councils == "trafford,bury"
+
+
+def test_backfill_is_idempotent_and_never_duplicates(session):
+    workspace = resolve_default_workspace(session)
+    for key in BUYER_PROFILE_ORDER:
+        _make_pre_b1_mandate(session, workspace, key)
+
+    first = backfill_buyer_mandate_b1_defaults(session, dry_run=False)
+    second = backfill_buyer_mandate_b1_defaults(session, dry_run=False)
+
+    assert all(info["needs_backfill"] for info in first["mandates"].values())
+    assert not any(info["needs_backfill"] for info in second["mandates"].values())
+    assert len(session.execute(select(BuyerMandate)).scalars().all()) == 4  # no duplicate rows created
+
+
+def test_backfill_dry_run_makes_zero_database_changes(session):
+    workspace = resolve_default_workspace(session)
+    _make_pre_b1_mandate(session, workspace, "nesten_homes")
+
+    report = backfill_buyer_mandate_b1_defaults(session, dry_run=True)
+
+    assert report["dry_run"] is True
+    assert report["mandates"]["nesten_homes"]["needs_backfill"] is True
+    assert "proposed_fields" in report["mandates"]["nesten_homes"]
+    reloaded = _mandate_for(session, "nesten_homes")
+    assert reloaded.geography_scope is None  # still untouched
+
+
+# --- Architecture test (Phase B1 brief, Section 29): fingerprint baseline
+# migration must NOT trigger a wasted re-onboarding scan -------------------
+
+def test_b1_backfill_on_an_already_onboarded_mandate_refreshes_fingerprint_without_reonboarding(session):
+    """The core Section 29 requirement: adding new matching-relevant
+    fields naturally changes an existing mandate's own fingerprint once -
+    but B1 does not change assess_buyer_fit's own output at all, so that
+    change must be applied as a direct fingerprint refresh (a "baseline
+    migration"), never by re-running the full, expensive opportunity-
+    universe scan a genuine strategy change would warrant. Proven here by
+    constructing a pre-B1 mandate that is ALREADY onboarded (has its own
+    real matching_fingerprint/onboarding_completed_at/onboarding_summary,
+    exactly like production's four Phase A mandates), then confirming the
+    backfill (a) makes it non-stale immediately, (b) changes its
+    fingerprint, and (c) leaves onboarding_completed_at/onboarding_summary
+    completely untouched, proving no re-scan occurred."""
+    workspace = resolve_default_workspace(session)
+    mandate = _make_pre_b1_mandate(session, workspace, "nesten_homes")
+
+    from app.policy.buyer_profile_store import _phase_a_only_fingerprint
+    template = BUYER_PROFILES["nesten_homes"]
+    pre_b1_fingerprint = _phase_a_only_fingerprint(template)
+    onboarded_at = dt.datetime(2026, 9, 7, 19, 11, 47, tzinfo=dt.timezone.utc)
+    mandate.matching_fingerprint = pre_b1_fingerprint
+    mandate.onboarding_completed_at = onboarded_at
+    mandate.onboarding_summary = "reviewed=255 strong_fit=2 not_suitable=5 insufficient_evidence=248 investigative_exceptions=85"
+    session.commit()
+
+    seed_default_buyer_profiles(session, workspace)  # this is what the backfill script actually calls
+
+    reloaded = _mandate_for(session, "nesten_homes")
+    # (a) not stale immediately - no re-onboarding was needed/triggered.
+    assert is_buyer_mandate_baseline_stale(reloaded) is False
+    # (b) fingerprint changed (now computed under the full, B1-inclusive
+    # field set) - and is internally self-consistent.
+    assert reloaded.matching_fingerprint != pre_b1_fingerprint
+    assert reloaded.matching_fingerprint == compute_buyer_mandate_fingerprint(mandate_to_policy(reloaded))
+    # (c) onboarding_completed_at/onboarding_summary are UNTOUCHED - proof
+    # no opportunity-universe scan ran (run_buyer_onboarding_baseline would
+    # have updated both to a fresh timestamp/summary).
+    assert reloaded.onboarding_completed_at.replace(tzinfo=None) == onboarded_at.replace(tzinfo=None)
+    assert reloaded.onboarding_summary == "reviewed=255 strong_fit=2 not_suitable=5 insufficient_evidence=248 investigative_exceptions=85"
+
+
+def test_bootstrap_does_not_reonboard_solely_because_b1_fields_were_added(session):
+    """End-to-end proof via the real production entry point
+    (bootstrap_acquisition_monitoring): a mandate that was already
+    onboarded before B1, once B1's backfill runs (which bootstrap's own
+    seed_default_buyer_profiles call now performs automatically), must NOT
+    appear in profiles_onboarded_this_run merely because five new columns
+    were populated - onboarding is reserved for a GENUINE strategy change
+    or first-time onboarding, never a structural-field backfill."""
+    workspace = resolve_default_workspace(session)
+    mandate = _make_pre_b1_mandate(session, workspace, "nesten_homes")
+    from app.policy.buyer_profile_store import _phase_a_only_fingerprint
+    mandate.matching_fingerprint = _phase_a_only_fingerprint(BUYER_PROFILES["nesten_homes"])
+    mandate.onboarding_completed_at = dt.datetime.now(dt.timezone.utc)
+    mandate.onboarding_summary = "reviewed=1 strong_fit=0 not_suitable=0 insufficient_evidence=1 investigative_exceptions=0"
+    session.commit()
+
+    result = bootstrap_acquisition_monitoring(session)
+
+    # The other three (genuinely never-onboarded) pilot mandates DO get
+    # onboarded, as normal - only nesten_homes (pre-onboarded, B1-backfilled
+    # in-place) is correctly excluded.
+    assert "nesten_homes" not in result["profiles_onboarded_this_run"]
+    assert set(result["profiles_onboarded_this_run"]) == {"strategic_land_buyer", "national_housebuilder", "housing_association"}
+
+
+# --- Geography council validation (Phase B1 brief, Section 26) ------------
+
+def test_validate_geography_councils_accepts_known_codes(session):
+    session.add(Council(code="trafford", name="Trafford Council", base_url="https://example.test", date_field_mode="received", doc_system="idox"))
+    session.commit()
+    validate_geography_councils(session, frozenset({"trafford"}))  # must not raise
+
+
+def test_validate_geography_councils_rejects_unknown_codes(session):
+    session.add(Council(code="trafford", name="Trafford Council", base_url="https://example.test", date_field_mode="received", doc_system="idox"))
+    session.commit()
+    try:
+        validate_geography_councils(session, frozenset({"trafford", "atlantis"}))
+        assert False, "expected a ValueError for an unrecognised council code"
+    except ValueError as e:
+        assert "atlantis" in str(e)
+
+
+def test_validate_geography_councils_accepts_empty_set():
+    # No session needed at all - an empty set is trivially valid (nothing
+    # to check) and must never attempt a query.
+    validate_geography_councils(session=None, council_codes=frozenset())
+
+
+# --- Behavioural-equivalence requirement (Phase B1 brief, Sections 33-34) --
+
+def test_existing_four_mandates_behaviourally_unchanged_by_b1_fields(session):
+    """The single most important Phase B1 guarantee: adding five new
+    structural columns/fields must not move ANY existing buyer-fit
+    conclusion by even one reason string. Compares assess_buyer_fit's
+    output for all four pilot mandates, read via the live, post-B1
+    get_buyer_profile_dataclass path, against the same Focus-School-shaped
+    fixture tests/test_buyer_profile_persistence.py's own Phase A
+    equivalence test already used - zero mismatches required."""
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)
+
+    site = Site(council_code="stockport", canonical_address="focus school b1", display_address="Focus School B1")
+    session.add(site)
+    session.flush()
+    app = Application(council_code="stockport", reference="DC/085997-B1", site_id=site.id, status="Decided", decision="Granted")
+    session.add(app)
+    session.flush()
+    si = SchemeIntelligence(
+        application_id=app.id, total_units_final=82, affordable_units_final=72, affordable_percentage_final=100.0,
+        affordable_missing=False, development_type="mixed_retirement_and_market_housing",
+        applicant_company="Anwyl Partnerships", core_intelligence_complete=True,
+    )
+    session.add(si)
+    session.commit()
+    facts = build_planning_delivery_matching_facts(si)
+
+    for buyer_key in BUYER_PROFILE_ORDER:
+        template = BUYER_PROFILES[buyer_key]
+        persisted = get_buyer_profile_dataclass(session, buyer_key)  # the live, current read path
+
+        template_result = assess_buyer_fit(template, facts)
+        persisted_result = assess_buyer_fit(persisted, facts)
+        assert template_result.classification == persisted_result.classification
+        assert template_result.is_investigative_exception == persisted_result.is_investigative_exception
+        assert template_result.matches == persisted_result.matches
+        assert template_result.does_not_match == persisted_result.does_not_match
+        assert template_result.unknown == persisted_result.unknown
+        assert template_result.investigate == persisted_result.investigate

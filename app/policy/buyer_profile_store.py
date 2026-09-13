@@ -52,9 +52,20 @@ import json
 
 from sqlalchemy import select
 
-from app.db.models import Buyer, BuyerMandate, Workspace, utcnow
+from app.db.models import Buyer, BuyerMandate, Council, Workspace, utcnow
 from app.policy.buyer_matching import INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit
-from app.policy.buyer_profiles import BUYER_PROFILE_ORDER, BUYER_PROFILES, BuyerMandatePolicy
+from app.policy.buyer_profiles import (
+    ACQUISITION_TYPES,
+    BUYER_PROFILE_ORDER,
+    BUYER_PROFILES,
+    CONTROL_APPETITES,
+    DEVELOPMENT_STATE_APPETITES,
+    DEVELOPMENT_STATE_UNSPECIFIED,
+    GEOGRAPHY_COUNCILS,
+    GEOGRAPHY_SCOPES,
+    GEOGRAPHY_UNSPECIFIED,
+    BuyerMandatePolicy,
+)
 from app.reporting.opportunity_change import sync_opportunity_monitoring_state
 from app.reporting.opportunity_universe import DEFAULT_STRATEGIC_LAND_PAGE_SIZE, build_current_opportunity_universe
 
@@ -112,7 +123,58 @@ def compute_buyer_mandate_fingerprint(policy: BuyerMandatePolicy) -> str:
     matching-relevant portion) cannot change this value, structurally,
     not merely by convention. See compute_buyer_mandate_fingerprint's own
     test coverage (tests/test_buyer_profile_persistence.py) for a direct
-    proof of this."""
+    proof of this.
+
+    Buyer Mandate V2, Phase B1: geography/acquisition_types/development_
+    state_appetite/control_appetite are now included, per the Phase B1
+    brief's own explicit instruction ("these fields are matching-relevant
+    and therefore should be included... even though B1 does not activate
+    matching behaviour yet, establish correct fingerprint semantics now").
+    Every set-like value is sorted before hashing (geography_councils,
+    acquisition_types, control_appetite) so member ORDER can never affect
+    the fingerprint - only membership can. Adding these fields changes
+    every existing mandate's own fingerprint value once - see
+    scripts.backfill_buyer_mandate_b1_defaults for how that one-time change
+    is applied without triggering a wasted full opportunity-universe
+    re-onboarding scan (B1 does not change assess_buyer_fit's own output at
+    all, so re-scanning would recompute identical conclusions)."""
+    fingerprint_source = {
+        "target_unit_min": policy.target_unit_min,
+        "target_unit_max": policy.target_unit_max,
+        "scale_metric": policy.scale_metric,
+        "accepted_planning_states": sorted(policy.accepted_planning_states),
+        "treats_no_activity_as_positive": policy.treats_no_activity_as_positive,
+        "large_allocation_is_self_qualifying": policy.large_allocation_is_self_qualifying,
+        "specialist_development_is_exclusion": policy.specialist_development_is_exclusion,
+        "wholly_affordable_is_exclusion": policy.wholly_affordable_is_exclusion,
+        "below_minimum_scale_is_exclusion": policy.below_minimum_scale_is_exclusion,
+        "geography_scope": policy.geography_scope,
+        "geography_councils": sorted(policy.geography_councils),
+        "acquisition_types": sorted(policy.acquisition_types),
+        "development_state_appetite": policy.development_state_appetite,
+        "control_appetite": sorted(policy.control_appetite),
+    }
+    canonical = json.dumps(fingerprint_source, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+# Phase-A-era alias, kept for one release so any external/ad-hoc caller of
+# the pre-split name does not break silently. New code should call
+# compute_buyer_mandate_fingerprint directly.
+compute_buyer_profile_fingerprint = compute_buyer_mandate_fingerprint
+
+
+def _phase_a_only_fingerprint(policy: BuyerMandatePolicy) -> str:
+    """Frozen replica of compute_buyer_mandate_fingerprint's field set AS
+    IT EXISTED BEFORE Buyer Mandate V2 Phase B1 - used ONLY by
+    migrate_buyer_profiles_to_mandates' own internal self-consistency
+    check (does the field-by-field copy from a legacy BuyerProfile row
+    reproduce the same Phase-A fields its own matching_fingerprint was
+    computed over), since that legacy fingerprint was necessarily computed
+    under the pre-B1 schema and can never be compared against the current,
+    wider one. Never used to persist a mandate's own matching_fingerprint
+    column - that is always the current, full compute_buyer_mandate_
+    fingerprint value."""
     fingerprint_source = {
         "target_unit_min": policy.target_unit_min,
         "target_unit_max": policy.target_unit_max,
@@ -128,12 +190,6 @@ def compute_buyer_mandate_fingerprint(policy: BuyerMandatePolicy) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-# Phase-A-era alias, kept for one release so any external/ad-hoc caller of
-# the pre-split name does not break silently. New code should call
-# compute_buyer_mandate_fingerprint directly.
-compute_buyer_profile_fingerprint = compute_buyer_mandate_fingerprint
-
-
 # --- Record <-> dataclass conversion -------------------------------------
 
 def mandate_to_policy(mandate: BuyerMandate) -> BuyerMandatePolicy:
@@ -146,7 +202,17 @@ def mandate_to_policy(mandate: BuyerMandate) -> BuyerMandatePolicy:
     every existing consumer/test already means by a policy's `.key`
     (a stable per-buyer-strategy identity), and Phase A's one-mandate-
     per-buyer migration makes the two values equivalent in every case
-    that exists today."""
+    that exists today.
+
+    Buyer Mandate V2, Phase B1: geography_scope/development_state_appetite
+    default to their own UNSPECIFIED constant, and geography_councils/
+    acquisition_types/control_appetite default to the empty frozenset,
+    whenever the persisted column is still NULL (a row the B1 backfill/
+    reseed has not reached yet - see BuyerMandate's own class docstring).
+    This is a deliberately SAFE read-time fallback, never a claim that
+    "unconfigured" means "matches everything" - no code reads these fields
+    for matching purposes yet (Phase B2), so the distinction is purely
+    about not fabricating a decision no one has made."""
     buyer = mandate.buyer
     return BuyerMandatePolicy(
         key=buyer.buyer_key,
@@ -163,6 +229,11 @@ def mandate_to_policy(mandate: BuyerMandate) -> BuyerMandatePolicy:
         wholly_affordable_is_exclusion=mandate.wholly_affordable_is_exclusion,
         below_minimum_scale_is_exclusion=mandate.below_minimum_scale_is_exclusion,
         notes=mandate.notes or "",
+        geography_scope=mandate.geography_scope or GEOGRAPHY_UNSPECIFIED,
+        geography_councils=frozenset(c for c in (mandate.geography_councils or "").split(",") if c),
+        acquisition_types=frozenset(t for t in (mandate.acquisition_types or "").split(",") if t),
+        development_state_appetite=mandate.development_state_appetite or DEVELOPMENT_STATE_UNSPECIFIED,
+        control_appetite=frozenset(c for c in (mandate.control_appetite or "").split(",") if c),
     )
 
 
@@ -197,7 +268,72 @@ def _template_to_mandate_fields(template: BuyerMandatePolicy, buyer_id: int) -> 
         below_minimum_scale_is_exclusion=template.below_minimum_scale_is_exclusion,
         notes=template.notes,
         source_template_key=template.key,
+        geography_scope=template.geography_scope,
+        geography_councils=",".join(sorted(template.geography_councils)),
+        acquisition_types=",".join(sorted(template.acquisition_types)),
+        development_state_appetite=template.development_state_appetite,
+        control_appetite=",".join(sorted(template.control_appetite)),
     )
+
+
+def validate_geography_councils(session, council_codes) -> None:
+    """Buyer Mandate V2, Phase B1 - the one DB-aware validation this domain
+    needs: app.policy.buyer_profiles.BuyerMandatePolicy.__post_init__
+    validates geography_scope/geography_councils structurally (a COUNCILS
+    scope must carry at least one code, every other scope must carry none)
+    but cannot check whether a given code is a REAL council - that requires
+    a database, which the pure policy module must never depend on. Raises
+    ValueError naming exactly which code(s) are unrecognised; a caller with
+    no session-aware validation point of its own (there is no mandate-
+    editing UI yet - Phase B3) has nowhere else this could be checked."""
+    if not council_codes:
+        return
+    known = {c.code for c in session.execute(select(Council)).scalars()}
+    invalid = set(council_codes) - known
+    if invalid:
+        raise ValueError(f"Unknown council code(s): {sorted(invalid)} (known councils: {sorted(known)})")
+
+
+def _b1_fields_from_template(template: BuyerMandatePolicy) -> dict:
+    """Just the Buyer Mandate V2 Phase B1 columns, in persisted (comma-
+    joined-string) form - the subset of _template_to_mandate_fields used
+    by _apply_b1_defaults_if_missing below to backfill an EXISTING mandate
+    row that predates these columns, without touching any of its other,
+    already-set fields."""
+    return dict(
+        geography_scope=template.geography_scope,
+        geography_councils=",".join(sorted(template.geography_councils)),
+        acquisition_types=",".join(sorted(template.acquisition_types)),
+        development_state_appetite=template.development_state_appetite,
+        control_appetite=",".join(sorted(template.control_appetite)),
+    )
+
+
+def _apply_b1_defaults_if_missing(mandate: BuyerMandate, template: BuyerMandatePolicy) -> bool:
+    """Backfills the Phase B1 structural fields onto an EXISTING mandate
+    row whose geography_scope is still NULL (i.e. it predates Phase B1 -
+    every Phase-A-only production mandate is in exactly this state before
+    this function first runs for it), from its own source template.
+    Idempotent and non-destructive: a mandate whose geography_scope is
+    already set (by an earlier call to this function, or - once a future
+    UI exists - a genuine user edit) is never touched again, mirroring
+    seed_default_buyer_profiles' own existing "never overwrite an already-
+    persisted value" guarantee for the Phase A fields.
+
+    geography_scope alone is used as the single "has B1 already run for
+    this row" signal (rather than checking all five fields independently)
+    because _template_to_mandate_fields/this function always set all five
+    together, in one call - they can never be partially set for a row this
+    module created or backfilled.
+
+    Returns True if anything was changed (the caller uses this to decide
+    whether a commit - and a one-time fingerprint refresh, see
+    scripts.backfill_buyer_mandate_b1_defaults - is needed)."""
+    if mandate.geography_scope is not None:
+        return False
+    for field_name, value in _b1_fields_from_template(template).items():
+        setattr(mandate, field_name, value)
+    return True
 
 
 # --- Seeding --------------------------------------------------------------
@@ -219,7 +355,28 @@ def seed_default_buyer_profiles(session, workspace: Workspace) -> list[BuyerMand
     transaction, so a Buyer row can never exist without its own default
     mandate (or vice versa) even if this is interrupted mid-way - the
     Buyer is added and flushed (to obtain its id) before its BuyerMandate
-    is constructed, and both are committed together."""
+    is constructed, and both are committed together.
+
+    Buyer Mandate V2, Phase B1: also backfills the five new structural
+    fields (geography/acquisition types/development-state appetite/
+    control appetite) onto an already-existing mandate whose
+    geography_scope is still NULL (see _apply_b1_defaults_if_missing) -
+    the same idempotent, non-destructive, "only fill in what's genuinely
+    missing" contract this function already had for Phase A fields,
+    extended rather than duplicated in a second function. When this
+    backfill fires on a mandate that was already onboarded (matching_
+    fingerprint set) under the pre-B1 field set, its fingerprint is
+    immediately recomputed and re-persisted under the complete post-B1
+    field set - a one-time "fingerprint baseline migration" (Phase B1
+    brief, Section 29) that keeps the stored fingerprint accurate for
+    future change detection WITHOUT calling run_buyer_onboarding_baseline
+    (which would re-scan the entire opportunity universe for zero benefit:
+    B1 does not change assess_buyer_fit's own output, so a re-scan would
+    only reproduce the exact counts already on record). onboarding_
+    completed_at/onboarding_summary are deliberately left untouched by
+    this - they still, correctly, describe when the mandate's assess_
+    buyer_fit conclusions were last genuinely reviewed, which this
+    backfill does not do."""
     existing_buyers = {
         b.buyer_key: b
         for b in session.execute(select(Buyer).where(Buyer.workspace_id == workspace.id)).scalars()
@@ -228,6 +385,7 @@ def seed_default_buyer_profiles(session, workspace: Workspace) -> list[BuyerMand
     created_any = False
     for key in BUYER_PROFILE_ORDER:
         template = BUYER_PROFILES[key]
+        validate_geography_councils(session, template.geography_councils)
         buyer = existing_buyers.get(key)
         if buyer is None:
             buyer = Buyer(**_template_to_buyer_fields(template, workspace.id))
@@ -239,6 +397,11 @@ def seed_default_buyer_profiles(session, workspace: Workspace) -> list[BuyerMand
             select(BuyerMandate).where(BuyerMandate.buyer_id == buyer.id, BuyerMandate.mandate_key == DEFAULT_MANDATE_KEY)
         ).scalars().first()
         if existing_mandate is not None:
+            was_already_onboarded = existing_mandate.matching_fingerprint is not None
+            if _apply_b1_defaults_if_missing(existing_mandate, template):
+                if was_already_onboarded:
+                    existing_mandate.matching_fingerprint = compute_buyer_mandate_fingerprint(mandate_to_policy(existing_mandate))
+                created_any = True
             mandates.append(existing_mandate)
             continue
         mandate = BuyerMandate(**_template_to_mandate_fields(template, buyer.id))
@@ -484,6 +647,61 @@ def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATE
     }
 
 
+# --- Phase B1 one-time backfill: structural fields onto pre-B1 mandates ----
+
+def backfill_buyer_mandate_b1_defaults(session, *, dry_run: bool = True) -> dict:
+    """Reporting/execution wrapper for scripts.backfill_buyer_mandate_b1_
+    defaults - identifies every known-template BuyerMandate (matched by
+    buyer_key against app.policy.buyer_profiles.BUYER_PROFILE_ORDER, the
+    same set seed_default_buyer_profiles seeds) whose geography_scope is
+    still NULL, reports its current state and the template values it would
+    receive, and - only when dry_run=False - actually performs the
+    backfill by calling seed_default_buyer_profiles itself (the SAME
+    idempotent, non-destructive code path every other reseed already uses,
+    now extended with the Phase B1 fields - see that function's own
+    docstring for the one-time fingerprint-baseline-migration it performs
+    when a mandate was already onboarded). Never touches a mandate whose
+    geography_scope is already set - there is nothing this function does
+    that seed_default_buyer_profiles' own idempotency guarantee doesn't
+    already cover; this exists purely to give the migration script a safe,
+    inspectable dry-run report before it commits to anything."""
+    workspace = resolve_default_workspace(session)
+    before: dict[str, dict] = {}
+    for key in BUYER_PROFILE_ORDER:
+        buyer = session.execute(
+            select(Buyer).where(Buyer.workspace_id == workspace.id, Buyer.buyer_key == key)
+        ).scalars().first()
+        if buyer is None:
+            continue
+        mandate = session.execute(
+            select(BuyerMandate).where(BuyerMandate.buyer_id == buyer.id, BuyerMandate.mandate_key == DEFAULT_MANDATE_KEY)
+        ).scalars().first()
+        if mandate is None:
+            continue
+        before[key] = {
+            "needs_backfill": mandate.geography_scope is None,
+            "matching_fingerprint_before": mandate.matching_fingerprint,
+        }
+
+    if not dry_run:
+        seed_default_buyer_profiles(session, workspace)
+
+    report: dict[str, dict] = {}
+    for key, info in before.items():
+        entry = dict(info)
+        if info["needs_backfill"]:
+            entry["proposed_fields"] = _b1_fields_from_template(BUYER_PROFILES[key])
+        if not dry_run and info["needs_backfill"]:
+            mandate = session.execute(
+                select(BuyerMandate).join(Buyer, BuyerMandate.buyer_id == Buyer.id).where(Buyer.buyer_key == key)
+            ).scalars().first()
+            entry["applied_fields"] = _b1_fields_from_template(BUYER_PROFILES[key])
+            entry["matching_fingerprint_after"] = mandate.matching_fingerprint
+        report[key] = entry
+
+    return {"dry_run": dry_run, "workspace_id": workspace.id, "mandates": report}
+
+
 # --- Phase A one-time migration: legacy BuyerProfile -> Buyer + BuyerMandate
 
 def migrate_buyer_profiles_to_mandates(session, *, dry_run: bool = True) -> dict:
@@ -591,19 +809,39 @@ def migrate_buyer_profiles_to_mandates(session, *, dry_run: bool = True) -> dict
             source_template_key=legacy.source_template_key,
             onboarding_completed_at=legacy.onboarding_completed_at,
             onboarding_summary=legacy.onboarding_summary,
+            # Buyer Mandate V2, Phase B1: a mandate migrated from a known
+            # code template is fully B1-populated from birth, exactly like
+            # one created by seed_default_buyer_profiles - never left with
+            # NULL B1 columns merely because it arrived via this older
+            # migration path instead. A legacy row with no matching
+            # template (source_template_key not in BUYER_PROFILES) is left
+            # unset - mandate_to_policy's own NULL-safe fallback handles it.
+            **(_b1_fields_from_template(BUYER_PROFILES[legacy.profile_key]) if legacy.profile_key in BUYER_PROFILES else {}),
         )
         session.add(mandate)
         session.flush()
 
-        recomputed = compute_buyer_mandate_fingerprint(mandate_to_policy(mandate))
-        if legacy.matching_fingerprint is not None and recomputed != legacy.matching_fingerprint:
-            # Same field set, same hashing convention - this should be
-            # structurally impossible if the field-by-field copy above is
-            # correct. Recorded for the caller (scripts.migrate_buyer_
-            # profiles_to_mandates.py) to treat as a STOP signal rather
-            # than silently trusted either value.
+        # Phase A's own self-consistency check: did the field-by-field copy
+        # above correctly reproduce the SAME Phase-A-era fields the legacy
+        # row's own matching_fingerprint was computed over? Deliberately
+        # compared against a fingerprint FROZEN to that original field set
+        # (_phase_a_only_fingerprint), never the current, Phase-B1-widened
+        # compute_buyer_mandate_fingerprint - the two now cover genuinely
+        # different field sets by design (B1 added new fields no legacy
+        # row ever had an opinion on), so comparing the current schema's
+        # fingerprint against a pre-B1 value would always "mismatch" for a
+        # reason that has nothing to do with a copy error.
+        phase_a_check = _phase_a_only_fingerprint(mandate_to_policy(mandate))
+        if legacy.matching_fingerprint is not None and phase_a_check != legacy.matching_fingerprint:
+            # This should be structurally impossible if the field-by-field
+            # copy above is correct. Recorded for the caller (scripts.
+            # migrate_buyer_profiles_to_mandates.py) to treat as a STOP
+            # signal rather than silently trusted either value.
             skipped_fingerprint_mismatch.append(legacy.profile_key)
-        mandate.matching_fingerprint = recomputed
+        # The mandate's own PERSISTED fingerprint is always the CURRENT,
+        # full (post-Phase-B1) value - never the Phase-A-only comparison
+        # value above, which exists solely for this one integrity check.
+        mandate.matching_fingerprint = compute_buyer_mandate_fingerprint(mandate_to_policy(mandate))
 
         migrated_mandates += 1
 
