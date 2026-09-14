@@ -178,7 +178,14 @@ Specifications take precedence over implementation convenience. A feature being 
 * Preserve backwards compatibility where practical.
 * Explain architectural trade-offs before introducing new dependencies.
 * Never commit secrets, API keys or sensitive data.
-* Never merge directly into the main branch.
+* Never merge unapproved work into the main branch.
+* Explicit Product Owner approval given in the current development conversation constitutes release approval for that specific tested change set.
+* After that approval, Claude may merge the approved feature branch into `master` using the established repository workflow and push `master` without requiring the Product Owner to separately operate GitHub.
+* Before merging, Claude must run and report the required tests, confirm the exact feature branch/SHA, and summarize the release diff.
+* Approval applies only to the exact reviewed/tested release state. Any material code change after approval requires fresh Product Owner approval.
+* Claude must never bypass failing tests or merge unrelated/unreviewed work.
+* After push, Claude must verify that `master` HEAD, deployed SHA and production-reported SHA agree before declaring the release complete.
+* Claude must not push unapproved work directly to `master`.
 
 \---
 
