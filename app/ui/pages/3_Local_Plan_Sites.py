@@ -57,7 +57,8 @@ from app.policy.allocation_planning_coverage import (
     classify_planning_activity_coverage,
     enrich_none_found_reason,
 )
-from app.policy.buyer_matching import assess_buyer_fit, build_strategic_land_matching_facts
+from app.policy.buyer_matching import build_strategic_land_matching_facts
+from app.policy.buyer_matching_b2_context import evaluate_buyer_fit
 from app.policy.buyer_profile_store import get_buyer_profile_dataclass
 from app.ui.buyer_selector import active_buyer_key, buyer_selector
 from app.reporting.ownership_control import (
@@ -332,7 +333,10 @@ def _render_detail(view: dict, allocation_id: int) -> None:
         profile = None
     if profile is not None:
         matching_facts = build_strategic_land_matching_facts(allocation_row, coverage, card.get("phasing"))
-        assessment = assess_buyer_fit(profile, matching_facts)
+        # Agent-Ready Fact Foundation (P0-2): the one authoritative Buyer
+        # Fit evaluation path, never bare assess_buyer_fit(profile, facts) -
+        # see app.policy.buyer_matching_b2_context's own docstring.
+        assessment = evaluate_buyer_fit(session, profile, matching_facts, allocation_id=allocation_row.id)
         section_header(f"Fit for {profile.display_name}", icon="🧭")
         status_badge(BUYER_FIT_BADGE_KIND.get(assessment.classification, "info"), assessment.classification.replace("_", " ").title())
         if assessment.is_investigative_exception:

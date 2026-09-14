@@ -290,7 +290,7 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
     included). Within each bucket, the pool's own existing order (strategic
     land already capacity-ranked; planning/delivery already lapse/date-
     ranked) is preserved - buyer-fit never re-ranks by scale itself."""
-    from app.policy.buyer_matching import assess_buyer_fit
+    from app.policy.buyer_matching_b2_context import evaluate_buyer_fit
     from app.policy.buyer_profile_store import get_buyer_profile_dataclass
 
     profile = get_buyer_profile_dataclass(session, buyer_key)
@@ -309,7 +309,24 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
         facts = card.get("matching_facts")
         if facts is None:
             continue
-        assessment = assess_buyer_fit(profile, facts)
+        # Agent-Ready Fact Foundation (P0-2): the one authoritative Buyer
+        # Fit evaluation path, never bare assess_buyer_fit(profile, facts) -
+        # see app.policy.buyer_matching_b2_context's own docstring. This
+        # module's own cards carry a raw allocation_id/site_id (its own
+        # "opp-feed-alloc-N" card identity is a presentation-layer
+        # convention, never the opportunity_universe id string
+        # build_b2_context parses), so evaluate_buyer_fit is called with
+        # that raw id directly rather than via an opportunity_id.
+        # development_state_scope_verified is deliberately left at its
+        # safe default (False) here - this module's own detector
+        # taxonomy (approaching-lapse/undeveloped-phase cards) does not
+        # map 1:1 onto opportunity_universe's site/phase/recent_
+        # permission/long_pending_application kinds, so scope is never
+        # positively asserted without being able to establish it.
+        if card["opportunity_type"] == STRATEGIC_LAND:
+            assessment = evaluate_buyer_fit(session, profile, facts, allocation_id=int(card["params"]["allocation_id"]))
+        else:
+            assessment = evaluate_buyer_fit(session, profile, facts, site_id=int(card["params"]["site_id"]))
         card["buyer_fit"] = assessment
         if assessment.classification == NOT_SUITABLE:
             excluded_not_suitable += 1
