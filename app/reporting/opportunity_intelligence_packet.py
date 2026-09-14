@@ -276,7 +276,7 @@ def build_opportunity_intelligence_packet(
         linked_strategic_allocation_id = None
         linked_strategic_allocation_name = None
 
-        transaction_signals = build_transaction_signals(session, opportunity)
+        transaction_signals = build_transaction_signals(session, opportunity, scope_verified=context.development_state_scope_verified)
 
     else:
         site_id = entity_id
@@ -331,7 +331,10 @@ def build_opportunity_intelligence_packet(
         linked_strategic_allocation_id = linked_allocation.id if linked_allocation is not None else None
         linked_strategic_allocation_name = linked_allocation.site_name if linked_allocation is not None else None
 
-        transaction_signals = build_transaction_signals(session, opportunity, applications=applications, site=site)
+        transaction_signals = build_transaction_signals(
+            session, opportunity, applications=applications, site=site,
+            scope_verified=context.development_state_scope_verified,
+        )
 
     total_units = FactValue.unknown() if facts.unit_count is None else FactValue.known(facts.unit_count)
 

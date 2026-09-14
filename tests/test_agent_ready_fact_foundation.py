@@ -421,8 +421,8 @@ def test_packet_strategic_land_fields(session):
     # for the full signal taxonomy; this proves the packet wiring itself.
     from app.reporting.opportunity_transaction_signals import NOT_APPLICABLE as SIGNAL_NOT_APPLICABLE
     assert packet.transaction_signals.recent_permission.state == SIGNAL_NOT_APPLICABLE
-    assert packet.transaction_signals.development_underway.state == SIGNAL_NOT_APPLICABLE
-    assert packet.transaction_signals.no_identified_development_progress.state == SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.implementation_activity_evidence_identified.state == SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.no_qualifying_progress_evidence_identified.state == SIGNAL_NOT_APPLICABLE
 
 
 def test_packet_phase_unit_count_not_substituted_by_whole_site(session):

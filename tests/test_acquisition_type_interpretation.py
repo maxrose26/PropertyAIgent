@@ -51,9 +51,9 @@ def test_no_rigid_universal_polarity_encoded_for_recent_permission():
         assert "always positive" not in principle.strengthens_when.lower()
 
 
-def test_no_rigid_universal_polarity_encoded_for_development_underway():
+def test_no_rigid_universal_polarity_encoded_for_implementation_activity_evidence_identified():
     for acquisition_type in ACQUISITION_TYPES:
-        principle = get_principle_for_signal(acquisition_type, "development_underway")
+        principle = get_principle_for_signal(acquisition_type, "implementation_activity_evidence_identified")
         if principle is None:
             continue
         assert principle.strengthens_when.strip()
@@ -71,11 +71,11 @@ def test_land_site_acquisition_recent_permission_is_genuinely_ambiguous():
     assert principle.weakens_when.strip()
 
 
-def test_development_underway_polarity_differs_by_acquisition_type():
+def test_implementation_activity_evidence_identified_polarity_differs_by_acquisition_type():
     """The same signal must be read through genuinely different, acquisition-
     type-specific commercial lenses - not copy-pasted principles."""
-    land = get_principle_for_signal(LAND_SITE_ACQUISITION, "development_underway")
-    homes = get_principle_for_signal(DEVELOPMENT_HOMES_ACQUISITION, "development_underway")
+    land = get_principle_for_signal(LAND_SITE_ACQUISITION, "implementation_activity_evidence_identified")
+    homes = get_principle_for_signal(DEVELOPMENT_HOMES_ACQUISITION, "implementation_activity_evidence_identified")
     assert land is not None and homes is not None
     assert land.why_it_matters != homes.why_it_matters
     assert land.strengthens_when != homes.strengthens_when
