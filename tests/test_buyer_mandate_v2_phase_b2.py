@@ -139,9 +139,11 @@ class _FakeAcquisitionPositionFacts:
 # --- Matching-policy version tests (Phase B2 brief, Section 47) ------------
 
 def test_policy_version_is_the_current_expected_value():
-    # Version 3: B2 narrow semantic cleanup (post Buyer Fit Classification
-    # Audit) - see BUYER_MATCHING_POLICY_VERSION's own docstring.
-    assert BUYER_MATCHING_POLICY_VERSION == 3
+    # Version 4: Agent-Ready Fact Foundation (authoritative B2 context
+    # mandatory at the production evaluation boundary + authoritative
+    # normalised Local Plan status for strategic land) - see
+    # BUYER_MATCHING_POLICY_VERSION's own docstring.
+    assert BUYER_MATCHING_POLICY_VERSION == 4
 
 
 def test_fingerprint_changes_when_policy_version_changes():
@@ -687,7 +689,10 @@ def test_strategic_land_matched_to_site_produces_no_ownership_gap_reason():
 # --- Matching-policy version (B2 narrow semantic cleanup) -----------------
 
 def test_matching_policy_version_is_now_3():
-    assert BUYER_MATCHING_POLICY_VERSION == 3
+    # Superseded by Agent-Ready Fact Foundation's own version 4 bump - see
+    # test_policy_version_is_the_current_expected_value above for why 4 is
+    # now the correct current value.
+    assert BUYER_MATCHING_POLICY_VERSION == 4
 
 
 def test_semantic_cleanup_fingerprint_differs_from_prior_policy_version():
