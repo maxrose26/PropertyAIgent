@@ -60,6 +60,7 @@ from app.db.models import Application, LocalPlan, LocalPlanSite, Site
 from app.policy.buyer_matching import PLANNING_DELIVERY, STRATEGIC_LAND, B2MatchingContext, MatchingFacts, OTHER_OR_UNKNOWN
 from app.policy.buyer_matching_b2_context import build_b2_context
 from app.reporting.acquisition_position import build_acquisition_position_facts
+from app.reporting.opportunity_transaction_signals import TransactionSignals, build_transaction_signals
 
 # --- FactValue: KNOWN / UNKNOWN / NOT_APPLICABLE -----------------------------
 
@@ -168,6 +169,15 @@ class OpportunityIntelligencePacket:
     linked_strategic_allocation_id: int | None
     linked_strategic_allocation_name: str | None
 
+    # --- Transaction/disposition signals (Agent Evaluation Foundation) ---
+    # Buyer-independent, deterministic, never a seller-intent/availability
+    # claim - see app.reporting.opportunity_transaction_signals' own module
+    # docstring for the full governing semantics and the two Product Owner
+    # corrections it encodes (absence of commencement evidence is never
+    # confirmed inactivity; evidence changing is not the same claim as
+    # ownership changing).
+    transaction_signals: TransactionSignals
+
 
 def _scheme_intelligence_field(applications, field_name: str) -> str | None:
     """Returns the first non-null value of `field_name` across every
@@ -266,6 +276,8 @@ def build_opportunity_intelligence_packet(
         linked_strategic_allocation_id = None
         linked_strategic_allocation_name = None
 
+        transaction_signals = build_transaction_signals(session, opportunity)
+
     else:
         site_id = entity_id
         allocation_id = None
@@ -319,6 +331,8 @@ def build_opportunity_intelligence_packet(
         linked_strategic_allocation_id = linked_allocation.id if linked_allocation is not None else None
         linked_strategic_allocation_name = linked_allocation.site_name if linked_allocation is not None else None
 
+        transaction_signals = build_transaction_signals(session, opportunity, applications=applications, site=site)
+
     total_units = FactValue.unknown() if facts.unit_count is None else FactValue.known(facts.unit_count)
 
     return OpportunityIntelligencePacket(
@@ -344,4 +358,5 @@ def build_opportunity_intelligence_packet(
         actors_control=actors_control,
         linked_strategic_allocation_id=linked_strategic_allocation_id,
         linked_strategic_allocation_name=linked_strategic_allocation_name,
+        transaction_signals=transaction_signals,
     )
