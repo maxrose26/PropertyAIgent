@@ -19,8 +19,11 @@ from app.policy.agent_evaluation_result import (
     MEDIUM,
     MONITOR,
     NOT_RELEVANT,
+    PLANNING_STATUS_CHANGED,
     PURSUE,
     VERIFY,
+    WHOLE_ALLOCATION,
+    AcquisitionSubject,
     AgentEvaluationResult,
     AgentEvaluationResultKey,
     MaterialSignal,
@@ -34,7 +37,7 @@ def _make_result(**overrides) -> AgentEvaluationResult:
         recommendation=PURSUE,
         confidence=MEDIUM,
         confidence_basis=("Ownership unresolved but non-load-bearing for a control-stage strategy",),
-        acquisition_subject="The allocation itself",
+        acquisition_subject=AcquisitionSubject(level=WHOLE_ALLOCATION, note="The allocation itself"),
         mandate_fingerprint="fp-mandate-1",
         opportunity_fingerprint="fp-opportunity-1",
         evaluation_policy_version="mandate_interpretation=1;acquisition_type_interpretation=1",
@@ -65,8 +68,13 @@ def test_monitor_requires_a_monitoring_trigger():
 
 
 def test_monitor_with_a_trigger_is_valid():
-    result = _make_result(recommendation=MONITOR, monitoring_trigger="Re-evaluate if planning_status_changed fires.")
-    assert result.monitoring_trigger
+    result = _make_result(recommendation=MONITOR, monitoring_trigger=PLANNING_STATUS_CHANGED)
+    assert result.monitoring_trigger == PLANNING_STATUS_CHANGED
+
+
+def test_invalid_monitoring_trigger_rejected():
+    with pytest.raises(ValueError):
+        _make_result(recommendation=MONITOR, monitoring_trigger="Re-evaluate if planning_status_changed fires.")
 
 
 def test_pursue_does_not_require_a_monitoring_trigger():
@@ -78,10 +86,11 @@ def test_material_signals_and_unknowns_are_structured_not_free_text():
     result = _make_result(
         material_positive_signals=(MaterialSignal(label="Early-stage allocation", source_reference="progression_signal"),),
         material_negative_signals=(),
-        material_unknowns=(MaterialUnknown(fact="Ownership/control not established", blocking=False, resolvable=True),),
+        material_unknowns=(MaterialUnknown(fact_or_question="Ownership/control not established", blocking=False, resolvable=True),),
     )
     assert result.material_positive_signals[0].source_reference == "progression_signal"
     assert result.material_unknowns[0].blocking is False
+    assert result.material_unknowns[0].fact_or_question == "Ownership/control not established"
 
 
 # --- One result key per (mandate, opportunity, acquisition_type) -----------
