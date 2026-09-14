@@ -12,12 +12,17 @@ from __future__ import annotations
 
 from app.policy.agent_evaluation_prompt import GOVERNING_POLICY, PromptContext, render_prompt
 from app.policy.agent_evaluation_result import (
+    DEVELOPMENT_SITE,
     HIGH,
+    IDENTIFY_PHASE_OR_PARCEL,
     MONITOR,
     NOT_RELEVANT,
     PARCEL_TBD,
+    PHASE,
     PURSUE,
     VERIFY,
+    VERIFY_OWNERSHIP,
+    WHOLE_ALLOCATION,
     AgentEvaluationResultKey,
 )
 from app.policy.agent_evaluation_validator import find_unsupported_language, validate_and_build_result
@@ -264,7 +269,12 @@ def test_monitor_with_positive_signal_zero_negative_all_nonblocking_unknowns_rej
     assert any("inconsistent" in e for e in outcome.errors)
 
 
-def test_monitor_with_at_least_one_blocking_unknown_and_no_negative_signal_passes():
+def test_monitor_with_a_material_resolvable_blocking_unknown_and_no_negative_signal_is_now_rejected():
+    """Superseded by the Pre-Release Commercial Semantic Fix (Section 6/10):
+    a material+resolvable+BLOCKING unknown with no real negative signal is
+    exactly the "investigate now, disguised as MONITOR" pattern - this
+    must now be rejected (forcing VERIFY) rather than accepted as MONITOR,
+    per the new MONITOR-vs-VERIFY consistency rule below."""
     raw = _raw(
         recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
         supporting_reasons=[{"label": "A clean positive.", "evidence_reference": "packet.total_units"}],
@@ -272,7 +282,7 @@ def test_monitor_with_at_least_one_blocking_unknown_and_no_negative_signal_passe
         material_unknowns=[{"fact_or_question": "Q1", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
     )
     outcome = _validate(raw)
-    assert outcome.ok is True
+    assert outcome.ok is False
 
 
 def test_monitor_with_negative_signal_and_all_nonblocking_unknowns_passes():
@@ -356,3 +366,166 @@ def test_schema_and_evidence_discipline_hold_regardless_of_injected_text_in_evid
     outcome = _validate(raw, context=context)
     assert outcome.ok is False
     assert any("recommendation" in e for e in outcome.errors)
+
+
+# --- Pre-Release Commercial Semantic Fix: acquisition-subject/next-action --
+# --- consistency, and PARCEL_TBD must never assert a real parcel exists ---
+
+def test_parcel_tbd_with_a_populated_reference_rejected():
+    """PARCEL_TBD means 'may exist, not yet identified' - a populated
+    reference asserts a SPECIFIC parcel has been found, which contradicts
+    that meaning. Structural check, no NLP."""
+    raw = _raw(acquisition_subject={"level": PARCEL_TBD, "reference": "Parcel A", "note": None})
+    outcome = _validate(raw)
+    assert outcome.ok is False
+    assert any("PARCEL_TBD must not carry a specific reference" in e for e in outcome.errors)
+
+
+def test_parcel_tbd_without_a_reference_still_passes():
+    raw = _raw(acquisition_subject={"level": PARCEL_TBD, "reference": None, "note": "may exist, not yet identified"})
+    outcome = _validate(raw)
+    assert outcome.ok is True
+    assert outcome.result.acquisition_subject.reference is None
+
+
+def test_identify_phase_or_parcel_with_whole_allocation_subject_rejected():
+    """The task's own worked example: subject=WHOLE_ALLOCATION with
+    reasoning that depends on finding a smaller parcel must not pass
+    unchanged - caught here via the bounded next_action field, never via
+    free-text pattern matching over reasoning_summary."""
+    raw = _raw(
+        acquisition_subject={"level": WHOLE_ALLOCATION, "reference": None, "note": None},
+        next_action=IDENTIFY_PHASE_OR_PARCEL,
+        reasoning_summary="Worth pursuing to identify an 80-unit parcel within the wider allocation.",
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is False
+    assert any("inconsistent with acquisition_subject.level" in e for e in outcome.errors)
+
+
+def test_identify_phase_or_parcel_with_development_site_subject_rejected():
+    raw = _raw(acquisition_subject={"level": DEVELOPMENT_SITE, "reference": None, "note": None}, next_action=IDENTIFY_PHASE_OR_PARCEL)
+    outcome = _validate(raw)
+    assert outcome.ok is False
+
+
+def test_identify_phase_or_parcel_with_parcel_tbd_subject_passes():
+    raw = _raw(acquisition_subject={"level": PARCEL_TBD, "reference": None, "note": None}, next_action=IDENTIFY_PHASE_OR_PARCEL)
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+def test_identify_phase_or_parcel_with_phase_subject_passes():
+    raw = _raw(acquisition_subject={"level": PHASE, "reference": "Phase 3B", "note": None}, next_action=IDENTIFY_PHASE_OR_PARCEL)
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+def test_whole_allocation_subject_with_a_different_next_action_is_unaffected():
+    """The new check is scoped to IDENTIFY_PHASE_OR_PARCEL specifically -
+    WHOLE_ALLOCATION paired with any other next_action is untouched."""
+    raw = _raw(acquisition_subject={"level": WHOLE_ALLOCATION, "reference": None, "note": None}, next_action=VERIFY_OWNERSHIP)
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+# --- Pre-Release Commercial Semantic Fix: ownership non-blocking + PURSUE --
+
+def test_pursue_with_verify_ownership_next_action_and_non_blocking_unknown_passes():
+    raw = _raw(
+        recommendation=PURSUE, next_action=VERIFY_OWNERSHIP,
+        material_unknowns=[{"fact_or_question": "What is the ownership/control position?", "material": True, "resolvable": True, "blocking": False, "why_it_matters": "y"}],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+    assert outcome.result.recommendation == PURSUE
+    assert outcome.result.material_unknowns[0].blocking is False
+
+
+def test_pursue_with_blocking_ownership_unknown_is_still_permitted():
+    """Ownership CAN legitimately be blocking (e.g. it prevents identifying
+    the acquisition subject/route) - the validator must not forbid this
+    either; the LLM's judgement call, not a fixed rule in either
+    direction."""
+    raw = _raw(
+        recommendation=PURSUE,
+        material_unknowns=[{"fact_or_question": "Which legal interest is the relevant acquisition subject?", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+# --- Pre-Release Commercial Semantic Fix: MONITOR must not be disguised ----
+# --- "investigate now" work ---------------------------------------------
+
+def test_monitor_with_material_resolvable_blocking_unknown_rejected():
+    """Regression for the live-calibration finding: a model that correctly
+    marks an unknown material+resolvable+blocking must not then also
+    choose MONITOR - by the policy's own formula that combination IS
+    VERIFY (or PURSUE-with-a-credible-angle), never a future-trigger
+    deferral."""
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
+        next_action=IDENTIFY_PHASE_OR_PARCEL,
+        acquisition_subject={"level": PARCEL_TBD, "reference": None, "note": None},
+        material_unknowns=[{"fact_or_question": "Is there a suitable parcel within target range?", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is False
+    assert any("MONITOR is inconsistent with a material_unknowns entry" in e for e in outcome.errors)
+
+
+def test_monitor_with_only_non_blocking_unknowns_and_a_real_negative_signal_passes():
+    """A genuine future-trigger MONITOR (e.g. development already
+    underway, waiting for that to change) with only non-blocking parallel
+    unknowns must remain valid - the new rule targets the specific
+    material+resolvable+BLOCKING combination only."""
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="IMPLEMENTATION_ACTIVITY_CHANGED",
+        countervailing_reasons=[{"label": "Development is already underway.", "evidence_reference": "packet.total_units"}],
+        material_unknowns=[{"fact_or_question": "Is the implementation activity specific to this site?", "material": True, "resolvable": True, "blocking": False, "why_it_matters": "y"}],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+def test_monitor_with_zero_unknowns_and_a_real_negative_signal_passes():
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="IMPLEMENTATION_ACTIVITY_CHANGED",
+        countervailing_reasons=[{"label": "Development is already underway.", "evidence_reference": "packet.total_units"}],
+        material_unknowns=[],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+def test_verify_with_material_resolvable_blocking_unknown_is_unaffected_by_the_new_rule():
+    raw = _raw(
+        recommendation=VERIFY,
+        material_unknowns=[{"fact_or_question": "Is there a suitable parcel within target range?", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+def test_monitor_grounded_only_in_buyer_fit_unknown_with_nonblocking_unknowns_rejected():
+    """Regression for a second live-calibration finding: citing
+    buyer_fit.unknown[i] (e.g. "scale exceeds target") as MONITOR's only
+    countervailing basis is the same unknown-reframed-as-confirmed pattern
+    already fixed for NOT_RELEVANT - it must not count as real grounding
+    for MONITOR either."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 109", "buyer_fit.matches[0]": "Planning position matches appetite.",
+        "buyer_fit.unknown[0]": "Overall scale exceeds buyer's target range.",
+    })
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
+        confidence_basis=["buyer_fit.matches[0]"],
+        supporting_reasons=[{"label": "Planning position matches appetite.", "evidence_reference": "buyer_fit.matches[0]"}],
+        countervailing_reasons=[{"label": "Overall scale exceeds target range.", "evidence_reference": "buyer_fit.unknown[0]"}],
+        material_unknowns=[{"fact_or_question": "Is there a suitable parcel?", "material": True, "resolvable": True, "blocking": False, "why_it_matters": "y"}],
+        evidence_references=["buyer_fit.matches[0]", "buyer_fit.unknown[0]"],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is False
+    assert any("no CONFIRMED countervailing reason" in e for e in outcome.errors)

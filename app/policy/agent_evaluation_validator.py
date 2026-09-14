@@ -17,10 +17,13 @@ from app.policy.agent_evaluation_prompt import PromptContext
 from app.policy.agent_evaluation_result import (
     ACQUISITION_SUBJECT_LEVELS,
     CONFIDENCE_VALUES,
+    IDENTIFY_PHASE_OR_PARCEL,
     MONITOR,
     MONITORING_TRIGGER_VALUES,
     NEXT_ACTION_VALUES,
     NOT_RELEVANT,
+    PARCEL_TBD,
+    PHASE,
     RECOMMENDATION_VALUES,
     VERIFY,
     AcquisitionSubject,
@@ -137,6 +140,38 @@ def validate_and_build_result(
         else:
             acquisition_subject = AcquisitionSubject(level=level, reference=reference, note=note)
 
+            # PARCEL_TBD means "a smaller subject MAY exist but has not
+            # been identified" (Pre-Release Commercial Semantic Fix,
+            # Section 2/I) - a populated `reference` asserts a SPECIFIC
+            # parcel/phase has been identified, which contradicts that
+            # meaning outright. This is a pure structural check (no NLP):
+            # if the model actually has a specific reference, PHASE is the
+            # correct level, never PARCEL_TBD.
+            if level == PARCEL_TBD and reference:
+                errors.append(
+                    f"acquisition_subject.level=PARCEL_TBD must not carry a specific reference "
+                    f"(got {reference!r}) - a populated reference asserts a parcel has been identified, "
+                    "which contradicts PARCEL_TBD's own meaning; use PHASE instead if a specific "
+                    "phase/parcel has actually been established by evidence"
+                )
+
+            # Structural acquisition-subject/next-action consistency
+            # (Pre-Release Commercial Semantic Fix, Section 3): choosing
+            # next_action=IDENTIFY_PHASE_OR_PARCEL is itself a statement
+            # that the true acquisition subject is not yet established -
+            # it is therefore inconsistent with an acquisition_subject that
+            # already claims to BE the whole evidence object
+            # (WHOLE_ALLOCATION/DEVELOPMENT_SITE) or the whole affordable
+            # package/pipeline. Checked via the bounded next_action field,
+            # never via free-text pattern-matching over reasoning_summary.
+            if next_action == IDENTIFY_PHASE_OR_PARCEL and level not in (PARCEL_TBD, PHASE):
+                errors.append(
+                    f"next_action=IDENTIFY_PHASE_OR_PARCEL is inconsistent with acquisition_subject.level="
+                    f"{level!r} - choosing to identify a phase/parcel implies the acquisition subject is not "
+                    "yet established; use acquisition_subject.level=PARCEL_TBD (or PHASE if a specific "
+                    "phase/parcel is already evidenced), never WHOLE_ALLOCATION or DEVELOPMENT_SITE"
+                )
+
     # Evidence-reference discipline: every cited reference must be one of
     # the exact tokens actually supplied in this evaluation's own context -
     # never a fact the model was not given (Section 16 of the narrow-
@@ -185,41 +220,66 @@ def validate_and_build_result(
         if not any(u.material and u.resolvable and u.blocking for u in unknowns):
             errors.append("VERIFY requires at least one material_unknowns entry with material=True, resolvable=True, blocking=True")
 
-    # Recommendation-vs-evidence consistency: MONITOR (and NOT_RELEVANT)
-    # both mean "the current commercial case does not justify effort now" -
-    # if the model itself supplied at least one supporting_reasons entry,
-    # zero countervailing_reasons, and every material_unknowns entry is
-    # blocking=False, there is no honest basis left for anything other than
-    # PURSUE. This is not re-judging commercial attractiveness (Section O's
-    # own limit) - it is catching the model contradicting its OWN
-    # structured fields with its OWN recommendation, a real, reproducible
-    # failure mode confirmed during live calibration (a model that
-    # correctly marks both unknowns non-blocking yet still returns
-    # MONITOR).
-    if recommendation in (MONITOR, NOT_RELEVANT) and positive_signals and not negative_signals:
-        if unknowns and all(not u.blocking for u in unknowns):
-            errors.append(
-                f"{recommendation} is inconsistent with the model's own structured output: at least one "
-                "supporting reason was cited, no countervailing reason was cited, and every material_unknowns "
-                "entry is blocking=false - there is no basis left for anything other than PURSUE (with any "
-                "non-blocking unknowns investigated in parallel)"
-            )
+    # MONITOR must never be "investigate now" in disguise (Pre-Release
+    # Commercial Semantic Fix, Section 6/10): the governing policy's own
+    # formula is MATERIAL + RESOLVABLE + BLOCKING == VERIFY. If the model's
+    # own material_unknowns already contain such an entry, MONITOR is
+    # structurally inconsistent with it - a question that could be
+    # resolved NOW is investigation work to do now (PURSUE or VERIFY),
+    # never a reason to defer to some future external trigger. Confirmed
+    # live: a model that correctly marks an unknown material+resolvable+
+    # blocking nonetheless sometimes still chose MONITOR instead of VERIFY.
+    if recommendation == MONITOR and any(u.material and u.resolvable and u.blocking for u in unknowns):
+        errors.append(
+            "MONITOR is inconsistent with a material_unknowns entry that is material=True, resolvable=True, "
+            "blocking=True - by this policy's own rule (MATERIAL + RESOLVABLE + BLOCKING = VERIFY), a "
+            "question resolvable right now is investigation work to act on (VERIFY, or PURSUE if the "
+            "opportunity already has a credible angle), never a reason to wait for a future external trigger"
+        )
 
-    # NOT_RELEVANT must never rely solely on an unknown/soft-miss/absence-
-    # of-disposal-evidence basis (Section 3 - "never solely because of
-    # UNKNOWN / soft target miss / absence of disposal evidence"). A
-    # countervailing reason is only real grounding if it cites a CONFIRMED
-    # fact - "buyer_fit.unknown[i]" and "buyer_fit.investigate[i]" are
-    # Buyer Fit's own "could not establish this" buckets (see
-    # agent_evaluation_prompt.build_prompt_context), not confirmed negative
-    # facts, so citing only those is exactly the forbidden "relies solely on
-    # UNKNOWN" pattern even though the reference token itself is technically
-    # valid - confirmed during live calibration (BENCHMARK 3 cited only
-    # buyer_fit.unknown[2] and reframed it as a confirmed mismatch).
+    # A countervailing reason is only real grounding for DEFERRING/
+    # REJECTING an opportunity if it cites a CONFIRMED fact -
+    # "buyer_fit.unknown[i]" and "buyer_fit.investigate[i]" are Buyer Fit's
+    # own "could not establish this" buckets (see agent_evaluation_prompt.
+    # build_prompt_context), not confirmed negative facts. Citing only
+    # those to justify NOT pursuing now is the same "unknown reframed as a
+    # confirmed negative" pattern whether the recommendation is NOT_RELEVANT
+    # (Section 3/9 - confirmed live via BENCHMARK 3) or MONITOR (confirmed
+    # live via the Pre-Release Commercial Semantic Fix calibration - a
+    # model citing only "scale exceeds target" via buyer_fit.unknown[i] to
+    # justify MONITOR instead of investigating now).
     _NOT_A_CONFIRMED_FACT_PREFIXES = ("buyer_fit.unknown[", "buyer_fit.investigate[")
     confirmed_countervailing_refs = [
         r for r in countervailing_refs_valid if not r.startswith(_NOT_A_CONFIRMED_FACT_PREFIXES)
     ]
+    confirmed_negative_signals = [
+        s for s in negative_signals if not s.source_reference.startswith(_NOT_A_CONFIRMED_FACT_PREFIXES)
+    ]
+
+    # Recommendation-vs-evidence consistency: MONITOR (and NOT_RELEVANT)
+    # both mean "the current commercial case does not justify effort now" -
+    # if the model itself supplied at least one supporting_reasons entry,
+    # zero CONFIRMED countervailing_reasons, and every material_unknowns
+    # entry is blocking=False, there is no honest basis left for anything
+    # other than PURSUE. This is not re-judging commercial attractiveness
+    # (Section O's own limit) - it is catching the model contradicting its
+    # OWN structured fields with its OWN recommendation, a real,
+    # reproducible failure mode confirmed during live calibration (a model
+    # that correctly marks both unknowns non-blocking yet still returns
+    # MONITOR, in one case grounded only in a buyer_fit.unknown[i] token).
+    if recommendation in (MONITOR, NOT_RELEVANT) and positive_signals and not confirmed_negative_signals:
+        if unknowns and all(not u.blocking for u in unknowns):
+            errors.append(
+                f"{recommendation} is inconsistent with the model's own structured output: at least one "
+                "supporting reason was cited, no CONFIRMED countervailing reason was cited (a "
+                "buyer_fit.unknown[i]/buyer_fit.investigate[i] citation alone does not count), and every "
+                "material_unknowns entry is blocking=false - there is no basis left for anything other than "
+                "PURSUE (with any non-blocking unknowns investigated in parallel)"
+            )
+
+    # NOT_RELEVANT must never rely solely on an unknown/soft-miss/absence-
+    # of-disposal-evidence basis (Section 3 - "never solely because of
+    # UNKNOWN / soft target miss / absence of disposal evidence").
     if recommendation == NOT_RELEVANT and not confirmed_countervailing_refs:
         errors.append(
             "NOT_RELEVANT requires at least one countervailing_reasons entry citing a CONFIRMED fact "
