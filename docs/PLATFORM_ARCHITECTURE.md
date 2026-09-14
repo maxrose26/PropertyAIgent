@@ -390,7 +390,7 @@ Structured intelligence        (Planning, Policy, Market Intelligence, §§1-3)
      ↓
 Deterministic engines          (matching, coverage, classification, calculation)
      ↓
-Agentic investigation          (Opportunity Analyst · Buyer Analyst · Market & Investment Analyst)
+Agentic investigation          (Opportunity Analyst · Mandate Intake Agent · Buyer Analyst · Market & Investment Analyst)
      ↓
 Evidence-backed recommendation
      ↓
@@ -498,6 +498,7 @@ Not every proposed "agent" is actually an agent. A capability that primarily bui
 | Capability | Kind | Where it lives | Why |
 |---|---|---|---|
 | Opportunity Analyst | **Agentic** | Consumes Policy Intelligence §2 (Opportunity Intelligence) | Genuinely requires judgement over already-established facts — is this worth investigating, why, what's uncertain |
+| Mandate Intake Agent | **Agentic** | Sits above Buyer Mandate persistence (Buyer Mandate V2) | Converting a buyer's natural-language strategy into a structured, confirmed mandate is interpretation of intent, not fact extraction — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "AI-Native Acquisition Architecture" |
 | Buyer Analyst | **Agentic** | Consumes structured buyer profiles + opportunity facts | Interpretation of a deterministic fit result is judgement; the fit result itself is not |
 | Market & Investment Analyst | **Agentic** | Consumes Market Intelligence §3 + Development Economics §4 | Same pattern: structured comparables/appraisal facts first, interpretation second |
 | Strategic Land Intelligence | **Platform intelligence** | Policy Intelligence §2 | Building/maintaining allocation, plan-stage, spatial-strategy evidence is evidence work, not reasoning — it *feeds* the Opportunity Analyst |
@@ -525,7 +526,15 @@ Sits above structured buyer profiles (geography, unit/site scale, planning-risk 
 
 **Implementation status:** the deterministic layer this agent will sit above is built and closed - Buyer Profiles V1 (four pilot profiles) and `app.policy.buyer_matching.assess_buyer_fit`, merged to master, plus persistent, Workspace-owned Buyer Profiles and a deterministic onboarding baseline (Gate 1: Acquisition Monitoring Substrate, merged to master). The Buyer Analyst's own agentic interpretation layer is not yet built — the acquisition-first roadmap now sequences it as **Buyer Mandate V2 → Acquisition Agent V1** (extending, never rebuilding, this same Buyer Profile substrate — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)).
 
-### C. Market / Investment Analyst
+### C. Mandate Intake Agent
+
+*(Added at the AI-Native Acquisition Architecture update — documentation only, not authorised for implementation. Full design detail lives in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "AI-Native Acquisition Architecture," to avoid duplicating it here.)*
+
+**Core question:** *What does this buyer's natural-language acquisition strategy actually mean commercially, and has the buyer confirmed that interpretation?*
+
+Sits **above** Buyer Mandate persistence (Buyer Mandate V2), not above deterministic Buyer Fit — its output is a structured, user-confirmed `BuyerMandate`/`BuyerMandatePolicy`, never a fit assessment. Architecture: **natural-language mandate → targeted clarification → structured draft → user-readable confirmation → active mandate**, never silent AI authority over an active mandate. Distinguishes hard constraints from targets/preferences/tolerances (e.g. "50-100 homes" is not automatically `units >= 50 AND units <= 100`) and supports planning-stage adjacency rather than naive exact-state matching (e.g. "sites with planning" may mean planning-ready, not formal-permission-only) — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for both principles in full, including how they connect directly to specific findings in the current Buyer Fit Classification Audit. **Implementation status:** not built, not scheduled — a future implementation gate's own design decision, sequenced before Acquisition Agent V1 per [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)'s revised sequencing.
+
+### D. Market / Investment Analyst
 
 **Phase 2.** Must not distract from current Phase 1 opportunity sourcing.
 
@@ -541,7 +550,7 @@ Sits above structured sales/rental comparables, comparable relevance, £/sq ft, 
 2. **Acquisition Intelligence** — structured evidence extraction (Applicant Intelligence, built/closed — Gate 2A; Acquisition Position Intelligence, Gate 2C, sequenced after Gate 2B-0B) with agentic reasoning (the Buyer Analyst / Gate 3 Autonomous Acquisition Agent above) layered on afterward, not built together.
 3. **Opportunity Monitoring** — the deterministic change-detection infrastructure (Gate 1/1C) is built and closed, and Gate 2B-2C corrected the facts it detects changes against; Gate 2B-0B extends detection to durable lifecycle history; only the interpretation of a detected change ("does this matter for this buyer's mandate?") — Gate 3 — is agentic.
 
-Later: the Market & Investment Analyst (§C above) and a future Development Appraisal Agent remain sequenced behind real market data existing — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Phase 2."
+Later: the Market & Investment Analyst (§D above) and a future Development Appraisal Agent remain sequenced behind real market data existing — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Phase 2."
 
 ### Grokbot — long-term concept, not designed here
 
