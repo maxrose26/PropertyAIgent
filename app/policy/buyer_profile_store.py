@@ -53,7 +53,7 @@ import json
 from sqlalchemy import select
 
 from app.db.models import Buyer, BuyerMandate, Council, Workspace, utcnow
-from app.policy.buyer_matching import INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit
+from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit
 from app.policy.buyer_profiles import (
     ACQUISITION_TYPES,
     BUYER_PROFILE_ORDER,
@@ -137,8 +137,25 @@ def compute_buyer_mandate_fingerprint(policy: BuyerMandatePolicy) -> str:
     scripts.backfill_buyer_mandate_b1_defaults for how that one-time change
     is applied without triggering a wasted full opportunity-universe
     re-onboarding scan (B1 does not change assess_buyer_fit's own output at
-    all, so re-scanning would recompute identical conclusions)."""
+    all, so re-scanning would recompute identical conclusions).
+
+    Buyer Mandate V2, Phase B2: app.policy.buyer_matching.
+    BUYER_MATCHING_POLICY_VERSION is now the FIRST key hashed - the
+    mandatory entry condition Phase B1 itself recorded ("a mandate
+    baseline must eventually become stale when either matching-relevant
+    mandate inputs change, OR the deterministic matching semantics used
+    to interpret those inputs change"). Every existing persisted
+    fingerprint was computed before this key existed at all, so its mere
+    introduction changes every current mandate's own fingerprint once,
+    with ZERO mandate field needing to change. Unlike Phase B1's own
+    field-addition transition (a safe, in-place refresh, since B1 changed
+    no matching output), THIS transition genuinely changes assess_buyer_
+    fit's own behaviour once a B2MatchingContext is supplied, so it
+    requires a real, controlled reassessment - never a silent fingerprint
+    rewrite - before any mandate's baseline may be considered current
+    again."""
     fingerprint_source = {
+        "matching_policy_version": BUYER_MATCHING_POLICY_VERSION,
         "target_unit_min": policy.target_unit_min,
         "target_unit_max": policy.target_unit_max,
         "scale_metric": policy.scale_metric,

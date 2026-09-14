@@ -170,18 +170,30 @@ def test_missing_affordable_evidence_never_becomes_zero_percent():
 
 def test_missing_phasing_does_not_become_phaseable():
     # An oversized opportunity with NO phasing evidence must never read as
-    # "a suitable phase exists" - it must stay an open question.
+    # "a suitable phase exists" - it must stay an open investigative
+    # question. B2 semantic cleanup (Buyer Fit Classification Audit,
+    # Section 6): the already-KNOWN whole-site scale itself is not missing
+    # evidence, so it must not by itself force INSUFFICIENT_EVIDENCE - only
+    # prove it is not falsely labelled a positive phase match either.
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=3500, has_phasing_evidence=False, opportunity_type=STRATEGIC_LAND))
-    assert result.classification != STRONG_FIT
     assert not any("phase" in m.lower() and "exists" in m.lower() for m in result.matches)
     assert result.is_investigative_exception is True
+    assert any("materially exceeds" in u for u in result.unknown)
+    assert any("Establish whether a suitable development parcel/phase" in i for i in result.investigate)
 
 
 def test_oversized_allocation_does_not_automatically_become_not_suitable():
+    # B2 semantic cleanup (Buyer Fit Classification Audit, Section 6): a
+    # known oversized scale with no phasing evidence is a visible,
+    # investigative fact, never a reason to call the classification
+    # itself unresolved - this opportunity has no hard mismatch and no
+    # genuine evidence gap, so it reaches STRONG_FIT, still correctly
+    # flagged as an investigative exception.
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=3500, opportunity_type=STRATEGIC_LAND, planning_state="adopted_allocation"))
     assert result.classification != NOT_SUITABLE
-    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert result.classification == STRONG_FIT
     assert result.is_investigative_exception is True
+    assert any("materially exceeds" in u for u in result.unknown)
 
 
 def test_insufficient_parcel_evidence_preserves_uncertainty_not_certainty():
@@ -339,10 +351,15 @@ def test_affordable_component_in_range_despite_total_exceeding_housing_associati
     assert any("400" in m and "homes" in m for m in national.matches)
 
     # Nesten (50-100 total): 400 total homes is oversized on ITS OWN metric
-    # - correctly investigated, never silently matched.
+    # - correctly flagged as an investigative exception, never silently
+    # matched as "a suitable phase exists". B2 semantic cleanup (Buyer Fit
+    # Classification Audit, Section 6): the known oversized scale fact
+    # itself is not missing evidence, so it no longer forces
+    # INSUFFICIENT_EVIDENCE on its own.
     nesten = assess_buyer_fit(NESTEN_HOMES, facts)
     assert nesten.is_investigative_exception is True
-    assert nesten.classification != STRONG_FIT
+    assert nesten.classification == STRONG_FIT
+    assert not any("phase" in m.lower() and "exists" in m.lower() for m in nesten.matches)
 
 
 # --- Required acceptance case (Housing Association amendment, Section 15):
@@ -438,24 +455,46 @@ def test_elton_reservoir_produces_materially_different_conclusions_per_buyer(ses
 
     # None is a hard mismatch - the allocation itself is genuinely
     # residential and adopted, matching every profile's planning appetite.
-    assert nesten.classification == INSUFFICIENT_EVIDENCE and nesten.is_investigative_exception
-    assert strategic.classification == INSUFFICIENT_EVIDENCE and strategic.is_investigative_exception
-    assert national.classification == INSUFFICIENT_EVIDENCE and national.is_investigative_exception
+    #
+    # B2 semantic cleanup (Buyer Fit Classification Audit, Section 7): the
+    # allocation's structurally-unavailable affordable-percentage and
+    # specialist-development facts, and its unmatched ownership/site
+    # linkage, no longer classification-block STRATEGIC_LAND opportunities
+    # - and a known oversized scale with no phasing evidence is itself not
+    # missing evidence - so Nesten, Strategic Land Buyer and National
+    # Housebuilder all reach STRONG_FIT (still correctly flagged as an
+    # investigative exception - the scale-vs-target and ownership
+    # questions remain genuinely open, visible in `unknown`/`investigate`).
+    assert nesten.classification == STRONG_FIT and nesten.is_investigative_exception
+    assert strategic.classification == STRONG_FIT and strategic.is_investigative_exception
+    assert national.classification == STRONG_FIT and national.is_investigative_exception
 
     # Housing Association (Section 10): no scheme-specific affordable-unit
     # evidence exists at all for a Local Plan allocation - correctly
     # INSUFFICIENT_EVIDENCE, never a fabricated affordable-unit estimate
     # from Local Plan/NPPF policy percentages applied to allocation
-    # capacity. Not flagged as an "investigative exception" - that flag is
-    # specific to the oversized-scale branch, which this buyer's own scale
-    # metric (affordable units) never reaches here.
+    # capacity. This is a genuine, still-missing fact (unaffected by the
+    # semantic cleanup, which only touches structurally-UNAVAILABLE facts,
+    # never genuinely-missing ones) - not flagged as an "investigative
+    # exception" either, since that flag is specific to the oversized-scale
+    # branch, which this buyer's own scale metric (affordable units) never
+    # reaches here.
     assert housing_association.classification == INSUFFICIENT_EVIDENCE
+    assert housing_association.is_investigative_exception is False
     assert any("affordable-unit count is available" in u for u in housing_association.unknown)
 
     # Nesten: allocation matches, scale materially exceeds target, no
-    # parcel evidence -> investigation required (never claimed to fit).
+    # parcel evidence -> visible, investigative, but no longer a reason to
+    # withhold STRONG_FIT (never claimed a suitable phase exists).
     assert any("materially exceeds" in u for u in nesten.unknown)
     assert not any("meaningful strategic-land position" in m for m in nesten.matches)
+
+    # Every buyer's unresolved ownership/site-linkage gap is now visible as
+    # an investigation question, never a Buyer Fit blocker and never
+    # fabricated ownership/control/availability.
+    for result in (nesten, strategic, national, housing_association):
+        assert any("Ownership/control has not been established" in i for i in result.investigate)
+        assert not any("Ownership/control" in u for u in result.unknown)
 
     # Strategic Land Buyer: the same evidence reads as materially more
     # relevant - no-activity framed positively, and the allocation's own
@@ -468,11 +507,6 @@ def test_elton_reservoir_produces_materially_different_conclusions_per_buyer(ses
     # appetite for this profile) but against its own different range.
     assert any("materially exceeds" in u for u in national.unknown)
     assert not any("meaningful strategic-land position" in m for m in national.matches)
-
-    # Ownership/control is a structural gap - present for every buyer,
-    # never invented as known for any of them.
-    for assessment in (nesten, strategic, national):
-        assert any("Ownership/control has not been established" in u for u in assessment.unknown)
 
 
 # --- Generic mode is unaffected ----------------------------------------------
