@@ -581,10 +581,23 @@ class B2MatchingContext:
     council_code/development_state cheaply (both already computed
     elsewhere for other purposes, e.g. compute_lapse_status's own
     fingerprint use) while leaving control_facts None if Gate 2C's own
-    per-opportunity computation cost is not justified for that call."""
+    per-opportunity computation cost is not justified for that call.
+
+    Phase B2 narrow remediation (Issue B): development_state_scope_
+    verified records whether `development_state` is known to cover the
+    SAME opportunity scope as the specific opportunity being assessed -
+    e.g. a site-level or genuinely whole-site/unphased opportunity, vs a
+    single named phase, a recent permission, or a long-pending
+    application, where an "underway" fact may only describe a DIFFERENT
+    part of the same site. Defaults to False (unverified/unknown scope)
+    so a caller that never computes this - deliberately including every
+    caller from before this field existed - gets the safe, conservative
+    behaviour: a hard rejection dependent on development_state is never
+    triggered on unverified scope."""
     council_code: str | None = None
     development_state: str | None = None  # one of the DEVELOPMENT_STATE_* constants above, or None (not computed)
     control_facts: ControlAppetiteFacts | None = None
+    development_state_scope_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -630,15 +643,39 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     classification (Phase B2 brief, Section 37's own required rule
     matrix) - only two paths in this whole function can ever append to
     does_not_match because of a B2 dimension: an explicit COUNCILS
-    mismatch, and a STRATEGIC_LAND_CONTROL-only mandate against
-    confirmed-underway-or-further development. Every other B2 rule is
-    deliberately soft (matches/unknown/investigate only), per the brief's
-    own repeated "use NOT_SUITABLE conservatively" instruction."""
+    mismatch, and a STRATEGIC_LAND_CONTROL mandate against confirmed-
+    underway-or-further development at a VERIFIED opportunity scope
+    (Phase B2 narrow remediation, Issue B - unverified scope is routed to
+    `investigate`/`unknown` instead, never a hard rejection). Every other
+    B2 rule is deliberately soft (matches/unknown/investigate only), per
+    the brief's own repeated "use NOT_SUITABLE conservatively"
+    instruction.
+
+    Phase B2 narrow remediation (Issue A): not every `unknown` reason
+    drives classification - see `blocking_unknown` below and the module-
+    level classification-driving-vs-contextual distinction it encodes."""
     matches: list[str] = []
     does_not_match: list[str] = []
     unknown: list[str] = []
     investigate: list[str] = []
     is_investigative_exception = False
+    # Phase B2 narrow remediation (Issue A): not every reason in `unknown`
+    # should block STRONG_FIT. A CLASSIFICATION-DRIVING unknown (a missing
+    # fact needed to confirm an actual mandate REQUIREMENT - e.g. is this
+    # general-needs housing, is the unit count known, is the planning
+    # position classifiable) genuinely means the opportunity cannot yet be
+    # confirmed a strong fit, and must still produce INSUFFICIENT_EVIDENCE.
+    # A CONTEXTUAL/SOFT-PREFERENCE unknown (a missing fact for something
+    # the mandate merely PREFERS, never requires - currently only the B2
+    # development-state-appetite reasons below) must remain visible in the
+    # `unknown` bucket for transparency but must NOT by itself downgrade an
+    # otherwise-STRONG_FIT opportunity. `blocking_unknown` is set alongside
+    # every pre-existing `unknown.append` call (preserving Phase B1/B2's
+    # exact prior classification behaviour for all of them) and at the B2
+    # geography/acquisition-type unknowns (both stated mandate
+    # REQUIREMENTS, not soft preferences) - but deliberately never at the
+    # four development-state-appetite unknown sites in block B2.3 below.
+    blocking_unknown = False
     # Buyer Mandate V2, Phase B2: whether the CALLER chose to activate B2
     # at all - deliberately independent of whether the mandate itself has
     # any B1 fields configured (all four real production mandates already
@@ -677,8 +714,10 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 f"appetite for specialist/retirement housing has not been specified, so this is not treated "
                 f"as confirmed positive or negative evidence."
             )
+            blocking_unknown = True
     elif facts.is_specialist_development is None:
         unknown.append("Development type has not been established with enough confidence to confirm this is general-needs housing.")
+        blocking_unknown = True
 
     # --- Hard exclusion 2: wholly (100%) affordable-led ---------------------
     #
@@ -698,6 +737,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             )
     elif not facts.affordable_percentage_trusted:
         unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
+        blocking_unknown = True
     # A trusted, non-100% figure (the normal policy-compliant case) is
     # deliberately NOT added as a "matches"/"does_not_match" reason for any
     # profile - per the brief, the mere presence of policy-compliant
@@ -711,8 +751,10 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         matches.append(f"Planning position ({_planning_state_label(facts.planning_state)}) matches this buyer's stated planning appetite.")
     elif facts.planning_state == OTHER_OR_UNKNOWN:
         unknown.append("Planning position could not be classified with confidence against this buyer's stated appetite.")
+        blocking_unknown = True
     else:
         unknown.append(f"This opportunity is {_planning_state_label(facts.planning_state)}, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.")
+        blocking_unknown = True
 
     # --- Consent + active proposal coexistence (Gate 2B-2B.1, Section 9) -
     #
@@ -736,6 +778,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             matches.append("No planning activity has yet been identified against this allocation - an early-stage position consistent with this buyer's strategic land appetite.")
         elif facts.has_identified_planning_activity is None:
             unknown.append("Planning activity position could not be established for this allocation.")
+            blocking_unknown = True
 
     # --- Unit-range assessment -----------------------------------------------
     #
@@ -759,6 +802,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
 
     if scale_value is None:
         unknown.append(no_count_message)
+        blocking_unknown = True
     elif profile.target_unit_min <= scale_value <= profile.target_unit_max:
         matches.append(f"Approximately {scale_value:,} {unit_noun} sits within this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}).")
     elif scale_value < profile.target_unit_min:
@@ -774,6 +818,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             )
         else:
             unknown.append(f"Approximately {scale_value:,} {unit_noun} is below this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}) - not treated as a disqualifying fact on its own.")
+            blocking_unknown = True
     else:  # oversized
         if profile.large_allocation_is_self_qualifying and facts.opportunity_type == STRATEGIC_LAND:
             matches.append(
@@ -785,12 +830,14 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
         else:
             unknown.append(f"Overall scale (~{scale_value:,} {unit_noun}) materially exceeds this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.")
+            blocking_unknown = True
         investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
         is_investigative_exception = True
 
     # --- Ownership/control - allocation-specific, structural gap -----------
     if facts.opportunity_type == STRATEGIC_LAND and not facts.matched_to_site:
         unknown.append("Ownership/control has not been established for this allocation.")
+        blocking_unknown = True
 
     # ==========================================================================
     # Buyer Mandate V2, Phase B2 - the four newly-activated mandate dimensions.
@@ -818,6 +865,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     if b2_active and profile.geography_scope == GEOGRAPHY_COUNCILS:
         if context.council_code is None:
             unknown.append("This opportunity's council is not available to assess against this buyer's stated geographic boundary.")
+            blocking_unknown = True
         elif context.council_code in profile.geography_councils:
             matches.append(f"This opportunity's council ({context.council_code}) is within this buyer's stated geographic boundary.")
         else:
@@ -829,33 +877,54 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # brief, Section 14) - each acquisition type below reasons from the
     # actual facts available (planning position, affordable evidence,
     # development progress), and a multi-type mandate is compatible if
-    # ANY of its stated types finds a match - only LAND_SITE_ACQUISITION-
-    # and DEVELOPMENT_HOMES_ACQUISITION-only evaluation never excludes;
-    # STRATEGIC_LAND_CONTROL is the only type capable of a hard rejection
-    # (confirmed underway-or-further development - a known fact that the
-    # early-stage "land control" opportunity this type describes has
-    # already passed), and AFFORDABLE_HOUSING_PACKAGE only when trusted
+    # ANY of its stated types finds a match. STRATEGIC_LAND_CONTROL is the
+    # only type capable of a hard rejection (confirmed underway-or-further
+    # development AT THE SAME OPPORTUNITY SCOPE - see the scope-safety
+    # note below), and AFFORDABLE_HOUSING_PACKAGE only when trusted
     # evidence explicitly shows a genuinely ZERO-affordable scheme.
+    #
+    # Phase B2 narrow remediation (Issue C): a mandate stating "I want
+    # LAND_SITE_ACQUISITION" is a fact about the MANDATE, not about the
+    # OPPORTUNITY - it does not by itself establish that any given
+    # opportunity positively represents a whole/material development-site
+    # acquisition context. LAND_SITE_ACQUISITION therefore contributes
+    # NOTHING here (neither matches nor unknown) unless/until a genuine
+    # opportunity-side fact is available to reason from; it remains one of
+    # this mandate's acceptable types for the "ANY type matches" OR
+    # semantics below without ever being a circular, fact-free positive
+    # match on its own. Neutral is preferable to a circular reason.
     if b2_active and profile.acquisition_types:
         acquisition_type_matched = False
         acquisition_type_hard_mismatches: list[str] = []
         acquisition_type_unknowns: list[str] = []
 
-        if LAND_SITE_ACQUISITION in profile.acquisition_types:
-            # Always structurally compatible - a site does not need to be
-            # "for sale" to be a land/site acquisition candidate (Section
-            # 16); developer ownership/control alone never excludes it.
-            matches.append("This opportunity represents a development site, structurally compatible with this buyer's land/site acquisition strategy.")
-            acquisition_type_matched = True
-
         if STRATEGIC_LAND_CONTROL in profile.acquisition_types:
             is_strategic_situation = facts.opportunity_type == STRATEGIC_LAND or facts.planning_state in (ADOPTED_ALLOCATION, EMERGING_ALLOCATION)
             confirmed_underway_or_further = context.development_state in _DEVELOPMENT_STARTED_STATES
-            if confirmed_underway_or_further:
+            # Phase B2 narrow remediation (Issue B): a hard rejection here
+            # is only safe when the underway-or-further evidence is known
+            # to apply to the SAME opportunity scope as the opportunity
+            # being assessed (see B2MatchingContext.development_state_
+            # scope_verified's own docstring) - a confirmed-underway
+            # PHASE, recent permission, or long-pending application does
+            # not itself prove the wider strategic-land opportunity has
+            # been overtaken. Where the underway evidence exists but scope
+            # is not verified, this is surfaced as worth investigating
+            # rather than a confirmed hard contradiction - never
+            # does_not_match on unverified scope.
+            if confirmed_underway_or_further and context.development_state_scope_verified:
                 acquisition_type_hard_mismatches.append(
-                    "Trusted evidence shows development is already underway or further, which is fundamentally "
-                    "incompatible with this buyer's strategic-land-control acquisition strategy."
+                    "Trusted evidence shows development is already underway or further at this opportunity's own "
+                    "scope, which is fundamentally incompatible with this buyer's strategic-land-control "
+                    "acquisition strategy."
                 )
+            elif confirmed_underway_or_further:
+                investigate.append(
+                    "Trusted evidence shows development is underway or further, but this is not confirmed to "
+                    "cover this opportunity's full relevant scope - review whether the wider strategic-land "
+                    "opportunity has genuinely been overtaken by delivery, or only a part of it."
+                )
+                acquisition_type_unknowns.append("This opportunity's planning position does not clearly establish whether it remains an early-stage strategic-land-control opportunity, pending review of the underway evidence's own scope.")
             elif is_strategic_situation:
                 matches.append("This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy.")
                 acquisition_type_matched = True
@@ -876,16 +945,21 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 acquisition_type_unknowns.append("Affordable housing content has not been established with enough confidence to assess against this buyer's affordable-housing-package acquisition strategy.")
 
         if DEVELOPMENT_HOMES_ACQUISITION in profile.acquisition_types:
-            # Intentionally broad (Section 18) - never excluded from this
-            # dimension; confirmed underway-or-further development is
-            # itself a positive structural signal here (the opposite
-            # polarity from STRATEGIC_LAND_CONTROL above), never a claim
-            # that a forward-purchase/funding opportunity actually exists.
+            # Never excluded from this dimension; confirmed underway-or-
+            # further development is a positive structural signal here
+            # (the opposite polarity from STRATEGIC_LAND_CONTROL above),
+            # never a claim that a forward-purchase/funding or completed-
+            # homes opportunity actually exists.
+            #
+            # Phase B2 narrow remediation (Issue C): removed the previous
+            # unconditional "else" match - an opportunity that is NOT
+            # confirmed underway/further has no opportunity-side fact yet
+            # establishing it as a development/homes acquisition context,
+            # so this dimension contributes nothing (neutral) rather than
+            # matching merely because the mandate states this type.
             if context.development_state in _DEVELOPMENT_STARTED_STATES:
                 matches.append("Trusted evidence shows development is underway or further, structurally compatible with this buyer's development/homes acquisition strategy - this does not establish that a forward purchase, forward funding or completed-homes opportunity actually exists.")
-            else:
-                matches.append("This opportunity represents a development, structurally compatible with this buyer's development/homes acquisition strategy.")
-            acquisition_type_matched = True
+                acquisition_type_matched = True
 
         # Multi-select OR semantics: only reject if NOTHING in the set
         # matched AND at least one type was actively, hard-contradicted -
@@ -897,6 +971,13 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             does_not_match.extend(acquisition_type_hard_mismatches)
         elif not acquisition_type_matched:
             unknown.extend(acquisition_type_unknowns)
+            if acquisition_type_unknowns:
+                # Acquisition type is a stated mandate REQUIREMENT (the
+                # buyer selected specific types it will acquire), not a
+                # soft preference - unlike development-state appetite
+                # below, a genuine evidence gap here is classification-
+                # driving.
+                blocking_unknown = True
 
     # --- B2.3 Development-State Appetite — SOFT PREFERENCE, never hard -----
     #
@@ -954,9 +1035,16 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         if PARTIAL_SITE_CONTROL_ACCEPTABLE in profile.control_appetite and control_facts.partial_control_evidence is True:
             matches.append("Trusted evidence indicates a partial/shared ownership position, which this buyer's mandate does not require to be whole-site control.")
 
+    # Phase B2 narrow remediation (Issue A): classification is driven by
+    # `blocking_unknown`, not by the mere presence of ANY reason in
+    # `unknown` - a soft/contextual unknown (currently only the four
+    # development-state-appetite reasons above) stays visible in the
+    # `unknown` bucket for transparency but never by itself prevents
+    # STRONG_FIT for an opportunity that satisfies every classification-
+    # driving requirement.
     if does_not_match:
         classification = NOT_SUITABLE
-    elif unknown:
+    elif blocking_unknown:
         classification = INSUFFICIENT_EVIDENCE
     else:
         classification = STRONG_FIT

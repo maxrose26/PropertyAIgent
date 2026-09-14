@@ -32,6 +32,7 @@ from sqlalchemy import select
 
 from app.db.models import Application, LocalPlanSite, Site
 from app.pipeline.lapse_tracking import compute_lapse_status
+from app.pipeline.phase_tracking import UNPHASED_LABEL
 from app.policy.buyer_matching import PLANNING_DELIVERY, STRATEGIC_LAND, B2MatchingContext, build_control_appetite_facts
 from app.reporting.acquisition_position import build_acquisition_position_facts
 
@@ -48,7 +49,28 @@ def build_b2_context(session, opportunity_id: str, opportunity_type: str) -> B2M
     further suffix (e.g. a phase_code) - so parsing only ever needs that
     one segment.
 
-    Read-only throughout - never creates, updates or deletes anything."""
+    Read-only throughout - never creates, updates or deletes anything.
+
+    Phase B2 narrow remediation (Issue B): also determines
+    development_state_scope_verified - whether `development_state` below
+    is known to cover the SAME opportunity scope as this specific
+    opportunity, using the platform's OWN existing scope vocabulary
+    (app.pipeline.phase_tracking.UNPHASED_LABEL, already used by
+    app.reporting.opportunity_universe itself to distinguish a genuine
+    whole-site/"Whole site / unphased" card from a named Phase/Plot
+    card - no new scope taxonomy is introduced here). A "site" kind
+    opportunity IS the whole site, so scope is trivially verified; a
+    "phase" kind opportunity is verified only when its own phase_code
+    equals UNPHASED_LABEL (i.e. it is itself the whole-site/unphased
+    scope, just recorded under the "phase" kind bucket - see
+    build_current_opportunity_universe's own kind=="phase" branch). A
+    named phase/plot, a "recent_permission", or a "long_pending_
+    application" opportunity is a NARROWER scope than "the whole site",
+    so a site-wide or differently-scoped underway/build-status fact is
+    never assumed to describe that narrower opportunity's own scope -
+    scope stays unverified (False) for those, which is the safe default
+    B2MatchingContext.development_state_scope_verified itself already
+    documents."""
     parts = opportunity_id.split(":")
     kind = parts[1]
     entity_id = int(parts[2])
@@ -84,7 +106,23 @@ def build_b2_context(session, opportunity_id: str, opportunity_type: str) -> B2M
         lapse_result = compute_lapse_status(applications, site)
         development_state = lapse_result.get("build_status") or "unknown"
 
+    if kind == "site":
+        development_state_scope_verified = True
+    elif kind == "phase":
+        # parts[3] is the phase_code segment of planning_delivery_phase_
+        # opportunity_id(site_id, phase_code) - only equal to UNPHASED_
+        # LABEL for a genuine whole-site/unphased card.
+        phase_code = parts[3] if len(parts) > 3 else None
+        development_state_scope_verified = phase_code == UNPHASED_LABEL
+    else:  # "recent_permission" / "long_pending_application"
+        development_state_scope_verified = False
+
     acquisition_facts = build_acquisition_position_facts(session, applications)
     control_facts = build_control_appetite_facts(acquisition_facts)
 
-    return B2MatchingContext(council_code=council_code, development_state=development_state, control_facts=control_facts)
+    return B2MatchingContext(
+        council_code=council_code,
+        development_state=development_state,
+        control_facts=control_facts,
+        development_state_scope_verified=development_state_scope_verified,
+    )

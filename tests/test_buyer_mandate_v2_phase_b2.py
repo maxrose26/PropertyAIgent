@@ -16,20 +16,35 @@ Geography (COUNCILS scope only):
     known council NOT IN set      -> HARD MISMATCH (does_not_match)
     unknown council                -> EVIDENCE GAP (unknown)
     ALL_CURRENT_COVERAGE/UNSPECIFIED -> no reason at all
-Acquisition Type:
-    LAND_SITE_ACQUISITION          -> always MATCH, never excludes
+Acquisition Type (Phase B2 narrow remediation, Issue C: positive matches
+must come from opportunity-side facts, never merely from the mandate
+stating the type - "neutral is preferable to circular logic"):
+    LAND_SITE_ACQUISITION          -> NEUTRAL - contributes nothing on its
+                                       own (no opportunity-side fact makes
+                                       this type positively established);
+                                       never excludes
     STRATEGIC_LAND_CONTROL         -> MATCH if strategic-shaped; HARD
                                        MISMATCH only if confirmed underway+
-                                       and no other type in the set matched
+                                       AND the underway evidence is scope-
+                                       verified for this opportunity (Issue
+                                       B); confirmed-underway-but-scope-
+                                       unverified is EVIDENCE GAP/investigate,
+                                       never a hard rejection; requires no
+                                       other type in the set to have matched
     AFFORDABLE_HOUSING_PACKAGE     -> MATCH if affordable content known;
                                        HARD MISMATCH only if trusted 0%;
                                        else EVIDENCE GAP
-    DEVELOPMENT_HOMES_ACQUISITION  -> always MATCH, never excludes;
-                                       underway is a MATCH signal here
-Development-State Appetite (never hard, always SOFT or EVIDENCE GAP):
-    UNCOMMENCED_PREFERRED + underway   -> SOFT MISMATCH (unknown)
-    UNCOMMENCED_PREFERRED + no evidence -> EVIDENCE GAP (unknown)
+    DEVELOPMENT_HOMES_ACQUISITION  -> MATCH only if confirmed underway/
+                                       further (an opportunity-side fact);
+                                       otherwise NEUTRAL - never excludes
+Development-State Appetite (never hard, always SOFT/CONTEXTUAL - Phase B2
+narrow remediation, Issue A: none of these four reasons are classification-
+driving; they stay visible in `unknown` but never by themselves prevent
+STRONG_FIT for an otherwise-qualifying opportunity):
+    UNCOMMENCED_PREFERRED + underway   -> SOFT MISMATCH (unknown, non-blocking)
+    UNCOMMENCED_PREFERRED + no evidence -> EVIDENCE GAP (unknown, non-blocking)
     UNDERWAY_ACCEPTABLE + underway      -> SOFT MATCH (matches)
+    UNDERWAY_ACCEPTABLE/PREFERRED + no evidence -> EVIDENCE GAP (unknown, non-blocking)
     UNDERWAY_PREFERRED + underway       -> SOFT MATCH (matches, stronger)
     (anything) + UNSPECIFIED appetite   -> no reason at all
 Control/Ownership Appetite (never hard, always SOFT):
@@ -294,10 +309,20 @@ def test_strategic_land_opportunity_matches_strategic_land_control():
     assert any("strategic-land-control" in m for m in result.matches)
 
 
-def test_planning_delivery_matches_land_site_acquisition():
-    policy = replace(NESTEN_HOMES, acquisition_types=frozenset({LAND_SITE_ACQUISITION}))
-    result = assess_buyer_fit(policy, _facts(opportunity_type=PLANNING_DELIVERY), context=B2MatchingContext())
-    assert any("land/site acquisition" in m for m in result.matches)
+def test_land_site_acquisition_type_is_neutral_not_circular():
+    """Phase B2 narrow remediation (Issue C): a mandate stating it wants
+    LAND_SITE_ACQUISITION opportunities is a fact about the MANDATE, not
+    the opportunity - it must never by itself produce a positive match.
+    LAND_SITE_ACQUISITION contributes nothing (neither matches nor
+    unknown), and an otherwise fully-qualifying opportunity (using
+    Nesten's own real target range/appetite) still reaches STRONG_FIT -
+    removing the circular match must not force INSUFFICIENT_EVIDENCE
+    either."""
+    policy = replace(NESTEN_HOMES, target_unit_min=200, target_unit_max=500, acquisition_types=frozenset({LAND_SITE_ACQUISITION}))
+    result = assess_buyer_fit(policy, _facts(opportunity_type=PLANNING_DELIVERY, unit_count=300), context=B2MatchingContext())
+    assert not any("land/site acquisition" in m for m in result.matches)
+    assert not any("land/site acquisition" in u for u in result.unknown)
+    assert result.classification == STRONG_FIT
 
 
 def test_affordable_containing_scheme_matches_affordable_housing_package():
@@ -327,21 +352,39 @@ def test_one_opportunity_compatible_with_multiple_acquisition_types():
 
 
 def test_mandate_with_multiple_acquisition_types():
+    """Confirmed-underway-but-scope-unverified (the default) never hard-
+    mismatches STRATEGIC_LAND_CONTROL (Issue B) - and LAND_SITE_ACQUISITION
+    is neutral rather than an automatic rescue (Issue C) - so this mandate
+    is never NOT_SUITABLE purely from this dimension."""
     policy = replace(NESTEN_HOMES, acquisition_types=frozenset({LAND_SITE_ACQUISITION, STRATEGIC_LAND_CONTROL}))
-    # Confirmed underway would hard-mismatch STRATEGIC_LAND_CONTROL alone,
-    # but LAND_SITE_ACQUISITION always matches - the mandate as a whole
-    # must NOT become NOT_SUITABLE (OR semantics across the set).
     ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY)
     result = assess_buyer_fit(policy, _facts(), context=ctx)
     assert result.classification != NOT_SUITABLE
+    assert not any("fundamentally incompatible" in m for m in result.does_not_match)
 
 
-def test_strategic_land_control_only_hard_mismatches_when_confirmed_underway():
+def test_strategic_land_control_only_hard_mismatches_when_confirmed_underway_and_scope_verified():
+    """Phase B2 narrow remediation (Issue B): the hard rejection requires
+    BOTH confirmed-underway AND verified opportunity scope."""
     policy = replace(NESTEN_HOMES, acquisition_types=frozenset({STRATEGIC_LAND_CONTROL}))
-    ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY)
+    ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY, development_state_scope_verified=True)
     result = assess_buyer_fit(policy, _facts(opportunity_type=PLANNING_DELIVERY, planning_state=PERMISSION_GRANTED), context=ctx)
     assert result.classification == NOT_SUITABLE
     assert any("underway" in m for m in result.does_not_match)
+
+
+def test_strategic_land_control_confirmed_underway_but_scope_unverified_is_not_hard_rejected():
+    """Phase B2 narrow remediation (Issue B): confirmed-underway evidence
+    whose scope is NOT verified to cover this specific opportunity (the
+    DEFAULT, e.g. a named phase, a recent permission, or a long-pending
+    application on a larger site) must never hard-reject the whole
+    opportunity - it is surfaced as worth investigating instead."""
+    policy = replace(NESTEN_HOMES, acquisition_types=frozenset({STRATEGIC_LAND_CONTROL}))
+    ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY)  # development_state_scope_verified defaults False
+    result = assess_buyer_fit(policy, _facts(opportunity_type=PLANNING_DELIVERY, planning_state=PERMISSION_GRANTED), context=ctx)
+    assert result.classification != NOT_SUITABLE
+    assert not result.does_not_match
+    assert any("underway" in i and "scope" in i for i in result.investigate)
 
 
 def test_affordable_housing_package_hard_mismatch_only_on_trusted_zero():
@@ -403,6 +446,55 @@ def test_unspecified_development_state_appetite_contributes_nothing():
     policy = replace(NESTEN_HOMES, development_state_appetite=DEVELOPMENT_STATE_UNSPECIFIED)
     result = assess_buyer_fit(policy, _facts(), context=B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY))
     assert not any("underway" in m for m in result.matches + result.unknown)
+
+
+# --- Classification-driving vs contextual/soft-preference unknown (Phase B2
+# narrow remediation, Issue A) - "PREFERRED must not behave like REQUIRED" --
+
+def test_a_otherwise_strong_fit_with_only_soft_preference_unknown_stays_strong_fit():
+    """(A) An opportunity that satisfies every classification-driving
+    requirement, whose ONLY gap is an unevaluable soft preference
+    (UNCOMMENCED_PREFERRED with unknown development state), must remain
+    STRONG_FIT - the contextual unknown stays visible in `unknown` for
+    transparency but must not by itself downgrade the classification."""
+    policy = replace(NESTEN_HOMES, target_unit_min=50, target_unit_max=100, development_state_appetite=UNCOMMENCED_PREFERRED)
+    facts = _facts(unit_count=70, is_specialist_development=False, affordable_percentage=0.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
+    result = assess_buyer_fit(policy, facts, context=B2MatchingContext(development_state=None))
+    assert result.classification == STRONG_FIT
+    assert any("not treated as confirmed non-commencement" in u for u in result.unknown)
+
+
+def test_b_otherwise_insufficient_evidence_from_genuine_classification_driving_gap_stays_insufficient_evidence():
+    """(B) An opportunity whose evidence gap is a genuine classification-
+    driving requirement (here: no trusted unit count at all) must remain
+    INSUFFICIENT_EVIDENCE - the remediation must not erase real
+    uncertainty, only stop a SOFT preference from behaving like one."""
+    policy = replace(NESTEN_HOMES, target_unit_min=50, target_unit_max=100, development_state_appetite=UNCOMMENCED_PREFERRED)
+    facts = _facts(unit_count=None, is_specialist_development=False, affordable_percentage=0.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
+    result = assess_buyer_fit(policy, facts, context=B2MatchingContext(development_state=None))
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert any("No trusted unit count" in u for u in result.unknown)
+
+
+def test_c_otherwise_not_suitable_from_hard_contradiction_stays_not_suitable():
+    """(C) A genuine hard contradiction (100% affordable-led, an explicit
+    exclusion for this buyer) must remain NOT_SUITABLE regardless of any
+    soft-preference gap elsewhere."""
+    policy = replace(NESTEN_HOMES, target_unit_min=50, target_unit_max=100, development_state_appetite=UNCOMMENCED_PREFERRED)
+    facts = _facts(unit_count=70, is_specialist_development=False, affordable_percentage=100.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
+    result = assess_buyer_fit(policy, facts, context=B2MatchingContext(development_state=None))
+    assert result.classification == NOT_SUITABLE
+
+
+def test_d_no_commencement_evidence_never_becomes_a_positive_uncommenced_match():
+    """(D) Absence of commencement evidence is an evidence gap, never a
+    positive "confirmed uncommenced" match - even though it no longer
+    blocks STRONG_FIT (test A above), it must never itself appear in
+    `matches`."""
+    policy = replace(NESTEN_HOMES, target_unit_min=50, target_unit_max=100, development_state_appetite=UNCOMMENCED_PREFERRED)
+    facts = _facts(unit_count=70, is_specialist_development=False, affordable_percentage=0.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
+    result = assess_buyer_fit(policy, facts, context=B2MatchingContext(development_state=None))
+    assert not any("uncommenced" in m.lower() for m in result.matches)
 
 
 # --- Control Appetite test matrix (Phase B2 brief, Section 44) ------------
@@ -588,11 +680,33 @@ def test_strategic_land_buyer_b2_behaviour_confirmed_underway_is_incompatible():
     """Section 52: a genuinely permissioned AND underway development is
     much less compatible with strategic-land-control - but only because
     trusted facts clearly contradict it, not merely because it's a
-    PLANNING_DELIVERY signal."""
-    ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY)
+    PLANNING_DELIVERY signal.
+
+    Phase B2 narrow remediation (Issue B): this hard rejection is only
+    safe when the underway evidence is verified to cover the SAME
+    opportunity scope being assessed (e.g. this opportunity IS the whole
+    site, not merely a phase/recent permission/long-pending application
+    on a larger site whose remaining scope is unresolved)."""
+    ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY, development_state_scope_verified=True)
     facts = _facts(opportunity_type=PLANNING_DELIVERY, planning_state=PERMISSION_GRANTED, unit_count=150)
     result = assess_buyer_fit(STRATEGIC_LAND_BUYER, facts, context=ctx)
     assert result.classification == NOT_SUITABLE
+
+
+def test_strategic_land_buyer_b2_behaviour_underway_phase_of_larger_opportunity_is_not_auto_rejected():
+    """Phase B2 narrow remediation (Issue B), regression test: one known
+    underway phase/recent-permission/long-pending-application on what may
+    be a larger strategic-land opportunity must NOT automatically reject
+    the whole opportunity when the remaining opportunity scope is
+    unresolved - the exact real-world pattern found during remediation
+    investigation (a still-pending application whose own opportunity
+    signal was previously hard-rejected using a site-wide "underway" fact
+    that may describe a different part of the same site)."""
+    ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY)  # scope NOT verified (the honest default)
+    facts = _facts(opportunity_type=PLANNING_DELIVERY, planning_state=PERMISSION_GRANTED, unit_count=150)
+    result = assess_buyer_fit(STRATEGIC_LAND_BUYER, facts, context=ctx)
+    assert result.classification != NOT_SUITABLE
+    assert not result.does_not_match
 
 
 def test_national_housebuilder_b2_behaviour():
@@ -623,7 +737,18 @@ def test_housing_association_b2_behaviour_developer_led_mixed_tenure():
 def test_same_facts_different_mandates_produce_materially_different_b2_reasoning():
     """The B1 fixture, now WITH B2 active: ~300 homes, permissioned,
     developer-led, Phase 1 underway, ~30% affordable, no disposal
-    evidence. Four mandates must reason differently about it."""
+    evidence. Four mandates must reason differently about it.
+
+    Phase B2 narrow remediation (Issues B & C): the fixture only ever
+    says "Phase 1 underway" - it does NOT establish that the wider
+    strategic-land opportunity itself has been overtaken by delivery -
+    so development_state_scope_verified is deliberately left at its
+    honest default (False/unverified) here. This fixture must therefore
+    NOT be used to prove a whole-opportunity Strategic Land NOT_SUITABLE
+    result (see test_strategic_land_hard_rejection_requires_verified_
+    whole_opportunity_scope below for the case where scope IS verified).
+    The land/site buyer must also not receive a fact-free positive
+    acquisition-type reason merely for stating LAND_SITE_ACQUISITION."""
     shared_facts = _facts(unit_count=300, affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
     control_facts = ControlAppetiteFacts(developer_or_applicant_led=True, third_party_interest_declared=None, ownership_unresolved=None, partial_control_evidence=None)
     ctx = B2MatchingContext(council_code="trafford", development_state=DEVELOPMENT_STATE_UNDERWAY, control_facts=control_facts)
@@ -639,9 +764,11 @@ def test_same_facts_different_mandates_produce_materially_different_b2_reasoning
     strategic_result = assess_buyer_fit(strategic_buyer, shared_facts, context=ctx)
 
     # Land buyer: underway weakens its uncommenced preference (soft), but
-    # developer-led control is accepted, never a hard rejection.
+    # developer-led control is accepted, never a hard rejection - and it
+    # must not get a circular, fact-free LAND_SITE_ACQUISITION match.
     assert land_result.classification != NOT_SUITABLE
     assert any("preference is not met" in u for u in land_result.unknown)
+    assert not any("land/site acquisition" in m for m in land_result.matches)
 
     # Housing Association: STRONG_FIT - developer-led + underway both
     # explicitly accepted, affordable package structurally relevant.
@@ -651,14 +778,32 @@ def test_same_facts_different_mandates_produce_materially_different_b2_reasoning
     # signal here - the opposite polarity from the land buyer.
     assert any("positive signal" in m for m in institutional_result.matches)
 
-    # Strategic land buyer: confirmed underway is fundamentally
-    # incompatible with land-control strategy - the only one of the four
-    # where B2 produces a hard rejection from these exact facts.
-    assert strategic_result.classification == NOT_SUITABLE
+    # Strategic land buyer: "Phase 1 underway" alone does NOT establish
+    # that the wider strategic-land opportunity's own relevant scope has
+    # been overtaken - scope is unverified, so this must NOT be a hard
+    # rejection; it is surfaced as worth investigating instead.
+    assert strategic_result.classification != NOT_SUITABLE
+    assert not strategic_result.does_not_match
+    assert any("scope" in i for i in strategic_result.investigate)
 
-    # The four reasoning sets are genuinely different from each other.
-    all_matches = [tuple(sorted(r.matches)) for r in (land_result, ha_result, institutional_result, strategic_result)]
-    assert len(set(all_matches)) == 4
+
+def test_strategic_land_hard_rejection_requires_verified_whole_opportunity_scope():
+    """Positive companion to the fixture above (Phase B2 narrow
+    remediation, Issue B): when evidence DOES establish that the
+    RELEVANT strategic-land opportunity itself - not merely one phase of
+    a larger site - has been overtaken by confirmed development delivery
+    (development_state_scope_verified=True, e.g. this opportunity IS the
+    whole site), the hard rejection remains available. The remediation
+    must not remove all Strategic Land hard exclusions - only make them
+    scope-safe."""
+    shared_facts = _facts(unit_count=300, affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
+    control_facts = ControlAppetiteFacts(developer_or_applicant_led=True, third_party_interest_declared=None, ownership_unresolved=None, partial_control_evidence=None)
+    ctx = B2MatchingContext(council_code="trafford", development_state=DEVELOPMENT_STATE_UNDERWAY, control_facts=control_facts, development_state_scope_verified=True)
+    strategic_buyer = replace(STRATEGIC_LAND_BUYER, target_unit_min=100, target_unit_max=500, acquisition_types=frozenset({STRATEGIC_LAND_CONTROL}))
+
+    result = assess_buyer_fit(strategic_buyer, shared_facts, context=ctx)
+    assert result.classification == NOT_SUITABLE
+    assert any("underway" in m and "scope" in m for m in result.does_not_match)
 
 
 # --- UNKNOWN semantics review (Section 22) ---------------------------------
