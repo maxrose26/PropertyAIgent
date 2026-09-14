@@ -115,7 +115,21 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # only assess_buyer_fit's interpretation of already-existing values did -
 # exactly the case this version constant exists to invalidate a baseline
 # for.
-BUYER_MATCHING_POLICY_VERSION = 3
+#
+# Version 4 (Agent-Ready Fact Foundation): two production evaluation-
+# boundary changes altered which classification the SAME mandate/evidence
+# pair deterministically resolves to, again with no mandate field changing:
+# (1) every production caller of Buyer Fit now consistently evaluates
+# through the authoritative B2MatchingContext (app.policy.
+# buyer_matching_b2_context.evaluate_buyer_fit), including the onboarding
+# baseline itself, which previously could assess without one; (2)
+# strategic-land opportunities' planning_state fact is now derived from the
+# authoritative, normalised Local Plan allocation status rather than the
+# deprecated raw LocalPlanSite.plan_status field. Confirmed materially to
+# change classification for 3 of the 4 production Buyer Mandates. assess_
+# buyer_fit's own commercial rules, Buyer Mandate fields, and every other
+# domain area were NOT touched by this bump.
+BUYER_MATCHING_POLICY_VERSION = 4
 
 # --- Buyer Mandate V2, Phase B2: build_status vocabulary (reused verbatim) --
 #

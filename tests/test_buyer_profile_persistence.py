@@ -324,6 +324,39 @@ def test_mandate_strategy_change_changes_the_fingerprint(session):
     assert is_buyer_mandate_baseline_stale(mandate) is True
 
 
+def test_matching_policy_version_bump_makes_baseline_stale_without_mandate_change(session, monkeypatch):
+    """Agent-Ready Fact Foundation, BUYER_MATCHING_POLICY_VERSION 3 -> 4:
+    proves the version constant does exactly what its own module comment
+    claims - invalidates every mandate's baseline the moment it changes,
+    with ZERO mandate strategy field touched. Simulates "persisted under
+    v3" by monkeypatching the constant (as seen by both the fingerprint
+    function and the store module's own import of it) down to 3, onboarding
+    normally, then restoring the real, current value (4) and asserting the
+    now-stale baseline is detected purely from the version change."""
+    import app.policy.buyer_matching as buyer_matching_module
+    import app.policy.buyer_profile_store as buyer_profile_store_module
+
+    real_version = buyer_matching_module.BUYER_MATCHING_POLICY_VERSION
+    assert real_version == 4, "this test assumes the current production version is 4"
+
+    monkeypatch.setattr(buyer_matching_module, "BUYER_MATCHING_POLICY_VERSION", 3)
+    monkeypatch.setattr(buyer_profile_store_module, "BUYER_MATCHING_POLICY_VERSION", 3)
+
+    workspace = resolve_default_workspace(session)
+    seed_default_buyer_profiles(session, workspace)
+    mandate = _mandate_for(session, "nesten_homes")
+    run_buyer_onboarding_baseline(session, mandate)
+    fingerprint_under_v3 = mandate.matching_fingerprint
+    assert is_buyer_mandate_baseline_stale(mandate) is False
+
+    monkeypatch.setattr(buyer_matching_module, "BUYER_MATCHING_POLICY_VERSION", real_version)
+    monkeypatch.setattr(buyer_profile_store_module, "BUYER_MATCHING_POLICY_VERSION", real_version)
+
+    assert is_buyer_mandate_baseline_stale(mandate) is True
+    assert compute_buyer_mandate_fingerprint(mandate_to_policy(mandate)) != fingerprint_under_v3
+    # No mandate strategy field was touched anywhere in this test.
+
+
 # --- Onboarding baseline -----------------------------------------------------
 
 def _make_plan(session) -> LocalPlan:
