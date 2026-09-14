@@ -382,6 +382,13 @@ def test_packet_planning_delivery_fields(session):
     assert packet.allocation_status.state == NOT_APPLICABLE
     assert packet.progression_signal.state == NOT_APPLICABLE
     assert packet.has_identified_planning_activity.state == NOT_APPLICABLE
+    # Agent Evaluation Foundation: PLANNING_DELIVERY opportunities get real
+    # (non-N/A) transaction signals - raw facts are always populated,
+    # whatever the interpreted signal states resolve to.
+    from app.reporting.opportunity_transaction_signals import NOT_APPLICABLE as SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.recent_permission.state != SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.raw_lapse_status is not None
+    assert packet.transaction_signals.raw_build_status is not None
 
 
 def test_packet_strategic_land_fields(session):
@@ -408,6 +415,14 @@ def test_packet_strategic_land_fields(session):
     assert packet.operative_planning_state.state == NOT_APPLICABLE
     assert packet.recommendation_direction.state == NOT_APPLICABLE
     assert packet.affordable_housing_status.state == NOT_APPLICABLE
+    # Agent Evaluation Foundation: every development-progress-shaped
+    # transaction signal is NOT_APPLICABLE for a strategic land allocation -
+    # see app.reporting.opportunity_transaction_signals' own dedicated tests
+    # for the full signal taxonomy; this proves the packet wiring itself.
+    from app.reporting.opportunity_transaction_signals import NOT_APPLICABLE as SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.recent_permission.state == SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.implementation_activity_evidence_identified.state == SIGNAL_NOT_APPLICABLE
+    assert packet.transaction_signals.no_qualifying_progress_evidence_identified.state == SIGNAL_NOT_APPLICABLE
 
 
 def test_packet_phase_unit_count_not_substituted_by_whole_site(session):
