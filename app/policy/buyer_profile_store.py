@@ -53,7 +53,8 @@ import json
 from sqlalchemy import select
 
 from app.db.models import Buyer, BuyerMandate, Council, Workspace, utcnow
-from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT, assess_buyer_fit
+from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT
+from app.policy.buyer_matching_b2_context import build_b2_context, evaluate_buyer_fit
 from app.policy.buyer_profiles import (
     ACQUISITION_TYPES,
     BUYER_PROFILE_ORDER,
@@ -535,7 +536,12 @@ class OnboardingBaselineResult:
         self.summary_line = summary_line
 
 
-def run_buyer_onboarding_baseline(session, mandate: BuyerMandate, *, page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE) -> OnboardingBaselineResult:
+def run_buyer_onboarding_baseline(
+    session, mandate: BuyerMandate, *,
+    page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE,
+    universe: list | None = None,
+    contexts: dict | None = None,
+) -> OnboardingBaselineResult:
     """Gate 1 brief, Sections 17-18 (unchanged by Phase A - only the
     persisted object passed in changed from a BuyerProfile row to a
     BuyerMandate row): when a BuyerMandate is newly onboarded (or its own
@@ -547,16 +553,38 @@ def run_buyer_onboarding_baseline(session, mandate: BuyerMandate, *, page_size: 
     point on, never later reported as newly discovered merely because
     monitoring has just started.
 
+    Agent-Ready Fact Foundation (P0-2): this is one of the three
+    production callers the Fact Coverage Assessment found evaluating
+    Buyer Fit WITHOUT a B2MatchingContext - now routed through
+    app.policy.buyer_matching_b2_context.evaluate_buyer_fit, the one
+    supported production entry point, so this onboarding baseline can
+    never again diverge from the live opportunity feed / Local Plan
+    Sites page for the identical opportunity and mandate.
+
+    `universe`/`contexts` let a caller onboarding SEVERAL mandates in one
+    run (bootstrap_acquisition_monitoring below) supply a pre-built
+    opportunity universe and a pre-built {opportunity_id: B2MatchingContext}
+    map, so the (expensive, Gate 2C-backed) context is computed exactly
+    ONCE per opportunity for the whole run, never once per stale mandate -
+    the same "build once, reuse across buyers" contract build_b2_context
+    has always documented. A caller onboarding a single mandate on its
+    own (the ordinary path) omits both and this function builds them
+    itself, exactly as before.
+
     Sets mandate.matching_fingerprint/onboarding_completed_at/
     onboarding_summary and commits; creates no BuyerOpportunityAssessment
     row (a future gate's own responsibility, explicitly out of scope
     here, unchanged from before Phase A)."""
     policy = mandate_to_policy(mandate)
-    universe = build_current_opportunity_universe(session, page_size=page_size)
+    if universe is None:
+        universe = build_current_opportunity_universe(session, page_size=page_size)
+    if contexts is None:
+        contexts = {o.opportunity_id: build_b2_context(session, o.opportunity_id, o.opportunity_type) for o in universe}
 
     strong_fit = not_suitable = insufficient_evidence = investigative_exceptions = 0
     for opportunity in universe:
-        assessment = assess_buyer_fit(policy, opportunity.matching_facts)
+        context = contexts.get(opportunity.opportunity_id)
+        assessment = evaluate_buyer_fit(session, policy, opportunity.matching_facts, context=context)
         if assessment.classification == STRONG_FIT:
             strong_fit += 1
         elif assessment.classification == NOT_SUITABLE:
@@ -644,7 +672,7 @@ def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATE
         select(Buyer).where(Buyer.workspace_id == workspace.id, Buyer.status == "active")
     ).scalars().all()
 
-    onboarding_results: dict[str, OnboardingBaselineResult] = {}
+    stale_mandates: list[tuple[Buyer, BuyerMandate]] = []
     mandate_count = 0
     for buyer in buyers:
         mandates = session.execute(
@@ -653,7 +681,26 @@ def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATE
         mandate_count += len(mandates)
         for mandate in mandates:
             if is_buyer_mandate_baseline_stale(mandate):
-                onboarding_results[buyer.buyer_key] = run_buyer_onboarding_baseline(session, mandate, page_size=page_size)
+                stale_mandates.append((buyer, mandate))
+
+    # Performance (Agent-Ready Fact Foundation, Section 21 - "build once,
+    # reuse across buyers"): when more than one mandate is stale in the
+    # same run (the common case right after a matching-policy version
+    # bump, e.g. all four pilot mandates at once), the opportunity
+    # universe and every opportunity's Gate 2C-backed B2MatchingContext
+    # are each built exactly ONCE here and shared across every stale
+    # mandate's own onboarding pass below - never once per mandate.
+    universe = None
+    contexts = None
+    if stale_mandates:
+        universe = build_current_opportunity_universe(session, page_size=page_size)
+        contexts = {o.opportunity_id: build_b2_context(session, o.opportunity_id, o.opportunity_type) for o in universe}
+
+    onboarding_results: dict[str, OnboardingBaselineResult] = {}
+    for buyer, mandate in stale_mandates:
+        onboarding_results[buyer.buyer_key] = run_buyer_onboarding_baseline(
+            session, mandate, page_size=page_size, universe=universe, contexts=contexts,
+        )
 
     return {
         "workspace_id": workspace.id,

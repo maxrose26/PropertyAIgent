@@ -204,7 +204,26 @@ def build_strategic_land_matching_facts(allocation, coverage, phasing) -> Matchi
     # (unknown) rather than being guessed at False.
     is_specialist = True if allocation.intended_use == "employment" else None
 
-    plan_meta = PLAN_STATUS_META.get(allocation.plan_status, PLAN_STATUS_META.get(None))
+    # Agent-Ready Fact Foundation (P0-1, Fact Coverage Assessment): read
+    # the AUTHORITATIVE, already-normalised Local Plan stage
+    # (allocation.local_plan.status - one of app.policy.status.
+    # PLAN_STATUSES, e.g. "adopted"/"proposed_submission"/
+    # "draft_consultation") rather than the DEPRECATED, raw, per-council
+    # LocalPlanSite.plan_status text (e.g. "Regulation 19 Publication",
+    # "Adopted (with effect from 21 March 2024)" - see that field's own
+    # docstring: "kept populated... New code should read local_plan.
+    # plan_name/plan_status instead"). Verified directly against
+    # production: 284/287 LocalPlanSite rows have a deprecated plan_status
+    # that disagrees with their own local_plan.status, and reading the
+    # authoritative field instead takes strategic-land planning-state
+    # classifiability from 3/229 to 229/229 - a reconciliation/exposure
+    # fix, not a new fact or a new taxonomy (PLAN_STATUS_META's own
+    # bucket vocabulary is unchanged). Falls back to the deprecated field
+    # only for the (currently zero, but not schema-guaranteed) case where
+    # local_plan_id itself is unset - never silently drops to
+    # OTHER_OR_UNKNOWN when a genuine source is available.
+    authoritative_plan_status = allocation.local_plan.status if allocation.local_plan is not None else allocation.plan_status
+    plan_meta = PLAN_STATUS_META.get(authoritative_plan_status, PLAN_STATUS_META.get(None))
     bucket = plan_meta["bucket"] if plan_meta else None
     if bucket == "adopted":
         planning_state = ADOPTED_ALLOCATION
