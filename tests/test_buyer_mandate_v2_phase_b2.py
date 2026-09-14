@@ -93,6 +93,7 @@ from app.policy.buyer_profiles import (
     OTHER_OR_UNKNOWN,
     PARTIAL_SITE_CONTROL_ACCEPTABLE,
     PERMISSION_GRANTED,
+    PLANNING_ACTIVE_PROPOSAL,
     STRATEGIC_LAND_BUYER,
     STRATEGIC_LAND_CONTROL,
     THIRD_PARTY_INTEREST_ACCEPTABLE,
@@ -138,7 +139,9 @@ class _FakeAcquisitionPositionFacts:
 # --- Matching-policy version tests (Phase B2 brief, Section 47) ------------
 
 def test_policy_version_is_the_current_expected_value():
-    assert BUYER_MATCHING_POLICY_VERSION == 2
+    # Version 3: B2 narrow semantic cleanup (post Buyer Fit Classification
+    # Audit) - see BUYER_MATCHING_POLICY_VERSION's own docstring.
+    assert BUYER_MATCHING_POLICY_VERSION == 3
 
 
 def test_fingerprint_changes_when_policy_version_changes():
@@ -215,11 +218,15 @@ def test_changing_policy_version_again_would_stale_it_again():
     import app.policy.buyer_matching as buyer_matching_module
     import app.policy.buyer_profile_store as store_module
 
-    persisted = compute_buyer_mandate_fingerprint(NESTEN_HOMES)  # "reassessed under v2"
+    persisted = compute_buyer_mandate_fingerprint(NESTEN_HOMES)  # "reassessed under the current version"
     original = buyer_matching_module.BUYER_MATCHING_POLICY_VERSION
     try:
-        buyer_matching_module.BUYER_MATCHING_POLICY_VERSION = 3
-        store_module.BUYER_MATCHING_POLICY_VERSION = 3
+        # A version distinct from whatever the module's OWN current value
+        # is right now (never hardcoded to a specific number - the module
+        # has itself moved from 2 to 3 once already, and this test must
+        # keep proving the general staling mechanism, not one past value).
+        buyer_matching_module.BUYER_MATCHING_POLICY_VERSION = original + 1
+        store_module.BUYER_MATCHING_POLICY_VERSION = original + 1
         fresh_under_v3 = compute_buyer_mandate_fingerprint(NESTEN_HOMES)
     finally:
         buyer_matching_module.BUYER_MATCHING_POLICY_VERSION = original
@@ -495,6 +502,214 @@ def test_d_no_commencement_evidence_never_becomes_a_positive_uncommenced_match()
     facts = _facts(unit_count=70, is_specialist_development=False, affordable_percentage=0.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
     result = assess_buyer_fit(policy, facts, context=B2MatchingContext(development_state=None))
     assert not any("uncommenced" in m.lower() for m in result.matches)
+
+
+# --- B2 narrow semantic cleanup (post Buyer Fit Classification Audit) -----
+#
+# Core principle proven throughout this section: a KNOWN fact that simply
+# falls outside a soft target/preference, or a fact this platform's own
+# domain semantics establish can never be safely resolved for a given
+# opportunity type, must be visible/contextual, never classification-
+# blocking. Genuine evidence gaps (a value that could, in principle, still
+# be extracted/reconciled) remain classification-driving, unchanged.
+
+def test_scale_known_below_soft_target_is_not_insufficient_evidence():
+    """(A) Nesten target 50-100: 42 units, known, below target - must NOT
+    be INSUFFICIENT_EVIDENCE solely for sitting below a soft target."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=42))
+    assert result.classification == STRONG_FIT
+    assert any("below this buyer's target range" in u for u in result.unknown)
+
+
+def test_scale_known_above_soft_target_is_not_insufficient_evidence():
+    """(A) Nesten target 50-100: 101 units, known, above target - must NOT
+    be INSUFFICIENT_EVIDENCE solely for sitting above a soft target. No
+    arbitrary tolerance is invented - 101 is simply "known and outside
+    target", exactly like 42 above; it is never claimed to be a positive
+    commercial recommendation, only correctly not-missing-evidence."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=101))
+    assert result.classification == STRONG_FIT
+    assert result.is_investigative_exception is True
+    assert any("materially exceeds this buyer's target range" in u for u in result.unknown)
+    assert not any("meaningful strategic-land position" in m or "phase" in m.lower() for m in result.matches)
+
+
+def test_materially_oversized_known_scheme_no_phasing_is_not_insufficient_evidence():
+    """(A) A materially oversized, known scale with no phasing evidence
+    stays an open investigative question (never claimed a suitable phase
+    exists) but must not itself force INSUFFICIENT_EVIDENCE."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=5000, has_phasing_evidence=False))
+    assert result.classification == STRONG_FIT
+    assert result.is_investigative_exception is True
+    assert any("materially exceeds" in u for u in result.unknown)
+    assert any("Establish whether a suitable development parcel/phase" in i for i in result.investigate)
+
+
+def test_genuinely_missing_unit_count_remains_insufficient_evidence():
+    """(A) Genuinely missing scale evidence (never extracted at all) is
+    unaffected by this cleanup - it remains classification-driving."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=None))
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert any("No trusted unit count is available" in u for u in result.unknown)
+
+
+def test_explicit_housing_association_below_minimum_hard_exclusion_unaffected():
+    """(A) The genuine, explicit Housing Association hard exclusion
+    (below_minimum_scale_is_exclusion) must remain NOT_SUITABLE - this
+    cleanup only affects buyers WITHOUT an explicit hard scale rule."""
+    facts = _facts(unit_count=80, affordable_unit_count=20, development_type_raw="houses")
+    result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert result.classification == NOT_SUITABLE
+    assert any("below this buyer's minimum" in d for d in result.does_not_match)
+
+
+def test_known_active_planning_proposal_outside_appetite_is_not_insufficient_evidence():
+    """(B) A permission-focused buyer (Nesten accepts PERMISSION_GRANTED/
+    ADOPTED_ALLOCATION/EMERGING_ALLOCATION) sees a KNOWN
+    PLANNING_ACTIVE_PROPOSAL state - not in its accepted set, but fully
+    KNOWN, not missing - must NOT become INSUFFICIENT_EVIDENCE solely for
+    being outside appetite, and must remain visible in reasoning."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=75, planning_state=PLANNING_ACTIVE_PROPOSAL))
+    assert result.classification == STRONG_FIT
+    assert any("outside this buyer's stated planning appetite" in u for u in result.unknown)
+    assert not any("matches this buyer's stated planning appetite" in m for m in result.matches)
+
+
+def test_genuinely_unclassifiable_planning_state_remains_insufficient_evidence():
+    """(B) OTHER_OR_UNKNOWN is a genuine evidence gap (planning position
+    itself could not be established) - unaffected by this cleanup."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=75, planning_state=OTHER_OR_UNKNOWN))
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert any("could not be classified with confidence" in u for u in result.unknown)
+
+
+def test_permission_granted_positive_planning_behaviour_unchanged():
+    """(B) Baseline positive case, unaffected by this cleanup."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=75, planning_state=PERMISSION_GRANTED))
+    assert result.classification == STRONG_FIT
+    assert any("matches this buyer's stated planning appetite" in m for m in result.matches)
+
+
+def _strategic_land_facts(**overrides) -> MatchingFacts:
+    """A minimal, valid STRATEGIC_LAND MatchingFacts, real-shaped: no
+    scheme-specific affordable evidence, no employment-use specialist
+    signal, unmatched to a Site - exactly what build_strategic_land_
+    matching_facts always produces for a genuine residential allocation."""
+    base = dict(
+        opportunity_type=STRATEGIC_LAND, unit_count=150, development_type_raw="residential",
+        is_specialist_development=None, affordable_percentage=None, affordable_percentage_trusted=False,
+        affordable_unit_count=None, planning_state=ADOPTED_ALLOCATION, has_identified_planning_activity=True,
+        has_phasing_evidence=False, matched_to_site=False,
+    )
+    base.update(overrides)
+    return MatchingFacts(**base)
+
+
+def test_strategic_land_structurally_unavailable_affordable_percentage_is_not_blocking():
+    """(C1) A strategic-land opportunity's structurally-unavailable
+    scheme-specific affordable percentage must not be classification-
+    blocking - no 0%/100% assumption, no open-market assumption either."""
+    result = assess_buyer_fit(STRATEGIC_LAND_BUYER, _strategic_land_facts())
+    assert result.classification == STRONG_FIT
+    assert any("affordable housing proportion is not established" in u.lower() for u in result.unknown)
+    assert not any("wholly" in m.lower() or "0%" in m or "100%" in m for m in result.matches)
+    assert not any("wholly" in d.lower() for d in result.does_not_match)
+
+
+def test_planning_delivery_wholly_affordable_hard_exclusion_remains_intact():
+    """(C1) The generic planning-delivery wholly-affordable hard exclusion
+    (which the strategic-land fix must never weaken) is unaffected."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(affordable_percentage=100.0, affordable_percentage_trusted=True))
+    assert result.classification == NOT_SUITABLE
+    assert any("wholly" in d and "100%" in d for d in result.does_not_match)
+
+
+def test_planning_delivery_affordable_percentage_unconfirmed_still_blocks():
+    """(C1) Genuinely unconfirmed affordable percentage for a
+    PLANNING_DELIVERY opportunity (a real, resolvable-by-more-data gap)
+    remains classification-driving - only STRATEGIC_LAND's structurally
+    permanent absence is affected."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(affordable_percentage=None, affordable_percentage_trusted=False))
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert any(u == "Affordable housing proportion has not been confirmed - not assumed to be 0%." for u in result.unknown)
+
+
+def test_strategic_land_specialist_status_unknown_is_not_blocking():
+    """(C2/D) A normal, trusted RESIDENTIAL strategic allocation (not
+    employment) must not be permanently trapped by a structurally
+    impossible specialist=False requirement - is_specialist_development
+    stays None (never fabricated False), but no longer blocks
+    classification for this opportunity type."""
+    result = assess_buyer_fit(STRATEGIC_LAND_BUYER, _strategic_land_facts())
+    assert result.classification == STRONG_FIT
+    assert any("specialist-development status cannot be established" in u.lower() for u in result.unknown)
+
+
+def test_strategic_land_employment_use_remains_a_hard_specialist_exclusion():
+    """(C2) Genuinely employment-use allocations are unaffected - the
+    existing hard specialist exclusion for STRATEGIC_LAND is untouched."""
+    result = assess_buyer_fit(STRATEGIC_LAND_BUYER, _strategic_land_facts(is_specialist_development=True, development_type_raw="employment"))
+    assert result.classification == NOT_SUITABLE
+    assert any("specialist development" in d for d in result.does_not_match)
+
+
+def test_planning_delivery_specialist_status_unknown_still_blocks():
+    """(C2) A PLANNING_DELIVERY opportunity's genuinely unresolved
+    specialist-development status (a real, resolvable-by-more-data gap)
+    remains classification-driving - only STRATEGIC_LAND's structural
+    near-permanence is affected."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(is_specialist_development=None))
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert any("Development type has not been established" in u for u in result.unknown)
+
+
+def test_strategic_land_unmatched_ownership_is_investigate_not_blocking():
+    """(D) An unmatched strategic allocation's ownership/site-linkage gap
+    must not classification-block Buyer Fit - it is preserved as an
+    investigation question, never fabricated ownership/control/
+    availability, never a match, never a hard mismatch."""
+    result = assess_buyer_fit(STRATEGIC_LAND_BUYER, _strategic_land_facts(matched_to_site=False))
+    assert result.classification == STRONG_FIT
+    assert result.classification != NOT_SUITABLE
+    assert any("Ownership/control has not been established" in i for i in result.investigate)
+    assert not any("Ownership/control" in u for u in result.unknown)
+    assert not any("owner" in m.lower() or "control" in m.lower() for m in result.matches)
+    assert not any("owner" in d.lower() or "control" in d.lower() for d in result.does_not_match)
+
+
+def test_strategic_land_matched_to_site_produces_no_ownership_gap_reason():
+    """(D) A matched allocation (matched_to_site=True) is unaffected -
+    the structural gap this rule exists for simply does not apply."""
+    result = assess_buyer_fit(STRATEGIC_LAND_BUYER, _strategic_land_facts(matched_to_site=True))
+    assert not any("Ownership/control has not been established" in i for i in result.investigate)
+
+
+# --- Matching-policy version (B2 narrow semantic cleanup) -----------------
+
+def test_matching_policy_version_is_now_3():
+    assert BUYER_MATCHING_POLICY_VERSION == 3
+
+
+def test_semantic_cleanup_fingerprint_differs_from_prior_policy_version():
+    """(G) Same mandate VALUES, different matching-policy VERSION (the
+    prior B2 baseline, version 2, vs the current semantic-cleanup version)
+    must produce a different fingerprint - an existing v2 baseline becomes
+    stale without any mandate field changing."""
+    import app.policy.buyer_matching as buyer_matching_module
+    import app.policy.buyer_profile_store as store_module
+
+    current_fingerprint = compute_buyer_mandate_fingerprint(NESTEN_HOMES)
+
+    original = buyer_matching_module.BUYER_MATCHING_POLICY_VERSION
+    try:
+        buyer_matching_module.BUYER_MATCHING_POLICY_VERSION = 2
+        store_module.BUYER_MATCHING_POLICY_VERSION = 2
+        v2_fingerprint = compute_buyer_mandate_fingerprint(NESTEN_HOMES)
+    finally:
+        buyer_matching_module.BUYER_MATCHING_POLICY_VERSION = original
+        store_module.BUYER_MATCHING_POLICY_VERSION = original
+
+    assert current_fingerprint != v2_fingerprint
 
 
 # --- Control Appetite test matrix (Phase B2 brief, Section 44) ------------

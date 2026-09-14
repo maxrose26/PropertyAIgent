@@ -105,7 +105,17 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # change. Bump this only when assess_buyer_fit's OWN INTERPRETATION of an
 # already-existing field changes commercial meaning - never for a purely
 # cosmetic/refactoring change that provably produces identical output.
-BUYER_MATCHING_POLICY_VERSION = 2
+#
+# Version 3 (B2 narrow semantic cleanup, post Buyer Fit Classification
+# Audit): four classification-driving rules were reclassified as
+# contextual/investigative - a known-but-non-preferred planning state, a
+# known scale outside a soft target range, strategic land's structurally
+# unavailable affordable-percentage/specialist-status facts, and strategic
+# land's ownership/site-linkage gap. No mandate field's own value changed;
+# only assess_buyer_fit's interpretation of already-existing values did -
+# exactly the case this version constant exists to invalidate a baseline
+# for.
+BUYER_MATCHING_POLICY_VERSION = 3
 
 # --- Buyer Mandate V2, Phase B2: build_status vocabulary (reused verbatim) --
 #
@@ -659,22 +669,27 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     unknown: list[str] = []
     investigate: list[str] = []
     is_investigative_exception = False
-    # Phase B2 narrow remediation (Issue A): not every reason in `unknown`
-    # should block STRONG_FIT. A CLASSIFICATION-DRIVING unknown (a missing
-    # fact needed to confirm an actual mandate REQUIREMENT - e.g. is this
-    # general-needs housing, is the unit count known, is the planning
-    # position classifiable) genuinely means the opportunity cannot yet be
+    # Phase B2 narrow remediation (Issue A), extended by the B2 narrow
+    # semantic cleanup (post Buyer Fit Classification Audit): not every
+    # reason in `unknown` should block STRONG_FIT. A CLASSIFICATION-DRIVING
+    # unknown (a genuinely missing fact needed to confirm an actual mandate
+    # REQUIREMENT - e.g. is the unit count known at all, is the planning
+    # position classifiable at all) means the opportunity cannot yet be
     # confirmed a strong fit, and must still produce INSUFFICIENT_EVIDENCE.
-    # A CONTEXTUAL/SOFT-PREFERENCE unknown (a missing fact for something
-    # the mandate merely PREFERS, never requires - currently only the B2
-    # development-state-appetite reasons below) must remain visible in the
-    # `unknown` bucket for transparency but must NOT by itself downgrade an
-    # otherwise-STRONG_FIT opportunity. `blocking_unknown` is set alongside
-    # every pre-existing `unknown.append` call (preserving Phase B1/B2's
-    # exact prior classification behaviour for all of them) and at the B2
-    # geography/acquisition-type unknowns (both stated mandate
-    # REQUIREMENTS, not soft preferences) - but deliberately never at the
-    # four development-state-appetite unknown sites in block B2.3 below.
+    # A CONTEXTUAL unknown - either (a) a soft preference never a
+    # requirement (the four B2.3 development-state-appetite reasons), (b) a
+    # KNOWN fact that simply falls outside a soft target/preference (a
+    # known-but-non-preferred planning state; a known scale outside a
+    # target range), or (c) a fact this platform's own domain semantics
+    # already establish can never be safely resolved for a given
+    # opportunity type (strategic land's affordable-percentage and
+    # specialist-development status; see their own inline comments below) -
+    # must remain visible in the `unknown` bucket for transparency but must
+    # NOT by itself downgrade an otherwise-STRONG_FIT opportunity.
+    # `blocking_unknown` is set at every remaining genuine-evidence-gap
+    # `unknown.append` call, and deliberately NOT set at any of the sites
+    # listed above - each site's own inline comment explains which category
+    # it falls into and why.
     blocking_unknown = False
     # Buyer Mandate V2, Phase B2: whether the CALLER chose to activate B2
     # at all - deliberately independent of whether the mandate itself has
@@ -716,8 +731,28 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             )
             blocking_unknown = True
     elif facts.is_specialist_development is None:
-        unknown.append("Development type has not been established with enough confidence to confirm this is general-needs housing.")
-        blocking_unknown = True
+        if facts.opportunity_type == STRATEGIC_LAND:
+            # B2 semantic cleanup (Buyer Fit Classification Audit, Section
+            # 7.C2): decision recorded here, not merely in commit history.
+            # build_strategic_land_matching_facts's own docstring already
+            # explains why this can never resolve to False by design:
+            # intended_use only distinguishes residential/mixed_use/
+            # employment/gypsy_traveller at Local-Plan level, with no
+            # retirement/student/care granularity - a "residential"
+            # allocation could still deliver a specialist product once an
+            # actual scheme comes forward. Mapping non-employment to a
+            # confirmed False would risk exactly the false-negative this
+            # platform must never invent (Unknown Must Remain Unknown), so
+            # NO mapping change is made here - the fact stays honestly
+            # unresolved. But a fact this platform's own domain semantics
+            # say can never be safely resolved from Local Plan evidence
+            # alone must not classification-block Buyer Fit for this
+            # opportunity type - that is a genuine structural-null
+            # question, not a temporary evidence gap.
+            unknown.append("Specialist-development status cannot be established from a strategic land allocation's own intended-use classification alone - not treated as a disqualifying fact for this opportunity type.")
+        else:
+            unknown.append("Development type has not been established with enough confidence to confirm this is general-needs housing.")
+            blocking_unknown = True
 
     # --- Hard exclusion 2: wholly (100%) affordable-led ---------------------
     #
@@ -736,8 +771,20 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 f"scheme, directly relevant to this buyer's affordable-housing focus."
             )
     elif not facts.affordable_percentage_trusted:
-        unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
-        blocking_unknown = True
+        if facts.opportunity_type == STRATEGIC_LAND:
+            # B2 semantic cleanup (Buyer Fit Classification Audit, Section
+            # 7.C1): scheme-specific affordable_percentage is
+            # STRUCTURALLY unavailable for a Local Plan allocation (see
+            # MatchingFacts' own field docstring - "Always None for
+            # STRATEGIC_LAND", never estimated from an NPPF/Local Plan
+            # affordable-housing policy percentage) - never a temporary
+            # data gap future extraction could close, so it must not
+            # classification-block Buyer Fit for this opportunity type.
+            # Still surfaced for transparency; never assumed 0% or 100%.
+            unknown.append("Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.")
+        else:
+            unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
+            blocking_unknown = True
     # A trusted, non-100% figure (the normal policy-compliant case) is
     # deliberately NOT added as a "matches"/"does_not_match" reason for any
     # profile - per the brief, the mere presence of policy-compliant
@@ -750,11 +797,21 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     if facts.planning_state in profile.accepted_planning_states:
         matches.append(f"Planning position ({_planning_state_label(facts.planning_state)}) matches this buyer's stated planning appetite.")
     elif facts.planning_state == OTHER_OR_UNKNOWN:
+        # Genuinely unclassifiable - a real evidence gap (planning position
+        # itself could not be established), not a known-but-non-preferred
+        # fact - remains classification-driving.
         unknown.append("Planning position could not be classified with confidence against this buyer's stated appetite.")
         blocking_unknown = True
     else:
+        # B2 semantic cleanup (Buyer Fit Classification Audit, Section 5):
+        # the planning STATE IS KNOWN here - this is a soft/contextual
+        # mismatch against this buyer's stated appetite, never a missing
+        # fact, and must not by itself block STRONG_FIT (the same
+        # known-but-non-preferred distinction Issue A already established
+        # for development-state appetite). Text unchanged - it already
+        # said "not treated as a disqualifying fact"; only the
+        # classification consequence was wrong.
         unknown.append(f"This opportunity is {_planning_state_label(facts.planning_state)}, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.")
-        blocking_unknown = True
 
     # --- Consent + active proposal coexistence (Gate 2B-2B.1, Section 9) -
     #
@@ -817,8 +874,12 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 f"requirement of {profile.target_unit_min} {unit_noun}."
             )
         else:
+            # B2 semantic cleanup (Buyer Fit Classification Audit, Section
+            # 6): scale_value IS KNOWN here - a target range is not
+            # automatically a hard constraint (the audit's own core
+            # principle), so a known below-target scale is a soft/
+            # contextual mismatch, never missing evidence. Text unchanged.
             unknown.append(f"Approximately {scale_value:,} {unit_noun} is below this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}) - not treated as a disqualifying fact on its own.")
-            blocking_unknown = True
     else:  # oversized
         if profile.large_allocation_is_self_qualifying and facts.opportunity_type == STRATEGIC_LAND:
             matches.append(
@@ -829,15 +890,31 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         elif facts.has_phasing_evidence:
             investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
         else:
+            # B2 semantic cleanup (Buyer Fit Classification Audit, Section
+            # 6): the WHOLE-OPPORTUNITY scale_value is known and known to
+            # exceed target - lack of phasing evidence is a genuine open
+            # question for future acquisition-position investigation ("is
+            # there a suitable phase within this larger scheme?"), never a
+            # reason to call the already-known scale fact "insufficient
+            # evidence" for basic Buyer Fit. Text unchanged.
             unknown.append(f"Overall scale (~{scale_value:,} {unit_noun}) materially exceeds this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.")
-            blocking_unknown = True
         investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
         is_investigative_exception = True
 
     # --- Ownership/control - allocation-specific, structural gap -----------
+    #
+    # B2 semantic cleanup (Buyer Fit Classification Audit, Section 8):
+    # whether a strategic allocation is linked to a matched Site/ownership
+    # position is primarily an Acquisition Position / investigation
+    # question, not a fundamental Buyer Fit compatibility question - moved
+    # from a classification-blocking `unknown` reason to `investigate`,
+    # exactly the same treatment the existing B2.4 control-appetite
+    # UNRESOLVED_OWNERSHIP_INVESTIGATABLE rule already gives unresolved
+    # ownership evidence elsewhere in this function. Never fabricates
+    # ownership, control, availability or seller intention; never a match;
+    # never a hard mismatch.
     if facts.opportunity_type == STRATEGIC_LAND and not facts.matched_to_site:
-        unknown.append("Ownership/control has not been established for this allocation.")
-        blocking_unknown = True
+        investigate.append("Ownership/control has not been established for this allocation - a genuine investigation question, not a Buyer Fit blocker.")
 
     # ==========================================================================
     # Buyer Mandate V2, Phase B2 - the four newly-activated mandate dimensions.
