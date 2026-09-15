@@ -1,0 +1,145 @@
+{
+  "case_id": "sl_emerging_allocation_with_activity",
+  "case_name": "North Leigh Park - INVESTIGATE: allocation/application/phase relationship cannot be determined from the frozen evidence",
+  "commercial_scenario": "A rare combination in the current universe (only 2 of 229 strategic-land candidates): identified planning activity despite the LOCAL PLAN itself still being emerging/pre-adoption. APPROVED (Recommendation Taxonomy V2 Implementation Gate, Section 10): recommendation=INVESTIGATE, tested rigorously against all four V2 recommendations, not merely accepted. The frozen evaluator input (has_identified_planning_activity=True and nothing more) genuinely cannot establish what the activity represents, how much of the allocation it covers, the phase/parcel relationship, or the relevant promoter/control position - and that gap is commercially material (it spans from 'materially all of the allocation remains uncontrolled' to 'a promoter has already substantially delivered the site'), reasonably resolvable now (a bounded investigation, not a wait for a future event), and decision-blocking (it determines whether PURSUE or NOT_RELEVANT is even defensible). Deeper evidence found during benchmark preparation (the real North Leigh Park planning history) is recorded below in reviewer_notes for provenance ONLY - it is deliberately NOT added to frozen_commercial_facts/frozen_evaluation_input, since it was never part of what Agent Evaluation Policy V1's evaluator actually received.",
+  "benchmark_version_introduced": 1,
+  "provenance": {
+    "captured_at": "2026-09-15T12:10:35.302123+00:00",
+    "captured_from_opportunity_id": "strategic_land:allocation:210",
+    "buyer_key": "strategic_land_buyer",
+    "mandate_key": "default",
+    "acquisition_subject_scope_key": "WHOLE_ALLOCATION",
+    "buyer_matching_policy_version": 4,
+    "mandate_interpretation_policy_version": 1,
+    "acquisition_type_interpretation_policy_version": 1,
+    "transaction_signal_policy_version": 2,
+    "terminal_hard_exclusion_policy_version": 1,
+    "agent_evaluation_policy_version": 1
+  },
+  "frozen_commercial_facts": {
+    "acquisition_type": "STRATEGIC_LAND_CONTROL",
+    "opportunity_type": "strategic_land",
+    "buyer_fit_classification": "STRONG_FIT",
+    "buyer_fit_is_investigative_exception": true,
+    "buyer_fit_matches": [
+      "Planning position (an emerging residential allocation) matches this buyer's stated planning appetite.",
+      "This allocation's own scale (~1,400 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy."
+    ],
+    "buyer_fit_unknown": [
+      "Specialist-development status cannot be established from a strategic land allocation's own intended-use classification alone - not treated as a disqualifying fact for this opportunity type.",
+      "Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.",
+      "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference."
+    ],
+    "buyer_fit_investigate": [
+      "Establish whether a suitable development parcel/phase could become available within this buyer's target range.",
+      "Ownership/control has not been established for this allocation - a genuine investigation question, not a Buyer Fit blocker.",
+      "Ownership/control evidence for this opportunity remains unresolved; this buyer's mandate treats unresolved ownership as worth investigating rather than a disqualifying fact."
+    ],
+    "buyer_fit_non_terminal_does_not_match": [],
+    "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+    "opportunity_facts": {
+      "total_units": [
+        "KNOWN",
+        1400
+      ],
+      "development_state_scope_verified": false,
+      "actors_control_developer_indications": [],
+      "actors_control_ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+      "actors_control_conflicts": [],
+      "local_plan_status": [
+        "KNOWN",
+        "proposed_submission"
+      ],
+      "allocation_status": [
+        "KNOWN",
+        "draft_allocation"
+      ],
+      "progression_signal": [
+        "KNOWN",
+        "progressing"
+      ],
+      "has_identified_planning_activity": [
+        "KNOWN",
+        true
+      ]
+    },
+    "transaction_signal_states": {
+      "recent_permission": "NOT_APPLICABLE",
+      "approaching_implementation_deadline": "NOT_APPLICABLE",
+      "implementation_activity_evidence_identified": "NOT_APPLICABLE",
+      "wider_site_implementation_activity_context": "NOT_APPLICABLE",
+      "no_qualifying_progress_evidence_identified": "NOT_APPLICABLE",
+      "ownership_or_control_evidence_changed": "ABSENT",
+      "scope_verified": false
+    },
+    "linked_strategic_allocation_id": null
+  },
+  "frozen_evaluation_input": {
+    "buyer_key": "strategic_land_buyer",
+    "acquisition_type": "STRATEGIC_LAND_CONTROL",
+    "opportunity_type": "strategic_land",
+    "mandate_interpretation_lines": [
+      "- target_unit_min [TARGET]: A scheme below 100 total homes is a soft/contextual signal for this buyer, never a disqualifying fact on its own.",
+      "- target_unit_max [TARGET]: A scheme above 300 total homes is a soft/contextual signal, worth investigating (e.g. for a suitable phase/parcel), never a disqualifying fact on its own - no current mandate has a hard maximum, and this module does not add one.",
+      "- accepted_planning_states [PREFERENCE  (active)]: A planning state outside this set is a soft signal (unknown/context), never a disqualifying fact on its own.",
+      "- specialist_development_is_exclusion [EXCLUSION  (active)]: A confirmed specialist development is a hard exclusion for this buyer.",
+      "- wholly_affordable_is_exclusion [EXCLUSION  (active)]: A confirmed wholly-affordable scheme is a hard exclusion for this buyer.",
+      "- treats_no_activity_as_positive [PREFERENCE  (active)]: No identified planning activity on a strategic land allocation reads as a positive signal for this buyer.",
+      "- large_allocation_is_self_qualifying [TOLERANCE  (active)]: An oversized strategic land allocation is read as a meaningful position in its own right for this buyer, independent of a confirmed smaller parcel.",
+      "- geography_scope [HARD_CONSTRAINT]: This buyer has not stated a geographic boundary that excludes anything.",
+      "- development_state_appetite [PREFERENCE  (active)]: This buyer's stated development-state appetite is 'UNCOMMENCED_PREFERRED' - a leaning, never an exclusion.",
+      "- control_appetite [INVESTIGATION_CONDITION  (active)]: This buyer is willing to investigate: ['A', 'A', 'B', 'D', 'E', 'E', 'E', 'E', 'E', 'G', 'H', 'I', 'I', 'I', 'L', 'L', 'N', 'N', 'N', 'O', 'O', 'P', 'R', 'R', 'S', 'S', 'S', 'T', 'T', 'U', 'V', 'V', 'W', '_', '_'] rather than treating unresolved ownership/control as a rejection reason."
+    ],
+    "buyer_fit_classification": "STRONG_FIT",
+    "buyer_fit_is_investigative_exception": true,
+    "reference_tokens": {
+      "packet.total_units": "KNOWN = 1400",
+      "packet.local_plan_status": "KNOWN = 'proposed_submission'",
+      "packet.allocation_status": "KNOWN = 'draft_allocation'",
+      "packet.progression_signal": "KNOWN = 'progressing'",
+      "packet.has_identified_planning_activity": "KNOWN = True",
+      "packet.development_state_scope_verified": "False",
+      "packet.actors_control.developer_indications": "()",
+      "packet.actors_control.ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+      "packet.actors_control.has_ownership_evidence": "False",
+      "packet.actors_control.conflicts": "()",
+      "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+      "signals.recent_permission": "NOT_APPLICABLE - Not applicable to a strategic land allocation - no decided planning permission exists to anchor a lapse/build-status clock.",
+      "signals.approaching_implementation_deadline": "NOT_APPLICABLE",
+      "signals.implementation_activity_evidence_identified": "NOT_APPLICABLE - Not applicable to a strategic land allocation - no decided planning permission exists to anchor a lapse/build-status clock.",
+      "signals.wider_site_implementation_activity_context": "NOT_APPLICABLE - Not applicable to a strategic land allocation - no decided planning permission exists to anchor a lapse/build-status clock.",
+      "signals.no_qualifying_progress_evidence_identified": "NOT_APPLICABLE - Not applicable to a strategic land allocation - no decided planning permission exists to anchor a lapse/build-status clock.",
+      "signals.ownership_or_control_evidence_changed": "ABSENT - No ownership/control evidence change was detected at this opportunity's last monitoring pass.",
+      "signals.coverage_checked_at": "None",
+      "signals.scope_verified": "False",
+      "buyer_fit.matches[0]": "Planning position (an emerging residential allocation) matches this buyer's stated planning appetite.",
+      "buyer_fit.matches[1]": "This allocation's own scale (~1,400 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "buyer_fit.matches[2]": "This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy.",
+      "buyer_fit.unknown[0]": "Specialist-development status cannot be established from a strategic land allocation's own intended-use classification alone - not treated as a disqualifying fact for this opportunity type.",
+      "buyer_fit.unknown[1]": "Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.",
+      "buyer_fit.unknown[2]": "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference.",
+      "buyer_fit.investigate[0]": "Establish whether a suitable development parcel/phase could become available within this buyer's target range.",
+      "buyer_fit.investigate[1]": "Ownership/control has not been established for this allocation - a genuine investigation question, not a Buyer Fit blocker.",
+      "buyer_fit.investigate[2]": "Ownership/control evidence for this opportunity remains unresolved; this buyer's mandate treats unresolved ownership as worth investigating rather than a disqualifying fact."
+    },
+    "governing_policy_prompt_version": 1,
+    "agent_evaluation_output_schema_version": 1
+  },
+  "expected_recommendation": [
+    "INVESTIGATE"
+  ],
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 10): INVESTIGATE. Investigation objective: determine the allocation <-> application <-> phase/parcel relationship and the relevant promoter/control position sufficiently to determine whether meaningful strategic acquisition opportunity remains. Tested against the alternatives: PURSUE is not defensible because the buyer's own scale-tolerance addresses SIZE, not WHETHER SOMEONE ELSE ALREADY HOLDS THE LAND; MONITOR is not defensible because the fact is resolvable NOW, not dependent on a future event; NOT_RELEVANT is not defensible because it would infer incompatibility from evidentiary ambiguity, the forbidden pattern.",
+  "required_invariants": [],
+  "forbidden_claims": [],
+  "required_material_unknowns": [
+    "Determine the allocation <-> application <-> phase/parcel relationship and the relevant promoter/control position sufficiently to determine whether meaningful strategic acquisition opportunity remains."
+  ],
+  "expected_acquisition_subject_level": null,
+  "expected_next_action": null,
+  "monitoring_trigger_constraints": null,
+  "repeat_for_consistency": true,
+  "is_zero_llm_case": false,
+  "reviewer_notes": "READ-ONLY INVESTIGATION FINDING (2026-09-15), PROVENANCE ONLY - deliberately NOT part of the frozen evaluator input above (Section 10: 'do not expose deeper evidence discovered during benchmark preparation to the model unless it is actually part of the frozen evaluator input'). The allocation (site 170, Wigan) is the 'North Leigh Park' scheme: a 2012 outline consent for 1,800 homes (app A/12/76665, decided/approved, applicant/developer 'North Leigh Park Group Limited'), substantially implemented since 2019 via reserved-matters/condition-discharge applications naming 'Countryside Properties (UK) Limited' as developer (confirmed CONFIRMED_PHASED phasing evidence: 'Phase 1a(1)', 'Phase 1b', 'future phases' - first phase lawfully implemented 2 Dec 2019), PLUS a newly REGISTERED (undecided) 1,491-unit reserved-matters application from 'Vistry Group' (A/26/100520/RMMAJ) on the same site. The platform's own deterministic per-Site development-coverage accounting currently returns identified_application_capacity=2 for this site - an evident data-quality artifact in representative-application selection, separately reported as technical debt. APPROVED as INVESTIGATE by Product Owner (2026-09-15).",
+  "approved_by_product_owner": true
+}

@@ -18,6 +18,7 @@ from app.policy.agent_evaluation_result import (
     ACQUISITION_SUBJECT_LEVELS,
     CONFIDENCE_VALUES,
     IDENTIFY_PHASE_OR_PARCEL,
+    INVESTIGATE,
     MONITOR,
     MONITORING_TRIGGER_VALUES,
     NEXT_ACTION_VALUES,
@@ -25,7 +26,6 @@ from app.policy.agent_evaluation_result import (
     PARCEL_TBD,
     PHASE,
     RECOMMENDATION_VALUES,
-    VERIFY,
     AcquisitionSubject,
     AgentEvaluationResult,
     AgentEvaluationResultKey,
@@ -213,27 +213,33 @@ def validate_and_build_result(
         except (KeyError, TypeError) as exc:
             errors.append(f"material_unknowns entry malformed: {exc}")
 
-    # VERIFY requires >=1 material+resolvable+blocking unknown (Section 11
-    # of the narrow-implementation authorisation - "VERIFY requires at
-    # least one: blocking=True, resolvable=True material unknown").
-    if recommendation == VERIFY:
+    # INVESTIGATE requires >=1 material+resolvable+blocking unknown
+    # (Recommendation Taxonomy V2 - the exact V1 VERIFY test transfers
+    # unchanged: "at least one: blocking=True, resolvable=True material
+    # unknown", renamed from VERIFY to INVESTIGATE at the recommendation
+    # layer only - see app.policy.agent_evaluation_result's own V2
+    # changelog comment. Deliberately NOT relaxed or tightened by the
+    # taxonomy change itself.
+    if recommendation == INVESTIGATE:
         if not any(u.material and u.resolvable and u.blocking for u in unknowns):
-            errors.append("VERIFY requires at least one material_unknowns entry with material=True, resolvable=True, blocking=True")
+            errors.append("INVESTIGATE requires at least one material_unknowns entry with material=True, resolvable=True, blocking=True")
 
     # MONITOR must never be "investigate now" in disguise (Pre-Release
-    # Commercial Semantic Fix, Section 6/10): the governing policy's own
-    # formula is MATERIAL + RESOLVABLE + BLOCKING == VERIFY. If the model's
-    # own material_unknowns already contain such an entry, MONITOR is
+    # Commercial Semantic Fix, Section 6/10; carried into Recommendation
+    # Taxonomy V2 unchanged): the governing policy's own formula is
+    # MATERIAL + RESOLVABLE + BLOCKING == INVESTIGATE. If the model's own
+    # material_unknowns already contain such an entry, MONITOR is
     # structurally inconsistent with it - a question that could be
-    # resolved NOW is investigation work to do now (PURSUE or VERIFY),
+    # resolved NOW is investigation work to do now (PURSUE or INVESTIGATE),
     # never a reason to defer to some future external trigger. Confirmed
     # live: a model that correctly marks an unknown material+resolvable+
-    # blocking nonetheless sometimes still chose MONITOR instead of VERIFY.
+    # blocking nonetheless sometimes still chose MONITOR instead of the
+    # correct recommendation.
     if recommendation == MONITOR and any(u.material and u.resolvable and u.blocking for u in unknowns):
         errors.append(
             "MONITOR is inconsistent with a material_unknowns entry that is material=True, resolvable=True, "
-            "blocking=True - by this policy's own rule (MATERIAL + RESOLVABLE + BLOCKING = VERIFY), a "
-            "question resolvable right now is investigation work to act on (VERIFY, or PURSUE if the "
+            "blocking=True - by this policy's own rule (MATERIAL + RESOLVABLE + BLOCKING = INVESTIGATE), a "
+            "question resolvable right now is investigation work to act on (INVESTIGATE, or PURSUE if the "
             "opportunity already has a credible angle), never a reason to wait for a future external trigger"
         )
 

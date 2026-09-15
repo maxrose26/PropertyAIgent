@@ -1,0 +1,158 @@
+{
+  "case_id": "xc_developer_identity_no_control",
+  "case_name": "Developer identity (Bloor Homes) without proven ownership/control",
+  "commercial_scenario": "A named national housebuilder identified as developer/applicant, but ownership/control evidence does NOT establish same-subject control. Tests the role-conflation trap: developer identity alone must never be read as ownership or whole-site control.",
+  "benchmark_version_introduced": 1,
+  "provenance": {
+    "captured_at": "2026-09-15T12:10:57.575385+00:00",
+    "captured_from_opportunity_id": "planning_delivery:long_pending_application:104",
+    "buyer_key": "nesten_homes",
+    "mandate_key": "default",
+    "acquisition_subject_scope_key": "WHOLE_SITE",
+    "buyer_matching_policy_version": 4,
+    "mandate_interpretation_policy_version": 1,
+    "acquisition_type_interpretation_policy_version": 1,
+    "transaction_signal_policy_version": 2,
+    "terminal_hard_exclusion_policy_version": 1,
+    "agent_evaluation_policy_version": 1
+  },
+  "frozen_commercial_facts": {
+    "acquisition_type": "LAND_SITE_ACQUISITION",
+    "opportunity_type": "planning_delivery",
+    "buyer_fit_classification": "STRONG_FIT",
+    "buyer_fit_is_investigative_exception": true,
+    "buyer_fit_matches": [],
+    "buyer_fit_unknown": [
+      "This opportunity is an active planning application, not yet decided, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.",
+      "Overall scale (~675 homes) materially exceeds this buyer's target range (50-100 homes); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.",
+      "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference."
+    ],
+    "buyer_fit_investigate": [
+      "Establish whether a suitable development parcel/phase could become available within this buyer's target range.",
+      "Ownership/control evidence for this opportunity remains unresolved; this buyer's mandate treats unresolved ownership as worth investigating rather than a disqualifying fact."
+    ],
+    "buyer_fit_non_terminal_does_not_match": [],
+    "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+    "opportunity_facts": {
+      "total_units": [
+        "KNOWN",
+        675
+      ],
+      "development_state_scope_verified": false,
+      "actors_control_developer_indications": [
+        "Bloor Homes (North West) Ltd",
+        "Bloor Homes (North West) Ltd"
+      ],
+      "actors_control_ownership_coverage": "RELEVANT_EVIDENCE_SEARCHED_NO_CONTROL_INDICATION_FOUND",
+      "actors_control_conflicts": [],
+      "development_state": [
+        "UNKNOWN",
+        null
+      ],
+      "affordable_units": [
+        "KNOWN",
+        338
+      ],
+      "affordable_percentage": [
+        "KNOWN",
+        50.0
+      ],
+      "operative_planning_state": [
+        "KNOWN",
+        "planning_active_proposal"
+      ],
+      "recommendation_direction": [
+        "KNOWN",
+        "unclear"
+      ],
+      "affordable_housing_status": [
+        "KNOWN",
+        "proposed"
+      ]
+    },
+    "transaction_signal_states": {
+      "recent_permission": "ABSENT",
+      "approaching_implementation_deadline": "UNKNOWN",
+      "implementation_activity_evidence_identified": "UNKNOWN",
+      "wider_site_implementation_activity_context": "UNKNOWN",
+      "no_qualifying_progress_evidence_identified": "UNKNOWN",
+      "ownership_or_control_evidence_changed": "ABSENT",
+      "scope_verified": false
+    },
+    "linked_strategic_allocation_id": null
+  },
+  "frozen_evaluation_input": {
+    "buyer_key": "nesten_homes",
+    "acquisition_type": "LAND_SITE_ACQUISITION",
+    "opportunity_type": "planning_delivery",
+    "mandate_interpretation_lines": [
+      "- target_unit_min [TARGET]: A scheme below 50 total homes is a soft/contextual signal for this buyer, never a disqualifying fact on its own.",
+      "- target_unit_max [TARGET]: A scheme above 100 total homes is a soft/contextual signal, worth investigating (e.g. for a suitable phase/parcel), never a disqualifying fact on its own - no current mandate has a hard maximum, and this module does not add one.",
+      "- accepted_planning_states [PREFERENCE  (active)]: A planning state outside this set is a soft signal (unknown/context), never a disqualifying fact on its own.",
+      "- specialist_development_is_exclusion [EXCLUSION  (active)]: A confirmed specialist development is a hard exclusion for this buyer.",
+      "- wholly_affordable_is_exclusion [EXCLUSION  (active)]: A confirmed wholly-affordable scheme is a hard exclusion for this buyer.",
+      "- treats_no_activity_as_positive [PREFERENCE]: This buyer has not stated a preference for early-stage, activity-free allocations.",
+      "- large_allocation_is_self_qualifying [TOLERANCE]: An oversized strategic land allocation is read the same as any other oversized opportunity for this buyer (see target_unit_max).",
+      "- geography_scope [HARD_CONSTRAINT]: This buyer has not stated a geographic boundary that excludes anything.",
+      "- development_state_appetite [PREFERENCE  (active)]: This buyer's stated development-state appetite is 'UNCOMMENCED_PREFERRED' - a leaning, never an exclusion.",
+      "- control_appetite [INVESTIGATION_CONDITION  (active)]: This buyer is willing to investigate: ['A', 'A', 'B', 'D', 'E', 'E', 'E', 'E', 'E', 'G', 'H', 'I', 'I', 'I', 'L', 'L', 'N', 'N', 'N', 'O', 'O', 'P', 'R', 'R', 'S', 'S', 'S', 'T', 'T', 'U', 'V', 'V', 'W', '_', '_'] rather than treating unresolved ownership/control as a rejection reason."
+    ],
+    "buyer_fit_classification": "STRONG_FIT",
+    "buyer_fit_is_investigative_exception": true,
+    "reference_tokens": {
+      "packet.total_units": "KNOWN = 675",
+      "packet.affordable_units": "KNOWN = 338",
+      "packet.affordable_percentage": "KNOWN = 50.0",
+      "packet.operative_planning_state": "KNOWN = 'planning_active_proposal'",
+      "packet.recommendation_direction": "KNOWN = 'unclear'",
+      "packet.affordable_housing_status": "KNOWN = 'proposed'",
+      "packet.development_state": "UNKNOWN",
+      "packet.development_state_scope_verified": "False",
+      "packet.actors_control.developer_indications": "('Bloor Homes (North West) Ltd', 'Bloor Homes (North West) Ltd')",
+      "packet.actors_control.ownership_coverage": "RELEVANT_EVIDENCE_SEARCHED_NO_CONTROL_INDICATION_FOUND",
+      "packet.actors_control.has_ownership_evidence": "False",
+      "packet.actors_control.conflicts": "()",
+      "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+      "signals.recent_permission": "ABSENT - No application has been granted for this opportunity at all.",
+      "signals.approaching_implementation_deadline": "UNKNOWN",
+      "signals.implementation_activity_evidence_identified": "UNKNOWN - No resolved operative permission exists to search subsequent planning activity against.",
+      "signals.wider_site_implementation_activity_context": "UNKNOWN - No resolved operative permission exists to search subsequent planning activity against.",
+      "signals.no_qualifying_progress_evidence_identified": "UNKNOWN - Insufficient basis to conclude no qualifying progress evidence exists: no resolved operative permission exists; this opportunity's own scope has not been verified.",
+      "signals.ownership_or_control_evidence_changed": "ABSENT - No ownership/control evidence change was detected at this opportunity's last monitoring pass.",
+      "signals.coverage_checked_at": "None",
+      "signals.scope_verified": "False",
+      "buyer_fit.unknown[0]": "This opportunity is an active planning application, not yet decided, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.",
+      "buyer_fit.unknown[1]": "Overall scale (~675 homes) materially exceeds this buyer's target range (50-100 homes); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.",
+      "buyer_fit.unknown[2]": "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference.",
+      "buyer_fit.investigate[0]": "Establish whether a suitable development parcel/phase could become available within this buyer's target range.",
+      "buyer_fit.investigate[1]": "Ownership/control evidence for this opportunity remains unresolved; this buyer's mandate treats unresolved ownership as worth investigating rather than a disqualifying fact."
+    },
+    "governing_policy_prompt_version": 1,
+    "agent_evaluation_output_schema_version": 1
+  },
+  "expected_recommendation": [
+    "PURSUE"
+  ],
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 11): PURSUE (narrowed from PURSUE/VERIFY). Bloor Homes appears as an identified applicant/developer - that does NOT prove ownership, legal control, or whole-site control, but it DOES provide a commercially relevant identified actor associated with the opportunity (the Commercial Counterparty Principle) - do not use INVESTIGATE simply because ownership/control remains unresolved; developer/applicant identity != ownership/control, but is not automatically blocking either. PARCEL_TBD/IDENTIFY_PHASE_OR_PARCEL remain appropriate given the 675-vs-50-100-unit scale gap. NOT_RELEVANT must never be derived from Bloor identity alone - an explicit CRITICAL FAILURE for this case, not merely an unlikely answer.",
+  "required_invariants": [
+    "no_developer_to_ownership_control_inference",
+    "developer_identity_can_establish_counterparty_without_ownership"
+  ],
+  "forbidden_claims": [
+    "is unavailable",
+    "will not sell",
+    "self-delivering"
+  ],
+  "required_material_unknowns": [],
+  "expected_acquisition_subject_level": [
+    "PARCEL_TBD"
+  ],
+  "expected_next_action": [
+    "IDENTIFY_PHASE_OR_PARCEL"
+  ],
+  "monitoring_trigger_constraints": null,
+  "repeat_for_consistency": false,
+  "is_zero_llm_case": false,
+  "reviewer_notes": "PARCEL_TBD/IDENTIFY_PHASE_OR_PARCEL added and NOT_RELEVANT explicitly named as a critical failure by Product Owner (2026-09-15), Case Correction Gate Section 11. APPROVED as PURSUE by Product Owner (2026-09-15), Recommendation Taxonomy V2 Implementation Gate Section 11/27.",
+  "approved_by_product_owner": true
+}

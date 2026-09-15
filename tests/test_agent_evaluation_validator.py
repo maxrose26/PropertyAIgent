@@ -15,12 +15,12 @@ from app.policy.agent_evaluation_result import (
     DEVELOPMENT_SITE,
     HIGH,
     IDENTIFY_PHASE_OR_PARCEL,
+    INVESTIGATE,
     MONITOR,
     NOT_RELEVANT,
     PARCEL_TBD,
     PHASE,
     PURSUE,
-    VERIFY,
     VERIFY_OWNERSHIP,
     WHOLE_ALLOCATION,
     AgentEvaluationResultKey,
@@ -179,21 +179,23 @@ def test_countervailing_reasons_citing_unknown_token_rejected():
     assert any("countervailing_reasons" in e for e in outcome.errors)
 
 
-# --- VERIFY requires a material+resolvable+blocking unknown ----------------
+# --- INVESTIGATE requires a material+resolvable+blocking unknown -----------
+# (Recommendation Taxonomy V2 - renamed from VERIFY; the underlying test is
+# byte-for-byte the same "material+resolvable+blocking" rule.)
 
-def test_verify_without_qualifying_unknown_rejected():
+def test_investigate_without_qualifying_unknown_rejected():
     raw = _raw(
-        recommendation=VERIFY,
+        recommendation=INVESTIGATE,
         material_unknowns=[{"fact_or_question": "Is X true?", "material": True, "resolvable": True, "blocking": False, "why_it_matters": "y"}],
     )
     outcome = _validate(raw)
     assert outcome.ok is False
-    assert any("VERIFY requires" in e for e in outcome.errors)
+    assert any("INVESTIGATE requires" in e for e in outcome.errors)
 
 
-def test_verify_with_qualifying_unknown_passes():
+def test_investigate_with_qualifying_unknown_passes():
     raw = _raw(
-        recommendation=VERIFY,
+        recommendation=INVESTIGATE,
         material_unknowns=[{"fact_or_question": "Is X true?", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
     )
     outcome = _validate(raw)
@@ -273,8 +275,9 @@ def test_monitor_with_a_material_resolvable_blocking_unknown_and_no_negative_sig
     """Superseded by the Pre-Release Commercial Semantic Fix (Section 6/10):
     a material+resolvable+BLOCKING unknown with no real negative signal is
     exactly the "investigate now, disguised as MONITOR" pattern - this
-    must now be rejected (forcing VERIFY) rather than accepted as MONITOR,
-    per the new MONITOR-vs-VERIFY consistency rule below."""
+    must now be rejected (forcing INVESTIGATE) rather than accepted as
+    MONITOR, per the MONITOR-vs-INVESTIGATE consistency rule below
+    (Recommendation Taxonomy V2 - renamed from MONITOR-vs-VERIFY)."""
     raw = _raw(
         recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
         supporting_reasons=[{"label": "A clean positive.", "evidence_reference": "packet.total_units"}],
@@ -462,7 +465,7 @@ def test_monitor_with_material_resolvable_blocking_unknown_rejected():
     """Regression for the live-calibration finding: a model that correctly
     marks an unknown material+resolvable+blocking must not then also
     choose MONITOR - by the policy's own formula that combination IS
-    VERIFY (or PURSUE-with-a-credible-angle), never a future-trigger
+    INVESTIGATE (or PURSUE-with-a-credible-angle), never a future-trigger
     deferral."""
     raw = _raw(
         recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
@@ -499,9 +502,9 @@ def test_monitor_with_zero_unknowns_and_a_real_negative_signal_passes():
     assert outcome.ok is True
 
 
-def test_verify_with_material_resolvable_blocking_unknown_is_unaffected_by_the_new_rule():
+def test_investigate_with_material_resolvable_blocking_unknown_is_unaffected_by_the_new_rule():
     raw = _raw(
-        recommendation=VERIFY,
+        recommendation=INVESTIGATE,
         material_unknowns=[{"fact_or_question": "Is there a suitable parcel within target range?", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
     )
     outcome = _validate(raw)
@@ -651,3 +654,54 @@ def test_pursue_may_cite_ownership_control_posture_token():
     raw = _raw(confidence_basis=["ownership_control_posture", "buyer_fit.matches[0]"], evidence_references=["ownership_control_posture"])
     outcome = _validate(raw, context=context)
     assert outcome.ok is True
+
+
+# --- Recommendation Taxonomy V2 - required regression proofs (Product ------
+# --- Owner Implementation Gate, Section 33) ---------------------------------
+
+def test_pursue_with_identified_developer_and_unresolved_ownership_remains_valid():
+    """An identified developer/applicant plus unresolved registered
+    ownership must NOT force INVESTIGATE - the Commercial Counterparty
+    Principle: an active developer can itself be the sensible route in,
+    with ownership verification as ordinary (non-blocking) due diligence."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 120", "buyer_fit.matches[0]": "Planning appetite match.",
+        "packet.actors_control.developer_indications": "('Bellway Homes Limited',)",
+        "packet.actors_control.has_ownership_evidence": "False",
+        "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+    })
+    raw = _raw(
+        recommendation=PURSUE, next_action="VERIFY_OWNERSHIP",
+        confidence_basis=["packet.actors_control.developer_indications"],
+        supporting_reasons=[{"label": "Bellway Homes Limited is an identified developer/applicant - a commercially actionable route in.", "evidence_reference": "packet.actors_control.developer_indications"}],
+        material_unknowns=[{
+            "fact_or_question": "Registered ownership is not independently established.",
+            "material": True, "resolvable": True, "blocking": False, "why_it_matters": "Ordinary due diligence, not a gate.",
+        }],
+        evidence_references=["packet.actors_control.developer_indications"],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is True
+    assert outcome.result.recommendation == PURSUE
+    assert outcome.result.next_action == "VERIFY_OWNERSHIP"
+
+
+def test_investigate_with_verify_control_position_action_valid_when_blocking():
+    """INVESTIGATE may validly pair with next_action=VERIFY_CONTROL_POSITION
+    when a specific material+resolvable+blocking control question exists -
+    the SAME action name that validly pairs with PURSUE elsewhere (see
+    test_pursue_with_identified_developer_and_unresolved_ownership_remains_
+    valid above) - proving action name alone never determines the
+    recommendation."""
+    raw = _raw(
+        recommendation=INVESTIGATE, next_action="VERIFY_CONTROL_POSITION",
+        material_unknowns=[{
+            "fact_or_question": "Does the identified developer control only this phase, or the wider allocation?",
+            "material": True, "resolvable": True, "blocking": True,
+            "why_it_matters": "Determines whether a genuine acquisition angle remains on the wider site.",
+        }],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+    assert outcome.result.recommendation == INVESTIGATE
+    assert outcome.result.next_action == "VERIFY_CONTROL_POSITION"

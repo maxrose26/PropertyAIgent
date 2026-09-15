@@ -428,7 +428,7 @@ def test_second_successful_evaluation_creates_new_history_but_updates_current_po
         mandate_fingerprint="fp-mandate-v1", acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp,
         opportunity_fingerprint="fp-opp", packet=packet, buyer_fit_assessment=assessment, client=client,
     )
-    raw2 = _valid_raw(recommendation="VERIFY")
+    raw2 = _valid_raw(recommendation="INVESTIGATE")
     raw2["material_unknowns"] = [{
         "fact_or_question": "What is the ownership/control position?", "material": True,
         "resolvable": True, "blocking": True, "why_it_matters": "Determines the acquisition route.",
@@ -846,3 +846,113 @@ def test_structured_output_schema_version_is_independent_of_the_evaluation_input
     assert "OUTPUT_SCHEMA" not in source
     assert "acquisition_evaluate" not in source  # never imports from the module owning OUTPUT_SCHEMA at all
     assert "structured_output_schema_version" not in inspect.signature(func).parameters
+
+
+# --- Recommendation Taxonomy V2 - required regression proofs (Product ------
+# --- Owner Implementation Gate, Section 33/21) ------------------------------
+
+def test_historical_v1_verify_recommendation_still_readable_without_migration(session):
+    """A pre-V2 historical row persisted under policy version 1 with
+    recommendation="VERIFY" must remain fully readable forever -
+    AgentEvaluationHistory.recommendation is a plain string column with no
+    CHECK constraint or enum, and nothing on the read path reconstructs an
+    AgentEvaluationResult (which WOULD reject "VERIFY" under the current,
+    V2 RECOMMENDATION_VALUES) from a historical row. Directly inserts a
+    row exactly as a real V1 evaluation would have looked, never rewriting
+    or migrating it."""
+    site, opp, mandate_row, mandate, packet, assessment = _build_case(session)
+    subject_type, anchor_id, scope_key = resolve_acquisition_subject_key(opp.opportunity_id, opp.opportunity_type)
+    anchor = get_or_create_subject_anchor(session, subject_type=subject_type, anchor_id=anchor_id, scope_key=scope_key)
+    session.commit()
+
+    history = AgentEvaluationHistory(
+        buyer_mandate_id=mandate_row.id, subject_anchor_id=anchor.id, acquisition_type="LAND_SITE_ACQUISITION",
+        opportunity_id=opp.opportunity_id, opportunity_kind="site",
+        buyer_mandate_fingerprint="fp-v1", evaluation_input_fingerprint="fp-input-v1",
+        evaluation_policy_version="mandate_interpretation=1;acquisition_type_interpretation=1;transaction_signal=2;terminal_hard_exclusion=1;agent_evaluation=1",
+        prompt_version=1, structured_output_schema_version=1, model_provider="openai", model_id="gpt-4o-mini",
+        execution_status=SUCCESS, retry_count=0,
+        recommendation="VERIFY", confidence="HIGH", confidence_basis=json.dumps(["packet.total_units"]),
+        acquisition_subject_level="DEVELOPMENT_SITE", next_action="VERIFY_OWNERSHIP", next_action_detail="",
+        reasoning_summary="A historical V1 evaluation.", evidence_references=json.dumps(["packet.total_units"]),
+    )
+    session.add(history)
+    session.commit()
+
+    reread = session.get(AgentEvaluationHistory, history.id)
+    assert reread.recommendation == "VERIFY"
+    assert "agent_evaluation=1" in reread.evaluation_policy_version
+    assert reread.prompt_version == 1
+    assert reread.structured_output_schema_version == 1
+
+
+def test_v2_investigate_recommendation_persists_without_any_schema_migration(session):
+    """A V2 evaluation producing recommendation="INVESTIGATE" must persist
+    through the EXISTING, unmigrated AgentEvaluationHistory table exactly
+    like any other recommendation string - confirms Section 23/26 of the
+    Design Report: no database migration is required."""
+    site, opp, mandate_row, mandate, packet, assessment = _build_case(session)
+    tokens = _reference_tokens_for_case(session, opp=opp, packet=packet, assessment=assessment, mandate=mandate)
+    ref = next(iter(tokens))
+    raw = {
+        "recommendation": "INVESTIGATE", "confidence": "HIGH", "confidence_basis": [ref],
+        "acquisition_subject": {"level": "DEVELOPMENT_SITE", "reference": None, "note": None},
+        "supporting_reasons": [], "countervailing_reasons": [],
+        "material_unknowns": [{"fact_or_question": "Q", "material": True, "resolvable": True, "blocking": True, "why_it_matters": "y"}],
+        "reasoning_summary": "A V2 evaluation.", "next_action": "VERIFY_CONTROL_POSITION", "next_action_detail": "",
+        "monitoring_trigger": None, "evidence_references": [ref],
+    }
+    client = _FakeClient([json.dumps(raw)])
+    outcome = run_persisted_evaluation(
+        session, mandate=mandate, mandate_key=mandate_row.buyer.buyer_key, buyer_mandate_id=mandate_row.id,
+        mandate_fingerprint="fp-v2", acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp,
+        opportunity_fingerprint="fp-opp", packet=packet, buyer_fit_assessment=assessment, client=client,
+    )
+    assert outcome.status == "evaluated"
+    assert outcome.history.execution_status == SUCCESS
+    assert outcome.history.recommendation == "INVESTIGATE"
+    assert outcome.history.next_action == "VERIFY_CONTROL_POSITION"
+    # No schema/migration required: the same table, same columns, same
+    # session, already held the V1 "VERIFY" row from the previous test.
+    all_recommendations = {h.recommendation for h in session.execute(select(AgentEvaluationHistory)).scalars().all()}
+    assert "INVESTIGATE" in all_recommendations
+
+
+def _reference_tokens_for_case(session, *, opp, packet, assessment, mandate):
+    from app.policy.agent_evaluation_prompt import build_prompt_context
+    from app.policy.terminal_hard_exclusion import classify_terminal_exclusion
+
+    terminal = classify_terminal_exclusion(assessment.does_not_match)
+    context = build_prompt_context(
+        buyer_key="mandate", mandate=mandate, acquisition_type="LAND_SITE_ACQUISITION",
+        opportunity_id=opp.opportunity_id, opportunity_type=opp.opportunity_type,
+        buyer_fit_assessment=assessment, non_terminal_does_not_match=terminal.non_terminal_texts,
+        packet=packet, transaction_signals=packet.transaction_signals,
+    )
+    return context.reference_tokens
+
+
+def test_gate2c_investigate_signal_is_not_an_acquisition_agent_recommendation():
+    """Narrow regression guard (Recommendation Taxonomy V2 Design Report,
+    Section AD/AF): app.reporting.allocation_development_coverage's own
+    pre-existing, buyer-independent 'opportunity signal' (INVESTIGATE/
+    MONITOR/LOWER_PRIORITY/INSUFFICIENT_EVIDENCE) is a DIFFERENT, unrelated
+    classification from app.policy.agent_evaluation_result's buyer-specific
+    Agent recommendation - both happen to use the string "INVESTIGATE" (and
+    "MONITOR") but must never be treated as equivalent or compared to each
+    other. Confirms no import-level coupling exists between the two."""
+    import inspect
+
+    from app.policy import agent_evaluation_persistence, agent_evaluation_result, acquisition_evaluate
+    from app.reporting import allocation_development_coverage
+
+    assert allocation_development_coverage.INVESTIGATE == "INVESTIGATE"
+    assert agent_evaluation_result.INVESTIGATE == "INVESTIGATE"
+    # Same bare string value by coincidence - but never the same Python
+    # object identity requirement, and never imported into each other's
+    # module namespace.
+    assert "allocation_development_coverage" not in inspect.getsource(agent_evaluation_persistence)
+    assert "allocation_development_coverage" not in inspect.getsource(agent_evaluation_result)
+    assert "allocation_development_coverage" not in inspect.getsource(acquisition_evaluate)
+    assert "agent_evaluation_result" not in inspect.getsource(allocation_development_coverage)
+    assert "agent_evaluation_persistence" not in inspect.getsource(allocation_development_coverage)

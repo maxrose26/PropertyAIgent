@@ -21,7 +21,7 @@ from app.policy.agent_evaluation_result import (
     NOT_RELEVANT,
     PLANNING_STATUS_CHANGED,
     PURSUE,
-    VERIFY,
+    INVESTIGATE,
     WHOLE_ALLOCATION,
     AcquisitionSubject,
     AgentEvaluationResult,
@@ -110,7 +110,7 @@ def test_multi_acquisition_type_mandate_representable_without_blending():
     must coexist as independent, addressable results."""
     result_land = _make_result(
         key=AgentEvaluationResultKey(buyer_key="mixed_mandate_buyer", opportunity_id="planning_delivery:site:526", acquisition_type="LAND_SITE_ACQUISITION"),
-        recommendation=VERIFY, confidence=LOW,
+        recommendation=INVESTIGATE, confidence=LOW,
         confidence_basis=("Land-acquisition read is ambiguous pending phasing evidence",),
         monitoring_trigger=None,
     )
@@ -121,7 +121,7 @@ def test_multi_acquisition_type_mandate_representable_without_blending():
     )
     results_by_key = {result_land.key: result_land, result_homes.key: result_homes}
     assert len(results_by_key) == 2
-    assert results_by_key[result_land.key].recommendation == VERIFY
+    assert results_by_key[result_land.key].recommendation == INVESTIGATE
     assert results_by_key[result_homes.key].recommendation == PURSUE
 
 
