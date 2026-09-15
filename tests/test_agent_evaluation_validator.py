@@ -221,7 +221,7 @@ def test_not_relevant_citing_only_buyer_fit_unknown_rejected():
     )
     outcome = _validate(raw, context=context)
     assert outcome.ok is False
-    assert any("NOT_RELEVANT requires" in e and "CONFIRMED fact" in e for e in outcome.errors)
+    assert any("NOT_RELEVANT requires" in e and "CONFIRMED MANDATE-INCOMPATIBILITY fact" in e for e in outcome.errors)
 
 
 def test_not_relevant_citing_only_buyer_fit_investigate_rejected():
@@ -529,3 +529,125 @@ def test_monitor_grounded_only_in_buyer_fit_unknown_with_nonblocking_unknowns_re
     outcome = _validate(raw, context=context)
     assert outcome.ok is False
     assert any("no CONFIRMED countervailing reason" in e for e in outcome.errors)
+
+
+# --- Final Pre-Release Ownership & Stability Patch --------------------------
+
+def test_not_relevant_grounded_only_in_developer_identity_rejected():
+    """Section 13: a KNOWN DEVELOPER - even a national housebuilder - is
+    never sufficient alone for NOT_RELEVANT. packet.actors_control.* is
+    transaction context, never itself a mandate-incompatibility fact."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 244",
+        "packet.actors_control.developer_indications": "('Taylor Wimpey (Manchester)',)",
+    })
+    raw = _raw(
+        recommendation=NOT_RELEVANT, supporting_reasons=[],
+        confidence_basis=["packet.actors_control.developer_indications"],
+        countervailing_reasons=[{"label": "A national housebuilder is already developing this site.", "evidence_reference": "packet.actors_control.developer_indications"}],
+        evidence_references=["packet.actors_control.developer_indications"],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is False
+    assert any("mandate-incompatibility" in e.lower() for e in outcome.errors)
+
+
+def test_not_relevant_with_genuine_mandate_incompatibility_still_passes():
+    """The new actors_control exclusion must not weaken a genuine
+    NOT_RELEVANT grounded in a real mandate-incompatibility fact."""
+    raw = _raw(
+        recommendation=NOT_RELEVANT, supporting_reasons=[],
+        countervailing_reasons=[{"label": "Specialist retirement scheme, not general-needs.", "evidence_reference": "packet.total_units"}],
+    )
+    outcome = _validate(raw)
+    assert outcome.ok is True
+
+
+def test_monitor_may_still_use_developer_identity_as_confirmed_negative_grounding():
+    """packet.actors_control.* remains legitimate grounding for MONITOR
+    (a real transaction-context fact reducing current urgency) even though
+    it can never alone satisfy NOT_RELEVANT's stronger incompatibility bar
+    - the exclusion is scoped to NOT_RELEVANT only."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 244",
+        "packet.actors_control.developer_indications": "('Taylor Wimpey (Manchester)',)",
+        "ownership_control_posture": "ESTABLISHED_SAME_SUBJECT_CONTROL",
+    })
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
+        confidence_basis=["packet.actors_control.developer_indications"],
+        supporting_reasons=[{"label": "Recent permission matches appetite.", "evidence_reference": "packet.total_units"}],
+        countervailing_reasons=[{"label": "National housebuilder evidenced controlling this exact site.", "evidence_reference": "packet.actors_control.developer_indications"}],
+        material_unknowns=[],
+        evidence_references=["packet.actors_control.developer_indications", "packet.total_units"],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is True
+
+
+def test_monitor_grounded_only_in_absence_of_ownership_evidence_rejected():
+    """Regression for a second live-calibration finding: citing the
+    ABSENCE of ownership evidence (has_ownership_evidence=False) as
+    MONITOR's countervailing basis is exactly the forbidden "missing
+    evidence treated as a negative signal" pattern (Section 3), even
+    though the token itself is a genuinely confirmed fact (the absence IS
+    real) - it must not count as grounding for deferring."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 109", "buyer_fit.matches[0]": "Planning position matches appetite.",
+        "packet.actors_control.has_ownership_evidence": "False",
+    })
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
+        confidence_basis=["buyer_fit.matches[0]"],
+        supporting_reasons=[{"label": "Planning position matches appetite.", "evidence_reference": "buyer_fit.matches[0]"}],
+        countervailing_reasons=[{"label": "No ownership/control evidence established.", "evidence_reference": "packet.actors_control.has_ownership_evidence"}],
+        material_unknowns=[{"fact_or_question": "Is there a suitable parcel?", "material": True, "resolvable": True, "blocking": False, "why_it_matters": "y"}],
+        evidence_references=["buyer_fit.matches[0]", "packet.actors_control.has_ownership_evidence"],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is False
+    assert any("no CONFIRMED countervailing reason" in e for e in outcome.errors)
+
+
+def test_monitor_grounded_in_presence_of_ownership_evidence_is_unaffected():
+    """The exclusion is value-specific: has_ownership_evidence=True (a
+    confirmed PRESENCE) remains legitimate grounding."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 109", "buyer_fit.matches[0]": "Planning position matches appetite.",
+        "packet.actors_control.has_ownership_evidence": "True",
+    })
+    raw = _raw(
+        recommendation=MONITOR, monitoring_trigger="OWNERSHIP_EVIDENCE_CHANGED",
+        confidence_basis=["buyer_fit.matches[0]"],
+        supporting_reasons=[{"label": "Planning position matches appetite.", "evidence_reference": "buyer_fit.matches[0]"}],
+        countervailing_reasons=[{"label": "A conflicting ownership party is evidenced.", "evidence_reference": "packet.actors_control.has_ownership_evidence"}],
+        material_unknowns=[],
+        evidence_references=["buyer_fit.matches[0]", "packet.actors_control.has_ownership_evidence"],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is True
+
+
+def test_not_relevant_grounded_only_in_absence_of_ownership_evidence_rejected():
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 109",
+        "packet.actors_control.has_ownership_evidence": "False",
+    })
+    raw = _raw(
+        recommendation=NOT_RELEVANT, supporting_reasons=[],
+        countervailing_reasons=[{"label": "No ownership evidence exists.", "evidence_reference": "packet.actors_control.has_ownership_evidence"}],
+    )
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is False
+
+
+def test_pursue_may_cite_ownership_control_posture_token():
+    """ownership_control_posture is just another reference token - valid
+    to cite like any other."""
+    context = _context(reference_tokens={
+        "packet.total_units": "KNOWN = 109", "buyer_fit.matches[0]": "Planning appetite match.",
+        "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+    })
+    raw = _raw(confidence_basis=["ownership_control_posture", "buyer_fit.matches[0]"], evidence_references=["ownership_control_posture"])
+    outcome = _validate(raw, context=context)
+    assert outcome.ok is True

@@ -342,7 +342,7 @@ def test_not_relevant_citing_only_buyer_fit_unknown_is_repaired_or_fails(session
     )
     assert result.status == FAILED
     assert result.failure_reason == MALFORMED_LLM_OUTPUT
-    assert "CONFIRMED fact" in result.diagnostic_detail
+    assert "CONFIRMED MANDATE-INCOMPATIBILITY fact" in result.diagnostic_detail
 
 
 def test_monitor_with_valid_trigger_and_confirmed_countervailing_succeeds(session):

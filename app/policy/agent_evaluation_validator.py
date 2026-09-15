@@ -248,12 +248,32 @@ def validate_and_build_result(
     # live via the Pre-Release Commercial Semantic Fix calibration - a
     # model citing only "scale exceeds target" via buyer_fit.unknown[i] to
     # justify MONITOR instead of investigating now).
+    #
+    # Final Pre-Release Ownership & Stability Patch, Section 3: "missing
+    # ownership/control evidence must NOT cause an otherwise interesting
+    # opportunity to be systematically discounted." packet.actors_control.
+    # has_ownership_evidence is a genuinely CONFIRMED fact even when its
+    # value is False (absence really was confirmed) - but citing the
+    # ABSENCE of ownership evidence as countervailing/negative grounding is
+    # exactly the forbidden "ordinary incompleteness treated as a negative
+    # signal" pattern, confirmed live (a model citing "no ownership/control
+    # evidence established" as its countervailing basis for MONITOR). Only
+    # the ABSENCE value is excluded here - a confirmed PRESENCE of
+    # ownership evidence (has_ownership_evidence=True) is legitimate
+    # negative grounding where relevant (e.g. combined with the ownership/
+    # control posture), so this is a narrow, value-specific exclusion, not
+    # a blanket ban on the token.
+    def _is_absence_of_ownership_evidence(ref: str) -> bool:
+        return ref == "packet.actors_control.has_ownership_evidence" and context.reference_tokens.get(ref) == "False"
+
     _NOT_A_CONFIRMED_FACT_PREFIXES = ("buyer_fit.unknown[", "buyer_fit.investigate[")
     confirmed_countervailing_refs = [
-        r for r in countervailing_refs_valid if not r.startswith(_NOT_A_CONFIRMED_FACT_PREFIXES)
+        r for r in countervailing_refs_valid
+        if not r.startswith(_NOT_A_CONFIRMED_FACT_PREFIXES) and not _is_absence_of_ownership_evidence(r)
     ]
     confirmed_negative_signals = [
-        s for s in negative_signals if not s.source_reference.startswith(_NOT_A_CONFIRMED_FACT_PREFIXES)
+        s for s in negative_signals
+        if not s.source_reference.startswith(_NOT_A_CONFIRMED_FACT_PREFIXES) and not _is_absence_of_ownership_evidence(s.source_reference)
     ]
 
     # Recommendation-vs-evidence consistency: MONITOR (and NOT_RELEVANT)
@@ -279,13 +299,28 @@ def validate_and_build_result(
 
     # NOT_RELEVANT must never rely solely on an unknown/soft-miss/absence-
     # of-disposal-evidence basis (Section 3 - "never solely because of
-    # UNKNOWN / soft target miss / absence of disposal evidence").
+    # UNKNOWN / soft target miss / absence of disposal evidence"), and - per
+    # the Final Pre-Release Ownership & Stability Patch, Section 13 -
+    # "KNOWN DEVELOPER, even a KNOWN NATIONAL HOUSEBUILDER, alone must not
+    # create NOT_RELEVANT". packet.actors_control.* tokens are transaction/
+    # ownership CONTEXT (who has been identified, what posture applies) -
+    # they are never themselves a mandate-INCOMPATIBILITY fact, so citing
+    # only those does not satisfy NOT_RELEVANT's own evidentiary bar either
+    # (they remain legitimate grounding for MONITOR, which only means
+    # "insufficient case right now" - see confirmed_negative_signals above,
+    # deliberately NOT filtered the same way).
+    _NOT_A_MANDATE_INCOMPATIBILITY_PREFIXES = _NOT_A_CONFIRMED_FACT_PREFIXES + ("packet.actors_control.",)
+    confirmed_countervailing_refs = [
+        r for r in confirmed_countervailing_refs if not r.startswith(_NOT_A_MANDATE_INCOMPATIBILITY_PREFIXES)
+    ]
     if recommendation == NOT_RELEVANT and not confirmed_countervailing_refs:
         errors.append(
-            "NOT_RELEVANT requires at least one countervailing_reasons entry citing a CONFIRMED fact "
-            "(packet.*, signals.*, or buyer_fit.non_terminal_does_not_match[i]) - never solely "
-            "material_unknowns, and never solely buyer_fit.unknown[i] or buyer_fit.investigate[i], which "
-            "are Buyer Fit's own unresolved/could-not-establish buckets, not confirmed negative facts"
+            "NOT_RELEVANT requires at least one countervailing_reasons entry citing a CONFIRMED MANDATE-"
+            "INCOMPATIBILITY fact (packet.* excluding actors_control.*, signals.*, or "
+            "buyer_fit.non_terminal_does_not_match[i]) - never solely material_unknowns, never solely "
+            "buyer_fit.unknown[i]/buyer_fit.investigate[i] (Buyer Fit's own unresolved buckets), and never "
+            "solely packet.actors_control.* (developer/ownership identity is transaction context, never "
+            "itself a mandate-incompatibility fact)"
         )
 
     # Unsupported-language guard across every free-text field.

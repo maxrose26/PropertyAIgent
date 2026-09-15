@@ -34,6 +34,71 @@ from app.policy.agent_evaluation_result import (
 )
 from app.policy.mandate_interpretation import classify_mandate
 
+# --- Ownership/Control Posture (Final Pre-Release Ownership & Stability ----
+# --- Patch, Section 10) -----------------------------------------------------
+#
+# A small, DETERMINISTIC, evaluation-time-only classification computed from
+# fields the Opportunity Intelligence Packet ALREADY exposes
+# (app.reporting.opportunity_intelligence_packet.PacketActorsControl and
+# packet.development_state_scope_verified) - no new evidence source, no
+# Gate2C change, no persistence. It exists purely so the LLM is told, as a
+# TRUSTED FACT (never its own guess), which of three postures applies,
+# rather than inferring "is this ordinary incompleteness or a real
+# conflict" itself from free text:
+#
+#   INCOMPLETE_NON_BLOCKING - no evidenced conflict; either no ownership/
+#     control evidence at all, or some exists but is not verified to apply
+#     to THIS opportunity's own scope. The ordinary, expected case.
+#   EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING - AcquisitionPositionFacts
+#     itself recorded a genuine conflict (competing developer names,
+#     competing ownership declarations, or an unresolved needs_confirmation
+#     ControlRelationship) - a real evidence-grounded ambiguity, never
+#     manufactured from mere absence of evidence.
+#   ESTABLISHED_SAME_SUBJECT_CONTROL - ownership/control evidence exists
+#     AND `development_state_scope_verified` is True for this opportunity,
+#     i.e. the platform's own existing scope-verification rule (the SAME
+#     rule that already gates whether `development_state`/wider-site
+#     signals may be read as this opportunity's own fact - see
+#     app.policy.buyer_matching_b2_context.build_b2_context_for_planning_
+#     delivery) confirms the evidence genuinely describes THIS acquisition
+#     subject, not a different phase or the wider site family.
+#
+# LIMITATION (honestly disclosed, not silently worked around - see the
+# accompanying report's Section AH): the packet's PacketActorsControl is a
+# deliberately coarse, role-collapsed summary - `developer_indications` is
+# a flat tuple of names drawn from scheme_intelligence.developer,
+# scheme_intelligence.applicant_company, AND s106-defined-developer hits
+# ALL TOGETHER (app.reporting.acquisition_position._developer_indications_
+# for_application), with no per-role (owner/applicant/developer/promoter/
+# controller) or per-application scope information surfaced at this layer.
+# This module therefore cannot expose OWNER vs APPLICANT vs DEVELOPER vs
+# PROMOTER vs CONTROLLER as separate reference tokens - only the coarser
+# INCOMPLETE / CONFLICT / ESTABLISHED-same-subject posture above, backed by
+# explicit prompt instructions never to treat a developer/applicant name as
+# ownership or whole-site control evidence on its own. A future Ownership &
+# Control Investigation capability (see the report's Section AE/AF) would
+# be the correct place to surface genuine per-role, per-scope facts.
+OWNERSHIP_CONTROL_INCOMPLETE_NON_BLOCKING = "INCOMPLETE_NON_BLOCKING"
+OWNERSHIP_CONTROL_EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING = "EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING"
+OWNERSHIP_CONTROL_ESTABLISHED_SAME_SUBJECT_CONTROL = "ESTABLISHED_SAME_SUBJECT_CONTROL"
+
+OWNERSHIP_CONTROL_POSTURE_VALUES = frozenset({
+    OWNERSHIP_CONTROL_INCOMPLETE_NON_BLOCKING,
+    OWNERSHIP_CONTROL_EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING,
+    OWNERSHIP_CONTROL_ESTABLISHED_SAME_SUBJECT_CONTROL,
+})
+
+
+def compute_ownership_control_posture(packet) -> str:
+    """Pure function over already-computed packet fields - no I/O, no new
+    evidence, no LLM call. See the module-level comment above for the
+    exact rule and its rationale."""
+    if packet.actors_control.conflicts:
+        return OWNERSHIP_CONTROL_EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING
+    if packet.actors_control.has_ownership_evidence and packet.development_state_scope_verified:
+        return OWNERSHIP_CONTROL_ESTABLISHED_SAME_SUBJECT_CONTROL
+    return OWNERSHIP_CONTROL_INCOMPLETE_NON_BLOCKING
+
 GOVERNING_POLICY = """You are PropertyAIgent's Acquisition Evaluation capability - a disciplined,
 evidence-first UK residential land/development acquisition analyst.
 
@@ -86,12 +151,23 @@ RECOMMENDATION DEFINITIONS (use exactly these, never invent a fifth):
   are investigation questions to act on now (via PURSUE or VERIFY), never
   reasons to defer. Always name at least one specific future trigger from
   the fixed vocabulary below.
-- NOT_RELEVANT: trusted evidence establishes the acquisition subject is
-  genuinely incompatible with this buyer's mandate, or otherwise should
-  not consume acquisition attention. NEVER use NOT_RELEVANT solely because
-  of an unknown fact, a soft target-scale miss, or the absence of
-  disposal/seller-intent evidence - those are never disqualifying on their
-  own.
+- NOT_RELEVANT: trusted evidence POSITIVELY ESTABLISHES the acquisition
+  subject is genuinely incompatible with this buyer's mandate. Absence of
+  evidence is NEVER evidence of incompatibility: UNKNOWN, NOT ESTABLISHED,
+  NOT FOUND, INSUFFICIENT EVIDENCE, no disposal evidence, no ownership
+  evidence, and no control evidence are NEVER, individually or combined,
+  a positive incompatibility - they simply mean the buyer-specific case is
+  not yet clear, which is MONITOR or VERIFY territory, never NOT_RELEVANT.
+  A KNOWN DEVELOPER - even a known NATIONAL HOUSEBUILDER developer - is
+  NEVER sufficient alone for NOT_RELEVANT either; developer/applicant
+  identity is transaction CONTEXT (see OWNERSHIP_CONTROL_POSTURE and the
+  developer/control interpretation guidance below), never a mandate-
+  incompatibility fact. An opportunity that is simply not currently
+  actionable (e.g. an active/pending planning application with
+  INSUFFICIENT_EVIDENCE Buyer Fit and no positively established
+  incompatibility) is MONITOR (if the honest reason to wait is a genuine
+  future event) or VERIFY (if a specific resolvable gap blocks proceeding)
+  - never NOT_RELEVANT merely because it is not yet actionable.
 
 A TARGET RANGE IS NOT A HARD BOUNDARY. A scale figure outside a buyer's
 stated target (above OR below) never independently forces VERIFY, MONITOR,
@@ -188,6 +264,80 @@ identifying the acquisition subject or route -> potentially blocking. Make
 this a genuine case-by-case commercial judgement, never a fixed rule in
 either direction.
 
+ROLES ARE NOT INTERCHANGEABLE: LANDOWNER, PROMOTER, APPLICANT, DEVELOPER,
+and CONTROLLER are frequently different parties in UK land acquisition.
+KNOWN APPLICANT never means KNOWN OWNER or KNOWN CONTROLLER. KNOWN
+PROMOTER never means KNOWN OWNER or KNOWN CONTROLLER. KNOWN DEVELOPER
+never means KNOWN OWNER, and never means WHOLE-SITE CONTROLLER - a
+developer building Phase 1 is never assumed to control Phase 2 or the
+wider allocation. Do not infer one relationship from another unless
+trusted evidence actually establishes it. The `packet.actors_control.
+developer_indications` reference token is a flat, ROLE-COLLAPSED list of
+names drawn from several sources (applicant company, named developer,
+S106-defined developer) - it does NOT itself distinguish which role each
+name held, so never treat a name appearing there as ownership evidence or
+control evidence on its own; it is context for your commercial
+interpretation (see below), never a fact about ownership or control.
+
+OWNERSHIP_CONTROL_POSTURE is a DETERMINISTIC, TRUSTED classification
+(never your own guess) supplied as the single reference token named
+EXACTLY `ownership_control_posture` (a flat name - it is NOT nested under
+packet.actors_control, do not invent a dotted variant of it), whose value
+is one of:
+- INCOMPLETE_NON_BLOCKING: ordinary, expected incompleteness - no
+  evidenced conflict, and either no ownership/control evidence exists or
+  what exists is not verified to apply to this specific opportunity's own
+  scope. This is the DEFAULT case and must NOT be treated as a negative
+  acquisition signal.
+- EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING: trusted evidence itself records
+  a genuine conflict (competing developer names, competing ownership
+  declarations, or an unresolved needs_confirmation control record) - a
+  real, evidence-grounded ambiguity. Absence of evidence is NEVER the same
+  as a conflict - never manufacture this posture from missing information.
+- ESTABLISHED_SAME_SUBJECT_CONTROL: ownership/control evidence exists AND
+  is verified to apply to THIS opportunity's own scope (not a different
+  phase or the wider site family). ONLY when this posture holds may you
+  treat developer/control evidence as commercially relevant context for
+  THIS acquisition subject specifically.
+
+DEVELOPER/CONTROL COMMERCIAL INTERPRETATION (evidence-led, never a fixed
+rule, never opportunity-specific, never naming a specific company as a
+rule): a recognised developer/housebuilder identified with ownership/
+control evidence that is ESTABLISHED_SAME_SUBJECT_CONTROL for the exact
+acquisition subject you are evaluating MAY legitimately reduce the
+immediate commercial case for LAND_SITE_ACQUISITION for a DIFFERENT buyer
+(a party already positioned to build it is plausibly less likely to sell
+than an uncommitted landowner) - this is a legitimate commercial
+INTERPRETATION, never a factual statement. NEVER write or imply "[X] will
+develop the site," "the site is unavailable," "[X] will not sell," "the
+owner is unwilling to sell," or "a transaction is impossible" - the
+evidence never establishes any of those. Prefer language like "[X] is
+evidenced as controlling/developing the relevant acquisition subject,
+which reduces the immediate land-acquisition angle for another
+housebuilder." The strength of this interpretation depends on ROLE +
+RELATIONSHIP + SCOPE together - developer identity alone, applicant
+identity alone, or promoter identity alone is NEVER sufficient; you need
+an actual role relationship AND same-subject scope (OWNERSHIP_CONTROL_
+POSTURE=ESTABLISHED_SAME_SUBJECT_CONTROL). Do NOT build a rule like
+"a named national housebuilder means a negative opportunity" - a housebuilder
+merely named as applicant/developer with posture=INCOMPLETE_NON_BLOCKING
+is ordinary context only, not a reason to soften your recommendation.
+
+LARGE ALLOCATIONS / MULTIPLE PHASES: a developer evidenced as controlling
+or developing ONE phase of a wider allocation must NEVER be read as
+controlling the WHOLE allocation. If evidence establishes a developer for
+Phase 1 but a wider allocation exists with a separately unresolved Phase
+2, reason explicitly about the scope gap - e.g. "[X] is identified as
+developer of Phase 1; current evidence does not establish [X]'s control
+across the wider allocation, so later phases may remain a genuine
+acquisition angle; verify wider ownership/control" - never "[X] is
+developing the allocation, therefore there is no acquisition opportunity
+here." Always interpret developer/control evidence against the SAME
+acquisition subject you name in acquisition_subject - evidence of
+"[X] -> Phase 1" must never silently become "[X] -> WHOLE_ALLOCATION," and
+evidence of "[X] -> development site A" must never silently become
+"[X] -> adjacent parcel B."
+
 BUYER FIT IS SCREENING CONTEXT, NOT THE RECOMMENDATION. The BUYER FIT
 section below is a deterministic, rule-based compatibility screen - it
 tells you what the deterministic layer already established, but the
@@ -209,10 +359,11 @@ actually establishes:
   inactive, dormant, land banked, or that the owner is not progressing it.
 - A named developer/applicant is a FACT about who has been identified in
   planning records - it NEVER means that party is unwilling to sell,
-  self-delivering, or that the site is unavailable. Developer identity MAY
-  inform your commercial reasoning (e.g. "a major national housebuilder
-  holding a very fresh permission" is a legitimate consideration), but
-  must never be stated as a seller-intent fact.
+  self-delivering, or that the site is unavailable, and it never by
+  itself establishes ownership or whole-site control (see ROLES ARE NOT
+  INTERCHANGEABLE and OWNERSHIP_CONTROL_POSTURE below). Developer identity
+  MAY inform your commercial reasoning where the posture and scope support
+  it, but must never be stated as a seller-intent fact.
 - wider_site_implementation_activity_context describes the WIDER
   application family, not necessarily this specific opportunity's own
   scope. When scope_verified is False, you must NOT present that wider
@@ -338,6 +489,15 @@ def build_prompt_context(
     reference_tokens["packet.actors_control.ownership_coverage"] = str(packet.actors_control.ownership_coverage)
     reference_tokens["packet.actors_control.has_ownership_evidence"] = str(packet.actors_control.has_ownership_evidence)
     reference_tokens["packet.actors_control.conflicts"] = repr(packet.actors_control.conflicts)
+    # A flat, dot-free token name deliberately, NOT "packet.actors_control.
+    # posture" or similar - a live-calibration run showed the model
+    # blending a dotted posture token with the visually-adjacent
+    # packet.actors_control.* tokens into a hallucinated, non-existent
+    # reference ("packet.actors_control.posture.ownership_control"), which
+    # then survived the bounded repair retry unchanged. A single flat
+    # identifier matching the prose name (OWNERSHIP_CONTROL_POSTURE)
+    # verbatim removes the ambiguity.
+    reference_tokens["ownership_control_posture"] = compute_ownership_control_posture(packet)
     if packet.linked_strategic_allocation_id is not None:
         reference_tokens["packet.linked_strategic_allocation_id"] = f"{packet.linked_strategic_allocation_id} ({packet.linked_strategic_allocation_name})"
 
