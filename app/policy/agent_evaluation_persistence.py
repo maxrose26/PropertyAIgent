@@ -15,6 +15,14 @@ docstrings (AcquisitionSubjectAnchor, AgentEvaluationHistory,
 CurrentBuyerOpportunityState, AgentEvaluationClaim) for the full schema
 rationale this module implements against.
 
+The ONE exception, explicitly authorised at Gate 1 pre-merge review
+(Product Owner Section 3): app.policy.agent_evaluation_prompt gained a
+single new constant, GOVERNING_POLICY_PROMPT_VERSION - a pure provenance
+identifier, never read by any evaluation/validation/prompt-rendering
+logic, so this is a non-semantic addition, not a change to Agent
+Evaluation Policy V1's commercial behaviour. GOVERNING_POLICY's own text
+was not touched.
+
 NOT INCLUDED IN GATE 1 (Product Owner brief, explicit deferrals):
   - the Scheduled Acquisition Agent Runner itself (no cron, no weekly loop,
     no full-universe evaluation) - this module only provides the service
@@ -49,6 +57,7 @@ from app.db.models import (
     utcnow,
 )
 from app.policy.acquisition_type_interpretation import ACQUISITION_TYPE_INTERPRETATION_POLICY_VERSION
+from app.policy.agent_evaluation_prompt import GOVERNING_POLICY_PROMPT_VERSION
 from app.policy.agent_evaluation_result import FAILED as EXEC_FAILED
 from app.policy.agent_evaluation_result import SUCCESS as EXEC_SUCCESS
 from app.policy.agent_evaluation_result import EvaluationExecutionResult
@@ -59,24 +68,11 @@ from app.reporting.opportunity_transaction_signals import TRANSACTION_SIGNAL_POL
 
 # --- Provenance constants (Gate 1, Section 11/J) ----------------------------
 #
-# GOVERNING_POLICY_PROMPT_VERSION is deliberately declared HERE, not inside
-# app.policy.agent_evaluation_prompt itself - the architecture audit found
-# AGENT_EVALUATION_POLICY_VERSION stayed at 1 across three real production
-# prompt-text releases (the narrow implementation, the commercial-semantic
-# fix, the ownership/role-separation patch), so there is currently no way
-# to tell, from persisted provenance alone, which released prompt text
-# produced a historical evaluation. This constant tracks EXACTLY that gap
-# for evaluations persisted FROM Gate 1 onwards - it starts at 1 because it
-# tracks the CURRENT, already-production-verified GOVERNING_POLICY text as
-# of Gate 1 (the ownership/role-separation patch, feature SHA a201d85f...),
-# not because any earlier revision is being retroactively numbered (there
-# is no historical Agent Evaluation dataset to backfill - Gate 1 brief,
-# Section 30). Bump this by 1 whenever GOVERNING_POLICY's text changes in a
-# future controlled release - a manual, documented operational discipline,
-# never inferred automatically (an automatic diff-based version would be a
-# fingerprint, not a controlled-release marker - see Section 19's own
-# distinction).
-GOVERNING_POLICY_PROMPT_VERSION = 1
+# GOVERNING_POLICY_PROMPT_VERSION moved to app.policy.agent_evaluation_
+# prompt (Gate 1 pre-merge review, Product Owner Section 3 - "the version
+# identifier belongs beside the artefact it versions") - imported here,
+# never re-declared. See that module's own comment for the full rationale
+# and version-history discipline. This module only ever READS it.
 
 MODEL_PROVIDER_OPENAI = "openai"
 
@@ -84,8 +80,12 @@ MODEL_PROVIDER_OPENAI = "openai"
 # payload below), independent of any individual policy-version component
 # inside that payload - so a future change to what the fingerprint
 # considers material can be told apart from an ordinary policy-version bump
-# within the existing shape.
-AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION = 1
+# within the existing shape. Bumped 1 -> 2 at the pre-merge fingerprint-
+# completeness audit (Product Owner review): the payload gained actors_
+# control developer_indications/ownership_coverage/conflicts and linked_
+# strategic_allocation_id, three real gaps the audit found - see compute_
+# agent_evaluation_input_fingerprint's own docstring for the full account.
+AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION = 2
 
 # --- Acquisition Subject scope keys (Gate 1, Section 3/4) -------------------
 WHOLE_SITE = "WHOLE_SITE"
@@ -200,33 +200,64 @@ def compute_agent_evaluation_input_fingerprint(
     Agent reason differently", and the Gate 1 brief explicitly forbids
     assuming the two match without proof).
 
+    Pre-merge fingerprint-completeness audit (Product Owner review):
+    every reference token app.policy.agent_evaluation_prompt.
+    build_prompt_context() actually constructs was individually checked
+    against this payload. Three real gaps were found and fixed here:
+    packet.actors_control.developer_indications and .conflicts (the LLM
+    sees the raw content, not merely the derived ownership_control_
+    posture - a NEWLY named developer, or a NEW/DIFFERENT conflict, can
+    change commercial reasoning even when posture's own 3-value bucket
+    does not move) and packet.actors_control.ownership_coverage (a
+    materially different fact from has_ownership_evidence/posture alone -
+    "never searched" (COVERAGE_INSUFFICIENT) and "searched thoroughly,
+    found nothing" (COVERAGE_SEARCHED_NO_INDICATION_FOUND) both leave
+    has_ownership_evidence False and posture unchanged, yet are a
+    genuinely different evidentiary state the model is shown verbatim -
+    exactly the "coverage-aware negative signal semantics" the audit was
+    asked to check). packet.linked_strategic_allocation_id (never its
+    companion _name, which is a display label) was also added - a
+    planning_delivery opportunity newly gaining (or losing) a linked
+    strategic-allocation cross-reference is commercially material
+    strategic context the model is shown. development_state's own
+    inclusion was narrowed to planning_delivery only, matching build_
+    prompt_context's own conditional exactly (it was never rendered to
+    the model at all for strategic_land - the prior unconditional
+    inclusion was over-inclusive, never a false negative, but is now
+    exact). AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION bumped 1 -> 2 to
+    mark this payload-shape change explicitly.
+
     INCLUDED (Section 17 - commercially material): the Buyer Mandate's
     own matching_fingerprint (reused verbatim, never re-derived here -
     Section 20), acquisition_type, the full deterministic Buyer Fit
     assessment (classification/investigative-exception/matches/unknown/
     investigate/non-terminal does_not_match), the packet's own
     commercially material facts (scale, planning/strategic position,
-    development state, scope verification, the COMPUTED ownership/
-    control posture - never the raw developer-name list itself, which is
-    presentation/identity-bearing text, not itself a commercial fact),
-    every Transaction Signal's own `.state` (never its free-text
-    `.detail`), and only the policy-version components the Product Owner
-    has designated as automatically-invalidating market/buyer-fit
-    interpretation policies (BUYER_MATCHING_POLICY_VERSION, MANDATE_
-    INTERPRETATION_POLICY_VERSION, ACQUISITION_TYPE_INTERPRETATION_
-    POLICY_VERSION, TRANSACTION_SIGNAL_POLICY_VERSION, TERMINAL_HARD_
-    EXCLUSION_POLICY_VERSION).
+    development state, scope verification, the actors_control state the
+    model is actually shown - developer_indications/ownership_coverage/
+    conflicts verbatim, plus the COMPUTED ownership/control posture),
+    linked strategic allocation identity, every Transaction Signal's own
+    `.state` (never its free-text `.detail` - app.reporting.opportunity_
+    transaction_signals.SignalValue's own docstring makes `.detail`'s
+    "never assert anything the state doesn't already mean" invariant
+    explicit, confirmed by direct reading, not assumed), and only the
+    policy-version components the Product Owner has designated as
+    automatically-invalidating market/buyer-fit interpretation policies
+    (BUYER_MATCHING_POLICY_VERSION, MANDATE_INTERPRETATION_POLICY_
+    VERSION, ACQUISITION_TYPE_INTERPRETATION_POLICY_VERSION,
+    TRANSACTION_SIGNAL_POLICY_VERSION, TERMINAL_HARD_EXCLUSION_POLICY_
+    VERSION).
 
     EXCLUDED (Section 18 - controlled-release or presentation-only, never
     part of this hash): AGENT_EVALUATION_POLICY_VERSION, prompt_version,
     model_provider/model_id (Section 19 - these are CONTROLLED RELEASE
     concerns, recorded as separate history columns, never blended into
     the auto-invalidating fingerprint); site/address/council/linked-
-    allocation display names; raw coverage timestamps
-    (signals.coverage_checked_at); free-text reasoning_summary/next_
-    action_detail/signal labels/raw conflict sentences (the COMPUTED
-    ownership/control posture already captures the material fact of a
-    conflict existing, without being sensitive to how it is worded)."""
+    allocation DISPLAY NAMES (the allocation's own id is included, its
+    _name companion is not); raw coverage timestamps (signals.
+    coverage_checked_at - the state fields already reflect whether
+    coverage exists); free-text reasoning_summary/next_action_detail/
+    signal .detail strings (see above)."""
     from app.policy.agent_evaluation_prompt import compute_ownership_control_posture
 
     payload: dict = {
@@ -243,9 +274,12 @@ def compute_agent_evaluation_input_fingerprint(
         },
         "opportunity_facts": {
             "total_units": _fact_value_pair(packet.total_units),
-            "development_state": _fact_value_pair(packet.development_state),
             "development_state_scope_verified": packet.development_state_scope_verified,
             "ownership_control_posture": compute_ownership_control_posture(packet),
+            "actors_control_developer_indications": sorted(packet.actors_control.developer_indications),
+            "actors_control_ownership_coverage": packet.actors_control.ownership_coverage,
+            "actors_control_conflicts": sorted(packet.actors_control.conflicts),
+            "linked_strategic_allocation_id": packet.linked_strategic_allocation_id,
         },
         "policy_versions": {
             "buyer_matching_policy_version": BUYER_MATCHING_POLICY_VERSION,
@@ -255,6 +289,12 @@ def compute_agent_evaluation_input_fingerprint(
             "terminal_hard_exclusion_policy_version": TERMINAL_HARD_EXCLUSION_POLICY_VERSION,
         },
     }
+
+    if packet.opportunity_type != STRATEGIC_LAND:
+        # development_state is only ever rendered into the prompt for
+        # planning_delivery (app.policy.agent_evaluation_prompt.
+        # build_prompt_context's own conditional) - mirrored exactly here.
+        payload["opportunity_facts"]["development_state"] = _fact_value_pair(packet.development_state)
 
     if packet.opportunity_type == STRATEGIC_LAND:
         payload["opportunity_facts"]["local_plan_status"] = _fact_value_pair(packet.local_plan_status)
@@ -307,12 +347,12 @@ class ClaimOutcome:
       "already_in_progress" - another (unexpired) worker owns it; the
         caller must NOT call evaluate().
       "already_completed" - a successful evaluation for this EXACT
-        fingerprint already exists; the caller should read
-        `existing_history_id` instead of re-evaluating.
+        fingerprint already exists and force=False; the caller should
+        read `existing_history_id` instead of re-evaluating.
       "previously_failed" - the last attempt for this exact fingerprint
-        failed and was not force-reclaimed; the caller must NOT call
-        evaluate() (retry policy is the future Scheduled Runner's
-        responsibility - Gate 1 brief Section 15)."""
+        failed and force=False; the caller must NOT call evaluate()
+        (retry policy is the future Scheduled Runner's responsibility -
+        Gate 1 brief Section 15)."""
     status: str
     claim: AgentEvaluationClaim | None
     existing_history_id: int | None = None
@@ -328,6 +368,17 @@ def try_claim_evaluation(
     (chosen over pg_advisory_lock specifically because this platform's
     production DATABASE_URL is a Supabase transaction-mode pooler
     connection, under which session-scoped advisory locks are unsafe).
+
+    `force=True` is the ONLY way to reclaim a "completed" OR "failed"
+    claim - never automatic, always an explicit, deliberate caller
+    decision (Gate 1 pre-merge review: since prompt_version/model_id/
+    AGENT_EVALUATION_POLICY_VERSION are deliberately EXCLUDED from the
+    fingerprint - Section 19's own "controlled release, not automatic
+    invalidation" design - a "completed" claim for an unchanged
+    fingerprint would otherwise block a future controlled prompt/model
+    release from ever re-evaluating it, indefinitely, with no way out.
+    force=True is that way out; the smallest fix that does not build the
+    full reconciliation process itself (still explicitly deferred).
 
     Each branch below is one short, immediately-committed transaction -
     never held open across the caller's own subsequent OpenAI call."""
@@ -356,13 +407,12 @@ def try_claim_evaluation(
             return ClaimOutcome(status="already_in_progress", claim=None)
         return ClaimOutcome(status="claimed", claim=claim)
 
-    if existing.status == CLAIM_COMPLETED:
+    if existing.status == CLAIM_COMPLETED and not force:
         return ClaimOutcome(status="already_completed", claim=existing, existing_history_id=existing.history_id)
 
     if existing.status == CLAIM_FAILED and not force:
         return ClaimOutcome(status="previously_failed", claim=existing, existing_history_id=existing.history_id)
 
-    # status == CLAIM_CLAIMED (in progress), or CLAIM_FAILED with force=True.
     if existing.status == CLAIM_CLAIMED:
         cutoff = utcnow() - timedelta(minutes=CLAIM_EXPIRY_MINUTES)
         claimed_at = _as_aware_utc(existing.claimed_at)
@@ -386,11 +436,13 @@ def try_claim_evaluation(
         session.refresh(existing)
         return ClaimOutcome(status="claimed", claim=existing)
 
-    # CLAIM_FAILED with force=True - reclaim explicitly, same conditional-
-    # UPDATE-with-rowcount-check discipline.
+    # CLAIM_COMPLETED or CLAIM_FAILED with force=True - reclaim explicitly,
+    # same conditional-UPDATE-with-rowcount-check discipline, guarded on
+    # the EXACT status this caller observed so a concurrent third party
+    # reclaiming it first is never silently overwritten.
     result = session.execute(
         AgentEvaluationClaim.__table__.update()
-        .where(AgentEvaluationClaim.id == existing.id, AgentEvaluationClaim.status == CLAIM_FAILED)
+        .where(AgentEvaluationClaim.id == existing.id, AgentEvaluationClaim.status == existing.status)
         .values(status=CLAIM_CLAIMED, claimed_at=utcnow(), completed_at=None, history_id=None)
     )
     session.commit()

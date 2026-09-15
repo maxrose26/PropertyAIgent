@@ -40,7 +40,7 @@ from app.policy.agent_evaluation_result import FAILED, SUCCESS, ACQUISITION_TYPE
 from app.policy.buyer_matching import PLANNING_DELIVERY, STRATEGIC_LAND, build_planning_delivery_matching_facts_from_operative
 from app.policy.buyer_matching_b2_context import build_b2_context_for_planning_delivery, evaluate_buyer_fit
 from app.policy.buyer_profile_store import resolve_default_workspace, seed_default_buyer_profiles
-from app.reporting.opportunity_intelligence_packet import build_opportunity_intelligence_packet
+from app.reporting.opportunity_intelligence_packet import FactValue, build_opportunity_intelligence_packet
 from app.reporting.opportunity_universe import (
     planning_delivery_long_pending_application_opportunity_id,
     planning_delivery_phase_opportunity_id,
@@ -49,6 +49,69 @@ from app.reporting.opportunity_universe import (
     strategic_land_opportunity_id,
 )
 from app.reporting.scheme_reconciliation import build_operative_planning_facts
+
+
+# --- Minimal fake packet for fingerprint field-sensitivity tests ------------
+# (Section 1 pre-merge audit: developer_indications/ownership_coverage/
+# conflicts/linked_strategic_allocation_id are easiest to vary directly
+# rather than round-tripping through real S106/ownership-certificate
+# documents, which test the extraction pipeline, not the fingerprint.)
+
+class _FakeSignal:
+    def __init__(self, state="UNKNOWN"):
+        self.state = state
+        self.detail = None
+
+
+class _FakeTransactionSignals:
+    def __init__(self):
+        self.recent_permission = _FakeSignal()
+        self.approaching_implementation_deadline = _FakeSignal()
+        self.implementation_activity_evidence_identified = _FakeSignal()
+        self.wider_site_implementation_activity_context = _FakeSignal()
+        self.no_qualifying_progress_evidence_identified = _FakeSignal()
+        self.ownership_or_control_evidence_changed = _FakeSignal()
+        self.scope_verified = False
+
+
+class _FakeActorsControl:
+    def __init__(self, developer_indications=(), ownership_coverage="INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL", conflicts=(), has_ownership_evidence=False):
+        self.developer_indications = developer_indications
+        self.ownership_coverage = ownership_coverage
+        self.conflicts = conflicts
+        self.has_ownership_evidence = has_ownership_evidence
+
+
+class _FakeFingerprintPacket:
+    def __init__(self, **overrides):
+        self.opportunity_type = PLANNING_DELIVERY
+        self.total_units = FactValue.known(75)
+        self.affordable_units = FactValue.unknown()
+        self.affordable_percentage = FactValue.unknown()
+        self.operative_planning_state = FactValue.known("permission_granted")
+        self.recommendation_direction = FactValue.unknown()
+        self.affordable_housing_status = FactValue.unknown()
+        self.development_state = FactValue.unknown()
+        self.development_state_scope_verified = False
+        self.actors_control = _FakeActorsControl()
+        self.linked_strategic_allocation_id = None
+        self.transaction_signals = _FakeTransactionSignals()
+        for k, v in overrides.items():
+            setattr(self, k, v)
+
+
+def _fake_assessment(**overrides):
+    from app.policy.buyer_matching import BuyerFitAssessment
+    defaults = dict(classification="STRONG_FIT", is_investigative_exception=False)
+    defaults.update(overrides)
+    return BuyerFitAssessment(**defaults)
+
+
+def _fp(**packet_overrides):
+    return compute_agent_evaluation_input_fingerprint(
+        mandate_fingerprint="fp-mandate", acquisition_type="LAND_SITE_ACQUISITION",
+        buyer_fit_assessment=_fake_assessment(), packet=_FakeFingerprintPacket(**packet_overrides),
+    )
 
 
 # --- Shared fixtures ---------------------------------------------------------
@@ -286,6 +349,57 @@ def test_raw_coverage_timestamp_is_not_part_of_the_fingerprint(session):
     body_only = inspect.getsource(func).split('"""', 2)[-1]  # strip the docstring, keep only executable code
     assert "coverage_checked_at" not in body_only
     assert ".detail" not in body_only  # only .state is ever read from a transaction signal
+
+
+# --- Pre-merge fingerprint-completeness audit regressions -------------------
+# (Section 1: three real gaps found - developer_indications/conflicts raw
+# content, ownership_coverage, linked_strategic_allocation_id - each is
+# shown to the LLM as its own reference token but was not previously
+# reflected in the fingerprint even when the COMPUTED ownership_control_
+# posture stayed unchanged.)
+
+def test_new_developer_identification_changes_fingerprint_even_when_posture_unchanged():
+    """Going from no developer named to one developer named does not, on
+    its own, flip has_ownership_evidence/conflicts/posture (posture only
+    reads conflicts+has_ownership_evidence+scope_verified) - yet the model
+    is shown the raw developer_indications list and can legitimately
+    reason differently. Must not be a false-negative gap."""
+    before = _fp(actors_control=_FakeActorsControl())
+    after = _fp(actors_control=_FakeActorsControl(developer_indications=("Bellway Homes Limited",)))
+    assert before != after
+
+
+def test_ownership_coverage_change_alters_fingerprint_even_when_posture_unchanged():
+    """"Never searched" (INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL) vs
+    "searched thoroughly, found nothing" (RELEVANT_EVIDENCE_SEARCHED_NO_
+    CONTROL_INDICATION_FOUND) both leave has_ownership_evidence False and
+    ownership_control_posture at INCOMPLETE_NON_BLOCKING - a genuinely
+    different evidentiary state ("coverage-aware negative signal
+    semantics") that must not be invisible to the fingerprint."""
+    before = _fp(actors_control=_FakeActorsControl(ownership_coverage="INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL"))
+    after = _fp(actors_control=_FakeActorsControl(ownership_coverage="RELEVANT_EVIDENCE_SEARCHED_NO_CONTROL_INDICATION_FOUND"))
+    assert before != after
+
+
+def test_conflict_content_change_alters_fingerprint_beyond_mere_existence():
+    """Both packets have a non-empty conflicts tuple (posture stays
+    EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING in both) but the SPECIFIC
+    conflict differs - the model is shown the raw text and this must not
+    be invisible to the fingerprint."""
+    before = _fp(actors_control=_FakeActorsControl(conflicts=("Conflicting developer evidence: A vs B.",)))
+    after = _fp(actors_control=_FakeActorsControl(conflicts=("Conflicting developer evidence: A vs B.", "Conflicting ownership declaration: X vs Y.")))
+    assert before != after
+
+
+def test_linked_strategic_allocation_id_change_alters_fingerprint():
+    before = _fp(linked_strategic_allocation_id=None)
+    after = _fp(linked_strategic_allocation_id=42)
+    assert before != after
+
+
+def test_fingerprint_version_constant_was_bumped_for_this_payload_shape_change():
+    from app.policy.agent_evaluation_persistence import AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION
+    assert AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION == 2
 
 
 # --- Section 33: persistence --------------------------------------------------
@@ -551,6 +665,78 @@ def test_expired_claim_can_be_recovered(session):
     assert recovered.status == "claimed"
 
 
+def test_recovered_expired_claim_completes_exactly_once_end_to_end(session):
+    """The full worked sequence from Section 2: worker holding DEF crashes
+    (claim stays "claimed" forever, never completed) -> expiry makes it
+    recoverable -> the recovering worker completes it -> exactly ONE
+    AgentEvaluationHistory row and ONE claim row exist in a terminal
+    state, never two."""
+    site, opp, mandate_row, mandate, packet, assessment = _build_case(session)
+    fingerprint = compute_agent_evaluation_input_fingerprint(
+        mandate_fingerprint="fp-mandate", acquisition_type="LAND_SITE_ACQUISITION",
+        buyer_fit_assessment=assessment, packet=packet,
+    )
+    subject_type, anchor_id, scope_key = resolve_acquisition_subject_key(opp.opportunity_id, opp.opportunity_type)
+    anchor = get_or_create_subject_anchor(session, subject_type=subject_type, anchor_id=anchor_id, scope_key=scope_key)
+
+    # Simulate the crashed worker: claim it, then never complete it.
+    crashed = try_claim_evaluation(
+        session, buyer_mandate_id=mandate_row.id, subject_anchor_id=anchor.id,
+        acquisition_type="LAND_SITE_ACQUISITION", evaluation_input_fingerprint=fingerprint,
+    )
+    assert crashed.status == "claimed"
+    import datetime as dt
+    crashed.claim.claimed_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=999)
+    session.commit()
+
+    # The recovering worker uses the normal orchestration entry point.
+    client = _FakeClient([json.dumps(_valid_raw(recommendation="PURSUE"))])
+    recovered_outcome = run_persisted_evaluation(
+        session, mandate=mandate, mandate_key=mandate_row.buyer.buyer_key, buyer_mandate_id=mandate_row.id,
+        mandate_fingerprint="fp-mandate", acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp,
+        opportunity_fingerprint="fp-opp", packet=packet, buyer_fit_assessment=assessment, client=client,
+    )
+    assert recovered_outcome.status == "evaluated"
+
+    all_claims = session.execute(
+        select(AgentEvaluationClaim).where(AgentEvaluationClaim.evaluation_input_fingerprint == fingerprint)
+    ).scalars().all()
+    all_history = session.execute(
+        select(AgentEvaluationHistory).where(AgentEvaluationHistory.evaluation_input_fingerprint == fingerprint)
+    ).scalars().all()
+    assert len(all_claims) == 1
+    assert all_claims[0].status == CLAIM_COMPLETED
+    assert len(all_history) == 1
+
+
+def test_completed_claim_can_be_force_reclaimed_for_a_controlled_release(session):
+    """Section 2 pre-merge defect fix: since prompt_version/model_id/
+    AGENT_EVALUATION_POLICY_VERSION are deliberately excluded from the
+    fingerprint (Section 19's own controlled-release design), a
+    "completed" claim for an otherwise-unchanged fingerprint must not
+    block a deliberate, explicit future re-evaluation forever - force=True
+    is the escape hatch, never automatic."""
+    first = try_claim_evaluation(
+        session, buyer_mandate_id=1, subject_anchor_id=1, acquisition_type="LAND_SITE_ACQUISITION",
+        evaluation_input_fingerprint="fp-release",
+    )
+    first.claim.status = CLAIM_COMPLETED
+    first.claim.history_id = None
+    session.commit()
+
+    default_attempt = try_claim_evaluation(
+        session, buyer_mandate_id=1, subject_anchor_id=1, acquisition_type="LAND_SITE_ACQUISITION",
+        evaluation_input_fingerprint="fp-release",
+    )
+    assert default_attempt.status == "already_completed"
+
+    forced_attempt = try_claim_evaluation(
+        session, buyer_mandate_id=1, subject_anchor_id=1, acquisition_type="LAND_SITE_ACQUISITION",
+        evaluation_input_fingerprint="fp-release", force=True,
+    )
+    assert forced_attempt.status == "claimed"
+
+
 def test_different_fingerprint_can_be_evaluated_independently(session):
     outcome1 = try_claim_evaluation(
         session, buyer_mandate_id=1, subject_anchor_id=1, acquisition_type="LAND_SITE_ACQUISITION",
@@ -589,9 +775,27 @@ def test_persisted_history_includes_full_provenance(session):
     )
     h = outcome.history
     assert h.evaluation_policy_version  # non-empty composite string
-    assert h.prompt_version == 1
     assert h.model_provider == "openai"
     assert h.model_id == "gpt-4o-mini"
     assert h.buyer_mandate_fingerprint == "fp-mandate-xyz"
     assert h.evaluation_input_fingerprint
     assert h.retry_count == 0
+
+
+def test_persisted_prompt_version_is_read_from_the_prompt_module_not_hardcoded(session):
+    """Section 3 pre-merge review: GOVERNING_POLICY_PROMPT_VERSION now
+    lives in app.policy.agent_evaluation_prompt, the module that owns
+    GOVERNING_POLICY itself - persistence only ever reads it. Proven here
+    by asserting equality against that module's own constant (not a
+    literal), so a future prompt-version bump is picked up automatically
+    with no change required in this module."""
+    from app.policy.agent_evaluation_prompt import GOVERNING_POLICY_PROMPT_VERSION
+
+    site, opp, mandate_row, mandate, packet, assessment = _build_case(session)
+    client = _FakeClient([json.dumps(_valid_raw(recommendation="PURSUE"))])
+    outcome = run_persisted_evaluation(
+        session, mandate=mandate, mandate_key=mandate_row.buyer.buyer_key, buyer_mandate_id=mandate_row.id,
+        mandate_fingerprint="fp-mandate", acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp,
+        opportunity_fingerprint="fp-opp", packet=packet, buyer_fit_assessment=assessment, client=client,
+    )
+    assert outcome.history.prompt_version == GOVERNING_POLICY_PROMPT_VERSION
