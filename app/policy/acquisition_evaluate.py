@@ -56,6 +56,27 @@ MAX_REPAIR_ATTEMPTS = 1
 
 MODEL = "gpt-4o-mini"
 
+# --- Structured-output contract provenance (Acquisition Agent V1, Gate 1 --
+# --- controlled release) ----------------------------------------------------
+#
+# Tracks OUTPUT_SCHEMA specifically - owned beside the artefact it versions,
+# the same principle already applied to app.policy.agent_evaluation_prompt.
+# GOVERNING_POLICY_PROMPT_VERSION for GOVERNING_POLICY. A pure provenance
+# identifier: never read by evaluate(), validate_and_build_result(), or any
+# other evaluation/validation logic, so declaring it does not change Agent
+# Evaluation Policy V1's commercial semantics in any way, and it is
+# deliberately NOT part of app.policy.agent_evaluation_persistence.
+# compute_agent_evaluation_input_fingerprint's own payload - a structured-
+# output schema change is a CONTROLLED EVALUATION RELEASE (Section 19 of
+# that module's own design), never something that should automatically
+# invalidate every persisted evaluation merely because a scheduled runner
+# executes. Starts at 1 because it tracks the CURRENT, already-production-
+# verified OUTPUT_SCHEMA (unchanged by this addition) - bump by 1 whenever
+# OUTPUT_SCHEMA's shape changes in a future controlled release, the same
+# manual, documented discipline every other *_VERSION constant in this
+# codebase already follows.
+AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION = 1
+
 OUTPUT_SCHEMA = {
     "name": "agent_evaluation_result",
     "schema": {

@@ -799,3 +799,50 @@ def test_persisted_prompt_version_is_read_from_the_prompt_module_not_hardcoded(s
         opportunity_fingerprint="fp-opp", packet=packet, buyer_fit_assessment=assessment, client=client,
     )
     assert outcome.history.prompt_version == GOVERNING_POLICY_PROMPT_VERSION
+
+
+def test_persisted_structured_output_schema_version_is_read_from_the_owning_module(session):
+    """Gate 1 controlled release, Section 1: AGENT_EVALUATION_OUTPUT_
+    SCHEMA_VERSION lives in app.policy.acquisition_evaluate, the module
+    that owns OUTPUT_SCHEMA itself - persistence only ever reads it.
+    Proven here against that module's own constant, not a literal."""
+    from app.policy.acquisition_evaluate import AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION
+
+    site, opp, mandate_row, mandate, packet, assessment = _build_case(session)
+    client = _FakeClient([json.dumps(_valid_raw(recommendation="PURSUE"))])
+    outcome = run_persisted_evaluation(
+        session, mandate=mandate, mandate_key=mandate_row.buyer.buyer_key, buyer_mandate_id=mandate_row.id,
+        mandate_fingerprint="fp-mandate", acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp,
+        opportunity_fingerprint="fp-opp", packet=packet, buyer_fit_assessment=assessment, client=client,
+    )
+    assert outcome.history.structured_output_schema_version == AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION
+
+
+def test_structured_output_schema_version_is_persisted_on_every_history_row():
+    """The value must be a real, always-populated column - never optional
+    provenance that could silently end up NULL."""
+    from app.db.models import AgentEvaluationHistory
+
+    column = AgentEvaluationHistory.__table__.columns["structured_output_schema_version"]
+    assert column.nullable is False
+
+
+def test_structured_output_schema_version_is_independent_of_the_evaluation_input_fingerprint():
+    """Section 1, IMPORTANT: changing AGENT_EVALUATION_OUTPUT_SCHEMA_
+    VERSION must never move agent_evaluation_input_fingerprint_v2 - a
+    structured-output schema change is a controlled evaluation release,
+    never automatic market-input invalidation. Proven both structurally
+    (the fingerprint function's own source never references the schema-
+    version constant or module at all) and behaviourally (the fingerprint
+    function does not even accept a schema-version parameter, so no
+    caller could pass one in even by mistake)."""
+    import inspect
+
+    from app.policy import agent_evaluation_persistence
+
+    func = agent_evaluation_persistence.compute_agent_evaluation_input_fingerprint
+    source = inspect.getsource(func)
+    assert "AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION" not in source
+    assert "OUTPUT_SCHEMA" not in source
+    assert "acquisition_evaluate" not in source  # never imports from the module owning OUTPUT_SCHEMA at all
+    assert "structured_output_schema_version" not in inspect.signature(func).parameters

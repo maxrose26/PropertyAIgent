@@ -15,13 +15,19 @@ docstrings (AcquisitionSubjectAnchor, AgentEvaluationHistory,
 CurrentBuyerOpportunityState, AgentEvaluationClaim) for the full schema
 rationale this module implements against.
 
-The ONE exception, explicitly authorised at Gate 1 pre-merge review
-(Product Owner Section 3): app.policy.agent_evaluation_prompt gained a
-single new constant, GOVERNING_POLICY_PROMPT_VERSION - a pure provenance
-identifier, never read by any evaluation/validation/prompt-rendering
-logic, so this is a non-semantic addition, not a change to Agent
-Evaluation Policy V1's commercial behaviour. GOVERNING_POLICY's own text
-was not touched.
+The TWO exceptions, both explicitly authorised, non-semantic provenance
+additions - neither reads by any evaluation/validation/prompt-rendering
+logic, neither changes Agent Evaluation Policy V1's commercial behaviour:
+  - Gate 1 pre-merge review (Product Owner Section 3): app.policy.
+    agent_evaluation_prompt gained GOVERNING_POLICY_PROMPT_VERSION.
+    GOVERNING_POLICY's own text was not touched.
+  - Gate 1 controlled release (Product Owner Section 1): app.policy.
+    acquisition_evaluate gained AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION,
+    owned beside OUTPUT_SCHEMA for the identical reason. OUTPUT_SCHEMA
+    itself was not touched, and this version is deliberately NOT part of
+    compute_agent_evaluation_input_fingerprint's own payload - a
+    structured-output schema change is a controlled evaluation release,
+    never automatic market-input invalidation (Section 19).
 
 NOT INCLUDED IN GATE 1 (Product Owner brief, explicit deferrals):
   - the Scheduled Acquisition Agent Runner itself (no cron, no weekly loop,
@@ -472,7 +478,7 @@ def record_evaluation_outcome(
     session: Session, *, claim: AgentEvaluationClaim, result: EvaluationExecutionResult,
     buyer_mandate_id: int, subject_anchor_id: int, acquisition_type: str,
     opportunity_id: str, buyer_mandate_fingerprint: str, evaluation_input_fingerprint: str,
-    model_id: str,
+    model_id: str, structured_output_schema_version: int,
 ) -> AgentEvaluationHistory:
     """Inserts the one, never-mutated-again AgentEvaluationHistory row for
     this attempt, updates the claim to its terminal state, and upserts
@@ -497,7 +503,9 @@ def record_evaluation_outcome(
         opportunity_id=opportunity_id, opportunity_kind=opportunity_kind,
         buyer_mandate_fingerprint=buyer_mandate_fingerprint, evaluation_input_fingerprint=evaluation_input_fingerprint,
         evaluation_policy_version=(e.evaluation_policy_version if e else ""),
-        prompt_version=GOVERNING_POLICY_PROMPT_VERSION, model_provider=MODEL_PROVIDER_OPENAI, model_id=model_id,
+        prompt_version=GOVERNING_POLICY_PROMPT_VERSION,
+        structured_output_schema_version=structured_output_schema_version,
+        model_provider=MODEL_PROVIDER_OPENAI, model_id=model_id,
         execution_status=result.status, failure_reason=result.failure_reason, retry_count=result.retry_count,
         diagnostic_detail=result.diagnostic_detail,
         recommendation=(e.recommendation if e else None),
@@ -581,7 +589,7 @@ def run_persisted_evaluation(
          database transaction is held open here at all.
       5. record_evaluation_outcome - one short DB transaction (history
          insert + claim update + current-state upsert together)."""
-    from app.policy.acquisition_evaluate import MODEL, evaluate
+    from app.policy.acquisition_evaluate import AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION, MODEL, evaluate
 
     subject_type, anchor_id, scope_key = resolve_acquisition_subject_key(opportunity.opportunity_id, opportunity.opportunity_type)
     anchor = get_or_create_subject_anchor(session, subject_type=subject_type, anchor_id=anchor_id, scope_key=scope_key)
@@ -614,6 +622,7 @@ def run_persisted_evaluation(
         buyer_mandate_id=buyer_mandate_id, subject_anchor_id=anchor.id, acquisition_type=acquisition_type,
         opportunity_id=opportunity.opportunity_id, buyer_mandate_fingerprint=mandate_fingerprint,
         evaluation_input_fingerprint=fingerprint, model_id=MODEL,
+        structured_output_schema_version=AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION,
     )
     current_state = session.execute(
         select(CurrentBuyerOpportunityState).where(

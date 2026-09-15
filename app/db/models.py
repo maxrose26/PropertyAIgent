@@ -3281,12 +3281,25 @@ class AgentEvaluationHistory(Base):
     buyer_mandate_fingerprint: Mapped[str] = mapped_column(String(64))
     evaluation_input_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
     evaluation_policy_version: Mapped[str] = mapped_column(String(300))
-    # app.policy.agent_evaluation_persistence.GOVERNING_POLICY_PROMPT_
-    # VERSION at evaluation time - DISTINCT from evaluation_policy_version
-    # (the architecture audit found AGENT_EVALUATION_POLICY_VERSION stayed
-    # at 1 across three real prompt-text releases - this column exists
-    # specifically so that gap never recurs for future releases).
+    # app.policy.agent_evaluation_prompt.GOVERNING_POLICY_PROMPT_VERSION at
+    # evaluation time - DISTINCT from evaluation_policy_version (the
+    # architecture audit found AGENT_EVALUATION_POLICY_VERSION stayed at 1
+    # across three real prompt-text releases - this column exists
+    # specifically so that gap never recurs for future releases). Owned
+    # beside GOVERNING_POLICY itself (Gate 1 pre-merge review, Product
+    # Owner Section 3) - this table only ever reads it.
     prompt_version: Mapped[int] = mapped_column(Integer)
+    # app.policy.acquisition_evaluate.AGENT_EVALUATION_OUTPUT_SCHEMA_
+    # VERSION at evaluation time - Gate 1 controlled-release addition
+    # (Product Owner review, "Structured Output Schema Version"). Pure
+    # historical provenance ("which structured-output contract produced
+    # this evaluation") - deliberately NEVER part of app.policy.
+    # agent_evaluation_persistence.compute_agent_evaluation_input_
+    # fingerprint's own payload, since a schema change is a controlled
+    # evaluation release, never automatic market-input invalidation
+    # (the same principle already applied to prompt_version/model_id/
+    # AGENT_EVALUATION_POLICY_VERSION).
+    structured_output_schema_version: Mapped[int] = mapped_column(Integer)
     model_provider: Mapped[str] = mapped_column(String(30))
     model_id: Mapped[str] = mapped_column(String(100))
 
