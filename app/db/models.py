@@ -3152,3 +3152,309 @@ class ApplicantIntelligence(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     company: Mapped["Company | None"] = relationship(foreign_keys=[company_id])
+
+
+# =============================================================================
+# Acquisition Agent V1, Gate 1 (Persistence Foundation) - 4 new, purely
+# additive tables. Nothing above this line is touched by Gate 1. See
+# app.policy.agent_evaluation_persistence for the pure logic that reads and
+# writes these tables - app.policy.acquisition_evaluate/agent_evaluation_
+# prompt/agent_evaluation_validator/agent_evaluation_result (Agent
+# Evaluation Policy V1, CLOSED - PRODUCTION VERIFIED) are NOT modified by
+# this gate and remain the sole commercial reasoning engine; these tables
+# only ever persist what that engine already produces.
+# =============================================================================
+
+class AcquisitionSubjectAnchor(Base):
+    """The persistent UNDERLYING ACQUISITION SUBJECT a buyer-opportunity
+    lineage is tracked against - deliberately separate from the CURRENT
+    CANDIDATE REPRESENTATION (app.reporting.opportunity_universe's own
+    opportunity_id string, which is a read-model convenience label that
+    can and does change kind over an opportunity's real lifecycle - see
+    that module's own docstring: "Opportunities should remain read
+    models, not persisted rows").
+
+    Product Owner Gate 1 modification #1: a genuine candidate-KIND
+    transition for the SAME underlying Site (e.g.
+    planning_delivery:long_pending_application:61 -> planning_delivery:
+    recent_permission:61 -> planning_delivery:site:61) must NOT be treated
+    as a brand-new commercial subject merely because the read-model label
+    changed - but a genuinely DIFFERENT commercial scope (Site 67 / Phase
+    3B vs Site 67 / Phase 4, or a specific phase vs the whole site) must
+    NEVER be silently collapsed into one subject. This table is the
+    smallest structure that satisfies both: identity is
+    (subject_type, anchor_id, scope_key) - see app.policy.
+    agent_evaluation_persistence.resolve_acquisition_subject_key for the
+    pure function deriving these three values from an opportunity_id/
+    opportunity_type pair, applied uniformly:
+      - kind in {site, recent_permission, long_pending_application}:
+        scope_key = "WHOLE_SITE" - these three kinds already represent, by
+        app.reporting.opportunity_universe's own documented design, "AT
+        MOST one planning/delivery card at a time" for the SAME site as it
+        moves through its lifecycle, so they intentionally share one
+        subject/one WHOLE_SITE scope.
+      - kind == "phase": scope_key = the phase_code segment verbatim
+        (e.g. "3B") - a different phase_code is always a different
+        subject, never merged with WHOLE_SITE or another phase.
+      - strategic_land allocations: scope_key = "WHOLE_ALLOCATION".
+
+    `anchor_id` is a plain Integer, deliberately NOT a ForeignKey -
+    mirrors OpportunityMonitoringState.opportunity_id's own "no single
+    target table" justification exactly, except here the reason is
+    structural rather than absent: `anchor_id` means Site.id when
+    subject_type == "planning_delivery" and LocalPlanSite.id when
+    subject_type == "strategic_land" - two different target tables, so no
+    single-table ForeignKey could ever be correct.
+
+    STRATEGIC-LAND LIMITATION (Product Owner Gate 1 modification, Section
+    5 - documented, not fixed here): the architecture audit found
+    LocalPlanSite.id is matched across re-ingestion runs by a text-derived
+    dedup key, not a stable content hash - a shifted extraction can
+    silently create a REPLACEMENT LocalPlanSite row with a new id for what
+    is really the same real-world allocation, orphaning the old row (and
+    therefore this table's old anchor row) with no automatic cross-link.
+    This is the safest identity available today without building fuzzy
+    matching or entity resolution (both explicitly out of scope for Gate
+    1) - a future stronger canonical-subject/entity-resolution layer can
+    be added later without restructuring this table, since subject_type/
+    anchor_id/scope_key is already a generic enough shape to point at a
+    future resolved identity instead of a raw LocalPlanSite.id if that
+    ever becomes necessary."""
+
+    __tablename__ = "acquisition_subject_anchors"
+    __table_args__ = (
+        UniqueConstraint("subject_type", "anchor_id", "scope_key", name="uq_acquisition_subject_anchor"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # "planning_delivery" | "strategic_land" - app.policy.buyer_matching.
+    # PLANNING_DELIVERY/STRATEGIC_LAND verbatim, never a parallel vocabulary.
+    subject_type: Mapped[str] = mapped_column(String(30))
+    anchor_id: Mapped[int] = mapped_column(Integer)
+    # "WHOLE_SITE" | "WHOLE_ALLOCATION" | <phase_code string, e.g. "3B">
+    scope_key: Mapped[str] = mapped_column(String(100))
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AgentEvaluationHistory(Base):
+    """Acquisition Agent V1, Gate 1 - append-only history of Agent
+    Evaluation Policy V1 (app.policy.acquisition_evaluate.evaluate())
+    attempts. Never mutated after insert - one row per attempt, exactly
+    mirroring this schema's own established append-only convention
+    (LocalPlanStatusHistory/AllocationVersion/PolicyChangeEvent).
+
+    Persists app.policy.agent_evaluation_result.AgentEvaluationResult /
+    EvaluationExecutionResult verbatim - this table does not redesign or
+    reinterpret Agent Evaluation Policy V1's own contract, it only stores
+    it. `opportunity_id`/`opportunity_kind` are the CURRENT CANDIDATE
+    REPRESENTATION that existed at evaluation time (Product Owner Gate 1
+    modification #1, Section 6) - denormalised and frozen at insert time,
+    deliberately never updated even if the same underlying subject's
+    candidate representation later changes kind again.
+
+    A FAILED row (execution_status == "FAILED") carries recommendation=
+    NULL and every other commercial field NULL - a technical failure is
+    never persisted as if it were a commercial recommendation, mirroring
+    EvaluationExecutionResult's own invariant exactly."""
+
+    __tablename__ = "agent_evaluation_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    buyer_mandate_id: Mapped[int] = mapped_column(ForeignKey("buyer_mandates.id"))
+    subject_anchor_id: Mapped[int] = mapped_column(ForeignKey("acquisition_subject_anchors.id"))
+    acquisition_type: Mapped[str] = mapped_column(String(50))
+
+    # Current candidate representation AT evaluation time - see class
+    # docstring. Never a FK (app.reporting.opportunity_universe's own
+    # opportunity_id is deliberately not a persisted-row key).
+    opportunity_id: Mapped[str] = mapped_column(String(200))
+    # "site" | "phase" | "recent_permission" | "long_pending_application" |
+    # "allocation" - the kind segment of opportunity_id, denormalised for
+    # cheap filtering without re-parsing the string.
+    opportunity_kind: Mapped[str] = mapped_column(String(50))
+
+    # Provenance - copied verbatim from already-existing trusted state,
+    # never recomputed by this table (mirrors AgentEvaluationResult.
+    # mandate_fingerprint/opportunity_fingerprint's own documented
+    # "copied verbatim" discipline).
+    buyer_mandate_fingerprint: Mapped[str] = mapped_column(String(64))
+    evaluation_input_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    evaluation_policy_version: Mapped[str] = mapped_column(String(300))
+    # app.policy.agent_evaluation_persistence.GOVERNING_POLICY_PROMPT_
+    # VERSION at evaluation time - DISTINCT from evaluation_policy_version
+    # (the architecture audit found AGENT_EVALUATION_POLICY_VERSION stayed
+    # at 1 across three real prompt-text releases - this column exists
+    # specifically so that gap never recurs for future releases).
+    prompt_version: Mapped[int] = mapped_column(Integer)
+    model_provider: Mapped[str] = mapped_column(String(30))
+    model_id: Mapped[str] = mapped_column(String(100))
+
+    # SUCCESS | FAILED - EvaluationExecutionResult.status verbatim.
+    execution_status: Mapped[str] = mapped_column(String(20))
+    failure_reason: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    diagnostic_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Commercial recommendation - NULL throughout when execution_status
+    # == FAILED (never a fabricated recommendation for a technical failure) ---
+    recommendation: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    confidence: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    confidence_basis: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list[str]
+    acquisition_subject_level: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    acquisition_subject_reference: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    acquisition_subject_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    supporting_signals: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list[{label, source_reference}]
+    countervailing_signals: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list[{label, source_reference}]
+    material_unknowns: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list[{fact_or_question, material, resolvable, blocking, why_it_matters}]
+    reasoning_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_action: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    next_action_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    monitoring_trigger: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    evidence_references: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list[str]
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    buyer_mandate: Mapped["BuyerMandate"] = relationship(foreign_keys=[buyer_mandate_id])
+    subject_anchor: Mapped["AcquisitionSubjectAnchor"] = relationship(foreign_keys=[subject_anchor_id])
+
+
+class CurrentBuyerOpportunityState(Base):
+    """Acquisition Agent V1, Gate 1 - the materialised CURRENT Agent
+    position for one (Buyer Mandate x Acquisition Subject x acquisition
+    type). Deliberately distinct from AgentEvaluationHistory (Product
+    Owner brief Section 13/16: "Do not conflate Current Buyer Opportunity
+    State with Agent Evaluation History") - this row is mutated in place
+    as new attempts complete; history is never mutated.
+
+    `current_history_id` points at the most recent SUCCESSFUL evaluation
+    only - a FAILED attempt updates `last_evaluated_at`/
+    `last_attempt_status` but NEVER replaces `current_history_id` (Product
+    Owner brief Section 14: a technical failure must never become, or
+    silently erase, a commercial recommendation). `current_history_id` is
+    NULL when no successful evaluation has ever existed for this
+    combination - represented honestly, never defaulted to a fabricated
+    recommendation.
+
+    NOT_RELEVANT rows are retained here exactly like every other
+    recommendation (Product Owner brief Section 21) - `is_current_
+    candidate` (whether the opportunity is still present in the live
+    candidate universe) is tracked separately from the recommendation
+    itself, so "why did PropertyAIgent reject this" and "is this still an
+    open opportunity" never get conflated. Gate 1 only provides this field
+    - no scheduled process yet sets is_current_candidate=False (that is
+    the future Scheduled Acquisition Agent Runner's job, explicitly
+    deferred)."""
+
+    __tablename__ = "current_buyer_opportunity_states"
+    __table_args__ = (
+        UniqueConstraint("buyer_mandate_id", "subject_anchor_id", "acquisition_type", name="uq_current_buyer_opportunity_state"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    buyer_mandate_id: Mapped[int] = mapped_column(ForeignKey("buyer_mandates.id"))
+    subject_anchor_id: Mapped[int] = mapped_column(ForeignKey("acquisition_subject_anchors.id"))
+    acquisition_type: Mapped[str] = mapped_column(String(50))
+
+    current_history_id: Mapped[int | None] = mapped_column(ForeignKey("agent_evaluation_history.id"), nullable=True)
+    # Denormalised copy of current_history_id's own evaluation_input_
+    # fingerprint - lets a future runner cheaply decide "is re-evaluation
+    # needed" via one indexed row read, without joining to history.
+    current_evaluation_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Latest known candidate representation - refreshed on every attempt
+    # (success or failure), unlike AgentEvaluationHistory's own frozen-at-
+    # insert-time copy.
+    current_opportunity_id: Mapped[str] = mapped_column(String(200))
+    current_opportunity_kind: Mapped[str] = mapped_column(String(50))
+
+    last_evaluated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    # "success" | "failed" - the MOST RECENT attempt's own outcome, which
+    # may legitimately be "failed" even while current_history_id still
+    # points at an older successful evaluation (Product Owner brief
+    # Section 14).
+    last_attempt_status: Mapped[str] = mapped_column(String(20))
+
+    # Whether this subject is still present in the live candidate universe
+    # - see class docstring. Defaults True (every row starts current by
+    # construction - it was just evaluated against a live universe member).
+    is_current_candidate: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    buyer_mandate: Mapped["BuyerMandate"] = relationship(foreign_keys=[buyer_mandate_id])
+    subject_anchor: Mapped["AcquisitionSubjectAnchor"] = relationship(foreign_keys=[subject_anchor_id])
+    current_history: Mapped["AgentEvaluationHistory | None"] = relationship(foreign_keys=[current_history_id])
+
+
+class AgentEvaluationClaim(Base):
+    """Acquisition Agent V1, Gate 1 - Product Owner modification #2
+    (pre-LLM concurrency/claiming). Establishes the invariant "only one
+    worker may own evaluation of (Buyer Mandate x Acquisition Subject x
+    Evaluation Input Fingerprint) at a time" BEFORE any OpenAI call is
+    made, so two concurrent workers can never both pay for the same
+    evaluation (a database unique constraint alone only rejects the
+    second WRITE, after both workers have already paid - insufficient,
+    per the Product Owner's own explicit brief).
+
+    WHY A CLAIM ROW, NOT A POSTGRESQL ADVISORY LOCK: this platform's
+    production DATABASE_URL points at a Supabase connection pooler
+    (aws-*.pooler.supabase.com) - Supabase's standard pooled connection
+    string runs PgBouncer in transaction-pooling mode, under which a
+    session-scoped primitive like pg_advisory_lock is unsafe (the
+    underlying physical connection can be handed to a different client
+    between statements, so a lock acquired in one statement may not be
+    held, or may be released, by the connection that later tries to
+    release it). An ordinary row, written and read inside plain
+    autocommit-safe statements, has no such hazard and works identically
+    under any pooling mode - this is why the brief's own "atomic insert/
+    claim semantics" option was chosen over "PostgreSQL advisory
+    locking".
+
+    Claim lifecycle (see app.policy.agent_evaluation_persistence.
+    try_claim_evaluation for the exact mechanism):
+      - ACQUISITION: no row exists for this (buyer_mandate_id,
+        subject_anchor_id, acquisition_type, evaluation_input_fingerprint)
+        -> insert with status="claimed". The unique constraint below makes
+        a concurrent second insert for the identical key fail with an
+        IntegrityError, which the caller treats as "someone else already
+        claimed this" - never as a bug to retry blindly.
+      - COLLISION: a row already exists with status="claimed" and
+        claimed_at is within CLAIM_EXPIRY_MINUTES -> refuse; the caller
+        must not proceed to a paid evaluation.
+      - EXPIRY/RECOVERY: a row exists with status="claimed" but claimed_at
+        is older than CLAIM_EXPIRY_MINUTES (the prior claimant crashed
+        without ever completing it) -> a single conditional UPDATE ...
+        WHERE status='claimed' AND claimed_at < cutoff reclaims it
+        atomically; the caller only proceeds if that UPDATE's own rowcount
+        confirms it actually won the race.
+      - COMPLETION: status becomes "completed" or "failed", completed_at
+        is set, and history_id points at the AgentEvaluationHistory row
+        that attempt produced - this is the one and only place a claim
+        row is ever mutated after its initial insert (or expiry-recovery
+        update)."""
+
+    __tablename__ = "agent_evaluation_claims"
+    __table_args__ = (
+        UniqueConstraint(
+            "buyer_mandate_id", "subject_anchor_id", "acquisition_type", "evaluation_input_fingerprint",
+            name="uq_agent_evaluation_claim",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    buyer_mandate_id: Mapped[int] = mapped_column(ForeignKey("buyer_mandates.id"))
+    subject_anchor_id: Mapped[int] = mapped_column(ForeignKey("acquisition_subject_anchors.id"))
+    acquisition_type: Mapped[str] = mapped_column(String(50))
+    evaluation_input_fingerprint: Mapped[str] = mapped_column(String(64))
+
+    # claimed | completed | failed
+    status: Mapped[str] = mapped_column(String(20), default="claimed")
+    claimed_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    history_id: Mapped[int | None] = mapped_column(ForeignKey("agent_evaluation_history.id"), nullable=True)
+
+    buyer_mandate: Mapped["BuyerMandate"] = relationship(foreign_keys=[buyer_mandate_id])
+    subject_anchor: Mapped["AcquisitionSubjectAnchor"] = relationship(foreign_keys=[subject_anchor_id])
+    history: Mapped["AgentEvaluationHistory | None"] = relationship(foreign_keys=[history_id])
