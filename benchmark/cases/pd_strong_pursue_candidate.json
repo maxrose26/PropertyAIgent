@@ -1,0 +1,146 @@
+{
+  "case_id": "pd_strong_pursue_candidate",
+  "case_name": "Strong PURSUE candidate (clean matches, only non-blocking open questions)",
+  "commercial_scenario": "No case in the current universe has literally zero open questions for any mandate - this is the strongest available real candidate: positive matches with no confirmed negative signal. Tests whether a model correctly reaches PURSUE-with-parallel-investigation rather than being wrongly cautious about ordinary open questions.",
+  "benchmark_version_introduced": 1,
+  "provenance": {
+    "captured_at": "2026-09-15T12:10:43.710293+00:00",
+    "captured_from_opportunity_id": "planning_delivery:site:491",
+    "buyer_key": "national_housebuilder",
+    "mandate_key": "default",
+    "acquisition_subject_scope_key": "WHOLE_SITE",
+    "buyer_matching_policy_version": 4,
+    "mandate_interpretation_policy_version": 1,
+    "acquisition_type_interpretation_policy_version": 1,
+    "transaction_signal_policy_version": 2,
+    "terminal_hard_exclusion_policy_version": 1,
+    "agent_evaluation_policy_version": 1
+  },
+  "frozen_commercial_facts": {
+    "acquisition_type": "LAND_SITE_ACQUISITION",
+    "opportunity_type": "planning_delivery",
+    "buyer_fit_classification": "INSUFFICIENT_EVIDENCE",
+    "buyer_fit_is_investigative_exception": false,
+    "buyer_fit_matches": [
+      "Planning position (planning permission granted) matches this buyer's stated planning appetite."
+    ],
+    "buyer_fit_unknown": [
+      "Development type has not been established with enough confidence to confirm this is general-needs housing.",
+      "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+      "No trusted unit count is available to assess against this buyer's target range.",
+      "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference."
+    ],
+    "buyer_fit_investigate": [],
+    "buyer_fit_non_terminal_does_not_match": [],
+    "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+    "opportunity_facts": {
+      "total_units": [
+        "UNKNOWN",
+        null
+      ],
+      "development_state_scope_verified": true,
+      "actors_control_developer_indications": [],
+      "actors_control_ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+      "actors_control_conflicts": [],
+      "development_state": [
+        "UNKNOWN",
+        null
+      ],
+      "affordable_units": [
+        "UNKNOWN",
+        null
+      ],
+      "affordable_percentage": [
+        "UNKNOWN",
+        null
+      ],
+      "operative_planning_state": [
+        "KNOWN",
+        "permission_granted"
+      ],
+      "recommendation_direction": [
+        "UNKNOWN",
+        null
+      ],
+      "affordable_housing_status": [
+        "UNKNOWN",
+        null
+      ]
+    },
+    "transaction_signal_states": {
+      "recent_permission": "ABSENT",
+      "approaching_implementation_deadline": "PRESENT",
+      "implementation_activity_evidence_identified": "UNKNOWN",
+      "wider_site_implementation_activity_context": "UNKNOWN",
+      "no_qualifying_progress_evidence_identified": "PRESENT",
+      "ownership_or_control_evidence_changed": "ABSENT",
+      "scope_verified": true
+    },
+    "linked_strategic_allocation_id": null
+  },
+  "frozen_evaluation_input": {
+    "buyer_key": "national_housebuilder",
+    "acquisition_type": "LAND_SITE_ACQUISITION",
+    "opportunity_type": "planning_delivery",
+    "mandate_interpretation_lines": [
+      "- target_unit_min [TARGET]: A scheme below 200 total homes is a soft/contextual signal for this buyer, never a disqualifying fact on its own.",
+      "- target_unit_max [TARGET]: A scheme above 500 total homes is a soft/contextual signal, worth investigating (e.g. for a suitable phase/parcel), never a disqualifying fact on its own - no current mandate has a hard maximum, and this module does not add one.",
+      "- accepted_planning_states [PREFERENCE  (active)]: A planning state outside this set is a soft signal (unknown/context), never a disqualifying fact on its own.",
+      "- specialist_development_is_exclusion [EXCLUSION  (active)]: A confirmed specialist development is a hard exclusion for this buyer.",
+      "- wholly_affordable_is_exclusion [EXCLUSION  (active)]: A confirmed wholly-affordable scheme is a hard exclusion for this buyer.",
+      "- treats_no_activity_as_positive [PREFERENCE]: This buyer has not stated a preference for early-stage, activity-free allocations.",
+      "- large_allocation_is_self_qualifying [TOLERANCE]: An oversized strategic land allocation is read the same as any other oversized opportunity for this buyer (see target_unit_max).",
+      "- geography_scope [HARD_CONSTRAINT]: This buyer has not stated a geographic boundary that excludes anything.",
+      "- development_state_appetite [PREFERENCE  (active)]: This buyer's stated development-state appetite is 'UNCOMMENCED_PREFERRED' - a leaning, never an exclusion.",
+      "- control_appetite [INVESTIGATION_CONDITION]: This buyer is willing to investigate: (none stated) rather than treating unresolved ownership/control as a rejection reason."
+    ],
+    "buyer_fit_classification": "INSUFFICIENT_EVIDENCE",
+    "buyer_fit_is_investigative_exception": false,
+    "reference_tokens": {
+      "packet.total_units": "UNKNOWN",
+      "packet.affordable_units": "UNKNOWN",
+      "packet.affordable_percentage": "UNKNOWN",
+      "packet.operative_planning_state": "KNOWN = 'permission_granted'",
+      "packet.recommendation_direction": "UNKNOWN",
+      "packet.affordable_housing_status": "UNKNOWN",
+      "packet.development_state": "UNKNOWN",
+      "packet.development_state_scope_verified": "True",
+      "packet.actors_control.developer_indications": "()",
+      "packet.actors_control.ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+      "packet.actors_control.has_ownership_evidence": "False",
+      "packet.actors_control.conflicts": "()",
+      "ownership_control_posture": "INCOMPLETE_NON_BLOCKING",
+      "signals.recent_permission": "ABSENT - The operative permission was decided on 2023-10-23, outside the platform's 3-calendar-month recency window.",
+      "signals.approaching_implementation_deadline": "PRESENT",
+      "signals.implementation_activity_evidence_identified": "UNKNOWN - No qualifying post-permission planning activity (condition-discharge or variation/amendment filing) has been identified for this site's application family.",
+      "signals.wider_site_implementation_activity_context": "UNKNOWN - No qualifying post-permission planning activity (condition-discharge or variation/amendment filing) has been identified for this site's application family.",
+      "signals.no_qualifying_progress_evidence_identified": "PRESENT - PropertyAIgent has completed the relevant covered planning-evidence search (related-application discovery) and no qualifying implementation/progress evidence was identified within those covered sources. This does not mean the site is confirmed uncommenced, inactive, stalled, dormant, or land banked, and it does not mean the owner is not progressing the site - only that no qualifying evidence was found within the sources actually searched.",
+      "signals.ownership_or_control_evidence_changed": "ABSENT - No ownership/control evidence change was detected at this opportunity's last monitoring pass.",
+      "signals.coverage_checked_at": "2026-08-31 05:06:58.693715+00:00",
+      "signals.scope_verified": "True",
+      "buyer_fit.matches[0]": "Planning position (planning permission granted) matches this buyer's stated planning appetite.",
+      "buyer_fit.unknown[0]": "Development type has not been established with enough confidence to confirm this is general-needs housing.",
+      "buyer_fit.unknown[1]": "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+      "buyer_fit.unknown[2]": "No trusted unit count is available to assess against this buyer's target range.",
+      "buyer_fit.unknown[3]": "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference."
+    },
+    "governing_policy_prompt_version": 1,
+    "agent_evaluation_output_schema_version": 1
+  },
+  "expected_recommendation": [
+    "PURSUE"
+  ],
+  "commercial_rationale": "No confirmed negative signal is present; open questions here should read as non-blocking parallel investigation, not a reason to defer. PENDING PRODUCT OWNER REVIEW of the exact extracted unknowns.",
+  "required_invariants": [
+    "monitor_not_investigate_now_in_disguise"
+  ],
+  "forbidden_claims": [],
+  "required_material_unknowns": [],
+  "expected_acquisition_subject_level": null,
+  "expected_next_action": null,
+  "monitoring_trigger_constraints": null,
+  "repeat_for_consistency": false,
+  "is_zero_llm_case": false,
+  "reviewer_notes": "",
+  "approved_by_product_owner": false
+}

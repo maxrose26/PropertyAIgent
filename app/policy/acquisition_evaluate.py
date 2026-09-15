@@ -17,6 +17,7 @@ already relies on."""
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 
 from app.policy.acquisition_type_interpretation import ACQUISITION_TYPE_INTERPRETATION_POLICY_VERSION
@@ -162,6 +163,30 @@ OUTPUT_SCHEMA = {
 }
 
 
+# --- Benchmark-only execution telemetry (Agent Evaluation Benchmark V1, ------
+# --- Implementation Gate, Modification #1) ----------------------------------
+#
+# Deliberately NEVER referenced by app.policy.agent_evaluation_persistence,
+# never part of EvaluationExecutionResult (agent_evaluation_result.py is
+# Agent Evaluation Policy V1's closed, provider-agnostic domain contract -
+# see that module's own docstring), and never persisted. Only
+# evaluate_with_telemetry() (below) ever constructs one; evaluate() itself
+# (the production entry point) never sees this type at all. Any field that
+# could not be determined for a given call (e.g. a model/SDK version with no
+# usage object, or no reasoning-token concept) is None, never 0 or fabricated.
+@dataclass(frozen=True)
+class EvaluationExecutionTelemetry:
+    model: str
+    reasoning_effort: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    reasoning_tokens: int | None
+    total_tokens: int | None
+    api_call_count: int
+    retry_count: int
+    wall_clock_seconds: float
+
+
 def _evaluation_policy_version() -> str:
     return (
         f"mandate_interpretation={MANDATE_INTERPRETATION_POLICY_VERSION};"
@@ -201,37 +226,48 @@ def _deterministic_terminal_result(
     )
 
 
-def evaluate(
+def _evaluate_impl(
     session, *, mandate, mandate_key: str, mandate_fingerprint: str,
     acquisition_type: str, opportunity, opportunity_fingerprint: str,
-    packet, buyer_fit_assessment, client=None,
-) -> EvaluationExecutionResult:
-    """The narrow-slice EVALUATE(buyer_mandate, acquisition_type,
-    opportunity_packet). `client` is an optional pre-constructed OpenAI
-    client (dependency-injected for testing without a live API call) -
-    defaults to a fresh `OpenAI()` instance, exactly like every other
-    caller in this codebase.
+    packet, buyer_fit_assessment, client, model: str, reasoning_effort: str | None,
+    collect_telemetry: bool,
+) -> tuple[EvaluationExecutionResult, EvaluationExecutionTelemetry | None]:
+    """The ONE real implementation of EVALUATE(buyer_mandate, acquisition_type,
+    opportunity_packet) - shared, byte-for-byte, by both evaluate() (the
+    production entry point) and evaluate_with_telemetry() (Agent Evaluation
+    Benchmark V1's additive, benchmark-only seam - Implementation Gate,
+    Modification #1/#2). Neither wrapper re-implements any commercial
+    reasoning, retry, or validation logic - both call this function and
+    differ only in what they pass in (`model`/`reasoning_effort`/
+    `collect_telemetry`) and what they return.
 
-    FLOW (Section 21 of the narrow-implementation authorisation):
+    FLOW (Section 21 of the narrow-implementation authorisation, unchanged):
       1. validate acquisition_type is in the mandate  -> FAILED if not.
       2. deterministic Terminal Hard Exclusion Policy check -> if terminal,
          return a deterministic NOT_RELEVANT result, NO LLM call.
       3. otherwise build the bounded prompt context and call the LLM once.
       4. deterministic post-validation; on failure, ONE bounded repair
          retry with the specific errors fed back; still-invalid -> FAILED.
-    """
+
+    `collect_telemetry=False` (evaluate()'s own call) performs ZERO extra
+    work beyond what this function did before this seam existed - no timer
+    starts, no usage object is inspected, and the second return value is
+    always None. This is what makes "production behaviour unchanged"
+    provable rather than merely asserted."""
     key = AgentEvaluationResultKey(buyer_key=mandate_key, opportunity_id=opportunity.opportunity_id, acquisition_type=acquisition_type)
 
     if acquisition_type not in mandate.acquisition_types:
-        return EvaluationExecutionResult(status=FAILED, failure_reason=ACQUISITION_TYPE_NOT_IN_MANDATE)
+        result = EvaluationExecutionResult(status=FAILED, failure_reason=ACQUISITION_TYPE_NOT_IN_MANDATE)
+        return result, (_empty_telemetry(model, reasoning_effort) if collect_telemetry else None)
 
     terminal = classify_terminal_exclusion(buyer_fit_assessment.does_not_match)
     if terminal.is_terminal:
-        result = _deterministic_terminal_result(
+        evaluation = _deterministic_terminal_result(
             key=key, terminal=terminal, packet=packet,
             mandate_fingerprint=mandate_fingerprint, opportunity_fingerprint=opportunity_fingerprint,
         )
-        return EvaluationExecutionResult(status=SUCCESS, evaluation=result, retry_count=0)
+        result = EvaluationExecutionResult(status=SUCCESS, evaluation=evaluation, retry_count=0)
+        return result, (_empty_telemetry(model, reasoning_effort) if collect_telemetry else None)
 
     context = build_prompt_context(
         buyer_key=mandate_key, mandate=mandate, acquisition_type=acquisition_type,
@@ -239,20 +275,65 @@ def evaluate(
         buyer_fit_assessment=buyer_fit_assessment, non_terminal_does_not_match=terminal.non_terminal_texts,
         packet=packet, transaction_signals=packet.transaction_signals,
     )
+    return _run_llm_and_validate(
+        client=client, model=model, reasoning_effort=reasoning_effort, context=context, key=key,
+        mandate_fingerprint=mandate_fingerprint, opportunity_fingerprint=opportunity_fingerprint,
+        collect_telemetry=collect_telemetry,
+    )
+
+
+def _run_llm_and_validate(
+    *, client, model: str, reasoning_effort: str | None, context, key: AgentEvaluationResultKey,
+    mandate_fingerprint: str, opportunity_fingerprint: str, collect_telemetry: bool,
+) -> tuple[EvaluationExecutionResult, EvaluationExecutionTelemetry | None]:
+    """The ONE bounded LLM-call + validate + repair-retry loop (Section 21
+    of the narrow-implementation authorisation) - shared verbatim by
+    `_evaluate_impl` (live-object path: evaluate()/evaluate_with_telemetry())
+    and `evaluate_frozen_input_with_telemetry` (Agent Evaluation Benchmark
+    V1's frozen-fixture path, Implementation Gate Modification #2) below.
+    Takes an already-built `context: PromptContext` - never builds one
+    itself - so a caller supplying a context reconstructed from a FROZEN
+    benchmark fixture (Layer B) gets byte-for-byte the same call/validate/
+    repair behaviour as a live evaluation, with zero duplicated logic."""
     prompt = render_prompt(context)
 
     if client is None:
         from openai import OpenAI
         client = OpenAI()
 
+    start = time.perf_counter() if collect_telemetry else None
+    api_call_count = 0
+    usage_totals = {"input_tokens": None, "output_tokens": None, "reasoning_tokens": None, "total_tokens": None}
+
+    def _accumulate_usage(response) -> None:
+        if not collect_telemetry:
+            return
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+        for field in ("input_tokens", "output_tokens", "total_tokens"):
+            value = getattr(usage, field, None)
+            if value is not None:
+                usage_totals[field] = value if usage_totals[field] is None else usage_totals[field] + value
+        details = getattr(usage, "output_tokens_details", None)
+        reasoning_value = getattr(details, "reasoning_tokens", None) if details is not None else None
+        if reasoning_value is not None:
+            usage_totals["reasoning_tokens"] = reasoning_value if usage_totals["reasoning_tokens"] is None else usage_totals["reasoning_tokens"] + reasoning_value
+
+    create_kwargs = dict(
+        model=model, instructions=GOVERNING_POLICY,
+        text={"format": {"type": "json_schema", "name": OUTPUT_SCHEMA["name"], "schema": OUTPUT_SCHEMA["schema"], "strict": True}},
+    )
+    if reasoning_effort is not None:
+        create_kwargs["reasoning"] = {"effort": reasoning_effort}
+
     retry_count = 0
     input_text = prompt
     while True:
         try:
-            response = client.responses.create(
-                model=MODEL, instructions=GOVERNING_POLICY, input=input_text,
-                text={"format": {"type": "json_schema", "name": OUTPUT_SCHEMA["name"], "schema": OUTPUT_SCHEMA["schema"], "strict": True}},
-            )
+            api_call_count += 1
+            response = client.responses.create(input=input_text, **create_kwargs)
+            _accumulate_usage(response)
             raw = json.loads(response.output_text)
         except Exception as exc:  # noqa: BLE001 - any SDK/parse failure is a bounded MALFORMED_LLM_OUTPUT failure, never an uncaught crash
             # Deliberately broad: covers json.JSONDecodeError (malformed JSON)
@@ -263,10 +344,11 @@ def evaluate(
             # detail previously made a real batch-run failure undiagnosable.
             diagnostic = f"{type(exc).__name__}: {exc}"
             if retry_count >= MAX_REPAIR_ATTEMPTS:
-                return EvaluationExecutionResult(
+                result = EvaluationExecutionResult(
                     status=FAILED, failure_reason=MALFORMED_LLM_OUTPUT, retry_count=retry_count,
                     diagnostic_detail=diagnostic,
                 )
+                break
             retry_count += 1
             input_text = prompt + f"\n\nYour previous response could not be parsed ({exc}). Return ONLY valid JSON matching the required schema."
             continue
@@ -276,7 +358,8 @@ def evaluate(
             opportunity_fingerprint=opportunity_fingerprint, evaluation_policy_version=_evaluation_policy_version(),
         )
         if outcome.ok:
-            return EvaluationExecutionResult(status=SUCCESS, evaluation=outcome.result, retry_count=retry_count)
+            result = EvaluationExecutionResult(status=SUCCESS, evaluation=outcome.result, retry_count=retry_count)
+            break
 
         if retry_count >= MAX_REPAIR_ATTEMPTS:
             failure_reason = (
@@ -284,10 +367,11 @@ def evaluate(
                 if any("unsupported language" in e for e in outcome.errors)
                 else MALFORMED_LLM_OUTPUT
             )
-            return EvaluationExecutionResult(
+            result = EvaluationExecutionResult(
                 status=FAILED, failure_reason=failure_reason, retry_count=retry_count,
                 diagnostic_detail="; ".join(outcome.errors),
             )
+            break
 
         retry_count += 1
         input_text = (
@@ -296,3 +380,114 @@ def evaluate(
               "fully valid response (cite ONLY reference tokens from the table above; every rule in the governing "
               "policy still applies):\n- " + "\n- ".join(outcome.errors)
         )
+
+    if not collect_telemetry:
+        return result, None
+
+    telemetry = EvaluationExecutionTelemetry(
+        model=model, reasoning_effort=reasoning_effort,
+        input_tokens=usage_totals["input_tokens"], output_tokens=usage_totals["output_tokens"],
+        reasoning_tokens=usage_totals["reasoning_tokens"], total_tokens=usage_totals["total_tokens"],
+        api_call_count=api_call_count, retry_count=result.retry_count,
+        wall_clock_seconds=time.perf_counter() - start,
+    )
+    return result, telemetry
+
+
+def _empty_telemetry(model: str, reasoning_effort: str | None) -> EvaluationExecutionTelemetry:
+    """Telemetry for a path that made zero OpenAI calls (mandate-mismatch
+    FAILED, or a deterministic terminal-hard-exclusion SUCCESS) - every
+    count is genuinely zero/None, never fabricated."""
+    return EvaluationExecutionTelemetry(
+        model=model, reasoning_effort=reasoning_effort,
+        input_tokens=None, output_tokens=None, reasoning_tokens=None, total_tokens=None,
+        api_call_count=0, retry_count=0, wall_clock_seconds=0.0,
+    )
+
+
+def evaluate(
+    session, *, mandate, mandate_key: str, mandate_fingerprint: str,
+    acquisition_type: str, opportunity, opportunity_fingerprint: str,
+    packet, buyer_fit_assessment, client=None,
+) -> EvaluationExecutionResult:
+    """The narrow-slice EVALUATE(buyer_mandate, acquisition_type,
+    opportunity_packet) - PRODUCTION entry point, UNCHANGED contract
+    (Agent Evaluation Benchmark V1 Implementation Gate, Modification #1:
+    "production evaluate() return type unchanged; production behaviour
+    unchanged"). `client` is an optional pre-constructed OpenAI client
+    (dependency-injected for testing without a live API call) - defaults to
+    a fresh `OpenAI()` instance, exactly like every other caller in this
+    codebase. Always evaluates with MODEL and no reasoning-effort override -
+    the model string is never a caller-supplied parameter here, so no
+    caller of evaluate() can (accidentally or otherwise) run production
+    evaluation against a non-approved model."""
+    result, _telemetry = _evaluate_impl(
+        session, mandate=mandate, mandate_key=mandate_key, mandate_fingerprint=mandate_fingerprint,
+        acquisition_type=acquisition_type, opportunity=opportunity, opportunity_fingerprint=opportunity_fingerprint,
+        packet=packet, buyer_fit_assessment=buyer_fit_assessment, client=client,
+        model=MODEL, reasoning_effort=None, collect_telemetry=False,
+    )
+    return result
+
+
+def evaluate_with_telemetry(
+    session, *, mandate, mandate_key: str, mandate_fingerprint: str,
+    acquisition_type: str, opportunity, opportunity_fingerprint: str,
+    packet, buyer_fit_assessment, client=None, model: str = MODEL, reasoning_effort: str | None = None,
+) -> tuple[EvaluationExecutionResult, EvaluationExecutionTelemetry]:
+    """BENCHMARK-ONLY additive seam (Agent Evaluation Benchmark V1,
+    Implementation Gate, Modification #1/#2) - the ONLY function in this
+    codebase that can evaluate against a model other than MODEL, and the
+    ONLY function that returns execution telemetry (tokens, API call count,
+    wall-clock duration) alongside the commercial result.
+
+    NOT called by app.policy.agent_evaluation_persistence, NOT called by any
+    production code path, and NEVER will be until a future, separately
+    authorised gate explicitly changes production model selection - this
+    function exists solely for benchmark/scripts.run_agent_evaluation_
+    benchmark use. It does not read or write the MODEL module constant -
+    `model` defaults to MODEL (today's production default) but is a plain
+    parameter, never a global mutation, so calling this function under any
+    `model=...` can never alter what evaluate() itself does for any other
+    caller, concurrently or otherwise."""
+    return _evaluate_impl(
+        session, mandate=mandate, mandate_key=mandate_key, mandate_fingerprint=mandate_fingerprint,
+        acquisition_type=acquisition_type, opportunity=opportunity, opportunity_fingerprint=opportunity_fingerprint,
+        packet=packet, buyer_fit_assessment=buyer_fit_assessment, client=client,
+        model=model, reasoning_effort=reasoning_effort, collect_telemetry=True,
+    )
+
+
+def evaluate_frozen_input_with_telemetry(
+    *, context, key: AgentEvaluationResultKey, client=None, model: str = MODEL, reasoning_effort: str | None = None,
+    mandate_fingerprint: str = "benchmark", opportunity_fingerprint: str = "benchmark",
+) -> tuple[EvaluationExecutionResult, EvaluationExecutionTelemetry]:
+    """BENCHMARK-ONLY frozen-fixture entry point (Agent Evaluation Benchmark
+    V1, Implementation Gate, Modification #2) - takes an already-built
+    `context: agent_evaluation_prompt.PromptContext` (reconstructed by the
+    benchmark harness from a BenchmarkCase's own Layer B / frozen_evaluation_
+    input, never from live mandate/packet/opportunity objects) and runs
+    ONLY the LLM-call + validate + repair-retry loop against it.
+
+    This is deliberately NOT `evaluate_with_telemetry` with live objects
+    swapped for None: `_evaluate_impl` performs the mandate/acquisition_type
+    check and the terminal-hard-exclusion classification from LIVE objects
+    (`mandate.acquisition_types`, `buyer_fit_assessment.does_not_match`),
+    neither of which a frozen fixture carries in that shape - a benchmark
+    case already recorded whether it was a deterministic hard exclusion at
+    EXTRACTION time (BenchmarkCase.is_zero_llm_case) and simply never
+    reaches this function in that case (the harness's own runner skips the
+    LLM call entirely for such cases, exactly as evaluate() itself would).
+    Calling this function is therefore never a re-implementation of that
+    classification logic - it is simply not needed here, since the fixture
+    already encodes its own answer.
+
+    No commercial reasoning/validation logic is duplicated: `context` is
+    validated by the SAME app.policy.agent_evaluation_validator.validate_
+    and_build_result the production path uses, via the SAME _run_llm_and_
+    validate helper."""
+    return _run_llm_and_validate(
+        client=client, model=model, reasoning_effort=reasoning_effort, context=context, key=key,
+        mandate_fingerprint=mandate_fingerprint, opportunity_fingerprint=opportunity_fingerprint,
+        collect_telemetry=True,
+    )

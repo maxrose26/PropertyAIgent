@@ -14,7 +14,7 @@ import json
 from sqlalchemy import select
 
 from app.db.models import Application, Site, SchemeIntelligence
-from app.policy.acquisition_evaluate import evaluate
+from app.policy.acquisition_evaluate import MODEL, evaluate, evaluate_with_telemetry
 from app.policy.agent_evaluation_prompt import build_prompt_context
 from app.policy.agent_evaluation_result import (
     ACQUISITION_TYPE_NOT_IN_MANDATE,
@@ -144,29 +144,46 @@ def _valid_raw(*, recommendation, ref_token, monitoring_trigger=None, extra_coun
 
 # --- Fake OpenAI client -----------------------------------------------------
 
+class _FakeUsageDetails:
+    def __init__(self, reasoning_tokens):
+        self.reasoning_tokens = reasoning_tokens
+
+
+class _FakeUsage:
+    def __init__(self, input_tokens, output_tokens, total_tokens, reasoning_tokens=None):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.total_tokens = total_tokens
+        self.output_tokens_details = _FakeUsageDetails(reasoning_tokens)
+
+
 class _FakeResponse:
-    def __init__(self, output_text):
+    def __init__(self, output_text, usage=None):
         self.output_text = output_text
         self.status = "completed"
         self.incomplete_details = None
+        self.usage = usage
 
 
 class _FakeResponses:
-    def __init__(self, outputs):
+    def __init__(self, outputs, usage=None):
         self._outputs = list(outputs)
         self.calls = 0
+        self.calls_kwargs = []
+        self._usage = usage
 
     def create(self, **kwargs):
         self.calls += 1
+        self.calls_kwargs.append(kwargs)
         item = self._outputs.pop(0)
         if isinstance(item, Exception):
             raise item
-        return _FakeResponse(item)
+        return _FakeResponse(item, usage=self._usage)
 
 
 class _FakeClient:
-    def __init__(self, outputs):
-        self.responses = _FakeResponses(outputs)
+    def __init__(self, outputs, usage=None):
+        self.responses = _FakeResponses(outputs, usage=usage)
 
 
 # --- Tests -------------------------------------------------------------------
@@ -361,3 +378,148 @@ def test_monitor_with_valid_trigger_and_confirmed_countervailing_succeeds(sessio
     assert result.status == SUCCESS
     assert result.evaluation.recommendation == MONITOR
     assert result.evaluation.monitoring_trigger == "OWNERSHIP_EVIDENCE_CHANGED"
+
+
+# --- Agent Evaluation Benchmark V1, Implementation Gate: additive seam ------
+# --- safety tests (Modification #1/#2 - "prove through tests") -------------
+
+def test_ordinary_evaluate_always_requests_the_production_model(session):
+    """evaluate() (the production entry point) must request MODEL - never a
+    caller-suppliable value - regardless of anything a benchmark call
+    elsewhere in the process might have done first."""
+    opp, packet, assessment = _build_case(session, unit_count=75)
+    tokens = _reference_tokens_for(opp=opp, packet=packet, assessment=assessment, mandate=NESTEN_HOMES, acquisition_type="LAND_SITE_ACQUISITION")
+    ref = next(iter(tokens))
+    raw = _valid_raw(recommendation=PURSUE, ref_token=ref)
+    client = _FakeClient([json.dumps(raw)])
+
+    result = evaluate(
+        session=session, mandate=NESTEN_HOMES, mandate_key="nesten_homes", mandate_fingerprint="fp",
+        acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=client,
+    )
+    assert result.status == SUCCESS
+    assert client.responses.calls_kwargs[0]["model"] == MODEL
+    assert "reasoning" not in client.responses.calls_kwargs[0]
+
+
+def test_benchmark_evaluate_with_telemetry_uses_explicitly_requested_model(session):
+    """evaluate_with_telemetry() must request exactly the model/reasoning
+    configuration the caller supplied - never silently substitute MODEL."""
+    opp, packet, assessment = _build_case(session, unit_count=75)
+    tokens = _reference_tokens_for(opp=opp, packet=packet, assessment=assessment, mandate=NESTEN_HOMES, acquisition_type="LAND_SITE_ACQUISITION")
+    ref = next(iter(tokens))
+    raw = _valid_raw(recommendation=PURSUE, ref_token=ref)
+    client = _FakeClient([json.dumps(raw)], usage=_FakeUsage(1000, 200, 1200, reasoning_tokens=50))
+
+    result, telemetry = evaluate_with_telemetry(
+        session=session, mandate=NESTEN_HOMES, mandate_key="nesten_homes", mandate_fingerprint="fp",
+        acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=client,
+        model="gpt-5.6-terra", reasoning_effort="medium",
+    )
+    assert result.status == SUCCESS
+    assert client.responses.calls_kwargs[0]["model"] == "gpt-5.6-terra"
+    assert client.responses.calls_kwargs[0]["reasoning"] == {"effort": "medium"}
+    assert telemetry.model == "gpt-5.6-terra"
+    assert telemetry.reasoning_effort == "medium"
+    assert telemetry.input_tokens == 1000
+    assert telemetry.output_tokens == 200
+    assert telemetry.total_tokens == 1200
+    assert telemetry.reasoning_tokens == 50
+    assert telemetry.api_call_count == 1
+    assert telemetry.retry_count == 0
+    assert telemetry.wall_clock_seconds >= 0.0
+
+
+def test_benchmark_model_choice_cannot_mutate_production_module_state(session):
+    """A benchmark call requesting a non-production model must never alter
+    what a SUBSEQUENT plain evaluate() call does for a different caller -
+    proves there is no module-global mutation (no monkeypatching MODEL)
+    anywhere in this seam."""
+    opp, packet, assessment = _build_case(session, unit_count=75)
+    tokens = _reference_tokens_for(opp=opp, packet=packet, assessment=assessment, mandate=NESTEN_HOMES, acquisition_type="LAND_SITE_ACQUISITION")
+    ref = next(iter(tokens))
+    raw = _valid_raw(recommendation=PURSUE, ref_token=ref)
+
+    benchmark_client = _FakeClient([json.dumps(raw)])
+    evaluate_with_telemetry(
+        session=session, mandate=NESTEN_HOMES, mandate_key="nesten_homes", mandate_fingerprint="fp",
+        acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=benchmark_client,
+        model="gpt-6-astra", reasoning_effort="high",
+    )
+    assert benchmark_client.responses.calls_kwargs[0]["model"] == "gpt-6-astra"
+    assert MODEL == "gpt-4o-mini", "MODEL constant must remain the production default, unmutated"
+
+    production_client = _FakeClient([json.dumps(raw)])
+    evaluate(
+        session=session, mandate=NESTEN_HOMES, mandate_key="nesten_homes", mandate_fingerprint="fp",
+        acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=production_client,
+    )
+    assert production_client.responses.calls_kwargs[0]["model"] == MODEL
+
+
+def test_telemetry_zero_calls_for_terminal_hard_exclusion(session):
+    """A deterministic terminal-exclusion path makes zero OpenAI calls -
+    evaluate_with_telemetry() must report that honestly (api_call_count=0,
+    every token field None), never fabricate a call that never happened."""
+    opp, packet, assessment = _build_terminal_zero_affordable_case(session)
+    client = _FakeClient([])
+    result, telemetry = evaluate_with_telemetry(
+        session=session, mandate=HOUSING_ASSOCIATION, mandate_key="housing_association", mandate_fingerprint="fp",
+        acquisition_type="AFFORDABLE_HOUSING_PACKAGE", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=client, model="gpt-5.6-luna",
+    )
+    assert result.status == SUCCESS
+    assert result.evaluation.recommendation == NOT_RELEVANT
+    assert telemetry.api_call_count == 0
+    assert telemetry.input_tokens is None and telemetry.output_tokens is None and telemetry.total_tokens is None
+    assert client.responses.calls == 0
+
+
+def test_telemetry_counts_repair_retry_as_two_api_calls(session):
+    opp, packet, assessment = _build_case(session, unit_count=75)
+    tokens = _reference_tokens_for(opp=opp, packet=packet, assessment=assessment, mandate=NESTEN_HOMES, acquisition_type="LAND_SITE_ACQUISITION")
+    ref = next(iter(tokens))
+    invalid_raw = _valid_raw(recommendation=PURSUE, ref_token="not_a_real_reference_token")
+    valid_raw = _valid_raw(recommendation=PURSUE, ref_token=ref)
+    client = _FakeClient(
+        [json.dumps(invalid_raw), json.dumps(valid_raw)],
+        usage=_FakeUsage(500, 100, 600),
+    )
+
+    result, telemetry = evaluate_with_telemetry(
+        session=session, mandate=NESTEN_HOMES, mandate_key="nesten_homes", mandate_fingerprint="fp",
+        acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=client, model="gpt-5.6-luna",
+    )
+    assert result.status == SUCCESS
+    assert result.retry_count == 1
+    assert telemetry.api_call_count == 2
+    assert telemetry.retry_count == 1
+    # usage accumulated across BOTH calls (500+500 input, 100+100 output) -
+    # the repaired attempt's own tokens are real cost, never discarded.
+    assert telemetry.input_tokens == 1000
+    assert telemetry.output_tokens == 200
+    assert telemetry.total_tokens == 1200
+
+
+def test_gpt_4o_mini_style_model_omits_reasoning_kwarg_by_default(session):
+    """evaluate_with_telemetry() called with reasoning_effort=None (the
+    correct configuration for a model generation that predates configurable
+    reasoning, e.g. gpt-4o-mini) must never send a `reasoning` kwarg at
+    all - some models reject an unrecognised parameter outright."""
+    opp, packet, assessment = _build_case(session, unit_count=75)
+    tokens = _reference_tokens_for(opp=opp, packet=packet, assessment=assessment, mandate=NESTEN_HOMES, acquisition_type="LAND_SITE_ACQUISITION")
+    ref = next(iter(tokens))
+    raw = _valid_raw(recommendation=PURSUE, ref_token=ref)
+    client = _FakeClient([json.dumps(raw)])
+
+    evaluate_with_telemetry(
+        session=session, mandate=NESTEN_HOMES, mandate_key="nesten_homes", mandate_fingerprint="fp",
+        acquisition_type="LAND_SITE_ACQUISITION", opportunity=opp, opportunity_fingerprint="fp",
+        packet=packet, buyer_fit_assessment=assessment, client=client, model="gpt-4o-mini", reasoning_effort=None,
+    )
+    assert "reasoning" not in client.responses.calls_kwargs[0]
