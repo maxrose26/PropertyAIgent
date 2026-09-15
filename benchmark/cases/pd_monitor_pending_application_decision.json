@@ -1,7 +1,7 @@
 {
-  "case_id": "pd_genuine_verify_long_pending",
-  "case_name": "Genuine VERIFY - long-pending application, material blocking unknown",
-  "commercial_scenario": "Reused from the original Agent Evaluation Policy V1 ownership/stability-patch calibration (10 runs) - a long-pending application case with a real, resolvable, blocking unknown. Tests the VERIFY-vs-MONITOR boundary the validator itself enforces.",
+  "case_id": "pd_monitor_pending_application_decision",
+  "case_name": "MONITOR - long-pending application, waiting on the decision itself",
+  "commercial_scenario": "RENAMED (Recommendation Taxonomy V2 Implementation Gate, Section 29): the previous case_id/filename ('pd_genuine_verify_long_pending') was stale after the Case Correction Gate reversed this case's label from VERIFY to MONITOR - the identity now matches the settled recommendation. Reused from the original Agent Evaluation Policy V1 ownership/stability-patch calibration (10 runs) - a long-pending application case where buyer_fit_matches is EMPTY and every unknown is ordinary pre-decision incompleteness, not one specific blocking fact - the genuine future trigger is the application being decided (DECISION_CHANGED).",
   "benchmark_version_introduced": 1,
   "provenance": {
     "captured_at": "2026-09-15T12:10:45.993754+00:00",
@@ -143,6 +143,6 @@
   ],
   "repeat_for_consistency": true,
   "is_zero_llm_case": false,
-  "reviewer_notes": "Historically calibrated (prior phase) as VERIFY; re-extracted fresh evidence for V1 does not support that label (Section 18 - never assume stale calibration facts still apply). Corrected to MONITOR by Product Owner (2026-09-15).",
+  "reviewer_notes": "Historically calibrated (prior phase) as VERIFY; re-extracted fresh evidence for V1 does not support that label (Section 18 - never assume stale calibration facts still apply). Corrected to MONITOR by Product Owner (2026-09-15). File/case_id renamed from 'pd_genuine_verify_long_pending' to match (Recommendation Taxonomy V2 Implementation Gate, Section 29) - no re-extraction, same frozen evidence throughout.",
   "approved_by_product_owner": false
 }

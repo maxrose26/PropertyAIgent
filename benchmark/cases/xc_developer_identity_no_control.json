@@ -131,12 +131,12 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "PURSUE",
-    "VERIFY"
+    "PURSUE"
   ],
-  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: acceptable set PURSUE/VERIFY confirmed unchanged. Developer identity (Bloor Homes) alone is transaction context, never a mandate-incompatibility fact - NOT_RELEVANT is an explicit CRITICAL FAILURE for this case, not merely an unlikely answer. PARCEL_TBD requirement reviewed: at 675 units vs. this buyer's 50-100 target (a 6-13x overshoot, larger than Case 11's own scale gap) this matches the Case 2/10 pattern - expected_acquisition_subject_level/expected_next_action added for consistency.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 11): PURSUE (narrowed from PURSUE/VERIFY). Bloor Homes appears as an identified applicant/developer - that does NOT prove ownership, legal control, or whole-site control, but it DOES provide a commercially relevant identified actor associated with the opportunity (the Commercial Counterparty Principle) - do not use INVESTIGATE simply because ownership/control remains unresolved; developer/applicant identity != ownership/control, but is not automatically blocking either. PARCEL_TBD/IDENTIFY_PHASE_OR_PARCEL remain appropriate given the 675-vs-50-100-unit scale gap. NOT_RELEVANT must never be derived from Bloor identity alone - an explicit CRITICAL FAILURE for this case, not merely an unlikely answer.",
   "required_invariants": [
-    "no_developer_to_ownership_control_inference"
+    "no_developer_to_ownership_control_inference",
+    "developer_identity_can_establish_counterparty_without_ownership"
   ],
   "forbidden_claims": [
     "is unavailable",
@@ -153,6 +153,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "PARCEL_TBD/IDENTIFY_PHASE_OR_PARCEL added and NOT_RELEVANT explicitly named as a critical failure by Product Owner (2026-09-15), Case Correction Gate Section 11.",
-  "approved_by_product_owner": false
+  "reviewer_notes": "PARCEL_TBD/IDENTIFY_PHASE_OR_PARCEL added and NOT_RELEVANT explicitly named as a critical failure by Product Owner (2026-09-15), Case Correction Gate Section 11. APPROVED as PURSUE by Product Owner (2026-09-15), Recommendation Taxonomy V2 Implementation Gate Section 11/27.",
+  "approved_by_product_owner": true
 }

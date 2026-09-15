@@ -133,9 +133,9 @@
   },
   "expected_recommendation": [
     "PURSUE",
-    "VERIFY"
+    "INVESTIGATE"
   ],
-  "commercial_rationale": "A resolvable-now question is investigation work to act on, not a reason to wait for a future trigger - MONITOR would only be correct here if a genuine future external trigger exists, which needs Product Owner confirmation against the extracted evidence. PENDING PRODUCT OWNER REVIEW.",
+  "commercial_rationale": "Recommendation Taxonomy V2 migration: VERIFY -> INVESTIGATE (direct rename, acceptable-set breadth unchanged). A resolvable-now question is investigation work to act on, not a reason to wait for a future trigger - MONITOR remains excluded. PURSUE/INVESTIGATE remains acceptable for now (Case Correction Gate Section 27) - whether affordable-% uncertainty is blocking (INVESTIGATE) or ordinary due diligence (PURSUE) for this AFFORDABLE_HOUSING_PACKAGE-specific buyer is still a genuine judgement call pending Product Owner confirmation.",
   "required_invariants": [
     "monitor_not_investigate_now_in_disguise",
     "monitor_trigger_is_genuinely_future_not_investigate_later"

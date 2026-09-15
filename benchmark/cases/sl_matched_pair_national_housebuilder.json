@@ -123,16 +123,14 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "PURSUE",
-    "VERIFY"
+    "PURSUE"
   ],
-  "commercial_rationale": "IDENTICAL underlying evidence to the sibling case, but this buyer's own 200-500 target is exceeded by the 600-home allocation ('materially exceeds... no phasing/parcel evidence exists'), with an investigate item naming exactly the PARCEL_TBD question. Proposed: PURSUE with next_action=IDENTIFY_PHASE_OR_PARCEL, mirroring the Case 2/10 scale pattern - NOT APPROVED, must be reviewed alongside the strategic-buyer sibling.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 12): PURSUE, narrowed from PURSUE/VERIFY for consistency with the settled Case 2/10 PARCEL_TBD pattern. IDENTICAL underlying evidence to the strategic-buyer sibling, but this buyer's own 200-500 target is exceeded by the 600-home allocation, with an investigate item naming exactly the PARCEL_TBD question. Do NOT use INVESTIGATE merely because the exact parcel has not yet been identified - the Agent already has enough evidence to determine acquisition effort may be justified; finding the appropriate parcel is acquisition work, not a gate.",
   "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
   "expected_acquisition_subject_level": [
-    "PARCEL_TBD",
-    "PHASE"
+    "PARCEL_TBD"
   ],
   "expected_next_action": [
     "IDENTIFY_PHASE_OR_PARCEL"
@@ -140,6 +138,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "MATCHED-BUYER PAIR - see sibling case for the other buyer's reading of the identical Layer A evidence. Neither side of this pair is approved.",
-  "approved_by_product_owner": false
+  "reviewer_notes": "MATCHED-BUYER PAIR - see sibling case (sl_matched_pair_strategic_land_buyer) for the other buyer's reading of the identical Layer A evidence. APPROVED as PURSUE by Product Owner (2026-09-15); expected_acquisition_subject_level narrowed from [PARCEL_TBD, PHASE] to [PARCEL_TBD] for consistency with Case 2.",
+  "approved_by_product_owner": true
 }

@@ -129,7 +129,7 @@
   "expected_recommendation": [
     "PURSUE"
   ],
-  "commercial_rationale": "STRONG_FIT, no confirmed negative, scale reads positively for this buyer's own mandate (large-allocation-is-self-qualifying), ownership/control unresolved but investigable. Proposed: PURSUE with parallel ownership/control investigation - mirrors Case 1/Case 4's reasoning. NOT APPROVED - Product Owner must review both sides of this pair together before either is approved (Section 8/9).",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 13): PURSUE. STRONG_FIT, no confirmed negative, scale reads positively for this buyer's own mandate (large-allocation-is-self-qualifying), ownership/control unresolved but investigable - mirrors Case 1/Case 4's reasoning. Retain the buyer-specific distinction from the National Housebuilder sibling side.",
   "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
@@ -138,6 +138,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "MATCHED-BUYER PAIR - see sibling case for the other buyer's reading of the identical Layer A evidence. Neither side of this pair is approved.",
-  "approved_by_product_owner": false
+  "reviewer_notes": "MATCHED-BUYER PAIR - see sibling case (sl_matched_pair_national_housebuilder) for the other buyer's reading of the identical Layer A evidence. APPROVED as PURSUE by Product Owner (2026-09-15).",
+  "approved_by_product_owner": true
 }

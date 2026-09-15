@@ -21,10 +21,11 @@ ONE RESULT PER (BUYER MANDATE, OPPORTUNITY, ACQUISITION TYPE) - not one
 blended result per (mandate, opportunity). A mandate stating more than one
 acquisition_types entry (Buyer Mandate V2 already permits this) may
 genuinely warrant a DIFFERENT recommendation under each acquisition-type
-reading of the same opportunity (e.g. LAND_SITE_ACQUISITION says VERIFY,
-DEVELOPMENT_HOMES_ACQUISITION says PURSUE, for the identical buyer and
-opportunity) - blending would silently hide exactly that divergence. See
-AgentEvaluationResultKey below for the composite identity this implies.
+reading of the same opportunity (e.g. LAND_SITE_ACQUISITION says
+INVESTIGATE, DEVELOPMENT_HOMES_ACQUISITION says PURSUE, for the identical
+buyer and opportunity) - blending would silently hide exactly that
+divergence. See AgentEvaluationResultKey below for the composite identity
+this implies.
 
 NO CHAIN-OF-THOUGHT. reasoning_summary is a short, structured explanation
 (the eventual WHY/WHAT WE DON'T KNOW/NEXT ACTION contract), never a raw
@@ -35,11 +36,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 PURSUE = "PURSUE"
-VERIFY = "VERIFY"
+INVESTIGATE = "INVESTIGATE"
 MONITOR = "MONITOR"
 NOT_RELEVANT = "NOT_RELEVANT"
 
-RECOMMENDATION_VALUES = frozenset({PURSUE, VERIFY, MONITOR, NOT_RELEVANT})
+RECOMMENDATION_VALUES = frozenset({PURSUE, INVESTIGATE, MONITOR, NOT_RELEVANT})
 
 HIGH = "HIGH"
 MEDIUM = "MEDIUM"
@@ -47,7 +48,26 @@ LOW = "LOW"
 
 CONFIDENCE_VALUES = frozenset({HIGH, MEDIUM, LOW})
 
-AGENT_EVALUATION_POLICY_VERSION = 1
+# --- Recommendation Taxonomy V2 (Product Owner Implementation Gate) --------
+#
+# 1 -> 2: RECOMMENDATION_VALUES changed VERIFY -> INVESTIGATE. This is a
+# genuine commercial-contract change, not a cosmetic rename: VERIFY's own
+# definition ("material + resolvable + blocking unknown") transfers exactly
+# to INVESTIGATE, but the recommendation layer is now explicitly separated
+# from the ACTION layer - NEXT_ACTION_VALUES' own VERIFY_OWNERSHIP/
+# VERIFY_CONTROL_POSITION/VERIFY_AFFORDABLE_PACKAGE are UNCHANGED and
+# deliberately still spelled "VERIFY_*" (see this module's own NEXT_ACTION_
+# VALUES comment below) - a VERIFY_* next_action never implies
+# recommendation=INVESTIGATE, and may validly pair with PURSUE (ordinary
+# acquisition due diligence) or INVESTIGATE (a genuinely blocking question),
+# depending on commercial materiality, never on the action name alone.
+# Historical rows persisted under policy version 1 keep recommendation=
+# "VERIFY" forever - AgentEvaluationHistory.recommendation is a plain string
+# column, never rewritten (app.policy.agent_evaluation_persistence never
+# reconstructs an AgentEvaluationResult from a historical row, so V1's
+# now-removed VERIFY value never needs to validate against this module's
+# CURRENT RECOMMENDATION_VALUES to remain readable).
+AGENT_EVALUATION_POLICY_VERSION = 2
 
 # --- Acquisition subject (Product Owner narrow-implementation approval) ----
 # A typed, validated structure - never arbitrary free text, and PARCEL_TBD
@@ -161,7 +181,7 @@ class MaterialUnknown:
     `resolvable` marks whether a plausible bounded capability could
     establish it.
     `blocking` marks whether this unknown, if resolved unfavourably, could
-    plausibly change the recommendation - VERIFY requires at least one
+    plausibly change the recommendation - INVESTIGATE requires at least one
     unknown with BOTH blocking=True and resolvable=True (app.policy.
     agent_evaluation_validator enforces this); PURSUE may legitimately
     carry a non-blocking (blocking=False) unknown alongside it - a
@@ -219,7 +239,7 @@ class AgentEvaluationResult:
     # One of MONITORING_TRIGGER_VALUES, or None. REQUIRED when
     # recommendation == MONITOR (every MONITOR needs a named trigger -
     # Product Owner's own explicit rule); optional otherwise - never
-    # invented merely to populate the field for PURSUE/VERIFY/NOT_RELEVANT.
+    # invented merely to populate the field for PURSUE/INVESTIGATE/NOT_RELEVANT.
     monitoring_trigger: str | None = None
 
     evidence_references: tuple[str, ...] = field(default_factory=tuple)
@@ -287,7 +307,7 @@ class EvaluationExecutionResult:
     separate from COMMERCIAL RECOMMENDATION (what the Agent concluded) - a
     technical/structural failure is represented by status=FAILED with
     evaluation=None, NEVER by a fifth value on RECOMMENDATION_VALUES and
-    NEVER by silently returning VERIFY. `retry_count` records how many
+    NEVER by silently returning INVESTIGATE. `retry_count` records how many
     bounded repair attempts were used (app.policy.acquisition_evaluate's own
     documented retry policy) - 0 means the first LLM response was already
     valid."""

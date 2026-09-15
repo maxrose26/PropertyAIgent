@@ -494,7 +494,7 @@ def record_evaluation_outcome(
     evaluation (if any) remains operative, exactly per the Product Owner
     brief Section 14. If no successful evaluation has ever existed, the
     current-state row's current_history_id stays NULL - represented
-    honestly, never fabricated as VERIFY/MONITOR/NOT_RELEVANT."""
+    honestly, never fabricated as PURSUE/INVESTIGATE/MONITOR/NOT_RELEVANT."""
     opportunity_kind = _opportunity_kind(opportunity_id)
     e = result.evaluation
 

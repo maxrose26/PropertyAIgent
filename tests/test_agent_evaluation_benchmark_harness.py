@@ -225,15 +225,36 @@ def test_save_refuses_to_silently_overwrite_an_approved_case(tmp_path):
 
 
 def test_all_shipped_cases_load_and_reference_only_known_invariants():
-    """The 12 real candidate fixtures extracted from production in this
-    gate must all load cleanly and reference only registered invariant
-    names - a real regression check on benchmark/cases/*.json itself."""
+    """Every real candidate fixture must load cleanly and reference only
+    registered invariant names - a real regression check on benchmark/
+    cases/*.json itself. approved_by_product_owner reflects genuine,
+    per-case Product Owner review outcomes (some cases have since been
+    reviewed and approved across several correction gates) - this test
+    does not assert a fixed value for it, only that extraction itself
+    (benchmark.extraction.extract_candidate_case) never sets it True on
+    its own (a freshly-extracted, never-reviewed case must start False)."""
     cases = load_all_cases()
     assert len(cases) >= 12
     for case in cases:
         assert set(case.required_invariants) <= ALL_INVARIANTS
-        assert case.approved_by_product_owner is False, f"{case.case_id} must not be pre-approved by extraction"
         assert case.frozen_evaluation_input.reference_tokens, f"{case.case_id} must carry a non-empty reference-token table"
+
+
+def test_extraction_never_sets_approved_by_product_owner_true():
+    """The extraction tool itself always returns approved_by_product_owner
+    =False regardless of what proposed_expected_recommendation is passed -
+    only a human editing the saved JSON afterward may set it True (Section
+    17 of the original Design Audit: "must not automatically approve a
+    case"). Checked both structurally (the function's own source has no
+    way to pass True) and behaviourally (BenchmarkCase's own default)."""
+    import inspect
+
+    import benchmark.extraction as ext
+
+    source = inspect.getsource(ext.extract_candidate_case)
+    assert "approved_by_product_owner=False" in source
+    assert "approved_by_product_owner=True" not in source
+    assert _build_dummy_case().approved_by_product_owner is False
 
 
 # --- Extraction tool tests (real in-memory DB, zero OpenAI calls) ----------

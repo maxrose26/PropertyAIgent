@@ -76,14 +76,21 @@ MODEL = "gpt-4o-mini"
 # OUTPUT_SCHEMA's shape changes in a future controlled release, the same
 # manual, documented discipline every other *_VERSION constant in this
 # codebase already follows.
-AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION = 1
+#
+# 1 -> 2 (Recommendation Taxonomy V2, Product Owner Implementation Gate):
+# the "recommendation" enum literal changed VERIFY -> INVESTIGATE - a real
+# shape change to the strict json_schema contract, bumped alongside
+# AGENT_EVALUATION_POLICY_VERSION and GOVERNING_POLICY_PROMPT_VERSION as one
+# controlled release. "next_action"'s own enum (including every VERIFY_*
+# value) is UNCHANGED - only the recommendation layer moved.
+AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION = 2
 
 OUTPUT_SCHEMA = {
     "name": "agent_evaluation_result",
     "schema": {
         "type": "object",
         "properties": {
-            "recommendation": {"type": "string", "enum": ["PURSUE", "VERIFY", "MONITOR", "NOT_RELEVANT"]},
+            "recommendation": {"type": "string", "enum": ["PURSUE", "INVESTIGATE", "MONITOR", "NOT_RELEVANT"]},
             "confidence": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
             "confidence_basis": {"type": "array", "items": {"type": "string"}},
             "acquisition_subject": {

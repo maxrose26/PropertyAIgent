@@ -1,7 +1,7 @@
 {
   "case_id": "sl_emerging_allocation_with_activity",
-  "case_name": "Emerging (pre-adoption) allocation with identified planning activity",
-  "commercial_scenario": "A rare combination in the current universe (only 2 of 229 strategic-land candidates): identified planning activity despite the LOCAL PLAN itself still being emerging/pre-adoption. Tests whether the model over-weights activity against plan immaturity or reasons about the two dimensions independently.",
+  "case_name": "North Leigh Park - INVESTIGATE: allocation/application/phase relationship cannot be determined from the frozen evidence",
+  "commercial_scenario": "A rare combination in the current universe (only 2 of 229 strategic-land candidates): identified planning activity despite the LOCAL PLAN itself still being emerging/pre-adoption. APPROVED (Recommendation Taxonomy V2 Implementation Gate, Section 10): recommendation=INVESTIGATE, tested rigorously against all four V2 recommendations, not merely accepted. The frozen evaluator input (has_identified_planning_activity=True and nothing more) genuinely cannot establish what the activity represents, how much of the allocation it covers, the phase/parcel relationship, or the relevant promoter/control position - and that gap is commercially material (it spans from 'materially all of the allocation remains uncontrolled' to 'a promoter has already substantially delivered the site'), reasonably resolvable now (a bounded investigation, not a wait for a future event), and decision-blocking (it determines whether PURSUE or NOT_RELEVANT is even defensible). Deeper evidence found during benchmark preparation (the real North Leigh Park planning history) is recorded below in reviewer_notes for provenance ONLY - it is deliberately NOT added to frozen_commercial_facts/frozen_evaluation_input, since it was never part of what Agent Evaluation Policy V1's evaluator actually received.",
   "benchmark_version_introduced": 1,
   "provenance": {
     "captured_at": "2026-09-15T12:10:35.302123+00:00",
@@ -127,18 +127,19 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "PURSUE",
-    "VERIFY"
+    "INVESTIGATE"
   ],
-  "commercial_rationale": "HELD - Product Owner instructed a read-only investigation of what has_identified_planning_activity=True actually represents before any expected_recommendation is approved (Case Correction Gate, Section 5). Not yet approved to any label.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 10): INVESTIGATE. Investigation objective: determine the allocation <-> application <-> phase/parcel relationship and the relevant promoter/control position sufficiently to determine whether meaningful strategic acquisition opportunity remains. Tested against the alternatives: PURSUE is not defensible because the buyer's own scale-tolerance addresses SIZE, not WHETHER SOMEONE ELSE ALREADY HOLDS THE LAND; MONITOR is not defensible because the fact is resolvable NOW, not dependent on a future event; NOT_RELEVANT is not defensible because it would infer incompatibility from evidentiary ambiguity, the forbidden pattern.",
   "required_invariants": [],
   "forbidden_claims": [],
-  "required_material_unknowns": [],
+  "required_material_unknowns": [
+    "Determine the allocation <-> application <-> phase/parcel relationship and the relevant promoter/control position sufficiently to determine whether meaningful strategic acquisition opportunity remains."
+  ],
   "expected_acquisition_subject_level": null,
   "expected_next_action": null,
   "monitoring_trigger_constraints": null,
-  "repeat_for_consistency": false,
+  "repeat_for_consistency": true,
   "is_zero_llm_case": false,
-  "reviewer_notes": "READ-ONLY INVESTIGATION FINDING (2026-09-15): RELATIONSHIP NOT DETERMINED. The allocation (site 170, Wigan) is the 'North Leigh Park' scheme: a 2012 outline consent for 1,800 homes (app A/12/76665, decided/approved, applicant/developer 'North Leigh Park Group Limited'), substantially implemented since 2019 via reserved-matters/condition-discharge applications naming 'Countryside Properties (UK) Limited' as developer (confirmed CONFIRMED_PHASED phasing evidence: 'Phase 1a(1)', 'Phase 1b', 'future phases' - first phase lawfully implemented 2 Dec 2019), PLUS a newly REGISTERED (undecided) 1,491-unit reserved-matters application from 'Vistry Group' (A/26/100520/RMMAJ) on the same site. Despite this, the platform's own deterministic per-Site development-coverage accounting (app.reporting.allocation_development_coverage.build_allocation_development_coverage) currently returns identified_application_capacity=2 for this site - an evident data-quality artifact in representative-application selection, not a true reflection of the real, well-documented activity. Separately and more fundamentally: NONE of this coverage percentage, phasing classification, or linked-applicant/developer detail is exposed to the Agent Evaluation Policy V1 evaluator at all for a strategic_land opportunity - build_prompt_context() only ever renders the bare has_identified_planning_activity boolean. The model cannot currently distinguish 'no activity' from 'a well-documented, 1,800+1,491-home multi-phase scheme is already progressing on this allocation' - this is an architecture-boundary gap, not something the benchmark case alone can paper over. Recommend: do not approve any expected_recommendation for this case until either (a) a different, cleaner seed identity is substituted, or (b) Agent Evaluation Policy V1's own evidence layer is extended to surface allocation-development-coverage detail for strategic_land opportunities (a separate, larger change outside benchmark scope).",
-  "approved_by_product_owner": false
+  "reviewer_notes": "READ-ONLY INVESTIGATION FINDING (2026-09-15), PROVENANCE ONLY - deliberately NOT part of the frozen evaluator input above (Section 10: 'do not expose deeper evidence discovered during benchmark preparation to the model unless it is actually part of the frozen evaluator input'). The allocation (site 170, Wigan) is the 'North Leigh Park' scheme: a 2012 outline consent for 1,800 homes (app A/12/76665, decided/approved, applicant/developer 'North Leigh Park Group Limited'), substantially implemented since 2019 via reserved-matters/condition-discharge applications naming 'Countryside Properties (UK) Limited' as developer (confirmed CONFIRMED_PHASED phasing evidence: 'Phase 1a(1)', 'Phase 1b', 'future phases' - first phase lawfully implemented 2 Dec 2019), PLUS a newly REGISTERED (undecided) 1,491-unit reserved-matters application from 'Vistry Group' (A/26/100520/RMMAJ) on the same site. The platform's own deterministic per-Site development-coverage accounting currently returns identified_application_capacity=2 for this site - an evident data-quality artifact in representative-application selection, separately reported as technical debt. APPROVED as INVESTIGATE by Product Owner (2026-09-15).",
+  "approved_by_product_owner": true
 }

@@ -65,7 +65,14 @@ CASES_DIR = Path(__file__).parent / "cases"
 # designed to stress (e.g. for the repair-rate/first-pass-validity
 # telemetry), never because passing it is itself evidence of model quality.
 MACHINE_ENFORCED_INVARIANTS = frozenset({
-    "verify_requires_material_resolvable_blocking_unknown",
+    # Recommendation Taxonomy V2: renamed from
+    # "verify_requires_material_resolvable_blocking_unknown" - the rule
+    # itself (material+resolvable+blocking) is unchanged, only the
+    # recommendation-layer name it attaches to moved from VERIFY to
+    # INVESTIGATE (app.policy.agent_evaluation_validator's own check was
+    # renamed identically). Confirmed zero fixtures referenced the old name
+    # at the time of this rename, so no case file required updating for it.
+    "investigate_requires_material_resolvable_blocking_unknown",
     "monitor_not_investigate_now_in_disguise",
     "evidence_references_must_exist_in_context",
     "parcel_tbd_never_carries_specific_reference",
@@ -81,6 +88,12 @@ MACHINE_ENFORCED_INVARIANTS = frozenset({
 # look for this failure mode in the model's own prose.
 HUMAN_REVIEWED_INVARIANTS = frozenset({
     "no_developer_to_ownership_control_inference",
+    # Recommendation Taxonomy V2 additions - both are prose-level
+    # judgements the validator cannot safely automate (Design Report
+    # Section R: "distinguishing... requires commercial judgment the
+    # validator can't safely automate").
+    "developer_identity_can_establish_counterparty_without_ownership",
+    "planning_outcome_never_establishes_land_control",
     "monitor_trigger_is_genuinely_future_not_investigate_later",
     "phase_control_never_promoted_to_whole_allocation_control",
     "not_applicable_facts_never_treated_as_unknowns",

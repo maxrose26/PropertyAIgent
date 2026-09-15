@@ -1,7 +1,7 @@
 {
-  "case_id": "xc_established_same_subject_control",
-  "case_name": "CORRECTED (Case Correction Gate): evidenced developer-name conflict (Redrow Homes / Redrow NW) - NOT established same-subject control",
-  "commercial_scenario": "CORRECTED (2026-09-15): this case's original name/premise was wrong. The frozen ownership_control_posture is EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING, not ESTABLISHED_SAME_SUBJECT_CONTROL - a 'Redrow Homes' vs. 'Redrow NW' name-variant conflict trips the conflict branch of compute_ownership_control_posture() before the established-control branch is ever reached. A read-only search across the entire current 389-candidate universe found ZERO opportunities with ownership_control_posture==ESTABLISHED_SAME_SUBJECT_CONTROL (see Case Correction Gate Section 12/P) - no real seed for that reasoning capability currently exists. This case is retained under its TRUE purpose: does the model correctly treat a recorded developer-name conflict as a resolvable, phase-scoped verification question (confirm the developer's actual identity) rather than either a whole-allocation control fact or a reason to walk away, and without either overreacting or silently ignoring the recorded conflict.",
+  "case_id": "xc_evidenced_conflict_developer_names",
+  "case_name": "Evidenced developer-name conflict (Redrow Homes / Redrow NW) - INVESTIGATE, NOT established same-subject control",
+  "commercial_scenario": "RENAMED (Recommendation Taxonomy V2 Implementation Gate, Section 29 - file/case_id was 'xc_established_same_subject_control', a stale, incorrect premise): the frozen ownership_control_posture is EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING, not ESTABLISHED_SAME_SUBJECT_CONTROL - a 'Redrow Homes' vs. 'Redrow NW' name-variant conflict trips the conflict branch of compute_ownership_control_posture() before the established-control branch is ever reached. A read-only search across the entire current 389-candidate universe found ZERO opportunities with ownership_control_posture==ESTABLISHED_SAME_SUBJECT_CONTROL (see Case Correction Gate Section 12/P) - no real seed for that reasoning capability currently exists; this is reported, not fabricated around. This case is retained under its TRUE purpose: does the model correctly treat a recorded developer-name conflict as a resolvable, phase-scoped verification question (confirm the developer's actual identity) rather than either a whole-allocation control fact or a reason to walk away, and without either overreacting or silently ignoring the recorded conflict. Do NOT infer Redrow owns/controls the relevant subject.",
   "benchmark_version_introduced": 1,
   "provenance": {
     "captured_at": "2026-09-15T12:11:00.841363+00:00",
@@ -131,11 +131,12 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "VERIFY"
+    "INVESTIGATE"
   ],
-  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Case Correction Gate Section 13): VERIFY only, not established control. A recorded developer-name conflict on an otherwise strong-fit, in-target-range, permission-granted phase is exactly the material+resolvable+blocking shape VERIFY exists for: confirm which entity (Redrow Homes vs. Redrow NW - plausibly the same legal entity under two source spellings) actually holds the relevant role, before deciding whether/how to proceed. Do NOT treat this as established control of anything, whole-allocation or otherwise - the posture is EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING, not ESTABLISHED_SAME_SUBJECT_CONTROL. NOT YET APPROVED.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION (Recommendation Taxonomy V2 Implementation Gate, Section 28): INVESTIGATE (renamed from VERIFY - Recommendation Taxonomy V2), not established control. A recorded developer-name conflict on an otherwise strong-fit, in-target-range, permission-granted phase is a real, specific, resolvable conflict requiring clarification: confirm which entity (Redrow Homes vs. Redrow NW - plausibly the same legal entity under two source spellings) actually holds the relevant role, before deciding whether/how to proceed. Do NOT treat this as established control of anything, whole-allocation or otherwise - the posture is EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING, not ESTABLISHED_SAME_SUBJECT_CONTROL. Do not infer Redrow owns/controls the relevant subject.",
   "required_invariants": [
-    "phase_control_never_promoted_to_whole_allocation_control"
+    "phase_control_never_promoted_to_whole_allocation_control",
+    "planning_outcome_never_establishes_land_control"
   ],
   "forbidden_claims": [],
   "required_material_unknowns": [],
@@ -144,6 +145,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "case_id/filename ('xc_established_same_subject_control') is now known to be misleading given the corrected premise - retained unrenamed per explicit Product Owner instruction to 'retain the existing Redrow Phase 3B fixture' (Section 13); flagged here for a future rename decision. MONITOR removed from the acceptable set - no genuine future external trigger is evidenced, only a present-day identity-verification question.",
-  "approved_by_product_owner": false
+  "reviewer_notes": "case_id/filename renamed from 'xc_established_same_subject_control' to 'xc_evidenced_conflict_developer_names' to match the corrected premise (Recommendation Taxonomy V2 Implementation Gate, Section 29) - same frozen evidence throughout, no re-extraction. MONITOR was already removed from the acceptable set in the prior Case Correction Gate. APPROVED as INVESTIGATE by Product Owner (2026-09-15).",
+  "approved_by_product_owner": true
 }

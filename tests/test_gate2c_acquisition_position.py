@@ -403,9 +403,13 @@ def test_module_makes_no_database_writes(session):
 def test_no_pursue_verify_monitor_output_anywhere_in_module():
     """No module-level constant's own STRING VALUE is one of these buyer-
     recommendation tokens - the docstring legitimately names them in prose
-    while explaining they belong to a future gate, which is expected."""
+    while explaining they belong to a future gate, which is expected.
+    Recommendation Taxonomy V2: INVESTIGATE added (replaces VERIFY at the
+    Agent Evaluation recommendation layer - app.reporting.acquisition_
+    position is buyer-independent and must never produce ANY of these,
+    old or new vocabulary)."""
     for name in dir(ap):
         if name.isupper():
             value = getattr(ap, name)
             if isinstance(value, str):
-                assert value.upper() not in ("PURSUE", "VERIFY", "MONITOR", "NOT_RELEVANT")
+                assert value.upper() not in ("PURSUE", "VERIFY", "INVESTIGATE", "MONITOR", "NOT_RELEVANT")

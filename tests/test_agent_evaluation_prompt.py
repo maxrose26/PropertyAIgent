@@ -129,3 +129,55 @@ def test_ownership_control_posture_reference_token_key_is_flat_not_dotted():
     assert 'reference_tokens["ownership_control_posture"]' in source
     assert 'reference_tokens["posture.ownership_control"]' not in source
     assert 'reference_tokens["packet.actors_control.posture' not in source
+
+
+# --- Recommendation Taxonomy V2 (Product Owner Implementation Gate) --------
+
+def test_governing_policy_uses_investigate_not_verify_as_a_recommendation():
+    """Every bare "VERIFY" occurrence must be immediately followed by "_"
+    (part of a VERIFY_* next_action name, e.g. VERIFY_OWNERSHIP) - VERIFY
+    must never stand alone as a recommendation-layer word."""
+    import re
+
+    for match in re.finditer("VERIFY(.)", GOVERNING_POLICY):
+        assert match.group(1) == "_", f"bare VERIFY found, not part of a VERIFY_* name: ...{GOVERNING_POLICY[max(0, match.start()-40):match.start()+40]}..."
+    assert "INVESTIGATE" in GOVERNING_POLICY
+    assert "PURSUE / INVESTIGATE / MONITOR /" in GOVERNING_POLICY or "PURSUE/INVESTIGATE/MONITOR" in GOVERNING_POLICY.replace(" ", "")
+
+
+def test_governing_policy_teaches_verify_action_does_not_imply_investigate():
+    lowered = GOVERNING_POLICY.lower()
+    assert "next_action named verify_*" in lowered or "a verify_* next_action" in lowered
+    assert "never by itself impl" in lowered or "never implies" in lowered
+
+
+def test_governing_policy_teaches_commercial_counterparty_principle():
+    assert "COMMERCIAL COUNTERPARTY PRINCIPLE" in GOVERNING_POLICY
+    normalized = " ".join(GOVERNING_POLICY.split()).lower()
+    assert "commercially actionable counterparty" in normalized or "commercially relevant counterparty" in normalized
+    assert "without establishing legal ownership or control" in normalized
+
+
+def test_governing_policy_teaches_lifecycle_aware_ownership_significance():
+    normalized = " ".join(GOVERNING_POLICY.split()).lower()
+    assert "early strategic allocation" in normalized
+    assert "active planning application" in normalized or "permissioned site" in normalized
+
+
+def test_governing_policy_teaches_planning_outcome_does_not_establish_control():
+    assert "PLANNING OUTCOME DOES NOT ESTABLISH LAND CONTROL" in GOVERNING_POLICY
+    normalized = " ".join(GOVERNING_POLICY.split()).lower()
+    assert "refused" in normalized
+    assert "never tells you whether the applicant" in normalized or "never establish" in normalized
+
+
+def test_governing_policy_teaches_parcel_tbd_does_not_mean_investigate():
+    assert "PARCEL_TBD DOES NOT MEAN INVESTIGATE" in GOVERNING_POLICY
+
+
+def test_governing_policy_teaches_scope_safe_application_vs_allocation_inference():
+    normalized = " ".join(GOVERNING_POLICY.split())
+    assert "2,000-home" in normalized
+    normalized_lower = normalized.lower()
+    assert "application/parcel-level involvement" in normalized_lower
+    assert "allocation-level control" in normalized_lower
