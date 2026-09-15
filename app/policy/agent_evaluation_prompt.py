@@ -34,6 +34,30 @@ from app.policy.agent_evaluation_result import (
 )
 from app.policy.mandate_interpretation import classify_mandate
 
+# --- Prompt provenance (Acquisition Agent V1, Gate 1 pre-merge review) -----
+#
+# Tracks the GOVERNING_POLICY text specifically - DISTINCT from
+# AGENT_EVALUATION_POLICY_VERSION (app.policy.agent_evaluation_result),
+# which the architecture audit found stayed at 1 across three real
+# production prompt-text releases (the narrow implementation, the
+# commercial-semantic fix, the ownership/role-separation patch), leaving no
+# way to tell, from persisted provenance alone, which released prompt text
+# produced a historical evaluation. This is a pure provenance identifier -
+# it is never read by any evaluation/validation logic in this module or
+# app.policy.acquisition_evaluate, so declaring it does not change Agent
+# Evaluation Policy V1's commercial semantics in any way.
+#
+# Starts at 1 because it tracks the CURRENT, already-production-verified
+# GOVERNING_POLICY text (as of the ownership/role-separation patch, feature
+# SHA a201d85f...) - not because any earlier revision is being retroactively
+# numbered (no historical Agent Evaluation dataset exists to backfill).
+# Bump this by 1 whenever GOVERNING_POLICY's text changes in a future
+# controlled release - a manual, documented operational discipline, the
+# same convention every other *_POLICY_VERSION constant in this codebase
+# already follows (see e.g. app.policy.buyer_matching.
+# BUYER_MATCHING_POLICY_VERSION's own version-history comment).
+GOVERNING_POLICY_PROMPT_VERSION = 1
+
 # --- Ownership/Control Posture (Final Pre-Release Ownership & Stability ----
 # --- Patch, Section 10) -----------------------------------------------------
 #
