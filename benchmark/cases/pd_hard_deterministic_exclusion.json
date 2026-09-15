@@ -144,6 +144,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": true,
-  "reviewer_notes": "",
+  "reviewer_notes": "SPECIFIC DETERMINISTIC EXCLUSION REASON (captured read-only, Case Correction Gate Section 11/Case 5, since Layer A/B do not themselves record which does_not_match text was terminal): 'Trusted evidence identifies this as a specialist development (mixed_retirement_and_market_housing), not the general-needs residential development this buyer requires.' - a SPECIALIST_DEVELOPMENT_EXCLUSION hard-constraint match (Buyer Fit's own terminal marker classification), not a wholly-affordable or geography exclusion. This text is provenance-only documentation of the extraction gap identified in the prior Case Review Pack (Section F) - the extraction tool itself was not modified to add a new schema field for this in this gate.",
   "approved_by_product_owner": false
 }

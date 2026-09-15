@@ -141,6 +141,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "Confirmed by Product Owner (2026-09-15), Case Correction Gate Section 11 - PURSUE unchanged.",
   "approved_by_product_owner": false
 }

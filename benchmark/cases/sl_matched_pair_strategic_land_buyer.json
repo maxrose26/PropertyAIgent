@@ -1,11 +1,11 @@
 {
-  "case_id": "sl_very_large_allocation_parcel_level",
-  "case_name": "Very large (15,000-unit) emerging allocation - parcel-level interpretation test",
-  "commercial_scenario": "An allocation two to three orders of magnitude larger than any buyer's normal scale. Tests whether the model correctly reaches for acquisition_subject.level=PARCEL_TBD (a smaller portion may be relevant) rather than reasoning about the whole 15,000-unit allocation as one acquisition, and never fabricates a specific parcel that has not been evidenced.",
+  "case_id": "sl_matched_pair_strategic_land_buyer",
+  "case_name": "Matched pair (A): Strategic Land Buyer view of a 600-home emerging allocation",
+  "commercial_scenario": "MATCHED-BUYER PAIR (Product Owner Section 8): the SAME frozen market evidence (strategic_land:allocation:213, a 600-home emerging allocation with identified planning activity - a single REFUSED 83-unit Bellway Homes Limited (Manchester) application covers 13.83% of the allocation, per read-only allocation_development_coverage investigation) evaluated against TWO different buyer mandates. Layer A (frozen_commercial_facts.opportunity_facts/transaction_signal_states/ownership_control_posture) is BYTE-IDENTICAL between the two sibling cases - only buyer_fit_classification/matches/unknown/investigate and the acquisition_type/mandate_interpretation differ, exactly reflecting the buyer-mandate layer, never a re-extraction of the underlying evidence. EVIDENCE BOUNDARY NOTE: the REFUSED Bellway application is NOT surfaced to the LLM evaluator at all - packet.actors_control.developer_indications is empty for this allocation (the packet's actors_control summary is not wired to surface site-level application applicant/developer identity for an unmatched strategic_land allocation) - the model can only see has_identified_planning_activity=True, nothing about what that activity is, its outcome, or who filed it. This is a real, disclosed architecture boundary, not a benchmark design choice.",
   "benchmark_version_introduced": 1,
   "provenance": {
-    "captured_at": "2026-09-15T12:10:33.144653+00:00",
-    "captured_from_opportunity_id": "strategic_land:allocation:136",
+    "captured_at": "2026-09-15T13:00:49.103141+00:00",
+    "captured_from_opportunity_id": "strategic_land:allocation:213",
     "buyer_key": "strategic_land_buyer",
     "mandate_key": "default",
     "acquisition_subject_scope_key": "WHOLE_ALLOCATION",
@@ -23,8 +23,7 @@
     "buyer_fit_is_investigative_exception": true,
     "buyer_fit_matches": [
       "Planning position (an emerging residential allocation) matches this buyer's stated planning appetite.",
-      "No planning activity has yet been identified against this allocation - an early-stage position consistent with this buyer's strategic land appetite.",
-      "This allocation's own scale (~15,000 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "This allocation's own scale (~600 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
       "This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy."
     ],
     "buyer_fit_unknown": [
@@ -42,7 +41,7 @@
     "opportunity_facts": {
       "total_units": [
         "KNOWN",
-        15000
+        600
       ],
       "development_state_scope_verified": false,
       "actors_control_developer_indications": [],
@@ -54,7 +53,7 @@
       ],
       "allocation_status": [
         "KNOWN",
-        "proposed_submission_allocation"
+        "draft_allocation"
       ],
       "progression_signal": [
         "KNOWN",
@@ -62,7 +61,7 @@
       ],
       "has_identified_planning_activity": [
         "KNOWN",
-        false
+        true
       ]
     },
     "transaction_signal_states": {
@@ -95,11 +94,11 @@
     "buyer_fit_classification": "STRONG_FIT",
     "buyer_fit_is_investigative_exception": true,
     "reference_tokens": {
-      "packet.total_units": "KNOWN = 15000",
+      "packet.total_units": "KNOWN = 600",
       "packet.local_plan_status": "KNOWN = 'proposed_submission'",
-      "packet.allocation_status": "KNOWN = 'proposed_submission_allocation'",
+      "packet.allocation_status": "KNOWN = 'draft_allocation'",
       "packet.progression_signal": "KNOWN = 'progressing'",
-      "packet.has_identified_planning_activity": "KNOWN = False",
+      "packet.has_identified_planning_activity": "KNOWN = True",
       "packet.development_state_scope_verified": "False",
       "packet.actors_control.developer_indications": "()",
       "packet.actors_control.ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
@@ -115,9 +114,8 @@
       "signals.coverage_checked_at": "None",
       "signals.scope_verified": "False",
       "buyer_fit.matches[0]": "Planning position (an emerging residential allocation) matches this buyer's stated planning appetite.",
-      "buyer_fit.matches[1]": "No planning activity has yet been identified against this allocation - an early-stage position consistent with this buyer's strategic land appetite.",
-      "buyer_fit.matches[2]": "This allocation's own scale (~15,000 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
-      "buyer_fit.matches[3]": "This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy.",
+      "buyer_fit.matches[1]": "This allocation's own scale (~600 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "buyer_fit.matches[2]": "This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy.",
       "buyer_fit.unknown[0]": "Specialist-development status cannot be established from a strategic land allocation's own intended-use classification alone - not treated as a disqualifying fact for this opportunity type.",
       "buyer_fit.unknown[1]": "Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.",
       "buyer_fit.unknown[2]": "No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference.",
@@ -131,19 +129,15 @@
   "expected_recommendation": [
     "PURSUE"
   ],
-  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: PURSUE, with acquisition_subject=PARCEL_TBD and next_action=IDENTIFY_PHASE_OR_PARCEL. Scale alone never forces a negative recommendation; buyer_fit_is_investigative_exception=True, a genuine positive planning-position match, no confirmed negative anywhere, and a concrete, resolvable, non-blocking investigate item (find the parcel) together support PURSUE-with-parallel-investigation rather than VERIFY/MONITOR.",
+  "commercial_rationale": "STRONG_FIT, no confirmed negative, scale reads positively for this buyer's own mandate (large-allocation-is-self-qualifying), ownership/control unresolved but investigable. Proposed: PURSUE with parallel ownership/control investigation - mirrors Case 1/Case 4's reasoning. NOT APPROVED - Product Owner must review both sides of this pair together before either is approved (Section 8/9).",
   "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
-  "expected_acquisition_subject_level": [
-    "PARCEL_TBD"
-  ],
-  "expected_next_action": [
-    "IDENTIFY_PHASE_OR_PARCEL"
-  ],
+  "expected_acquisition_subject_level": null,
+  "expected_next_action": null,
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "Case Review Pack flagged the prior VERIFY/MONITOR set as inconsistent with the case's own expected_next_action=IDENTIFY_PHASE_OR_PARCEL. Product Owner corrected to PURSUE (2026-09-15).",
+  "reviewer_notes": "MATCHED-BUYER PAIR - see sibling case for the other buyer's reading of the identical Layer A evidence. Neither side of this pair is approved.",
   "approved_by_product_owner": false
 }

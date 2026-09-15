@@ -130,19 +130,19 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "VERIFY"
+    "MONITOR"
   ],
-  "commercial_rationale": "Historically calibrated as a genuine VERIFY case - re-extracted fresh for V1 rather than assumed unchanged (Section 18). PENDING PRODUCT OWNER REVIEW against the freshly extracted evidence below.",
-  "required_invariants": [
-    "verify_requires_material_resolvable_blocking_unknown"
-  ],
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: MONITOR, required trigger DECISION_CHANGED - correcting the prior VERIFY label (Case Correction Gate, Section 11/Case 7). Unlike every other case, buyer_fit_matches is EMPTY here - there is no positive signal at all, only breadth of ordinary application-stage unknowns (no unit count yet, no development type, application not yet decided). VERIFY requires a specific, named, resolvable, BLOCKING fact; nothing here rises to that - it is ordinary pre-decision incompleteness. The genuine future external trigger is the application being decided (DECISION_CHANGED), which is real, nameable, and external - not an investigate-now question in disguise.",
+  "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
   "expected_acquisition_subject_level": null,
   "expected_next_action": null,
-  "monitoring_trigger_constraints": null,
+  "monitoring_trigger_constraints": [
+    "DECISION_CHANGED"
+  ],
   "repeat_for_consistency": true,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "Historically calibrated (prior phase) as VERIFY; re-extracted fresh evidence for V1 does not support that label (Section 18 - never assume stale calibration facts still apply). Corrected to MONITOR by Product Owner (2026-09-15).",
   "approved_by_product_owner": false
 }

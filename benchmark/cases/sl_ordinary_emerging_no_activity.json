@@ -129,10 +129,9 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "PURSUE",
-    "MONITOR"
+    "PURSUE"
   ],
-  "commercial_rationale": "Represents the modal strategic-land case - whichever way the Product Owner ultimately labels it will set the baseline expectation for the largest single cluster of real candidates. PENDING PRODUCT OWNER REVIEW.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: PURSUE. The Strategic Land Buyer's own mandate explicitly treats absence of identified planning activity as a positive early-stage promotion/control characteristic - early-stage/no-activity must not automatically become MONITOR, and no invented future event is required before acquisition investigation begins. Represents the modal strategic-land case (the largest single real cluster), so this label sets the baseline expectation for that cluster.",
   "required_invariants": [
     "not_applicable_facts_never_treated_as_unknowns"
   ],
@@ -143,6 +142,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "Confirmed by Product Owner (2026-09-15), Case Correction Gate Section 4.",
   "approved_by_product_owner": false
 }

@@ -134,7 +134,7 @@
     "PURSUE",
     "VERIFY"
   ],
-  "commercial_rationale": "Developer identity alone is transaction context, never a mandate-incompatibility fact - NOT_RELEVANT would be a critical failure here. PENDING PRODUCT OWNER REVIEW of the exact extracted posture.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: acceptable set PURSUE/VERIFY confirmed unchanged. Developer identity (Bloor Homes) alone is transaction context, never a mandate-incompatibility fact - NOT_RELEVANT is an explicit CRITICAL FAILURE for this case, not merely an unlikely answer. PARCEL_TBD requirement reviewed: at 675 units vs. this buyer's 50-100 target (a 6-13x overshoot, larger than Case 11's own scale gap) this matches the Case 2/10 pattern - expected_acquisition_subject_level/expected_next_action added for consistency.",
   "required_invariants": [
     "no_developer_to_ownership_control_inference"
   ],
@@ -144,11 +144,15 @@
     "self-delivering"
   ],
   "required_material_unknowns": [],
-  "expected_acquisition_subject_level": null,
-  "expected_next_action": null,
+  "expected_acquisition_subject_level": [
+    "PARCEL_TBD"
+  ],
+  "expected_next_action": [
+    "IDENTIFY_PHASE_OR_PARCEL"
+  ],
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "PARCEL_TBD/IDENTIFY_PHASE_OR_PARCEL added and NOT_RELEVANT explicitly named as a critical failure by Product Owner (2026-09-15), Case Correction Gate Section 11.",
   "approved_by_product_owner": false
 }

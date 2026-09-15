@@ -147,6 +147,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": true,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "Confirmed by Product Owner (2026-09-15), Case Correction Gate Section 11 - acceptable set PURSUE/VERIFY unchanged; MONITOR explicitly confirmed NOT acceptable for this case.",
   "approved_by_product_owner": false
 }

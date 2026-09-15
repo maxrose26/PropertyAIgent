@@ -1,7 +1,7 @@
 {
   "case_id": "pd_wider_site_context_different_mandate",
-  "case_name": "Wider-site implementation context, scope-safety test (regression sample)",
-  "commercial_scenario": "TERMINAL (hard exclusion) for housing_association but genuinely open for national_housebuilder - the SAME opportunity produces two different results for two different mandates, illustrating the platform's own 'one result per (buyer, opportunity, acquisition_type)' principle directly. Also exercises wider_site_implementation_activity_context scope-safety.",
+  "case_name": "REFRAMED (Case Correction Gate): large permission, acquisition-subject/PARCEL_TBD reasoning (990 homes vs. 200-500 target)",
+  "commercial_scenario": "CORRECTED (2026-09-15): the original framing claimed this case tested wider_site_implementation_activity_context scope-safety with scope_verified=False - the frozen evidence actually shows development_state_scope_verified=True and signals.scope_verified=True, so no scope-safety question exists here. The evidence instead matches the Case 2 pattern exactly: a 990-home permitted site materially exceeding this buyer's 200-500 target, no confirmed negative, and an explicit investigate item naming the parcel/phase question - a large-permission acquisition-subject reasoning test, not a scope-safety test. Retained secondarily as an illustration that the SAME opportunity is TERMINAL for housing_association but genuinely open for national_housebuilder (the platform's own 'one result per (buyer, opportunity, acquisition_type)' principle).",
   "benchmark_version_introduced": 1,
   "provenance": {
     "captured_at": "2026-09-15T12:10:54.539144+00:00",
@@ -135,19 +135,21 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "VERIFY",
-    "MONITOR",
     "PURSUE"
   ],
-  "commercial_rationale": "Genuinely open for this specific mandate - exact label pending Product Owner review of the extracted wider-site evidence; the KEY test is that scope_verified=False evidence is never presented as a confident same-scope fact.",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: PURSUE, reframed around large-permission/acquisition-subject reasoning (Case Correction Gate Section 11/Case 10). Mirrors Case 2's PARCEL_TBD pattern: scale materially exceeds target, no confirmed negative, an explicit investigate item names the parcel/phase question. expected_acquisition_subject_level/expected_next_action added for consistency with Case 2.",
   "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
-  "expected_acquisition_subject_level": null,
-  "expected_next_action": null,
+  "expected_acquisition_subject_level": [
+    "PARCEL_TBD"
+  ],
+  "expected_next_action": [
+    "IDENTIFY_PHASE_OR_PARCEL"
+  ],
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "Original commercial_scenario incorrectly claimed scope_verified=False - actual frozen evidence shows scope_verified=True. Reframed and corrected by Product Owner (2026-09-15).",
   "approved_by_product_owner": false
 }

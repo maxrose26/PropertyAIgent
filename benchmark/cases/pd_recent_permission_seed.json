@@ -129,11 +129,9 @@
     "agent_evaluation_output_schema_version": 1
   },
   "expected_recommendation": [
-    "PURSUE",
-    "VERIFY",
-    "MONITOR"
+    "PURSUE"
   ],
-  "commercial_rationale": "Placeholder acceptable set pending Product Owner review against the freshly extracted evidence - do not assume the original calibration's recommendation still applies (Section 18).",
+  "commercial_rationale": "PRODUCT OWNER SETTLED DECISION: PURSUE. STRONG_FIT, a single consistent developer, zero confirmed negative, only a soft scale miss (23 vs. 200-500 target, explicitly non-disqualifying per this buyer's own mandate). No named blocking unknown exists to support VERIFY; no genuine future external trigger exists to support MONITOR. Corrects the prior three-value placeholder set flagged as too broad in the Case Review Pack.",
   "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
@@ -142,6 +140,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "Tightened from PURSUE/VERIFY/MONITOR by Product Owner (2026-09-15), Case Correction Gate Section 11.",
   "approved_by_product_owner": false
 }

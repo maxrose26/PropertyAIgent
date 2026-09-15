@@ -130,7 +130,7 @@
     "PURSUE",
     "VERIFY"
   ],
-  "commercial_rationale": "Genuinely mixed signal (early plan maturity, but real identified activity) - a defensible case for either PURSUE-with-parallel-investigation or VERIFY depending on what the activity evidence actually shows. PENDING PRODUCT OWNER REVIEW.",
+  "commercial_rationale": "HELD - Product Owner instructed a read-only investigation of what has_identified_planning_activity=True actually represents before any expected_recommendation is approved (Case Correction Gate, Section 5). Not yet approved to any label.",
   "required_invariants": [],
   "forbidden_claims": [],
   "required_material_unknowns": [],
@@ -139,6 +139,6 @@
   "monitoring_trigger_constraints": null,
   "repeat_for_consistency": false,
   "is_zero_llm_case": false,
-  "reviewer_notes": "",
+  "reviewer_notes": "READ-ONLY INVESTIGATION FINDING (2026-09-15): RELATIONSHIP NOT DETERMINED. The allocation (site 170, Wigan) is the 'North Leigh Park' scheme: a 2012 outline consent for 1,800 homes (app A/12/76665, decided/approved, applicant/developer 'North Leigh Park Group Limited'), substantially implemented since 2019 via reserved-matters/condition-discharge applications naming 'Countryside Properties (UK) Limited' as developer (confirmed CONFIRMED_PHASED phasing evidence: 'Phase 1a(1)', 'Phase 1b', 'future phases' - first phase lawfully implemented 2 Dec 2019), PLUS a newly REGISTERED (undecided) 1,491-unit reserved-matters application from 'Vistry Group' (A/26/100520/RMMAJ) on the same site. Despite this, the platform's own deterministic per-Site development-coverage accounting (app.reporting.allocation_development_coverage.build_allocation_development_coverage) currently returns identified_application_capacity=2 for this site - an evident data-quality artifact in representative-application selection, not a true reflection of the real, well-documented activity. Separately and more fundamentally: NONE of this coverage percentage, phasing classification, or linked-applicant/developer detail is exposed to the Agent Evaluation Policy V1 evaluator at all for a strategic_land opportunity - build_prompt_context() only ever renders the bare has_identified_planning_activity boolean. The model cannot currently distinguish 'no activity' from 'a well-documented, 1,800+1,491-home multi-phase scheme is already progressing on this allocation' - this is an architecture-boundary gap, not something the benchmark case alone can paper over. Recommend: do not approve any expected_recommendation for this case until either (a) a different, cleaner seed identity is substituted, or (b) Agent Evaluation Policy V1's own evidence layer is extended to surface allocation-development-coverage detail for strategic_land opportunities (a separate, larger change outside benchmark scope).",
   "approved_by_product_owner": false
 }
