@@ -739,6 +739,36 @@ Maturity is reported against real repository evidence, not against whether a fun
 
 ---
 
+
+## Validation-derived Specialist Trust Priorities — Affordable Housing
+
+**Product Owner decision following the 17–18 September 2026 Affordable Housing / RP live audit.** The audit confirms that affordable-housing data quality is a material acquisition-intelligence trust gap. PropertyAIgent can extract useful AH evidence, but current operative AH meaning is not consistently reliable across scope, denominator, legal/status position, tenure, funding qualifiers and downstream buyer-facing surfaces.
+
+A dedicated **Affordable Housing Verification Agent** remains on the roadmap, but the audit changes the dependency order: **a trusted Affordable Housing Truth / Operative Position Layer is now an explicit prerequisite to that agent.** The agent must verify unresolved positions; it must not become the mechanism that invents a canonical position over an ambiguous existing model.
+
+Target sequence:
+
+```text
+Confirmed P0 AH corrections
+        ↓
+Affordable Housing Truth / Operative Position Layer
+        ↓
+Affordable Housing Verification Agent
+        ↓
+Shared downstream propagation
+        ↓
+RP / Housing Association qualification improvements
+        ↓
+Astra regression acceptance
+```
+
+The truth layer should preserve, per development scope, units + denominator + percentage + tenure + whole-site/phase/parcel scope + proposed/agreed/secured status + grant/viability qualifiers + on-site/off-site/financial contribution semantics + provenance + freshness + conflict/unknown state. Zero requires affirmative evidence; “not mentioned” can never establish zero.
+
+Initial P0 acceptance cases promoted by the audit include Cross Lane (false zero), Woodford Garden Village Extension (wrong scale/status), Viadux Phase 2 (wrong denominator), Stretford Mall and Hazelhurst (scope mixing), Lacy Street (grant qualifier loss), Brixham Road (on-site vs contribution semantics), World of Pets (historic/current quantum conflict), and specialist/100%-AH cases such as Focus School and Brotherton House.
+
+Full specification and implementation boundaries are recorded in [PRODUCT_ROADMAP_ADDENDUM_AFFORDABLE_HOUSING_VERIFICATION.md](PRODUCT_ROADMAP_ADDENDUM_AFFORDABLE_HOUSING_VERIFICATION.md). This roadmap entry is **documentation only** and does not authorise schema changes, production writes, full-corpus reprocessing, scheduled agents or deployment.
+
+
 ## Recommended Next Task
 
 **Gate 2B-0B — Application Lifecycle Intelligence (architecture investigation only).** Gate 2B is fully closed (2B-0A through 2B-2C, production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`, live at `propertyaigent.onrender.com`). Promoted ahead of Gate 2C by Product Owner decision: the platform can now reliably answer "what does the planning evidence mean?" but not yet "has that evidence changed since we last checked?" The next task is an architecture investigation only — see "Gate 2B-0B — Application Lifecycle Intelligence (NEXT)" above for the full required-investigation scope. **Do not implement Gate 2B-0B yet; no schema or code change is authorised until that investigation is reviewed by the Product Owner.** Separately: platform-wide scheduled status verification stays fail-closed until the production daily-scrape scheduler is proven healthy (operational dependency, not Gate 2B feature work).
