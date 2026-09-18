@@ -379,7 +379,132 @@ The two newly identified specialist monitoring/verification capabilities are com
 
 Both must ultimately feed the same trusted evidence → opportunity reassessment pipeline rather than become isolated AI-summary generators.
 
-## 18. Product-owner implementation boundary
+
+## 18. Post-Astra Audit Amendment — Affordable Housing Truth Layer is a prerequisite
+
+**Product Owner decision following the 17–18 September 2026 live Affordable Housing / RP audit:** the Affordable Housing Verification Agent remains a roadmap capability, but it must **not** be the first implementation step. The audit demonstrated that the immediate architectural gap is a trusted, evidence-resolved affordable-housing position that the agent can verify and update.
+
+The live audit found that PropertyAIgent can extract useful AH counts and tenure labels, but it is not yet reliable at selecting the current commercially applicable AH position. Confirmed failure modes included:
+
+- absence of AH evidence becoming a false zero;
+- correct AH counts paired with the wrong scheme denominator;
+- whole-site and phase evidence being mixed across screens;
+- grant-dependent delivery losing its qualifier;
+- proposal / policy / agreed / secured meanings being collapsed;
+- non-tenure content appearing in tenure fields;
+- buyer-fit language treating unresolved AH as trusted;
+- corrected or conflicted intelligence failing to propagate consistently across Dashboard, Explore, Detail and AI summaries.
+
+### New prerequisite capability — Affordable Housing Truth / Operative Position Layer
+
+Before a verification agent is authorised to write or promote conclusions, PropertyAIgent should establish one reusable, evidence-resolved AH position **per development scope**.
+
+Conceptually, that position should be capable of representing, separately and without semantic flattening:
+
+- physical affordable units;
+- the denominator those units relate to;
+- affordable percentage;
+- on-site percentage;
+- off-site provision;
+- financial contribution / commuted sum;
+- overall policy-equivalent contribution where explicitly evidenced;
+- tenure and tenure split;
+- proposed / recommended / agreed / S106-secured / legally secured status;
+- grant dependency;
+- viability outcome and review mechanism where evidenced;
+- minimum / maximum / `up to` / indicative qualifiers;
+- whole-site / phase / parcel scope;
+- general-needs vs specialist / extra-care / supported housing;
+- source application, document, date and passage;
+- extraction confidence;
+- operative-fact confidence;
+- verification freshness;
+- conflict / unresolved state.
+
+A value of zero requires affirmative evidence applicable to the selected scope. **No mention / not found / not extracted / unknown / not applicable / confirmed zero are distinct states and must never be collapsed.**
+
+### Revised sequencing
+
+```text
+1. Correct confirmed P0 AH data defects
+        ↓
+2. Affordable Housing Truth / Operative Position Layer
+        ↓
+3. Affordable Housing Verification Agent
+        ↓
+4. Shared downstream propagation
+   Dashboard / Explore / Scheme Detail / AI Summary / Buyer Fit / reports
+        ↓
+5. RP / Housing Association qualification improvements
+        ↓
+6. Re-run the same difficult Astra cohort as release acceptance
+```
+
+The Verification Agent therefore becomes an **exception-driven investigator** over unresolved or suspicious AH positions, not a roaming agent that re-researches every scheme indiscriminately.
+
+### Verification queue principle
+
+Long-term preferred flow:
+
+```text
+Raw planning evidence
+        ↓
+AH extraction
+        ↓
+AH scope / legal-status reconciliation
+        ↓
+Trusted Affordable Housing Position
+        ↓
+Resolved? ── yes ──> downstream consumers
+   │
+   no
+   ↓
+Affordable Housing Verification Agent
+        ↓
+existing internal evidence review
+        ↓
+authoritative external investigation where needed
+        ↓
+verified / conflicted / manual-review result
+        ↓
+Trusted Affordable Housing Position updated non-destructively
+        ↓
+bounded opportunity + buyer reassessment
+```
+
+### Acceptance principles promoted from the audit
+
+A future release should not pass unless the difficult regression cohort demonstrates all of the following:
+
+1. no unknown becomes zero;
+2. no AH percentage uses an incompatible denominator;
+3. no whole-site position is silently attached to a phase, or vice versa;
+4. grant-dependent intended delivery is not presented as secured planning obligation;
+5. tenure contains tenure concepts only;
+6. proposed, recommended, agreed and legally secured positions remain distinct;
+7. specialist housing is not silently treated as general-needs AH;
+8. unresolved AH cannot produce language such as “trusted” or an unqualified Strong Fit;
+9. the same development scope produces the same AH position across every buyer-facing surface;
+10. a correction to the trusted AH position triggers bounded downstream reassessment rather than leaving stale opportunity logic in place.
+
+### Initial confirmed P0 acceptance cases
+
+The live audit promotes these cases into the initial implementation/acceptance cohort:
+
+- **Cross Lane / former Ship, Salford** — false zero from “AH not mentioned”;
+- **Woodford Garden Village Extension** — wrong operative scheme scale/status and AH quantum;
+- **Viadux Phase 2** — wrong denominator;
+- **Stretford Mall** — whole-scheme AH mixed with Reserved Matters phase;
+- **Hazelhurst Farm** — multiple incompatible site/phase totals;
+- **Lacy Street** — grant-dependent intended AH presented without sufficient qualification;
+- **Brixham Road** — physical on-site homes vs financial contribution semantics;
+- **World of Pets** — later scheme quantum vs historic scale;
+- **Focus School / Brotherton House** — specialist / whole-scheme 100%-AH classification and tenure semantics.
+
+This amendment does **not** authorise implementation. It changes the required architecture and sequencing for the already-identified Affordable Housing Verification capability.
+
+
+## 19. Product-owner implementation boundary
 
 This roadmap entry is **documentation only**.
 
