@@ -1,0 +1,17 @@
+{
+  "commit": "35d439f1af504af680040ac725a0a64eb0a82b60",
+  "working_tree": " M app/reporting/ownership_control.py\n M app/reporting/residential_mix.py\n M docs/AH_SAME_RECORD_REVIEW_20260929.md\n M docs/PRODUCT_ROADMAP.md\n M docs/PRODUCT_VISION.md\n?? tests/test_ah_workflow_presentation.py\n?? verification/ah_workflow/\n",
+  "python": "3.12.14",
+  "dependencies": {
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.1.1",
+    "pandas": "3.0.6",
+    "streamlit": "1.64.0"
+  },
+  "mode": "Offline disposable SQLite; real Streamlit AppTest rendering and download media bytes; no HTTP delivery test",
+  "code_sha256": {
+    "app/reporting/residential_mix.py": "414858f86335b52f53df2fa4ab774d775795fa8b4fccf2970eca336ade3cbc09",
+    "app/reporting/ownership_control.py": "c3054f0a0ecf9431494f0d6e04a368e1dace8c6d83140e8c612466400434b3ff",
+    "verification/ah_workflow/run.py": "dace62e1730a60920b12834870bae003bf488b10328d0585a98576c9b22fcd28"
+  }
+}

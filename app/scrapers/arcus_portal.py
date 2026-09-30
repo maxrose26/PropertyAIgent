@@ -401,7 +401,7 @@ def fetch_application_detail(
     )
 
 
-def fetch_application_by_reference(page: Page, council: CouncilConfig, reference: str) -> ScrapedApplication | None:
+def fetch_application_by_reference(page: Page, council: CouncilConfig, reference: str, *, strict: bool = False) -> ScrapedApplication | None:
     """Targeted single-application lookup by exact reference via Arcus's
     "quick search" (a single free-text box, distinct from the date-range
     advanced search build_search_url constructs) - used to backfill a
@@ -425,6 +425,14 @@ def fetch_application_by_reference(page: Page, council: CouncilConfig, reference
     ref_to_url = {l["text"]: l["href"] for l in links}
     rows = _parse_result_page(text, ref_to_url)
     matching = [r for r in rows if r["reference"].strip().upper() == reference.strip().upper()]
+    if strict:
+        from app.pipeline.lookup_outcome import AmbiguousIdentity, UnrecognisedSearch
+        if re.search(r"(?:page\s+1\s+of\s+[2-9]|showing\s+\d+\s*-\s*\d+\s+of)", text, re.I):
+            raise UnrecognisedSearch("incomplete result traversal")
+        if len(matching) > 1 or len({l['href'] for l in links if l['text'].strip().casefold() == reference.strip().casefold()}) > 1 or (rows and not matching):
+            raise AmbiguousIdentity("unresolved search identities")
+        if not matching and "no results found" not in text.casefold():
+            raise UnrecognisedSearch("no supported empty-results marker")
     if not matching:
         return None
 
@@ -442,3 +450,9 @@ def scrape_month(page: Page, council: CouncilConfig, date_from_iso: str, date_to
             print(f"  [{i}/{len(rows)}] error fetching {row.get('reference')}: {e}")
         time.sleep(WAIT_SECONDS)
     return applications
+
+
+def lookup_parent(page, council, reference, seconds=60):
+    from app.pipeline.lookup_outcome import strict_lookup, BoundedPage
+    return strict_lookup(lambda: fetch_application_by_reference(
+        BoundedPage(page), council, reference, strict=True), reference, seconds)

@@ -9,6 +9,8 @@ script, never an LLM.
 """
 from __future__ import annotations
 
+from tests.ah_claim_fixtures import verified_count
+
 import datetime as dt
 
 from sqlalchemy import select
@@ -214,14 +216,12 @@ def test_different_profiles_produce_different_conclusions_from_the_same_opportun
     assert len(strategic.matches) > len(nesten.matches)
 
 
-# --- Required acceptance case: Focus School (real figures) ------------------
+# --- Historical Focus School extraction: contradictory AH figures ------------------
 
 def test_focus_school_is_not_a_strong_nesten_fit(session):
-    """Real Focus School figures (see the Buyer Profiles V1 investigation
-    report): 82 total units, granted permission, development_type
-    'mixed_retirement_and_market_housing', 100% affordable, applicant
-    Anwyl Partnerships. Nesten must not classify this as a strong fit -
-    the reasoning must name the trusted disqualifying evidence."""
+    """Historical extraction is not reconciled source truth: 72 of 82
+    homes conflicts with recorded 100% AH. Specialist evidence may still
+    exclude Nesten, but the inconsistent percentage must not do so."""
     site = Site(council_code="stockport", canonical_address="focus school", display_address="Focus School 237 Didsbury Road")
     session.add(site)
     session.flush()
@@ -241,7 +241,12 @@ def test_focus_school_is_not_a_strong_nesten_fit(session):
 
     assert result.classification == NOT_SUITABLE
     assert any("specialist" in r for r in result.does_not_match)
-    assert any("100%" in r for r in result.does_not_match)
+    assert not any("100%" in r for r in result.does_not_match)
+    assert facts.affordable_percentage is None
+    assert facts.affordable_reported_percentage == 100.0
+    assert facts.affordable_unit_count == 72
+    assert facts.affordable_review_reason in result.unknown
+    assert any("affordable housing source position" in r for r in result.investigate)
     # Must not fabricate ownership/control certainty from the applicant's
     # name alone (the brief's own explicit instruction) - no reason
     # anywhere in this assessment claims Anwyl proves ownership/control.
@@ -261,10 +266,7 @@ def test_focus_school_with_missing_scheme_intelligence_reads_as_unknown_not_excl
 #     same site, opposite buyer effect ------------------------------------
 
 def _focus_school_scheme_intelligence(session) -> SchemeIntelligence:
-    """Real Focus School figures - see test_focus_school_is_not_a_strong_
-    nesten_fit's own docstring and this amendment's live production check
-    (72 affordable of 82 total, 100% affordable, mixed_retirement_and_
-    market_housing, applicant Anwyl Partnerships)."""
+    """Historical contradictory extraction; not a verified whole-site AH position."""
     site = Site(council_code="stockport", canonical_address="focus school ha", display_address="Focus School 237 Didsbury Road")
     session.add(site)
     session.flush()
@@ -282,29 +284,28 @@ def _focus_school_scheme_intelligence(session) -> SchemeIntelligence:
 
 
 def test_focus_school_same_evidence_opposite_buyer_effect(session):
-    """Required acceptance case (Housing Association amendment, Section 13):
-    the SAME trusted evidence (Focus School) must be a hard negative for
-    Nesten Homes but NOT a negative for Housing Association - proving
-    buyer-fit is genuinely buyer-relative, not a universal opportunity
-    quality judgement."""
+    """Buyer-relative specialist decisions survive unresolved AH evidence.
+    Neither buyer may treat the inconsistent percentage as trusted."""
     si = _focus_school_scheme_intelligence(session)
     facts = build_planning_delivery_matching_facts(si)
 
     nesten = assess_buyer_fit(NESTEN_HOMES, facts)
     housing_association = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
 
-    # Nesten: 100% affordable remains a hard exclusion (unchanged).
+    # Independent specialist evidence remains a Nesten exclusion.
     assert nesten.classification == NOT_SUITABLE
-    assert any("100%" in r for r in nesten.does_not_match)
-
-    # Housing Association: 100% affordable is NOT a negative - it is
-    # explicit positive evidence instead.
-    assert not any("100%" in r for r in housing_association.does_not_match)
-    assert any("100%" in r and "affordable-housing focus" in r for r in housing_association.matches)
-
-    # Its scale is assessed against the 72 AFFORDABLE homes (not the 82
-    # total) - within the 50-300 affordable-home target range.
-    assert any("72" in r and "affordable homes" in r for r in housing_association.matches)
+    assert any("specialist" in r for r in nesten.does_not_match)
+    for result in (nesten, housing_association):
+        assert facts.affordable_review_reason in result.unknown
+        assert any("affordable housing source position" in r for r in result.investigate)
+        assert not any("100%" in r for r in result.matches + result.does_not_match)
+    # Preserve the raw evidence, but do not claim a trusted AH package scale.
+    assert facts.affordable_unit_count == 72
+    assert facts.affordable_reported_percentage == 100.0
+    assert facts.affordable_percentage is None
+    assert not any("72" in r and "affordable homes" in r for r in housing_association.matches)
+    assert si.affordable_units_final == 72
+    assert si.affordable_percentage_final == 100.0
 
     # An unresolved criterion (the buyer's own specialist/retirement
     # appetite was never specified) correctly prevents STRONG_FIT without
@@ -336,7 +337,7 @@ def test_affordable_component_in_range_despite_total_exceeding_housing_associati
     target. Existing housebuilder profiles continue to assess the SAME
     opportunity using their own total-unit requirements, from the exact
     same underlying facts."""
-    facts = _facts(
+    facts = _facts(affordable_assessment=verified_count(120),
         unit_count=400, affordable_unit_count=120, affordable_percentage=30.0, affordable_percentage_trusted=True,
         development_type_raw="mixed_apartments_and_houses",
     )
@@ -371,7 +372,7 @@ def test_below_affordable_minimum_is_not_suitable_for_housing_association():
     unlike the housebuilder profiles' own "below minimum" handling, this is
     a genuine hard exclusion for this buyer, with a reason naming both the
     evidenced figure and the stated minimum."""
-    facts = _facts(unit_count=80, affordable_unit_count=20, development_type_raw="houses")
+    facts = _facts(affordable_assessment=verified_count(20), unit_count=80, affordable_unit_count=20, development_type_raw="houses")
     result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
     assert result.classification == NOT_SUITABLE
     assert any("20" in r and "50" in r for r in result.does_not_match)

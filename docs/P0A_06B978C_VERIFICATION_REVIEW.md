@@ -1,0 +1,35 @@
+# P0-A WSL verification review — 29 September 2026
+
+Exact tested candidate: 06b978c59ece44bb20efc6d5b26009d769a22b5d, clean in the uploaded manifest. Baseline: 301a56b3cde781f37e5f5bb0ffaded6537d5ca14. Runner blob aa27ee294e57ff87c7aafa58a71b56df1e6336d7. Python 3.12.3, dependency snapshot byte-identical (SHA-256 551b45953598a503c8190a9f924cd6930e04f127ba496770a9a64c8ab05f43d9), disposable PostgreSQL UTF8, external network blocked by the reviewed WSL runner. Archive results-20260929T111800Z.tar.gz SHA-256: 706bea36659b96b1113aa28c7099a8a5ff2b1c373c4caa971deaf1967c0cb9ad.
+
+## Actual result and limits
+
+Candidate 365 passed / 4 failed / 0 skipped / 1 deselected in 90.12s. Baseline 282 passed / 4 failed / 0 skipped / 1 deselected in 29.53s. The four failures have identical identities and missing OPENAI_API_KEY messages; no credentials were added. The deselected test remains page_recycling_keeps_renderer_rss_flat_across_navigations. The repository evidence assessor passes this archive and confirms required integration cases and baseline coverage. This supports offline Gate A review with the four exceptions, not a fully passing suite, production release or sustained-health claim.
+
+All seven new real PostgreSQL cases pass, covering transaction-local settings after commit/rollback/connection replacement and ORM use, real timeout followed by rollback and successful subsequent work, fail-closed verification, exact additive migration first/repeat, transactional rollback, and schema-drift rejection. Existing PostgreSQL constraints, conditional owner transitions, stale writes and interrupted-result recovery also pass.
+
+All five real Chromium cases pass: cooperative navigation deadline then subsequent work, document recycling then evidence refresh, browser-descendant cleanup on failure, supervisor death with browser child, and cleanup during blocked persistence. Inherited-lock retention blocks a successor while the child survives; confirmed termination releases it. Shell rejection and synthetic positive scheduler admission pass. Synthetic identity does not prove Render scheduler identity.
+
+Timeout: monotonic 15.001804s, wall 15.001811s, raw monotonic 15.742661s, server elapsed including recovery 15.006662s. SQLSTATE 57014 and server statement-timeout text confirmed. Rollback/subsequent-work property is true. Original 14 <= monotonic elapsed < 19 assertion unchanged and passed. The prior c1c3da4 result of 13.463783s is retained as an unexplained timing anomaly, not declared fixed or attributed conclusively to WSL. The raw-clock disagreement reinforces caution about inferring clock cause; this is one successful rerun, not repeated timing stability evidence.
+
+Blocked-persistence termination: 2.461–2.674s, all below 2s deadline + 3s scheduling margin. Browser termination and descendant cleanup: 8.563s under 12s envelope. Confirmed child termination to successor admission: 0.02055s. These are synthetic local measurements; no production throughput or OOM-cause conclusion follows. PostgreSQL log confirms cluster shutdown. Fixture cleanup is not substituted for the application cleanup assertions.
+
+## Changes and review boundary
+
+Since c1c3da4, only the timeout test and evidence documentation changed: extra clocks and recovery checked before the unchanged timing assertion. Application, migration, dependencies, runner and original specification are unchanged. Specification SHA-256 remains c007e2b2912ae5d8817142c32fdf35e0000f72d4fa127d5c83e32e6ef10970f8. This report and JSON are a subsequent documentation-only commit; test acceptance stays attached to exact 06b978c. Earlier disclosed implementation deviations and operating switches remain in existing reviews; no new production-design deviation is introduced.
+
+## Operational decision, still unapproved
+
+Recommend a separately approved temporary suspension of the still-enabled old 05:00 UTC cron before 30 September's run (06:00 BST). Based on the previously inspected 24–29 September cohort, saved work includes 3 Bolton applications, 1 Bury application, 10 Bolton downloaded/text-extracted documents and 7 Manchester applications. Timestamp association is not exclusive writer attribution. Repeated Manchester OOM termination left seven later councils unattempted on five successive days. Suspending loses useful early-council freshness; continuing unchanged repeats work without restoring broad coverage. No live configuration was rechecked or changed during this offline review.
+
+Review any approved pause at release review and before the following daily slot. Resume only under separately approved bounded controls, not by automatically reverting to old uncontrolled discovery. The old deployed cron does not understand new activation switches. Keep it externally suspended during migration/deployment/rollback; retain additive schema, continuation state and committed evidence. No suspension has been performed.
+
+## Remaining release sequence and positive scheduler evidence
+
+1. Review this exact offline candidate with exceptions and timing caveat. Separately approve any suspension and confirm old execution termination.
+2. Review exact additive migration and read-only production schema preflight, then separately approve migration first. No generic historical backfills. Direct PostgreSQL passes do not establish the actual Supabase session-pooler path's behaviour; verify transaction-local settings and timeout/rollback on the approved runtime path without persistent settings changes.
+3. Separately approve inactive deployment and verify deployed SHA, safety-switch precedence, sole entrypoint and runtime configuration. Production scheduled admission remains deliberately blocked until trustworthy identity evidence is obtained.
+4. Under separate approval, execute a diagnostic-only scheduled invocation in the actual cron execution context; discovery stays inactive. It must exit before scraping, migration or application writes. Correlate sanitized service/type/instance identity, SHA and PID/start timestamps with scheduled run records; compare successive actual scheduled executions to verify instance lifecycle and single-run guarantees. A temporary shell is only a negative control. An instance string or self-set marker alone does not prove origin. If the provider cannot establish the contract, return the specific ownership decision; never weaken admission. Any resulting admission code change requires a new tested candidate.
+5. Review limits that contain the full 130-second parent envelope plus other stage/cleanup budgets; separately approve Manchester-only smoke, then Salford only after confirmed termination. No Stockport trial or platform-wide readiness. Observation follows smoke; no OOM or egress resolution claim.
+
+No push, PR, merge, production write/migration/deployment, live scrape, suspension, paid call or production configuration change occurred. See P0A_C1C3DA4_WSL_REVIEW.md and P0A_NARROW_CORRECTIONS_REVIEW.md for prior failures, migration scope and cohort sources.

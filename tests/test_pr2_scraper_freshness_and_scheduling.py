@@ -180,7 +180,7 @@ def _fake_run_council_subprocess(lines=(), returncode=0):
     that only care about run_one_council's own behaviour, not
     _run_council_subprocess's internals (see
     tests/test_render_daily_discovery_memory_audit.py for those)."""
-    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         if on_line is not None:
             for line in lines:
                 on_line(line)
@@ -189,7 +189,7 @@ def _fake_run_council_subprocess(lines=(), returncode=0):
 
 
 def _fake_run_council_subprocess_timeout(lines=()):
-    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         if on_line is not None:
             for line in lines:
                 on_line(line)
@@ -205,7 +205,7 @@ def test_run_one_council_records_success(session):
 
     with patch(
         "scripts.run_daily_councils._run_council_subprocess",
-        side_effect=_fake_run_council_subprocess(["Done."], returncode=0),
+        side_effect=_fake_run_council_subprocess(["[run-health] status=success"], returncode=0),
     ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
@@ -259,7 +259,7 @@ def test_one_council_failure_does_not_prevent_the_next_council_from_running(sess
 
     call_results = iter([
         _fake_run_council_subprocess(["council 1 crashed"], returncode=1),
-        _fake_run_council_subprocess(["council 2 fine"], returncode=0),
+        _fake_run_council_subprocess(["[run-health] status=success"], returncode=0),
     ])
     with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=lambda *a, **k: next(call_results)(*a, **k)):
         run1 = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="scheduled")

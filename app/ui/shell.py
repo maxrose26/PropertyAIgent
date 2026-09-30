@@ -773,7 +773,7 @@ def _scheme_stack_card(card: dict, *, rank: int, key: str) -> None:
         badge_cols = st.columns(4)
         badge_fields = [
             ("total_units", lambda v: f"{v} units"),
-            ("affordable_units", lambda v: f"{v} affordable"),
+            ("affordable_units", lambda v: f"{v} affordable (reported; see evidence)"),
             ("affordable_percentage", lambda v: f"{v:.0f}% affordable"),
             ("decision_status", lambda v: v),
             ("build_status", lambda v: v),
@@ -864,6 +864,8 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
         st.caption(card["subtitle"])
         if card.get("signal"):
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(card["signal"], "info"), card.get("signal_label") or card["signal"])
+        if card.get("affordable_label"):
+            st.caption(card["affordable_label"])
         buyer_fit = card.get("buyer_fit")
         if buyer_fit is not None:
             status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), buyer_fit.classification.replace("_", " ").title())

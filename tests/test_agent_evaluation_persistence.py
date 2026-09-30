@@ -84,6 +84,8 @@ class _FakeActorsControl:
 
 class _FakeFingerprintPacket:
     def __init__(self, **overrides):
+        from app.policy.ah_assessment import AHAssessment
+        self.affordable_assessment = AHAssessment()
         self.opportunity_type = PLANNING_DELIVERY
         self.total_units = FactValue.known(75)
         self.affordable_units = FactValue.unknown()

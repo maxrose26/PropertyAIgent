@@ -6,6 +6,8 @@
 
 This addendum forms part of the current PropertyAIgent product roadmap and should be read alongside `PRODUCT_ROADMAP.md`, `PRODUCT_VISION.md` and `PLATFORM_ARCHITECTURE.md`.
 
+**28 September sequencing update:** the current [roadmap](PRODUCT_ROADMAP.md) prioritises operational reliability and measured freshness before new agent execution. Investigate existing monitoring coverage under P0; retain current infrastructure unless measured requirements justify change. This specialist capability remains planned and is not authorised by this handover.
+
 ## Why this capability has been added
 
 Live product review showed that PropertyAIgent can regenerate a current AI Local Plan / planning-intelligence summary while some of the underlying council policy sources have not been rechecked for several weeks, and some authorities remain disabled or never checked in the monitoring view.

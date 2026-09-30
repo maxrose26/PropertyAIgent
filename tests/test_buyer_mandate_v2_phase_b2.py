@@ -57,6 +57,8 @@ Control/Ownership Appetite (never hard, always SOFT):
 """
 from __future__ import annotations
 
+from tests.ah_claim_fixtures import verified_count
+
 from dataclasses import replace
 
 import pytest
@@ -139,11 +141,12 @@ class _FakeAcquisitionPositionFacts:
 # --- Matching-policy version tests (Phase B2 brief, Section 47) ------------
 
 def test_policy_version_is_the_current_expected_value():
-    # Version 4: Agent-Ready Fact Foundation (authoritative B2 context
+    # Version 5 adds AH reconciliation trust guards; version 4 established
+    # Agent-Ready Fact Foundation (authoritative B2 context
     # mandatory at the production evaluation boundary + authoritative
     # normalised Local Plan status for strategic land) - see
     # BUYER_MATCHING_POLICY_VERSION's own docstring.
-    assert BUYER_MATCHING_POLICY_VERSION == 4
+    assert BUYER_MATCHING_POLICY_VERSION == 5
 
 
 def test_fingerprint_changes_when_policy_version_changes():
@@ -336,7 +339,7 @@ def test_land_site_acquisition_type_is_neutral_not_circular():
 
 def test_affordable_containing_scheme_matches_affordable_housing_package():
     policy = replace(NESTEN_HOMES, acquisition_types=frozenset({AFFORDABLE_HOUSING_PACKAGE}))
-    facts = _facts(affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True)
+    facts = _facts(affordable_assessment=verified_count(90), affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True)
     result = assess_buyer_fit(policy, facts, context=B2MatchingContext())
     assert any("affordable-housing-package" in m and "does not establish" in m for m in result.matches)
 
@@ -351,7 +354,7 @@ def test_underway_developer_scheme_matches_development_homes_acquisition():
 def test_one_opportunity_compatible_with_multiple_acquisition_types():
     """Proves there is no one-to-one Opportunity Type map (Section 14) -
     the SAME facts satisfy three different acquisition types independently."""
-    facts = _facts(affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True)
+    facts = _facts(affordable_assessment=verified_count(90), affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True)
     ctx = B2MatchingContext(development_state=DEVELOPMENT_STATE_UNDERWAY)
     land = assess_buyer_fit(replace(NESTEN_HOMES, acquisition_types=frozenset({LAND_SITE_ACQUISITION})), facts, context=ctx)
     affordable = assess_buyer_fit(replace(NESTEN_HOMES, acquisition_types=frozenset({AFFORDABLE_HOUSING_PACKAGE})), facts, context=ctx)
@@ -398,7 +401,7 @@ def test_strategic_land_control_confirmed_underway_but_scope_unverified_is_not_h
 
 def test_affordable_housing_package_hard_mismatch_only_on_trusted_zero():
     policy = replace(NESTEN_HOMES, acquisition_types=frozenset({AFFORDABLE_HOUSING_PACKAGE}))
-    facts = _facts(affordable_unit_count=0, affordable_percentage=0.0, affordable_percentage_trusted=True)
+    facts = _facts(affordable_assessment=verified_count(0), affordable_unit_count=0, affordable_percentage=0.0, affordable_percentage_trusted=True)
     result = assess_buyer_fit(policy, facts, context=B2MatchingContext())
     assert result.classification == NOT_SUITABLE
     assert any("no affordable housing content" in m for m in result.does_not_match)
@@ -559,7 +562,7 @@ def test_explicit_housing_association_below_minimum_hard_exclusion_unaffected():
     """(A) The genuine, explicit Housing Association hard exclusion
     (below_minimum_scale_is_exclusion) must remain NOT_SUITABLE - this
     cleanup only affects buyers WITHOUT an explicit hard scale rule."""
-    facts = _facts(unit_count=80, affordable_unit_count=20, development_type_raw="houses")
+    facts = _facts(affordable_assessment=verified_count(20), unit_count=80, affordable_unit_count=20, development_type_raw="houses")
     result = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
     assert result.classification == NOT_SUITABLE
     assert any("below this buyer's minimum" in d for d in result.does_not_match)
@@ -690,9 +693,9 @@ def test_strategic_land_matched_to_site_produces_no_ownership_gap_reason():
 
 def test_matching_policy_version_is_now_3():
     # Superseded by Agent-Ready Fact Foundation's own version 4 bump - see
-    # test_policy_version_is_the_current_expected_value above for why 4 is
+    # test_policy_version_is_the_current_expected_value above for why 5 is
     # now the correct current value.
-    assert BUYER_MATCHING_POLICY_VERSION == 4
+    assert BUYER_MATCHING_POLICY_VERSION == 5
 
 
 def test_semantic_cleanup_fingerprint_differs_from_prior_policy_version():
@@ -944,7 +947,7 @@ def test_housing_association_b2_behaviour_developer_led_mixed_tenure():
     strategy - never penalised for not being a land-sale opportunity."""
     control_facts = ControlAppetiteFacts(developer_or_applicant_led=True, third_party_interest_declared=None, ownership_unresolved=None, partial_control_evidence=None)
     ctx = B2MatchingContext(council_code="stockport", development_state=DEVELOPMENT_STATE_UNDERWAY, control_facts=control_facts)
-    facts = _facts(unit_count=300, affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True)
+    facts = _facts(affordable_assessment=verified_count(90), unit_count=300, affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True)
     result = assess_buyer_fit(HOUSING_ASSOCIATION, facts, context=ctx)
     assert result.classification == STRONG_FIT
     assert any("developer/applicant-led" in m for m in result.matches)
@@ -969,7 +972,7 @@ def test_same_facts_different_mandates_produce_materially_different_b2_reasoning
     whole_opportunity_scope below for the case where scope IS verified).
     The land/site buyer must also not receive a fact-free positive
     acquisition-type reason merely for stating LAND_SITE_ACQUISITION."""
-    shared_facts = _facts(unit_count=300, affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
+    shared_facts = _facts(affordable_assessment=verified_count(90), unit_count=300, affordable_unit_count=90, affordable_percentage=30.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
     control_facts = ControlAppetiteFacts(developer_or_applicant_led=True, third_party_interest_declared=None, ownership_unresolved=None, partial_control_evidence=None)
     ctx = B2MatchingContext(council_code="trafford", development_state=DEVELOPMENT_STATE_UNDERWAY, control_facts=control_facts)
 

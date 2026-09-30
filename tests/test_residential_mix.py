@@ -224,10 +224,10 @@ def test_no_version_conflict_when_alternative_agrees(session):
 
 
 def test_residential_mix_never_mixes_affordable_and_total_across_versions(session):
-    """The core Part 5/12 guarantee end to end: build_residential_mix's
-    affordable_headline must come entirely from rep_app's own scheme, even
-    when another application on the same site has wildly different,
-    tempting-to-blend figures."""
+    """Bare legacy applications have no operative/count-level evidence.
+    Preserve the selected extraction for investigation, never qualify it or
+    blend it with another application's tempting larger count.
+    """
     site = _make_site(session)
     rep = _make_app(session, site.id, "APP/2")
     other = _make_app(session, site.id, "APP/1")
@@ -237,7 +237,18 @@ def test_residential_mix_never_mixes_affordable_and_total_across_versions(sessio
     session.refresh(other)
 
     mix = build_residential_mix(site, [rep, other], rep_app=rep)
-    assert mix["affordable_headline"]["affordable_units"] == 30
+    assert mix["affordable_headline"]["affordable_units"] is None
+    assert mix["overview_totals"]["affordable_homes"] is None
+    selected = mix["affordable_assessment"]
+    reported = mix["reported_affordable_assessment"]
+    assert reported.count.value == 30
+    assert reported.count.application_reference == "APP/2"
+    assert "reported; source and scope unverified" in reported.label()
+    assert not reported.count.qualified
+    for assessment in (selected, reported):
+        assert assessment.search(minimum=20) == "unknown"
+        assert assessment.search(maximum=50) == "unknown"
+    assert mix["scheme"].affordable_units_final == 30
     assert mix["affordable_headline"]["percentage_raw"] == 30.0
     assert mix["current_version"]["version_conflict"] is True
     assert mix["current_version"]["alternatives"][0]["affordable_units_final"] == 490

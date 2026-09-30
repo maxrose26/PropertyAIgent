@@ -1,0 +1,49 @@
+name: P0-A isolated verification (baseline exceptions reported)
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [feature/p0a-bounded-discovery]
+permissions:
+  contents: read
+jobs:
+  isolated:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.3'
+      - name: Check evidence assessment logic
+        run: python -m unittest discover -s verification -p 'test_p0a*.py'
+      - name: Provision disposable runner dependencies (before isolation)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 tini iproute2 util-linux
+          python -m venv "$RUNNER_TEMP/p0a-venv"
+          "$RUNNER_TEMP/p0a-venv/bin/python" -m pip install -r verification/p0a-python-environment.txt
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/p0a-browsers" "$RUNNER_TEMP/p0a-venv/bin/python" -m playwright install --with-deps chromium
+      - name: Run real PostgreSQL, Chromium and ownership checks without external network
+        run: bash verification/p0a_ci.sh
+      - name: Report regressions and explicit accepted exceptions
+        if: always()
+        run: |
+          python verification/p0a_ci_assess.py "$RUNNER_TEMP/p0a-results" | tee "$RUNNER_TEMP/p0a-assessment.txt"
+          cat "$RUNNER_TEMP/p0a-assessment.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0a-offline-evidence
+          path: |
+            ${{ runner.temp }}/p0a-results
+            ${{ runner.temp }}/p0a-assessment.txt
+          if-no-files-found: error
+          retention-days: 14

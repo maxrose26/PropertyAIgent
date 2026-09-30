@@ -1,0 +1,28 @@
+.......................F................................................ [ 75%]
+........................                                       [100%]
+=================================== FAILURES ===================================
+____ test_residential_mix_never_mixes_affordable_and_total_across_versions _____
+
+session = <sqlalchemy.orm.session.Session object at 0x7feb9a6eac60>
+
+    def test_residential_mix_never_mixes_affordable_and_total_across_versions(session):
+        """The core Part 5/12 guarantee end to end: build_residential_mix's
+        affordable_headline must come entirely from rep_app's own scheme, even
+        when another application on the same site has wildly different,
+        tempting-to-blend figures."""
+        site = _make_site(session)
+        rep = _make_app(session, site.id, "APP/2")
+        other = _make_app(session, site.id, "APP/1")
+        _make_scheme(session, rep.id, total_units_final=100, affordable_units_final=30, affordable_percentage_final=30.0, core_intelligence_complete=True)
+        _make_scheme(session, other.id, total_units_final=500, affordable_units_final=490, affordable_percentage_final=98.0)
+        session.refresh(rep)
+        session.refresh(other)
+    
+        mix = build_residential_mix(site, [rep, other], rep_app=rep)
+>       assert mix["affordable_headline"]["affordable_units"] == 30
+E       assert None == 30
+
+tests/test_residential_mix.py:240: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_residential_mix.py::test_residential_mix_never_mixes_affordable_and_total_across_versions
+1 failed, 95 passed, 10 subtests passed in 3.22s

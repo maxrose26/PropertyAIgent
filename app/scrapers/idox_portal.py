@@ -9,6 +9,7 @@ from __future__ import annotations
 import calendar
 import re
 import time
+from app.pipeline.lookup_outcome import bounded_sleep, remaining_seconds
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
 
@@ -107,19 +108,25 @@ def get_with_retry(
     last_error: Exception | None = None
     for attempt in range(MAX_RETRIES):
         try:
-            response = session.get(url, timeout=timeout, stream=stream, **kwargs)
+            remaining = remaining_seconds()
+            # requests' timeout is an inactivity bound, not a total body deadline.
+            # The independent stage envelope remains the hard containment bound.
+            response = session.get(url, timeout=timeout if remaining is None else min(timeout, remaining), stream=stream, **kwargs)
+            remaining_seconds()
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
             last_error = e
-            time.sleep(CONNECTION_ERROR_BACKOFF_SECONDS * (attempt + 1))
+            bounded_sleep(CONNECTION_ERROR_BACKOFF_SECONDS * (attempt + 1))
             continue
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
-            wait = float(retry_after) if retry_after and retry_after.isdigit() else BACKOFF_BASE_SECONDS * (attempt + 1)
+            from app.pipeline.lookup_outcome import remember_retry_after, retry_wait
+            wait = retry_wait(retry_after, BACKOFF_BASE_SECONDS * (attempt + 1))
+            remember_retry_after(wait)
             # Release the connection before retrying - especially
             # important when stream=True, where the body was never read
             # and the underlying socket would otherwise sit open.
             response.close()
-            time.sleep(wait)
+            bounded_sleep(wait)
             last_error = requests.exceptions.HTTPError(f"429 after {attempt + 1} attempts: {url}")
             continue
         try:
@@ -155,7 +162,7 @@ def _goto_with_retry(page: Page, url: str, *, timeout: int = 30000) -> None:
         except PlaywrightTimeoutError as e:
             last_error = e
             if attempt < GOTO_MAX_ATTEMPTS - 1:
-                time.sleep(GOTO_RETRY_BACKOFF_SECONDS * (attempt + 1))
+                bounded_sleep(GOTO_RETRY_BACKOFF_SECONDS * (attempt + 1))
     raise last_error
 
 
@@ -190,7 +197,7 @@ def collect_result_links(page: Page, council: CouncilConfig, date_from: str, dat
     try:
         page.select_option('select[name="searchCriteria.resultsPerPage"]', "100")
         page.wait_for_load_state("networkidle", timeout=30000)
-        time.sleep(WAIT_SECONDS)
+        bounded_sleep(WAIT_SECONDS)
     except Exception:
         pass  # not all portals expose this control
 
@@ -210,7 +217,7 @@ def collect_result_links(page: Page, council: CouncilConfig, date_from: str, dat
         try:
             next_links.first.click()
             page.wait_for_load_state("networkidle", timeout=30000)
-            time.sleep(WAIT_SECONDS)
+            bounded_sleep(WAIT_SECONDS)
         except Exception:
             break
 
@@ -247,7 +254,7 @@ def fetch_application_detail(
     classification = result.classification
 
     if result.qualifies:
-        time.sleep(request_delay_seconds)
+        bounded_sleep(request_delay_seconds)
         fi_response = get_with_retry(session, further_info_url)
         fields.update(extract_table_fields(fi_response.text))
 
@@ -273,7 +280,7 @@ def fetch_application_detail(
 
 
 def fetch_application_by_reference(
-    page: Page, session: requests.Session, council: CouncilConfig, reference: str
+    page: Page, session: requests.Session, council: CouncilConfig, reference: str, *, strict: bool = False
 ) -> ScrapedApplication | None:
     """Targeted single-application lookup by exact reference, bypassing the
     normal date-range search - used to backfill a parent outline/full
@@ -315,6 +322,14 @@ def fetch_application_by_reference(
             if "applicationDetails.do" in a["href"] and "keyVal=" in a["href"]
         }
         keyvals.discard(None)
+        if strict:
+            from app.pipeline.lookup_outcome import AmbiguousIdentity, UnrecognisedSearch
+            if soup.select_one('a.next, a[rel="next"], .pagination a'):
+                raise UnrecognisedSearch("incomplete result traversal")
+            if len(keyvals) > 1:
+                raise AmbiguousIdentity("multiple detail identities")
+            if not keyvals and not soup.select_one(".noResults, #noResults"):
+                raise UnrecognisedSearch("no supported empty-results marker")
         if not keyvals:
             return None
         keyval = sorted(keyvals)[0]
@@ -329,7 +344,7 @@ def fetch_application_by_reference(
         # only fetched by fetch_application_detail when its own internal
         # qualify() passed - re-fetch with the same URL now that we're
         # forcing it through, so the parent record isn't left half-empty.
-        time.sleep(council.request_delay_seconds)
+        bounded_sleep(council.request_delay_seconds)
         further_info_url = summary_url.replace("activeTab=summary", f"activeTab={council.further_info_tab}")
         fi_response = get_with_retry(session, further_info_url)
         detail.fields.update(extract_table_fields(fi_response.text))
@@ -392,7 +407,7 @@ def search_related_applications(page: Page, council: CouncilConfig, query: str) 
         try:
             next_links.first.click()
             page.wait_for_load_state("networkidle", timeout=30000)
-            time.sleep(WAIT_SECONDS)
+            bounded_sleep(WAIT_SECONDS)
         except Exception:
             break
 
@@ -417,6 +432,12 @@ def scrape_month(page: Page, council: CouncilConfig, date_from: str, date_to: st
             applications.append(app)
         except Exception as e:
             print(f"  [{i}/{len(links)}] error fetching {url}: {e}")
-        time.sleep(council.request_delay_seconds)
+        bounded_sleep(council.request_delay_seconds)
 
     return applications
+
+
+def lookup_parent(page, session, council, reference, seconds=60):
+    from app.pipeline.lookup_outcome import strict_lookup, BoundedPage
+    return strict_lookup(lambda: fetch_application_by_reference(
+        BoundedPage(page), session, council, reference, strict=True), reference, seconds)

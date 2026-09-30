@@ -308,6 +308,7 @@ def compute_agent_evaluation_input_fingerprint(
         payload["opportunity_facts"]["progression_signal"] = _fact_value_pair(packet.progression_signal)
         payload["opportunity_facts"]["has_identified_planning_activity"] = _fact_value_pair(packet.has_identified_planning_activity)
     else:
+        payload["opportunity_facts"]["affordable_assessment"] = packet.affordable_assessment.fingerprint_payload() if packet.affordable_assessment else None
         payload["opportunity_facts"]["affordable_units"] = _fact_value_pair(packet.affordable_units)
         payload["opportunity_facts"]["affordable_percentage"] = _fact_value_pair(packet.affordable_percentage)
         payload["opportunity_facts"]["operative_planning_state"] = _fact_value_pair(packet.operative_planning_state)

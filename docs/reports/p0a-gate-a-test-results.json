@@ -1,0 +1,29 @@
+{
+  "tested_commit": "57451caa519676472767fa2270fbe2864a4d201f",
+  "baseline_commit": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+  "feature_summary": "6 failed, 331 passed, 5 skipped, 1 deselected in 32.00s",
+  "baseline_summary": "5 failed, 281 passed, 1 deselected in 24.41s",
+  "feature_failures": [
+    "FAILED tests/test_p0a_bounded_discovery.py::test_actual_supervisor_death_surviving_child_holds_lock",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_selects_only_outstanding_applications",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+  ],
+  "baseline_failures": [
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_selects_only_outstanding_applications",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+  ],
+  "additional_failure": "Supervisor-death test: supervisor process identity unavailable; child never started. Not counted as passed or baseline-equivalent.",
+  "integration_skips": {
+    "postgresql": 1,
+    "real_chromium": 4
+  },
+  "earlier_attempt_note": "An earlier aggregate failed local streaming RSS check with psutil.NoSuchProcess for its own PID. One isolated recheck passed. Final aggregate passed that check, but the instability remains recorded.",
+  "gate_a": "OPEN",
+  "external_calls": "No live scrape, paid model call, production DB or production configuration change."
+}

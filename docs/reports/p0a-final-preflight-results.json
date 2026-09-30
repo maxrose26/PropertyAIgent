@@ -1,0 +1,87 @@
+{
+  "candidate": {
+    "summary": "6 failed, 343 passed, 6 skipped, 1 deselected in 51.76s",
+    "failures": [
+      "tests.test_p0a_bounded_discovery::test_actual_supervisor_death_surviving_child_holds_lock",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_selects_only_outstanding_applications",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+    ],
+    "skips": [
+      "tests.test_p0a_bounded_discovery::test_postgres_migration_and_unique_key_when_disposable_server_available",
+      "tests.test_p0a_chromium_integration::test_real_navigation_deadline_cleanup_then_subsequent_work",
+      "tests.test_p0a_chromium_integration::test_real_document_recycling_then_evidence_refresh",
+      "tests.test_p0a_chromium_integration::test_real_browser_descendant_cleanup_on_supervised_failure",
+      "tests.test_p0a_chromium_integration::test_real_supervisor_death_with_browser_child",
+      "tests.test_p0a_chromium_integration::test_real_browser_cleanup_when_persistence_blocks"
+    ],
+    "measurements": {
+      "test_independent_watchdog_bounds_blocked_persistence[bootstrap]": {
+        "termination_seconds": "2.4020021289998112",
+        "configured_deadline_seconds": "2",
+        "emergency_cleanup_allowance_seconds": "0",
+        "scheduling_margin_seconds": "3"
+      },
+      "test_independent_watchdog_bounds_blocked_persistence[reconciliation]": {
+        "termination_seconds": "2.354257740000321",
+        "configured_deadline_seconds": "2",
+        "emergency_cleanup_allowance_seconds": "0",
+        "scheduling_margin_seconds": "3"
+      },
+      "test_independent_watchdog_bounds_blocked_persistence[on_start]": {
+        "termination_seconds": "2.3310592270008783",
+        "configured_deadline_seconds": "2",
+        "emergency_cleanup_allowance_seconds": "0",
+        "scheduling_margin_seconds": "3"
+      },
+      "test_independent_watchdog_bounds_blocked_persistence[on_line]": {
+        "termination_seconds": "2.3346122480015765",
+        "configured_deadline_seconds": "2",
+        "emergency_cleanup_allowance_seconds": "0",
+        "scheduling_margin_seconds": "3"
+      },
+      "test_independent_watchdog_bounds_blocked_persistence[final_status]": {
+        "termination_seconds": "2.3407460449998325",
+        "configured_deadline_seconds": "2",
+        "emergency_cleanup_allowance_seconds": "0",
+        "scheduling_margin_seconds": "3"
+      },
+      "test_unregistered_gate_exits_on_supervisor_pipe_loss": {
+        "unregistered_gate_cleanup_seconds": "0.03176112900109729"
+      },
+      "test_expired_group_cannot_extend_budget": {
+        "expired_group_termination_seconds": "0.34913194099863176"
+      },
+      "test_real_escalation_when_child_ignores_sigterm": {
+        "sigterm_to_forced_cleanup_total_seconds": "5.217000544998882"
+      },
+      "test_full_stderr_pipe_cannot_hold_watchdog_alive": {
+        "blocked_logging_termination_seconds": "0.5652098089994979"
+      }
+    }
+  },
+  "baseline": {
+    "summary": "5 failed, 281 passed, 1 deselected in 24.47s",
+    "failures": [
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_selects_only_outstanding_applications",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+    ],
+    "skips": [],
+    "measurements": {}
+  },
+  "candidate_commit": "e1b53eb4b942eb7b27fa14b49a60731eb2179293",
+  "baseline_commit": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+  "runner_blob": "a82af5ab4f49675a92cba4ad10f9f6fae11f5969",
+  "runner_sha256": "7b916e9824857ca679ae2ae6525eccd9581338263e6a424e1b9abbc4f7617065",
+  "dependency_snapshot_sha256": "551b45953598a503c8190a9f924cd6930e04f127ba496770a9a64c8ab05f43d9",
+  "specification_sha256": "c007e2b2912ae5d8817142c32fdf35e0000f72d4fa127d5c83e32e6ef10970f8",
+  "working_tree_at_test_start": "clean",
+  "gate_a": "OPEN",
+  "external_runtime": "not available; PostgreSQL and Chromium unexecuted",
+  "production_changes": false
+}

@@ -1,0 +1,183 @@
+{
+  "candidate": {
+    "suite": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "5",
+      "skipped": "0",
+      "tests": "355",
+      "time": "66.857",
+      "timestamp": "2026-09-29T09:49:58.029103+01:00",
+      "hostname": "Max"
+    },
+    "failures": [
+      "test_postgres_migration_and_unique_key_when_disposable_server_available",
+      "test_process_intelligence_backlog_selects_only_outstanding_applications",
+      "test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+      "test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+      "test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+    ],
+    "measurements": {
+      "test_actual_supervisor_death_surviving_child_holds_lock": [
+        {
+          "name": "confirmed_termination_to_successor_seconds",
+          "value": "0.020808545999898342"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[bootstrap]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.5030866939996486"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[reconciliation]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4288242930006163"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[on_start]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4237184700004946"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[on_line]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.415152634000151"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[final_status]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4230138839993742"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_unregistered_gate_exits_on_supervisor_pipe_loss": [
+        {
+          "name": "unregistered_gate_cleanup_seconds",
+          "value": "0.06437752900001215"
+        }
+      ],
+      "test_expired_group_cannot_extend_budget": [
+        {
+          "name": "expired_group_termination_seconds",
+          "value": "0.38788694699996995"
+        }
+      ],
+      "test_real_escalation_when_child_ignores_sigterm": [
+        {
+          "name": "sigterm_to_forced_cleanup_total_seconds",
+          "value": "5.226590870000109"
+        }
+      ],
+      "test_full_stderr_pipe_cannot_hold_watchdog_alive": [
+        {
+          "name": "blocked_logging_termination_seconds",
+          "value": "0.5708424159993228"
+        }
+      ],
+      "test_real_navigation_deadline_cleanup_then_subsequent_work": [
+        {
+          "name": "cooperative_cancellation_seconds",
+          "value": "0.2103672800003551"
+        }
+      ],
+      "test_real_browser_cleanup_when_persistence_blocks": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.411179547999382"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.412058740999782"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ]
+    }
+  },
+  "baseline": {
+    "suite": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "4",
+      "skipped": "0",
+      "tests": "286",
+      "time": "27.126",
+      "timestamp": "2026-09-29T09:51:09.345892+01:00",
+      "hostname": "Max"
+    },
+    "failures": [
+      "test_process_intelligence_backlog_selects_only_outstanding_applications",
+      "test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+      "test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+      "test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+    ],
+    "measurements": {}
+  },
+  "archive_sha256": "d07622bdd8a99471e0befda066d32b4a10c9d365dae165d28876102375fa4601"
+}

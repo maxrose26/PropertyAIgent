@@ -44,10 +44,10 @@ def test_daily_orchestrator_defaults_to_skipping_ai_stages():
 
     captured_commands = []
 
-    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         captured_commands.append(command)
         if on_line is not None:
-            on_line("Done.")
+            on_line("[run-health] status=success")
         return 0
 
     from sqlalchemy import create_engine as _ce
@@ -74,10 +74,10 @@ def test_daily_orchestrator_include_ai_stages_flag_omits_the_skip_flags():
 
     captured_commands = []
 
-    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         captured_commands.append(command)
         if on_line is not None:
-            on_line("Done.")
+            on_line("[run-health] status=success")
         return 0
 
     from sqlalchemy import create_engine as _ce

@@ -1,0 +1,126 @@
+{
+  "candidate": "06b978c59ece44bb20efc6d5b26009d769a22b5d",
+  "attempts": [
+    {
+      "attempt": 1,
+      "passed": true,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.453580327000964"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.506020135999279"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ],
+      "descendants_absent_and_successor_lock_admitted_asserted_by_test": true,
+      "browser_process_records": [
+        "attempt-1-tmp/test_real_browser_cleanup_when0/browser.json"
+      ]
+    },
+    {
+      "attempt": 2,
+      "passed": true,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.439718846999313"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.492197062001651"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ],
+      "descendants_absent_and_successor_lock_admitted_asserted_by_test": true,
+      "browser_process_records": [
+        "attempt-2-tmp/test_real_browser_cleanup_when0/browser.json"
+      ]
+    },
+    {
+      "attempt": 3,
+      "passed": true,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.453764811998553"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.506854093000584"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ],
+      "descendants_absent_and_successor_lock_admitted_asserted_by_test": true,
+      "browser_process_records": [
+        "attempt-3-tmp/test_real_browser_cleanup_when0/browser.json"
+      ]
+    },
+    {
+      "attempt": 4,
+      "passed": true,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.425311478000367"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.477927046998957"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ],
+      "descendants_absent_and_successor_lock_admitted_asserted_by_test": true,
+      "browser_process_records": [
+        "attempt-4-tmp/test_real_browser_cleanup_when0/browser.json"
+      ]
+    },
+    {
+      "attempt": 5,
+      "passed": true,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.457939817002625"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.510563008003373"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ],
+      "descendants_absent_and_successor_lock_admitted_asserted_by_test": true,
+      "browser_process_records": [
+        "attempt-5-tmp/test_real_browser_cleanup_when0/browser.json"
+      ]
+    }
+  ],
+  "all_five_passed": true,
+  "scope": "Only browser cleanup during blocked persistence; baseline not rerun; no production readiness claim",
+  "archive_sha256": "daab6b9b9a22abf93c7ae11fadc660323bf5273e648a0df6b7f3db67037113cf",
+  "working_tree": "clean",
+  "runner_sha256": "9baa70be07218b54fbce27305d3824c11fb598374f61985e0eb2aafe931802cb",
+  "independent_xml_review": "five single-test reports: five passes, no failures/errors/skips; all exits zero; seven recorded descendant identities each; dependencies match"
+}

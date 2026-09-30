@@ -6,6 +6,7 @@ assembly entrypoint" split (CLAUDE.md: "keep business logic out of the UI").
 """
 from __future__ import annotations
 
+import json
 from sqlalchemy import select
 
 from app.db.models import Council, ScrapeRun
@@ -26,11 +27,15 @@ def build_scraper_health_summary(session) -> list[dict]:
         ).scalars().all()
 
         last_attempt = runs[0] if runs else None
-        last_success = next((r for r in runs if r.status in ("success", "partial")), None)
+        last_success = next((r for r in runs if r.status in ("success", "partial") and not json.loads(r.progress or "{}").get("process_failure", False)), None)
 
         freshness = classify_scraper_freshness(last_success.finished_at if last_success else None)
 
+        progress = json.loads(last_attempt.progress or '{}') if last_attempt else {}
         rows.append({
+            "coverage_detail": progress or None,
+            "coverage_label": "coverage detail available" if progress else "coverage detail unavailable",
+            "historical_incomplete": sum(r.status == 'running' and not json.loads(r.progress or '{}').get('owner') for r in runs),
             "council_code": council.code,
             "council_name": council.name,
             "last_attempted_at": last_attempt.started_at if last_attempt else None,

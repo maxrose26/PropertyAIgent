@@ -10,6 +10,10 @@ All six sit on top of one shared technical foundation — the **Evidence Platfor
 
 *(Added at the Product Vision & Roadmap Refresh, post–Opportunity Experience V2: a seventh section, §7 "Agentic Reasoning," sits alongside this stack, not after it in the same linear sequence — it is the cross-cutting discipline for how AI reasoning is allowed to consume the six capability areas' own structured facts, wherever in the stack that reasoning happens. See §7 for the full guardrail and the three agentic capabilities it currently justifies.)*
 
+## Current implementation and health note — 28 September 2026
+
+The current execution order is the P0–P4 sequence in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). Historical design descriptions below are retained; they are not current implementation permission. Lifecycle V1, acquisition-position facts, Buyer Mandate V2 through B2, evaluation policy, persistence/subject identity and taxonomy V2 are implemented and included in deployed `6fd4202`. Benchmark infrastructure exists; execution/model selection, scheduled acquisition execution and human/buyer workflow remain outstanding. Historical production verification is distinct from today's unhealthy discovery execution and Supabase quota restriction. AH truth-layer acceptance requires consistent downstream consumption and invalidation before a verification agent.
+
 ## The Acquisition-First Conceptual Architecture
 
 *(Added at the Acquisition-First Roadmap Alignment. This is the same six-layer capability stack above, redrawn along the acquisition journey the Product Vision now states as the commercial outcome — see [PRODUCT_VISION.md](PRODUCT_VISION.md), "The Acquisition-First Commercial Outcome." It does not replace the six-layer stack; every box below is built from capability that already lives inside one of those six layers or the Evidence Platform beneath them.)*
@@ -21,17 +25,17 @@ TRUSTED OPERATIVE OPPORTUNITY FACTS              BUILT, CLOSED (Gate 2B, all six
         ↓
 OPPORTUNITY DETECTION                            BUILT, CLOSED (Gate 1 + Gate 1C — opportunity universe, fingerprinting, change detection; corrected onto the trusted facts above by Gate 2B-2B.2/2B-2C)
         ↓
-APPLICATION LIFECYCLE INTELLIGENCE               NEXT    (Gate 2B-0B — architecture investigation only, not yet implemented; promoted ahead of Gate 2C)
+APPLICATION LIFECYCLE INTELLIGENCE               BUILT   (Gate 2B-0B V1; operational freshness still requires P0 acceptance)
         ↓
-ACQUISITION POSITION INTELLIGENCE                FUTURE  (Gate 2C — after Gate 2B-0B; purpose refined — evidence-specific ownership/control facts and buyer-neutral Transaction/Disposition Signals, never a site-availability claim — see PRODUCT_ROADMAP.md, "Gate 2C — Acquisition Position, Transaction Signals & Buyer Acquisition Type")
+ACQUISITION POSITION INTELLIGENCE                BUILT   (Gate 2C facts plus Agent Evaluation Foundation transaction signals; never a site-availability claim)
         ↓
-BUYER MANDATE                                    PARTIAL (Buyer Profiles V1 built/closed — Gate 1; Buyer Mandate V2 extension FUTURE, after Gate 2C)
+BUYER MANDATE                                    BUILT   (Buyer Mandate V2 through B2; B3 mandate UX remains deferred)
         ↓
 DETERMINISTIC BUYER FIT                          BUILT   (`app.policy.buyer_matching.assess_buyer_fit`)
         ↓
-AUTONOMOUS ACQUISITION AGENT                     FUTURE  (Gate 3 — Autonomous Acquisition Agent V1, after Buyer Mandate V2; see "The Autonomy Principle" in §7)
+AUTONOMOUS ACQUISITION AGENT                     PARTIAL (evaluation/persistence built; benchmark execution, approved model and scheduled runner outstanding)
         ↓
-PURSUE / VERIFY / MONITOR / NOT RELEVANT         FUTURE  (Gate 3's own output — names provisional)
+PURSUE / INVESTIGATE / MONITOR / NOT RELEVANT    BUILT   (taxonomy V2; buyer-facing workflow outstanding)
         ↓
 PRIORITISED BUYER OPPORTUNITY PIPELINE           FUTURE  (Gate 4 — Acquisition Prioritisation — explainable bands, not a premature numeric score)
         ↓
@@ -239,7 +243,7 @@ Council portals + planning documents
         ↓
 Trusted Opportunity Data                            — production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`
         ↓
-2B-0B     APPLICATION LIFECYCLE INTELLIGENCE       durable lifecycle-change detection, history, propagation [NEXT]
+2B-0B     APPLICATION LIFECYCLE INTELLIGENCE       durable lifecycle-change detection, history, propagation [V1 BUILT]
         ↓
 Buyer/Acquisition Intelligence                      (Gate 2C onward)
         ↓
@@ -252,10 +256,10 @@ AUTONOMOUS ACQUISITION AGENT                        (Gate 3 — see §7, "The Au
 - **Trusted Consumer Alignment** (Gate 2B-2B.1) — **CLOSED**. Migrated downstream buyer-facing consumers (Buyer Fit planning-state resolution, Site Profile Structured Summary, Affordable Homes tile) from the legacy `pick_representative_application`/`aggregate_scheme_fields` selection onto Trusted Operative Planning Facts; removed a hardcoded `PERMISSION_GRANTED` fallback; corrected a live production AH percentage/unit-count conflation defect (Brixham Road), with two closure hotfixes.
 - **Acquisition Opportunity Scope Alignment** (Gate 2B-2B.2) — **CLOSED**. Migrated *acquisition opportunity generation itself* — not just presentation — onto the same operative-scope model 2B-2A introduced: an individual dwelling plot filing can no longer become its own standalone acquisition opportunity inheriting the whole site's unit count (confirmed real defects at Lacy Street, Barton Road and four further production sites, all corrected). Introduced `app.reporting.opportunity_monitoring_transition` — a narrow, dry-run-first, manifest-driven mechanism so a software scope/fact correction is never misreported as a genuine `NEW`/`MATERIALLY_CHANGED` market event to `app.reporting.opportunity_change`. Reused, unmodified, by Gate 2B-2C.
 - **Planning Signal Consumer Alignment** (Gate 2B-2C) — **CLOSED**, production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`. `app.reporting.scheme_reconciliation.resolve_operative_lapse_anchor` — the one trusted, role-aware "which application governs implementation/lapse" answer, reused (never re-derived) by both `compute_lapse_status` (whole-site) and `compute_phase_progress` (phase/parcel-scoped). Fixes a confirmed defect where `compute_lapse_status`/`compute_phase_progress` independently selected the most recently *decided* "approve"/"grant"-worded application with no role awareness — a later NMA, condition discharge or S73/variation could become the lapse-clock anchor, or wrongly suppress genuine post-permission progress evidence, purely by being the most recent grant-worded filing (World of Pets, and 56 further production sites). A pre-merge semantic review distinguished `NOT_GRANTED` (no application granted at all — an ordinary, stable fact) from `NOT_DETERMINED` (something granted, not trustworthy as the operative permission) via `OperativeLapseAnchor.any_granted`, eliminating ~125 spurious fingerprint relabellings the first pass introduced. S73/variation requires no special-cased "never resets the clock" logic — it was already excluded from Gate 2B-2A's substantive-role set. Production impact at closure: 407→389 total opportunities, 178→160 planning_delivery; 11/18 `RECENT_PERMISSION` and 8 `UNDEVELOPED_PERMISSION`/`APPROACHING_LAPSE` opportunities confirmed false and removed; zero unrelated fingerprint fields touched. Comprehensive statutory outline/reserved-matters commencement-period modelling remains explicitly deferred.
-- **Application Lifecycle Intelligence** (Gate 2B-0B) — **NEXT, architecture investigation only**. Promoted ahead of Gate 2C by Product Owner decision, post Gate 2B-2C: the platform can now reliably answer "what does the evidence mean?" but not yet "has it changed since we last checked?" Broadened from the original narrower "Application Lifecycle History" framing — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Gate 2B-0B — Application Lifecycle Intelligence (NEXT)" for the full lifecycle-event list, history requirement, monitoring-cadence principle, and required architecture-investigation scope. Builds on 2B-0A's freshness signal, does not rebuild it. **No schema or implementation is authorised until that investigation is reviewed by the Product Owner.**
+- **Application Lifecycle Intelligence** (Gate 2B-0B) — **V1 implemented/deployed; the following records its historical investigation scope**. Promoted ahead of Gate 2C by Product Owner decision, post Gate 2B-2C: the platform can now reliably answer "what does the evidence mean?" but not yet "has it changed since we last checked?" Broadened from the original narrower "Application Lifecycle History" framing — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md), "Gate 2B-0B — Application Lifecycle Intelligence (V1 closed; historical scope)" for the full lifecycle-event list, history requirement, monitoring-cadence principle, and required architecture-investigation scope. Builds on 2B-0A's freshness signal, does not rebuild it. **V1 subsequently closed; further changes require a new approved gate.**
 - **Monitoring Agent / Autonomous Acquisition Agent** (Gate 3, roadmap only — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)) — the genuinely agentic capability sitting above Gate 2B-0B. It must never itself scrape a portal or decide planning truth; it consumes 2B-0B's trusted lifecycle changes and answers "what changed that matters" (buyer-specifically, once Buyer Mandate V2 exists). Same "agent reads, deterministic layers write" discipline as every other agentic capability in this document (§7) — see "The Autonomy Principle" there for the specific architecture Gate 2B-0B's own capabilities must expose for this agent to consume.
 
-Conceptual only for Gate 2B-0B and the Monitoring/Acquisition Agent — the technical shape of each is deliberately undecided here beyond what's stated; Gate 2B-0B's own architecture investigation (not yet run) is what determines further design, not this document. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence.
+Gate 2B-0B V1 now implements lifecycle events, document content hashes and bounded same-day reassessment. The fuller Monitoring/Acquisition Agent remains future work; its design builds on those foundations. See [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) for the gate sequence.
 
 ### Opportunity Dimensions and Trust Dimensions — kept structurally separate
 
@@ -524,7 +528,7 @@ Reasons over the platform's own existing structured intelligence: allocation sta
 
 Sits above structured buyer profiles (geography, unit/site scale, planning-risk appetite, planning status, development type, tenure, delivery horizon, brownfield/greenfield preference) and deterministic suitability logic. Architecture: **buyer profile → deterministic suitability → agent interpretation**, never an LLM producing an arbitrary buyer score. No opaque, generic Opportunity Score is introduced anywhere in this architecture — an opportunity may legitimately be highly suitable for one buyer and unsuitable for another, and the platform's output must show that contextual difference, not average it away.
 
-**Implementation status:** the deterministic layer this agent will sit above is built and closed - Buyer Profiles V1 (four pilot profiles) and `app.policy.buyer_matching.assess_buyer_fit`, merged to master, plus persistent, Workspace-owned Buyer Profiles and a deterministic onboarding baseline (Gate 1: Acquisition Monitoring Substrate, merged to master). The Buyer Analyst's own agentic interpretation layer is not yet built — the acquisition-first roadmap now sequences it as **Buyer Mandate V2 → Acquisition Agent V1** (extending, never rebuilding, this same Buyer Profile substrate — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)).
+**Implementation status:** the deterministic layer this agent will sit above is built and closed - Buyer Profiles V1 (four pilot profiles) and `app.policy.buyer_matching.assess_buyer_fit`, merged to master, plus persistent, Workspace-owned Buyer Profiles and a deterministic onboarding baseline (Gate 1: Acquisition Monitoring Substrate, merged to master). Bounded agent evaluation and persistence are now built; scheduled execution and buyer-facing interpretation remain outstanding — the acquisition-first roadmap preserves **Buyer Mandate V2 → Acquisition Agent V1** (extending, never rebuilding, this same Buyer Profile substrate — see [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)).
 
 ### C. Mandate Intake Agent
 

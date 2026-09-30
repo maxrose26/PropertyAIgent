@@ -890,6 +890,7 @@ def _scheme_card(
     if operative_facts is not None:
         filter_facts = resolve_operative_filter_facts(operative_facts)
         total_units = filter_facts.units
+        affordable_assessment = filter_facts.affordable_assessment
         affordable_units = filter_facts.affordable_units
         affordable_percentage = filter_facts.affordable_percentage
         decision_status_label = (
@@ -898,12 +899,18 @@ def _scheme_card(
         )
     else:
         total_units = si.total_units_final if si else None
+        from app.policy.ah_assessment import legacy_assessment
+        affordable_assessment = legacy_assessment(si, application_reference=app.reference)
+        from app.policy.ah_claim_selection import for_applications
+        affordable_assessment = for_applications([app], affordable_assessment)
         affordable_units = si.affordable_units_final if si else None
         affordable_percentage = si.affordable_percentage_final if si else None
         decision_status = classify_decision_status(app.decision, app.status)
         decision_status_label = DECISION_STATUS_LABELS.get(decision_status) if decision_status != "not_yet_decided" else None
 
     return {
+        "affordable_assessment": affordable_assessment.payload(),
+        "affordable_label": affordable_assessment.label(),
         "id": f"scheme-{app.id}",
         "reference": app.reference,
         "council_code": app.council_code,

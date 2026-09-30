@@ -115,14 +115,16 @@ def test_kill_process_tree_posix_kills_the_whole_process_group():
     fake_process.pid = 4242
 
     with patch("scripts.run_daily_councils.os.name", "posix"), \
-         patch("scripts.run_daily_councils.os.getpgid", return_value=9999, create=True) as mock_getpgid, \
+         patch("scripts.run_daily_councils.os.getpgid", side_effect=ProcessLookupError, create=True) as mock_getpgid, \
          patch("scripts.run_daily_councils.os.killpg", create=True) as mock_killpg:
         _kill_process_tree(fake_process)
 
-    mock_getpgid.assert_called_once_with(4242)
+    # start_new_session establishes group ID == child PID. The leader may
+    # already have exited; querying its current group can skip living descendants.
+    mock_getpgid.assert_not_called()
     # 9 == SIGKILL's POSIX-standard value - see the source's own comment on
     # why this is a portable literal rather than signal.SIGKILL.
-    mock_killpg.assert_called_once_with(9999, 9)
+    mock_killpg.assert_called_once_with(4242, 9)
     fake_process.kill.assert_not_called()
 
 
@@ -153,7 +155,7 @@ def test_run_council_subprocess_streams_each_line_via_callback():
         cwd=REPO_ROOT, timeout_seconds=15, on_line=lines.append,
     )
     assert rc == 0
-    assert lines == ["line1", "line2"]
+    assert [line for line in lines if not line.startswith("[discovery-progress]")] == ["line1", "line2"]
 
 
 def test_run_council_subprocess_raises_timeout_and_kills_the_hung_process():
@@ -172,7 +174,7 @@ def test_run_council_subprocess_raises_timeout_and_kills_the_hung_process():
     elapsed = time.monotonic() - start
 
     assert elapsed < 15  # actually killed - did not wait out the full 30s sleep
-    assert lines == ["before-hang"]
+    assert [line for line in lines if not line.startswith("[discovery-progress]")] == ["before-hang"]
 
 
 def test_run_council_subprocess_leaves_no_orphaned_descendants_after_normal_exit():
@@ -210,9 +212,9 @@ def test_run_one_council_still_uses_run_council_subprocess(session):
     success/failure/ScrapeRun contract."""
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         if on_line is not None:
-            on_line("Done.")
+            on_line("[run-health] status=success")
         return 0
 
     with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_subprocess) as mock_helper:
@@ -225,7 +227,7 @@ def test_run_one_council_still_uses_run_council_subprocess(session):
 def test_run_one_council_records_timeout_from_the_new_helper_without_raising(session):
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_timeout(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_timeout(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         if on_line is not None:
             on_line("stuck mid-stage")
         raise subprocess.TimeoutExpired(command, timeout_seconds)
@@ -246,12 +248,12 @@ def test_one_council_timeout_does_not_prevent_the_next_council_being_attempted(s
     ))
     session.commit()
 
-    def _fake_timeout(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_timeout(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         raise subprocess.TimeoutExpired(command, timeout_seconds)
 
-    def _fake_success(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_success(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         if on_line is not None:
-            on_line("Done.")
+            on_line("[run-health] status=success")
         return 0
 
     with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_timeout):

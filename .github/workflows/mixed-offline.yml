@@ -1,0 +1,56 @@
+name: Mixed council child disposable PostgreSQL
+on:
+  pull_request:
+    paths: ['app/revisit/**', 'app/pipeline/discovery_*.py', 'app/pipeline/parent_lookup.py', 'app/db/models.py', 'app/db/session.py', 'scripts/migrate_p0a.py', 'app/pipeline/run_weekly.py', 'scripts/run_daily_councils.py', 'verification/mixed_pg/**', 'verification/ah_pg/**', 'verification/revisit_pg/**', 'verification/ci/**', '.github/workflows/mixed-offline.yml']
+  push:
+    paths: ['app/revisit/**', 'app/pipeline/discovery_*.py', 'app/pipeline/parent_lookup.py', 'app/db/models.py', 'app/db/session.py', 'scripts/migrate_p0a.py', 'app/pipeline/run_weekly.py', 'scripts/run_daily_councils.py', 'verification/mixed_pg/**', 'verification/ah_pg/**', 'verification/revisit_pg/**', 'verification/ci/**', '.github/workflows/mixed-offline.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mixed-offline-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  mixed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Provision runner-local tools (no application services)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 iproute2 util-linux
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/mixed-venv"
+      - name: Focused controller and offline-boundary checks
+        run: |
+          mkdir -p "$RUNNER_TEMP/mixed-results"
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+            "$RUNNER_TEMP/mixed-venv/bin/python" -m pytest -q -p no:cacheprovider \
+            verification/mixed_pg/test_pause_control.py verification/mixed_pg/test_boundary.py \
+            --junitxml="$RUNNER_TEMP/mixed-results/controller.xml"
+      - name: Run unchanged guarded native runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/mixed-results"
+          env -i HOME="$HOME" PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+            "$RUNNER_TEMP/mixed-venv/bin/python" verification/mixed_pg/run.py \
+            --candidate "$(git rev-parse HEAD)" --output-parent "$RUNNER_TEMP/mixed-results"
+      - name: Readable native result and work ledger
+        if: always()
+        run: python3 verification/ci/summary.py "$RUNNER_TEMP/mixed-results" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mixed-offline-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/mixed-results/controller.xml
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/*.log
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/*.json
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/*.jsonl
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/*.xml
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/*.txt
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/SHA256SUMS
+            ${{ runner.temp }}/mixed-results/mixed-pg-run-*/*.tar.gz
+          retention-days: 7
+          if-no-files-found: error

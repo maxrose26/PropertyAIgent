@@ -82,6 +82,8 @@ scraper_table_rows = [{
     "Last successful run": r["last_successful_at"].strftime("%d %b %Y %H:%M") if r["last_successful_at"] else "Never",
     "Last attempt": r["last_attempted_at"].strftime("%d %b %Y %H:%M") if r["last_attempted_at"] else "Never",
     "Last attempt status": r["last_attempt_status"] or "—",
+    "Coverage": r["coverage_label"],
+    "Historical incomplete": r["historical_incomplete"],
     "Applications discovered (last run)": (
         r["last_run_applications_discovered"] if r["last_run_applications_discovered"] is not None else "—"
     ),
@@ -93,6 +95,15 @@ st.caption(
     "\"No run evidence\" means this council has never had a recorded scraper attempt from the production "
     "orchestrator (scripts/run_daily_councils.py) - distinct from Stale, which means a run happened but is now old."
 )
+with st.expander("Discovery coverage and deferred work"):
+    st.caption("Run freshness does not prove complete source coverage. Partial runs can contain useful committed evidence; historical incomplete runs have unverified termination.")
+    for row in scraper_rows:
+        progress = row["coverage_detail"]
+        if progress:
+            st.write(row["council_name"])
+            st.json({key: progress[key] for key in ("stages", "parents", "memory", "deferred_councils", "recovery", "process_failure") if key in progress})
+        else:
+            st.caption(f"{row['council_name']}: coverage detail unavailable")
 st.divider()
 
 # AI Processing Reliability & Backlog Throughput - minimum operator

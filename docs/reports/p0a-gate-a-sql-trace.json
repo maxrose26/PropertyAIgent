@@ -1,0 +1,48 @@
+{
+  "before_commit": "705590b26d79239df9a808946bd3bfb487f29928",
+  "after_commit": "57451caa519676472767fa2270fbe2864a4d201f",
+  "fixture": {
+    "references": 48,
+    "citations": 192,
+    "invocations": 3
+  },
+  "before": {
+    "sql_statements": 1169,
+    "by_function_and_verb": {
+      "fan_out / SELECT": 383,
+      "fan_out / UPDATE": 192,
+      "finish / SELECT": 48,
+      "finish / UPDATE": 48,
+      "populate / INSERT": 48,
+      "populate / RELEASE": 48,
+      "populate / SAVEPOINT": 48,
+      "populate / SELECT": 147,
+      "reserve / SELECT": 48,
+      "reserve / UPDATE": 48,
+      "run_parent_stage / INSERT": 48,
+      "run_parent_stage / SELECT": 63
+    },
+    "transaction_boundaries": {
+      "commit": 294
+    }
+  },
+  "after": {
+    "sql_statements": 608,
+    "by_function_and_verb": {
+      "fan_out / SELECT": 59,
+      "fan_out / UPDATE": 192,
+      "finish / UPDATE": 48,
+      "populate / INSERT": 48,
+      "populate / RELEASE": 48,
+      "populate / SAVEPOINT": 48,
+      "populate / SELECT": 6,
+      "reserve / UPDATE": 48,
+      "run_parent_stage / INSERT": 48,
+      "run_parent_stage / SELECT": 63
+    },
+    "transaction_boundaries": {
+      "commit": 294
+    }
+  },
+  "scope": "SQLite cursor statement count; transaction commits listed separately; not database wire bytes or production throughput"
+}

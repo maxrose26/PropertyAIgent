@@ -344,8 +344,13 @@ class BuyerMandatePolicy:
     acquisition_types: frozenset[str] = field(default_factory=frozenset)
     development_state_appetite: str = DEVELOPMENT_STATE_UNSPECIFIED
     control_appetite: frozenset[str] = field(default_factory=frozenset)
+    # Local policy input only; no persisted mandate field or production profile
+    # activation. Acceptance never overrides an existing specialist exclusion.
+    retirement_appetite: str = "UNSPECIFIED"
 
     def __post_init__(self) -> None:
+        if self.retirement_appetite not in {"ACCEPT", "EXCLUDE", "UNSPECIFIED"}:
+            raise ValueError("retirement_appetite must be ACCEPT, EXCLUDE or UNSPECIFIED")
         if self.geography_scope not in GEOGRAPHY_SCOPES:
             raise ValueError(f"geography_scope {self.geography_scope!r} is not one of {sorted(GEOGRAPHY_SCOPES)}")
         if self.geography_scope == GEOGRAPHY_COUNCILS and not self.geography_councils:

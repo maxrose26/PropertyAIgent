@@ -1,0 +1,22 @@
+{
+  "commit": "182bce89199f265e986746f5a68fefc464e1e9d3",
+  "working_tree": " M app/policy/ah_assessment.py\n M app/policy/buyer_matching.py\n M app/policy/buyer_profiles.py\n M app/reporting/residential_mix.py\n M app/ui/pages/0_Explore.py\n M app/ui/site_profile_view.py\n M tests/test_ah_workflow_presentation.py\n M tests/test_residential_mix.py\n M verification/ah_workflow/run.py\n M verification/test_ah_classification_presentation.py\n",
+  "python": "3.12.14",
+  "dependencies": {
+    "pytest": "9.1.1",
+    "SQLAlchemy": "2.1.1",
+    "pandas": "3.0.6",
+    "streamlit": "1.64.0"
+  },
+  "mode": "Offline disposable SQLite; real Streamlit AppTest rendering and download media bytes; no HTTP delivery test",
+  "code_sha256": {
+    "app/reporting/residential_mix.py": "57af9754da57ffba55e0c2d99e939c7faa82a15d8829233cda92705d53be65d3",
+    "app/reporting/ownership_control.py": "c3054f0a0ecf9431494f0d6e04a368e1dace8c6d83140e8c612466400434b3ff",
+    "verification/ah_workflow/run.py": "19ccfd2d05490d42acab535b1a4735bb96d02f83ef3504489f441bd102de7cdf",
+    "app/policy/buyer_profiles.py": "881a101d076a8903a43f2671d70197b1f4aa98838efc24109a6c13508d5d9c77",
+    "app/policy/buyer_matching.py": "30d5edeca6d0ab3e13ce85e3fe2fed043a738d6c2ae5f92cd16f6a32292c2f02",
+    "app/policy/ah_assessment.py": "a71e97e7d95ddda59cf12a69010775f1a7e7bc711e91eb94b8ba314b96d931dc",
+    "app/ui/site_profile_view.py": "04e91ac0c6ba3b7691a8c1e587ff5e500c3a6fada067c85f5da0f46375b6cb70",
+    "app/ui/pages/0_Explore.py": "b853d74679596a4e75d5def2c960f24c0ac58f8b5fcb86c70b0f23d071d0a667"
+  }
+}

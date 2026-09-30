@@ -1,0 +1,28 @@
+[
+  {
+    "Address":"Southlink",
+    "Council":"oldham",
+    "Units":147,
+    "Affordable":"147.0 affordable homes \u2014 exact, verified; Southlink proposed scheme; FUL\/355201\/25; proposed (reported; stage unverified); source 2; document date 2026-09-24; Accepted source claim 3; scoped evidence only, not a statement of current availability.",
+    "Development Type":"Houses",
+    "Planning Status":"Awaiting decision",
+    "Decision":"Awaiting decision",
+    "Build Status":"Unknown",
+    "Application Ref(s)":"FUL\/355201\/25",
+    "Developer":null,
+    "Planning portal":null
+  },
+  {
+    "Address":"Focus School",
+    "Council":"stockport",
+    "Units":82,
+    "Affordable":"72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC\/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+    "Development Type":"Mixed (houses & apartments)",
+    "Planning Status":"Decided",
+    "Decision":"Granted",
+    "Build Status":"Unknown",
+    "Application Ref(s)":"DC\/085997, DC\/093884",
+    "Developer":null,
+    "Planning portal":null
+  }
+]

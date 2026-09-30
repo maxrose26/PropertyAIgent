@@ -1,0 +1,22 @@
+{
+  "standard_library_checks": {
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "candidate_collection_attempt": {
+    "exit": 1,
+    "output": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python: No module named pytest",
+    "test_counts": null
+  },
+  "baseline_collection_attempt": {
+    "commit": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+    "exit": 1,
+    "output": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python: No module named pytest",
+    "test_counts": null
+  },
+  "integration_executed": false,
+  "production_changes": false,
+  "note": "Both pytest attempts failed before collection; not baseline-equivalent application failures. WSL execution required."
+}

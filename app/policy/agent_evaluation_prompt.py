@@ -615,6 +615,7 @@ def build_prompt_context(
         _fv("progression_signal", packet.progression_signal)
         _fv("has_identified_planning_activity", packet.has_identified_planning_activity)
     else:
+        reference_tokens["packet.affordable_assessment"] = repr(packet.affordable_assessment.payload() if packet.affordable_assessment else None)
         _fv("affordable_units", packet.affordable_units)
         _fv("affordable_percentage", packet.affordable_percentage)
         _fv("operative_planning_state", packet.operative_planning_state)

@@ -1,0 +1,19 @@
+test_accepted_exceptions_remain_explicit (test_p0a_ci_assess.AssessmentTests.test_accepted_exceptions_remain_explicit) ... ok
+test_changed_known_failure_rejected (test_p0a_ci_assess.AssessmentTests.test_changed_known_failure_rejected) ... ok
+test_deselection_must_be_reported (test_p0a_ci_assess.AssessmentTests.test_deselection_must_be_reported) ... ok
+test_integration_skip_rejected (test_p0a_ci_assess.AssessmentTests.test_integration_skip_rejected) ... ok
+test_missing_integration_rejected (test_p0a_ci_assess.AssessmentTests.test_missing_integration_rejected) ... ok
+test_missing_xml_rejected (test_p0a_ci_assess.AssessmentTests.test_missing_xml_rejected) ... ok
+test_new_failure_rejected (test_p0a_ci_assess.AssessmentTests.test_new_failure_rejected) ... ok
+test_known_shell_rejected_even_by_permissive_test_pattern (test_p0a_scheduler_contract.SchedulerContractTests.test_known_shell_rejected_even_by_permissive_test_pattern) ... ok
+test_legacy_row_not_an_owner (test_p0a_scheduler_contract.SchedulerContractTests.test_legacy_row_not_an_owner) ... ok
+test_offline_attested_shape (test_p0a_scheduler_contract.SchedulerContractTests.test_offline_attested_shape) ... ok
+test_same_host_active_child_still_blocks (test_p0a_scheduler_contract.SchedulerContractTests.test_same_host_active_child_still_blocks) ... ok
+test_successor_requires_both_contracts (test_p0a_scheduler_contract.SchedulerContractTests.test_successor_requires_both_contracts) ... ok
+test_unverified_contract_blocks_production (test_p0a_scheduler_contract.SchedulerContractTests.test_unverified_contract_blocks_production) ... ok
+test_wrong_service_is_not_scheduled_identity (test_p0a_scheduler_contract.SchedulerContractTests.test_wrong_service_is_not_scheduled_identity) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.024s
+
+OK

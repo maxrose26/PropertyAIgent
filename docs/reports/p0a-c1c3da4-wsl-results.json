@@ -1,0 +1,207 @@
+{
+  "candidate": "c1c3da4fcf8c1e3846a2fcf8d1570cdb702f6284",
+  "baseline": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+  "archive_sha256": "1c1dee64573922d2eb0bed216cd8d89beaa7e526757d4b1aefd25f2d7001f50d",
+  "working_tree": "",
+  "runner_blob": "aa27ee294e57ff87c7aafa58a71b56df1e6336d7",
+  "assessment": "Gate A OPEN: one candidate-specific timing failure; recovery assertions not reached in that test",
+  "candidate_results": {
+    "passed": 364,
+    "failures": [
+      {
+        "name": "tests.test_p0a_release_corrections.test_pg_real_timeout_retry_and_subsequent_work",
+        "message": "assert 14 <= 13.463782664999599"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_selects_only_outstanding_applications",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_workload_is_bounded_not_unlimited",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      }
+    ],
+    "skipped": 0,
+    "deselected": 1,
+    "properties": {
+      "test_actual_supervisor_death_surviving_child_holds_lock": [
+        {
+          "name": "confirmed_termination_to_successor_seconds",
+          "value": "0.020559992000926286"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[bootstrap]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.49765832400044"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[reconciliation]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.458560570999907"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[on_start]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.446852842000226"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[on_line]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.472299302000465"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[final_status]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4359633450003457"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_unregistered_gate_exits_on_supervisor_pipe_loss": [
+        {
+          "name": "unregistered_gate_cleanup_seconds",
+          "value": "0.06403700500050036"
+        }
+      ],
+      "test_expired_group_cannot_extend_budget": [
+        {
+          "name": "expired_group_termination_seconds",
+          "value": "0.3753518689991324"
+        }
+      ],
+      "test_real_escalation_when_child_ignores_sigterm": [
+        {
+          "name": "sigterm_to_forced_cleanup_total_seconds",
+          "value": "5.228480476000186"
+        }
+      ],
+      "test_full_stderr_pipe_cannot_hold_watchdog_alive": [
+        {
+          "name": "blocked_logging_termination_seconds",
+          "value": "0.567197774998931"
+        }
+      ],
+      "test_real_navigation_deadline_cleanup_then_subsequent_work": [
+        {
+          "name": "cooperative_cancellation_seconds",
+          "value": "0.2035734630007937"
+        }
+      ],
+      "test_real_browser_cleanup_when_persistence_blocks": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.46352693100016"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.515689035999458"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ],
+      "test_pg_real_timeout_retry_and_subsequent_work": [
+        {
+          "name": "statement_timeout_elapsed_seconds",
+          "value": "13.463782664999599"
+        }
+      ]
+    }
+  },
+  "baseline_results": {
+    "passed": 282,
+    "failures": [
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_selects_only_outstanding_applications",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_workload_is_bounded_not_unlimited",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      }
+    ],
+    "skipped": 0,
+    "deselected": 1,
+    "properties": {}
+  }
+}

@@ -373,7 +373,7 @@ def test_circuit_open_skips_remaining_parent_lookups(session):
     session.commit()
 
     with patch(
-        "app.pipeline.run_weekly.fetch_application_by_reference_idox",
+        "app.scrapers.idox_portal.fetch_application_by_reference",
         side_effect=[requests.exceptions.ConnectTimeout()] * 3 + [MagicMock(reference=None)] * 2,
     ) as mock_fetch:
         breaker = CouncilPortalCircuitBreaker(council_code="testcouncil")
@@ -799,7 +799,7 @@ def test_run_daily_councils_cannot_print_ok_for_aborted_circuit_run(session, cap
     real_line = health.summary_line()
     assert real_line.startswith("[run-health] status=partial")  # confirms the fix actually changed the printed line
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line(real_line)
         return 0
 

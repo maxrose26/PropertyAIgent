@@ -278,3 +278,20 @@ def log_memory(
             )
     except Exception:  # noqa: BLE001 - a diagnostic must never take the real pipeline down with it
         pass
+
+
+def cgroup_memory():
+    """Return container bytes/limit, or None. Never substitute summed RSS."""
+    from pathlib import Path
+    try:
+        root = Path('/sys/fs/cgroup')
+        if (root / 'memory.current').exists():
+            used = int((root / 'memory.current').read_text())
+            limit = int((root / 'memory.max').read_text())
+        else:
+            root = root / 'memory'
+            used = int((root / 'memory.usage_in_bytes').read_text())
+            limit = int((root / 'memory.limit_in_bytes').read_text())
+        return (used, limit) if 0 < limit < 2**60 else None
+    except Exception:
+        return None

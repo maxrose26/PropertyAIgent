@@ -60,6 +60,8 @@ from app.db.models import Application, LocalPlan, LocalPlanSite, Site
 from app.policy.buyer_matching import PLANNING_DELIVERY, STRATEGIC_LAND, B2MatchingContext, MatchingFacts, OTHER_OR_UNKNOWN
 from app.policy.buyer_matching_b2_context import build_b2_context
 from app.reporting.acquisition_position import build_acquisition_position_facts
+from app.reporting.affordable_housing_scope import select_affordable_position_for_scope
+from app.reporting.scheme_reconciliation import build_operative_planning_facts
 from app.reporting.opportunity_transaction_signals import TransactionSignals, build_transaction_signals
 
 # --- FactValue: KNOWN / UNKNOWN / NOT_APPLICABLE -----------------------------
@@ -177,6 +179,7 @@ class OpportunityIntelligencePacket:
     # confirmed inactivity; evidence changing is not the same claim as
     # ownership changing).
     transaction_signals: TransactionSignals
+    affordable_assessment: object = None
 
 
 def _scheme_intelligence_field(applications, field_name: str) -> str | None:
@@ -289,9 +292,14 @@ def build_opportunity_intelligence_packet(
         )
         recommendation_direction_raw = _scheme_intelligence_field(applications, "recommendation_direction")
         recommendation_direction = FactValue.known(recommendation_direction_raw) if recommendation_direction_raw else FactValue.unknown()
-        affordable_housing_status_raw = _scheme_intelligence_field(applications, "affordable_housing_status")
+        operative = build_operative_planning_facts(applications)
+        ah_position = select_affordable_position_for_scope(
+            operative.affordable_housing, phase_code=phase_code,
+            active_position_count=len(operative.active_positions),
+        )
+        status = (ah_position.status or "").strip() if ah_position else None
         affordable_housing_status = (
-            FactValue.known(affordable_housing_status_raw) if affordable_housing_status_raw else FactValue.unknown()
+            FactValue.known(status) if status and status.strip().lower() != "unknown" else FactValue.unknown()
         )
 
         # Strategic-land-only facts are NOT_APPLICABLE for a
@@ -304,9 +312,30 @@ def build_opportunity_intelligence_packet(
         progression_signal = FactValue.not_applicable()
         has_identified_planning_activity = FactValue.not_applicable()
 
-        affordable_units = FactValue.unknown() if facts.affordable_unit_count is None else FactValue.known(facts.affordable_unit_count)
+        affordable_units = (
+            FactValue.known(ah_position.units)
+            if ah_position is not None and ah_position.assessment is not None
+            and ah_position.assessment.count.qualified and ah_position.assessment.count.qualifier == "exact"
+            and ah_position.assessment.count.scope_type == "whole_site" else FactValue.unknown()
+        )
+        # The packet's overall quantum still follows its existing caller contract.
+        # Do not pair a position's percentage with an unrelated denominator.
+        source = next((a.scheme_intelligence for a in applications
+                       if ah_position is not None and a.id == ah_position.application_id), None)
+        quantum = operative.consented_position.approved_units
+        if quantum.source is None and len(operative.active_positions) == 1:
+            quantum = operative.active_positions[0].proposed_units
+        denominator_matches = (
+            ah_position is not None and quantum.source is not None
+            and quantum.source.application_id == ah_position.application_id
+            and source is not None and source.total_units_final is not None
+            and source.total_units_final == facts.unit_count == quantum.value
+        )
         affordable_percentage = (
-            FactValue.unknown() if not facts.affordable_percentage_trusted else FactValue.known(facts.affordable_percentage)
+            FactValue.known(ah_position.percentage)
+            if ah_position is not None and ah_position.percentage is not None
+            and ah_position.percentage_reconciles and denominator_matches
+            else FactValue.unknown()
         )
 
         acquisition_facts = build_acquisition_position_facts(session, applications)
@@ -348,6 +377,7 @@ def build_opportunity_intelligence_packet(
         phase_code=phase_code,
         development_state_scope_verified=context.development_state_scope_verified,
         total_units=total_units,
+        affordable_assessment=(ah_position.assessment if ah_position else None) if opportunity.opportunity_type != STRATEGIC_LAND else None,
         affordable_units=affordable_units,
         affordable_percentage=affordable_percentage,
         operative_planning_state=operative_planning_state,

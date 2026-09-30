@@ -36,6 +36,8 @@ class AcquisitionHealth:
     primary_scrape_attempted: bool = False
     primary_scrape_completed: bool = False
 
+    parents_deferred: int = 0
+    page_cleanup_failed: int = 0
     parents_attempted: int = 0
     parents_succeeded: int = 0
     parents_failed: int = 0
@@ -194,7 +196,7 @@ class AcquisitionHealth:
             return "failed"
 
         if (
-            self.parents_failed > 0 or self.documents_applications_failed > 0
+            self.page_cleanup_failed > 0 or self.parents_deferred > 0 or self.parents_failed > 0 or self.documents_applications_failed > 0
             or self.portal_circuit_opened or self.evidence_refresh_failed > 0
         ):
             return "partial"
@@ -217,6 +219,7 @@ class AcquisitionHealth:
             f"primary_scrape_attempted={int(self.primary_scrape_attempted)} "
             f"primary_scrape_completed={int(self.primary_scrape_completed)} "
             f"parents_attempted={self.parents_attempted} "
+            f"parents_deferred={self.parents_deferred} "
             f"parents_succeeded={self.parents_succeeded} "
             f"parents_failed={self.parents_failed} "
             f"documents_applications_attempted={self.documents_applications_attempted} "

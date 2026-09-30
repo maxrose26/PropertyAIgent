@@ -557,7 +557,7 @@ def test_navigation_timeout_then_success_records_successful_parent_lookup(sessio
     # Stands in for a call that internally hit-and-recovered-from a
     # Playwright navigation timeout via _goto_with_retry - what matters
     # here is only that it returns normally (does not raise).
-    with patch("app.pipeline.run_weekly.fetch_application_by_reference_idox", return_value=fake_result):
+    with patch("app.scrapers.idox_portal.fetch_application_by_reference", return_value=fake_result):
         health = AcquisitionHealth()
         health.record_primary_scrape_attempt()
         health.record_primary_scrape_completed()
@@ -603,7 +603,7 @@ def test_run_daily_councils_parses_run_health_status_into_scraperun(session):
     parsed and used as ScrapeRun.status - not the old crash-only binary."""
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line("[run-health] status=partial primary_scrape_attempted=1 primary_scrape_completed=1 "
                  "documents_applications_attempted=3 documents_applications_succeeded=0 documents_applications_failed=3")
         return 0
@@ -620,7 +620,7 @@ def test_crashed_subprocess_is_failed_regardless_of_run_health_line(session):
     mid-print, so its own exit signal is the more reliable one."""
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line("[run-health] status=success primary_scrape_attempted=1 primary_scrape_completed=1")
         return 1  # crashed AFTER printing a (now stale) success line
 
@@ -637,7 +637,7 @@ def test_trafford_style_silent_scrape_failure_is_not_reported_ok(session, capsys
     OK - both in ScrapeRun.status AND in the human-readable line."""
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line("[scrape] FAILED for 01/08/2026 -> 11/08/2026: Page.goto: Timeout 30000ms exceeded")
         on_line("[scrape] continuing to next month...")
         on_line("[run-health] status=failed primary_scrape_attempted=1 primary_scrape_completed=0")
@@ -652,27 +652,26 @@ def test_trafford_style_silent_scrape_failure_is_not_reported_ok(session, capsys
     assert "trafford: OK" not in out
 
 
-def test_no_run_health_line_falls_back_to_success(session):
-    """Backward-compatible default - a clean exit with no [run-health]
-    line at all (e.g. an unexpected/older code path) still resolves to
-    "success", the previous default behaviour, rather than inventing a
-    new failure mode with no evidence."""
+def test_no_run_health_line_is_partial_with_process_failure(session):
+    """Missing completion evidence is partial coverage and unhealthy execution."""
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line("Done.")
         return 0
 
     with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=_fake_subprocess):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="scheduled")
 
-    assert run.status == "success"
+    assert run.status == "partial"
+    import json
+    assert json.loads(run.progress)["process_failure"] is True
 
 
 def test_partial_status_prints_distinctly_not_ok_or_failed(session, capsys):
     from scripts.run_daily_councils import run_one_council
 
-    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake_subprocess(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line("[run-health] status=partial primary_scrape_attempted=1 primary_scrape_completed=1")
         return 0
 
@@ -699,6 +698,7 @@ def test_main_summary_distinguishes_success_partial_failed(monkeypatch, session,
     class _FakeRun:
         def __init__(self, status):
             self.status = status
+            self.progress = '{"process_failure": false}'
 
     fake_runs = {"councila": _FakeRun("success"), "councilb": _FakeRun("partial"), "councilc": _FakeRun("failed")}
 
@@ -728,6 +728,7 @@ def test_main_all_success_and_partial_exits_zero(monkeypatch, session, capsys):
     class _FakeRun:
         def __init__(self, status):
             self.status = status
+            self.progress = '{"process_failure": false}'
 
     fake_runs = {"councila": _FakeRun("success"), "councilb": _FakeRun("partial")}
 

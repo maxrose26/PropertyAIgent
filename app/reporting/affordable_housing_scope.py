@@ -174,6 +174,7 @@ class AffordablePosition:
     tenure: str | None
     status: str | None
     notes: str | None
+    assessment: object = None
     decided_state: str = DECIDED_UNDETERMINED
     # Gate 2B-2B.1 (Brixham Road; renamed from `onsite_percentage` in the
     # Product Owner's pre-merge remediation - arithmetic alone never
@@ -233,6 +234,41 @@ class AffordableHousingSummary:
     active_phases: tuple[AffordablePosition, ...]
     historical: tuple[AffordablePosition, ...]
     conflicts: tuple[ScopeConflict, ...]
+    source_positions: tuple[AffordablePosition, ...] = ()
+
+
+def select_affordable_position_for_scope(summary, *, phase_code=None, active_position_count=0):
+    """Select one existing coherent position; never inherit whole-site AH into a phase.
+
+    Phase opportunity IDs omit phase/parcel kind. If both labels exist for
+    the code, identity is ambiguous and the answer remains unknown. A
+    same-scope conflict must not fall through to an active proposal.
+    """
+    source = [p for p in getattr(summary, 'source_positions', ()) if
+              (p.scope_label == 'AH source selection' if phase_code in (None, UNPHASED_LABEL)
+               else p.scope_label in (f'Phase {phase_code}', f'Plot {phase_code}'))]
+    if len(source) == 1:
+        return source[0]
+    if len(source) > 1:
+        return None
+    if phase_code in (None, UNPHASED_LABEL):
+        if any(c.scope_type in (SCOPE_WHOLE_SITE, SCOPE_UNCLEAR) for c in summary.conflicts):
+            return None
+        if summary.whole_site is not None:
+            return summary.whole_site
+        return summary.active_whole_site if active_position_count == 1 else None
+    labels = {f"Phase {phase_code}", f"Plot {phase_code}"}
+    if any(c.scope_label in labels for c in summary.conflicts):
+        return None
+    consented = [p for p in summary.phases if p.scope_label in labels]
+    active = [p for p in summary.active_phases if p.scope_label in labels]
+    if len({p.scope_label for p in consented + active}) > 1:
+        return None
+    if len(consented) == 1:
+        return consented[0]
+    if not consented and active_position_count == 1 and len(active) == 1:
+        return active[0]
+    return None
 
 
 def _effective_fields(app: Application, prospective_overrides: dict[int, dict] | None) -> dict | None:
@@ -393,13 +429,16 @@ def compute_percentage_reconciliation(scheme) -> dict:
 
 
 def _position(scope_type: str, scope_label: str, app: Application, fields: dict) -> AffordablePosition:
+    from app.policy.ah_assessment import legacy_assessment
+    assessment = legacy_assessment(app.scheme_intelligence, application_reference=app.reference,
+        scope_type=scope_type, scope_label=scope_label, fields=fields)
     units_implied_percentage, percentage_reconciles = _units_implied_percentage_reconciliation(fields)
     explicit_onsite_percentage, explicit_financial_contribution_percentage = _explicit_evidence_percentages(
         fields["affordable_tenure_split_final"],
     )
     return AffordablePosition(
         scope_type=scope_type, scope_label=scope_label,
-        application_id=app.id, application_reference=app.reference,
+        application_id=app.id, application_reference=app.reference, assessment=assessment,
         percentage=fields["affordable_percentage_final"], units=fields["affordable_units_final"],
         tenure=fields["affordable_tenure_split_final"], status=fields["affordable_housing_status"],
         notes=fields["affordable_housing_notes"], decided_state=resolve_decided_state(app.decision, app.status),
@@ -570,11 +609,46 @@ def compute_affordable_housing_scope_summary(
 
         historical.extend(_historical_positions(scope_type, label, historical_apps, prospective_overrides))
 
-    return AffordableHousingSummary(
+    summary = AffordableHousingSummary(
         whole_site=whole_site, phases=tuple(phases),
         active_whole_site=active_whole_site, active_phases=tuple(active_phases),
         historical=tuple(historical), conflicts=tuple(conflicts),
     )
+    from app.policy.ah_claim_selection import enabled, for_applications, with_legacy
+    if not enabled() or not applications or prospective_overrides:
+        return summary
+    # Select all source assertions before allowing the percentage-led legacy
+    # position to supply context. It cannot choose which count claim survives.
+    from dataclasses import replace
+    source_positions = []
+    whole_assessment = for_applications(applications)
+    source_labels = {c['claim']['scope_label'] for c in whole_assessment.source_claims
+                     if c['claim']['scope_type']=='phase'} if whole_assessment else set()
+    for label in [None] + sorted({p.scope_label for p in phases + active_phases} | source_labels):
+        assessment = whole_assessment if label is None else for_applications(applications, phase_label=label)
+        if assessment is None:
+            continue
+        legacy = whole_site or active_whole_site if label is None else next(
+            (p for p in phases + active_phases if p.scope_label == label), None)
+        app = next((a for a in applications if a.reference == assessment.count.application_reference), applications[0])
+        if legacy:
+            assessment = with_legacy(assessment,legacy.assessment)
+        p = AffordablePosition(scope_type='unclear',scope_label=label or 'AH source selection',
+            application_id=app.id,application_reference=app.reference,
+            percentage=legacy.percentage if legacy else None,
+            units=legacy.units if legacy else None,tenure=legacy.tenure if legacy else None,
+            status=None,notes=assessment.selection_reason,assessment=assessment)
+        source_positions.append(p)
+        if label is None:
+            if whole_site:
+                whole_site=replace(whole_site,assessment=assessment)
+            if active_whole_site:
+                active_whole_site=replace(active_whole_site,assessment=assessment)
+        else:
+            phases=[replace(x,assessment=assessment) if x.scope_label==label else x for x in phases]
+            active_phases=[replace(x,assessment=assessment) if x.scope_label==label else x for x in active_phases]
+    return replace(summary,whole_site=whole_site,active_whole_site=active_whole_site,
+        phases=tuple(phases),active_phases=tuple(active_phases),source_positions=tuple(source_positions))
 
 
 def _fmt_pct(value: float | None) -> str:
@@ -594,6 +668,8 @@ def format_affordable_housing_lines(summary: AffordableHousingSummary) -> list[s
     historical positions are labelled distinctly so the model never
     narrates a withdrawn application's figure as the current position."""
     lines: list[str] = []
+    for p in summary.source_positions:
+        lines.append('SOURCE-LINKED AH: ' + p.assessment.label())
 
     def _scope_qualifier(p: AffordablePosition) -> str:
         return (

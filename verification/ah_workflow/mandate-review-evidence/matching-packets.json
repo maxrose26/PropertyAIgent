@@ -1,0 +1,1635 @@
+[
+  {
+    "site": 78,
+    "assessment": {
+      "count": {
+        "value": 72.0,
+        "lower": null,
+        "upper": null,
+        "qualifier": "exact",
+        "state": "verified",
+        "application_reference": "DC/093884",
+        "scope_type": "component",
+        "scope_label": "72 retirement apartments within 82-home scheme",
+        "stage": "proposed (reported; stage unverified)",
+        "document_id": "1",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+        "document_date": "2024-10-23",
+        "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+        "review_reason": "Source and scope checked"
+      },
+      "alternatives": [],
+      "reported_percentage": 100.0,
+      "percentage_review_reason": null,
+      "reported_tenure": null,
+      "tenures": [
+        {
+          "name": "Social rent (applicant proposal; final approved terms uninspected)",
+          "claim": {
+            "value": 72.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "DC/093884",
+            "scope_type": "component",
+            "scope_label": "72 retirement apartments within 82-home scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "1",
+            "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+            "document_date": "2024-10-23",
+            "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+            "review_reason": "Source and scope checked"
+          }
+        }
+      ],
+      "reported_evidence": null,
+      "source_claims": [
+        {
+          "id": 1,
+          "application_id": 2,
+          "scheme_application_id": 1,
+          "scope_key": "RETIREMENT",
+          "metric": "affordable_count",
+          "tenure_name": null,
+          "status": "ACCEPT",
+          "historical": false,
+          "stage_checked": false,
+          "document_id": 1,
+          "passage_locator": "printed page 5 paragraphs 2.1-2.6",
+          "passage_hash": "2118ca39afd281a812a67f6a30e1cdfb9c99a432c686cd59c908e666a0500cb1",
+          "claim": {
+            "value": 72.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "DC/093884",
+            "scope_type": "component",
+            "scope_label": "72 retirement apartments within 82-home scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "1",
+            "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+            "document_date": "2024-10-23",
+            "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+            "review_reason": "Source and scope checked"
+          },
+          "replacements": []
+        },
+        {
+          "id": 2,
+          "application_id": 2,
+          "scheme_application_id": 1,
+          "scope_key": "RETIREMENT",
+          "metric": "tenure_count",
+          "tenure_name": "Social rent (applicant proposal; final approved terms uninspected)",
+          "status": "ACCEPT",
+          "historical": false,
+          "stage_checked": false,
+          "document_id": 1,
+          "passage_locator": "printed page 5 paragraphs 2.1-2.6",
+          "passage_hash": "2118ca39afd281a812a67f6a30e1cdfb9c99a432c686cd59c908e666a0500cb1",
+          "claim": {
+            "value": 72.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "DC/093884",
+            "scope_type": "component",
+            "scope_label": "72 retirement apartments within 82-home scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "1",
+            "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+            "document_date": "2024-10-23",
+            "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+            "review_reason": "Source and scope checked"
+          },
+          "replacements": []
+        }
+      ],
+      "selection_reason": "Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+      "relationships": []
+    },
+    "minimum50": "meets",
+    "buyer": {
+      "classification": "INSUFFICIENT_EVIDENCE",
+      "is_investigative_exception": false,
+      "matches": [
+        "Planning position (planning permission granted) matches this buyer's stated planning appetite.",
+        "AH count assessment: meets against this buyer's target range (50-None affordable homes). 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+        "Source-qualified affordable-housing-package signal: 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.. This does not establish that the package is known to be available for acquisition."
+      ],
+      "does_not_match": [],
+      "unknown": [
+        "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit.",
+        "Trusted evidence identifies this as a specialist development (mixed_retirement_and_market_housing); this buyer's own appetite for specialist/retirement housing has not been specified, so this is not treated as confirmed positive or negative evidence.",
+        "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+        "Development progress has not been established for this opportunity."
+      ],
+      "investigate": [
+        "Review the affordable housing source position and its scope; reported figures have not been corrected or assumed to be zero."
+      ]
+    },
+    "packet": {
+      "opportunity_id": "planning_delivery:site:78",
+      "opportunity_type": "planning_delivery",
+      "kind": "site",
+      "council_code": "stockport",
+      "site_id": 78,
+      "allocation_id": null,
+      "phase_code": null,
+      "development_state_scope_verified": false,
+      "total_units": {
+        "state": "KNOWN",
+        "value": 82
+      },
+      "affordable_units": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_percentage": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "operative_planning_state": {
+        "state": "KNOWN",
+        "value": "permission_granted"
+      },
+      "recommendation_direction": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "local_plan_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "allocation_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "progression_signal": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "has_identified_planning_activity": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "development_state": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_housing_status": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "actors_control": {
+        "developer_indications": [],
+        "ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+        "conflicts": [],
+        "has_ownership_evidence": false
+      },
+      "linked_strategic_allocation_id": null,
+      "linked_strategic_allocation_name": null,
+      "transaction_signals": {
+        "recent_permission": {
+          "state": "UNKNOWN",
+          "detail": "The operative permission's own decision date could not be resolved."
+        },
+        "approaching_implementation_deadline": {
+          "state": "UNKNOWN",
+          "detail": "No resolved implementation deadline exists to assess."
+        },
+        "implementation_activity_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "No qualifying post-permission planning activity (condition-discharge or variation/amendment filing) has been identified for this site's application family."
+        },
+        "wider_site_implementation_activity_context": {
+          "state": "UNKNOWN",
+          "detail": "No qualifying post-permission planning activity (condition-discharge or variation/amendment filing) has been identified for this site's application family."
+        },
+        "no_qualifying_progress_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "Insufficient basis to conclude no qualifying progress evidence exists: related-application discovery has not yet run for the operative permission; this opportunity's own scope has not been verified."
+        },
+        "ownership_or_control_evidence_changed": {
+          "state": "UNKNOWN",
+          "detail": "This opportunity has not yet been through a monitoring pass - no prior evidence snapshot exists to compare against."
+        },
+        "raw_lapse_status": "unknown",
+        "raw_implementation_deadline": null,
+        "raw_build_status": "unknown",
+        "raw_decision_date": "0001-01-01",
+        "raw_last_change_reasons": [],
+        "coverage_checked_at": null,
+        "scope_verified": false
+      },
+      "affordable_assessment": {
+        "count": {
+          "value": 72.0,
+          "lower": null,
+          "upper": null,
+          "qualifier": "exact",
+          "state": "verified",
+          "application_reference": "DC/093884",
+          "scope_type": "component",
+          "scope_label": "72 retirement apartments within 82-home scheme",
+          "stage": "proposed (reported; stage unverified)",
+          "document_id": "1",
+          "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+          "document_date": "2024-10-23",
+          "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+          "review_reason": "Source and scope checked"
+        },
+        "alternatives": [],
+        "reported_percentage": 100.0,
+        "percentage_review_reason": null,
+        "reported_tenure": null,
+        "tenures": [
+          {
+            "name": "Social rent (applicant proposal; final approved terms uninspected)",
+            "claim": {
+              "value": 72.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "DC/093884",
+              "scope_type": "component",
+              "scope_label": "72 retirement apartments within 82-home scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "1",
+              "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+              "document_date": "2024-10-23",
+              "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+              "review_reason": "Source and scope checked"
+            }
+          }
+        ],
+        "reported_evidence": null,
+        "source_claims": [
+          {
+            "id": 1,
+            "application_id": 2,
+            "scheme_application_id": 1,
+            "scope_key": "RETIREMENT",
+            "metric": "affordable_count",
+            "tenure_name": null,
+            "status": "ACCEPT",
+            "historical": false,
+            "stage_checked": false,
+            "document_id": 1,
+            "passage_locator": "printed page 5 paragraphs 2.1-2.6",
+            "passage_hash": "2118ca39afd281a812a67f6a30e1cdfb9c99a432c686cd59c908e666a0500cb1",
+            "claim": {
+              "value": 72.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "DC/093884",
+              "scope_type": "component",
+              "scope_label": "72 retirement apartments within 82-home scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "1",
+              "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+              "document_date": "2024-10-23",
+              "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+              "review_reason": "Source and scope checked"
+            },
+            "replacements": []
+          },
+          {
+            "id": 2,
+            "application_id": 2,
+            "scheme_application_id": 1,
+            "scope_key": "RETIREMENT",
+            "metric": "tenure_count",
+            "tenure_name": "Social rent (applicant proposal; final approved terms uninspected)",
+            "status": "ACCEPT",
+            "historical": false,
+            "stage_checked": false,
+            "document_id": 1,
+            "passage_locator": "printed page 5 paragraphs 2.1-2.6",
+            "passage_hash": "2118ca39afd281a812a67f6a30e1cdfb9c99a432c686cd59c908e666a0500cb1",
+            "claim": {
+              "value": 72.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "DC/093884",
+              "scope_type": "component",
+              "scope_label": "72 retirement apartments within 82-home scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "1",
+              "source_url": "https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf",
+              "document_date": "2024-10-23",
+              "passage": "Residential development consisting of A) 10 semi-detached houses and B) 72 retirement apartments. The 10 x 4-bed semi-detached houses are proposed to be for open market sale. The retirement apartments are to be 100% affordable (now to be of social rent tenure). Westshield on behalf of Housing 21.",
+              "review_reason": "Source and scope checked"
+            },
+            "replacements": []
+          }
+        ],
+        "selection_reason": "Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+        "relationships": []
+      }
+    },
+    "retirement_outcomes": {
+      "ACCEPT": {
+        "classification": "STRONG_FIT",
+        "is_investigative_exception": false,
+        "matches": [
+          "This buyer explicitly accepts retirement housing; count relevance, other mandate rules and acquisition availability remain separate assessments.",
+          "Planning position (planning permission granted) matches this buyer's stated planning appetite.",
+          "AH count assessment: meets against this buyer's target range (50-None affordable homes). 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+          "Source-qualified affordable-housing-package signal: 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.. This does not establish that the package is known to be available for acquisition."
+        ],
+        "does_not_match": [],
+        "unknown": [
+          "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit.",
+          "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+          "Development progress has not been established for this opportunity."
+        ],
+        "investigate": [
+          "Review the affordable housing source position and its scope; reported figures have not been corrected or assumed to be zero."
+        ]
+      },
+      "EXCLUDE": {
+        "classification": "NOT_SUITABLE",
+        "is_investigative_exception": false,
+        "matches": [
+          "Planning position (planning permission granted) matches this buyer's stated planning appetite.",
+          "AH count assessment: meets against this buyer's target range (50-None affordable homes). 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+          "Source-qualified affordable-housing-package signal: 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.. This does not establish that the package is known to be available for acquisition."
+        ],
+        "does_not_match": [
+          "This buyer explicitly excludes retirement housing; the affordable count does not override that product rule."
+        ],
+        "unknown": [
+          "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit.",
+          "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+          "Development progress has not been established for this opportunity."
+        ],
+        "investigate": [
+          "Review the affordable housing source position and its scope; reported figures have not been corrected or assumed to be zero."
+        ]
+      },
+      "UNSPECIFIED": {
+        "classification": "INSUFFICIENT_EVIDENCE",
+        "is_investigative_exception": false,
+        "matches": [
+          "Planning position (planning permission granted) matches this buyer's stated planning appetite.",
+          "AH count assessment: meets against this buyer's target range (50-None affordable homes). 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.",
+          "Source-qualified affordable-housing-package signal: 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability.. This does not establish that the package is known to be available for acquisition."
+        ],
+        "does_not_match": [],
+        "unknown": [
+          "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit.",
+          "Trusted evidence identifies this as a specialist development (mixed_retirement_and_market_housing); this buyer's own appetite for specialist/retirement housing has not been specified, so this is not treated as confirmed positive or negative evidence.",
+          "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+          "Development progress has not been established for this opportunity."
+        ],
+        "investigate": [
+          "Review the affordable housing source position and its scope; reported figures have not been corrected or assumed to be zero."
+        ]
+      }
+    },
+    "matching_context": {
+      "council_code": "stockport",
+      "development_state": "unknown",
+      "control_facts": {
+        "developer_or_applicant_led": null,
+        "third_party_interest_declared": null,
+        "ownership_unresolved": true,
+        "partial_control_evidence": null
+      },
+      "development_state_scope_verified": false
+    },
+    "local_mandate": {
+      "key": "housing_association",
+      "display_name": "Housing Association",
+      "buyer_type": "Housing association / registered provider",
+      "primary_requirement": "Affordable residential housing opportunities",
+      "target_unit_min": 50,
+      "target_unit_max": null,
+      "scale_metric": "affordable_units",
+      "accepted_planning_states": "frozenset({'adopted_allocation', 'permission_granted', 'emerging_allocation'})",
+      "treats_no_activity_as_positive": false,
+      "large_allocation_is_self_qualifying": false,
+      "specialist_development_is_exclusion": false,
+      "wholly_affordable_is_exclusion": false,
+      "below_minimum_scale_is_exclusion": true,
+      "notes": "Brief: scale is assessed using AFFORDABLE units (50-300), not total scheme units - a 400-home scheme with 120 affordable homes is potentially relevant, never rejected for exceeding 300 total units. 100% affordable is explicitly NOT an exclusion for this buyer (the opposite of the other three profiles). No specialist/retirement development-type exclusion is implemented - the brief explicitly states this buyer's specialist-product appetite has not been defined, so a specialist residential development type (e.g. Focus School's mixed_retirement_and_market_housing) is preserved as an unresolved/unknown fact, never a fabricated hard exclusion. No planning-stage preference is implemented beyond exposing whatever planning position exists as context (brief: \"do not assume the buyer requires planning permission/adopted/emerging allocation\"). Allocation- level (Local Plan) opportunities have no scheme-specific affordable-unit evidence at all (brief: \"do NOT estimate affordable units by applying Local Plan/NPPF affordable-housing policy percentages to allocation capacity\") - Housing Association fit for a Local Plan allocation is therefore INSUFFICIENT_EVIDENCE by design, not a gap in this implementation.",
+      "geography_scope": "ALL_CURRENT_COVERAGE",
+      "geography_councils": "frozenset()",
+      "acquisition_types": "frozenset({'AFFORDABLE_HOUSING_PACKAGE'})",
+      "development_state_appetite": "UNDERWAY_ACCEPTABLE",
+      "control_appetite": "frozenset({'DEVELOPER_LED_ACCEPTABLE'})",
+      "retirement_appetite": "UNSPECIFIED"
+    },
+    "independent_exclusion": {
+      "classification": "NOT_SUITABLE",
+      "is_investigative_exception": false,
+      "matches": [
+        "Planning position (planning permission granted) matches this buyer's stated planning appetite.",
+        "Approximately 82 homes sits within this buyer's target range (50-100 homes)."
+      ],
+      "does_not_match": [
+        "Trusted evidence identifies this as a specialist development (mixed_retirement_and_market_housing), not the general-needs residential development this buyer requires."
+      ],
+      "unknown": [
+        "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit.",
+        "Affordable housing proportion has not been confirmed - not assumed to be 0%."
+      ],
+      "investigate": [
+        "Review the affordable housing source position and its scope; reported figures have not been corrected or assumed to be zero."
+      ]
+    }
+  },
+  {
+    "site": 25,
+    "assessment": {
+      "count": {
+        "value": 147.0,
+        "lower": null,
+        "upper": null,
+        "qualifier": "exact",
+        "state": "verified",
+        "application_reference": "FUL/355201/25",
+        "scope_type": "whole_site",
+        "scope_label": "Southlink proposed scheme",
+        "stage": "proposed (reported; stage unverified)",
+        "document_id": "2",
+        "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+        "document_date": "2026-09-24",
+        "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+        "review_reason": "Source and scope checked"
+      },
+      "alternatives": [],
+      "reported_percentage": 100.0,
+      "percentage_review_reason": null,
+      "reported_tenure": null,
+      "tenures": [
+        {
+          "name": "Rent (reported)",
+          "claim": {
+            "value": 125.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          }
+        },
+        {
+          "name": "Shared ownership",
+          "claim": {
+            "value": 11.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          }
+        },
+        {
+          "name": "Rent to buy",
+          "claim": {
+            "value": 11.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          }
+        }
+      ],
+      "reported_evidence": null,
+      "source_claims": [
+        {
+          "id": 3,
+          "application_id": 3,
+          "scheme_application_id": 3,
+          "scope_key": "WHOLE_SCHEME",
+          "metric": "affordable_count",
+          "tenure_name": null,
+          "status": "ACCEPT",
+          "historical": false,
+          "stage_checked": false,
+          "document_id": 2,
+          "passage_locator": "report body",
+          "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+          "claim": {
+            "value": 147.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          },
+          "replacements": []
+        },
+        {
+          "id": 4,
+          "application_id": 3,
+          "scheme_application_id": 3,
+          "scope_key": "WHOLE_SCHEME",
+          "metric": "tenure_count",
+          "tenure_name": "Rent (reported)",
+          "status": "ACCEPT",
+          "historical": false,
+          "stage_checked": false,
+          "document_id": 2,
+          "passage_locator": "report body",
+          "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+          "claim": {
+            "value": 125.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          },
+          "replacements": []
+        },
+        {
+          "id": 5,
+          "application_id": 3,
+          "scheme_application_id": 3,
+          "scope_key": "WHOLE_SCHEME",
+          "metric": "tenure_count",
+          "tenure_name": "Shared ownership",
+          "status": "ACCEPT",
+          "historical": false,
+          "stage_checked": false,
+          "document_id": 2,
+          "passage_locator": "report body",
+          "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+          "claim": {
+            "value": 11.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          },
+          "replacements": []
+        },
+        {
+          "id": 6,
+          "application_id": 3,
+          "scheme_application_id": 3,
+          "scope_key": "WHOLE_SCHEME",
+          "metric": "tenure_count",
+          "tenure_name": "Rent to buy",
+          "status": "ACCEPT",
+          "historical": false,
+          "stage_checked": false,
+          "document_id": 2,
+          "passage_locator": "report body",
+          "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+          "claim": {
+            "value": 11.0,
+            "lower": null,
+            "upper": null,
+            "qualifier": "exact",
+            "state": "verified",
+            "application_reference": "FUL/355201/25",
+            "scope_type": "whole_site",
+            "scope_label": "Southlink proposed scheme",
+            "stage": "proposed (reported; stage unverified)",
+            "document_id": "2",
+            "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+            "document_date": "2026-09-24",
+            "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+            "review_reason": "Source and scope checked"
+          },
+          "replacements": []
+        }
+      ],
+      "selection_reason": "Accepted source claim 3; scoped evidence only, not a statement of current availability.",
+      "relationships": []
+    },
+    "minimum50": "meets",
+    "buyer": {
+      "classification": "STRONG_FIT",
+      "is_investigative_exception": false,
+      "matches": [
+        "Trusted evidence shows this is a wholly (100%) affordable-led scheme, directly relevant to this buyer's affordable-housing focus.",
+        "AH count assessment: meets against this buyer's target range (50-None affordable homes). 147.0 affordable homes \u2014 exact, verified; Southlink proposed scheme; FUL/355201/25; proposed (reported; stage unverified); source 2; document date 2026-09-24; Accepted source claim 3; scoped evidence only, not a statement of current availability.",
+        "Source-qualified affordable-housing-package signal: 147.0 affordable homes \u2014 exact, verified; Southlink proposed scheme; FUL/355201/25; proposed (reported; stage unverified); source 2; document date 2026-09-24; Accepted source claim 3; scoped evidence only, not a statement of current availability.. This does not establish that the package is known to be available for acquisition."
+      ],
+      "does_not_match": [],
+      "unknown": [
+        "This opportunity is an active planning application, not yet decided, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.",
+        "Development progress has not been established for this opportunity."
+      ],
+      "investigate": []
+    },
+    "packet": {
+      "opportunity_id": "planning_delivery:site:25",
+      "opportunity_type": "planning_delivery",
+      "kind": "site",
+      "council_code": "oldham",
+      "site_id": 25,
+      "allocation_id": null,
+      "phase_code": null,
+      "development_state_scope_verified": false,
+      "total_units": {
+        "state": "KNOWN",
+        "value": 147
+      },
+      "affordable_units": {
+        "state": "KNOWN",
+        "value": 147
+      },
+      "affordable_percentage": {
+        "state": "KNOWN",
+        "value": 100.0
+      },
+      "operative_planning_state": {
+        "state": "KNOWN",
+        "value": "planning_active_proposal"
+      },
+      "recommendation_direction": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "local_plan_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "allocation_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "progression_signal": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "has_identified_planning_activity": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "development_state": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_housing_status": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "actors_control": {
+        "developer_indications": [],
+        "ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+        "conflicts": [],
+        "has_ownership_evidence": false
+      },
+      "linked_strategic_allocation_id": null,
+      "linked_strategic_allocation_name": null,
+      "transaction_signals": {
+        "recent_permission": {
+          "state": "ABSENT",
+          "detail": "No application has been granted for this opportunity at all."
+        },
+        "approaching_implementation_deadline": {
+          "state": "UNKNOWN",
+          "detail": "No resolved implementation deadline exists to assess."
+        },
+        "implementation_activity_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "wider_site_implementation_activity_context": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "no_qualifying_progress_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "Insufficient basis to conclude no qualifying progress evidence exists: no resolved operative permission exists; this opportunity's own scope has not been verified."
+        },
+        "ownership_or_control_evidence_changed": {
+          "state": "UNKNOWN",
+          "detail": "This opportunity has not yet been through a monitoring pass - no prior evidence snapshot exists to compare against."
+        },
+        "raw_lapse_status": "not_granted",
+        "raw_implementation_deadline": null,
+        "raw_build_status": "unknown",
+        "raw_decision_date": null,
+        "raw_last_change_reasons": [],
+        "coverage_checked_at": null,
+        "scope_verified": false
+      },
+      "affordable_assessment": {
+        "count": {
+          "value": 147.0,
+          "lower": null,
+          "upper": null,
+          "qualifier": "exact",
+          "state": "verified",
+          "application_reference": "FUL/355201/25",
+          "scope_type": "whole_site",
+          "scope_label": "Southlink proposed scheme",
+          "stage": "proposed (reported; stage unverified)",
+          "document_id": "2",
+          "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+          "document_date": "2026-09-24",
+          "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+          "review_reason": "Source and scope checked"
+        },
+        "alternatives": [],
+        "reported_percentage": 100.0,
+        "percentage_review_reason": null,
+        "reported_tenure": null,
+        "tenures": [
+          {
+            "name": "Rent (reported)",
+            "claim": {
+              "value": 125.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            }
+          },
+          {
+            "name": "Shared ownership",
+            "claim": {
+              "value": 11.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            }
+          },
+          {
+            "name": "Rent to buy",
+            "claim": {
+              "value": 11.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            }
+          }
+        ],
+        "reported_evidence": null,
+        "source_claims": [
+          {
+            "id": 3,
+            "application_id": 3,
+            "scheme_application_id": 3,
+            "scope_key": "WHOLE_SCHEME",
+            "metric": "affordable_count",
+            "tenure_name": null,
+            "status": "ACCEPT",
+            "historical": false,
+            "stage_checked": false,
+            "document_id": 2,
+            "passage_locator": "report body",
+            "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+            "claim": {
+              "value": 147.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            },
+            "replacements": []
+          },
+          {
+            "id": 4,
+            "application_id": 3,
+            "scheme_application_id": 3,
+            "scope_key": "WHOLE_SCHEME",
+            "metric": "tenure_count",
+            "tenure_name": "Rent (reported)",
+            "status": "ACCEPT",
+            "historical": false,
+            "stage_checked": false,
+            "document_id": 2,
+            "passage_locator": "report body",
+            "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+            "claim": {
+              "value": 125.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            },
+            "replacements": []
+          },
+          {
+            "id": 5,
+            "application_id": 3,
+            "scheme_application_id": 3,
+            "scope_key": "WHOLE_SCHEME",
+            "metric": "tenure_count",
+            "tenure_name": "Shared ownership",
+            "status": "ACCEPT",
+            "historical": false,
+            "stage_checked": false,
+            "document_id": 2,
+            "passage_locator": "report body",
+            "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+            "claim": {
+              "value": 11.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            },
+            "replacements": []
+          },
+          {
+            "id": 6,
+            "application_id": 3,
+            "scheme_application_id": 3,
+            "scope_key": "WHOLE_SCHEME",
+            "metric": "tenure_count",
+            "tenure_name": "Rent to buy",
+            "status": "ACCEPT",
+            "historical": false,
+            "stage_checked": false,
+            "document_id": 2,
+            "passage_locator": "report body",
+            "passage_hash": "425c29164ea44939ccfa290872bca904c8cafd27474c2c614d7f290b4308fa74",
+            "claim": {
+              "value": 11.0,
+              "lower": null,
+              "upper": null,
+              "qualifier": "exact",
+              "state": "verified",
+              "application_reference": "FUL/355201/25",
+              "scope_type": "whole_site",
+              "scope_label": "Southlink proposed scheme",
+              "stage": "proposed (reported; stage unverified)",
+              "document_id": "2",
+              "source_url": "https://www.placenorthwest.co.uk/vistry-wins-oldham-consent/",
+              "document_date": "2026-09-24",
+              "passage": "147 affordable homes: 125 to rent, 11 shared ownership and 11 rent to buy. Reported committee approval; issued decision and obligations not inspected.",
+              "review_reason": "Source and scope checked"
+            },
+            "replacements": []
+          }
+        ],
+        "selection_reason": "Accepted source claim 3; scoped evidence only, not a statement of current availability.",
+        "relationships": []
+      }
+    },
+    "retirement_outcomes": {},
+    "matching_context": {
+      "council_code": "oldham",
+      "development_state": "unknown",
+      "control_facts": {
+        "developer_or_applicant_led": null,
+        "third_party_interest_declared": null,
+        "ownership_unresolved": true,
+        "partial_control_evidence": null
+      },
+      "development_state_scope_verified": false
+    },
+    "local_mandate": {
+      "key": "housing_association",
+      "display_name": "Housing Association",
+      "buyer_type": "Housing association / registered provider",
+      "primary_requirement": "Affordable residential housing opportunities",
+      "target_unit_min": 50,
+      "target_unit_max": null,
+      "scale_metric": "affordable_units",
+      "accepted_planning_states": "frozenset({'adopted_allocation', 'permission_granted', 'emerging_allocation'})",
+      "treats_no_activity_as_positive": false,
+      "large_allocation_is_self_qualifying": false,
+      "specialist_development_is_exclusion": false,
+      "wholly_affordable_is_exclusion": false,
+      "below_minimum_scale_is_exclusion": true,
+      "notes": "Brief: scale is assessed using AFFORDABLE units (50-300), not total scheme units - a 400-home scheme with 120 affordable homes is potentially relevant, never rejected for exceeding 300 total units. 100% affordable is explicitly NOT an exclusion for this buyer (the opposite of the other three profiles). No specialist/retirement development-type exclusion is implemented - the brief explicitly states this buyer's specialist-product appetite has not been defined, so a specialist residential development type (e.g. Focus School's mixed_retirement_and_market_housing) is preserved as an unresolved/unknown fact, never a fabricated hard exclusion. No planning-stage preference is implemented beyond exposing whatever planning position exists as context (brief: \"do not assume the buyer requires planning permission/adopted/emerging allocation\"). Allocation- level (Local Plan) opportunities have no scheme-specific affordable-unit evidence at all (brief: \"do NOT estimate affordable units by applying Local Plan/NPPF affordable-housing policy percentages to allocation capacity\") - Housing Association fit for a Local Plan allocation is therefore INSUFFICIENT_EVIDENCE by design, not a gap in this implementation.",
+      "geography_scope": "ALL_CURRENT_COVERAGE",
+      "geography_councils": "frozenset()",
+      "acquisition_types": "frozenset({'AFFORDABLE_HOUSING_PACKAGE'})",
+      "development_state_appetite": "UNDERWAY_ACCEPTABLE",
+      "control_appetite": "frozenset({'DEVELOPER_LED_ACCEPTABLE'})",
+      "retirement_appetite": "UNSPECIFIED"
+    },
+    "independent_exclusion": null
+  },
+  {
+    "site": 32,
+    "assessment": {
+      "count": {
+        "value": null,
+        "lower": null,
+        "upper": null,
+        "qualifier": "unknown",
+        "state": "unknown",
+        "application_reference": "OUT/355454/25",
+        "scope_type": "unclear",
+        "scope_label": "Whole site (scope not confirmed by phase evidence)",
+        "stage": "proposed",
+        "document_id": null,
+        "source_url": null,
+        "document_date": null,
+        "passage": null,
+        "review_reason": "Count-level source, qualifier and scope evidence not linked; reported value is unverified."
+      },
+      "alternatives": [],
+      "reported_percentage": null,
+      "percentage_review_reason": null,
+      "reported_tenure": null,
+      "tenures": [],
+      "reported_evidence": null,
+      "source_claims": [],
+      "selection_reason": null,
+      "relationships": []
+    },
+    "minimum50": "unknown",
+    "buyer": {
+      "classification": "INSUFFICIENT_EVIDENCE",
+      "is_investigative_exception": false,
+      "matches": [],
+      "does_not_match": [],
+      "unknown": [
+        "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+        "This opportunity is an active planning application, not yet decided, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.",
+        "No trusted affordable-unit count is available to assess against this buyer's target range.",
+        "AH count assessment: unknown against this buyer's target range (50-None affordable homes). unknown affordable homes \u2014 unknown, unknown; Whole site (scope not confirmed by phase evidence); OUT/355454/25; proposed; source unlinked; document date unknown",
+        "Affordable housing content has not been established with enough confidence to assess against this buyer's affordable-housing-package acquisition strategy.",
+        "Development progress has not been established for this opportunity."
+      ],
+      "investigate": [
+        "Check the named AH scope and source before making an acquisition decision."
+      ]
+    },
+    "packet": {
+      "opportunity_id": "planning_delivery:site:32",
+      "opportunity_type": "planning_delivery",
+      "kind": "site",
+      "council_code": "oldham",
+      "site_id": 32,
+      "allocation_id": null,
+      "phase_code": null,
+      "development_state_scope_verified": false,
+      "total_units": {
+        "state": "KNOWN",
+        "value": 26
+      },
+      "affordable_units": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_percentage": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "operative_planning_state": {
+        "state": "KNOWN",
+        "value": "planning_active_proposal"
+      },
+      "recommendation_direction": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "local_plan_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "allocation_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "progression_signal": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "has_identified_planning_activity": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "development_state": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_housing_status": {
+        "state": "KNOWN",
+        "value": "proposed"
+      },
+      "actors_control": {
+        "developer_indications": [],
+        "ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+        "conflicts": [],
+        "has_ownership_evidence": false
+      },
+      "linked_strategic_allocation_id": null,
+      "linked_strategic_allocation_name": null,
+      "transaction_signals": {
+        "recent_permission": {
+          "state": "ABSENT",
+          "detail": "No application has been granted for this opportunity at all."
+        },
+        "approaching_implementation_deadline": {
+          "state": "UNKNOWN",
+          "detail": "No resolved implementation deadline exists to assess."
+        },
+        "implementation_activity_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "wider_site_implementation_activity_context": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "no_qualifying_progress_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "Insufficient basis to conclude no qualifying progress evidence exists: no resolved operative permission exists; this opportunity's own scope has not been verified."
+        },
+        "ownership_or_control_evidence_changed": {
+          "state": "UNKNOWN",
+          "detail": "This opportunity has not yet been through a monitoring pass - no prior evidence snapshot exists to compare against."
+        },
+        "raw_lapse_status": "not_granted",
+        "raw_implementation_deadline": null,
+        "raw_build_status": "unknown",
+        "raw_decision_date": null,
+        "raw_last_change_reasons": [],
+        "coverage_checked_at": null,
+        "scope_verified": false
+      },
+      "affordable_assessment": {
+        "count": {
+          "value": null,
+          "lower": null,
+          "upper": null,
+          "qualifier": "unknown",
+          "state": "unknown",
+          "application_reference": "OUT/355454/25",
+          "scope_type": "unclear",
+          "scope_label": "Whole site (scope not confirmed by phase evidence)",
+          "stage": "proposed",
+          "document_id": null,
+          "source_url": null,
+          "document_date": null,
+          "passage": null,
+          "review_reason": "Count-level source, qualifier and scope evidence not linked; reported value is unverified."
+        },
+        "alternatives": [],
+        "reported_percentage": null,
+        "percentage_review_reason": null,
+        "reported_tenure": null,
+        "tenures": [],
+        "reported_evidence": null,
+        "source_claims": [],
+        "selection_reason": null,
+        "relationships": []
+      }
+    },
+    "retirement_outcomes": {},
+    "matching_context": {
+      "council_code": "oldham",
+      "development_state": "unknown",
+      "control_facts": {
+        "developer_or_applicant_led": null,
+        "third_party_interest_declared": null,
+        "ownership_unresolved": true,
+        "partial_control_evidence": null
+      },
+      "development_state_scope_verified": false
+    },
+    "local_mandate": {
+      "key": "housing_association",
+      "display_name": "Housing Association",
+      "buyer_type": "Housing association / registered provider",
+      "primary_requirement": "Affordable residential housing opportunities",
+      "target_unit_min": 50,
+      "target_unit_max": null,
+      "scale_metric": "affordable_units",
+      "accepted_planning_states": "frozenset({'adopted_allocation', 'permission_granted', 'emerging_allocation'})",
+      "treats_no_activity_as_positive": false,
+      "large_allocation_is_self_qualifying": false,
+      "specialist_development_is_exclusion": false,
+      "wholly_affordable_is_exclusion": false,
+      "below_minimum_scale_is_exclusion": true,
+      "notes": "Brief: scale is assessed using AFFORDABLE units (50-300), not total scheme units - a 400-home scheme with 120 affordable homes is potentially relevant, never rejected for exceeding 300 total units. 100% affordable is explicitly NOT an exclusion for this buyer (the opposite of the other three profiles). No specialist/retirement development-type exclusion is implemented - the brief explicitly states this buyer's specialist-product appetite has not been defined, so a specialist residential development type (e.g. Focus School's mixed_retirement_and_market_housing) is preserved as an unresolved/unknown fact, never a fabricated hard exclusion. No planning-stage preference is implemented beyond exposing whatever planning position exists as context (brief: \"do not assume the buyer requires planning permission/adopted/emerging allocation\"). Allocation- level (Local Plan) opportunities have no scheme-specific affordable-unit evidence at all (brief: \"do NOT estimate affordable units by applying Local Plan/NPPF affordable-housing policy percentages to allocation capacity\") - Housing Association fit for a Local Plan allocation is therefore INSUFFICIENT_EVIDENCE by design, not a gap in this implementation.",
+      "geography_scope": "ALL_CURRENT_COVERAGE",
+      "geography_councils": "frozenset()",
+      "acquisition_types": "frozenset({'AFFORDABLE_HOUSING_PACKAGE'})",
+      "development_state_appetite": "UNDERWAY_ACCEPTABLE",
+      "control_appetite": "frozenset({'DEVELOPER_LED_ACCEPTABLE'})",
+      "retirement_appetite": "UNSPECIFIED"
+    },
+    "independent_exclusion": null
+  },
+  {
+    "site": 107,
+    "assessment": {
+      "count": {
+        "value": null,
+        "lower": null,
+        "upper": null,
+        "qualifier": "unknown",
+        "state": "unknown",
+        "application_reference": "DC/098428",
+        "scope_type": "unclear",
+        "scope_label": "Whole site (scope not confirmed by phase evidence)",
+        "stage": "proposed",
+        "document_id": null,
+        "source_url": null,
+        "document_date": null,
+        "passage": null,
+        "review_reason": "Count-level source, qualifier and scope evidence not linked; reported value is unverified."
+      },
+      "alternatives": [],
+      "reported_percentage": null,
+      "percentage_review_reason": null,
+      "reported_tenure": null,
+      "tenures": [],
+      "reported_evidence": null,
+      "source_claims": [],
+      "selection_reason": null,
+      "relationships": []
+    },
+    "minimum50": "unknown",
+    "buyer": {
+      "classification": "INSUFFICIENT_EVIDENCE",
+      "is_investigative_exception": false,
+      "matches": [],
+      "does_not_match": [],
+      "unknown": [
+        "Affordable housing proportion has not been confirmed - not assumed to be 0%.",
+        "This opportunity is an active planning application, not yet decided, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.",
+        "No trusted affordable-unit count is available to assess against this buyer's target range.",
+        "AH count assessment: unknown against this buyer's target range (50-None affordable homes). unknown affordable homes \u2014 unknown, unknown; Whole site (scope not confirmed by phase evidence); DC/098428; proposed; source unlinked; document date unknown",
+        "Affordable housing content has not been established with enough confidence to assess against this buyer's affordable-housing-package acquisition strategy.",
+        "Development progress has not been established for this opportunity."
+      ],
+      "investigate": [
+        "Check the named AH scope and source before making an acquisition decision."
+      ]
+    },
+    "packet": {
+      "opportunity_id": "planning_delivery:site:107",
+      "opportunity_type": "planning_delivery",
+      "kind": "site",
+      "council_code": "stockport",
+      "site_id": 107,
+      "allocation_id": null,
+      "phase_code": null,
+      "development_state_scope_verified": false,
+      "total_units": {
+        "state": "KNOWN",
+        "value": 440
+      },
+      "affordable_units": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_percentage": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "operative_planning_state": {
+        "state": "KNOWN",
+        "value": "planning_active_proposal"
+      },
+      "recommendation_direction": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "local_plan_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "allocation_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "progression_signal": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "has_identified_planning_activity": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "development_state": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_housing_status": {
+        "state": "KNOWN",
+        "value": "proposed"
+      },
+      "actors_control": {
+        "developer_indications": [],
+        "ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+        "conflicts": [],
+        "has_ownership_evidence": false
+      },
+      "linked_strategic_allocation_id": null,
+      "linked_strategic_allocation_name": null,
+      "transaction_signals": {
+        "recent_permission": {
+          "state": "ABSENT",
+          "detail": "No application has been granted for this opportunity at all."
+        },
+        "approaching_implementation_deadline": {
+          "state": "UNKNOWN",
+          "detail": "No resolved implementation deadline exists to assess."
+        },
+        "implementation_activity_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "wider_site_implementation_activity_context": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "no_qualifying_progress_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "Insufficient basis to conclude no qualifying progress evidence exists: no resolved operative permission exists; this opportunity's own scope has not been verified."
+        },
+        "ownership_or_control_evidence_changed": {
+          "state": "UNKNOWN",
+          "detail": "This opportunity has not yet been through a monitoring pass - no prior evidence snapshot exists to compare against."
+        },
+        "raw_lapse_status": "not_granted",
+        "raw_implementation_deadline": null,
+        "raw_build_status": "unknown",
+        "raw_decision_date": null,
+        "raw_last_change_reasons": [],
+        "coverage_checked_at": null,
+        "scope_verified": false
+      },
+      "affordable_assessment": {
+        "count": {
+          "value": null,
+          "lower": null,
+          "upper": null,
+          "qualifier": "unknown",
+          "state": "unknown",
+          "application_reference": "DC/098428",
+          "scope_type": "unclear",
+          "scope_label": "Whole site (scope not confirmed by phase evidence)",
+          "stage": "proposed",
+          "document_id": null,
+          "source_url": null,
+          "document_date": null,
+          "passage": null,
+          "review_reason": "Count-level source, qualifier and scope evidence not linked; reported value is unverified."
+        },
+        "alternatives": [],
+        "reported_percentage": null,
+        "percentage_review_reason": null,
+        "reported_tenure": null,
+        "tenures": [],
+        "reported_evidence": null,
+        "source_claims": [],
+        "selection_reason": null,
+        "relationships": []
+      }
+    },
+    "retirement_outcomes": {},
+    "matching_context": {
+      "council_code": "stockport",
+      "development_state": "unknown",
+      "control_facts": {
+        "developer_or_applicant_led": null,
+        "third_party_interest_declared": null,
+        "ownership_unresolved": true,
+        "partial_control_evidence": null
+      },
+      "development_state_scope_verified": false
+    },
+    "local_mandate": {
+      "key": "housing_association",
+      "display_name": "Housing Association",
+      "buyer_type": "Housing association / registered provider",
+      "primary_requirement": "Affordable residential housing opportunities",
+      "target_unit_min": 50,
+      "target_unit_max": null,
+      "scale_metric": "affordable_units",
+      "accepted_planning_states": "frozenset({'adopted_allocation', 'permission_granted', 'emerging_allocation'})",
+      "treats_no_activity_as_positive": false,
+      "large_allocation_is_self_qualifying": false,
+      "specialist_development_is_exclusion": false,
+      "wholly_affordable_is_exclusion": false,
+      "below_minimum_scale_is_exclusion": true,
+      "notes": "Brief: scale is assessed using AFFORDABLE units (50-300), not total scheme units - a 400-home scheme with 120 affordable homes is potentially relevant, never rejected for exceeding 300 total units. 100% affordable is explicitly NOT an exclusion for this buyer (the opposite of the other three profiles). No specialist/retirement development-type exclusion is implemented - the brief explicitly states this buyer's specialist-product appetite has not been defined, so a specialist residential development type (e.g. Focus School's mixed_retirement_and_market_housing) is preserved as an unresolved/unknown fact, never a fabricated hard exclusion. No planning-stage preference is implemented beyond exposing whatever planning position exists as context (brief: \"do not assume the buyer requires planning permission/adopted/emerging allocation\"). Allocation- level (Local Plan) opportunities have no scheme-specific affordable-unit evidence at all (brief: \"do NOT estimate affordable units by applying Local Plan/NPPF affordable-housing policy percentages to allocation capacity\") - Housing Association fit for a Local Plan allocation is therefore INSUFFICIENT_EVIDENCE by design, not a gap in this implementation.",
+      "geography_scope": "ALL_CURRENT_COVERAGE",
+      "geography_councils": "frozenset()",
+      "acquisition_types": "frozenset({'AFFORDABLE_HOUSING_PACKAGE'})",
+      "development_state_appetite": "UNDERWAY_ACCEPTABLE",
+      "control_appetite": "frozenset({'DEVELOPER_LED_ACCEPTABLE'})",
+      "retirement_appetite": "UNSPECIFIED"
+    },
+    "independent_exclusion": null
+  },
+  {
+    "site": 313,
+    "assessment": {
+      "count": {
+        "value": 67,
+        "lower": null,
+        "upper": null,
+        "qualifier": "unknown",
+        "state": "unknown",
+        "application_reference": "25/00173/OUT",
+        "scope_type": "unclear",
+        "scope_label": "Whole site (scope not confirmed by phase evidence)",
+        "stage": "proposed",
+        "document_id": null,
+        "source_url": null,
+        "document_date": null,
+        "passage": null,
+        "review_reason": "Count-level source, qualifier and scope evidence not linked; reported value is unverified."
+      },
+      "alternatives": [],
+      "reported_percentage": 15.0,
+      "percentage_review_reason": null,
+      "reported_tenure": null,
+      "tenures": [],
+      "reported_evidence": null,
+      "source_claims": [],
+      "selection_reason": null,
+      "relationships": []
+    },
+    "minimum50": "unknown",
+    "buyer": {
+      "classification": "INSUFFICIENT_EVIDENCE",
+      "is_investigative_exception": true,
+      "matches": [],
+      "does_not_match": [],
+      "unknown": [
+        "This opportunity is an active planning application, not yet decided, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.",
+        "No trusted affordable-unit count is available to assess against this buyer's target range.",
+        "AH count assessment: unknown against this buyer's target range (50-None affordable homes). 67 affordable homes \u2014 unknown, unknown; reported; source and scope unverified; Whole site (scope not confirmed by phase evidence); 25/00173/OUT; proposed; source unlinked; document date unknown",
+        "Affordable housing content has not been established with enough confidence to assess against this buyer's affordable-housing-package acquisition strategy.",
+        "Development progress has not been established for this opportunity."
+      ],
+      "investigate": [
+        "Check the named AH scope and source before making an acquisition decision.",
+        "Reported AH content remains unverified: 67 affordable homes \u2014 unknown, unknown; reported; source and scope unverified; Whole site (scope not confirmed by phase evidence); 25/00173/OUT; proposed; source unlinked; document date unknown"
+      ]
+    },
+    "packet": {
+      "opportunity_id": "planning_delivery:site:313",
+      "opportunity_type": "planning_delivery",
+      "kind": "site",
+      "council_code": "tameside",
+      "site_id": 313,
+      "allocation_id": null,
+      "phase_code": null,
+      "development_state_scope_verified": false,
+      "total_units": {
+        "state": "KNOWN",
+        "value": 444
+      },
+      "affordable_units": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_percentage": {
+        "state": "KNOWN",
+        "value": 15.0
+      },
+      "operative_planning_state": {
+        "state": "KNOWN",
+        "value": "planning_active_proposal"
+      },
+      "recommendation_direction": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "local_plan_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "allocation_status": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "progression_signal": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "has_identified_planning_activity": {
+        "state": "NOT_APPLICABLE",
+        "value": null
+      },
+      "development_state": {
+        "state": "UNKNOWN",
+        "value": null
+      },
+      "affordable_housing_status": {
+        "state": "KNOWN",
+        "value": "proposed"
+      },
+      "actors_control": {
+        "developer_indications": [],
+        "ownership_coverage": "INSUFFICIENT_EVIDENCE_TO_DETERMINE_CONTROL",
+        "conflicts": [],
+        "has_ownership_evidence": false
+      },
+      "linked_strategic_allocation_id": null,
+      "linked_strategic_allocation_name": null,
+      "transaction_signals": {
+        "recent_permission": {
+          "state": "ABSENT",
+          "detail": "No application has been granted for this opportunity at all."
+        },
+        "approaching_implementation_deadline": {
+          "state": "UNKNOWN",
+          "detail": "No resolved implementation deadline exists to assess."
+        },
+        "implementation_activity_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "wider_site_implementation_activity_context": {
+          "state": "UNKNOWN",
+          "detail": "No resolved operative permission exists to search subsequent planning activity against."
+        },
+        "no_qualifying_progress_evidence_identified": {
+          "state": "UNKNOWN",
+          "detail": "Insufficient basis to conclude no qualifying progress evidence exists: no resolved operative permission exists; this opportunity's own scope has not been verified."
+        },
+        "ownership_or_control_evidence_changed": {
+          "state": "UNKNOWN",
+          "detail": "This opportunity has not yet been through a monitoring pass - no prior evidence snapshot exists to compare against."
+        },
+        "raw_lapse_status": "not_granted",
+        "raw_implementation_deadline": null,
+        "raw_build_status": "unknown",
+        "raw_decision_date": null,
+        "raw_last_change_reasons": [],
+        "coverage_checked_at": null,
+        "scope_verified": false
+      },
+      "affordable_assessment": {
+        "count": {
+          "value": 67,
+          "lower": null,
+          "upper": null,
+          "qualifier": "unknown",
+          "state": "unknown",
+          "application_reference": "25/00173/OUT",
+          "scope_type": "unclear",
+          "scope_label": "Whole site (scope not confirmed by phase evidence)",
+          "stage": "proposed",
+          "document_id": null,
+          "source_url": null,
+          "document_date": null,
+          "passage": null,
+          "review_reason": "Count-level source, qualifier and scope evidence not linked; reported value is unverified."
+        },
+        "alternatives": [],
+        "reported_percentage": 15.0,
+        "percentage_review_reason": null,
+        "reported_tenure": null,
+        "tenures": [],
+        "reported_evidence": null,
+        "source_claims": [],
+        "selection_reason": null,
+        "relationships": []
+      }
+    },
+    "retirement_outcomes": {},
+    "matching_context": {
+      "council_code": "tameside",
+      "development_state": "unknown",
+      "control_facts": {
+        "developer_or_applicant_led": null,
+        "third_party_interest_declared": null,
+        "ownership_unresolved": true,
+        "partial_control_evidence": null
+      },
+      "development_state_scope_verified": false
+    },
+    "local_mandate": {
+      "key": "housing_association",
+      "display_name": "Housing Association",
+      "buyer_type": "Housing association / registered provider",
+      "primary_requirement": "Affordable residential housing opportunities",
+      "target_unit_min": 50,
+      "target_unit_max": null,
+      "scale_metric": "affordable_units",
+      "accepted_planning_states": "frozenset({'adopted_allocation', 'permission_granted', 'emerging_allocation'})",
+      "treats_no_activity_as_positive": false,
+      "large_allocation_is_self_qualifying": false,
+      "specialist_development_is_exclusion": false,
+      "wholly_affordable_is_exclusion": false,
+      "below_minimum_scale_is_exclusion": true,
+      "notes": "Brief: scale is assessed using AFFORDABLE units (50-300), not total scheme units - a 400-home scheme with 120 affordable homes is potentially relevant, never rejected for exceeding 300 total units. 100% affordable is explicitly NOT an exclusion for this buyer (the opposite of the other three profiles). No specialist/retirement development-type exclusion is implemented - the brief explicitly states this buyer's specialist-product appetite has not been defined, so a specialist residential development type (e.g. Focus School's mixed_retirement_and_market_housing) is preserved as an unresolved/unknown fact, never a fabricated hard exclusion. No planning-stage preference is implemented beyond exposing whatever planning position exists as context (brief: \"do not assume the buyer requires planning permission/adopted/emerging allocation\"). Allocation- level (Local Plan) opportunities have no scheme-specific affordable-unit evidence at all (brief: \"do NOT estimate affordable units by applying Local Plan/NPPF affordable-housing policy percentages to allocation capacity\") - Housing Association fit for a Local Plan allocation is therefore INSUFFICIENT_EVIDENCE by design, not a gap in this implementation.",
+      "geography_scope": "ALL_CURRENT_COVERAGE",
+      "geography_councils": "frozenset()",
+      "acquisition_types": "frozenset({'AFFORDABLE_HOUSING_PACKAGE'})",
+      "development_state_appetite": "UNDERWAY_ACCEPTABLE",
+      "control_appetite": "frozenset({'DEVELOPER_LED_ACCEPTABLE'})",
+      "retirement_appetite": "UNSPECIFIED"
+    },
+    "independent_exclusion": null
+  }
+]

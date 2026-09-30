@@ -37,6 +37,7 @@ aggregate_scheme_fields/pick_representative_application already relies on.
 from __future__ import annotations
 
 from app.db.models import Application, SchemeIntelligence, Site
+from app.policy.ah_assessment import AHAssessment, legacy_assessment
 from app.reporting.affordable_housing_scope import compute_percentage_reconciliation
 
 # --- Evidence/review states (Part 16) ---------------------------------------
@@ -263,12 +264,18 @@ def parse_tenure_categories(raw: str | None) -> list[str]:
     return [_TENURE_LABELS.get(p, p.title()) for p in parts]
 
 
-def build_affordable_tenure(scheme: SchemeIntelligence | None, affordable_headline: dict) -> dict:
-    """Part 11 - only ever shows evidenced categories; never invents a
-    distribution across them (there is no per-category unit count to
-    show). If affordable homes are known but tenure isn't, says so
-    explicitly rather than leaving a blank that could read as "market
-    housing"."""
+def build_affordable_tenure(scheme: SchemeIntelligence | None, affordable_headline: dict,
+                            assessment: AHAssessment | None = None) -> dict:
+    """Prefer scoped tenure claims, retaining each claim's qualifications.
+
+    Legacy category-only extraction never invents a unit distribution.
+    A qualified count with missing tenure is not missing AH provision.
+    """
+    if assessment and assessment.tenures:
+        return {"categories": [f"{t.name}: {AHAssessment(count=t.claim).label()}" for t in assessment.tenures],
+                "has_categories": True, "affordable_known_tenure_unknown": False}
+    if assessment and assessment.count.qualified:
+        return {"categories": [], "has_categories": False, "affordable_known_tenure_unknown": True}
     categories = parse_tenure_categories(scheme.affordable_tenure_split_final if scheme else None)
     affordable_known = affordable_headline["state"] in ("verified", "calculated", "percentage_only", "zero")
     return {
@@ -544,8 +551,25 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
     current_version = build_current_version(site, apps, rep_app)
     scheme = rep_app.scheme_intelligence if rep_app else None
 
+    from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
+    assessment = resolve_operative_filter_facts(build_operative_planning_facts(apps)).affordable_assessment
+    # Retain old extraction separately; the headline must use the same operative
+    # claim as search, not label a populated representative row "verified".
     affordable_headline = compute_affordable_headline(scheme)
-    tenure = build_affordable_tenure(scheme, affordable_headline)
+    affordable_headline.update(state="review", evidence_status=assessment.count.state,
+        headline_units=assessment.label(), headline_percentage=None,
+        percentage_is_calculated=False, percentage_display=None,
+        affordable_units=assessment.count.value if assessment.count.qualified else None)
+
+    # Representative extraction remains inspectable even when no operative
+    # application can be selected. Never substitute it into the selected claim.
+    reported_assessment = legacy_assessment(scheme,
+        application_reference=rep_app.reference if rep_app else None,
+        scope_label="Reported application extraction; scheme scope unverified")
+
+    # The headline and CSV already use scoped source claims. Do not let a
+    # missing/stale representative-row tenure contradict that same evidence.
+    tenure = build_affordable_tenure(scheme, affordable_headline, assessment)
     bedroom_mix = build_bedroom_mix(scheme)
     housing_type = build_housing_type(scheme)
     density = build_density(scheme)
@@ -564,9 +588,12 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
         scheme.unit_reconciliation_status if scheme else None,
         percentage_reconciliation,
     )
+    structured_summary = assessment.label()
     evidence_gaps = build_evidence_gaps(current_version, affordable_headline, tenure, bedroom_mix, housing_type)
 
     return {
+        "affordable_assessment": assessment,
+        "reported_affordable_assessment": reported_assessment,
         "current_version": current_version,
         "affordable_headline": affordable_headline,
         "tenure": tenure,

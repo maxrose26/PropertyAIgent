@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import Base
@@ -12,6 +12,16 @@ from app.db.models import Base
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 DB_PATH = DATA_DIR / "deal_finder.db"
+
+_discovery_bounds = False
+
+def configure_discovery_database_bounds():
+    """Called only by daily discovery, before opening the first connection."""
+    global _discovery_bounds
+    if _engine is not None:
+        raise RuntimeError("discovery DB bounds must precede engine creation")
+    _discovery_bounds = True
+
 
 _engine = None
 _SessionLocal: sessionmaker | None = None
@@ -34,6 +44,33 @@ def _normalize_database_url(url: str) -> str:
     return url
 
 
+def install_discovery_transaction_bounds(engine):
+    """Opt-in per-engine bounds; never configure roles/global/session defaults.
+
+    SQLAlchemy's begin event runs for Core and ORM autobegin, including a new
+    transaction after commit/rollback and a replacement pooled connection.
+    Fail closed if the server did not apply the settings. The independent
+    invocation watchdog remains the bound for a stalled driver/network.
+    """
+    def begin(connection):
+        try:
+            for name, value in (("statement_timeout", "15s"),
+                                ("lock_timeout", "5s"),
+                                ("idle_in_transaction_session_timeout", "30s")):
+                connection.exec_driver_sql(f"SET LOCAL {name} = '{value}'")
+            effective = connection.exec_driver_sql(
+                "SELECT current_setting('statement_timeout')::interval = interval '15 seconds', "
+                "current_setting('lock_timeout')::interval = interval '5 seconds', "
+                "current_setting('idle_in_transaction_session_timeout')::interval = interval '30 seconds'"
+            ).one()
+            if not all(value is True for value in effective):
+                raise RuntimeError("discovery transaction bounds not effective")
+        except Exception:
+            connection.invalidate()
+            raise
+    event.listen(engine, "begin", begin)
+
+
 def get_engine():
     global _engine
     if _engine is None:
@@ -46,7 +83,18 @@ def get_engine():
         load_dotenv()
         database_url = os.getenv("DATABASE_URL")
         if database_url:
-            _engine = create_engine(_normalize_database_url(database_url), future=True)
+            url = _normalize_database_url(database_url)
+            kwargs = {}
+            if _discovery_bounds and url.startswith('postgresql'):
+                kwargs = dict(pool_timeout=10, connect_args={
+                    'connect_timeout': 10,
+                    'keepalives': 1, 'keepalives_idle': 10,
+                    'keepalives_interval': 5, 'keepalives_count': 2,
+                })
+            engine = create_engine(url, future=True, **kwargs)
+            if _discovery_bounds and url.startswith('postgresql'):
+                install_discovery_transaction_bounds(engine)
+            _engine = engine
         else:
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             _engine = create_engine(f"sqlite:///{DB_PATH}", future=True)

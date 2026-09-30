@@ -170,3 +170,12 @@ def housing_type_note(development_type: str | None, housing_typology: str | None
     if house_share <= 1 - MIXED_DOMINANCE_THRESHOLD:
         return f"Technically mixed: {house_count} houses, {apartment_count} apartments ({1 - house_share:.0%} apartments)"
     return None
+
+
+def explicit_affordable_maximum_mask(values, maximum):
+    """An explicit maximum requires an established count; unknown is not zero.
+
+    The default minimum-zero browsing filter remains inclusive of unknowns.
+    Accepts the existing pandas Series without importing pandas here.
+    """
+    return values.notna() & values.le(maximum)

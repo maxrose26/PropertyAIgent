@@ -54,6 +54,8 @@ other way: that module imports build_control_appetite_facts from here).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from app.policy.ah_assessment import AHAssessment, AHClaim, legacy_assessment
+from app.policy.ah_count_threshold import _number
 
 from app.policy.buyer_profiles import (
     ACQUISITION_TYPES,
@@ -129,7 +131,10 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # change classification for 3 of the 4 production Buyer Mandates. assess_
 # buyer_fit's own commercial rules, Buyer Mandate fields, and every other
 # domain area were NOT touched by this bump.
-BUYER_MATCHING_POLICY_VERSION = 4
+# Version 5 introduced AH trust interpretation. Version 6 distinguishes an
+# absent AH quantity requirement from missing quantity evidence. Local only:
+# activation/impact review is required; stored histories are not rewritten.
+BUYER_MATCHING_POLICY_VERSION = 6
 
 # --- Buyer Mandate V2, Phase B2: build_status vocabulary (reused verbatim) --
 #
@@ -193,6 +198,11 @@ class MatchingFacts:
     # "active positions" to report.
     has_active_proposal: bool = False
     active_proposal_count: int = 0
+    # Review-only evidence: never used as a trusted recommendation input.
+    affordable_review_reason: str | None = None
+    affordable_reported_percentage: float | None = None
+    affordable_source_reference: str | None = None
+    affordable_assessment: AHAssessment | None = None
 
 
 def build_strategic_land_matching_facts(allocation, coverage, phasing) -> MatchingFacts:
@@ -312,6 +322,7 @@ def build_planning_delivery_matching_facts(scheme_intelligence, *, planning_stat
             opportunity_type=PLANNING_DELIVERY, unit_count=None, development_type_raw=None,
             is_specialist_development=None, affordable_percentage=None, affordable_percentage_trusted=False,
             affordable_unit_count=None,
+            affordable_assessment=AHAssessment(),
             planning_state=planning_state, has_identified_planning_activity=True,
             has_phasing_evidence=False, matched_to_site=True,
         )
@@ -346,6 +357,33 @@ def build_planning_delivery_matching_facts(scheme_intelligence, *, planning_stat
     # per that module's own rules - never assumed to be 0 by this function.
     affordable_unit_count = scheme_intelligence.affordable_units_final
 
+    from app.reporting.affordable_housing_scope import compute_percentage_reconciliation
+    reconciliation = compute_percentage_reconciliation(scheme_intelligence)
+    total = scheme_intelligence.total_units_final
+    review_reason = None
+    if affordable_pct is not None or affordable_unit_count is not None:
+        if (total is None or total <= 0 or not reconciliation["percentage_reconciles"]
+                or affordable_pct is not None and not 0 <= affordable_pct <= 100
+                or affordable_unit_count is not None and
+                   (affordable_unit_count < 0 or total is not None and affordable_unit_count > total)
+                or getattr(scheme_intelligence, "affordable_status_note", None)
+                or getattr(scheme_intelligence, "unit_reconciliation_status", None) not in (None, "OK")
+                or getattr(scheme_intelligence, "affordable_missing", False)
+                or (getattr(scheme_intelligence, "affordable_data_status", None) == "all_units_affordable"
+                    or affordable_pct == 100) and
+                   (affordable_unit_count is not None and affordable_unit_count != total
+                    or affordable_pct is not None and affordable_pct != 100)):
+            review_reason = "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit."
+    affordable_trusted = affordable_trusted and review_reason is None
+    application = getattr(scheme_intelligence, "application", None)
+    application_reference = getattr(application, "reference", None)
+    assessment = legacy_assessment(scheme_intelligence,
+        application_reference=application_reference,
+        scope_label="Application report (scheme extent unverified)")
+    if application is not None:
+        from app.policy.ah_claim_selection import for_applications
+        assessment = for_applications([application], assessment)
+
     return MatchingFacts(
         opportunity_type=PLANNING_DELIVERY,
         unit_count=scheme_intelligence.total_units_final,
@@ -358,6 +396,10 @@ def build_planning_delivery_matching_facts(scheme_intelligence, *, planning_stat
         has_identified_planning_activity=True,
         has_phasing_evidence=False,
         matched_to_site=True,
+        affordable_assessment=assessment,
+        affordable_source_reference=application_reference,
+        affordable_review_reason=review_reason,
+        affordable_reported_percentage=affordable_pct,
     )
 
 
@@ -471,24 +513,40 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     dev_type = source_si.development_type if source_si else None
     is_specialist = (dev_type in SPECIALIST_DEVELOPMENT_TYPES) if dev_type else None
 
-    # --- affordable housing: consented AH preferred, else (exactly one
-    # active proposal) that proposal's own AH - ah.historical (withdrawn/
-    # refused positions) is never read here, so a withdrawn scheme's AH
-    # figure structurally cannot influence Buyer Fit (Section 8: "withdrawn/
-    # refused AH must NOT influence current Buyer Fit").
-    affordable_pct = None
-    affordable_units = None
-    if ah.whole_site is not None:
-        affordable_pct, affordable_units = ah.whole_site.percentage, ah.whole_site.units
-    elif len(active_positions) == 1 and ah.active_whole_site is not None:
-        affordable_pct, affordable_units = ah.active_whole_site.percentage, ah.active_whole_site.units
-    # A trusted, explicitly-evidenced 0% is preserved as 0 (never
-    # discarded) - affordable_trusted is about WHETHER a position was
-    # resolved at all (ah.whole_site/ah.active_whole_site is None whenever
-    # nothing genuinely evidenced was found - see affordable_housing_
-    # scope.py's own _has_no_independent_affordable_position), never about
-    # the resolved value happening to be zero.
-    affordable_trusted = affordable_pct is not None
+    # Reuse scoped reconciliation, retaining the source position unchanged.
+    from app.reporting.affordable_housing_scope import select_affordable_position_for_scope
+    position = select_affordable_position_for_scope(ah, active_position_count=len(active_positions))
+    affordable_pct = position.percentage if position else None
+    affordable_units = position.units if position else None
+    quantum = consented.approved_units
+    if quantum.state != FACT_RESOLVED and len(active_positions) == 1:
+        quantum = active_positions[0].proposed_units
+    source = applications_by_id.get(position.application_id) if position else None
+    si = source.scheme_intelligence if source else None
+    denominator_matches = bool(
+        position and quantum.source and quantum.state == FACT_RESOLVED and si
+        and quantum.source.application_id == position.application_id
+        and si.total_units_final == unit_count and unit_count is not None and unit_count > 0
+    )
+    review_reason = None
+    if position is not None:
+        contradictory_all = (
+            getattr(si, "affordable_data_status", None) == "all_units_affordable"
+            and (affordable_units is not None and unit_count is not None and affordable_units != unit_count
+                 or affordable_pct is not None and affordable_pct != 100)
+        )
+        invalid_quantum = (affordable_units is not None and
+                           (affordable_units < 0 or unit_count is not None and affordable_units > unit_count))
+        if (not denominator_matches or not position.percentage_reconciles or contradictory_all
+                or invalid_quantum or getattr(si, "affordable_status_note", None)
+                or getattr(si, "unit_reconciliation_status", None) not in (None, "OK")
+                or getattr(si, "affordable_missing", False)
+                or affordable_pct is not None and not 0 <= affordable_pct <= 100
+                or affordable_pct == 100 and affordable_units is not None and affordable_units != unit_count):
+            review_reason = "Affordable housing position is unresolved: reconcile the recorded percentage, count, denominator and source scope before relying on buyer fit."
+    elif ah.conflicts:
+        review_reason = "Affordable housing position is unresolved: review conflicting source positions before relying on buyer fit."
+    affordable_trusted = affordable_pct is not None and review_reason is None
 
     return MatchingFacts(
         opportunity_type=PLANNING_DELIVERY,
@@ -504,6 +562,10 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
         matched_to_site=True,
         has_active_proposal=len(active_positions) >= 1,
         active_proposal_count=len(active_positions),
+        affordable_assessment=position.assessment if position else AHAssessment(),
+        affordable_review_reason=review_reason,
+        affordable_reported_percentage=affordable_pct,
+        affordable_source_reference=position.application_reference if position else None,
     )
 
 
@@ -723,7 +785,16 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # `unknown.append` call, and deliberately NOT set at any of the sites
     # listed above - each site's own inline comment explains which category
     # it falls into and why.
+    # Compatibility for direct MatchingFacts callers: preserve the reported
+    # value, but never infer a qualifier or evidence from its presence.
+    ah_assessment = facts.affordable_assessment or AHAssessment(count=AHClaim(
+        value=facts.affordable_unit_count,
+        review_reason="Reported count has no linked source qualification.",
+    ))
     blocking_unknown = False
+    if facts.affordable_review_reason:
+        unknown.append(facts.affordable_review_reason)
+        investigate.append("Review the affordable housing source position and its scope; reported figures have not been corrected or assumed to be zero.")
     # Buyer Mandate V2, Phase B2: whether the CALLER chose to activate B2
     # at all - deliberately independent of whether the mandate itself has
     # any B1 fields configured (all four real production mandates already
@@ -749,12 +820,18 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # universal exclusion for every buyer in this pilot, not an unstated
     # specialist-housing preference question.
     if facts.is_specialist_development is True:
-        if profile.specialist_development_is_exclusion or facts.opportunity_type == STRATEGIC_LAND:
+        retirement = facts.development_type_raw in {
+            "retirement_living", "mixed_retirement_and_market_housing"}
+        if retirement and profile.retirement_appetite == "EXCLUDE":
+            does_not_match.append("This buyer explicitly excludes retirement housing; the affordable count does not override that product rule.")
+        elif profile.specialist_development_is_exclusion or facts.opportunity_type == STRATEGIC_LAND:
             does_not_match.append(
                 f"Trusted evidence identifies this as a specialist development "
                 f"({facts.development_type_raw or 'non-residential use'}), not the general-needs residential "
                 f"development this buyer requires."
             )
+        elif retirement and profile.retirement_appetite == "ACCEPT":
+            matches.append("This buyer explicitly accepts retirement housing; count relevance, other mandate rules and acquisition availability remain separate assessments.")
         else:
             unknown.append(
                 f"Trusted evidence identifies this as a specialist development "
@@ -792,7 +869,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # Housing Association amendment: deliberately reversed polarity for a
     # buyer whose own primary requirement IS affordable housing - see
     # BuyerMandatePolicy.wholly_affordable_is_exclusion's own docstring.
-    if facts.affordable_percentage is not None and facts.affordable_percentage >= WHOLLY_AFFORDABLE_THRESHOLD:
+    if facts.affordable_percentage_trusted and not facts.affordable_review_reason and facts.affordable_percentage is not None and facts.affordable_percentage >= WHOLLY_AFFORDABLE_THRESHOLD:
         if profile.wholly_affordable_is_exclusion:
             does_not_match.append(
                 f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
@@ -817,7 +894,8 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             unknown.append("Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.")
         else:
             unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
-            blocking_unknown = True
+            if profile.wholly_affordable_is_exclusion:
+                blocking_unknown = True
     # A trusted, non-100% figure (the normal policy-compliant case) is
     # deliberately NOT added as a "matches"/"does_not_match" reason for any
     # profile - per the brief, the mere presence of policy-compliant
@@ -882,7 +960,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # affordable_unit_count instead - a 400-home scheme with 120 affordable
     # homes is judged on 120, never rejected for the total exceeding 300.
     if profile.scale_metric == AFFORDABLE_UNITS:
-        scale_value = facts.affordable_unit_count
+        scale_value = None if facts.affordable_review_reason else facts.affordable_unit_count
         unit_noun = "affordable homes"
         no_count_message = "No trusted affordable-unit count is available to assess against this buyer's target range."
     else:
@@ -890,7 +968,36 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         unit_noun = "homes"
         no_count_message = "No trusted unit count is available to assess against this buyer's target range."
 
-    if scale_value is None:
+    if profile.scale_metric == AFFORDABLE_UNITS:
+        outcome = ah_assessment.search(profile.target_unit_min, profile.target_unit_max)
+        reason = (f"AH count assessment: {outcome} against this buyer's target range "
+                  f"({profile.target_unit_min}-{profile.target_unit_max} affordable homes). "
+                  f"{ah_assessment.label()}")
+        if outcome == "unfiltered":
+            # No AH quantity requirement is not an unknown requirement.
+            # Product/acquisition-type evidence is assessed independently.
+            pass
+        elif outcome == "meets":
+            matches.append(reason)
+        elif outcome == "does_not_meet":
+            if profile.below_minimum_scale_is_exclusion and ah_assessment.search(minimum=profile.target_unit_min) == "does_not_meet":
+                does_not_match.append("Source-qualified count is below this buyer's minimum. " + reason)
+            else:
+                investigate.append(reason)
+                is_investigative_exception = True
+        else:
+            if outcome == "unknown":
+                unknown.append(no_count_message)
+            unknown.append(reason)
+            investigate.append("Check the named AH scope and source before making an acquisition decision.")
+            blocking_unknown = True
+            # A reported legacy figure can justify investigation, never a
+            # numeric match. Completely absent/invalid quantities stay unknown.
+            reported = _number(ah_assessment.count.value)
+            is_investigative_exception = (is_investigative_exception
+                or outcome in ("likely_meets", "investigate")
+                or outcome == "unknown" and reported is not None)
+    elif scale_value is None:
         unknown.append(no_count_message)
         blocking_unknown = True
     elif profile.target_unit_min <= scale_value <= profile.target_unit_max:
@@ -1046,13 +1153,19 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 acquisition_type_unknowns.append("This opportunity's planning position does not clearly establish whether it remains an early-stage strategic-land-control opportunity.")
 
         if AFFORDABLE_HOUSING_PACKAGE in profile.acquisition_types:
-            if facts.affordable_percentage_trusted and facts.affordable_percentage == 0.0:
+            if ah_assessment.count.qualified and ah_assessment.count.scope_type == "whole_site" and ah_assessment.count.qualifier == "exact" and ah_assessment.count.value == 0:
                 acquisition_type_hard_mismatches.append("Trusted evidence shows this scheme has no affordable housing content at all, incompatible with this buyer's affordable-housing-package acquisition strategy.")
-            elif (facts.affordable_unit_count or 0) > 0 or (facts.affordable_percentage_trusted and facts.affordable_percentage and facts.affordable_percentage > 0):
-                matches.append("Trusted evidence shows this scheme includes an affordable housing component, structurally relevant to this buyer's affordable-housing-package acquisition strategy - this does not establish that the package is known to be available for acquisition.")
+            elif ah_assessment.search(minimum=1) in ("meets", "likely_meets"):
+                matches.append("Source-qualified affordable-housing-package signal: " + ah_assessment.label() + ". This does not establish that the package is known to be available for acquisition.")
+                if ah_assessment.search(minimum=1) != "meets":
+                    blocking_unknown = True
+                    is_investigative_exception = True
                 acquisition_type_matched = True
             else:
                 acquisition_type_unknowns.append("Affordable housing content has not been established with enough confidence to assess against this buyer's affordable-housing-package acquisition strategy.")
+                if _number(ah_assessment.count.value) is not None:
+                    investigate.append("Reported AH content remains unverified: " + ah_assessment.label())
+                    is_investigative_exception = True
 
         if DEVELOPMENT_HOMES_ACQUISITION in profile.acquisition_types:
             # Never excluded from this dimension; confirmed underway-or-

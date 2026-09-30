@@ -746,6 +746,7 @@ def _reconciliation_view(facts) -> dict:
             for p in facts.active_positions
         ],
         "affordable_housing": {
+            "source_selection": [_ah_position(p) for p in getattr(ah, 'source_positions', ())],
             "whole_site": _ah_position(ah.whole_site),
             "phases": [_ah_position(p) for p in ah.phases],
             "active_whole_site": _ah_position(ah.active_whole_site),
@@ -770,6 +771,8 @@ def _ah_position(p) -> dict | None:
     if p is None:
         return None
     return {
+        "assessment": p.assessment.payload() if p.assessment else None,
+        "assessment_label": p.assessment.label() if p.assessment else "AH evidence not qualified",
         "reference": p.application_reference, "scope": p.scope_label, "scope_type": p.scope_type,
         "percentage": p.percentage, "units": p.units, "tenure": p.tenure, "status": p.status,
         "notes": p.notes, "decided_state": p.decided_state,

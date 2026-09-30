@@ -1,0 +1,82 @@
+{
+  "production_inventory": "unmeasured; no production metadata queried",
+  "basis": "six explicitly enumerated synthetic applications; one body and one empty citation page each",
+  "applications": [
+    {
+      "council": "stockport",
+      "reference": "DC/085997"
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/093884"
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/094889"
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/098428"
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/095922"
+    },
+    {
+      "council": "tameside",
+      "reference": "SITE/313"
+    }
+  ],
+  "document_body_revalidations": 6,
+  "relationship_pages": 6,
+  "body_bytes": 144,
+  "slices": [
+    {
+      "attempts": 4,
+      "body_bytes": 48,
+      "applications": 6,
+      "document_checks": 6,
+      "relationship_lookups": 6,
+      "deferred": 8,
+      "incomplete": 8
+    },
+    {
+      "attempts": 2,
+      "body_bytes": 24,
+      "applications": 6,
+      "document_checks": 6,
+      "relationship_lookups": 6,
+      "deferred": 6,
+      "incomplete": 6
+    },
+    {
+      "attempts": 2,
+      "body_bytes": 24,
+      "applications": 6,
+      "document_checks": 6,
+      "relationship_lookups": 6,
+      "deferred": 4,
+      "incomplete": 4
+    },
+    {
+      "attempts": 2,
+      "body_bytes": 24,
+      "applications": 6,
+      "document_checks": 6,
+      "relationship_lookups": 6,
+      "deferred": 2,
+      "incomplete": 2
+    },
+    {
+      "attempts": 2,
+      "body_bytes": 24,
+      "applications": 6,
+      "document_checks": 6,
+      "relationship_lookups": 6,
+      "deferred": 0,
+      "incomplete": 0
+    }
+  ],
+  "new_version_observations_during_revisit": 0,
+  "cadence": "unapproved hypothesis; fixture steps are not seconds or portal throughput"
+}

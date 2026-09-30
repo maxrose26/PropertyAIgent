@@ -1,0 +1,40 @@
+{
+  "candidate": {
+    "passed": 338,
+    "failures": [
+      "tests.test_p0a_bounded_discovery::test_actual_supervisor_death_surviving_child_holds_lock",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_selects_only_outstanding_applications",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+    ],
+    "skips": [
+      "tests.test_p0a_chromium_integration::test_real_navigation_deadline_cleanup_then_subsequent_work",
+      "tests.test_p0a_chromium_integration::test_real_document_recycling_then_evidence_refresh",
+      "tests.test_p0a_chromium_integration::test_real_browser_descendant_cleanup_on_supervised_failure",
+      "tests.test_p0a_chromium_integration::test_real_supervisor_death_with_browser_child",
+      "tests.test_p0a_chromium_integration::test_real_browser_cleanup_when_persistence_blocks",
+      "tests.test_p0a_bounded_discovery::test_postgres_migration_and_unique_key_when_disposable_server_available"
+    ],
+    "summary": "6 failed, 338 passed, 6 skipped, 1 deselected in 44.28s"
+  },
+  "baseline": {
+    "passed": 281,
+    "failures": [
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_selects_only_outstanding_applications",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+      "tests.test_pr2_final_amendment_migration_and_intelligence_processing::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+    ],
+    "skips": [],
+    "summary": "5 failed, 281 passed, 1 deselected in 23.68s"
+  },
+  "candidate_commit": "c88c7248094ac8334bc4f5a5bcb02224abc56593",
+  "baseline_commit": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+  "specification_sha256": "c007e2b2912ae5d8817142c32fdf35e0000f72d4fa127d5c83e32e6ef10970f8",
+  "gate_a": "OPEN",
+  "python": "3.12.14",
+  "production_changes": false
+}

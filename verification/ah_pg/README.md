@@ -1,0 +1,27 @@
+# AH disposable PostgreSQL verification
+
+This is a local verification capability, not permission to enable PostgreSQL in ordinary application execution. The specification's section 12 is the approval boundary. Do not enable production migration or adopt existing PostgreSQL schemas on the strength of this package.
+
+## Boundary
+
+`run.py` requires an exact commit and clean tree, rejects inherited database/model inputs by name (never prints values), and rejects repository or ancestor environment files. Use a new bundle checkout, not your live application checkout. Dependency installation is separate, into a new dedicated venv with empty HOME, isolated pip configuration and public PyPI only. It makes no model calls. The project uses **psycopg 3**, not psycopg2; the previous handoff's psycopg2 check was wrong. Both pinned-package verification and actual driver/import/test-collection preflight must complete before initdb.
+
+Existing WSL prerequisites: Python 3.12 with venv, git, PostgreSQL 16 binaries at `/usr/lib/postgresql/16/bin`, sudo, util-linux (unshare/runuser), iproute2, mount, coreutils and libseccomp2. This handoff does not install/start a system PostgreSQL service or install browsers. Missing prerequisites or unavailable namespace isolation produce BLOCKED evidence; do not bypass checks.
+
+Sudo is used solely to construct fresh network/PID/mount namespaces, with only loopback, and to return immediately to the ordinary user. No shared PostgreSQL port/socket is used. The runner invokes initdb in a new private directory, starts its own server and identifies it with pg_controldata's system identifier, data-directory/process identity, PID/namespace ownership, port and start time. A connected identity check occurs before runner administrative DDL. Each test gets its own named case database and a restricted writer with no superuser, database/role creation, replication, bypass-RLS or membership powers. Schema creation is granted only inside each case database; the writer does not own the database. Connected identity and privileges are checked before admitting the engine and before application transactions. Ordinary engines are rejected before connection.
+
+The SQLAlchemy TABLES and `migrate_local` create the exact canonical provenance tables, constraints, indexes and append-only function/triggers in public, after the normal existing Base models. There is no alternate schema, guard monkeypatch, driver/dialect substitution or raw-DDL replacement. Negative tests deliberately damage real canonical objects to prove rejection. Existing functional assertions are reused with the PostgreSQL fixture. Feature-flag toggles in those assertions test the existing application feature; they do not bypass the database guard.
+
+Fresh creation is attested and catalog definitions are checked on use, including full constraint/index/function/trigger expressions. A new engine cannot adopt an existing provenance schema. This deliberately does not implement production schema adoption or migration planning. The trusted local user/root can modify code; this guard prevents accidental target/configuration mistakes, not a hostile OS owner.
+
+The suite covers 71 cases, including migration/idempotence, UPDATE/DELETE/TRUNCATE rejection, duplicate imports and concurrent imports, concurrent review/replay, correction/reversal, conflict selection, consumer agreement, feature rollback retaining history, transactional DDL rollback, FK failure and same-connection recovery, wrong proof, restricted-role permissions, catalog drift and ordinary-engine rejection. `native-collected.txt` and JUnit contain exact parametrized test identities. Zero skips are required. Isolation lifetime is bounded to 20 minutes, with forced namespace cleanup. Test databases are dropped and the cluster stopped; local files remain for troubleshooting. Only logs/proofs/version/test records enter the returned archive, not database contents or credentials.
+
+## Meaning of results
+
+Even a clean 71-case run is **awaiting archive inspection**, not an automatic PostgreSQL acceptance declaration. Inspect SHA256SUMS, exact commit/clean tree, dependencies/driver/libpq/server/runner versions, namespace/cluster identity, all test identities, counts, errors/skips and shutdown records.
+
+An inspected pass would support this candidate's canonical AH schema and synthetic import/review/selection/concurrency behavior on this particular disposable native PostgreSQL version. It would not establish production migration/adoption safety, production privileges/ownership/RLS, Supabase pooler/extensions/configuration compatibility, operational concurrency/scale, or buyer-facing source truth. Real-site source acceptance and measured version-5 stored impact remain two separate release gates. No production writes, paid calls, pushes, merges, deployments, discovery or P0-A changes are authorized.
+
+The package also includes exact candidate-versus-accepted-908c7f6-baseline SQLite evidence generated with the same pinned Python dependencies and network syscalls disabled. Native collection and compilation are not PostgreSQL execution.
+
+Repair after WSL archive 34596ad47d04e8e6b711911c236156351ce50bda003dc59d2f134f8298a8da7b: compare inet_server_addr()::text to exact 127.0.0.1/32 in both administrative and restricted-role identity checks. PostgreSQL includes the netmask in this cast. No identity component is removed or relaxed. The prior run stopped before role creation/native test execution; shutdown succeeded.

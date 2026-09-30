@@ -1,0 +1,29 @@
+{
+  "implementation_commit": "cd1d0bdd1c154c31e790a0ab5ded63c4a1908d31",
+  "baseline_commit": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+  "specification_sha256": "c007e2b2912ae5d8817142c32fdf35e0000f72d4fa127d5c83e32e6ef10970f8",
+  "focused_final": "40 passed, 1 skipped in 3.88s",
+  "affected_feature": "5 failed, 319 passed, 1 skipped, 1 deselected in 27.55s",
+  "affected_baseline": "5 failed, 281 passed, 1 deselected in 24.88s",
+  "baseline_failures": [
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_selects_only_outstanding_applications",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+  ],
+  "feature_failures": [
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_selects_only_outstanding_applications",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_excludes_unchanged_sites_from_summaries",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+    "FAILED tests/test_pr2_final_amendment_migration_and_intelligence_processing.py::test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+  ],
+  "notes": [
+    "Affected run includes 38 passing new tests; final focused run adds two tests, giving 40. Do not add the two suite totals.",
+    "Same five failing test IDs on baseline and feature. Four require OPENAI_API_KEY despite fake client factories; one encounters missing SOCKS dependency during SDK construction. No paid request executed.",
+    "PostgreSQL test explicitly skipped: no disposable server available. apt installation blocked by setgroups/seteuid permissions.",
+    "Existing Chromium RSS benchmark explicitly deselected: no installed local Chromium. Fake-page regression and actual subprocess lifecycle tests executed.",
+    "Initial exploratory runs exposed legacy test IO leakage. Final matched comparison uses committed offline harness to block external HTTP, stub TLS HEAD probes, and isolate document folders."
+  ]
+}

@@ -1171,6 +1171,7 @@ class OperativeFilterFacts:
     # note already does. True (the default) for the ordinary, reconciled
     # case, so normal schemes are completely unaffected.
     affordable_percentage_reconciles: bool = True
+    affordable_assessment: object = None
 
 
 def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
@@ -1259,7 +1260,12 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFi
         affordable_units, affordable_percentage, affordable_source = ah.active_whole_site.units, ah.active_whole_site.percentage, "active"
         affordable_percentage_reconciles = ah.active_whole_site.percentage_reconciles
 
+    from app.policy.ah_assessment import AHAssessment
+    from app.reporting.affordable_housing_scope import select_affordable_position_for_scope
+    position = select_affordable_position_for_scope(ah, active_position_count=len(active_positions))
+    assessment = (position.assessment if position else None) or AHAssessment()
     return OperativeFilterFacts(
+        affordable_assessment=assessment,
         decision_status=decision_status,
         has_active_proposal=len(active_positions) >= 1,
         active_proposal_count=len(active_positions),

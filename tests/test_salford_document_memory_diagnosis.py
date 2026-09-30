@@ -413,7 +413,7 @@ def test_per_document_mem_line_is_persisted_via_existing_orchestrator_checkpoint
 
     observed_detail = {}
 
-    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         on_line(real_mem_line)
         row = session.query(ScrapeRun).filter_by(council_code="testcouncil", status="running").one()
         observed_detail["mid_flight"] = row.detail

@@ -278,9 +278,17 @@ def _scrape_month_for_council(page, council: CouncilConfig, date_from: str, date
 def stage_scrape(
     session: Session, page, council: CouncilConfig, date_from: str, date_to: str, batch_id: str,
     lifecycle_event_stats: LifecycleEventStats | None = None,
+    *, recorded_applications=None,
 ) -> int:
     print(f"\n[scrape] {council.code} {date_from} -> {date_to}")
-    scraped = _scrape_month_for_council(page, council, date_from, date_to)
+    if recorded_applications is not None:
+        from app.revisit.offline_child import require_offline_owner
+        require_offline_owner(session.get_bind())
+        if len(recorded_applications) > 2:
+            raise ValueError('recorded discovery allocation exceeded')
+        scraped = recorded_applications
+    else:
+        scraped = _scrape_month_for_council(page, council, date_from, date_to)
     qualifying = [a for a in scraped if a.qualifies and a.reference]
 
     # condition_discharge_or_details applications (discharge of conditions,
@@ -454,171 +462,8 @@ def stage_fetch_missing_parents(
     session: Session, page, council: CouncilConfig,
     health: AcquisitionHealth | None = None, breaker: CouncilPortalCircuitBreaker | None = None,
 ) -> int:
-    """Reserved matters applications routinely cite a parent outline/full
-    permission that predates our scraping window and was never scraped in
-    its own right (confirmed real case: Wigan's North Leigh 1491-dwelling
-    reserved matters filing citing outline permission A/12/76665, granted
-    in 2013 - years before this council was ever scraped). Left alone, that
-    parent reference sits as a dead citation and the reserved matters
-    filing's own thin documents (layout/scale/appearance only) can't answer
-    "what's the affordable housing position/who's the developer" - the real
-    answer usually lives in the PARENT's own documents (planning statement,
-    S106, officer report), which is exactly the site-level detail the
-    parent-reference site-linking tier already knows how to merge in, once
-    the parent actually exists as an application in its own right.
-
-    Also resolves the reserved matters filing's OWN qualification against
-    its parent's real content - REVIEW_KEYWORDS treats "reserved matters"
-    as unambiguously relevant regardless of scheme size (needed to catch
-    genuine housing-phase filings with no unit count of their own), which
-    means a reserved matters filing for a single dwelling slips through
-    exactly the same way a 200-unit one does. Confirmed real case: Oldham
-    RES/355397/25 ("Reserved Matters application for the access, scale,
-    layout, appearance and landscape relating to app no. OUT/350210/22"),
-    whose parent OUT/350210/22 turned out to be outline permission for one
-    2-storey dwellinghouse. An explicit low unit count on the parent is
-    treated as a confident disqualification; a parent with no stated count
-    at all (genuinely vague outline text, e.g. "comprehensive mixed use
-    redevelopment") is left exactly as before, since that vagueness is just
-    as common on large legitimate schemes and shouldn't be penalised.
-
-    Targeted single-reference lookup (see idox_portal/arcus_portal's
-    fetch_application_by_reference) rather than a full date-range scrape -
-    the parent could be from any year, so there's no sensible month to
-    search instead.
-    """
-    candidates = session.execute(
-        select(Application).where(Application.council_code == council.code)
-    ).scalars().all()
-    # Every application on the council, not just reserved_matters/
-    # variation_or_amendment/condition_discharge_or_details (an earlier,
-    # narrower version of this filter - confirmed real cases of citations on
-    # applications outside all three categories too). This is cheap and safe
-    # to run broadly: extract_parent_reference only matches genuine citation
-    # phrasing ("pursuant to...", "following...approval...", "relating to
-    # app..."), so a standalone application with no citation just doesn't
-    # match - no portal call happens unless a real reference is actually
-    # found AND it's missing from the DB. The qualification-override logic
-    # below only meaningfully applies to reserved_matters (other categories
-    # already have their own unit_confirmation_status resolved elsewhere and
-    # simply no-op past it) - what matters for them here is recovering the
-    # missing parent itself, which feeds stage_link_sites' parent_reference
-    # tier and, from there, stage_fetch_related_applications.
-
-    ref_to_id = {
-        row[0]: row[1] for row in session.execute(
-            select(Application.reference, Application.id).where(Application.council_code == council.code)
-        ).all()
-    }
-
-    fetched = 0
-    for application in candidates:
-        # Circuit breaker (Hotfix: Recovery-First Council Processing +
-        # Portal Circuit Breaker) - checked once per candidate, BEFORE
-        # attempting its network call. Once open, no further parent
-        # lookups are attempted for the rest of this council's run - the
-        # remaining candidates are simply skipped this run, exactly like
-        # any other unresolved parent citation (they stay eligible for
-        # the next Daily Discovery run, which starts with a fresh
-        # breaker). Printed once, not per skipped candidate, to avoid
-        # noisy per-item logging.
-        if breaker is not None and breaker.is_open:
-            print(f"  [circuit] council={council.code} skipping_remaining_network_work stage=parent-lookup")
-            break
-
-        parent_ref = extract_parent_reference(application.proposal or "")
-        if not parent_ref:
-            continue
-
-        parent = session.get(Application, ref_to_id[parent_ref]) if parent_ref in ref_to_id else None
-
-        if parent is None:
-            print(f"  [parent-lookup] {application.reference} cites {parent_ref!r} - not in DB, fetching")
-            try:
-                if council.doc_system == "arcus":
-                    result = fetch_application_by_reference_arcus(page, council, parent_ref)
-                else:
-                    requests_session = requests.Session()
-                    requests_session.headers.update(HEADERS)
-                    result = fetch_application_by_reference_idox(page, requests_session, council, parent_ref)
-            except Exception as e:
-                print(f"    error fetching parent {parent_ref}: {e}")
-                # A genuine acquisition failure (Render Daily Discovery
-                # Portal Resilience & Truthful Run Health, Part 4) -
-                # distinct from "not found on the portal" just below,
-                # which is a legitimate, successfully-completed lookup
-                # that happened to find nothing, not a resilience failure.
-                if health is not None:
-                    health.record_parent_lookup(succeeded=False)
-                if breaker is not None:
-                    breaker.record_failure(e, stage="parent-lookup")
-                continue
-
-            if health is not None:
-                health.record_parent_lookup(succeeded=True)
-            if breaker is not None:
-                breaker.record_success()
-
-            if not result or not result.reference:
-                print(f"    parent {parent_ref} not found on the portal")
-                continue
-
-            parent_qualify = qualify(result.fields.get("Proposal", ""), council.unit_threshold)
-            # Force confirmed_qualifying by default rather than leaving it
-            # for stage_confirm_units - confirmed a real case (A/12/76665,
-            # vague outline text with no unit count) where that would
-            # otherwise land on "undetermined" and get silently excluded,
-            # despite already being confirmed relevant as the cited parent
-            # of a real qualifying scheme. Only overridden by a confident
-            # negative signal on the parent's OWN text: either an explicit
-            # low unit count, or a genuine non-residential match (confirmed
-            # real cases: a storage/distribution warehouse outline, a green
-            # hydrogen production facility). Deliberately NOT overridden by
-            # EXCLUDE_CATEGORIES matches (e.g. "variation_or_amendment") -
-            # that's a structural label ("this filing isn't itself a new
-            # development"), not a size signal - confirmed a real case
-            # (Oldham VAR/349651/22) where the cited "parent" was itself a
-            # variation of conditions on a further-removed genuine outline
-            # scheme, so treating it as disqualifying would have been wrong.
-            parent_status = (
-                "confirmed_disqualified"
-                if (parent_qualify.unit_count is not None and parent_qualify.unit_count < council.unit_threshold)
-                or parent_qualify.classification == "Excluded - non-residential"
-                else "confirmed_qualifying"
-            )
-            parent = _upsert_scraped_application(
-                session, council, result, batch_id=None, unit_confirmation_status=parent_status,
-            )
-            ref_to_id[result.reference] = parent.id
-            session.commit()
-            fetched += 1
-            print(f"    fetched {result.reference} ({parent_status}): {(result.fields.get('Proposal') or '')[:80]}")
-
-        if application.unit_confirmation_status not in (None, "undetermined"):
-            continue
-        parent_qualify = qualify(parent.proposal or "", council.unit_threshold)
-        parent_confidently_disqualified = (
-            (parent_qualify.unit_count is not None and parent_qualify.unit_count < council.unit_threshold)
-            or parent_qualify.classification == "Excluded - non-residential"
-        )
-        if parent_confidently_disqualified:
-            application.unit_confirmation_status = "confirmed_disqualified"
-            application.opportunity_classification = (
-                f"Excluded - parent {parent_ref} confirmed {parent_qualify.unit_count} unit(s)"
-                if parent_qualify.unit_count is not None
-                else f"Excluded - parent {parent_ref} is non-residential"
-            )
-            session.commit()
-            print(f"  [parent-lookup] {application.reference}: parent {parent_ref} confirmed disqualified - excluded")
-        elif parent_qualify.unit_count is not None and parent_qualify.unit_count >= council.unit_threshold:
-            application.estimated_unit_count = parent_qualify.unit_count
-            application.unit_confirmation_status = "confirmed_qualifying"
-            application.opportunity_classification = f"Confirmed - {parent_qualify.unit_count} units (via parent {parent_ref})"
-            session.commit()
-            print(f"  [parent-lookup] {application.reference}: parent {parent_ref} confirms {parent_qualify.unit_count} units")
-
-    print(f"\n[parent-lookup] {len(candidates)} applications checked for a parent citation, {fetched} parent(s) fetched")
-    return fetched
+    from app.pipeline.parent_lookup import run_parent_stage
+    return run_parent_stage(session, page, council, health, breaker)
 
 
 def stage_fetch_related_applications(
@@ -1582,18 +1427,23 @@ def stage_documents(
         # cannot lose anything a later stage or application needs. Scoped
         # to stage_documents only, applied once per application (matching
         # the granularity already instrumented above) - the one stage this
-        # diagnosis evidenced accumulation in, and, per this function's own
-        # caller, the LAST stage to use `page` before browser.close(), so
-        # nothing downstream depends on this exact Page object surviving.
+        # diagnosis evidenced accumulation in. The shared PageOwner also
+        # carries each replacement into subsequent evidence refresh.
         try:
-            new_page = page.context.new_page()
-            page.close()
-            page = new_page
+            from app.pipeline.page_owner import PageOwner
+            if isinstance(page, PageOwner):
+                page.recycle()
+            else:  # Legacy isolated callers; main always passes the shared owner.
+                new_page = page.context.new_page()
+                page.close()
+                page = new_page
         except Exception as e:
             # Never let a recycling failure abort the whole council's
             # document run - fall back to the existing (possibly now
             # slightly larger) page and keep going.
-            print(f"  [documents] page recycle failed, continuing with existing page: {e}")
+            if health:
+                health.page_cleanup_failed += 1
+            print(f"  [documents] page recycle failed: {type(e).__name__}")
 
     # Evidence-sufficiency snapshot (Evidence Completeness Foundation, PR A,
     # Part 10) - a lightweight, once-per-run summary of the council's WHOLE
@@ -2449,9 +2299,18 @@ def _resolve_month_ranges(args: argparse.Namespace) -> list[tuple[str, str]]:
 
 
 def main() -> None:
+    from app.pipeline.discovery_owner import verify_child
+    if verify_child() is not None:
+        from app.db.session import configure_discovery_database_bounds
+        configure_discovery_database_bounds()
     args = parse_args()
+    offline_case = os.getenv('PROPERTYAIGENT_MIXED_RECORDING')
+    if offline_case:
+        from app.revisit.offline_child import run
+        run(offline_case, args.council)
+        return
     log_memory("process.start", council=args.council)
-    load_dotenv(override=True)  # this project's .env always wins over stray shell-exported vars
+    load_dotenv(override=False)  # admitted runtime identifiers must remain authoritative
 
     # Render Daily Discovery Portal Resilience & Truthful Run Health - one
     # AcquisitionHealth instance for this council's whole run, printed as a
@@ -2536,7 +2395,8 @@ def main() -> None:
                        "Chrome/124.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 900},
         )
-        page = context.new_page()
+        from app.pipeline.page_owner import PageOwner
+        page = PageOwner(context.new_page())
         log_memory("context_page.created", council=council.code)
 
         if not args.skip_scrape:
@@ -2592,6 +2452,7 @@ def main() -> None:
             log_memory("stage_scrape.after", council=council.code)
 
         if not args.skip_parent_lookup:
+            print(f'[parent-budget] stage=stage_fetch_missing_parents.before parent_started={time.monotonic()}', flush=True)
             log_memory("stage_fetch_missing_parents.before", council=council.code)
             # Runs after every month's scrape (so any newly-found reserved
             # matters filing is included) but before site-linking, so a
@@ -2712,6 +2573,13 @@ def main() -> None:
                 log_memory("stage_evidence_refresh.before", council=council.code)
                 stage_evidence_refresh(session, page, council, health=health, breaker=breaker)
                 log_memory("stage_evidence_refresh.after", council=council.code)
+
+        # Local recorded revisit slice; dormant by default. No second scheduler,
+        # admission, migration, seeding or live portal fallback.
+        from app.revisit.stage import maybe_run_recorded_stage
+        revisit_result = maybe_run_recorded_stage(session.get_bind(), council.code)
+        if revisit_result['outcome'] != 'dormant':
+            print('[revisit-progress] ' + json.dumps(revisit_result), flush=True)
 
         log_memory("browser_close.before", council=council.code)
         browser.close()

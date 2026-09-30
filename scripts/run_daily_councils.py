@@ -1,82 +1,11 @@
-"""Daily multi-council Planning Application scraper orchestrator (Pilot
-Readiness PR-2, "Production Scheduling"). This is the production entry
-point Render's Cron Job (see render.yaml) invokes once a day.
+"""Daily discovery supervisor (specification 019).
 
-Reuses the existing per-council pipeline entry point UNCHANGED - each
-council is run as its own subprocess of
-
-    python -m app.pipeline.run_weekly --council <code>
-
-exactly the command scripts/register_weekly_task.ps1 already registers
-locally, just invoked here in a loop across every council instead of one
-Windows Task Scheduler job per council. No scraping/extraction/matching
-business logic is duplicated or reimplemented here - this script is
-orchestration only.
-
-Failure isolation (Part 5: "A failed council should not silently prevent
-the remaining councils from updating"): each council's subprocess failing
-(non-zero exit code, timeout, or an exception raised while managing it)
-is caught and recorded, and the loop always continues to the next council.
-A subprocess boundary is used deliberately, not an in-process function
-call - Playwright/browser and OpenAI SDK state from one council's run
-cannot leak into or destabilise the next council's run this way, a
-stronger isolation guarantee than a shared-process try/except would give.
-
-Observability (Part 6): before and after each council's subprocess, this
-script counts that council's Application rows directly (no change to
-run_weekly.py needed to get this) and writes one app.db.models.ScrapeRun
-row per attempt - see app.reporting.scraper_health for how Council
-Operations reads this back.
-
-Incremental by design (Part 3/5): invoked with no extra date-range flags,
-run_weekly.py's own default ("Default weekly cadence: just the current
-month") already bounds each daily run to a small, upsert-idempotent
-window - never a historical re-scrape. Running this daily instead of
-weekly does not change that default; it just checks it more often.
-
-AI cost safety (Pilot Readiness PR-2 pre-merge architecture check, "Daily
-Pipeline / AI Cost Safety"): run_weekly.py's own stage_extraction and
-stage_generate_scheme_summaries are each individually well-gated (the
-former only processes an Application with no scheme_intelligence row yet;
-the latter only regenerates a Site's summary when a newer Application has
-been linked since the last one) - genuinely incremental once a steady
-state is reached, not a blind re-run. But main() invokes BOTH
-unconditionally by default, with no orchestrator-level control, and BOTH
-raise immediately if OPENAI_API_KEY is unset - meaning this daily cron, if
-simply pointed at the existing entry point unmodified, would (a) require
-OPENAI_API_KEY to exist at all just to run scraping/document-discovery,
-and (b) on its very first-ever production run, potentially attempt AI
-extraction across however large an already-accumulated backlog of
-never-extracted qualifying Applications happens to exist, all in one
-subprocess invocation, with no operator visibility into that cost before
-it happens. Neither is a redesign of the extraction architecture (both
-stages' own gating is correct and untouched) - it is purely a question of
-whether the DAILY SCHEDULED job should include them by default. It should
-not: this script defaults to `--skip-extraction --skip-scheme-summary` on
-every subprocess invocation (a flag run_weekly.py already exposes - no
-change to that file was needed), so the scheduled daily job is
-deterministic discovery/document-collection/site-linking ONLY, and does
-not require OPENAI_API_KEY. Pass --include-ai-stages to opt a specific
-invocation IN to extraction/summary generation as well (e.g. for a
-manually-triggered catch-up run once an operator has reviewed how large
-the current backlog is).
-
-    python -m scripts.run_daily_councils [--council CODE ...] [--timeout-seconds N] [--include-ai-stages]
-
-Process exit status (Render Daily Discovery runtime failure hotfix):
-main() now returns a real exit code reflecting overall run health, instead
-of always exiting 0 regardless of how many councils failed - a production
-run that failed all 10 councils was previously still reported by Render as
-"Cron job run finished successfully", since the process fell off the end
-of main() with no explicit exit code at all (Python's default is 0).
-Policy (Product Owner, pilot readiness): ANY council failing marks the
-whole Cron Job run unhealthy - exit 0 only when every attempted council
-succeeded, exit 1 otherwise (whether some or all councils failed). An
-incomplete Greater Manchester refresh needs operator attention regardless
-of how many councils were affected; Render's own monitoring/alerting can
-only reflect that if the process exit code says so. This does not change
-failure isolation - every council is still attempted regardless of
-earlier failures; only the FINAL exit code changes.
+One owned invocation runs councils in least-recently-started order. Each council
+uses the existing run_weekly pipeline in a separately supervised process group.
+Count/time/memory limits contain exposure; they are not a proven OOM root-cause
+fix. Supporting partial coverage preserves exit 0; process failure, missing
+final health, and unattempted selected councils yield nonzero. Production is
+fail-closed pending separately approved runtime/migration/trial gates.
 """
 from __future__ import annotations
 
@@ -87,6 +16,10 @@ import re
 import subprocess
 import sys
 import threading
+import queue
+import time
+import json
+import signal
 from collections import deque
 from pathlib import Path
 
@@ -188,88 +121,178 @@ def _kill_process_tree(process: subprocess.Popen) -> None:
             # importing this module cleanly under test on this repo's own
             # Windows dev environment (this branch never actually runs on
             # Windows in production - os.name is always "posix" there).
-            os.killpg(os.getpgid(process.pid), 9)
+            os.killpg(process.pid, 9)
         except ProcessLookupError:
             pass  # already gone between the timeout firing and us getting here - fine
     else:
         process.kill()
 
 
+class MemoryContainment(RuntimeError):
+    pass
+
+
 def _run_council_subprocess(
-    command: list[str], *, cwd: Path, timeout_seconds: int, on_line=None, council_code: str | None = None,
+    command: list[str], *, cwd: Path, timeout_seconds: int, on_line=None,
+    council_code: str | None = None, owner=None, run_id=None, on_start=None,
 ) -> int:
-    """Runs one council's subprocess with STREAMED, bounded output instead
-    of subprocess.run(..., capture_output=True)'s "buffer everything, only
-    look at it once the child exits" model (Render Daily Discovery memory
-    instrumentation & architecture diagnosis).
+    """Bounded stream and process-group supervision, including silent children.
 
-    Two production failures (Starter/512Mi, then Standard/2Gi) both ended
-    in a container-level OOM kill of the WHOLE process tree, including the
-    orchestrator itself. Reconstructing the timeline afterwards from
-    ScrapeRun rows found the council that was actually running at the
-    moment of death had NO detail recorded at all (status stuck at
-    "running", detail=None) - because the old design only ever wrote
-    ScrapeRun.detail from the fully-buffered captured output AFTER
-    subprocess.run() returned, which never happened once the orchestrator
-    itself was killed. Whatever that council had already printed was
-    sitting entirely inside a Python string buffer nobody had looked at
-    yet - genuinely lost, not just hard to find.
-
-    Fixed by streaming: each line the child prints is read and handed to
-    `on_line` (the caller's own responsibility - run_one_council both
-    re-prints it to THIS process's own stdout, which Render's log capture
-    receives continuously and independently of whether this process is
-    later OOM-killed, AND appends it to a small bounded ring buffer for
-    ScrapeRun.detail) as it arrives, not buffered until the end. This also
-    directly answers Part 5's "does capture_output pose a real memory
-    risk": yes, unbounded buffering of a real (not blank-page) council's
-    full output is a genuine, if secondary, contributor - streaming with a
-    bounded ring buffer caps it regardless of how verbose a run becomes.
-
-    Kills the child's WHOLE PROCESS GROUP on timeout (POSIX), not just the
-    one tracked PID - unchanged reasoning from the prior hotfix, just
-    factored into _kill_process_tree so the streaming redesign didn't need
-    to duplicate it. Returns the child's own exit code; raises
-    subprocess.TimeoutExpired (no output/stderr payload - the caller
-    already received every line via on_line as it streamed) on timeout."""
-    stdout_kwargs = {"start_new_session": True} if os.name == "posix" else {}
-    process = subprocess.Popen(
-        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, **stdout_kwargs,
-    )
-    # "Immediately after council subprocess starts" (Render Daily Discovery
-    # memory instrumentation orchestrator boundary) - measures the CHILD's
-    # own OS-level footprint by pid from the parent's side, distinct from
-    # run_weekly.py's own self-measurement of the SAME process from inside.
-    log_memory("council.subprocess_started", council=council_code, pid=process.pid)
-
-    timed_out = threading.Event()
-
-    def _on_timeout() -> None:
-        timed_out.set()
-        _kill_process_tree(process)
-
-    timer = threading.Timer(timeout_seconds, _on_timeout)
-    timer.start()
-    try:
-        assert process.stdout is not None
-        for line in process.stdout:
-            if on_line is not None:
-                on_line(line.rstrip("\n"))
-        process.wait()
-    finally:
-        timer.cancel()
-
-    if timed_out.is_set():
+    A bounded reader queue avoids blocking the supervisor on a child's partial
+    line. An independent invocation watchdog covers stalled DB callbacks. The inherited lock
+    remains held by a child after supervisor death.
+    """
+    from app.diagnostics.memory import cgroup_memory
+    started = time.monotonic()
+    watchdog = getattr(owner, 'watchdog', None)
+    deadline = min(started + timeout_seconds, watchdog.deadline) if watchdog else started + timeout_seconds
+    if started >= deadline:
         raise subprocess.TimeoutExpired(command, timeout_seconds)
-    return process.returncode
+    kwargs = {'start_new_session': True} if os.name == 'posix' else {}
+    if owner is not None:
+        kwargs.update(env=owner.child_environment(run_id), pass_fds=(owner.fd,))
+    gate_read = gate_write = None
+    launch = command
+    if watchdog is not None:
+        gate_read, gate_write = os.pipe()
+        kwargs['pass_fds'] = (*kwargs.get('pass_fds', ()), gate_read)
+        launch = [sys.executable, '-m', 'app.pipeline.discovery_watchdog', 'gate',
+                  str(gate_read), str(deadline), *command]
+    try:
+        process = subprocess.Popen(launch, cwd=cwd, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, bufsize=1, **kwargs)
+    except BaseException:
+        if gate_write is not None: os.close(gate_write)
+        raise
+    finally:
+        if gate_read is not None: os.close(gate_read)
+    messages = queue.Queue(maxsize=100)
+    stopped = threading.Event()
+    parent_deadline = None
+    parent_seen = False
+    reader_error = []
+    dropped_lines = [0]
+
+    def reader():
+        nonlocal parent_deadline, parent_seen
+        try:
+            while not stopped.is_set():
+                line = process.stdout.readline(16384)
+                if not line: break
+                # Budget control must not wait behind a blocked DB/log callback.
+                if not parent_seen and re.search(r'\bstage=stage_fetch_missing_parents\.before\b', line):
+                    from app.pipeline.parent_lookup import positive_limit
+                    parent_seen = True
+                    stamp = re.search(r'\bparent_started=([0-9.]+)', line)
+                    parent_start = min(time.monotonic(), float(stamp[1])) if stamp else time.monotonic()
+                    from app.pipeline.discovery_watchdog import parent_deadlines
+                    parent_deadline, parent_hard_stop = parent_deadlines(parent_start,
+                        positive_limit('PARENT_SECONDS', 180), deadline,
+                        watchdog.deadline if watchdog else deadline + 20)
+                    if watchdog is not None:
+                        watchdog.register(process.pid, parent_hard_stop)
+                elif parent_deadline is not None and re.search(r'\bstage=stage_fetch_missing_parents\.after\b', line):
+                    # A late after-message cannot turn an expired stage into success.
+                    if time.monotonic() < parent_deadline:
+                        parent_deadline = None
+                        if watchdog is not None: watchdog.register(process.pid, deadline + 20)
+                try: messages.put_nowait(line.rstrip('\n'))
+                except queue.Full: dropped_lines[0] += 1
+        except BaseException as exc:
+            reader_error.append(exc)
+            _kill_process_tree(process)
+        finally:
+            while not stopped.is_set():
+                try:
+                    messages.put(None, timeout=.1)
+                    break
+                except queue.Full: pass
+
+    thread = threading.Thread(target=reader, daemon=True)
+    peak, next_sample, next_report = 0, 0, 0
+    reason = None
+    try:
+        if watchdog is not None:
+            watchdog.register(process.pid, deadline + 20)
+            if time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(command, timeout_seconds)
+            os.write(gate_write, b'!')
+            os.close(gate_write)
+            gate_write = None
+        thread.start()
+        if on_start: on_start(process.pid)
+        eof = False
+        while not eof or process.poll() is None:
+            now = time.monotonic()
+            if parent_deadline is not None and now >= parent_deadline:
+                reason = 'parent_envelope'
+                break
+            if now >= deadline:
+                reason = 'timeout'
+                break
+            if now >= next_sample:
+                memory = cgroup_memory()
+                next_sample = now + 2
+                if memory:
+                    peak = max(peak, memory[0])
+                    if memory[0] / memory[1] >= .80:
+                        reason = 'hard_memory'
+                        break
+                if now >= next_report:
+                    if on_line:
+                        on_line('[discovery-progress] ' + json.dumps({'memory': {
+                            'current_bytes': memory[0] if memory else None,
+                            'limit_bytes': memory[1] if memory else None,
+                            'peak_bytes': peak or None, 'available': memory is not None}}))
+                    next_report = now + 30
+            try:
+                line = messages.get(timeout=min(.2, max(.001, deadline-now)))
+                if line is None: eof = True
+                else:
+                    if on_line: on_line(line)
+            except queue.Empty: pass
+        if reason:
+            if os.name == 'posix':
+                try: os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError: pass
+            else: process.terminate()
+            try: process.wait(timeout=5 if reason in ('hard_memory', 'parent_envelope') else 15)
+            except subprocess.TimeoutExpired: pass
+            _kill_process_tree(process)
+            process.wait(timeout=5)
+            if reason == 'hard_memory': raise MemoryContainment('cgroup hard threshold')
+            if reason == 'parent_envelope': raise RuntimeError('parent stage stop envelope exhausted')
+            raise subprocess.TimeoutExpired(command, timeout_seconds)
+        if reader_error: raise RuntimeError('discovery control reader failed') from reader_error[0]
+        if dropped_lines[0]:
+            raise RuntimeError(f'discovery progress incomplete: {dropped_lines[0]} streamed lines dropped')
+        return process.wait()
+    finally:
+        if gate_write is not None: os.close(gate_write)
+        # Includes callback/DB errors and successful child exit with surviving
+        # browser descendants. Group id remains child pid after leader exit.
+        if os.name == 'posix':
+            try: os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError: pass
+        elif process.poll() is None: process.kill()
+        process.wait(timeout=5)
+        stopped.set()
+        if thread.ident is not None: thread.join(timeout=2)
+        process.stdout.close()
+        if watchdog is not None:
+            watchdog.unregister(process.pid)
 
 
 def run_one_council(
-    session, council_code: str, *, timeout_seconds: int, triggered_by: str, include_ai_stages: bool = False,
+    session, council_code: str, *, timeout_seconds: int, triggered_by: str, include_ai_stages: bool = False, owner=None,
 ) -> ScrapeRun:
     applications_before = _application_count(session, council_code)
 
     run = ScrapeRun(council_code=council_code, status="running", triggered_by=triggered_by)
+    progress = {'version': 1, 'scope': {'council': council_code, 'period': 'current_month'},
+                'owner': dict(owner.identity) if owner else None}
+    progress['limits'] = {**(getattr(owner, 'limits', {}) if owner else {}), 'effective_council_seconds': timeout_seconds}
+    run.progress = json.dumps(progress)
     session.add(run)
     session.commit()
 
@@ -311,6 +334,8 @@ def run_one_council(
     # line is actually seen - see the classification logic below this
     # subprocess call for what happens if it never is.
     run_health: dict[str, str | None] = {"status": None}
+    stage_starts = {}
+    last_memory_commit = [float("-inf")]
 
     def _on_line(line: str) -> None:
         # flush=True (Render Daily Discovery missing-runtime-logs diagnosis,
@@ -320,35 +345,33 @@ def run_one_council(
         # is important enough not to depend on external configuration
         # alone staying correct.
         print(f"[{council_code}] {line}", flush=True)
-        tail_lines.append(line)
-        if line.startswith("[mem]") or line.startswith("[mem-warning]"):
-            # Persisted memory checkpoint (Render Daily Discovery missing-
-            # runtime-logs diagnosis, Part 7): Render's live log stream has
-            # now proven unreliable enough - by definition a container OOM
-            # kill gives Python no chance to flush anything on the way out
-            # - that a checkpoint must also survive independently of logs
-            # entirely. The end-of-run write below (run.detail =
-            # combined_output[-4000:]) is not enough on its own either: it
-            # only executes once _run_council_subprocess RETURNS, and a
-            # container-level OOM (the observed failure mode - distinct
-            # from one council's own subprocess merely timing out) kills
-            # the ORCHESTRATOR itself mid-council, so that write never
-            # happens. Confirmed directly, not hypothetically: reconstructing
-            # the 3 most recent production OOM runs found the in-flight
-            # council's own ScrapeRun.detail entirely None every time -
-            # exactly this gap, with nothing recoverable after the fact.
-            # Fixed by committing the LATEST [mem]/[mem-warning] line as it
-            # arrives, reusing the existing column rather than adding a new
-            # one (no schema change needed) - overwritten by the final
-            # combined_output tail below on any normal completion or
-            # recorded failure; this only matters for the OOM case, where
-            # that final write never lands. Bounded and cheap: one short
-            # line, one commit, only at the small number of explicit stage
-            # boundaries a council run passes through (roughly 15-20 over
-            # several minutes) - not per application, per document, or per
-            # raw subprocess output line.
-            run.detail = line[:4000]
+        tail_lines.append(line[:16384])
+        if line.startswith('[discovery-progress] '):
+            progress.update(json.loads(line[len('[discovery-progress] '):]))
+            progress['heartbeat_at'] = dt.datetime.now(dt.timezone.utc).isoformat()
+            run.progress = json.dumps(progress)
             session.commit()
+        if line.startswith("[mem]") or line.startswith("[mem-warning]"):
+            # Stage transitions are durable immediately. Routine per-item
+            # memory diagnostics remain in logs; DB checkpoint at most every 30s.
+            stage_match = re.search(r'\bstage=(stage_[\w]+)\.(before|after)\b', line)
+            if stage_match:
+                stage, boundary = stage_match.groups()
+                stages = progress.setdefault('stages', {})
+                entry = stages.setdefault(stage, {})
+                entry[boundary + '_at'] = dt.datetime.now(dt.timezone.utc).isoformat()
+                if boundary == 'before':
+                    stage_starts[stage] = time.monotonic()
+                    entry['status'] = 'running'
+                else:
+                    entry['status'] = 'returned'  # not proof every item succeeded
+                    if stage in stage_starts:
+                        entry['duration_seconds'] = round(time.monotonic()-stage_starts[stage], 3)
+                run.progress = json.dumps(progress)
+            if stage_match or time.monotonic() - last_memory_commit[0] >= 30:
+                run.detail = line[:4000]
+                session.commit()
+                last_memory_commit[0] = time.monotonic()
         else:
             # Render Daily Discovery Portal Resilience & Truthful Run
             # Health, Part 4 - captured the same way as [mem] lines
@@ -361,10 +384,18 @@ def run_one_council(
             if status is not None:
                 run_health["status"] = status
 
+    def _on_start(pid):
+        from app.pipeline.discovery_owner import process_identity
+        if progress['owner']:
+            progress['owner'].update(child_pid=pid, child_start=process_identity(pid))
+        run.progress = json.dumps(progress)
+        session.commit()
+
     return_code = None
     try:
         return_code = _run_council_subprocess(
             command, cwd=PROJECT_ROOT, timeout_seconds=timeout_seconds, on_line=_on_line, council_code=council_code,
+            owner=owner, run_id=run.id, on_start=_on_start,
         )
         crashed = return_code != 0
         # Council-level failure isolation lives here: a non-zero exit code
@@ -377,27 +408,12 @@ def run_one_council(
         crashed = True
         tail_lines.append(f"Orchestrator error managing subprocess: {e}")
 
-    # Status classification (Render Daily Discovery Portal Resilience &
-    # Truthful Run Health, Part 4/5/7): a crashed/timed-out/non-zero-exit
-    # subprocess is ALWAYS "failed" - unchanged from before, and takes
-    # priority over anything the subprocess may have printed, since a
-    # crash can happen at any point (including mid-print) and its own
-    # exit signal is the more reliable one. Otherwise (a clean exit),
-    # trust the subprocess's OWN materiality assessment from its
-    # [run-health] line - "success"/"partial"/"failed" are the only
-    # values it ever emits (see app.pipeline.acquisition_health) - and
-    # this is exactly how the confirmed Trafford scenario (current-period
-    # scrape silently timed out, exception swallowed internally, clean
-    # exit 0) is now correctly classified "failed" instead of "success"
-    # despite the process itself not crashing. Falls back to "success"
-    # only if that line was somehow never seen at all (e.g. an
-    # older/unexpected code path) - preserves the previous default rather
-    # than inventing a new failure mode for a case with no evidence
-    # either way.
+    # A clean process exit without its final coverage assessment is unknown,
+    # not success. Preserve partial coverage separately from process health.
     if crashed:
         run.status = "failed"
     else:
-        run.status = run_health["status"] or "success"
+        run.status = run_health["status"] or "partial"
 
     log_memory("council.after", council=council_code)
 
@@ -405,6 +421,11 @@ def run_one_council(
     applications_after = _application_count(session, council_code)
     discovered = applications_after - applications_before
 
+    for entry in progress.get('stages', {}).values():
+        if entry['status'] == 'running': entry['status'] = 'interrupted_or_completion_unverified'
+    progress['process_failure'] = bool(crashed or run_health['status'] is None)
+    progress['final_health_received'] = run_health['status'] is not None
+    run.progress = json.dumps(progress)
     run.finished_at = dt.datetime.now(dt.timezone.utc)
     # run.status already set above (Part 4/5/7) - success/partial/failed,
     # not the old binary success/failed.
@@ -413,6 +434,9 @@ def run_one_council(
     run.applications_discovered = discovered
     run.detail = combined_output[-4000:]  # bounded twice over - a bounded LINE ring buffer, then a bounded CHAR tail
     session.commit()
+
+    from app.pipeline.discovery_owner import release_interrupted_work
+    release_interrupted_work(session, run.id)
 
     # Render Daily Discovery Portal Resilience & Truthful Run Health, Part
     # 4/5/7 - reported from run.status, NOT the earlier crash-only
@@ -449,48 +473,69 @@ def run_one_council(
 
 
 def main() -> int:
+    started = time.monotonic()
+    from app.pipeline.discovery_owner import DiscoveryOwner, reconcile_owners
+    from app.pipeline.parent_lookup import positive_limit
+    from app.diagnostics.memory import cgroup_memory
     args = parse_args()
-    # "[mem] orchestrator.start" (Render Daily Discovery missing-runtime-
-    # logs diagnosis, Part 6) - deliberately BEFORE init_db()/the council
-    # loop, so this line exists even if something in bootstrap itself
-    # consumes substantial memory before the first council subprocess is
-    # ever spawned. Proves, on the next production run, whether the parent
-    # process itself is genuinely emitting/flushing output from the very
-    # first line - if this is still missing from Render's log viewer next
-    # time, the buffering fix below did not work and the investigation
-    # must continue from here, not from some later stage.
-    log_memory("orchestrator.start")
-    init_db()
-    session = get_session()
-
-    council_codes = args.councils or sorted(load_councils().keys())
-    print(f"[run-daily-councils] {len(council_codes)} council(s) to run: {', '.join(council_codes)}", flush=True)
-
-    results = []
-    for council_code in council_codes:
+    from app.pipeline.discovery_config import discovery_switches
+    switches = discovery_switches()
+    if switches['disabled']:
+        print('[run-daily-councils] discovery disabled', flush=True)
+        return 1
+    if args.timeout_seconds <= 0: raise ValueError('council timeout must be positive')
+    limits = dict(parent_items=positive_limit('PARENT_ITEMS', 25),
+        parent_attempts=positive_limit('PARENT_ATTEMPTS', 30),
+        parent_seconds=positive_limit('PARENT_SECONDS', 180),
+        invocation_seconds=positive_limit('INVOCATION_SECONDS', 9000),
+        council_seconds=args.timeout_seconds, lookup_seconds=60,
+        soft_memory_ratio=.70, stop_memory_ratio=.80, restart_memory_ratio=.60)
+    from app.pipeline.discovery_watchdog import DiscoveryWatchdog
+    from app.db.session import configure_discovery_database_bounds
+    deadline = started + limits['invocation_seconds']
+    with DiscoveryWatchdog(deadline) as watchdog, DiscoveryOwner() as owner:
+        owner.watchdog = watchdog
+        configure_discovery_database_bounds()
+        owner.limits = limits
+        print('[discovery-config] ' + json.dumps({'switches': switches, 'limits': limits}), flush=True)
+        log_memory('orchestrator.start')
+        init_db()
+        session = get_session()
         try:
-            run = run_one_council(
-                session, council_code, timeout_seconds=args.timeout_seconds, triggered_by=args.triggered_by,
-                include_ai_stages=args.include_ai_stages,
-            )
-            results.append(run)
-        except Exception as e:  # noqa: BLE001 - one council's bookkeeping failure must not stop the rest
-            print(f"[run-daily-councils] {council_code}: orchestrator-level error, continuing: {e}", flush=True)
-
-    # Render Daily Discovery Portal Resilience & Truthful Run Health, Part
-    # 7 - three-way breakdown, PARTIAL never collapsed back into either
-    # bucket in this human-readable summary (explicit product requirement:
-    # "Do not collapse PARTIAL back into SUCCESS").
-    success_count = sum(1 for r in results if r.status == "success")
-    partial_count = sum(1 for r in results if r.status == "partial")
-    failed_count = sum(1 for r in results if r.status == "failed")
-    print(
-        f"\n[run-daily-councils] Done. {success_count} success, {partial_count} partial, "
-        f"{failed_count} failed, {len(council_codes)} attempted.",
-        flush=True,
-    )
-
-    return _exit_code(healthy=success_count + partial_count, attempted=len(council_codes))
+            reconcile_owners(session, owner)
+            codes = args.councils or sorted(load_councils().keys())
+            history = dict(session.execute(select(ScrapeRun.council_code,
+                func.max(ScrapeRun.started_at)).group_by(ScrapeRun.council_code)).all())
+            codes = sorted(set(codes), key=lambda code: ((history[code].replace(tzinfo=dt.timezone.utc).timestamp() if history.get(code) else float('-inf')), code))
+            owner.identity['council_order'] = codes
+            results = []
+            deferred = []
+            for index, code in enumerate(codes):
+                memory = cgroup_memory()
+                if time.monotonic() >= deadline or (memory and memory[0]/memory[1] >= .60):
+                    deferred = codes[index:]
+                    break
+                try:
+                    results.append(run_one_council(session, code,
+                        timeout_seconds=min(args.timeout_seconds, max(1, int(deadline-time.monotonic()))),
+                        triggered_by=args.triggered_by, include_ai_stages=args.include_ai_stages, owner=owner))
+                except Exception as exc:
+                    session.rollback()
+                    print(f'[run-daily-councils] {code}: bookkeeping failure {type(exc).__name__}', flush=True)
+            if deferred:
+                print('[discovery-progress] ' + json.dumps({'deferred_councils': deferred}), flush=True)
+                if results:
+                    progress = json.loads(results[-1].progress or '{}')
+                    progress['deferred_councils'] = deferred
+                    results[-1].progress = json.dumps(progress)
+                    session.commit()
+            healthy = sum(r.status in ('success', 'partial') and not
+                json.loads(r.progress or '{}').get('process_failure', True) for r in results)
+            print(f"[run-daily-councils] {sum(r.status == 'success' for r in results)} success, {sum(r.status == 'partial' for r in results)} partial, {sum(r.status == 'failed' for r in results)} failed, {len(results)} attempted", flush=True)
+            print(f'[run-daily-councils] completed={len(results)} selected={len(codes)} deferred={len(deferred)}', flush=True)
+            return _exit_code(healthy=healthy, attempted=len(codes))
+        finally:
+            session.close()
 
 
 def _exit_code(*, healthy: int, attempted: int) -> int:

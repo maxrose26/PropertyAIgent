@@ -1,0 +1,193 @@
+{
+  "candidate_passed": 365,
+  "baseline_passed": 282,
+  "failed_each": 4,
+  "skipped_each": 0,
+  "deselected_each": 1,
+  "accepted_failures": [
+    "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+    "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+    "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_selects_only_outstanding_applications",
+    "tests.test_pr2_final_amendment_migration_and_intelligence_processing.test_process_intelligence_backlog_workload_is_bounded_not_unlimited"
+  ],
+  "excluded_test": "page_recycling_keeps_renderer_rss_flat_across_navigations",
+  "assessment": "No new regression against accepted exceptions; NOT a fully passing suite or release approval",
+  "candidate_commit": "06b978c59ece44bb20efc6d5b26009d769a22b5d",
+  "baseline_commit": "301a56b3cde781f37e5f5bb0ffaded6537d5ca14",
+  "working_tree": "",
+  "runner_blob": "aa27ee294e57ff87c7aafa58a71b56df1e6336d7",
+  "archive_sha256": "706bea36659b96b1113aa28c7099a8a5ff2b1c373c4caa971deaf1967c0cb9ad",
+  "prior_timing_anomaly": "13.463782665s in c1c3da4 run remains unexplained; no timing assertion relaxed",
+  "measurements": {
+    "test_actual_supervisor_death_surviving_child_holds_lock": [
+      {
+        "name": "confirmed_termination_to_successor_seconds",
+        "value": "0.020547826001347858"
+      }
+    ],
+    "test_independent_watchdog_bounds_blocked_persistence[bootstrap]": [
+      {
+        "name": "termination_seconds",
+        "value": "2.5079137239990814"
+      },
+      {
+        "name": "configured_deadline_seconds",
+        "value": "2"
+      },
+      {
+        "name": "emergency_cleanup_allowance_seconds",
+        "value": "0"
+      },
+      {
+        "name": "scheduling_margin_seconds",
+        "value": "3"
+      }
+    ],
+    "test_independent_watchdog_bounds_blocked_persistence[reconciliation]": [
+      {
+        "name": "termination_seconds",
+        "value": "2.4605957200001285"
+      },
+      {
+        "name": "configured_deadline_seconds",
+        "value": "2"
+      },
+      {
+        "name": "emergency_cleanup_allowance_seconds",
+        "value": "0"
+      },
+      {
+        "name": "scheduling_margin_seconds",
+        "value": "3"
+      }
+    ],
+    "test_independent_watchdog_bounds_blocked_persistence[on_start]": [
+      {
+        "name": "termination_seconds",
+        "value": "2.673761852000098"
+      },
+      {
+        "name": "configured_deadline_seconds",
+        "value": "2"
+      },
+      {
+        "name": "emergency_cleanup_allowance_seconds",
+        "value": "0"
+      },
+      {
+        "name": "scheduling_margin_seconds",
+        "value": "3"
+      }
+    ],
+    "test_independent_watchdog_bounds_blocked_persistence[on_line]": [
+      {
+        "name": "termination_seconds",
+        "value": "2.4857782119997864"
+      },
+      {
+        "name": "configured_deadline_seconds",
+        "value": "2"
+      },
+      {
+        "name": "emergency_cleanup_allowance_seconds",
+        "value": "0"
+      },
+      {
+        "name": "scheduling_margin_seconds",
+        "value": "3"
+      }
+    ],
+    "test_independent_watchdog_bounds_blocked_persistence[final_status]": [
+      {
+        "name": "termination_seconds",
+        "value": "2.610146650000388"
+      },
+      {
+        "name": "configured_deadline_seconds",
+        "value": "2"
+      },
+      {
+        "name": "emergency_cleanup_allowance_seconds",
+        "value": "0"
+      },
+      {
+        "name": "scheduling_margin_seconds",
+        "value": "3"
+      }
+    ],
+    "test_unregistered_gate_exits_on_supervisor_pipe_loss": [
+      {
+        "name": "unregistered_gate_cleanup_seconds",
+        "value": "0.0639908920002199"
+      }
+    ],
+    "test_expired_group_cannot_extend_budget": [
+      {
+        "name": "expired_group_termination_seconds",
+        "value": "0.36761486700015666"
+      }
+    ],
+    "test_real_escalation_when_child_ignores_sigterm": [
+      {
+        "name": "sigterm_to_forced_cleanup_total_seconds",
+        "value": "5.2203762760000245"
+      }
+    ],
+    "test_full_stderr_pipe_cannot_hold_watchdog_alive": [
+      {
+        "name": "blocked_logging_termination_seconds",
+        "value": "0.5652404869997554"
+      }
+    ],
+    "test_real_navigation_deadline_cleanup_then_subsequent_work": [
+      {
+        "name": "cooperative_cancellation_seconds",
+        "value": "0.2058471489999647"
+      }
+    ],
+    "test_real_browser_cleanup_when_persistence_blocks": [
+      {
+        "name": "supervisor_termination_seconds",
+        "value": "8.510289128000295"
+      },
+      {
+        "name": "termination_and_descendant_cleanup_seconds",
+        "value": "8.562712394999835"
+      },
+      {
+        "name": "deadline_plus_margin_seconds",
+        "value": "12"
+      }
+    ],
+    "test_pg_real_timeout_retry_and_subsequent_work": [
+      {
+        "name": "statement_timeout_elapsed_seconds",
+        "value": "15.00180423600068"
+      },
+      {
+        "name": "statement_timeout_raw_elapsed_seconds",
+        "value": "15.74266119999993"
+      },
+      {
+        "name": "statement_timeout_wall_elapsed_seconds",
+        "value": "15.001810550689697"
+      },
+      {
+        "name": "statement_timeout_sqlstate",
+        "value": "57014"
+      },
+      {
+        "name": "statement_timeout_server_message",
+        "value": "canceling statement due to statement timeout"
+      },
+      {
+        "name": "server_elapsed_including_recovery_seconds",
+        "value": "15.006662"
+      },
+      {
+        "name": "rollback_and_subsequent_work_verified",
+        "value": "True"
+      }
+    ]
+  }
+}

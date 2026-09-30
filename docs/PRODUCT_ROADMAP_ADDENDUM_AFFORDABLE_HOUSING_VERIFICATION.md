@@ -3,6 +3,8 @@
 **Status:** Identified / specification pending — **not yet authorised for implementation**  
 **Product Owner decision:** Add a dedicated Affordable Housing Verification capability to the roadmap as a specialist trust/verification agent beneath the acquisition-intelligence layer.
 
+**28 September sequencing update:** follow the current P0–P4 priorities in [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md). Downstream consumption and invalidation are part of AH truth-layer acceptance, before exception-driven verification. Historical audit values require fresh source verification before correction. No bulk reprocessing or production writes are authorised.
+
 ## 1. Why this capability exists
 
 Affordable housing is one of the most commercially important and error-prone data domains in PropertyAIgent. A headline number can be numerically extracted correctly while still being commercially or legally misleading because the source may refer to a different application, phase, parcel, legal status, denominator, grant assumption or viability position.
@@ -430,10 +432,11 @@ A value of zero requires affirmative evidence applicable to the selected scope. 
         ↓
 2. Affordable Housing Truth / Operative Position Layer
         ↓
-3. Affordable Housing Verification Agent
-        ↓
-4. Shared downstream propagation
+3. Shared downstream consumption + invalidation
    Dashboard / Explore / Scheme Detail / AI Summary / Buyer Fit / reports
+   (part of truth-layer acceptance)
+        ↓
+4. Exception-driven Affordable Housing Verification Agent
         ↓
 5. RP / Housing Association qualification improvements
         ↓

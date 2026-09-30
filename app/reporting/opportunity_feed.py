@@ -327,6 +327,8 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
             assessment = evaluate_buyer_fit(session, profile, facts, allocation_id=int(card["params"]["allocation_id"]))
         else:
             assessment = evaluate_buyer_fit(session, profile, facts, site_id=int(card["params"]["site_id"]))
+        card["affordable_assessment"] = facts.affordable_assessment.payload() if facts.affordable_assessment else None
+        card["affordable_label"] = facts.affordable_assessment.label() if facts.affordable_assessment else "AH evidence unknown"
         card["buyer_fit"] = assessment
         if assessment.classification == NOT_SUITABLE:
             excluded_not_suitable += 1

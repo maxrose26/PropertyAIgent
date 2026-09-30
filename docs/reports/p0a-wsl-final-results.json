@@ -1,0 +1,230 @@
+{
+  "candidate": {
+    "suite": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "4",
+      "skipped": "0",
+      "tests": "355",
+      "time": "66.700",
+      "timestamp": "2026-09-29T10:09:54.649068+01:00",
+      "hostname": "Max"
+    },
+    "failures": [
+      {
+        "name": "test_process_intelligence_backlog_selects_only_outstanding_applications",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "test_process_intelligence_backlog_workload_is_bounded_not_unlimited",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      }
+    ],
+    "measurements": {
+      "test_actual_supervisor_death_surviving_child_holds_lock": [
+        {
+          "name": "confirmed_termination_to_successor_seconds",
+          "value": "0.020948682999915036"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[bootstrap]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4438270999999077"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[reconciliation]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4467546749992835"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[on_start]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.4557334669998454"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[on_line]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.441964285000722"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_independent_watchdog_bounds_blocked_persistence[final_status]": [
+        {
+          "name": "termination_seconds",
+          "value": "2.452823874999922"
+        },
+        {
+          "name": "configured_deadline_seconds",
+          "value": "2"
+        },
+        {
+          "name": "emergency_cleanup_allowance_seconds",
+          "value": "0"
+        },
+        {
+          "name": "scheduling_margin_seconds",
+          "value": "3"
+        }
+      ],
+      "test_unregistered_gate_exits_on_supervisor_pipe_loss": [
+        {
+          "name": "unregistered_gate_cleanup_seconds",
+          "value": "0.06402931600041484"
+        }
+      ],
+      "test_expired_group_cannot_extend_budget": [
+        {
+          "name": "expired_group_termination_seconds",
+          "value": "0.36612148499989416"
+        }
+      ],
+      "test_real_escalation_when_child_ignores_sigterm": [
+        {
+          "name": "sigterm_to_forced_cleanup_total_seconds",
+          "value": "5.224219444000482"
+        }
+      ],
+      "test_full_stderr_pipe_cannot_hold_watchdog_alive": [
+        {
+          "name": "blocked_logging_termination_seconds",
+          "value": "0.5678142199994909"
+        }
+      ],
+      "test_real_navigation_deadline_cleanup_then_subsequent_work": [
+        {
+          "name": "cooperative_cancellation_seconds",
+          "value": "0.20387436599958164"
+        }
+      ],
+      "test_real_browser_cleanup_when_persistence_blocks": [
+        {
+          "name": "supervisor_termination_seconds",
+          "value": "8.439243804999933"
+        },
+        {
+          "name": "termination_and_descendant_cleanup_seconds",
+          "value": "8.491557366000052"
+        },
+        {
+          "name": "deadline_plus_margin_seconds",
+          "value": "12"
+        }
+      ]
+    }
+  },
+  "baseline": {
+    "suite": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "4",
+      "skipped": "0",
+      "tests": "286",
+      "time": "27.555",
+      "timestamp": "2026-09-29T10:11:06.114767+01:00",
+      "hostname": "Max"
+    },
+    "failures": [
+      {
+        "name": "test_process_intelligence_backlog_selects_only_outstanding_applications",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "test_process_intelligence_backlog_enforces_extraction_limit_across_councils",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "test_process_intelligence_backlog_one_failure_does_not_corrupt_remaining_work",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      },
+      {
+        "name": "test_process_intelligence_backlog_workload_is_bounded_not_unlimited",
+        "message": "RuntimeError: OPENAI_API_KEY not set in .env"
+      }
+    ],
+    "measurements": {}
+  },
+  "candidate-commit.txt": "ff0baa237f809265be50b72247633a7b7a193c1d\n",
+  "runner-blob.txt": "9102803d9b2db4b52e22b4b7c46aa4a5657a1723\n",
+  "working-tree.txt": "",
+  "python-version.txt": "Python 3.12.3\n",
+  "postgres-encoding.txt": "server_encoding=UTF8\n",
+  "dependency-snapshot-sha256.txt": "551b45953598a503c8190a9f924cd6930e04f127ba496770a9a64c8ab05f43d9  verification/p0a-python-environment.txt\n",
+  "evidence_sha256": {
+    "actual-dependencies.txt": "551b45953598a503c8190a9f924cd6930e04f127ba496770a9a64c8ab05f43d9",
+    "baseline.log": "9cee8682712fd4a70af5deb47abcc9c04a3968ce23176fc215fae9d4632f8668",
+    "baseline.xml": "54ea6c79198fc8681d0af7f6123af59a828cff83998da82aa1f583bf477a6a8c",
+    "candidate-commit.txt": "a3fda5ed698c7517af41d2839516aa9bef616c394c4d3c34d394f208608aee01",
+    "candidate.log": "f5ed58f199fef15be778c1ef12fec917d8ac9bb653f5065285dc94c8f4eb7730",
+    "candidate.xml": "2b6532c8cfa3071c7d4f0886e434ae5ac581d6b9a0372e64ca30bcb5e160cbcc",
+    "dependency-snapshot-sha256.txt": "ca975dad47fb9c81ee3e8a48484205b90339ddb93694712e1bc1761932eca76b",
+    "environment-decision.txt": "e39b8b3404c1f2780de893484f6def99d99bc1a070778a7ac009e081c69191b9",
+    "initdb.log": "a0c3cc1c0d56e118b28438629227d8c87d79df33a9ef882b2d7c3d4a78865e19",
+    "operator-console.log": "28a14328014ab9ec181c472e5b9a9d7ed724057676bb91f82b98852260b8fa6d",
+    "postgres-encoding.txt": "c81c94ed4ab0ca27c5072a9b3d8b17cc029d89ef34af8b182498833bb8d49a72",
+    "postgres.log": "9b0f3cff99f72d1a403366b81e1d46d5dc5887b8a912f452bd6860f49d20d0dc",
+    "python-version.txt": "5b3e43dc38ca01e3f5a7854ba50d4330864b0c1e0f646650b2c78cf072acc366",
+    "runner-blob.txt": "ddf39f847ae51a24c8da564f94a7196630c1ce06f78f4aab2dc207e61361fc69",
+    "runner-exit-code.txt": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "working-tree.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "archive_sha256": "98b098066488d9897bf3c2974c69d2b475d6be0f6b0039d9a19704216a250e4b"
+}

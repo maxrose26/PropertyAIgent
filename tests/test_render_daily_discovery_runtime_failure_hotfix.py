@@ -146,7 +146,7 @@ def _fake_run_council_subprocess(text: str = "", returncode: int = 0):
     that only care about run_one_council's own behaviour (see
     tests/test_render_daily_discovery_memory_audit.py for tests of
     _run_council_subprocess's own internals against real subprocesses)."""
-    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def _fake(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         if on_line is not None:
             for line in text.splitlines():
                 on_line(line)
@@ -178,7 +178,7 @@ def test_run_one_council_success_path_does_not_print_error_lines(session, capsys
 
     with patch(
         "scripts.run_daily_councils._run_council_subprocess",
-        side_effect=_fake_run_council_subprocess("Done.", returncode=0),
+        side_effect=_fake_run_council_subprocess("[run-health] status=success", returncode=0),
     ):
         run = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
 
@@ -272,7 +272,7 @@ def test_one_council_failure_does_not_prevent_the_next_council_being_attempted(s
         run1 = run_one_council(session, "testcouncil", timeout_seconds=60, triggered_by="manual")
     with patch(
         "scripts.run_daily_councils._run_council_subprocess",
-        side_effect=_fake_run_council_subprocess("Done.", returncode=0),
+        side_effect=_fake_run_council_subprocess("[run-health] status=success", returncode=0),
     ):
         run2 = run_one_council(session, "thirdcouncil", timeout_seconds=60, triggered_by="manual")
 
@@ -319,7 +319,7 @@ def test_successful_council_still_recorded_as_successful_in_a_mixed_run(session)
 
     with patch(
         "scripts.run_daily_councils._run_council_subprocess",
-        side_effect=_fake_run_council_subprocess("Done.", returncode=0),
+        side_effect=_fake_run_council_subprocess("[run-health] status=success", returncode=0),
     ):
         good_run = run_one_council(session, "thirdcouncil", timeout_seconds=60, triggered_by="manual")
     with patch(
@@ -346,10 +346,10 @@ def test_run_daily_councils_still_defaults_to_skipping_ai_stages(session):
 
     captured_commands = []
 
-    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None):
+    def fake_run(command, *, cwd, timeout_seconds, on_line=None, council_code=None, **ownership):
         captured_commands.append(command)
         if on_line is not None:
-            on_line("Done.")
+            on_line("[run-health] status=success")
         return 0
 
     with patch("scripts.run_daily_councils._run_council_subprocess", side_effect=fake_run):

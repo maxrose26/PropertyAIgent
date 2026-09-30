@@ -1,0 +1,35 @@
+{
+  "markdown": [
+    "<style>.block-container { max-width: 94% !important; }</style>",
+    "<p class=\"pig-page-subtitle\">Search, filter and browse every site this platform tracks.</p>",
+    "##### \ud83d\udd0e Search Development Sites & Allocations",
+    "**Southlink**",
+    ":orange-badge[\ud83c\udfe0 Houses]",
+    "**Wall Hill Mill**",
+    ":orange-badge[\ud83c\udfe0 Houses]",
+    "**Focus School**",
+    ":violet-badge[\ud83c\udfd8\ufe0f Mixed (houses & apartments)]",
+    "**Hyde Stockport**",
+    ":orange-badge[\ud83c\udfe0 Houses]",
+    "**Hyde Tameside negative control**",
+    ":orange-badge[\ud83c\udfe0 Houses]"
+  ],
+  "caption": [
+    "Deterministic search by address, Application reference, allocation name, policy reference or council - never uses AI, and works with no OpenAI key configured.",
+    "147 units \u00b7 147.0 affordable homes \u2014 exact, verified; Southlink proposed scheme; FUL/355201/25; proposed (reported; stage unverified); source 2; document date 2026-09-24; Accepted source claim 3; scoped evidence only, not a statement of current availability. affordable",
+    "Awaiting decision \u00b7 Awaiting decision",
+    "26 units \u00b7 unknown affordable homes \u2014 unknown, unknown; Whole site (scope not confirmed by phase evidence); OUT/355454/25; proposed; source unlinked; document date unknown affordable",
+    "Awaiting decision \u00b7 Awaiting decision",
+    "82 units \u00b7 72.0 affordable homes \u2014 exact, verified; 72 retirement apartments within 82-home scheme; DC/093884; proposed (reported; stage unverified); source 1; document date 2024-10-23; Accepted source claim 1; scoped evidence only, not a statement of current availability. affordable",
+    "Decided \u00b7 Granted",
+    "440 units \u00b7 unknown affordable homes \u2014 unknown, unknown; Whole site (scope not confirmed by phase evidence); DC/098428; proposed; source unlinked; document date unknown affordable",
+    "Decided \u00b7 Awaiting decision",
+    "444 units \u00b7 67 affordable homes \u2014 unknown, unknown; reported count unverified; Whole site (scope not confirmed by phase evidence); 25/00173/OUT; proposed; source unlinked; document date unknown affordable",
+    "Awaiting decision \u00b7 Awaiting decision",
+    "Or get a shareable link to a specific scheme:",
+    "Personal spend-throttle for Apollo/Hunter/Companies House lookups - not real billing."
+  ],
+  "info": [],
+  "warning": [],
+  "metric": []
+}

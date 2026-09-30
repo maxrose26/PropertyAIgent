@@ -66,6 +66,7 @@ from app.ui.housing_type import (
     HOUSING_TYPE_LABELS,
     classify_housing_type,
     format_affordable_display,
+    explicit_affordable_maximum_mask,
     housing_type_note,
 )
 from app.ui.map_selection import resolve_selected_site_id
@@ -333,14 +334,17 @@ for site in sites:
         # consented AH position (the confirmed Burnage/Stockport Rugby
         # Club production defects). None when no consented or single
         # active AH position was resolved - never a fabricated zero.
-        "Affordable Units": filter_facts.affordable_units,
-        "Private Units": merged["private_units_final"],
+        "_ah_assessment": filter_facts.affordable_assessment,
+        "AH Assessment": filter_facts.affordable_assessment.label(),
+        **filter_facts.affordable_assessment.columns(),
+        "Affordable Units": filter_facts.affordable_units if filter_facts.affordable_assessment.count.qualified else None,
+        "Reported Private Units (unverified legacy scope)": merged["private_units_final"],
         "Affordable %": explore_affordable_percentage,
         # True whenever a percentage was withheld above because it does
         # not reconcile with the unit count - a reviewer can filter/sort
         # on this without needing to already know a figure is missing.
         "Affordable % Unreconciled": not filter_facts.affordable_percentage_reconciles,
-        "Tenure Split": merged["affordable_tenure_split_final"],
+        "Tenure Split": filter_facts.affordable_assessment.reported_tenure,
         "Development Type": merged["development_type"],
         "Housing Type": HOUSING_TYPE_LABELS[housing_type],
         "housing_type": housing_type,
@@ -417,7 +421,13 @@ with st.sidebar:
         "Housing type", list(HOUSING_TYPE_LABELS.values()), default=list(HOUSING_TYPE_LABELS.values()),
     )
     min_units = st.number_input("Min total units", min_value=0, value=0)
+    use_ah_minimum = st.checkbox("Apply affordable minimum", value=False)
     min_affordable = st.number_input("Min affordable units", min_value=0, value=0)
+    use_ah_maximum = st.checkbox("Apply affordable maximum", value=False)
+    max_affordable = st.number_input("Max affordable units", min_value=0, value=50)
+    ah_routes = st.multiselect("AH evidence results", ["meets", "likely_meets", "investigate", "unknown"],
+        default=["meets", "likely_meets"],
+        help="Investigate includes near-threshold estimates; unknown is a separate evidence route, never a numeric match.")
     exclude_completed = st.checkbox("Hide completed sites", value=False)
     hide_needs_review = st.checkbox("Hide schemes needing manual review", value=False)
     not_commenced_only = st.checkbox(
@@ -430,7 +440,23 @@ with st.sidebar:
 
 filtered = df[df["Council"].isin(councils) & df["Housing Type"].isin(housing_types)]
 filtered = filtered[filtered["Total Units"].fillna(0) >= min_units]
-filtered = filtered[filtered["Affordable Units"].fillna(0) >= min_affordable]
+# Manual and parsed constraints are assessed jointly against the same claim.
+ah_minima = [min_affordable] if use_ah_minimum else []
+ah_maxima = [max_affordable] if use_ah_maximum else []
+if nl_filters is not None:
+    if nl_filters.min_affordable_units is not None:
+        ah_minima.append(nl_filters.min_affordable_units)
+    if nl_filters.max_affordable_units is not None:
+        ah_maxima.append(nl_filters.max_affordable_units)
+ah_minimum = max(ah_minima) if ah_minima else None
+ah_maximum = min(ah_maxima) if ah_maxima else None
+if ah_minimum is not None and ah_maximum is not None and ah_minimum > ah_maximum:
+    st.warning("Affordable minimum exceeds maximum; amend the search.")
+    filtered = filtered.iloc[0:0]
+elif ah_minima or ah_maxima:
+    filtered = filtered.copy()
+    filtered["AH Search Outcome"] = filtered["_ah_assessment"].map(lambda a: a.search(ah_minimum, ah_maximum))
+    filtered = filtered[filtered["AH Search Outcome"].isin(ah_routes)]
 if exclude_completed:
     filtered = filtered[filtered["build_status"] != "complete"]
 if hide_needs_review:
@@ -455,10 +481,7 @@ if nl_filters:
         filtered = filtered[filtered["Total Units"].fillna(0) >= nl_filters.min_total_units]
     if nl_filters.max_total_units is not None:
         filtered = filtered[filtered["Total Units"].fillna(0) <= nl_filters.max_total_units]
-    if nl_filters.min_affordable_units is not None:
-        filtered = filtered[filtered["Affordable Units"].fillna(0) >= nl_filters.min_affordable_units]
-    if nl_filters.max_affordable_units is not None:
-        filtered = filtered[filtered["Affordable Units"].fillna(0) <= nl_filters.max_affordable_units]
+    # AH constraints have already been assessed jointly above.
     if nl_filters.development_types:
         filtered = filtered[filtered["Development Type"].isin(nl_filters.development_types)]
     if nl_filters.exclude_completed:
@@ -600,11 +623,13 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
             # Gate 2B-2B.1 - same trusted AH resolution as the main table
             # above, so the exported report can never show a different AH
             # figure than what a user just filtered by on-screen.
-            "Affordable Units": report_filter_facts.affordable_units,
-            "Private Units": merged["private_units_final"],
+            "AH Assessment": report_filter_facts.affordable_assessment.label(),
+            **report_filter_facts.affordable_assessment.columns(),
+            "Affordable Units": report_filter_facts.affordable_units if report_filter_facts.affordable_assessment.count.qualified else None,
+            "Reported Private Units (unverified legacy scope)": merged["private_units_final"],
             "Affordable %": report_affordable_percentage,
             "Affordable % Unreconciled": not report_filter_facts.affordable_percentage_reconciles,
-            "Tenure Split": merged["affordable_tenure_split_final"],
+            "Tenure Split": report_filter_facts.affordable_assessment.reported_tenure,
             "Development Type": merged["development_type"],
             "Housing Type": HOUSING_TYPE_LABELS[classify_housing_type(merged["development_type"], merged["housing_typology"])],
             "Housing Type Note": housing_type_note(merged["development_type"], merged["housing_typology"]),
@@ -858,11 +883,7 @@ _display["Development Type"] = _display["housing_type"].map(HOUSING_TYPE_LABELS)
 # None) for missing values, the same pandas quirk as "Total Units" below -
 # format_affordable_display checks `is None`, so NaN must be normalised to
 # None first or it would format as the literal string "nan (nan%)".
-_display["Affordable"] = [
-    format_affordable_display(
-        None if pd.isna(u) else u, None if pd.isna(p) else p,
-    ) for u, p in zip(_display["Affordable Units"], _display["Affordable %"])
-]
+_display["Affordable"] = _display["AH Assessment"]
 _display = _display.rename(columns={
     "Total Units": "Units", "References": "Application Ref(s)",
     "Latest Status": "Planning Status", "Decision Status": "Decision", "Portal URL": "Planning portal",

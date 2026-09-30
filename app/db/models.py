@@ -8,6 +8,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     String,
     Text,
     UniqueConstraint,
@@ -2414,6 +2415,8 @@ class ScrapeRun(Base):
 
     __tablename__ = "scrape_runs"
 
+    progress: Mapped[str | None] = mapped_column(Text, nullable=True)  # versioned JSON; old readers ignore
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
 
@@ -3471,3 +3474,27 @@ class AgentEvaluationClaim(Base):
     buyer_mandate: Mapped["BuyerMandate"] = relationship(foreign_keys=[buyer_mandate_id])
     subject_anchor: Mapped["AcquisitionSubjectAnchor"] = relationship(foreign_keys=[subject_anchor_id])
     history: Mapped["AgentEvaluationHistory | None"] = relationship(foreign_keys=[history_id])
+
+
+class ParentLookupWork(Base):
+    """Operational attempts only; never negative planning evidence."""
+    __tablename__ = "parent_lookup_work"
+    __table_args__ = (
+        UniqueConstraint("council_code", "reference_key", name="uq_parent_lookup_reference"),
+        Index("ix_parent_lookup_due", "council_code", "next_eligible_at", "last_started_at"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    council_code: Mapped[str] = mapped_column(ForeignKey("councils.code"))
+    reference_key: Mapped[str] = mapped_column(String(255))
+    raw_reference: Mapped[str] = mapped_column(String(255))
+    first_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    last_completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    last_outcome: Mapped[str | None] = mapped_column(String(40))
+    next_eligible_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+    total_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    owner_scrape_run_id: Mapped[int | None] = mapped_column(ForeignKey("scrape_runs.id"))
+    resolved_application_id: Mapped[int | None] = mapped_column(ForeignKey("applications.id"))
+    reason: Mapped[str | None] = mapped_column(String(100))
+    work_metadata: Mapped[str | None] = mapped_column(Text)
+    contract_version: Mapped[int] = mapped_column(Integer, default=1)

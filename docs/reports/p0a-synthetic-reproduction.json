@@ -1,0 +1,16 @@
+{
+  "fixture_references": 48,
+  "fixture_citations": 192,
+  "invocation_attempts": [
+    20,
+    20,
+    8
+  ],
+  "duplicate_requests_suppressed": 144,
+  "sql_statements": 1169,
+  "python_peak_bytes": 1175918,
+  "duration_seconds": 1.217,
+  "work_state_json_bytes": 25843,
+  "memory_scope": "tracemalloc Python allocations only; not cgroup or browser memory",
+  "transfer_scope": "serialized synthetic work state; not measured database wire egress"
+}

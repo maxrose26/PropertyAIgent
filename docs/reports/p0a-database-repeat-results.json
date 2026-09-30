@@ -1,0 +1,96 @@
+{
+  "candidate": "06b978c59ece44bb20efc6d5b26009d769a22b5d",
+  "attempts": [
+    {
+      "attempt": 1,
+      "passed": true,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "statement_timeout_elapsed_seconds",
+          "value": "15.002690291999897"
+        },
+        {
+          "name": "statement_timeout_raw_elapsed_seconds",
+          "value": "15.530632900001365"
+        },
+        {
+          "name": "statement_timeout_wall_elapsed_seconds",
+          "value": "15.002704858779907"
+        },
+        {
+          "name": "statement_timeout_sqlstate",
+          "value": "57014"
+        },
+        {
+          "name": "statement_timeout_server_message",
+          "value": "canceling statement due to statement timeout"
+        },
+        {
+          "name": "server_elapsed_including_recovery_seconds",
+          "value": "15.017443"
+        },
+        {
+          "name": "rollback_and_subsequent_work_verified",
+          "value": "True"
+        }
+      ],
+      "effective_settings_before_and_after_asserted_by_test": {
+        "statement_timeout": "15s",
+        "lock_timeout": "5s",
+        "idle_in_transaction_session_timeout": "30s"
+      },
+      "rollback_and_connection_reuse_asserted_by_test": true
+    },
+    {
+      "attempt": 2,
+      "passed": false,
+      "test_cases": 1,
+      "measurements": [
+        {
+          "name": "statement_timeout_elapsed_seconds",
+          "value": "13.873280532003264"
+        },
+        {
+          "name": "statement_timeout_raw_elapsed_seconds",
+          "value": "14.348324499998853"
+        },
+        {
+          "name": "statement_timeout_wall_elapsed_seconds",
+          "value": "15.001665830612183"
+        },
+        {
+          "name": "statement_timeout_sqlstate",
+          "value": "57014"
+        },
+        {
+          "name": "statement_timeout_server_message",
+          "value": "canceling statement due to statement timeout"
+        },
+        {
+          "name": "server_elapsed_including_recovery_seconds",
+          "value": "15.006126"
+        },
+        {
+          "name": "rollback_and_subsequent_work_verified",
+          "value": "True"
+        }
+      ],
+      "effective_settings_before_and_after_asserted_by_test": "inspect XML properties and traceback",
+      "rollback_and_connection_reuse_asserted_by_test": false
+    }
+  ],
+  "all_five_passed": false,
+  "scope": "Only database timeout and recovery; baseline not rerun; no production readiness claim",
+  "assessment": {
+    "passed": 1,
+    "failed": 1,
+    "skipped": 0,
+    "not_run": 3,
+    "archive_sha256": "3788b0c2645f24f20cb01a7f918f30b96be2af4dde5192fe0c10ccda06b814a8",
+    "recovery_verified_both_from_xml": true,
+    "warning": "summary recovery boolean follows overall case result; second case recovery succeeded before timing assertion failed",
+    "cause": "reproduced clock-domain disagreement; precise clock mechanism and original event unresolved",
+    "application_changes": false
+  }
+}
