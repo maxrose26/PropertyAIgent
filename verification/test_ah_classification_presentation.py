@@ -22,7 +22,7 @@ class ClassificationPresentationTests(unittest.TestCase):
             affordable_data_status='all_units_affordable',
             affordable_classification_evidence='72 retirement apartments plus ten private houses.',
             affordable_status_note=None)
-        ui = SimpleNamespace(caption=captions.append, write=writes.append,
+        ui = SimpleNamespace(caption=captions.append, write=writes.append, markdown=writes.append,
                              expander=lambda *a: nullcontext())
         ns = dict(st=ui, section_header=lambda *a, **k: None,
                   affordable_headline_tile=lambda *a: tiles.append(a),
@@ -79,7 +79,7 @@ class ClassificationPresentationTests(unittest.TestCase):
             application_reference='DC/085997')
         before = a.payload()
         captions, writes = self.render(a)
-        self.assertIn('Reported stage: legally secured; operative terms unverified', a.label())
+        self.assertIn('Reported AH status: legally secured; operative terms unverified', a.label())
         self.assertIn('operative terms unverified', a.columns()['AH Stage'])
         self.assertIn('Final approved conditions and tenure terms require checking', ' '.join(captions))
         self.assertNotIn('legally_secured', ' '.join(captions))

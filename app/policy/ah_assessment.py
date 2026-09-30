@@ -136,15 +136,15 @@ class AHAssessment:
         # contract has no separately reviewed legal-stage evidence field.
         stage = self.count.stage
         if not stage:
-            return 'Legal status unknown; operative terms unverified'
-        return f'Reported stage: {stage.replace("_", " ")}; operative terms unverified'
+            return 'Reported AH status: unknown; operative terms unverified'
+        return f'Reported AH status: {stage.replace("_", " ")}; operative terms unverified'
 
     def evidence_notes(self):
         c = self.count
         return (
             f'Application: {c.application_reference or "unknown"}. Scope: {c.scope_label or "unverified"}.',
             self.stage_label() + '. Final approved conditions and tenure terms require checking; acquisition availability is not established.',
-            f'Count source: {c.source_url or c.document_id or "not linked"}. Document date: {c.document_date or "unknown"}.',
+            f'Count source: {c.source_url or ("document " + c.document_id + "; source link unavailable" if c.document_id else "not linked; source link unavailable")}. Document date: {c.document_date or "unknown"}.',
             c.review_reason or 'Count evidence does not independently verify legal status, tenure or availability.',
         )
 
@@ -154,7 +154,7 @@ class AHAssessment:
                  f'at least {c.lower}' if c.qualifier == 'at_least' else
                  f'up to {c.upper}' if c.qualifier == 'up_to' else
                  str(c.value) if c.value is not None else 'unknown')
-        unverified = '; reported; source and scope unverified' if c.value is not None and not c.qualified else ''
+        unverified = '; reported; source and scope unverified' if any(v is not None for v in (c.value, c.lower, c.upper)) and not c.qualified else ''
         reason = f'; {self.selection_reason}' if self.selection_reason else ''
         alternatives = ('; alternatives: ' + '; '.join(
             f'{a.value if a.value is not None else str(a.lower) + "–" + str(a.upper)} ({a.qualifier}; {a.scope_label}; document {a.document_id}; {a.state})'

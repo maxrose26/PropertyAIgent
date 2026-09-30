@@ -63,6 +63,9 @@ def app(site,ref,total,ah=None,pct=None,decision=None,date='2026-01-01',kind='fu
             affordable_housing_status='legally_secured' if site.id==78 else 'proposed'))
     s.commit(); return a
 focus=site(78,'stockport','Focus School'); f=app(focus,'DC/085997',82,72,100,'Granted','2023-08-11')
+focus.status_summary='72 affordable retirement apartments legally secured; whole scheme 100% affordable.'
+focus.status_summary_updated_at=dt.datetime(2026,9,2)
+s.commit()
 variation=app(focus,'DC/093884',None,decision='Granted',date='2024-12-06',kind='condition_variation')
 south=site(25,'oldham','Southlink'); so=app(south,'FUL/355201/25',147,147,100)
 wall=site(32,'oldham','Wall Hill Mill'); wa=app(wall,'OUT/355454/25',26)
@@ -112,7 +115,9 @@ dashboard_text=json.dumps(values(explore))
 (OUT/'dashboard.json').write_text(dashboard_text)
 assert 'DC/085997' in dashboard_text
 assert 'Reported AH count: 72' in dashboard_text
-assert '100% affordable' not in dashboard_text and 'legally_secured' not in dashboard_text
+assert 'legally_secured' not in dashboard_text
+assert 'Historical AI output' in dashboard_text and 'unverified' in dashboard_text
+assert any(e.label=='Read historical narrative (unverified)' and not e.proto.expanded for e in explore.expander)
 explore.switch_page('pages/0_Explore.py')
 run(explore)
 (OUT/'explore-initial.json').write_text(json.dumps(values(explore),indent=2))
@@ -125,6 +130,23 @@ initial_table=table(explore)
 focus_row=initial_table[initial_table['Address']=='Focus School'].iloc[0]
 assert 'operative terms unverified' in str(focus_row.to_dict())
 assert 'legally_secured' not in str(focus_row.to_dict())
+# Exact previously missed branch: one selected row opens common.render_scheme_detail.
+focus_index=next(i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']=='Focus School')
+explore.session_state['sites_table']={'selection':{'rows':[focus_index]}}
+run(explore)
+inline=json.dumps(values(explore)); (OUT/'explore-single-focus.json').write_text(inline)
+assert 'Historical AI summary' in inline and 'unverified' in inline
+assert any(e.label=='Read historical narrative (unverified)' and not e.proto.expanded for e in explore.expander)
+assert 'reported; source and scope unverified' in inline
+assert 'operative terms unverified' in inline
+assert 'AH source link: not available' in inline
+assert '**Affordable %:**' not in inline
+assert '**Total / Affordable / Private units:**' not in inline
+assert 'built from evidence already verified' not in inline
+assert not explore.get('json')
+single=export_selected(explore,'single-focus.csv')
+assert len(single)==1 and single[0]['AH Application']=='DC/085997'
+assert float(single[0]['AH Reported Count'])==72 and single[0]['Affordable Units']==''
 selected=[i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']!='Hyde Tameside negative control']
 explore.session_state['sites_table']={'selection':{'rows':selected}}
 run(explore)
@@ -136,7 +158,7 @@ for r in rows:
 assert float(byname['Focus School']['AH Reported Count'])==72
 assert float(byname['Southlink']['AH Reported Count'])==147
 assert byname['Focus School']['AH Application']=='DC/085997'
-assert byname['Focus School']['AH Stage']=='Reported stage: legally secured; operative terms unverified'
+assert byname['Focus School']['AH Stage']=='Reported AH status: legally secured; operative terms unverified'
 assert 'legally_secured' not in byname['Focus School']['AH Assessment']
 for name in ('Wall Hill Mill','Hyde Stockport'):
     assert byname[name]['AH Reported Count']==''
@@ -170,7 +192,7 @@ for sid in (78,25,32,107):
     assert 'Not applicable - no affordable homes' not in rendered
     if sid==78:
         assert 'reported; source and scope unverified' in rendered
-        assert 'Reported stage: legally secured; operative terms unverified' in rendered
+        assert 'Reported AH status: legally secured; operative terms unverified' in rendered
         assert 'legally_secured' not in rendered
         assert not detail.get('json'), 'No internal assessment JSON on the buyer page'
         assert 'Final approved conditions and tenure terms require checking' in rendered
@@ -191,6 +213,26 @@ assert '100% affordable' not in card_text
 assert 'Reported AH percentage: 100% (scope unverified)' in card_text
 assert 'Existing-policy fit: Strong Fit' in card_text
 assert 'does not verify AH count source or scope' in card_text
+# Shared evidence renderer exercised with qualified/source-bounded and conflicting inputs.
+qualified = run(AppTest.from_string("""
+import streamlit as st
+from dataclasses import replace
+from app.policy.ah_assessment import AHAssessment, AHClaim
+from app.ui.ah_evidence import render_ah_evidence
+base=AHClaim(value=72, qualifier='exact', state='verified', application_reference='Q/1',
+ scope_type='whole_site', scope_label='Whole Q/1 scheme', document_id='q1',
+ source_url='https://example.invalid/q1.pdf', document_date='2024-10-23', passage='72 affordable homes')
+for assessment in (AHAssessment(count=base), AHAssessment(count=replace(base, value=None)),
+ AHAssessment(count=replace(base, state='conflicting'), alternatives=(base, replace(base,value=74))),
+ AHAssessment(count=replace(base, qualifier='at_least',value=None,lower=70)),
+ AHAssessment(count=replace(base, scope_type='component',scope_label='Retirement component'))):
+ st.caption(assessment.label())
+ render_ah_evidence(assessment)
+"""))
+qt=json.dumps(values(qualified)); (OUT/'qualified-presentations.json').write_text(qt)
+assert 'View reported AH source' in qt and 'https://example.invalid/q1.pdf' in qt
+assert 'Retirement component' in qt and '74' in qt
+assert not qualified.get('json')
 print('PASS: actual Explore/detail rendering, reported counts, min/max unknown exclusion, investigation route, and selected CSV bytes',flush=True)
 (OUT/'result.json').write_text(json.dumps({'candidate':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'csv_rows':len(rows),'schema':'unchanged production-baseline ORM; no AH/P0A/revisit additions','limits':'AppTest media bytes, not browser HTTP delivery; legacy inputs not source-qualified production claims'},indent=2))
 print('DONE',OUT,flush=True)

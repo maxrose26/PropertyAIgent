@@ -276,7 +276,8 @@ def build_affordable_tenure(scheme: SchemeIntelligence | None, affordable_headli
                 "has_categories": True, "affordable_known_tenure_unknown": False}
     if assessment and assessment.count.qualified:
         return {"categories": [], "has_categories": False, "affordable_known_tenure_unknown": True}
-    categories = parse_tenure_categories(scheme.affordable_tenure_split_final if scheme else None)
+    categories = parse_tenure_categories(assessment.reported_tenure if assessment is not None
+                                       else scheme.affordable_tenure_split_final if scheme else None)
     affordable_known = affordable_headline["state"] in ("verified", "calculated", "percentage_only", "zero")
     return {
         "categories": categories,

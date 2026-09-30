@@ -444,6 +444,8 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     two don't drift out of sync with each other."""
     rep_app = pick_representative_application(apps)
     merged = aggregate_scheme_fields(apps)
+    from app.reporting.scheme_reconciliation import resolve_operative_filter_facts
+    ah_assessment = resolve_operative_filter_facts(build_operative_planning_facts(list(site.applications))).affordable_assessment
     has_scheme = any(a.scheme_intelligence for a in apps)
     # Gate 2B-2A Stage A - the trusted operative planning position for this
     # Site's "Status / Decision" and unit-count lines below, so this shared
@@ -760,28 +762,14 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
                     total_units_display = f"~{total_units_display} (est.)"
             elif total_units_display is None:
                 total_units_display = "Not yet verified"
-            st.markdown(f"**Total / Affordable / Private units:** {total_units_display} / "
-                        f"{merged['affordable_units_final']} / {merged['private_units_final']}")
+            st.markdown(f"**Total homes:** {total_units_display}")
             if merged.get("total_units_is_estimated"):
-                st.caption(
-                    "ℹ️ No AI-verified unit count yet (no useful documents processed) - this is the portal "
-                    "search listing's own estimate from the proposal text, not confirmed against the full application."
-                )
-            if merged["affordable_units_final"] in (0, None) and merged.get("affordable_classification_reason"):
-                # A bare "0" reads as "no affordable housing required" - but
-                # confirmed a real case where 0 actually meant "viability
-                # assessment may reduce a stated 20% obligation to zero", a
-                # very different (and less certain) situation. Blank/None
-                # deserves the same treatment - confirmed a real case
-                # (PA/2026/0539) where a stated-but-unconfirmed 20% target
-                # was left unresolved rather than shown as a confident 0 (see
-                # the manual-review warning above), and the reason explains
-                # why. The reason is already captured (see Evidence below)
-                # but was easy to miss sitting in a collapsed expander below
-                # the figure it explains - surface it right next to the
-                # number instead.
-                st.caption(f"ℹ️ {merged['affordable_classification_reason']}")
-            st.markdown(f"**Affordable tenure split:** {merged['affordable_tenure_split_final']}")
+                st.caption("Total homes are a portal-listing estimate, not confirmed against the full application.")
+            st.markdown(f"**Affordable housing:** {ah_assessment.label()}")
+            from app.ui.ah_evidence import render_ah_evidence
+            render_ah_evidence(ah_assessment, st)
+            st.caption("Reported tenure (current approved terms unverified): "
+                       + str(ah_assessment.reported_tenure or "unknown"))
             st.markdown(f"**Development type:** {merged['development_type']}")
             st.markdown(f"**Build status:** {BUILD_STATUS_LABELS[lapse['build_status']]}")
             if lapse["build_status"] == "no_completions_yet":
@@ -790,8 +778,6 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
                     "finished yet - construction could genuinely be well underway with no EPCs lodged and no "
                     "portal filing on record. Treat this as \"not confirmed complete\", not \"confirmed unstarted\"."
                 )
-            if merged["affordable_units_final"] and merged["total_units_final"]:
-                st.markdown(f"**Affordable %:** {merged['affordable_percentage_final']}%")
             if lapse["granted_app"] and lapse["granted_app"].decision_issued_date:
                 st.markdown(f"**Decision date:** {lapse['granted_app'].decision_issued_date}")
             if rep_app.summary_url:
@@ -826,8 +812,8 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             st.markdown(f"**Data quality:** {merged['data_quality_status']}")
 
         with st.expander("Evidence"):
-            st.markdown(f"**Affordable classification reason:** {merged['affordable_classification_reason']}")
-            st.markdown(f"**Affordable evidence:** {merged['affordable_classification_evidence']}")
+            st.markdown(f"**Reported AH extraction notes (unreviewed):** {merged['affordable_classification_reason']}")
+            st.markdown(f"**Reported AH excerpt (unreviewed):** {merged['affordable_classification_evidence']}")
             st.markdown(f"**Site evidence:** {merged['site_evidence']}")
 
     st.divider()

@@ -89,8 +89,8 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
     assessment = resolve_operative_filter_facts(build_operative_planning_facts(apps)).affordable_assessment
     st.caption(assessment.label())
     with st.expander("AH source and uncertainty"):
-        for note in assessment.evidence_notes():
-            st.caption(note)
+        from app.ui.ah_evidence import render_ah_evidence
+        render_ah_evidence(assessment, st)
     phase_breakdown = build_phase_breakdown(site.applications)
     if phase_breakdown:
         section_header("Phase & plot breakdown", icon="🏗️")
@@ -237,8 +237,8 @@ def _affordable_housing_section(mix: dict) -> None:
     section_header("Affordable Housing", icon="🏡")
     scheme = mix["scheme"]
     if mix.get("affordable_assessment"):
-        for note in mix["affordable_assessment"].evidence_notes():
-            st.caption(note)
+        from app.ui.ah_evidence import render_ah_evidence
+        render_ah_evidence(mix["affordable_assessment"], st)
     headline = mix["affordable_headline"]
     affordable_headline_tile(headline, mix["percentage_reconciliation"])
     if headline["percentage_is_calculated"]:

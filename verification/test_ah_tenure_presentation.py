@@ -22,6 +22,15 @@ class TenurePresentationTests(unittest.TestCase):
         namespace[fn.name]({"categories": categories, "has_categories": bool(categories), "affordable_known_tenure_unknown": known})
         return messages
 
+    def test_current_application_does_not_borrow_older_tenure(self):
+        from types import SimpleNamespace
+        from app.policy.ah_assessment import AHAssessment, AHClaim
+        from app.reporting.residential_mix import build_affordable_tenure
+        older = SimpleNamespace(affordable_tenure_split_final="Social rent")
+        current = AHAssessment(count=AHClaim(application_reference="DC/098428"))
+        result = build_affordable_tenure(older, {"state": "unverified"}, current)
+        self.assertEqual(result["categories"], [])
+
     def test_unknown_provision_is_unresolved_not_not_applicable(self):
         self.assertEqual(self.render([]), ["Affordable tenure not identified; affordable housing provision remains unresolved."])
 

@@ -159,8 +159,8 @@ def format_site_tooltip(headline: dict) -> str:
 
     if headline.get("affordable_units") is not None:
         pct = headline.get("affordable_percentage")
-        pct_text = f" ({pct:.0f}%)" if pct is not None else ""
-        lines.append(f"Affordable: {headline['affordable_units']}{pct_text}")
+        pct_text = f" (reported {pct:.0f}%; scope unverified)" if pct is not None else ""
+        lines.append(f"Reported AH count: {headline['affordable_units']} (source and scope unverified){pct_text}")
 
     if headline.get("developer"):
         lines.append(f"Developer: {_clean_text(headline['developer'], max_length=50)}")
