@@ -677,7 +677,9 @@ if len(filtered) > 0:
     # Applications Detail is a list-of-dicts per row (per-application
     # breakdown, PDF-only) that doesn't serialise cleanly to a flat CSV cell.
     all_filtered_report_df = pd.DataFrame(all_filtered_rows).drop(
-        columns=["decision_status", "lapse_status", "build_status", "Applications Detail"]
+        columns=["decision_status", "lapse_status", "build_status", "Applications Detail",
+                 "AH Explicit Tenure Claims", "AH Conflicting Claims",
+                 "AH Source Claims", "AH Claim Relationships"]
     )
 
     col_csv, col_pdf = st.columns(2)
@@ -977,7 +979,9 @@ if len(selected_site_ids) == 1:
 if selected_site_ids:
     st.divider()
     report_df = pd.DataFrame(build_report_rows(selected_site_ids)).drop(
-        columns=["decision_status", "lapse_status", "build_status", "Applications Detail"]
+        columns=["decision_status", "lapse_status", "build_status", "Applications Detail",
+                 "AH Explicit Tenure Claims", "AH Conflicting Claims",
+                 "AH Source Claims", "AH Claim Relationships"]
     )
     st.download_button(
         f"Export as CSV ({len(selected_site_ids)} selected scheme{'s' if len(selected_site_ids) != 1 else ''})",

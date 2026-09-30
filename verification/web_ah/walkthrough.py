@@ -104,12 +104,16 @@ def values(at):
     return {'page_links': [str(e.proto) for e in at.get('page_link')], **{typ:[str(e.value) for e in at.get(typ)] for typ in ('markdown','caption','info','warning','metric','json')}}
 def table(at):
     return next(d.value for d in at.dataframe if d.key=='sites_table')
-def export_selected(at,name):
-    d=next(d for d in at.download_button if d.key=='download_selected_report')
+def export_selected(at,name,key='download_selected_report'):
+    d=next(d for d in at.download_button if d.key==key)
     fileid=d.proto.url.rsplit('/',1)[-1].split('.')[0]
     data=stores[-1].get_file(fileid).content
     (OUT/name).write_bytes(data)
-    return list(csv.DictReader(io.StringIO(data.decode())))
+    rows = list(csv.DictReader(io.StringIO(data.decode())))
+    internal = {'AH Explicit Tenure Claims', 'AH Conflicting Claims', 'AH Source Claims', 'AH Claim Relationships'}
+    assert rows and not internal.intersection(rows[0]), 'Machine claim JSON must not reach buyer CSV'
+    assert {'AH Assessment', 'AH Source', 'AH Application', 'AH Reported Count'} <= set(rows[0])
+    return rows
 explore=run(AppTest.from_file(str(ROOT/'app/ui/streamlit_app.py')))
 dashboard_text=json.dumps(values(explore))
 (OUT/'dashboard.json').write_text(dashboard_text)
@@ -126,6 +130,8 @@ print('OUT',OUT,flush=True)
 # cannot magically become a reviewed count-level claim in this release.
 assert set(table(explore)['Address']) == {'Focus School','Southlink','Wall Hill Mill','Hyde Stockport','Hyde Tameside negative control'}
 initial_table=table(explore)
+all_rows=export_selected(explore,'all-filtered.csv','download_all_filtered_report')
+assert len(all_rows)==5
 (OUT/'explore-table.json').write_text(initial_table.to_json(orient='records', default_handler=str))
 focus_row=initial_table[initial_table['Address']=='Focus School'].iloc[0]
 assert 'operative terms unverified' in str(focus_row.to_dict())
