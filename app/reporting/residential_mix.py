@@ -223,6 +223,9 @@ def format_affordable_tile(headline: dict, percentage_reconciliation: dict | Non
     full on-site/financial-contribution breakdown belongs in the
     Structured Summary, not this compact tile (Section 2's own "do not put
     the full explanation into the headline tile")."""
+    if "assessment" in headline:
+        from app.reporting.ah_kpi import affordable_count_kpi
+        return affordable_count_kpi(headline["assessment"]), None
     if headline["state"] == "percentage_only":
         return headline["headline_percentage"], headline["headline_units"]
     if headline["state"] in ("verified", "calculated"):
@@ -552,7 +555,7 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
     # Retain old extraction separately; the headline must use the same operative
     # claim as search, not label a populated representative row "verified".
     affordable_headline = compute_affordable_headline(scheme)
-    affordable_headline.update(state="review", evidence_status=assessment.count.state,
+    affordable_headline.update(state="review", assessment=assessment, evidence_status=assessment.count.state,
         headline_units=assessment.label(), headline_percentage=None,
         percentage_is_calculated=False, percentage_display=None,
         affordable_units=assessment.count.value if assessment.count.qualified else None)

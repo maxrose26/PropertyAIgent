@@ -908,6 +908,9 @@ DESKTOP_TABLE_COLUMNS = [
     "Address", "Council", "Units", "Affordable", "Development Type",
     "Planning Status", "Decision", "Build Status", "Application Ref(s)", "Developer", "Planning portal",
 ]
+from app.ui.explore_selection import selection_widget_key, selected_site_ids as resolve_table_selection
+ordered_result_ids = tuple(int(sid) for sid in filtered["site_id"])
+selection_key = selection_widget_key(st.session_state, ordered_result_ids)
 with st.container(key="explore-desktop-table"):
     table_display = _display[DESKTOP_TABLE_COLUMNS]
     table_event = st.dataframe(
@@ -921,7 +924,7 @@ with st.container(key="explore-desktop-table"):
         column_config={"Planning portal": st.column_config.LinkColumn(display_text="Planning portal ↗")},
         on_select="rerun",
         selection_mode="multi-row",
-        key="sites_table",
+        key=selection_key,
     )
 
 # Mobile card list (Part 20) - always rendered; CSS (see app.ui.shell.
@@ -945,8 +948,10 @@ with st.container(key="explore-mobile-cards"):
             # the correct missing-value check here.
             if pd.notna(row["Units"]):
                 meta_bits.append(f"{int(row['Units']):,} units")
-            if row["Affordable"] != "Not stated":
-                meta_bits.append(f"{row['Affordable']} affordable")
+            from app.reporting.ah_kpi import affordable_count_kpi
+            assessment = row["_ah_assessment"]
+            st.metric("Affordable homes", affordable_count_kpi(assessment))
+            st.caption(assessment.label())
             if meta_bits:
                 st.caption(" · ".join(meta_bits))
             # clean_display_text (app.ui.shell) - "Planning Status"/"Decision"/
@@ -973,7 +978,7 @@ if table_event is not None:
     selected_rows = table_event["selection"]["rows"]
     # table_display was reset_index'd to line up 1:1 with filtered's row
     # order, so selected positions map straight back to site_id.
-    selected_site_ids = [int(sid) for sid in filtered.iloc[selected_rows]["site_id"]]
+    selected_site_ids = resolve_table_selection(ordered_result_ids, selected_rows)
 
 if len(selected_site_ids) == 1:
     st.divider()

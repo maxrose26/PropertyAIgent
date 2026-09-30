@@ -107,7 +107,7 @@ def run(at):
 def values(at):
     return {'page_links': [str(e.proto) for e in at.get('page_link')], **{typ:[str(e.value) for e in at.get(typ)] for typ in ('markdown','caption','info','warning','metric','json')}}
 def table(at):
-    return next(d.value for d in at.dataframe if d.key=='sites_table')
+    return next(d.value for d in at.dataframe if str(d.key).startswith('sites_table_'))
 def export_selected(at,name,key='download_selected_report'):
     d=next(d for d in at.download_button if d.key==key)
     fileid=d.proto.url.rsplit('/',1)[-1].split('.')[0]
@@ -142,7 +142,7 @@ assert 'operative terms unverified' in str(focus_row.to_dict())
 assert 'legally_secured' not in str(focus_row.to_dict())
 # Exact previously missed branch: one selected row opens common.render_scheme_detail.
 focus_index=next(i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']=='Focus School')
-explore.session_state['sites_table']={'selection':{'rows':[focus_index]}}
+explore.session_state[next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))]={'selection':{'rows':[focus_index]}}
 run(explore)
 inline=json.dumps(values(explore)); (OUT/'explore-single-focus.json').write_text(inline)
 assert 'Historical AI summary' in inline and 'unverified' in inline
@@ -158,7 +158,7 @@ single=export_selected(explore,'single-focus.csv')
 assert len(single)==1 and single[0]['AH Application']=='DC/085997'
 assert float(single[0]['AH Reported Count'])==72 and single[0]['Affordable Units']==''
 hyde_index=next(i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']=='Hyde Stockport')
-explore.session_state['sites_table']={'selection':{'rows':[hyde_index]}}
+explore.session_state[next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))]={'selection':{'rows':[hyde_index]}}
 run(explore)
 hyde_inline=json.dumps(values(explore)); (OUT/'explore-single-hyde.json').write_text(hyde_inline)
 hyde_csv=export_selected(explore,'single-hyde.csv')
@@ -169,7 +169,7 @@ assert 'DC/095922' in hyde_csv[0]['Other application AH reports (not current)']
 assert '0 affordable homes' in hyde_csv[0]['Other application AH reports (not current)']
 assert 'Other application AH evidence' in [e.label.split(' —')[0] for e in explore.expander]
 selected=[i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']!='Hyde Tameside negative control']
-explore.session_state['sites_table']={'selection':{'rows':selected}}
+explore.session_state[next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))]={'selection':{'rows':selected}}
 run(explore)
 rows=export_selected(explore,'selected-records.csv')
 assert len(rows)==4
@@ -186,17 +186,50 @@ for name in ('Wall Hill Mill','Hyde Stockport'):
 assert byname['Hyde Stockport']['AH Application']=='DC/098428'
 assert float(byname['Wall Hill Mill']['Total Units'])==26
 assert '67' not in byname['Hyde Stockport']['AH Assessment']
+# Shrinking to a different nonempty set must clear a still-in-range old offset.
+before_first=table(explore).iloc[0]['Address']
+old_key=next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))
+explore.session_state[old_key]={'selection':{'rows':[0]}}
+run(explore)
+for e in explore.multiselect:
+    if e.label=='Council':e.set_value(['stockport'])
+run(explore)
+assert len(table(explore))==2
+assert table(explore).iloc[0]['Address']!=before_first  # same offset, different site
+assert not any(d.key=='download_selected_report' for d in explore.download_button)
+new_key=next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))
+assert new_key!=old_key
+assert 'Other application AH evidence — not applied to this record' not in [e.label for e in explore.expander]
+explore.session_state[new_key]={'selection':{'rows':[0,1]}}
+run(explore)
+reselected=export_selected(explore,'reselected-after-filter.csv')
+assert {r['Address'] for r in reselected}=={'Focus School','Hyde Stockport'}
+for e in explore.multiselect:
+    if e.label=='Council':e.set_value(['stockport','oldham','tameside'])
+run(explore)
+assert not any(d.key=='download_selected_report' for d in explore.download_button)
+# Re-select before the minimum produces zero rows: no stale .iloc access/export.
+key=next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))
+explore.session_state[key]={'selection':{'rows':[0,4]}}
+run(explore)
 for e in explore.checkbox:
     if e.label=='Apply affordable minimum':e.check()
 for e in explore.number_input:
     if e.label=='Min affordable units':e.set_value(50)
 run(explore)
-assert not any(d.key=='sites_table' and len(d.value) for d in explore.dataframe)
+assert not any(str(d.key).startswith('sites_table_') and len(d.value) for d in explore.dataframe)
+assert not any(d.key=='download_selected_report' for d in explore.download_button)
 for e in explore.multiselect:
     if e.label=='AH evidence results':e.set_value(['unknown'])
 run(explore)
 assert len(table(explore))==5
 assert all('unknown' in r for r in table(explore)['Affordable'])
+# Single selection before maximum-zero; this offset was valid in the old results.
+hyde_index=next(i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']=='Hyde Stockport')
+key=next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))
+explore.session_state[key]={'selection':{'rows':[hyde_index]}}
+run(explore)
+assert any(d.key=='download_selected_report' for d in explore.download_button)
 for e in explore.checkbox:
     if e.label=='Apply affordable minimum':e.uncheck()
     if e.label=='Apply affordable maximum':e.check()
@@ -205,13 +238,19 @@ for e in explore.number_input:
 for e in explore.multiselect:
     if e.label=='AH evidence results':e.set_value(['meets','likely_meets'])
 run(explore)
-assert not any(d.key=='sites_table' and len(d.value) for d in explore.dataframe)
+assert not any(str(d.key).startswith('sites_table_') and len(d.value) for d in explore.dataframe)
+assert not any(d.key=='download_selected_report' for d in explore.download_button)
 for sid in (78,25,32,107):
     detail=AppTest.from_file(str(ROOT/'app/ui/streamlit_app.py'))
     run(detail);detail.switch_page('pages/1_Scheme_Detail.py');detail.query_params['site_id']=str(sid);run(detail)
     rendered=json.dumps(values(detail));(OUT/f'detail-{sid}.json').write_text(rendered)
     assert 'confidence: high' not in rendered and 'all_units_affordable' not in rendered
     assert 'Not applicable - no affordable homes' not in rendered
+    if sid in (32,78,107):
+        ah_tiles=[block for block in detail.get('flex_container') if any(c.value=='Affordable homes' for c in block.get('caption')) and len(block.get('markdown'))==1]
+        assert ah_tiles and all('>N/A</div>' in block.get('markdown')[0].value for block in ah_tiles)
+    if sid==32:
+        assert any('26 (proposed)' in x for x in values(detail)['markdown'])
     if sid==107:
         assert 'stockport \u00b7 DC/098428' in '\n'.join(values(detail)['caption'])
         assert 'Current preferred version: **DC/098428**' in '\n'.join(values(detail)['caption'])
@@ -220,6 +259,8 @@ for sid in (78,25,32,107):
         assert 'Source application: DC/098428' not in '\n'.join(values(detail)['caption'])
         assert '0 affordable homes' not in next(x for x in values(detail)['markdown'] if 'unknown affordable homes' in x)
     if sid==78:
+        assert any('>N/A</div>' in x for x in values(detail)['markdown'])
+        assert not any('font-size:1.35rem' in x and 'reported;' in x for x in values(detail)['markdown'])
         assert 'reported; source and scope unverified' in rendered
         assert 'Reported AH status: legally secured; operative terms unverified' in rendered
         assert 'legally_secured' not in rendered
@@ -262,6 +303,35 @@ qt=json.dumps(values(qualified)); (OUT/'qualified-presentations.json').write_tex
 assert 'View reported AH source' in qt and 'https://example.invalid/q1.pdf' in qt
 assert 'Retirement component' in qt and '74' in qt
 assert not qualified.get('json')
+# Actual Streamlit selection replay for a server result reorder, same IDs and
+# still-valid offsets. Uses the production helper with production-shaped IDs.
+reorder = run(AppTest.from_string("""
+import streamlit as st
+import pandas as pd
+from app.ui.explore_selection import selection_widget_key, selected_site_ids
+ids=st.session_state.get('fixture_order',[78,25,32])
+key=selection_widget_key(st.session_state,ids)
+event=st.dataframe(pd.DataFrame({'site_id':ids}),key=key,on_select='rerun',selection_mode='multi-row')
+selected=selected_site_ids(ids,event['selection']['rows'])
+if selected:
+ st.caption('Selected site IDs: '+','.join(map(str,selected)))
+ st.download_button('Selected fixture CSV',pd.DataFrame({'Site ID':selected}).to_csv(index=False).encode(),key='reorder_csv')
+"""))
+def reorder_key():
+    return next(d.key for d in reorder.dataframe if str(d.key).startswith('sites_table_'))
+key_a=reorder_key();reorder.session_state[key_a]={'selection':{'rows':[0]}};run(reorder)
+assert 'Selected site IDs: 78' in values(reorder)['caption']
+reorder.session_state['fixture_order']=[25,78,32];run(reorder)
+assert reorder_key()!=key_a and not reorder.download_button
+reorder.session_state['fixture_order']=[78,25,32];run(reorder)
+assert reorder_key()!=key_a and not reorder.download_button
+reorder.session_state[reorder_key()]={'selection':{'rows':[1]}};run(reorder)
+assert 'Selected site IDs: 25' in values(reorder)['caption']
+d=next(d for d in reorder.download_button if d.key=='reorder_csv')
+fileid=d.proto.url.rsplit('/',1)[-1].split('.')[0]
+reorder_bytes=stores[-1].get_file(fileid).content
+(OUT/'reordered-reselection.csv').write_bytes(reorder_bytes)
+assert list(csv.DictReader(io.StringIO(reorder_bytes.decode())))==[{'Site ID':'25'}]
 print('PASS: actual Explore/detail rendering, reported counts, min/max unknown exclusion, investigation route, and selected CSV bytes',flush=True)
 (OUT/'result.json').write_text(json.dumps({'candidate':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'csv_rows':len(rows),'schema':'unchanged production-baseline ORM; no AH/P0A/revisit additions','limits':'AppTest media bytes, not browser HTTP delivery; legacy inputs not source-qualified production claims'},indent=2))
 print('DONE',OUT,flush=True)

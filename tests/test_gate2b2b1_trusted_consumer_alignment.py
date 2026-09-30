@@ -510,7 +510,8 @@ def test_brixham_end_to_end_tile_and_structured_summary_agree(session):
     affordable_headline_tile via the SAME format_affordable_tile call) and
     its Structured Summary sentence must never disagree: neither may
     present 54 affordable homes and the stored 40% as an ordinary
-    same-basis pair, while both keep the 54-unit figure visible."""
+    same-basis pair. The unqualified 54 remains visible in evidence text,
+    while the compact qualified-count KPI is N/A."""
     site = _site(session)
     app = _app(session, site.id, "114228/FUL/24", proposal="Residential development of 145 units",
                status="Awaiting decision")
@@ -521,8 +522,8 @@ def test_brixham_end_to_end_tile_and_structured_summary_agree(session):
     assert mix["percentage_reconciliation"]["percentage_reconciles"] is False
 
     value, caption = format_affordable_tile(mix["affordable_headline"], mix["percentage_reconciliation"])
-    assert "54 affordable homes" in value
-    assert "reported; source and scope unverified" in value
+    assert value == "N/A"  # Unlinked legacy count is evidence text, not a qualified KPI.
+    assert "reported; source and scope unverified" in mix["structured_summary"]
     assert "40%" not in (caption or "")
     assert "54 affordable homes" in mix["structured_summary"]
     assert "representing 40" not in mix["structured_summary"]
