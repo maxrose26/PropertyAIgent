@@ -60,7 +60,7 @@ def app(site,ref,total,ah=None,pct=None,decision=None,date='2026-01-01',kind='fu
             affordable_percentage_final=pct,core_intelligence_complete=True,unit_reconciliation_status='OK',
             affordable_classification_confidence='high', affordable_data_status='all_units_affordable' if pct==100 else None,
             development_type='mixed_retirement_and_market_housing' if site.id==78 else 'houses',
-            affordable_housing_status='proposed'))
+            affordable_housing_status='legally_secured' if site.id==78 else 'proposed'))
     s.commit(); return a
 focus=site(78,'stockport','Focus School'); f=app(focus,'DC/085997',82,72,100,'Granted','2023-08-11')
 variation=app(focus,'DC/093884',None,decision='Granted',date='2024-12-06',kind='condition_variation')
@@ -98,7 +98,7 @@ def run(at):
         raise RuntimeError(str([(e.message,e.stack_trace) for e in at.exception]))
     return at
 def values(at):
-    return {typ:[str(e.value) for e in at.get(typ)] for typ in ('markdown','caption','info','warning','metric')}
+    return {'page_links': [str(e.proto) for e in at.get('page_link')], **{typ:[str(e.value) for e in at.get(typ)] for typ in ('markdown','caption','info','warning','metric','json')}}
 def table(at):
     return next(d.value for d in at.dataframe if d.key=='sites_table')
 def export_selected(at,name):
@@ -108,6 +108,11 @@ def export_selected(at,name):
     (OUT/name).write_bytes(data)
     return list(csv.DictReader(io.StringIO(data.decode())))
 explore=run(AppTest.from_file(str(ROOT/'app/ui/streamlit_app.py')))
+dashboard_text=json.dumps(values(explore))
+(OUT/'dashboard.json').write_text(dashboard_text)
+assert 'DC/085997' in dashboard_text
+assert 'Reported AH count: 72' in dashboard_text
+assert '100% affordable' not in dashboard_text and 'legally_secured' not in dashboard_text
 explore.switch_page('pages/0_Explore.py')
 run(explore)
 (OUT/'explore-initial.json').write_text(json.dumps(values(explore),indent=2))
@@ -115,6 +120,11 @@ print('OUT',OUT,flush=True)
 # This release reads the existing schema only. Source text is preserved, but
 # cannot magically become a reviewed count-level claim in this release.
 assert set(table(explore)['Address']) == {'Focus School','Southlink','Wall Hill Mill','Hyde Stockport','Hyde Tameside negative control'}
+initial_table=table(explore)
+(OUT/'explore-table.json').write_text(initial_table.to_json(orient='records', default_handler=str))
+focus_row=initial_table[initial_table['Address']=='Focus School'].iloc[0]
+assert 'operative terms unverified' in str(focus_row.to_dict())
+assert 'legally_secured' not in str(focus_row.to_dict())
 selected=[i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']!='Hyde Tameside negative control']
 explore.session_state['sites_table']={'selection':{'rows':selected}}
 run(explore)
@@ -126,6 +136,8 @@ for r in rows:
 assert float(byname['Focus School']['AH Reported Count'])==72
 assert float(byname['Southlink']['AH Reported Count'])==147
 assert byname['Focus School']['AH Application']=='DC/085997'
+assert byname['Focus School']['AH Stage']=='Reported stage: legally secured; operative terms unverified'
+assert 'legally_secured' not in byname['Focus School']['AH Assessment']
 for name in ('Wall Hill Mill','Hyde Stockport'):
     assert byname[name]['AH Reported Count']==''
 assert float(byname['Wall Hill Mill']['Total Units'])==26
@@ -158,6 +170,10 @@ for sid in (78,25,32,107):
     assert 'Not applicable - no affordable homes' not in rendered
     if sid==78:
         assert 'reported; source and scope unverified' in rendered
+        assert 'Reported stage: legally secured; operative terms unverified' in rendered
+        assert 'legally_secured' not in rendered
+        assert not detail.get('json'), 'No internal assessment JSON on the buyer page'
+        assert 'Final approved conditions and tenure terms require checking' in rendered
         assert 'Westshield' in rendered and 'Housing 21' in rendered
         assert 'No applicant/developer organisation identified' not in rendered
         assert 'No applicant/developer/landowner names extracted' not in rendered

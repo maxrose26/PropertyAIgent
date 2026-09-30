@@ -119,7 +119,7 @@ class AHAssessment:
                 'AH Upper Bound': c.upper, 'AH Qualifier': c.qualifier,
                 'AH Evidence State': c.state, 'AH Qualified': c.qualified,
                 'AH Scope': c.scope_label, 'AH Scope Type': c.scope_type,
-                'AH Application': c.application_reference, 'AH Stage': c.stage,
+                'AH Application': c.application_reference, 'AH Stage': self.stage_label(),
                 'AH Source': c.source_url, 'AH Document ID': c.document_id,
                 'AH Document Date': c.document_date, 'AH Passage': c.passage,
                 'AH Review': c.review_reason, 'AH Reported Evidence': self.reported_evidence,
@@ -130,6 +130,23 @@ class AHAssessment:
                 'AH Source Claims': json.dumps(self.source_claims, sort_keys=True),
                 'AH Claim Relationships': json.dumps(self.relationships, sort_keys=True),
                 'AH Selection Reason': self.selection_reason}
+
+    def stage_label(self):
+        # Count provenance is not proof of current operative legal terms. This
+        # contract has no separately reviewed legal-stage evidence field.
+        stage = self.count.stage
+        if not stage:
+            return 'Legal status unknown; operative terms unverified'
+        return f'Reported stage: {stage.replace("_", " ")}; operative terms unverified'
+
+    def evidence_notes(self):
+        c = self.count
+        return (
+            f'Application: {c.application_reference or "unknown"}. Scope: {c.scope_label or "unverified"}.',
+            self.stage_label() + '. Final approved conditions and tenure terms require checking; acquisition availability is not established.',
+            f'Count source: {c.source_url or c.document_id or "not linked"}. Document date: {c.document_date or "unknown"}.',
+            c.review_reason or 'Count evidence does not independently verify legal status, tenure or availability.',
+        )
 
     def label(self):
         c = self.count
@@ -143,7 +160,7 @@ class AHAssessment:
             f'{a.value if a.value is not None else str(a.lower) + "–" + str(a.upper)} ({a.qualifier}; {a.scope_label}; document {a.document_id}; {a.state})'
             for a in self.alternatives)) if self.alternatives else ''
         relationships=''.join(f'; {r["action"]} claim {r["from"]} → {r["to"]}: {r["reason"]}' for r in self.relationships)
-        return f'{value} affordable homes — {c.qualifier}, {c.state}{unverified}; {c.scope_label or "scope unknown"}; {c.application_reference or "application unknown"}; {c.stage or "stage unknown"}; source {c.document_id or c.source_url or "unlinked"}; document date {c.document_date or "unknown"}{reason}{alternatives}{relationships}'
+        return f'{value} affordable homes — {c.qualifier}, {c.state}{unverified}; {c.scope_label or "scope unknown"}; {c.application_reference or "application unknown"}; {self.stage_label()}; source {c.document_id or c.source_url or "unlinked"}; document date {c.document_date or "unknown"}{reason}{alternatives}{relationships}'
 
 
 def legacy_assessment(intelligence=None, *, application_reference=None,

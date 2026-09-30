@@ -35,6 +35,7 @@ class ClassificationPresentationTests(unittest.TestCase):
         self.assertNotIn('confidence: high', ' '.join(captions))
         self.assertEqual(tiles[0][0]['affordable_units'], 72)
         self.assertEqual(scheme.affordable_data_status, 'all_units_affordable')
+        self.assertFalse(any(isinstance(w, dict) for w in writes), 'Internal assessment must not reach buyer UI')
         return captions, writes
 
     def test_focus_exact_component_retains_minimum_and_source_scope(self):
@@ -48,20 +49,19 @@ class ClassificationPresentationTests(unittest.TestCase):
         captions, writes = self.render(a)
         self.assertEqual(a.search(minimum=50), 'meets')
         self.assertEqual(a.count.threshold(73, 'minimum', whole_scheme=False), 'does_not_meet')
-        self.assertIn('exact, verified', captions[0])
-        self.assertIn('DC/093884', captions[0])
-        self.assertIn('proposed', captions[0])
-        self.assertIn('classification requires source and scope review', captions[1])
+        self.assertIn('exact, verified', ' '.join(captions))
+        self.assertIn('DC/093884', ' '.join(captions))
+        self.assertIn('proposed', ' '.join(captions))
+        self.assertIn('classification requires source and scope review', ' '.join(captions))
         # Same public projection consumed by Explore and selected CSV.
-        self.assertEqual(writes[0], a.columns())
-        self.assertEqual(writes[0]['AH Scope Type'], 'component')
-        self.assertTrue(writes[0]['AH Qualified'])
+        self.assertEqual(a.columns()['AH Scope Type'], 'component')
+        self.assertTrue(a.columns()['AH Qualified'])
         self.assertEqual(a.payload(), before)
 
     def test_unlinked_legacy_count_is_not_silently_qualified(self):
         a = legacy_assessment(fields={'affordable_units_final':72, 'affordable_percentage_final':100})
         captions, _ = self.render(a)
-        self.assertIn('reported; source and scope unverified', captions[0])
+        self.assertIn('reported; source and scope unverified', ' '.join(captions))
         self.assertEqual(a.search(minimum=50), 'unknown')
 
     def test_bare_application_report_is_visible_without_replacing_selected_unknown(self):
@@ -70,8 +70,33 @@ class ClassificationPresentationTests(unittest.TestCase):
         captions, writes = self.render(selected, reported=reported)
         self.assertTrue(any('30' in c and 'APP/2' in c and 'reported; source and scope unverified' in c for c in captions))
         self.assertTrue(any('not an operative numeric match' in c for c in captions))
-        self.assertIsNone(writes[0]['AH Reported Count'])
-        self.assertFalse(writes[0]['AH Qualified'])
+        self.assertIsNone(selected.columns()['AH Reported Count'])
+        self.assertFalse(selected.columns()['AH Qualified'])
+
+    def test_actual_focus_legacy_legal_stage_is_reported_not_verified(self):
+        a = legacy_assessment(fields={'affordable_units_final': 72,
+            'affordable_percentage_final': 100, 'affordable_housing_status': 'legally_secured'},
+            application_reference='DC/085997')
+        before = a.payload()
+        captions, writes = self.render(a)
+        self.assertIn('Reported stage: legally secured; operative terms unverified', a.label())
+        self.assertIn('operative terms unverified', a.columns()['AH Stage'])
+        self.assertIn('Final approved conditions and tenure terms require checking', ' '.join(captions))
+        self.assertNotIn('legally_secured', ' '.join(captions))
+        self.assertEqual(a.count.stage, 'legally_secured')
+        self.assertEqual(a.payload(), before)
+        self.assertEqual(a.columns()['AH Reported Count'], 72)
+        self.assertFalse(a.count.qualified)
+        self.assertEqual(a.search(minimum=50), 'unknown')
+        self.assertEqual(a.search(maximum=100), 'unknown')
+
+    def test_qualified_count_does_not_independently_verify_legal_stage(self):
+        a = AHAssessment(count=AHClaim(value=72, qualifier='exact', state='verified',
+            application_reference='DC/093884', scope_type='component', scope_label='Retirement',
+            stage='legally_secured', document_id='statement', passage='72 affordable apartments'))
+        self.assertTrue(a.count.qualified)
+        self.assertIn('operative terms unverified', a.label())
+        self.assertEqual(a.search(minimum=50), 'meets')
 
     def test_absent_assessment_fails_closed(self):
         captions, _ = self.render(None)
@@ -82,7 +107,7 @@ class ClassificationPresentationTests(unittest.TestCase):
             application_reference='LOCAL/1', scope_type='component', scope_label='Retirement',
             stage='proposed', document_id='local', passage='72 affordable apartments'))
         captions, _ = self.render(a, reconciles=True)
-        self.assertIn('classification requires source and scope review', captions[1])
+        self.assertIn('classification requires source and scope review', ' '.join(captions))
 
 
 if __name__ == '__main__':
