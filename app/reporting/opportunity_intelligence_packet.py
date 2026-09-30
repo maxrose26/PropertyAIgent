@@ -289,9 +289,19 @@ def build_opportunity_intelligence_packet(
         )
         recommendation_direction_raw = _scheme_intelligence_field(applications, "recommendation_direction")
         recommendation_direction = FactValue.known(recommendation_direction_raw) if recommendation_direction_raw else FactValue.unknown()
-        affordable_housing_status_raw = _scheme_intelligence_field(applications, "affordable_housing_status")
+        # Rebuild the current application's AH view, never borrow the packet's
+        # legacy fingerprint facts or the first nonempty sibling classification.
+        from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
+        assessment = resolve_operative_filter_facts(
+            build_operative_planning_facts(applications),
+        ).affordable_assessment
+        # Narrow opportunity IDs carry only a site ID, not reviewed AH
+        # application/component scope. Do not reuse the site conclusion.
+        if phase_code or kind != "site":
+            from app.policy.ah_assessment import AHAssessment
+            assessment = AHAssessment()
         affordable_housing_status = (
-            FactValue.known(affordable_housing_status_raw) if affordable_housing_status_raw else FactValue.unknown()
+            FactValue.known(assessment.stage_label()) if assessment.count.stage else FactValue.unknown()
         )
 
         # Strategic-land-only facts are NOT_APPLICABLE for a
@@ -304,10 +314,12 @@ def build_opportunity_intelligence_packet(
         progression_signal = FactValue.not_applicable()
         has_identified_planning_activity = FactValue.not_applicable()
 
-        affordable_units = FactValue.unknown() if facts.affordable_unit_count is None else FactValue.known(facts.affordable_unit_count)
-        affordable_percentage = (
-            FactValue.unknown() if not facts.affordable_percentage_trusted else FactValue.known(facts.affordable_percentage)
+        count = assessment.count
+        affordable_units = (
+            FactValue.known(count.value)
+            if count.qualified and count.qualifier == "exact" and count.scope_type == "whole_site" else FactValue.unknown()
         )
+        affordable_percentage = FactValue.unknown()
 
         acquisition_facts = build_acquisition_position_facts(session, applications)
         actors_control = PacketActorsControl(

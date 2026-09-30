@@ -888,7 +888,7 @@ def _scheme_card(
     build_status_raw = site.build_status if site else None
 
     if operative_facts is not None:
-        filter_facts = resolve_operative_filter_facts(operative_facts)
+        filter_facts = resolve_operative_filter_facts(operative_facts, application_reference=app.reference)
         total_units = filter_facts.units
         affordable_units = filter_facts.affordable_units
         affordable_percentage = filter_facts.affordable_percentage
@@ -1137,6 +1137,7 @@ def _approaching_lapse_cards(session: Session, limit: int) -> list[dict]:
             "metric": f"{days_left} day{'s' if days_left != 1 else ''} left",
             "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else None,
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+            "application_reference": result["granted_app"].reference if result["granted_app"] else None,
         }))
     scored.sort(key=lambda pair: pair[0])
     return [card for _, card in scored[:limit]]
@@ -1205,6 +1206,8 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
             "metric": f"{len(undeveloped)} phase(s) not yet started" if len(undeveloped) > 1 else "Not yet started",
             "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else site.updated_at,
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+            "application_reference": phase["latest_grant"].reference if phase.get("latest_grant") else None,
+            "phase_code": phase["code"],
             # Gate 2B-2B.2 - this scope's OWN deterministically supported
             # unit count (None if genuinely unknown), never the whole
             # site's total. Consumed by app.reporting.opportunity_universe.
@@ -1320,6 +1323,7 @@ def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: 
             "metric": f"Granted {grant_date.strftime('%d %b %Y')}",
             "when": dt.datetime.combine(grant_date, dt.time.min),
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+            "application_reference": granted_app.reference,
         }))
     scored.sort(key=lambda pair: pair[0], reverse=True)  # most recently granted first
     return [card for _, card in scored[:limit]]
@@ -1486,6 +1490,7 @@ def _long_pending_application_cards(
             "metric": f"Submitted {submitted_date.strftime('%d %b %Y')}",
             "when": dt.datetime.combine(submitted_date, dt.time.min),
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+            "application_reference": oldest_app.reference,
         }))
     scored.sort(key=lambda pair: pair[0])  # longest-pending (oldest submission) first
     return [card for _, card in scored[:limit]]

@@ -69,8 +69,12 @@ s.commit()
 variation=app(focus,'DC/093884',None,decision='Granted',date='2024-12-06',kind='condition_variation')
 south=site(25,'oldham','Southlink'); so=app(south,'FUL/355201/25',147,147,100)
 wall=site(32,'oldham','Wall Hill Mill'); wa=app(wall,'OUT/355454/25',26)
-hyde=site(107,'stockport','Hyde Stockport'); old=app(hyde,'DC/095922',440,0,0,'Withdrawn','2025-05-22')
-hy=app(hyde,'DC/098428',440,date='2026-01-15')
+hyde=site(107,'stockport','Hyde Stockport'); old=app(hyde,'DC/095922',440,0,0,'Objection (Consult with Neighbour Auth)','2025-05-22')
+old.status='Unknown'; old.application_type=None
+old.scheme_intelligence.affordable_housing_status='unknown'
+hy=app(hyde,'DC/098428',None,decision='Objection (Consult with Neighbour Auth)',date='2026-02-24')
+hy.status='Unknown'; hy.application_type=None
+s.commit()
 other=site(313,'tameside','Hyde Tameside negative control'); otherapp=app(other,'25/00173/OUT',444,67,15)
 
 SOURCE='https://planning.stockport.gov.uk/PlanningData-live/files/C49A86C04CBC9A23DAE658C0354A907F/pdf/DC_093884-AFFORDABLE_HOUSING_STATEMENT-2378349.pdf'
@@ -153,6 +157,17 @@ assert not explore.get('json')
 single=export_selected(explore,'single-focus.csv')
 assert len(single)==1 and single[0]['AH Application']=='DC/085997'
 assert float(single[0]['AH Reported Count'])==72 and single[0]['Affordable Units']==''
+hyde_index=next(i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']=='Hyde Stockport')
+explore.session_state['sites_table']={'selection':{'rows':[hyde_index]}}
+run(explore)
+hyde_inline=json.dumps(values(explore)); (OUT/'explore-single-hyde.json').write_text(hyde_inline)
+hyde_csv=export_selected(explore,'single-hyde.csv')
+assert hyde_csv[0]['AH Application']=='DC/098428'
+assert hyde_csv[0]['AH Reported Count']=='' and hyde_csv[0]['Affordable Units']==''
+assert '0 affordable homes' not in hyde_csv[0]['AH Assessment']
+assert 'DC/095922' in hyde_csv[0]['Other application AH reports (not current)']
+assert '0 affordable homes' in hyde_csv[0]['Other application AH reports (not current)']
+assert 'Other application AH evidence' in [e.label.split(' —')[0] for e in explore.expander]
 selected=[i for i,r in table(explore).reset_index(drop=True).iterrows() if r['Address']!='Hyde Tameside negative control']
 explore.session_state['sites_table']={'selection':{'rows':selected}}
 run(explore)
@@ -168,6 +183,7 @@ assert byname['Focus School']['AH Stage']=='Reported AH status: legally secured;
 assert 'legally_secured' not in byname['Focus School']['AH Assessment']
 for name in ('Wall Hill Mill','Hyde Stockport'):
     assert byname[name]['AH Reported Count']==''
+assert byname['Hyde Stockport']['AH Application']=='DC/098428'
 assert float(byname['Wall Hill Mill']['Total Units'])==26
 assert '67' not in byname['Hyde Stockport']['AH Assessment']
 for e in explore.checkbox:
@@ -196,6 +212,13 @@ for sid in (78,25,32,107):
     rendered=json.dumps(values(detail));(OUT/f'detail-{sid}.json').write_text(rendered)
     assert 'confidence: high' not in rendered and 'all_units_affordable' not in rendered
     assert 'Not applicable - no affordable homes' not in rendered
+    if sid==107:
+        assert 'stockport \u00b7 DC/098428' in '\n'.join(values(detail)['caption'])
+        assert 'Current preferred version: **DC/098428**' in '\n'.join(values(detail)['caption'])
+        assert 'Source application: DC/095922' in '\n'.join(values(detail)['caption'])
+        assert 'Residential extraction source for totals, housing type and density: DC/095922' in '\n'.join(values(detail)['caption'])
+        assert 'Source application: DC/098428' not in '\n'.join(values(detail)['caption'])
+        assert '0 affordable homes' not in next(x for x in values(detail)['markdown'] if 'unknown affordable homes' in x)
     if sid==78:
         assert 'reported; source and scope unverified' in rendered
         assert 'Reported AH status: legally secured; operative terms unverified' in rendered

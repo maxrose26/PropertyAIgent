@@ -618,6 +618,12 @@ def build_site_profile(
         header["primary_reference"] = active_positions[0].reference.value
     else:
         header["primary_reference"] = rep_app.reference if rep_app else None
+    # Navigation follows the same unambiguous application identity as AH.
+    # The separately labelled consented planning facts are not rewritten.
+    from app.reporting.scheme_reconciliation import selected_ah_application_reference
+    current_ah_reference = selected_ah_application_reference(facts)
+    if current_ah_reference is not None:
+        header["primary_reference"] = current_ah_reference
     # planning_status_label IS a substantive scheme fact - CONSENTED vs
     # ACTIVE are never collapsed (Gate 2B-2A Sections 5-7). A single clear
     # active position is shown as-is; several simultaneous active

@@ -341,22 +341,15 @@ def build_density(scheme: SchemeIntelligence | None) -> dict:
 
 
 def build_current_version(site: Site, apps: list[Application], rep_app: Application | None) -> dict:
-    """Identifies the one Application whose scheme_intelligence this whole
-    module reads from, and why - reusing app.ui.common.
-    pick_representative_application's own already-established selection
-    (passed in as rep_app, computed once by the caller), not a parallel
-    selector. This is the single mechanism that satisfies Part 5's "never
-    mix affordable units from one scheme version with total homes from
-    another": every figure in this module's totals/tenure/bedroom/housing-
-    type sections comes from exactly this one Application's
-    scheme_intelligence row, never blended across applications.
+    """Describe the supplied application identity and retain alternative rows.
 
-    Also surfaces every OTHER application on the Site that has its own
-    scheme_intelligence, as alternative/superseded evidence (never merged
-    into the current figures), and flags a "version conflict" when an
-    alternative's own total/affordable figures materially differ from the
-    current version's - a signal for manual review, never silently
-    resolved."""
+    The caller supplies the current AH application when it is resolved.
+    This identity does not establish the source of other residential
+    metrics: the top-level view separately exposes extraction_reference
+    for its retained totals, housing-type and density extraction.
+    Other application evidence remains attributed and is never merged
+    into the selected application's AH assessment.
+    """
     if rep_app is None:
         return {
             "application_id": None, "reference": None, "why_preferred": None,
@@ -549,11 +542,13 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
     and pick_representative_application already rely on for the same
     `apps` list - this module iterates that same already-loaded data, not a
     fresh query per application."""
-    current_version = build_current_version(site, apps, rep_app)
-    scheme = rep_app.scheme_intelligence if rep_app else None
-
     from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
     assessment = resolve_operative_filter_facts(build_operative_planning_facts(apps)).affordable_assessment
+    current_ah_app = next((a for a in apps if a.reference == assessment.count.application_reference), None)
+    current_version = build_current_version(site, apps, current_ah_app or rep_app)
+    if rep_app is not None and current_ah_app is not rep_app:
+        current_version["why_preferred"] = "Current AH application identity; residential extraction from another application remains separately attributed below."
+    scheme = rep_app.scheme_intelligence if rep_app else None
     # Retain old extraction separately; the headline must use the same operative
     # claim as search, not label a populated representative row "verified".
     affordable_headline = compute_affordable_headline(scheme)
@@ -596,6 +591,7 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
         "affordable_assessment": assessment,
         "reported_affordable_assessment": reported_assessment,
         "current_version": current_version,
+        "extraction_reference": rep_app.reference if rep_app else None,
         "affordable_headline": affordable_headline,
         "tenure": tenure,
         "bedroom_mix": bedroom_mix,

@@ -414,7 +414,7 @@ def _operative_source_scheme_intelligence(operative_facts, applications_by_id: d
     return app.scheme_intelligence if app else None
 
 
-def build_planning_delivery_matching_facts_from_operative(operative_facts, applications: list) -> MatchingFacts:
+def build_planning_delivery_matching_facts_from_operative(operative_facts, applications: list, *, application_reference=None) -> MatchingFacts:
     """Gate 2B-2B.1 - the trusted-facts-aware counterpart to
     build_planning_delivery_matching_facts above, consuming
     app.reporting.scheme_reconciliation.OperativePlanningFacts (already
@@ -471,24 +471,21 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     dev_type = source_si.development_type if source_si else None
     is_specialist = (dev_type in SPECIALIST_DEVELOPMENT_TYPES) if dev_type else None
 
-    # --- affordable housing: consented AH preferred, else (exactly one
-    # active proposal) that proposal's own AH - ah.historical (withdrawn/
-    # refused positions) is never read here, so a withdrawn scheme's AH
-    # figure structurally cannot influence Buyer Fit (Section 8: "withdrawn/
-    # refused AH must NOT influence current Buyer Fit").
+    # AH must belong to the same displayed application, not a prior consent
+    # sharing this Site. Legacy figures remain visible elsewhere as reports;
+    # they are not qualified numeric Buyer Fit inputs. This point-only legacy
+    # MatchingFacts contract cannot safely turn a range/lower bound into a point.
+    from app.reporting.scheme_reconciliation import resolve_operative_filter_facts
+    assessment = resolve_operative_filter_facts(
+        operative_facts, application_reference=application_reference,
+    ).affordable_assessment
+    count = assessment.count
+    current_scope = any(r.reference == count.application_reference and r.decided_state not in ('withdrawn', 'refused')
+                        for r in operative_facts.resolved_applications)
+    affordable_units = count.value if current_scope and count.qualified and count.qualifier == 'exact' and count.scope_type == 'whole_site' else None
+    # Count evidence never independently establishes percentage scope.
     affordable_pct = None
-    affordable_units = None
-    if ah.whole_site is not None:
-        affordable_pct, affordable_units = ah.whole_site.percentage, ah.whole_site.units
-    elif len(active_positions) == 1 and ah.active_whole_site is not None:
-        affordable_pct, affordable_units = ah.active_whole_site.percentage, ah.active_whole_site.units
-    # A trusted, explicitly-evidenced 0% is preserved as 0 (never
-    # discarded) - affordable_trusted is about WHETHER a position was
-    # resolved at all (ah.whole_site/ah.active_whole_site is None whenever
-    # nothing genuinely evidenced was found - see affordable_housing_
-    # scope.py's own _has_no_independent_affordable_position), never about
-    # the resolved value happening to be zero.
-    affordable_trusted = affordable_pct is not None
+    affordable_trusted = False
 
     return MatchingFacts(
         opportunity_type=PLANNING_DELIVERY,

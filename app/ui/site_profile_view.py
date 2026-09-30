@@ -312,7 +312,7 @@ def _evidence_and_reconciliation_section(mix: dict) -> None:
     scheme = mix["scheme"]
     if scheme:
         st.caption(
-            f"Source application: {current_version['reference']} · "
+            f"Source application: {mix.get('extraction_reference') or 'unknown'} · "
             f"reconciliation status: {scheme.unit_reconciliation_status or 'OK'}"
         )
     if current_version["alternatives"]:
@@ -330,6 +330,9 @@ def _render_residential_mix(mix: dict) -> None:
     """The dedicated Residential Mix Intelligence tab (Sprint 4.4
     Amendment, Part 2/6) - suggested section order, each one degrading
     honestly when its evidence doesn't exist rather than a dead panel."""
+    st.caption("Residential extraction source for totals, housing type and density: "
+               + str(mix.get("extraction_reference") or "unknown")
+               + ". This is separate from the current AH application and is not transferred to its AH position.")
     _residential_mix_overview_section(mix)
     st.divider()
     _bedroom_mix_section(mix["bedroom_mix"])

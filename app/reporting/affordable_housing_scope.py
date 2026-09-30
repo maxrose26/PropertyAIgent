@@ -237,13 +237,32 @@ class AffordableHousingSummary:
     source_positions: tuple[AffordablePosition, ...] = ()
 
 
-def select_affordable_position_for_scope(summary, *, phase_code=None, active_position_count=0):
+def select_affordable_position_for_scope(summary, *, phase_code=None, active_position_count=0, application_reference=None):
     """Select one existing coherent position; never inherit whole-site AH into a phase.
 
     Phase opportunity IDs omit phase/parcel kind. If both labels exist for
     the code, identity is ambiguous and the answer remains unknown. A
     same-scope conflict must not fall through to an active proposal.
     """
+    if application_reference is not None:
+        # Displayed application identity is an evidence boundary, independent
+        # of the site's older operative permission or a nearby component.
+        labels = None if phase_code in (None, UNPHASED_LABEL) else {f"Phase {phase_code}", f"Plot {phase_code}"}
+        sources = [p for p in summary.source_positions if p.application_reference == application_reference
+                   and (p.scope_label == 'AH source selection' if labels is None else p.scope_label in labels)]
+        if len(sources) == 1:
+            return sources[0]
+        if sources:
+            return None
+        positions = [p for p in (summary.whole_site, summary.active_whole_site, *summary.phases,
+                                 *summary.active_phases, *summary.historical) if p is not None
+                     and p.application_reference == application_reference
+                     and (p.scope_type in (SCOPE_WHOLE_SITE, SCOPE_UNCLEAR) if labels is None else p.scope_label in labels)]
+        positions.extend(p for c in summary.conflicts for p in c.positions
+                         if p.application_reference == application_reference
+                         and (p.scope_type in (SCOPE_WHOLE_SITE, SCOPE_UNCLEAR) if labels is None else p.scope_label in labels)
+                         and p not in positions)
+        return positions[0] if len(positions) == 1 else None
     source = [p for p in getattr(summary, 'source_positions', ()) if
               (p.scope_label == 'AH source selection' if phase_code in (None, UNPHASED_LABEL)
                else p.scope_label in (f'Phase {phase_code}', f'Plot {phase_code}'))]

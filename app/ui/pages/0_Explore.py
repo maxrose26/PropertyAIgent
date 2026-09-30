@@ -283,7 +283,9 @@ for site in sites:
     # Part 6), and both surfaces now read the identical resolved values.
     headline = build_site_headline(
         site_id=site.id, address=site.display_address, council_label=council_names.get(site.council_code, site.council_code),
-        merged=merged, lapse=lapse, decision_status=None,
+        merged={**merged, "affordable_units_final": filter_facts.affordable_assessment.count.value,
+                "affordable_percentage_final": filter_facts.affordable_assessment.reported_percentage},
+        lapse=lapse, decision_status=None,
         local_plan_status=_local_plan_headline_text(local_plan_by_site.get(site.id, [])),
         operative_total_units=filter_facts.units,
         operative_total_units_not_determined=filter_facts.units_not_determined,
@@ -336,6 +338,7 @@ for site in sites:
         "_ah_assessment": filter_facts.affordable_assessment,
         "AH Assessment": filter_facts.affordable_assessment.label(),
         **filter_facts.affordable_assessment.columns(),
+        "Other application AH reports (not current)": filter_facts.other_application_ah_reports,
         "Affordable Units": filter_facts.affordable_units if filter_facts.affordable_assessment.count.qualified else None,
         "Reported Private Units (unverified legacy scope)": merged["private_units_final"],
         "Affordable %": None,  # No count-level percentage scope provenance in legacy storage.
@@ -625,6 +628,7 @@ def build_report_rows(site_ids: list[int]) -> list[dict]:
             # figure than what a user just filtered by on-screen.
             "AH Assessment": report_filter_facts.affordable_assessment.label(),
             **report_filter_facts.affordable_assessment.columns(),
+            "Other application AH reports (not current)": report_filter_facts.other_application_ah_reports,
             "Affordable Units": report_filter_facts.affordable_units if report_filter_facts.affordable_assessment.count.qualified else None,
             "Reported Private Units (unverified legacy scope)": merged["private_units_final"],
             "Affordable %": None,  # Retained separately as AH Reported Percentage.

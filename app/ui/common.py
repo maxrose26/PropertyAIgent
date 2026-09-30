@@ -768,6 +768,10 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             st.markdown(f"**Affordable housing:** {ah_assessment.label()}")
             from app.ui.ah_evidence import render_ah_evidence
             render_ah_evidence(ah_assessment, st)
+            other_ah = resolve_operative_filter_facts(operative_facts).other_application_ah_reports
+            if other_ah:
+                with st.expander("Other application AH evidence — not applied to this record"):
+                    st.caption(other_ah)
             st.caption("Reported tenure (current approved terms unverified): "
                        + str(ah_assessment.reported_tenure or "unknown"))
             st.markdown(f"**Development type:** {merged['development_type']}")

@@ -313,12 +313,14 @@ def test_withdrawn_only_site_does_not_fall_back_to_current_mix(session):
     # neither a consented nor an active position resolved.
     mix = build_residential_mix(site, [app], rep_app=None)
     assert mix["overview_totals"]["total_homes"] is None
-    assert mix["affordable_headline"]["state"] == "not_identified"
-    # (Section 8, item 7 - final closure micro-fix) current AH remains
-    # "Not identified" and no Structured Summary sentence resurrects the
-    # withdrawn 45/50% figure.
-    assert mix["affordable_headline"]["headline_units"] == "Not identified"
-    assert mix["structured_summary"] is None
+    # The count-first presentation explicitly labels unknown rather than
+    # omitting the summary. It must not resurrect withdrawn 45/50% evidence.
+    assessment = mix["affordable_assessment"]
+    assert assessment.count.value is None
+    assert "unknown affordable homes" in mix["affordable_headline"]["headline_units"]
+    assert "45" not in mix["structured_summary"] and "50%" not in mix["structured_summary"]
+    assert assessment.search(minimum=1) == "unknown"
+    assert assessment.search(maximum=0) == "unknown"
 
 
 def test_eia_screening_only_site_does_not_become_current_mix(session):
@@ -337,18 +339,18 @@ def test_eia_screening_only_site_does_not_become_current_mix(session):
 
     mix = build_residential_mix(site, [app], rep_app=None)
     assert mix["overview_totals"]["total_homes"] is None
-    # (Section 8, item 8 - final closure micro-fix) remains NOT_DETERMINED
-    # end to end - no Structured Summary line at all.
-    assert mix["affordable_headline"]["state"] == "not_identified"
-    assert mix["structured_summary"] is None
+    # An explicit unknown explanation is permitted; screening quantum is not AH.
+    assert mix["affordable_assessment"].count.value is None
+    assert "unknown affordable homes" in mix["structured_summary"]
+    assert "68" not in mix["structured_summary"]
+    assert mix["affordable_assessment"].search(maximum=0) == "unknown"
 
 
 def test_burnage_residential_mix_keeps_concise_reconciled_summary(session):
     """(Section 8, item 9 - final closure micro-fix) Former Burnage
     Cricket Club shape - a genuinely reconciled 13/19.7% consented AH
-    position must keep the original, concise Structured Summary wording -
-    this fix must not make an ordinary reconciled scheme's summary more
-    verbose."""
+    position remains visible but requires count-level source/scope qualification.
+    Arithmetic reconciliation alone does not qualify the legacy figure."""
     site = _site(session)
     app = _app(session, site.id, "142311/FO/2025", proposal="Erection of up to 66 no. dwellings",
                status="Final", decision="Approve", decision_issued_date="Mon 23 Mar 2026",
@@ -357,9 +359,13 @@ def test_burnage_residential_mix_keeps_concise_reconciled_summary(session):
            affordable_housing_status="officer_recommended", core_intelligence_complete=True)
 
     mix = build_residential_mix(site, [app], rep_app=app)
-    assert mix["affordable_headline"]["headline_units"] == "13 affordable homes"
-    assert "13 homes, representing" in mix["structured_summary"]
-    assert "does not reconcile" not in mix["structured_summary"]
+    assert "13 affordable homes" in mix["affordable_headline"]["headline_units"]
+    assert "reported; source and scope unverified" in mix["structured_summary"]
+    assert "representing" not in mix["structured_summary"]
+    assert mix["affordable_assessment"].count.value == 13
+    assert not mix["affordable_assessment"].count.qualified
+    assert mix["affordable_assessment"].search(minimum=10) == "unknown"
+    assert mix["affordable_assessment"].search(maximum=20) == "unknown"
 
 
 def test_pinfold_residential_mix_never_shows_a_false_zero(session):
@@ -382,8 +388,10 @@ def test_pinfold_residential_mix_never_shows_a_false_zero(session):
     assert len(facts.active_positions) == 0
 
     mix = build_residential_mix(site, [app], rep_app=None)
-    assert mix["affordable_headline"]["headline_units"] == "Not identified"
-    assert mix["structured_summary"] is None
+    assert "unknown affordable homes" in mix["affordable_headline"]["headline_units"]
+    assert mix["affordable_assessment"].count.value is None
+    assert "0 affordable homes" not in mix["structured_summary"]
+    assert mix["affordable_assessment"].search(maximum=0) == "unknown"
 
 
 def test_not_determined_does_not_invoke_legacy_fallback_in_site_profile_mix_resolution(session):
@@ -513,14 +521,20 @@ def test_brixham_end_to_end_tile_and_structured_summary_agree(session):
     assert mix["percentage_reconciliation"]["percentage_reconciles"] is False
 
     value, caption = format_affordable_tile(mix["affordable_headline"], mix["percentage_reconciliation"])
-    assert value == "54 affordable homes"
-    assert caption == "Recorded percentage requires review"
-    assert "40%" not in caption
-
-    assert "54 homes" in mix["structured_summary"]
-    assert "37% on-site" in mix["structured_summary"]
-    assert "3% financial contribution" in mix["structured_summary"]
+    assert "54 affordable homes" in value
+    assert "reported; source and scope unverified" in value
+    assert "40%" not in (caption or "")
+    assert "54 affordable homes" in mix["structured_summary"]
     assert "representing 40" not in mix["structured_summary"]
+    assessment = mix["affordable_assessment"]
+    assert assessment.count.value == 54 and not assessment.count.qualified
+    assert assessment.search(minimum=50) == "unknown"
+    assert assessment.search(maximum=60) == "unknown"
+    # Preserve the source's on-site/contribution distinction separately;
+    # neither becomes a verified whole-scheme percentage or tenure count.
+    assert "37% on-site" in assessment.reported_tenure
+    assert "3% financial contribution" in assessment.reported_tenure
+    assert assessment.reported_percentage == 40.0
 
 
 # --- 14-17: AH semantics -----------------------------------------------------
