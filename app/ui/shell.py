@@ -773,8 +773,8 @@ def _scheme_stack_card(card: dict, *, rank: int, key: str) -> None:
         badge_cols = st.columns(4)
         badge_fields = [
             ("total_units", lambda v: f"{v} units"),
-            ("affordable_units", lambda v: f"{v} affordable"),
-            ("affordable_percentage", lambda v: f"{v:.0f}% affordable"),
+            ("affordable_units", lambda v: f"Reported AH count: {v} (source and scope unverified)"),
+            ("affordable_percentage", lambda v: f"Reported AH percentage: {v:.0f}% (scope unverified)"),
             ("decision_status", lambda v: v),
             ("build_status", lambda v: v),
             ("planning_status", lambda v: v),
@@ -866,11 +866,12 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(card["signal"], "info"), card.get("signal_label") or card["signal"])
         buyer_fit = card.get("buyer_fit")
         if buyer_fit is not None:
-            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), buyer_fit.classification.replace("_", " ").title())
+            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), "Existing-policy fit: " + buyer_fit.classification.replace("_", " ").title())
+            st.caption("This existing-policy result does not verify AH count source or scope, final tenure terms or acquisition availability.")
         if card.get("headline_reason"):
             st.write(card["headline_reason"])
         if buyer_fit is not None and buyer_fit.matches:
-            st.caption("Why it fits: " + " · ".join(buyer_fit.matches[:2]))
+            st.caption("Existing-policy reasons (AH qualification unverified): " + " · ".join(buyer_fit.matches[:2]))
 
         if card.get("metrics"):
             cols = st.columns(len(card["metrics"]))

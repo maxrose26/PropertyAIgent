@@ -885,7 +885,7 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
             candidates.append((role, split_name))
 
     if not candidates:
-        st.info("No applicant/developer/landowner names extracted yet for this site.")
+        st.info("No party names in the extracted application-summary fields. Document-backed roles are shown separately when recorded.")
 
     for role, name in candidates:
         company = enriched_by_key.get((role, companies_house.normalise_name(name)))

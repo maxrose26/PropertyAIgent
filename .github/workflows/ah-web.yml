@@ -1,0 +1,32 @@
+name: AH web-only acceptance
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ah-web-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned dependencies
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/ah-web-venv"
+      - name: Focused tests and actual rendered CSV
+        run: bash verification/web_ah/check.sh "$RUNNER_TEMP/ah-web-venv/bin/python" "$RUNNER_TEMP/ah-web-evidence"
+      - name: Test summary
+        if: always()
+        run: python3 verification/ci/summary.py "$RUNNER_TEMP/ah-web-evidence" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ah-web-${{ github.sha }}
+          path: ${{ runner.temp }}/ah-web-evidence
+          if-no-files-found: error
+          retention-days: 7
