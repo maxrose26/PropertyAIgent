@@ -25,12 +25,13 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 12
     env:
       AH_REHEARSAL_NONPRODUCTION: YES_DISPOSABLE_ONLY
-      AH_SERVICE_ID: ${{ job.services.postgres.id }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Fail closed on wrong branch or inherited production inputs
+        env:
+          AH_SERVICE_ID: ${{ job.services.postgres.id }}
         run: |
           python3 -c 'import os; from pathlib import Path; from verification.production_readiness.ci_guard import validate_environment; validate_environment(os.environ,Path.cwd())'
       - name: Install minimal pinned driver
@@ -39,9 +40,13 @@ jobs:
           "$RUNNER_TEMP/ah-native-venv/bin/pip" install -r verification/production_readiness/requirements-native.txt
           "$RUNNER_TEMP/ah-native-venv/bin/pip" check
       - name: Execute guarded native rehearsal
+        env:
+          AH_SERVICE_ID: ${{ job.services.postgres.id }}
         run: |
           "$RUNNER_TEMP/ah-native-venv/bin/python" -m verification.production_readiness.native_rehearsal "$RUNNER_TEMP/ah-native-evidence"
       - name: Stop disposable service and record cleanup
+        env:
+          AH_SERVICE_ID: ${{ job.services.postgres.id }}
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/ah-native-evidence"
