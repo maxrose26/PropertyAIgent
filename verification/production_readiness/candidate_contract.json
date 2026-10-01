@@ -11,6 +11,6 @@
     "ci_guard.py": "97a24800081929df7ee98f8abc80baf176703acb6cecb0271ae8eed2d50e013c",
     "catalog_verifier.py": "4f466ec9f6e0ace295b0de72f582d12e825259659bc876da6b53205d1044e37c",
     "requirements-native.txt": "caa57e19055f58f9a890edfb490a0a1fb9f050280b16f722979216d6d54a8d29",
-    "native-postgres.workflow.yml": "e678c31b68c89388b4275fdcc4046a9d9b996edfde27b314ae5fbebba12e7d3b"
+    "native-postgres.workflow.yml": "1bb8b7def34472634571fb74bb8eb1cfef1aefa7374e3c30aabb15312dcd6e0c"
   }
 }
