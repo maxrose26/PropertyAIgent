@@ -42,6 +42,23 @@ def evidence_hash(c):
     return {t:{'count':len(rows),'sha256':digest(rows)} for t in ('ah_source_claims','ah_claim_events')
        for rows in [[list(r) for r in c.execute('SELECT row_to_json(t)::text FROM '+t+' t ORDER BY id').fetchall()]]}
 
+def probe_append_only(c,forbidden):
+    """Separate FK rejection from trigger enforcement; never accept one as the other."""
+    before=evidence_hash(c)
+    for table in ('ah_source_claims','ah_claim_events'):
+        for op in ('UPDATE '+table+' SET id=id','DELETE FROM '+table):
+            forbidden(c,'trigger-'+op,op,states=('P0001',))
+    # The events FK intercepts a lone claims TRUNCATE before statement triggers.
+    forbidden(c,'fk-TRUNCATE ah_source_claims','TRUNCATE ah_source_claims',states=('0A000',))
+    # Include the dependent table explicitly, without CASCADE, to reach triggers.
+    op='TRUNCATE ah_source_claims,ah_claim_events'
+    forbidden(c,'trigger-'+op,op,states=('P0001',))
+    op='TRUNCATE ah_claim_events'
+    forbidden(c,'trigger-'+op,op,states=('P0001',))
+    after=evidence_hash(c)
+    if after!=before: raise AssertionError('Forbidden mutation changed evidence')
+    return {'before':before,'after':after}
+
 def main(out):
     out.mkdir(parents=True,exist_ok=False)
     results=[];authority=None;created=[]
@@ -194,11 +211,8 @@ def main(out):
             c.execute('INSERT INTO documents VALUES(2)');passed('registrar-document-only')
             forbidden(c,'registrar-claim-insert-denied','INSERT INTO ah_source_claims DEFAULT VALUES')
         with authority.connect(names['target']) as c:
-            before=evidence_hash(c)
-            for table in ('ah_source_claims','ah_claim_events'):
-                for op in ('UPDATE '+table+' SET id=id','DELETE FROM '+table,'TRUNCATE '+table):
-                    forbidden(c,'trigger-'+op,op,states=('P0001',))
-            if evidence_hash(c)!=before: raise AssertionError('Forbidden mutation changed evidence')
+            hashes=probe_append_only(c,forbidden)
+            write('append-only-hashes.json',hashes)
             passed('append-only-triggers-preserve-hashes')
         # Demonstrate revocation waiting on an in-flight writer, then bounded rollback and disable.
         with authority.connect(names['target'],'ah_ci_importer') as writer, authority.connect(names['target']) as admin:
@@ -224,8 +238,8 @@ def main(out):
     finally:
         write('case-results.json',results)
         for name,prefixes in {'permission-report.json':('ah_ci','reader','registrar','bounded','role','runtime','named','out-of'),
-          'append-only-report.json':('append','trigger'), 'drift-repeatability-report.json':('drift','second','partial','mismatch','reference'),
-          'disable-report.json':('disable','in-flight')}.items(): write(name,[r for r in results if r['case'].startswith(prefixes)])
+          'append-only-report.json':('append','trigger','fk-'), 'drift-repeatability-report.json':('drift','second','partial','mismatch','reference'),
+          'disable-report.json':('disable','in-flight')}.items(): write(name,[r for r in results if r['case'].startswith(prefixes) or (name=='disable-report.json' and '-disabled-' in r['case'])])
         cleanup={'databases_dropped':[],'service_stop':'workflow always step required'}
         if authority:
             try:

@@ -7,7 +7,7 @@
     "security_contract.sql": "107ae3684f440c8e4f2dfa787fb109b3218cfa00159bd80c4d388ee209c9432e",
     "local_role_probe.sql": "889ae166b6ecf77123822bc7261fbb84f7dd98967bb9d9d5176e6edd477f1ca4",
     "native_exporter.py": "88d323ee2a8a057ae922aebd7cf34f57240e827355f2982c2a248962c1f8c42a",
-    "native_rehearsal.py": "01348d18472f70eb50dc996e3417957cd23439581c8488741129ea6272930b1f",
+    "native_rehearsal.py": "b64e498d11d246acc26f0da6cc9051260540fa91c7ba27427b5dfc8bfd54dd5d",
     "ci_guard.py": "97a24800081929df7ee98f8abc80baf176703acb6cecb0271ae8eed2d50e013c",
     "catalog_verifier.py": "4f466ec9f6e0ace295b0de72f582d12e825259659bc876da6b53205d1044e37c",
     "requirements-native.txt": "caa57e19055f58f9a890edfb490a0a1fb9f050280b16f722979216d6d54a8d29",
