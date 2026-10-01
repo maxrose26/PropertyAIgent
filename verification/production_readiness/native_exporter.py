@@ -30,7 +30,7 @@ WITH RECURSIVE base_rel AS (
 ), seed_roles(oid) AS (
  SELECT oid FROM pg_catalog.pg_roles WHERE rolname=ANY(%s::text[])
  UNION SELECT relowner FROM rel UNION SELECT proowner FROM fun
- UNION SELECT a.grantee FROM rel r CROSS JOIN LATERAL aclexplode(coalesce(r.relacl,acldefault(CASE WHEN r.relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,r.relowner))) a WHERE a.grantee<>0
+ UNION SELECT a.grantee FROM rel r CROSS JOIN LATERAL aclexplode(coalesce(r.relacl,acldefault(CASE WHEN r.relkind='S' THEN 's'::"char" ELSE 'r'::"char" END,r.relowner))) a WHERE a.grantee<>0
  UNION SELECT a.grantee FROM fun f CROSS JOIN LATERAL aclexplode(coalesce(f.proacl,acldefault('f',f.proowner))) a WHERE a.grantee<>0
  UNION SELECT x.grantee FROM rel r JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid CROSS JOIN LATERAL aclexplode(c.attacl) x WHERE x.grantee<>0
  UNION SELECT x.grantor FROM rel r CROSS JOIN LATERAL aclexplode(r.relacl) x
@@ -107,7 +107,7 @@ QUERIES = {
  FROM rel r JOIN pg_catalog.pg_policy p ON p.polrelid=r.oid""",
 'acl': """SELECT 'relation' AS kind,(SELECT quote_ident(nspname) FROM pg_catalog.pg_namespace WHERE oid=r.relnamespace)||'.'||quote_ident(r.relname) AS identity,NULL::text AS column_name,
  pg_get_userbyid(a.grantor) AS grantor,CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END AS grantee,a.privilege_type,a.is_grantable
- FROM rel r CROSS JOIN LATERAL aclexplode(coalesce(r.relacl,acldefault(CASE WHEN r.relkind='S' THEN 'S'::"char" ELSE 'r'::"char" END,r.relowner))) a
+ FROM rel r CROSS JOIN LATERAL aclexplode(coalesce(r.relacl,acldefault(CASE WHEN r.relkind='S' THEN 's'::"char" ELSE 'r'::"char" END,r.relowner))) a
  UNION ALL SELECT 'column',(SELECT quote_ident(nspname) FROM pg_catalog.pg_namespace WHERE oid=r.relnamespace)||'.'||quote_ident(r.relname),c.attname,pg_get_userbyid(a.grantor),CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,a.privilege_type,a.is_grantable
  FROM rel r JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid CROSS JOIN LATERAL aclexplode(c.attacl) a
  UNION ALL SELECT 'function',(SELECT quote_ident(nspname) FROM pg_catalog.pg_namespace WHERE oid=f.pronamespace)||'.'||quote_ident(f.proname)||'('||pg_get_function_identity_arguments(f.oid)||')',NULL,

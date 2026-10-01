@@ -1,0 +1,16 @@
+{
+  ".github/workflows/ah-native-postgres.yml": "702839b2350dfdb43cf2ad5f3c65b22ecca42e08cf06377fcf37fc0172d0b377",
+  "verification/production_readiness/production_security/004_production_proposal.sql": "c01d6457b7e165dd968cc93d55d0112d04606a7f9f5a595f0d2fe5b316631386",
+  "verification/production_readiness/production_security/005_verify_security.sql": "adc8c08d5dbb4a0e0010293b47e1bf75773d0b2f9c0903ce5912e0f524a010ba",
+  "verification/production_readiness/production_security/final_guard.py": "3d2832eef942b43754d8c311d76b985caa390875101f1e49e2aa864b42d3d7c4",
+  "verification/production_readiness/production_security/final_rehearsal.py": "9eb74777f44b7209705763fd1ecec0effa24c122f151a4e4120835e6d2a18d65",
+  "verification/production_readiness/production_security/test_final_rehearsal.py": "dd8b8b5116c492d342448777a4ea0a81ff867708eb6d1ee751d779b9f88fcba1",
+  "verification/production_readiness/native_exporter.py": "d330b4146c0927cd67221f0bbe6d3b755c365305bb67008af7ec0b3e73f4e442",
+  "verification/production_readiness/catalog_verifier.py": "4f466ec9f6e0ace295b0de72f582d12e825259659bc876da6b53205d1044e37c",
+  "verification/production_readiness/expected_schema.json": "b08ffd876d817b0f092d58a1da93124ae4cda0d2fd8efc2412c57a5355fe51be",
+  "verification/production_readiness/reference_security.sql": "8411226e188eb45a147cadb3ef8d073d6f709eb55929726e3829880af0ec5cf6",
+  "verification/production_readiness/local_role_probe.sql": "889ae166b6ecf77123822bc7261fbb84f7dd98967bb9d9d5176e6edd477f1ca4",
+  "verification/production_readiness/requirements-native.txt": "caa57e19055f58f9a890edfb490a0a1fb9f050280b16f722979216d6d54a8d29",
+  "verification/production_readiness/native_rehearsal.py": "b64e498d11d246acc26f0da6cc9051260540fa91c7ba27427b5dfc8bfd54dd5d",
+  "verification/production_readiness/ci_guard.py": "97a24800081929df7ee98f8abc80baf176703acb6cecb0271ae8eed2d50e013c"
+}
