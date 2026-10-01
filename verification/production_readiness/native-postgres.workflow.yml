@@ -1,0 +1,57 @@
+# REVIEW ARTIFACT ONLY. Publication and dispatch require separate approval.
+name: AH disposable native rehearsal
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ah-native-rehearsal
+  cancel-in-progress: false
+jobs:
+  rehearse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ah_ci_bootstrap
+          POSTGRES_DB: ah_ci_bootstrap
+          POSTGRES_PASSWORD: ah-ci-disposable-only
+        ports:
+          - '127.0.0.1::5432'
+        options: >-
+          --health-cmd "pg_isready -U ah_ci_bootstrap -d ah_ci_bootstrap"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      AH_REHEARSAL_NONPRODUCTION: YES_DISPOSABLE_ONLY
+      AH_SERVICE_ID: ${{ job.services.postgres.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fail closed on wrong branch or inherited production inputs
+        run: |
+          python3 -c 'import os; from pathlib import Path; from verification.production_readiness.ci_guard import validate_environment; validate_environment(os.environ,Path.cwd())'
+      - name: Install minimal pinned driver
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ah-native-venv"
+          "$RUNNER_TEMP/ah-native-venv/bin/pip" install -r verification/production_readiness/requirements-native.txt
+          "$RUNNER_TEMP/ah-native-venv/bin/pip" check
+      - name: Execute guarded native rehearsal
+        run: |
+          "$RUNNER_TEMP/ah-native-venv/bin/python" -m verification.production_readiness.native_rehearsal "$RUNNER_TEMP/ah-native-evidence"
+      - name: Stop disposable service and record cleanup
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/ah-native-evidence"
+          docker stop "$AH_SERVICE_ID"
+          docker inspect --format '{{json .State}}' "$AH_SERVICE_ID" > "$RUNNER_TEMP/ah-native-evidence/service-stop.json"
+          test "$(docker inspect --format '{{.State.Running}}' "$AH_SERVICE_ID")" = false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ah-native-${{ github.sha }}
+          path: ${{ runner.temp }}/ah-native-evidence/
+          if-no-files-found: error
+          retention-days: 7
