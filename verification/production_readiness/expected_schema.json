@@ -1,0 +1,78 @@
+{
+  "ah_source_claims": {
+    "ddl": "\nCREATE TABLE ah_source_claims (\n\tid SERIAL NOT NULL, \n\tschema_version INTEGER DEFAULT '1' NOT NULL, \n\tapplication_id INTEGER NOT NULL, \n\tsite_id INTEGER, \n\tscheme_application_id INTEGER NOT NULL, \n\tscope_kind VARCHAR(20) NOT NULL, \n\tscope_key VARCHAR(200) NOT NULL, \n\tscope_label VARCHAR(300) NOT NULL, \n\tscope_basis TEXT NOT NULL, \n\tmetric VARCHAR(30) NOT NULL, \n\ttenure_name VARCHAR(100), \n\tqualifier VARCHAR(20) NOT NULL, \n\tvalue NUMERIC(18, 6), \n\tlower_bound NUMERIC(18, 6), \n\tupper_bound NUMERIC(18, 6), \n\tunknown_reason TEXT, \n\tdocument_id INTEGER NOT NULL, \n\tdocument_url_snapshot TEXT, \n\tdocument_title_snapshot TEXT, \n\tdocument_content_hash VARCHAR(64), \n\tdocument_date DATE, \n\tdocument_date_missing_reason TEXT, \n\tpassage_text TEXT NOT NULL, \n\tpassage_locator TEXT NOT NULL, \n\tpage_start INTEGER, \n\tpage_end INTEGER, \n\textracted_text_hash VARCHAR(64), \n\tpassage_start INTEGER, \n\tpassage_end INTEGER, \n\tpassage_hash VARCHAR(64) NOT NULL, \n\tplanning_stage VARCHAR(20) NOT NULL, \n\tstage_document_id INTEGER, \n\tstage_passage_text TEXT, \n\tstage_passage_locator TEXT, \n\torigin_kind VARCHAR(20) NOT NULL, \n\torigin_reference VARCHAR(200) NOT NULL, \n\textractor_version VARCHAR(200), \n\tcreated_by VARCHAR(200) NOT NULL, \n\trecorded_at TIMESTAMP WITH TIME ZONE NOT NULL, \n\timport_key VARCHAR(200) NOT NULL, \n\tpayload_hash VARCHAR(64) NOT NULL, \n\tPRIMARY KEY (id), \n\tCONSTRAINT uq_ah_import_key UNIQUE (import_key), \n\tCONSTRAINT ah_schema_v1 CHECK (schema_version = 1), \n\tCONSTRAINT ah_metric CHECK (metric IN ('affordable_count','tenure_count')), \n\tCONSTRAINT ah_tenure CHECK ((metric='tenure_count' AND tenure_name IS NOT NULL AND length(trim(tenure_name))>0) OR (metric='affordable_count' AND tenure_name IS NULL)), \n\tCONSTRAINT ah_scope_kind CHECK (scope_kind IN ('whole_scheme','component','phase','unclear')), \n\tCONSTRAINT ah_scope_key CHECK ((scope_kind='whole_scheme' AND scope_key='WHOLE_SCHEME') OR (scope_kind='unclear' AND scope_key='UNRESOLVED') OR (scope_kind IN ('component','phase') AND scope_key NOT IN ('WHOLE_SCHEME','UNRESOLVED'))), \n\tCONSTRAINT ah_stage CHECK (planning_stage IN ('proposed','approved','legally_secured','unresolved')), \n\tCONSTRAINT ah_origin CHECK (origin_kind IN ('reviewed_import','extraction')), \n\tCONSTRAINT ah_quantity_shape CHECK ((qualifier IN ('exact','approximate') AND value IS NOT NULL AND lower_bound IS NULL AND upper_bound IS NULL AND unknown_reason IS NULL) OR (qualifier='range' AND value IS NULL AND lower_bound IS NOT NULL AND upper_bound IS NOT NULL AND lower_bound<=upper_bound AND unknown_reason IS NULL) OR (qualifier='at_least' AND value IS NULL AND lower_bound IS NOT NULL AND upper_bound IS NULL AND unknown_reason IS NULL) OR (qualifier='up_to' AND value IS NULL AND lower_bound IS NULL AND upper_bound IS NOT NULL AND unknown_reason IS NULL) OR (qualifier='unknown' AND value IS NULL AND lower_bound IS NULL AND upper_bound IS NULL AND unknown_reason IS NOT NULL AND length(trim(unknown_reason))>0)), \n\tCONSTRAINT ah_value CHECK (value IS NULL OR (value >= 0 AND value < 1000000000000)), \n\tCONSTRAINT ah_lower_bound CHECK (lower_bound IS NULL OR (lower_bound >= 0 AND lower_bound < 1000000000000)), \n\tCONSTRAINT ah_upper_bound CHECK (upper_bound IS NULL OR (upper_bound >= 0 AND upper_bound < 1000000000000)), \n\tCONSTRAINT ah_date CHECK ((document_date IS NULL AND document_date_missing_reason IS NOT NULL AND length(trim(document_date_missing_reason))>0) OR (document_date IS NOT NULL AND document_date_missing_reason IS NULL)), \n\tCONSTRAINT ah_pages CHECK ((page_start IS NULL AND page_end IS NULL) OR (page_start IS NOT NULL AND page_end IS NOT NULL AND page_start>0 AND page_end>=page_start)), \n\tCONSTRAINT ah_offsets CHECK ((passage_start IS NULL AND passage_end IS NULL) OR (passage_start IS NOT NULL AND passage_end IS NOT NULL AND extracted_text_hash IS NOT NULL AND passage_start>=0 AND passage_end>passage_start)), \n\tCONSTRAINT ah_stage_source CHECK ((stage_document_id IS NULL AND stage_passage_text IS NULL AND stage_passage_locator IS NULL) OR (stage_document_id IS NOT NULL AND stage_passage_text IS NOT NULL AND stage_passage_locator IS NOT NULL AND length(trim(stage_passage_text))>0 AND length(trim(stage_passage_locator))>0)), \n\tFOREIGN KEY(application_id) REFERENCES applications (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(site_id) REFERENCES sites (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(scheme_application_id) REFERENCES applications (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(document_id) REFERENCES documents (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(stage_document_id) REFERENCES documents (id) ON DELETE RESTRICT, \n\tCONSTRAINT ah_nonempty_scope_key CHECK (length(trim(scope_key))>0), \n\tCONSTRAINT ah_nonempty_scope_label CHECK (length(trim(scope_label))>0), \n\tCONSTRAINT ah_nonempty_scope_basis CHECK (length(trim(scope_basis))>0), \n\tCONSTRAINT ah_nonempty_passage_text CHECK (length(trim(passage_text))>0), \n\tCONSTRAINT ah_nonempty_passage_locator CHECK (length(trim(passage_locator))>0), \n\tCONSTRAINT ah_nonempty_origin_reference CHECK (length(trim(origin_reference))>0), \n\tCONSTRAINT ah_nonempty_created_by CHECK (length(trim(created_by))>0), \n\tCONSTRAINT ah_nonempty_import_key CHECK (length(trim(import_key))>0), \n\tCONSTRAINT ah_hex_document_content_hash CHECK (document_content_hash IS NULL OR (length(document_content_hash)=64 AND length(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(document_content_hash,'0',''),'1',''),'2',''),'3',''),'4',''),'5',''),'6',''),'7',''),'8',''),'9',''),'a',''),'b',''),'c',''),'d',''),'e',''),'f',''))=0)), \n\tCONSTRAINT ah_hex_extracted_text_hash CHECK (extracted_text_hash IS NULL OR (length(extracted_text_hash)=64 AND length(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(extracted_text_hash,'0',''),'1',''),'2',''),'3',''),'4',''),'5',''),'6',''),'7',''),'8',''),'9',''),'a',''),'b',''),'c',''),'d',''),'e',''),'f',''))=0)), \n\tCONSTRAINT ah_hex_passage_hash CHECK (passage_hash IS NULL OR (length(passage_hash)=64 AND length(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(passage_hash,'0',''),'1',''),'2',''),'3',''),'4',''),'5',''),'6',''),'7',''),'8',''),'9',''),'a',''),'b',''),'c',''),'d',''),'e',''),'f',''))=0)), \n\tCONSTRAINT ah_hex_payload_hash CHECK (payload_hash IS NULL OR (length(payload_hash)=64 AND length(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(payload_hash,'0',''),'1',''),'2',''),'3',''),'4',''),'5',''),'6',''),'7',''),'8',''),'9',''),'a',''),'b',''),'c',''),'d',''),'e',''),'f',''))=0))\n)\n\n",
+    "indexes": [
+      "CREATE INDEX ix_ah_application_metric ON ah_source_claims (application_id, metric)",
+      "CREATE INDEX ix_ah_context ON ah_source_claims (site_id, scheme_application_id, scope_kind, scope_key, metric)",
+      "CREATE INDEX ix_ah_document ON ah_source_claims (document_id)",
+      "CREATE INDEX ix_ah_payload ON ah_source_claims (payload_hash)"
+    ],
+    "columns": [
+      "id",
+      "schema_version",
+      "application_id",
+      "site_id",
+      "scheme_application_id",
+      "scope_kind",
+      "scope_key",
+      "scope_label",
+      "scope_basis",
+      "metric",
+      "tenure_name",
+      "qualifier",
+      "value",
+      "lower_bound",
+      "upper_bound",
+      "unknown_reason",
+      "document_id",
+      "document_url_snapshot",
+      "document_title_snapshot",
+      "document_content_hash",
+      "document_date",
+      "document_date_missing_reason",
+      "passage_text",
+      "passage_locator",
+      "page_start",
+      "page_end",
+      "extracted_text_hash",
+      "passage_start",
+      "passage_end",
+      "passage_hash",
+      "planning_stage",
+      "stage_document_id",
+      "stage_passage_text",
+      "stage_passage_locator",
+      "origin_kind",
+      "origin_reference",
+      "extractor_version",
+      "created_by",
+      "recorded_at",
+      "import_key",
+      "payload_hash"
+    ]
+  },
+  "ah_claim_events": {
+    "ddl": "\nCREATE TABLE ah_claim_events (\n\tid SERIAL NOT NULL, \n\tclaim_id INTEGER NOT NULL, \n\tsequence INTEGER NOT NULL, \n\tprevious_event_id INTEGER, \n\taction VARCHAR(20) NOT NULL, \n\trelated_claim_id INTEGER, \n\treversed_event_id INTEGER, \n\tsource_checked BOOLEAN NOT NULL, \n\tscope_checked BOOLEAN NOT NULL, \n\tstage_checked BOOLEAN NOT NULL, \n\tactor_id VARCHAR(200) NOT NULL, \n\treason TEXT NOT NULL, \n\trecorded_at TIMESTAMP WITH TIME ZONE NOT NULL, \n\trequest_key VARCHAR(200) NOT NULL, \n\trequest_hash VARCHAR(64) NOT NULL, \n\tPRIMARY KEY (id), \n\tCONSTRAINT uq_ah_sequence UNIQUE (claim_id, sequence), \n\tCONSTRAINT uq_ah_request UNIQUE (request_key), \n\tCONSTRAINT ah_sequence CHECK (sequence>0), \n\tCONSTRAINT ah_previous CHECK ((sequence=1 AND previous_event_id IS NULL) OR (sequence>1 AND previous_event_id IS NOT NULL)), \n\tCONSTRAINT ah_action CHECK (action IN ('ACCEPT','REJECT','NEEDS_REVIEW','WITHDRAW','CORRECT','SUPERSEDE','CONFLICT','REVERSE_LINK')), \n\tCONSTRAINT ah_relation CHECK ((action IN ('CORRECT','SUPERSEDE','CONFLICT') AND related_claim_id IS NOT NULL AND related_claim_id<>claim_id AND reversed_event_id IS NULL) OR (action='REVERSE_LINK' AND reversed_event_id IS NOT NULL AND related_claim_id IS NULL) OR (action IN ('ACCEPT','REJECT','NEEDS_REVIEW','WITHDRAW') AND related_claim_id IS NULL AND reversed_event_id IS NULL)), \n\tCONSTRAINT ah_check_flags CHECK ((action='ACCEPT' AND source_checked AND scope_checked) OR (action<>'ACCEPT' AND NOT source_checked AND NOT scope_checked AND NOT stage_checked)), \n\tCONSTRAINT ah_event_nonempty CHECK (length(trim(actor_id))>0 AND length(trim(reason))>0 AND length(trim(request_key))>0), \n\tCONSTRAINT ah_request_hash CHECK (length(request_hash)=64), \n\tFOREIGN KEY(claim_id) REFERENCES ah_source_claims (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(previous_event_id) REFERENCES ah_claim_events (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(related_claim_id) REFERENCES ah_source_claims (id) ON DELETE RESTRICT, \n\tFOREIGN KEY(reversed_event_id) REFERENCES ah_claim_events (id) ON DELETE RESTRICT\n)\n\n",
+    "indexes": [
+      "CREATE INDEX ix_ah_related ON ah_claim_events (related_claim_id)",
+      "CREATE INDEX ix_ah_reversed ON ah_claim_events (reversed_event_id)"
+    ],
+    "columns": [
+      "id",
+      "claim_id",
+      "sequence",
+      "previous_event_id",
+      "action",
+      "related_claim_id",
+      "reversed_event_id",
+      "source_checked",
+      "scope_checked",
+      "stage_checked",
+      "actor_id",
+      "reason",
+      "recorded_at",
+      "request_key",
+      "request_hash"
+    ]
+  }
+}
