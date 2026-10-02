@@ -38,6 +38,8 @@ import streamlit as st
 from app.ui.shell import PRODUCT_NAME, inject_global_styles, render_footer
 
 st.set_page_config(page_title=PRODUCT_NAME, page_icon="🏠", layout="wide")
+from app.ui.access import admitted_actor
+actor=admitted_actor(controls=False)
 inject_global_styles()
 st.logo("🏠", size="medium")
 
@@ -55,8 +57,8 @@ local_plan_page = st.Page("pages/3_Local_Plan_Sites.py", title="Allocation Disco
 # not a persistent top-level tab (a V1 workflow step, not a standing
 # destination in its own right yet).
 shortlist_page = st.Page("pages/3b_Shortlist.py", title="Shortlist", icon="⭐", visibility="hidden")
-council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️")
-review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗")
+council_operations_page = st.Page("pages/4_Council_Dashboard.py", title="Council Operations", icon="⚙️", visibility="visible" if actor.role == "operator" else "hidden")
+review_links_page = st.Page("pages/2_Review_Site_Links.py", title="Site Matching", icon="🔗", visibility="visible" if actor.role == "operator" else "hidden")
 
 pg = st.navigation(
     {

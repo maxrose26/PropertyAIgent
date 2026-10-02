@@ -448,6 +448,9 @@ def run_one_council(
     return run
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('run_daily_councils')
 def main() -> int:
     args = parse_args()
     # "[mem] orchestrator.start" (Render Daily Discovery missing-runtime-

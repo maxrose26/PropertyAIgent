@@ -1,0 +1,94 @@
+{
+  "scripts/run_daily_councils.py": {
+    "command": "run_daily_councils",
+    "required_scope": "launch:run_daily_councils"
+  },
+  "scripts/run_intelligence_processing.py": {
+    "command": "run_intelligence_processing",
+    "required_scope": "launch:run_intelligence_processing"
+  },
+  "scripts/run_historical_rebuild_to_completion.py": {
+    "command": "run_historical_rebuild_to_completion",
+    "required_scope": "launch:run_historical_rebuild_to_completion"
+  },
+  "scripts/sync_opportunity_monitoring.py": {
+    "command": "sync_opportunity_monitoring",
+    "required_scope": "launch:sync_opportunity_monitoring"
+  },
+  "app/pipeline/run_weekly.py": {
+    "command": "run_weekly",
+    "required_scope": "launch:run_weekly"
+  },
+  "app/policy/monitor.py": {
+    "command": "monitor",
+    "required_scope": "launch:monitor"
+  },
+  "scripts/apply_pr2_allocation_match_review.py": {
+    "command": "apply_pr2_allocation_match_review",
+    "required_scope": "launch:apply_pr2_allocation_match_review"
+  },
+  "scripts/dry_run_gm_allocation_site_matching.py": {
+    "command": "dry_run_gm_allocation_site_matching",
+    "required_scope": "launch:dry_run_gm_allocation_site_matching"
+  },
+  "scripts/dry_run_gm_allocation_site_relationships.py": {
+    "command": "dry_run_gm_allocation_site_relationships",
+    "required_scope": "launch:dry_run_gm_allocation_site_relationships"
+  },
+  "scripts/cleanup_allocation_site_relationships.py": {
+    "command": "cleanup_allocation_site_relationships",
+    "required_scope": "launch:cleanup_allocation_site_relationships"
+  },
+  "scripts/register_policy_sources.py": {
+    "command": "register_policy_sources",
+    "required_scope": "launch:register_policy_sources"
+  },
+  "scripts/populate_control_relationships.py": {
+    "command": "populate_control_relationships",
+    "required_scope": "launch:populate_control_relationships"
+  },
+  "scripts/bootstrap_acquisition_monitoring.py": {
+    "command": "bootstrap_acquisition_monitoring",
+    "required_scope": "launch:bootstrap_acquisition_monitoring"
+  },
+  "scripts/backfill_buyer_mandate_b1_defaults.py": {
+    "command": "backfill_buyer_mandate_b1_defaults",
+    "required_scope": "launch:backfill_buyer_mandate_b1_defaults"
+  },
+  "scripts/migrate_buyer_profiles_to_mandates.py": {
+    "command": "migrate_buyer_profiles_to_mandates",
+    "required_scope": "launch:migrate_buyer_profiles_to_mandates"
+  },
+  "scripts/generate_allocation_intelligence_summaries.py": {
+    "command": "generate_allocation_intelligence_summaries",
+    "required_scope": "launch:generate_allocation_intelligence_summaries"
+  },
+  "scripts/run_agent_evaluation_benchmark.py": {
+    "command": "run_agent_evaluation_benchmark",
+    "required_scope": "launch:run_agent_evaluation_benchmark"
+  },
+  "scripts/refresh_intelligence_application.py": {
+    "command": "refresh_intelligence_application",
+    "required_scope": "launch:refresh_intelligence_application"
+  },
+  "scripts/rebuild_intelligence.py": {
+    "command": "rebuild_intelligence",
+    "required_scope": "launch:rebuild_intelligence"
+  },
+  "scripts/reextract_failed_documents.py": {
+    "command": "reextract_failed_documents",
+    "required_scope": "launch:reextract_failed_documents"
+  },
+  "scripts/dry_run_gm_allocation_document_evidence.py": {
+    "command": "dry_run_gm_allocation_document_evidence",
+    "required_scope": "launch:dry_run_gm_allocation_document_evidence"
+  },
+  "app/policy/extract_plan_evidence.py": {
+    "command": "extract_plan_evidence",
+    "required_scope": "launch:extract_plan_evidence"
+  },
+  "app/visuals/extract_site_plans.py": {
+    "command": "extract_site_plans",
+    "required_scope": "launch:extract_site_plans"
+  }
+}

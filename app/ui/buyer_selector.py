@@ -56,8 +56,18 @@ def buyer_selector(*, key: str, session) -> str | None:
         "Viewing opportunities for", labels, index=labels.index(current_label), key=f"buyer-selector-{key}",
     )
     if chosen_label == GENERIC_OPTION_LABEL:
+        if current is not None:
+            from app.ui.access import clear_view_state
+            clear_view_state()
+            st.session_state[ACTIVE_BUYER_SESSION_KEY] = None
+            st.rerun()
         st.session_state[ACTIVE_BUYER_SESSION_KEY] = None
         return None
     chosen_key = next(k for k, display_name in options if display_name == chosen_label)
+    if current != chosen_key:
+        from app.ui.access import clear_view_state
+        clear_view_state()
+        st.session_state[ACTIVE_BUYER_SESSION_KEY] = chosen_key
+        st.rerun()
     st.session_state[ACTIVE_BUYER_SESSION_KEY] = chosen_key
     return chosen_key

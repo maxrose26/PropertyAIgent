@@ -666,5 +666,6 @@ def to_csv_bytes(context: AllocationReportContext) -> bytes:
     writer = csv.DictWriter(buffer, fieldnames=CSV_COLUMNS)
     writer.writeheader()
     for row in to_csv_rows(context):
-        writer.writerow(row)
+        from app.reporting.csv_safety import safe_cell
+        writer.writerow({k:safe_cell(v) for k,v in row.items()})
     return buffer.getvalue().encode("utf-8-sig")  # BOM so Excel opens UTF-8 (e.g. "é", "—") correctly

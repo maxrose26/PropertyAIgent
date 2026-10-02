@@ -284,6 +284,9 @@ SUMMARY_SCHEMA = {
 }
 
 
+from app.security.commands import command
+
+@command('scheme.summary', paid=True)
 def generate_scheme_summary(
     client: OpenAI, site: Site, applications: list[Application], merged: dict, lapse: dict, phase_breakdown: list[dict],
     *, prospective_overrides: dict[int, dict] | None = None,

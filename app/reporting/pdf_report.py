@@ -48,7 +48,7 @@ class AggregateStats:
     site_count: int
     total_units: int
     total_affordable_units: int
-    total_private_units: int
+    total_private_units: int | None
     overall_affordable_pct: float | None
     decision_counts: dict[str, int]
     lapse_counts: dict[str, int]
@@ -67,7 +67,9 @@ def compute_aggregate_stats(df: pd.DataFrame, top_n: int = 5, highlight_n: int =
     Developer columns)."""
     total_units = int(df["Total Units"].fillna(0).sum())
     total_affordable = int(df["Affordable Units"].fillna(0).sum())
-    total_private = int(df["Private Units"].fillna(0).sum())
+    # The accepted AH projection deliberately labels legacy private counts as
+    # unverified. Never upgrade that column or derive a private count by subtraction.
+    total_private = int(df["Private Units"].fillna(0).sum()) if "Private Units" in df else None
     overall_pct = round(100 * total_affordable / total_units, 1) if total_units else None
 
     decision_counts = df["decision_status"].value_counts().to_dict()
@@ -153,7 +155,7 @@ VERIFIED AGGREGATE FIGURES (do not alter these numbers):
 - Schemes in this report: {stats.site_count}
 - Total units across all schemes: {stats.total_units}
 - Total affordable units: {stats.total_affordable_units} ({stats.overall_affordable_pct}% of total, where known)
-- Total private units: {stats.total_private_units}
+- Total private units: {_or_unknown(stats.total_private_units, 'unknown (no qualified private-unit count)')}
 - Decision status breakdown: {stats.decision_counts}
 - Lapse/commencement risk breakdown: {stats.lapse_counts}
 - Schemes approaching or past their commencement deadline (landowner may need to sell or re-apply): {stats.lapsing_count}
@@ -196,6 +198,9 @@ NARRATIVE_SCHEMA = {
 }
 
 
+from app.security.commands import command
+
+@command('report.narrative', paid=True)
 def generate_narrative(client: OpenAI, stats: AggregateStats, search_description: str | None = None) -> dict[str, str]:
     """One structured-output LLM call - returns {"EXECUTIVE SUMMARY": "...", "BUYING OPPORTUNITIES AND RISKS": "..."}.
 
@@ -206,6 +211,8 @@ def generate_narrative(client: OpenAI, stats: AggregateStats, search_description
     line about as often as it puts them on separate lines, so an exact
     line-match parser silently dropped whole sections (returned {}) on a
     real live report rather than raising an error."""
+    from app.security.access import require_operator
+    require_operator('report.narrative', paid=True)
     prompt = build_narrative_prompt(stats, search_description)
     response = client.responses.create(
         model=MODEL, input=prompt,
@@ -267,7 +274,7 @@ def _stats_table(stats: AggregateStats, styles) -> Table:
         ("Schemes", str(stats.site_count)),
         ("Total units", f"{stats.total_units:,}"),
         ("Affordable units", f"{stats.total_affordable_units:,}" + (f" ({stats.overall_affordable_pct}%)" if stats.overall_affordable_pct is not None else "")),
-        ("Private units", f"{stats.total_private_units:,}"),
+        ("Private units", f"{stats.total_private_units:,}" if stats.total_private_units is not None else "Unknown"),
         ("Decision status", _labelled(stats.decision_counts, DECISION_STATUS_LABELS)),
         ("Lapse/commencement risk", _labelled(stats.lapse_counts, _LAPSE_STATUS_TEXT_LABELS)),
         ("Buying opportunities flagged", f"{stats.lapsing_count} lapsing/approaching + {stats.early_stage_count} not yet decided"),

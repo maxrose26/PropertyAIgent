@@ -161,6 +161,8 @@ def _run_execute(session, args: argparse.Namespace) -> None:
     targets = _select_targets(session, args)
     print(f"targets considered: {len(targets)}")
 
+    from app.security.access import require_operator
+    require_operator('pipeline.processing', paid=True)
     client = OpenAI()  # reads OPENAI_API_KEY from the environment, same convention as every other AI call site in this codebase
 
     generated = regenerated_count = skipped = errors = rejected = 0
@@ -199,6 +201,9 @@ def _run_execute(session, args: argparse.Namespace) -> None:
     print("EXECUTE COMPLETE")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('generate_allocation_intelligence_summaries')
 def main() -> None:
     args = parse_args()
 

@@ -230,6 +230,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+from app.security.commands import command
+
+@command('pipeline.processing', paid=True)
 def process_intelligence_backlog(
     session,
     councils: dict[str, CouncilConfig],
@@ -550,6 +553,9 @@ def process_intelligence_backlog(
     return run
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('run_intelligence_processing')
 def main() -> None:
     args = parse_args()
     init_db()

@@ -183,6 +183,9 @@ def run_real_benchmark(cases: list[BenchmarkCase], configs: list[ModelConfig], r
     return records
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('run_agent_evaluation_benchmark')
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--models", required=True, help="comma-separated model specs, e.g. gpt-4o-mini,gpt-5.6-terra:medium")

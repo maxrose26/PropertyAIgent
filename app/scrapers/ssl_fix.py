@@ -22,6 +22,9 @@ from __future__ import annotations
 import socket
 import ssl
 import tempfile
+import json
+import subprocess
+from app.security import outbound
 from pathlib import Path
 
 import certifi
@@ -36,7 +39,13 @@ _verify_bundle_cache: dict[str, str] = {}
 
 def _fetch_leaf_cert(hostname: str, port: int = 443):
     ctx = ssl._create_unverified_context()
-    with socket.create_connection((hostname, port), timeout=15) as sock:
+    policy=json.loads((Path(__file__).resolve().parents[2]/"config/document_origins.json").read_text())
+    prefixes=policy["https"].get(hostname,[])
+    if port != 443 or not prefixes:
+        raise outbound.DestinationDenied("Certificate destination denied.")
+    outbound.destination("https://"+hostname+prefixes[0])
+    address=outbound.resolved_addresses(hostname,port)[0]
+    with socket.create_connection((address, port), timeout=15) as sock:
         with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
             der = ssock.getpeercert(binary_form=True)
     return x509.load_der_x509_certificate(der, default_backend())
@@ -51,7 +60,11 @@ def get_verify_bundle_for_host(hostname: str) -> str:
         return _verify_bundle_cache[hostname]
 
     try:
-        requests.head(f"https://{hostname}", timeout=15, verify=certifi.where())
+        policy=json.loads((Path(__file__).resolve().parents[2]/"config/document_origins.json").read_text())
+        prefixes=policy["https"].get(hostname,[])
+        if not prefixes: raise outbound.DestinationDenied("Certificate destination denied.")
+        response=outbound.DocumentSession().request("HEAD",f"https://{hostname}"+prefixes[0],timeout=15,verify=certifi.where())
+        response.close()
         _verify_bundle_cache[hostname] = certifi.where()
         return certifi.where()
     except requests.exceptions.SSLError:
@@ -73,16 +86,31 @@ def get_verify_bundle_for_host(hostname: str) -> str:
         if not issuer_url:
             raise ValueError("certificate has no CA Issuers URL to fetch a missing intermediate from")
 
-        intermediate_der = requests.get(issuer_url, timeout=15).content
+        response=outbound.get(issuer_url,timeout=15,stream=True)
+        try:
+            intermediate_der=b""
+            for chunk in response.iter_content(16384):
+                intermediate_der+=chunk
+                if len(intermediate_der)>1024*1024: raise ValueError("Issuer certificate too large")
+        finally:
+            response.close()
         intermediate_cert = x509.load_der_x509_certificate(intermediate_der, default_backend())
+        if intermediate_cert.issuer == intermediate_cert.subject:
+            raise ValueError("AIA cannot add a trust root")
         intermediate_pem = intermediate_cert.public_bytes(encoding=serialization.Encoding.PEM)
+        # Verify the fetched issuer against existing roots before using it;
+        # unauthenticated AIA content never establishes trust.
+        with tempfile.TemporaryDirectory(prefix="propertyaigent-ca-") as directory:
+            candidate=Path(directory)/"intermediate.pem"
+            candidate.write_bytes(intermediate_pem)
+            subprocess.run(["openssl","verify","-CAfile",certifi.where(),str(candidate)],check=True,timeout=15,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 
         combined = Path(tempfile.gettempdir()) / f"deal_finder_ca_bundle_{hostname}.pem"
         combined.write_bytes(Path(certifi.where()).read_bytes() + b"\n" + intermediate_pem)
-        print(f"    [ssl-fix] {hostname} sent an incomplete cert chain - fetched its missing intermediate from {issuer_url}")
+        print(f"    [ssl-fix] {hostname}: verified missing intermediate against existing roots")
         _verify_bundle_cache[hostname] = str(combined)
         return str(combined)
     except Exception as e:
-        print(f"    [ssl-fix] could not work around {hostname}'s cert chain ({e}) - falling back to standard verification")
+        print(f"    [ssl-fix] {hostname}: certificate repair unavailable; standard verification retained")
         _verify_bundle_cache[hostname] = certifi.where()
         return certifi.where()

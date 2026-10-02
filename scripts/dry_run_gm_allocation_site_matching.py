@@ -66,6 +66,9 @@ def _print_result(result) -> None:
         _print_candidate(candidate, indent="      (near-miss) ")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('dry_run_gm_allocation_site_matching')
 def main() -> None:
     args = parse_args()
 

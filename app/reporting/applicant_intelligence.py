@@ -1204,6 +1204,9 @@ _NOT_RESEARCHED_SUMMARY = (
 )
 
 
+from app.security.commands import command
+
+@command('applicant.intelligence', paid=True)
 def generate_applicant_intelligence(
     session: Session, client, context: ApplicantIdentityContext, *, force: bool = False,
 ) -> ApplicantIntelligenceResult:

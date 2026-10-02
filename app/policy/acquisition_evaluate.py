@@ -306,7 +306,8 @@ def _run_llm_and_validate(
 
     if client is None:
         from openai import OpenAI
-        client = OpenAI()
+        from app.security.commands import bounded_provider
+        client = bounded_provider(OpenAI(), "evaluation.run")
 
     start = time.perf_counter() if collect_telemetry else None
     api_call_count = 0
@@ -412,6 +413,9 @@ def _empty_telemetry(model: str, reasoning_effort: str | None) -> EvaluationExec
     )
 
 
+from app.security.commands import command
+
+@command('evaluation.run', paid=True)
 def evaluate(
     session, *, mandate, mandate_key: str, mandate_fingerprint: str,
     acquisition_type: str, opportunity, opportunity_fingerprint: str,
@@ -437,6 +441,7 @@ def evaluate(
     return result
 
 
+@command('evaluation.run', paid=True)
 def evaluate_with_telemetry(
     session, *, mandate, mandate_key: str, mandate_fingerprint: str,
     acquisition_type: str, opportunity, opportunity_fingerprint: str,
@@ -465,6 +470,7 @@ def evaluate_with_telemetry(
     )
 
 
+@command('evaluation.run', paid=True)
 def evaluate_frozen_input_with_telemetry(
     *, context, key: AgentEvaluationResultKey, client=None, model: str = MODEL, reasoning_effort: str | None = None,
     mandate_fingerprint: str = "benchmark", opportunity_fingerprint: str = "benchmark",

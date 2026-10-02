@@ -110,16 +110,20 @@ def _write_artefacts(results: list[AllocationEvidenceResult], output_dir: Path) 
             "multi_site_flag", "evidenced_site_ids", "positive_hit_count", "contradictory_hit_count",
         ])
         for r in results:
-            writer.writerow([
+            from app.reporting.csv_safety import safe_cell
+            writer.writerow([safe_cell(value) for value in [
                 r.allocation_id, r.council, r.policy_reference or "", r.allocation_name,
                 r.stage2a_classification, r.recommended_outcome, r.contradiction_flag,
                 r.multi_site_flag, ";".join(str(s) for s in sorted(r.evidenced_site_ids)),
                 len(r.positive_hits), len(r.contradictory_hits),
-            ])
+            ]])
 
     return json_path, csv_path
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('dry_run_gm_allocation_document_evidence')
 def main() -> None:
     args = parse_args()
     init_db()

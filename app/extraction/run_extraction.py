@@ -77,6 +77,9 @@ def _call_llm(client: OpenAI, prompt: str, schema: dict) -> dict:
     return _sanitise_null_like_strings(json.loads(response.output_text))
 
 
+from app.security.commands import command
+
+@command('pipeline.extract', paid=True)
 def run_extraction_for_application(client: OpenAI, application: Application) -> dict | None:
     documents: list[Document] = [d for d in application.documents if d.text_extracted and d.extracted_text]
     if not documents:

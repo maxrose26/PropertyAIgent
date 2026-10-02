@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "https": {
+    "account.rochdale.gov.uk": [
+      "/"
+    ],
+    "arcusbe.manchester.gov.uk": [
+      "/"
+    ],
+    "live-iag-static-assets.s3.eu-west-1.amazonaws.com": [
+      "/pdf/Local+Plan+evidence/"
+    ],
+    "pa.trafford.gov.uk": [
+      "/"
+    ],
+    "pad-planning.bury.gov.uk": [
+      "/"
+    ],
+    "paplanning.bolton.gov.uk": [
+      "/"
+    ],
+    "planning.bury.gov.uk": [
+      "/"
+    ],
+    "planning.stockport.gov.uk": [
+      "/"
+    ],
+    "planning.wigan.gov.uk": [
+      "/"
+    ],
+    "planningpa.oldham.gov.uk": [
+      "/"
+    ],
+    "publicaccess.tameside.gov.uk": [
+      "/"
+    ],
+    "salfordcitycouncil.my.site.com": [
+      "/"
+    ],
+    "tcintunestorage01.blob.core.windows.net": [
+      "/tc-drupal-repo/"
+    ],
+    "www.bolton.gov.uk": [
+      "/"
+    ],
+    "www.bury.gov.uk": [
+      "/"
+    ],
+    "www.greatermanchester-ca.gov.uk": [
+      "/"
+    ],
+    "www.manchester.gov.uk": [
+      "/"
+    ],
+    "www.oldham.gov.uk": [
+      "/"
+    ],
+    "www.rochdale.gov.uk": [
+      "/"
+    ],
+    "www.salford.gov.uk": [
+      "/"
+    ],
+    "www.stockport.gov.uk": [
+      "/"
+    ],
+    "www.tameside.gov.uk": [
+      "/"
+    ],
+    "www.trafford.gov.uk": [
+      "/"
+    ],
+    "www.wigan.gov.uk": [
+      "/"
+    ]
+  },
+  "http": {}
+}

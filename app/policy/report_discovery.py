@@ -23,6 +23,7 @@ import json
 from urllib.parse import urljoin
 
 import requests
+from app.security import outbound
 from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -103,6 +104,9 @@ def extract_document_links(html: str, base_url: str) -> list[dict]:
     return [{"url": url, "link_text": text} for url, text in seen.items()]
 
 
+from app.security.commands import command
+
+@command('documents.write')
 def register_discovered_reports(session: Session, source: MonitoredSource, links: list[dict]) -> dict:
     """For each discovered link: a URL already known to this source (any
     status - current or superseded, since a superseded row still means
@@ -202,6 +206,7 @@ def register_discovered_reports(session: Session, source: MonitoredSource, links
     return counts
 
 
+@command('documents.write')
 def discover_reports_for_source(session: Session, source: MonitoredSource, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict:
     """Fetches source.url, extracts document links, and registers any
     genuinely new ones. Returns register_discovered_reports' counts plus
@@ -209,7 +214,7 @@ def discover_reports_for_source(session: Session, source: MonitoredSource, timeo
     now = dt.datetime.now(dt.timezone.utc)
     source.last_checked = now
     try:
-        response = requests.get(source.url, timeout=timeout, headers=REQUEST_HEADERS)
+        response = outbound.get(source.url, timeout=timeout, headers=REQUEST_HEADERS)
         response.raise_for_status()
     except requests.RequestException:
         last_ok = source.last_successful_check
@@ -238,6 +243,7 @@ def _naive(value: dt.datetime) -> dt.datetime:
     return value.replace(tzinfo=None) if value.tzinfo else value
 
 
+@command('documents.write')
 def check_report_for_changes(session: Session, report: MonitoredReport, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> str:
     """Checks report.url for a content change. Returns "first_check",
     "unchanged", "changed", or "failed".
@@ -253,7 +259,7 @@ def check_report_for_changes(session: Session, report: MonitoredReport, timeout:
     report.last_checked = now
 
     try:
-        response = requests.get(report.url, timeout=timeout, headers=REQUEST_HEADERS)
+        response = outbound.get(report.url, timeout=timeout, headers=REQUEST_HEADERS)
         response.raise_for_status()
     except requests.RequestException:
         last_ok = report.last_successful_check
@@ -312,6 +318,7 @@ def check_report_for_changes(session: Session, report: MonitoredReport, timeout:
     return outcome
 
 
+@command('documents.write')
 def discover_reports_for_council(session: Session, council_code: str, timeout: int = DEFAULT_TIMEOUT_SECONDS, force: bool = False) -> dict:
     """Runs discover_reports_for_source for every active, due index-page
     MonitoredSource belonging to this council. Part 3: "the monitoring
@@ -336,6 +343,7 @@ def discover_reports_for_council(session: Session, council_code: str, timeout: i
     return totals
 
 
+@command('documents.write')
 def check_reports_for_council(session: Session, council_code: str, timeout: int = DEFAULT_TIMEOUT_SECONDS, force: bool = False) -> dict:
     """Re-checks every "current"-status MonitoredReport for this council
     that's due, for a same-URL replacement (Part 2.5)."""

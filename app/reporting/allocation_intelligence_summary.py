@@ -1723,6 +1723,9 @@ def _persisted_summary_result(summary: AllocationIntelligenceSummary, *, regener
     )
 
 
+from app.security.commands import command
+
+@command('allocation.summary', paid=True)
 def generate_allocation_intelligence_summary(
     session: Session, client, allocation: LocalPlanSite, *, force: bool = False,
 ) -> AllocationSummaryResult:
@@ -1741,6 +1744,8 @@ def generate_allocation_intelligence_summary(
     actually succeeds, so "row exists but headline is None" and "row does
     not exist yet" both correctly mean "no summary has ever been
     generated" (see should_regenerate_allocation_summary)."""
+    from app.security.access import require_operator
+    require_operator('allocation.summary', paid=True)
     context = build_allocation_context(session, allocation)
     fingerprint = compute_context_fingerprint(context)
 

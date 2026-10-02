@@ -76,6 +76,8 @@ EVIDENCE_SNIPPET_MAX_CHARS = 320
 # and an S106 legal-deed statement of the same nominal role never collapse
 # onto the same wording.
 _ROLE_LABEL_BY_EVIDENCE_CATEGORY: dict[str, str] = {
+    "DOCUMENT_DELIVERY_PARTY": "Developer / delivery party stated in document",
+    "DOCUMENT_PROPOSED_OPERATOR": "Housing association / proposed operator stated in document",
     "CERTIFICATE_A_APPLICANT_OWNER_DECLARATION": "Planning ownership declaration",
     "S106_DEFINED_OWNER": "S106 Owner",
     "S106_DEFINED_DEVELOPER": "S106 Developer",

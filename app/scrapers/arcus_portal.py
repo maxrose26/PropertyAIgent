@@ -267,7 +267,7 @@ class ArcusDocumentRow:
 MAX_FILE_PAGES = 20  # safety cap - a genuinely huge application (100+ docs) tops out well under this
 
 
-def parse_document_rows(page: Page) -> list[ArcusDocumentRow]:
+def parse_document_rows(page: Page, *, document_guard=None) -> list[ArcusDocumentRow]:
     """Walks every Files-tab page (Next link) - confirmed a real case where
     a 126-unit scheme showed only 1 of its real 111 documents (the default
     page size is 20), because this previously only ever read the current
@@ -301,15 +301,24 @@ def parse_document_rows(page: Page) -> list[ArcusDocumentRow]:
             break
         try:
             classes = next_link.first.evaluate("el => el.className") or ""
-        except Exception:
+        except Exception as exc:
+            if document_guard is not None:
+                document_guard.check()
+                from app.security.document_browser import DocumentBrowserFailure
+                raise DocumentBrowserFailure("Document pagination failed.") from exc
             break
         if "disabled" in classes:
             break
         try:
+            if document_guard is not None:document_guard.operation(30)
             next_link.first.click()
             page.wait_for_load_state("networkidle", timeout=30000)
             page.wait_for_timeout(1000)
-        except Exception:
+        except Exception as exc:
+            if document_guard is not None:
+                document_guard.check()
+                from app.security.document_browser import DocumentBrowserFailure
+                raise DocumentBrowserFailure("Document pagination failed.") from exc
             break
 
     return docs

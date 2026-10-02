@@ -88,6 +88,9 @@ def _find_default_workspace(session) -> Workspace | None:
     return session.execute(select(Workspace).order_by(Workspace.id.asc())).scalars().first()
 
 
+from app.security.commands import command
+
+@command('buyer.write')
 def resolve_default_workspace(session) -> Workspace:
     """Idempotent get-or-create for the single default Workspace this
     still-single-user installation needs - mirrors app.db.models.Settings'
@@ -96,10 +99,16 @@ def resolve_default_workspace(session) -> Workspace:
     scripts.bootstrap_acquisition_monitoring step, never from an ordinary
     request/page-load path (same "migrations/seeding are not a page-load
     side effect" discipline as scripts.migrate_schema)."""
-    workspace = _find_default_workspace(session)
+    from app.security.access import require_operator
+    require_operator('buyer.write')
+    from app.security.access import current_actor
+    actor=current_actor()
+    from app.services.authorised_reads import require_workspace_write
+    require_workspace_write(session,actor.workspace_id)
+    workspace=session.get(Workspace,actor.workspace_id)
     if workspace is not None:
         return workspace
-    workspace = Workspace(name=DEFAULT_WORKSPACE_NAME, status="active")
+    workspace=Workspace(id=actor.workspace_id,name=DEFAULT_WORKSPACE_NAME,status="active")
     session.add(workspace)
     session.commit()
     return workspace
@@ -356,6 +365,7 @@ def _apply_b1_defaults_if_missing(mandate: BuyerMandate, template: BuyerMandateP
 
 # --- Seeding --------------------------------------------------------------
 
+@command('buyer.write')
 def seed_default_buyer_profiles(session, workspace: Workspace) -> list[BuyerMandate]:
     """Idempotent: creates a Buyer + one BuyerMandate (mandate_key=
     DEFAULT_MANDATE_KEY) for every template in app.policy.buyer_profiles.
@@ -395,10 +405,15 @@ def seed_default_buyer_profiles(session, workspace: Workspace) -> list[BuyerMand
     this - they still, correctly, describe when the mandate's assess_
     buyer_fit conclusions were last genuinely reviewed, which this
     backfill does not do."""
+    from app.security.access import require_operator
+    require_operator('buyer.write')
+    from app.services.authorised_reads import require_workspace_write
+    require_workspace_write(session, workspace.id)
     existing_buyers = {
         b.buyer_key: b
         for b in session.execute(select(Buyer).where(Buyer.workspace_id == workspace.id)).scalars()
     }
+    assigned_ids=require_workspace_write(session,workspace.id,new_buyers=sum(key not in existing_buyers for key in BUYER_PROFILE_ORDER))
     mandates: list[BuyerMandate] = []
     created_any = False
     for key in BUYER_PROFILE_ORDER:
@@ -406,7 +421,7 @@ def seed_default_buyer_profiles(session, workspace: Workspace) -> list[BuyerMand
         validate_geography_councils(session, template.geography_councils)
         buyer = existing_buyers.get(key)
         if buyer is None:
-            buyer = Buyer(**_template_to_buyer_fields(template, workspace.id))
+            buyer = Buyer(id=next(assigned_ids),**_template_to_buyer_fields(template, workspace.id))
             session.add(buyer)
             session.flush()  # obtain buyer.id for the mandate FK below
             created_any = True
@@ -464,17 +479,12 @@ def list_active_buyer_options(session) -> list[tuple[str, str]]:
     def _sort_key(buyer: Buyer) -> tuple[int, int]:
         return (order_index.get(buyer.buyer_key, len(order_index)), buyer.id)
 
-    workspace = _find_default_workspace(session)
-    if workspace is not None:
-        buyers = session.execute(
-            select(Buyer)
-            .join(BuyerMandate, BuyerMandate.buyer_id == Buyer.id)
-            .where(Buyer.workspace_id == workspace.id, Buyer.status == "active", BuyerMandate.status == "active")
-            .distinct()
-        ).scalars().all()
-        if buyers:
-            return [(b.buyer_key, b.display_name) for b in sorted(buyers, key=_sort_key)]
-    return [(key, BUYER_PROFILES[key].display_name) for key in BUYER_PROFILE_ORDER]
+    from app.services.authorised_reads import buyer_query
+    with session.no_autoflush:
+        buyers = session.execute(buyer_query().join(BuyerMandate, BuyerMandate.buyer_id == Buyer.id).where(BuyerMandate.status == "active").distinct()).scalars().all()
+    from app.security.access import require_admitted
+    require_admitted()
+    return [(b.buyer_key, b.display_name) for b in sorted(buyers, key=_sort_key)]
 
 
 def _resolve_default_mandate_for_buyer(session, buyer: Buyer) -> BuyerMandate | None:
@@ -502,20 +512,14 @@ def get_buyer_profile_dataclass(session, profile_key: str) -> BuyerMandatePolicy
     directly. Parameter name/shape unchanged from before Phase A
     (`profile_key`, a plain string) - callers across the UI/opportunity
     feed need no changes at all."""
-    workspace = _find_default_workspace(session)
-    if workspace is not None:
-        buyer = session.execute(
-            select(Buyer).where(
-                Buyer.workspace_id == workspace.id,
-                Buyer.buyer_key == profile_key,
-                Buyer.status == "active",
-            )
-        ).scalars().first()
-        if buyer is not None:
-            mandate = _resolve_default_mandate_for_buyer(session, buyer)
-            if mandate is not None:
-                return mandate_to_policy(mandate)
-    return BUYER_PROFILES.get(profile_key)
+    from app.services.authorised_reads import buyer_by_key
+    buyer = buyer_by_key(session, profile_key)
+    with session.no_autoflush:
+        mandate = _resolve_default_mandate_for_buyer(session, buyer)
+    from app.security.access import require_admitted
+    result=mandate_to_policy(mandate) if mandate is not None else None
+    require_admitted()
+    return result
 
 
 # --- Onboarding baseline ---------------------------------------------------
@@ -536,6 +540,7 @@ class OnboardingBaselineResult:
         self.summary_line = summary_line
 
 
+@command('buyer.write')
 def run_buyer_onboarding_baseline(
     session, mandate: BuyerMandate, *,
     page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE,
@@ -575,6 +580,10 @@ def run_buyer_onboarding_baseline(
     onboarding_summary and commits; creates no BuyerOpportunityAssessment
     row (a future gate's own responsibility, explicitly out of scope
     here, unchanged from before Phase A)."""
+    from app.security.access import require_operator
+    require_operator('buyer.write')
+    from app.services.authorised_reads import mandate_by_id, persistent_id
+    mandate = mandate_by_id(session,persistent_id(mandate))
     policy = mandate_to_policy(mandate)
     if universe is None:
         universe = build_current_opportunity_universe(session, page_size=page_size)
@@ -636,6 +645,7 @@ def is_buyer_mandate_baseline_stale(mandate: BuyerMandate) -> bool:
 is_buyer_profile_baseline_stale = is_buyer_mandate_baseline_stale
 
 
+@command('buyer.write')
 def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE) -> dict:
     """The single Gate 1 entry point (scripts.bootstrap_acquisition_
     monitoring's own only call) - the ONE canonical, safe sequence (Gate 1
@@ -663,6 +673,14 @@ def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATE
     already prints as "profile_key") - Phase A's one-mandate-per-buyer
     migration makes buyer_key and this mandate's own identity equivalent
     in every case that exists today."""
+    from app.security.access import require_operator
+    require_operator('buyer.write')
+    from app.services.authorised_reads import require_workspace_write
+    from app.security.access import current_actor
+    require_workspace_write(session,current_actor().workspace_id,new_buyers=0)
+    with session.no_autoflush:
+        existing_keys=set(session.execute(select(Buyer.buyer_key).where(Buyer.workspace_id==current_actor().workspace_id)).scalars())
+    require_workspace_write(session,current_actor().workspace_id,new_buyers=sum(key not in existing_keys for key in BUYER_PROFILE_ORDER))
     global_baseline = sync_opportunity_monitoring_state(session, page_size=page_size)
 
     workspace = resolve_default_workspace(session)
@@ -713,6 +731,7 @@ def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATE
 
 # --- Phase B1 one-time backfill: structural fields onto pre-B1 mandates ----
 
+@command('buyer.write')
 def backfill_buyer_mandate_b1_defaults(session, *, dry_run: bool = True) -> dict:
     """Reporting/execution wrapper for scripts.backfill_buyer_mandate_b1_
     defaults - identifies every known-template BuyerMandate (matched by
@@ -729,6 +748,8 @@ def backfill_buyer_mandate_b1_defaults(session, *, dry_run: bool = True) -> dict
     that seed_default_buyer_profiles' own idempotency guarantee doesn't
     already cover; this exists purely to give the migration script a safe,
     inspectable dry-run report before it commits to anything."""
+    from app.security.access import require_operator
+    require_operator('buyer.write')
     workspace = resolve_default_workspace(session)
     before: dict[str, dict] = {}
     for key in BUYER_PROFILE_ORDER:
@@ -768,6 +789,7 @@ def backfill_buyer_mandate_b1_defaults(session, *, dry_run: bool = True) -> dict
 
 # --- Phase A one-time migration: legacy BuyerProfile -> Buyer + BuyerMandate
 
+@command('buyer.write')
 def migrate_buyer_profiles_to_mandates(session, *, dry_run: bool = True) -> dict:
     """The one-time, idempotent backfill from the legacy app.db.models.
     BuyerProfile table into an equivalent Buyer + BuyerMandate pair per
@@ -813,6 +835,8 @@ def migrate_buyer_profiles_to_mandates(session, *, dry_run: bool = True) -> dict
     Returns a dict report of what happened - never prints or logs
     directly, so scripts.migrate_buyer_profiles_to_mandates.py owns all
     operator-facing output."""
+    from app.security.access import require_operator
+    require_operator('buyer.write')
     from app.db.models import BuyerProfile as LegacyBuyerProfile
 
     # Ordered by the legacy row's own id - purely for deterministic,
@@ -821,7 +845,16 @@ def migrate_buyer_profiles_to_mandates(session, *, dry_run: bool = True) -> dict
     # display (it sorts by each buyer_key's own canonical position - see
     # that function's own docstring for exactly why an ORDER BY here would
     # not have been sufficient on its own).
-    legacy_rows = session.execute(select(LegacyBuyerProfile).order_by(LegacyBuyerProfile.id.asc())).scalars().all()
+    from app.security.access import current_actor, AccessDenied
+    from app.services.authorised_reads import require_workspace_write
+    actor=current_actor()
+    if not actor.machine:raise AccessDenied("Explicit migration command authority required.")
+    require_workspace_write(session,actor.workspace_id)
+    with session.no_autoflush:
+        missing=session.execute(select(LegacyBuyerProfile.id).outerjoin(Buyer,(Buyer.workspace_id==LegacyBuyerProfile.workspace_id)&(Buyer.buyer_key==LegacyBuyerProfile.profile_key)).where(LegacyBuyerProfile.workspace_id==actor.workspace_id,Buyer.id.is_(None))).scalars().all()
+    assigned_ids=require_workspace_write(session,actor.workspace_id,new_buyers=len(missing))
+    legacy_rows=session.execute(select(LegacyBuyerProfile).where(LegacyBuyerProfile.workspace_id==actor.workspace_id).order_by(LegacyBuyerProfile.id.asc())).scalars().all()
+
 
     migrated_buyers = 0
     migrated_mandates = 0
@@ -835,6 +868,7 @@ def migrate_buyer_profiles_to_mandates(session, *, dry_run: bool = True) -> dict
         ).scalars().first()
         if buyer is None:
             buyer = Buyer(
+                id=next(assigned_ids),
                 workspace_id=legacy.workspace_id,
                 buyer_key=legacy.profile_key,
                 display_name=legacy.display_name,

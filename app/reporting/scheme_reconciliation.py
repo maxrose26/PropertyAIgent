@@ -1171,6 +1171,8 @@ class OperativeFilterFacts:
     # note already does. True (the default) for the ordinary, reconciled
     # case, so normal schemes are completely unaffected.
     affordable_percentage_reconciles: bool = True
+    affordable_assessment: object = None
+    other_application_ah_reports: str = ""
 
 
 def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
@@ -1189,7 +1191,29 @@ def _resolve_units_from_units_facts(residential: OperativeFact, all_use: Operati
     return None, None, False
 
 
-def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFilterFacts:
+def selected_ah_application_reference(facts):
+    """Application shown by the existing reconciled scheme profile.
+
+    An ambiguous multi-scope active view has no whole-scheme AH selection.
+    This selects an identity, never a figure from another application's row.
+    """
+    consented = facts.consented_position.reference
+    if consented.state == FACT_RESOLVED:
+        return consented.value
+    if len(facts.active_positions) == 1:
+        active = facts.active_positions[0]
+        candidates = [r for r in facts.resolved_applications if r.is_substantive
+                      and r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)
+                      and (r.scope_type, r.scope_label) == (active.scope_type, active.scope_label)]
+        if candidates:
+            # Identity must not prefer an old row merely because it has an
+            # extracted figure. Recency selects the current case in this
+            # already-established scope, not the operative terms.
+            return max(candidates, key=lambda r: (r.received, r.id)).reference
+    return None
+
+
+def resolve_operative_filter_facts(facts: OperativePlanningFacts, *, application_reference=None) -> OperativeFilterFacts:
     """The single deterministic rule Explore's Total Units/Decision Status
     columns, min/max unit filters, and status filter all read from - see
     this module's own docstring cases A-F (Gate 2B-2A pre-merge
@@ -1214,6 +1238,8 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFi
          resolved -> that all-use total is used, flagged `units_kind=
          "all_use"` rather than silently presented as a residential count.
     """
+    if application_reference is None:
+        application_reference = selected_ah_application_reference(facts)
     consented = facts.consented_position
     active_positions = facts.active_positions
     reconciliation_ran = bool(facts.resolved_applications)
@@ -1259,7 +1285,42 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts) -> OperativeFi
         affordable_units, affordable_percentage, affordable_source = ah.active_whole_site.units, ah.active_whole_site.percentage, "active"
         affordable_percentage_reconciles = ah.active_whole_site.percentage_reconciles
 
+    from app.policy.ah_assessment import AHAssessment, AHClaim
+    from app.reporting.affordable_housing_scope import select_affordable_position_for_scope
+    position = select_affordable_position_for_scope(ah, active_position_count=len(active_positions), application_reference=application_reference) if application_reference is not None else None
+    if application_reference is not None:
+        identities = [r for r in facts.resolved_applications if r.reference == application_reference]
+        if len(identities) != 1 or len({r.application.council_code for r in facts.resolved_applications}) != 1:
+            position = None
+        if position and position.assessment and position.assessment.count.application_reference != application_reference:
+            position = None
+    assessment = (position.assessment if position else None) or AHAssessment(count=AHClaim(application_reference=application_reference))
+    # No unrelated or unscoped legacy fallback when identity is unresolved.
+    affordable_units = position.units if position else None
+    affordable_percentage = position.percentage if position else None
+    affordable_source = (None if affordable_units is None and affordable_percentage is None else
+                         "consented" if position is ah.whole_site else
+                         "active" if position is ah.active_whole_site else
+                         "selected_application" if position else None)
+    affordable_percentage_reconciles = position.percentage_reconciles if position else True
+    other_positions = [p for p in (ah.whole_site, ah.active_whole_site, *ah.phases, *ah.active_phases,
+                       *ah.historical, *ah.source_positions, *(p for c in ah.conflicts for p in c.positions))
+                       if p is not None and p.application_reference != application_reference]
+    other_reports = list(dict.fromkeys(p.assessment.label() if p.assessment else p.application_reference for p in other_positions))
+    # Even a legacy zero rejected as an operative position remains inspectable
+    # under its own application. It cannot supply current numeric facts.
+    from app.policy.ah_assessment import legacy_assessment
+    represented = {p.application_reference for p in other_positions}
+    for row in facts.resolved_applications:
+        si = row.application.scheme_intelligence
+        if row.reference != application_reference and row.reference not in represented and si is not None:
+            prior = legacy_assessment(si, application_reference=row.reference,
+                                      scope_label="Other application extraction; not current AH evidence")
+            if prior.count.value is not None or prior.reported_percentage is not None or prior.reported_tenure:
+                other_reports.append(prior.label())
     return OperativeFilterFacts(
+        other_application_ah_reports=" | ".join(other_reports),
+        affordable_assessment=assessment,
         decision_status=decision_status,
         has_active_proposal=len(active_positions) >= 1,
         active_proposal_count=len(active_positions),

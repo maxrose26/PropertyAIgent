@@ -28,6 +28,8 @@ loaded objects - this is the one file in the package that actually
 touches a database session and calls the real OpenAI client.
 """
 from __future__ import annotations
+from app.security.commands import command
+from app.security.access import require_operator
 
 import dataclasses
 from types import SimpleNamespace
@@ -314,10 +316,12 @@ def _process_pdf_pages(
         session.commit()
 
 
+@command("visual.write")
 def process_document(
     session, client, document: Document, limits: PipelineLimits, stats: PipelineStats,
     force: bool = False, dry_run: bool = False,
 ) -> None:
+    require_operator("visual.classify", paid=True)
     """Processes ONE already-selected candidate Document (caller runs it
     through app.visuals.document_selection first for a discovery run;
     an explicitly-targeted single document may skip that gate)."""
@@ -340,10 +344,12 @@ def process_document(
     )
 
 
+@command("visual.write")
 def process_report(
     session, client, report: MonitoredReport, pdf_path: str, limits: PipelineLimits, stats: PipelineStats,
     force: bool = False, dry_run: bool = False,
 ) -> None:
+    require_operator("visual.classify", paid=True)
     """Processes ONE Local Plan MonitoredReport against an already-
     downloaded local pdf_path - MonitoredReport has no local_path column
     of its own (Local Plan source files are supplied per-invocation, the
@@ -365,10 +371,12 @@ def process_report(
     )
 
 
+@command("visual.write")
 def process_local_plan_pdf(
     session, client, local_plan: LocalPlan, pdf_path: str, limits: PipelineLimits, stats: PipelineStats,
     force: bool = False, dry_run: bool = False, allocation_scope: LocalPlanSite | None = None,
 ) -> None:
+    require_operator("visual.classify", paid=True)
     """Processes a Local Plan's own PDF directly against pdf_path, for the
     --local-plan-id and --allocation-id CLI scopes (Part 15) - these have
     no MonitoredReport row of their own in the common case (a plan is
@@ -399,10 +407,12 @@ def process_local_plan_pdf(
     )
 
 
+@command("visual.write")
 def run_for_application(
     session, client, application: Application, limits: PipelineLimits, stats: PipelineStats,
     force: bool = False, dry_run: bool = False,
 ) -> None:
+    require_operator("visual.classify", paid=True)
     documents = list(session.execute(select(Document).where(Document.application_id == application.id)).scalars())
     candidates = select_candidate_documents(documents)
     stats.documents_skipped_not_candidate += len(documents) - len(candidates)
@@ -410,16 +420,20 @@ def run_for_application(
         process_document(session, client, candidate["document"], limits, stats, force=force, dry_run=dry_run)
 
 
+@command("visual.write")
 def run_for_site(
     session, client, site: Site, limits: PipelineLimits, stats: PipelineStats, force: bool = False, dry_run: bool = False,
 ) -> None:
+    require_operator("visual.classify", paid=True)
     for application in site.applications:
         run_for_application(session, client, application, limits, stats, force=force, dry_run=dry_run)
 
 
+@command("visual.write")
 def run_for_council(
     session, client, council_code: str, limits: PipelineLimits, stats: PipelineStats, force: bool = False, dry_run: bool = False,
 ) -> None:
+    require_operator("visual.classify", paid=True)
     applications = list(session.execute(select(Application).where(Application.council_code == council_code)).scalars())
     for application in applications:
         run_for_application(session, client, application, limits, stats, force=force, dry_run=dry_run)
@@ -481,6 +495,7 @@ def _find_proximity_anchor(page_number: int, anchors: list[tuple[int, int]]) -> 
     return allocation_id
 
 
+@command("visual.write")
 def rematch_local_plan_evidence(session, local_plan_id: int, dry_run: bool = False) -> RematchStats:
     """Re-matches every CURRENT, unlinked (allocation_id is None)
     VisualEvidence row for this Local Plan against its full current set of

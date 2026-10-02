@@ -43,6 +43,9 @@ from app.db.session import get_session
 from app.reporting.opportunity_change import sync_opportunity_monitoring_state
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('sync_opportunity_monitoring')
 def main() -> None:
     session = get_session()
     try:

@@ -7,6 +7,8 @@ own top-level script under Streamlit's pages/ convention).
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import datetime as dt
 import os
 import sys
@@ -16,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pandas as pd
 import streamlit as st
+from app.ui import safe_table
 from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy import select
@@ -32,7 +35,11 @@ from app.db.models import (
     PersonWithSignificantControl,
     Site,
 )
-from app.db.session import get_session, get_settings, init_db
+from app.db.session import get_session, get_engine, verify_schema, SchemaVerificationError
+from app.db.models import Settings
+from app.security.access import AccessUnavailable, require_admitted, require_operator, is_operator
+from app.services import ui_commands
+from app.ui import protected_download
 from app.enrichment import companies_house
 from app.enrichment.contact_pipeline import enrich_company, upsert_company_from_enrichment
 from app.pipeline.lapse_tracking import (
@@ -86,22 +93,43 @@ MERGED_SCHEME_FIELDS = [
 ]
 
 
-@st.cache_resource
 def bootstrap():
-    """Runs once per server process - DB init and the councils config don't
-    change between reruns/pages, so there's no need to redo it on every
-    script execution the way the plain session/settings lookups below do."""
-    load_dotenv(override=True)
-    init_db()
+    """Admitted, read-only startup; provisioning is an explicit CLI action."""
+    require_admitted()
+    return _bootstrap_config()
+
+
+@st.cache_resource
+def _bootstrap_config():
+    """Only immutable council configuration is cached, never user data."""
+    missing_tables, missing_columns = verify_schema(get_engine())
+    if missing_tables or missing_columns:
+        raise AccessUnavailable("Application schema unavailable; operator setup required.")
     return load_councils()
 
 
+def get_settings(session):
+    require_admitted()
+    settings = session.get(Settings, 1)
+    if settings is None:
+        raise AccessUnavailable("Application settings unavailable; operator setup required.")
+    require_admitted()
+    return settings
+
+
+@contextmanager
 def get_db():
-    """Session + settings need a fresh look-up per rerun (settings.credits_remaining
-    can change from user actions), unlike bootstrap() above."""
+    """Own a fresh page session through settings, rendering and explicit actions.
+
+    Closing releases transactions on every exit; it never commits pending work.
+    Keep lazy ORM access inside this scope and do not cache the session.
+    """
+    require_admitted()
     session = get_session()
-    settings = get_settings(session)
-    return session, settings
+    try:
+        yield session, get_settings(session)
+    finally:
+        session.close()
 
 
 def load_site_applications(session, site_id: int) -> list[Application]:
@@ -336,12 +364,13 @@ def credits_sidebar(session, settings) -> None:
     # collapsed at the bottom of the sidebar rather than as the first,
     # most prominent thing every page's sidebar shows - same session/DB
     # behaviour as before, presentation only.
+    if not is_operator():
+        return
     with st.sidebar:
         with st.expander(f"💳 Credits — {settings.credits_remaining} remaining", expanded=False):
             top_up = st.number_input("Add credits", min_value=0, value=0, step=10, label_visibility="collapsed")
             if st.button("Add credits") and top_up:
-                settings.credits_remaining += top_up
-                session.commit()
+                ui_commands.add_credits(session, top_up)
                 st.rerun()
             st.caption("Personal spend-throttle for Apollo/Hunter/Companies House lookups - not real billing.")
 
@@ -361,7 +390,7 @@ def render_visual_evidence(evidence: dict, *, missing_message: str, expander_lab
         return
 
     if primary.thumbnail_path and os.path.exists(primary.thumbnail_path):
-        st.image(primary.thumbnail_path, width=320)
+        protected_download.image(primary.thumbnail_path, width=320)
     # No broken-image placeholder (Part 11) - if the file is missing on
     # disk, the caption/metadata below still renders, just without the
     # image itself, rather than Streamlit's own broken-image icon.
@@ -386,7 +415,7 @@ def render_visual_evidence(evidence: dict, *, missing_message: str, expander_lab
             for i, image in enumerate(others):
                 with cols[i % len(cols)]:
                     if image.thumbnail_path and os.path.exists(image.thumbnail_path):
-                        st.image(image.thumbnail_path, width=150)
+                        protected_download.image(image.thumbnail_path, width=150)
                     other_label = IMAGE_TYPE_LABELS.get(image.image_type, image.image_type)
                     st.caption(other_label + (" ✓" if image.review_status == "confirmed" else " (unreviewed)"))
 
@@ -444,6 +473,8 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     two don't drift out of sync with each other."""
     rep_app = pick_representative_application(apps)
     merged = aggregate_scheme_fields(apps)
+    from app.reporting.scheme_reconciliation import resolve_operative_filter_facts
+    ah_assessment = resolve_operative_filter_facts(build_operative_planning_facts(list(site.applications))).affordable_assessment
     has_scheme = any(a.scheme_intelligence for a in apps)
     # Gate 2B-2A Stage A - the trusted operative planning position for this
     # Site's "Status / Decision" and unit-count lines below, so this shared
@@ -465,11 +496,8 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             f"🚫 Excluded from results — {site.excluded_reason or 'marked not a genuine residential scheme'} "
             f"({site.excluded_at.strftime('%d %b %Y') if site.excluded_at else 'date unknown'})"
         )
-        if st.button("Un-exclude — restore to results"):
-            site.excluded = False
-            site.excluded_reason = None
-            site.excluded_at = None
-            session.commit()
+        if is_operator() and st.button("Un-exclude — restore to results"):
+            ui_commands.set_site_exclusion(session, site.id, False)
             st.rerun()
 
     # Policy Intelligence (Part 12 of the Policy Intelligence Foundation
@@ -568,55 +596,37 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         expanded_key = f"review_expanded_{site.id}"
         message_key = f"review_message_{site.id}"
         pending_message = st.session_state.pop(message_key, None)
-        with st.expander("Review this scheme", expanded=st.session_state.pop(expanded_key, False)):
-            if pending_message:
-                level, text = pending_message
-                getattr(st, level)(text)
-            st.caption(
-                "Reading the summary above shows this isn't actually what it looks like on paper? "
-                "Correct it here rather than leaving a wrong entry in the results."
-            )
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("**Not a genuine residential scheme**")
-                exclude_reason = st.text_area(
-                    "Why", key=f"exclude_reason_{site.id}", label_visibility="collapsed",
-                    placeholder="e.g. commercial-only despite portal keyword match",
+        if is_operator():
+            with st.expander("Review this scheme", expanded=st.session_state.pop(expanded_key, False)):
+                if pending_message:
+                    level, text = pending_message
+                    getattr(st, level)(text)
+                st.caption(
+                    "Reading the summary above shows this isn't actually what it looks like on paper? "
+                    "Correct it here rather than leaving a wrong entry in the results."
                 )
-                if st.button("Exclude from results", key=f"exclude_btn_{site.id}"):
-                    site.excluded = True
-                    site.excluded_reason = exclude_reason or None
-                    site.excluded_at = dt.datetime.now(dt.timezone.utc)
-                    session.commit()
-                    st.session_state[expanded_key] = True
-                    st.session_state[message_key] = ("success", "Excluded - won't show up in results anymore.")
-                    st.rerun()
-            with col2:
-                st.markdown("**Actually part of a different scheme**")
-                parent_ref = st.text_input(
-                    "Parent application reference", key=f"parent_ref_{site.id}", label_visibility="collapsed",
-                    placeholder="e.g. A/12/76665 - must already be in the database",
-                )
-                if st.button("Link to that scheme", key=f"link_btn_{site.id}") and parent_ref:
-                    st.session_state[expanded_key] = True
-                    target = session.execute(
-                        select(Application).where(
-                            Application.council_code == site.council_code, Application.reference == parent_ref.strip(),
-                        )
-                    ).scalar_one_or_none()
-                    if not target:
-                        st.session_state[message_key] = ("error", f"No application {parent_ref!r} found for {site.council_code} - it needs to already be scraped.")
-                    elif not target.site_id:
-                        st.session_state[message_key] = ("error", f"{parent_ref} exists but isn't linked to a site itself yet - can't merge into it.")
-                    elif target.site_id == site.id:
-                        st.session_state[message_key] = ("warning", "That application is already part of this same site.")
-                    else:
-                        for a in site.applications:
-                            a.site_id = target.site_id
-                            a.site_link_method = "manual"
-                        session.commit()
-                        st.session_state[message_key] = ("success", f"Linked to {parent_ref}'s site.")
-                    st.rerun()
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Not a genuine residential scheme**")
+                    exclude_reason = st.text_area(
+                        "Why", key=f"exclude_reason_{site.id}", label_visibility="collapsed",
+                        placeholder="e.g. commercial-only despite portal keyword match",
+                    )
+                    if st.button("Exclude from results", key=f"exclude_btn_{site.id}"):
+                        ui_commands.set_site_exclusion(session, site.id, True, exclude_reason)
+                        st.session_state[expanded_key] = True
+                        st.session_state[message_key] = ("success", "Excluded - won't show up in results anymore.")
+                        st.rerun()
+                with col2:
+                    st.markdown("**Actually part of a different scheme**")
+                    parent_ref = st.text_input(
+                        "Parent application reference", key=f"parent_ref_{site.id}", label_visibility="collapsed",
+                        placeholder="e.g. A/12/76665 - must already be in the database",
+                    )
+                    if st.button("Link to that scheme", key=f"link_btn_{site.id}") and parent_ref:
+                        st.session_state[expanded_key] = True
+                        st.session_state[message_key] = ui_commands.relink_site_applications(session, site.id, parent_ref)
+                        st.rerun()
 
     if phase_breakdown:
         unit_summary = summarize_phase_units(phase_breakdown)
@@ -701,7 +711,7 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             "Decision": a.decision, "Received": a.application_received,
             "Link method": a.site_link_method, "Portal URL": a.summary_url,
         } for a in sorted(apps, key=lambda a: parse_portal_date(a.application_received), reverse=True)]
-        st.dataframe(
+        safe_table.dataframe(
             pd.DataFrame(history_rows), use_container_width=True,
             column_config={"Portal URL": st.column_config.LinkColumn()},
         )
@@ -737,7 +747,7 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
                     "Latest progress filing": f"{progress.reference} ({progress.application_received})" if progress else None,
                     "Applications": len(phase["applications"]),
                 })
-            st.dataframe(pd.DataFrame(phase_rows), use_container_width=True, hide_index=True)
+            safe_table.dataframe(pd.DataFrame(phase_rows), use_container_width=True, hide_index=True)
             if any(p.get("unit_count_source") == "portal_text" for p in phase_breakdown):
                 st.caption(
                     "Units sourced from a phase application's own portal listing text where no "
@@ -760,28 +770,18 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
                     total_units_display = f"~{total_units_display} (est.)"
             elif total_units_display is None:
                 total_units_display = "Not yet verified"
-            st.markdown(f"**Total / Affordable / Private units:** {total_units_display} / "
-                        f"{merged['affordable_units_final']} / {merged['private_units_final']}")
+            st.markdown(f"**Total homes:** {total_units_display}")
             if merged.get("total_units_is_estimated"):
-                st.caption(
-                    "ℹ️ No AI-verified unit count yet (no useful documents processed) - this is the portal "
-                    "search listing's own estimate from the proposal text, not confirmed against the full application."
-                )
-            if merged["affordable_units_final"] in (0, None) and merged.get("affordable_classification_reason"):
-                # A bare "0" reads as "no affordable housing required" - but
-                # confirmed a real case where 0 actually meant "viability
-                # assessment may reduce a stated 20% obligation to zero", a
-                # very different (and less certain) situation. Blank/None
-                # deserves the same treatment - confirmed a real case
-                # (PA/2026/0539) where a stated-but-unconfirmed 20% target
-                # was left unresolved rather than shown as a confident 0 (see
-                # the manual-review warning above), and the reason explains
-                # why. The reason is already captured (see Evidence below)
-                # but was easy to miss sitting in a collapsed expander below
-                # the figure it explains - surface it right next to the
-                # number instead.
-                st.caption(f"ℹ️ {merged['affordable_classification_reason']}")
-            st.markdown(f"**Affordable tenure split:** {merged['affordable_tenure_split_final']}")
+                st.caption("Total homes are a portal-listing estimate, not confirmed against the full application.")
+            st.markdown(f"**Affordable housing:** {ah_assessment.label()}")
+            from app.ui.ah_evidence import render_ah_evidence
+            render_ah_evidence(ah_assessment, st)
+            other_ah = resolve_operative_filter_facts(operative_facts).other_application_ah_reports
+            if other_ah:
+                with st.expander("Other application AH evidence — not applied to this record"):
+                    st.caption(other_ah)
+            st.caption("Reported tenure (current approved terms unverified): "
+                       + str(ah_assessment.reported_tenure or "unknown"))
             st.markdown(f"**Development type:** {merged['development_type']}")
             st.markdown(f"**Build status:** {BUILD_STATUS_LABELS[lapse['build_status']]}")
             if lapse["build_status"] == "no_completions_yet":
@@ -790,8 +790,6 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
                     "finished yet - construction could genuinely be well underway with no EPCs lodged and no "
                     "portal filing on record. Treat this as \"not confirmed complete\", not \"confirmed unstarted\"."
                 )
-            if merged["affordable_units_final"] and merged["total_units_final"]:
-                st.markdown(f"**Affordable %:** {merged['affordable_percentage_final']}%")
             if lapse["granted_app"] and lapse["granted_app"].decision_issued_date:
                 st.markdown(f"**Decision date:** {lapse['granted_app'].decision_issued_date}")
             if rep_app.summary_url:
@@ -826,8 +824,8 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             st.markdown(f"**Data quality:** {merged['data_quality_status']}")
 
         with st.expander("Evidence"):
-            st.markdown(f"**Affordable classification reason:** {merged['affordable_classification_reason']}")
-            st.markdown(f"**Affordable evidence:** {merged['affordable_classification_evidence']}")
+            st.markdown(f"**Reported AH extraction notes (unreviewed):** {merged['affordable_classification_reason']}")
+            st.markdown(f"**Reported AH excerpt (unreviewed):** {merged['affordable_classification_evidence']}")
             st.markdown(f"**Site evidence:** {merged['site_evidence']}")
 
     st.divider()
@@ -844,6 +842,9 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
     unchanged by both the dedicated Scheme Detail page's legacy path and
     Explore's inline row-expansion) keeps behaving identically, just via
     this named function now instead of inline code."""
+    if not is_operator():
+        return
+    require_operator("contacts.read")
     st.subheader("Companies & contacts")
 
     app_ids = [a.id for a in apps]
@@ -885,7 +886,7 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
             candidates.append((role, split_name))
 
     if not candidates:
-        st.info("No applicant/developer/landowner names extracted yet for this site.")
+        st.info("No party names in the extracted application-summary fields. Document-backed roles are shown separately when recorded.")
 
     for role, name in candidates:
         company = enriched_by_key.get((role, companies_house.normalise_name(name)))
@@ -895,6 +896,7 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
             if settings.credits_remaining <= 0:
                 st.warning("No contacts unlocked yet. Add credits in the sidebar to unlock.")
             elif st.button("Unlock contacts (1 credit)", key=f"unlock_{site.id}_{role}_{name}"):
+                require_operator("contacts.enrich", paid=True)
                 ch_key = os.getenv("CH_API_KEY")
                 if not ch_key:
                     st.error("CH_API_KEY not set in .env.")
@@ -985,7 +987,7 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
                     "Also director of": o.other_appointments or "",
                 } for o in officers if not o.resigned_on]
                 if officer_rows:
-                    st.dataframe(pd.DataFrame(officer_rows), use_container_width=True, hide_index=True)
+                    safe_table.dataframe(pd.DataFrame(officer_rows), use_container_width=True, hide_index=True)
                 else:
                     st.write("(All listed officers have since resigned.)")
             else:
@@ -999,7 +1001,7 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
                 "Context": c.source_context,
             } for c in contacts]
 
-            edited = st.data_editor(
+            edited = safe_table.data_editor(
                 pd.DataFrame(contact_rows).set_index("id"),
                 key=f"contacts_{site.id}_{company.id}",
                 use_container_width=True,
@@ -1016,10 +1018,7 @@ def render_companies_and_contacts(session, settings, site: Site, apps: list[Appl
             )
 
             if st.button("Save changes", key=f"save_{site.id}_{company.id}"):
-                for contact_id, row in edited.iterrows():
-                    contact = session.get(Contact, int(contact_id))
-                    contact.outreach_status = row["Outreach status"]
-                    contact.suppressed = bool(row["Suppressed"])
-                session.commit()
+                changes = {int(contact_id): (row["Outreach status"], bool(row["Suppressed"])) for contact_id,row in edited.iterrows()}
+                ui_commands.save_contacts(session, site.id, company.id, changes)
                 st.success("Saved.")
                 st.rerun()

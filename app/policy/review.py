@@ -83,6 +83,9 @@ def _recompute_allocation_review_status(session, row: LocalPlanSite) -> None:
     row.review_status = "needs_review" if still_pending else "confirmed"
 
 
+from app.security.commands import command
+
+@command('policy.write')
 def approve_change(session, event: PolicyChangeEvent, note: str | None = None, override_data: dict | None = None) -> None:
     """Applies event.proposed_data (or override_data, if given) onto the
     LocalPlan/LocalPlanSite/MonitoredReport it targets, snapshotting the
@@ -98,6 +101,10 @@ def approve_change(session, event: PolicyChangeEvent, note: str | None = None, o
     approve_change(session, event, override_data={"source_type": "housing_delivery_report", "classification_status": "auto"}).
     Ignored for every other event type, which always applies proposed_data
     exactly as detected."""
+    from app.security.access import require_operator
+    require_operator('policy.write')
+    from app.services.authorised_reads import reload_shared
+    event=reload_shared(session,event,PolicyChangeEvent)
     if event.review_status != "needs_review":
         raise ValueError(
             f"PolicyChangeEvent {event.id} is not pending review (review_status={event.review_status!r}) - "
@@ -161,6 +168,7 @@ def approve_change(session, event: PolicyChangeEvent, note: str | None = None, o
     session.commit()
 
 
+@command('policy.write')
 def reject_change(session, event: PolicyChangeEvent, note: str | None = None) -> None:
     """Records that a proposed change was reviewed and declined. Touches
     NOTHING on the target LocalPlan/LocalPlanSite's actual data fields -
@@ -168,6 +176,10 @@ def reject_change(session, event: PolicyChangeEvent, note: str | None = None) ->
     mis-extraction/false positive) - the only state that changes is the
     event's own review outcome, plus the allocation's denormalised
     "has a pending review" flag if this was its last one."""
+    from app.security.access import require_operator
+    require_operator('policy.write')
+    from app.services.authorised_reads import reload_shared
+    event=reload_shared(session,event,PolicyChangeEvent)
     if event.review_status != "needs_review":
         raise ValueError(
             f"PolicyChangeEvent {event.id} is not pending review (review_status={event.review_status!r}) - "

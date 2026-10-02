@@ -27,7 +27,11 @@ current trusted value creates no event at all, unless --reprocess-unchanged
 is passed explicitly.
 """
 from __future__ import annotations
+from app.security.commands import command
+from app.security.access import require_operator
 
+from app.security.cli import authorised_cli
+from app.security.access import require_operator
 import argparse
 import datetime as dt
 import json
@@ -142,6 +146,7 @@ def resolve_plan(session: Session, council_code: str, plan_id: int | None) -> Lo
     raise ValueError(f"Council {council_code!r} has more than one LocalPlan - pass --plan-id to disambiguate: {options}")
 
 
+@command("policy.write")
 def run_extraction(
     session: Session,
     client: OpenAI,
@@ -157,6 +162,7 @@ def run_extraction(
     reprocess_unchanged: bool = False,
     monitored_report_id: int | None = None,
 ) -> dict:
+    require_operator("plan.extract", paid=True)
     """Runs every extraction category eligible for source_type (or just
     category_override, if given) against pdf_path[first_page:last_page],
     validates every fact, and turns each accepted one into a
@@ -346,6 +352,7 @@ def _empty_stats() -> dict:
     }
 
 
+@command("policy.write")
 def run_extraction_for_report(
     session: Session,
     client: OpenAI,
@@ -356,6 +363,7 @@ def run_extraction_for_report(
     force: bool = False,
     dry_run: bool = False,
 ) -> dict:
+    require_operator("plan.extract", paid=True)
     """The MonitoredReport-driven counterpart to run_extraction: resolves
     the plan/category from the report itself (its own local_plan_id and
     source_type via app.policy.document_selection.DOCUMENT_TYPE_TO_CATEGORIES),
@@ -436,7 +444,9 @@ def _resolve_page_range(pdf_path: str, pages_arg: str | None) -> tuple[int, int]
         return 1, len(pdf.pages)
 
 
+@authorised_cli("extract_plan_evidence")
 def main() -> None:
+    require_operator("plan.extract", paid=True)
     args = parse_args()
     load_dotenv(override=True)
     from app.db.session import get_session, init_db  # local import: keeps this module importable/testable without touching the real DB

@@ -393,6 +393,9 @@ def _persisted_summary_result(plan: LocalPlan, *, regenerated: bool, rejected: b
     }
 
 
+from app.security.commands import command
+
+@command('plan.summary', paid=True)
 def generate_local_plan_summary(session: Session, client: OpenAI, plan: LocalPlan, force: bool = False) -> dict:
     """Returns a dict with "regenerated"/"rejected"/"rejection_reason" plus
     the summary content itself (freshly generated, or - when regeneration
@@ -401,6 +404,8 @@ def generate_local_plan_summary(session: Session, client: OpenAI, plan: LocalPla
     unsupported output). Only calls the AI model when should_regenerate
     says a real trigger applies (Part 6) - an unchanged plan re-viewed or
     re-checked with no new evidence costs nothing."""
+    from app.security.access import require_operator
+    require_operator('plan.summary', paid=True)
     payload = build_summary_payload(session, plan)
     fingerprint = compute_evidence_fingerprint(payload)
 

@@ -67,6 +67,9 @@ def _print_report(report: dict) -> None:
             print(f"    matching_fingerprint_after: {info['matching_fingerprint_after']}")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('backfill_buyer_mandate_b1_defaults')
 def main() -> None:
     args = parse_args()
     execute = bool(args.execute and args.confirm == CONFIRM_PHRASE)

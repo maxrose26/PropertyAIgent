@@ -32,6 +32,7 @@ import argparse
 import datetime as dt
 
 import requests
+from app.security import outbound
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -68,6 +69,9 @@ def _has_pending_change_event(session: Session, source: MonitoredSource) -> bool
     ).first() is not None
 
 
+from app.security.commands import command
+
+@command('policy.monitor')
 def check_source(session: Session, source: MonitoredSource, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> str:
     """Checks one source and updates its own monitoring fields. Returns one
     of "first_check", "unchanged", "changed", or "failed" - the per-source
@@ -79,7 +83,7 @@ def check_source(session: Session, source: MonitoredSource, timeout: int = DEFAU
     source.last_checked = now
 
     try:
-        response = requests.get(source.url, timeout=timeout, headers=REQUEST_HEADERS)
+        response = outbound.get(source.url, timeout=timeout, headers=REQUEST_HEADERS)
         response.raise_for_status()
     except requests.RequestException:
         last_ok = source.last_successful_check
@@ -149,6 +153,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('monitor')
 def main() -> None:
     args = parse_args()
     from app.db.session import get_session, init_db  # local import: keeps this module importable/testable without touching the real DB

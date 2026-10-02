@@ -1,0 +1,128 @@
+{
+  "app/pipeline/site_linking.py": {
+    "confirm_suggested_link": "matching.write",
+    "reject_suggested_link": "matching.write"
+  },
+  "app/policy/allocation_site_dry_run_matching.py": {
+    "confirm_review_candidate": "matching.write",
+    "reject_review_candidate": "matching.write",
+    "run_controlled_write": "matching.write"
+  },
+  "app/policy/site_match_review.py": {
+    "confirm_site_match": "matching.write",
+    "reject_site_match": "matching.write"
+  },
+  "app/policy/review.py": {
+    "approve_change": "policy.write",
+    "reject_change": "policy.write"
+  },
+  "app/visuals/review.py": {
+    "confirm_image": "visual.write",
+    "reject_image": "visual.write",
+    "relink_image": "visual.write",
+    "mark_primary": "visual.write"
+  },
+  "app/enrichment/contact_pipeline.py": {
+    "enrich_company": "paid:contacts.enrich",
+    "upsert_company_from_enrichment": "contacts.write"
+  },
+  "app/reporting/local_plan_summary.py": {
+    "generate_local_plan_summary": "paid:plan.summary"
+  },
+  "app/reporting/allocation_intelligence_summary.py": {
+    "generate_allocation_intelligence_summary": "paid:allocation.summary"
+  },
+  "app/reporting/cross_site_intelligence.py": {
+    "generate_cross_site_intelligence": "paid:shortlist.intelligence"
+  },
+  "app/reporting/allocation_web_research.py": {
+    "build_allocation_web_research_context": "paid:shortlist.research"
+  },
+  "app/search/query_parser.py": {
+    "parse_query": "paid:search.parse"
+  },
+  "app/reporting/pdf_report.py": {
+    "generate_narrative": "paid:report.narrative"
+  },
+  "app/policy/agent_evaluation_persistence.py": {
+    "get_or_create_subject_anchor": "evaluation.write",
+    "try_claim_evaluation": "evaluation.write",
+    "record_evaluation_outcome": "evaluation.write",
+    "run_persisted_evaluation": "paid:evaluation.run"
+  },
+  "app/policy/buyer_profile_store.py": {
+    "resolve_default_workspace": "buyer.write",
+    "seed_default_buyer_profiles": "buyer.write",
+    "run_buyer_onboarding_baseline": "buyer.write",
+    "bootstrap_acquisition_monitoring": "buyer.write",
+    "backfill_buyer_mandate_b1_defaults": "buyer.write",
+    "migrate_buyer_profiles_to_mandates": "buyer.write"
+  },
+  "app/reporting/opportunity_feed.py": {
+    "build_opportunity_feed": "read"
+  },
+  "app/reporting/site_profile.py": {
+    "build_site_profile": "read"
+  },
+  "app/services/ui_commands.py": {
+    "add_credits": "credits.write",
+    "set_site_exclusion": "site.exclude",
+    "relink_site_applications": "matching.write",
+    "save_contacts": "contacts.write"
+  },
+  "app/policy/acquisition_evaluate.py": {
+    "evaluate": "paid:evaluation.run",
+    "evaluate_with_telemetry": "paid:evaluation.run",
+    "evaluate_frozen_input_with_telemetry": "paid:evaluation.run"
+  },
+  "scripts/run_intelligence_processing.py": {
+    "process_intelligence_backlog": "paid:pipeline.processing"
+  },
+  "app/extraction/run_extraction.py": {
+    "run_extraction_for_application": "paid:pipeline.extract"
+  },
+  "app/extraction/intelligence_refresh.py": {
+    "refresh_intelligence_for_application": "paid:pipeline.refresh"
+  },
+  "app/extraction/plan_evidence.py": {
+    "extract_plan_evidence": "paid:plan.extract"
+  },
+  "app/reporting/scheme_summary.py": {
+    "generate_scheme_summary": "paid:scheme.summary"
+  },
+  "app/reporting/applicant_intelligence.py": {
+    "generate_applicant_intelligence": "paid:applicant.intelligence"
+  },
+  "app/policy/monitor.py": {
+    "check_source": "policy.monitor"
+  },
+  "app/policy/document_discovery.py": {
+    "register_candidate_policy_sources": "documents.write",
+    "discover_policy_pages_for_council": "documents.write",
+    "queue_ambiguous_policy_document": "documents.write",
+    "download_policy_document": "documents.write"
+  },
+  "app/policy/report_discovery.py": {
+    "register_discovered_reports": "documents.write",
+    "discover_reports_for_source": "documents.write",
+    "check_report_for_changes": "documents.write",
+    "discover_reports_for_council": "documents.write",
+    "check_reports_for_council": "documents.write"
+  },
+  "app/policy/extract_plan_evidence.py": {
+    "run_extraction": "policy.write",
+    "run_extraction_for_report": "policy.write"
+  },
+  "app/visuals/pipeline.py": {
+    "process_document": "visual.write",
+    "process_report": "visual.write",
+    "process_local_plan_pdf": "visual.write",
+    "run_for_application": "visual.write",
+    "run_for_site": "visual.write",
+    "run_for_council": "visual.write",
+    "rematch_local_plan_evidence": "visual.write"
+  },
+  "app/visuals/classification.py": {
+    "classify_page": "paid:visual.classify"
+  }
+}

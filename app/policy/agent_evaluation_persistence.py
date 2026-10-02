@@ -144,11 +144,16 @@ def resolve_acquisition_subject_key(opportunity_id: str, opportunity_type: str) 
     return (PLANNING_DELIVERY, anchor_id, WHOLE_SITE)
 
 
+from app.security.commands import command
+
+@command('evaluation.write')
 def get_or_create_subject_anchor(session: Session, *, subject_type: str, anchor_id: int, scope_key: str) -> AcquisitionSubjectAnchor:
     """Idempotent lookup-or-create against the unique (subject_type,
     anchor_id, scope_key) key. A concurrent duplicate insert is caught and
     resolved by re-querying - the row itself, not who created it, is what
     every caller actually needs."""
+    from app.security.access import require_operator
+    require_operator('evaluation.write')
     existing = session.execute(
         select(AcquisitionSubjectAnchor).where(
             AcquisitionSubjectAnchor.subject_type == subject_type,
@@ -364,6 +369,7 @@ class ClaimOutcome:
     existing_history_id: int | None = None
 
 
+@command('evaluation.write')
 def try_claim_evaluation(
     session: Session, *, buyer_mandate_id: int, subject_anchor_id: int, acquisition_type: str,
     evaluation_input_fingerprint: str, force: bool = False,
@@ -388,6 +394,10 @@ def try_claim_evaluation(
 
     Each branch below is one short, immediately-committed transaction -
     never held open across the caller's own subsequent OpenAI call."""
+    from app.security.access import require_operator
+    require_operator('evaluation.write')
+    from app.services.authorised_reads import mandate_by_id
+    mandate_by_id(session, buyer_mandate_id)
     existing = session.execute(
         select(AgentEvaluationClaim).where(
             AgentEvaluationClaim.buyer_mandate_id == buyer_mandate_id,
@@ -474,6 +484,7 @@ def _json_unknowns(unknowns) -> str:
     ])
 
 
+@command('evaluation.write')
 def record_evaluation_outcome(
     session: Session, *, claim: AgentEvaluationClaim, result: EvaluationExecutionResult,
     buyer_mandate_id: int, subject_anchor_id: int, acquisition_type: str,
@@ -495,6 +506,15 @@ def record_evaluation_outcome(
     brief Section 14. If no successful evaluation has ever existed, the
     current-state row's current_history_id stays NULL - represented
     honestly, never fabricated as PURSUE/INVESTIGATE/MONITOR/NOT_RELEVANT."""
+    from app.security.access import require_operator
+    require_operator('evaluation.write')
+    from app.services.authorised_reads import mandate_by_id
+    mandate_by_id(session, buyer_mandate_id)
+    from app.services.authorised_reads import persistent_id
+    from app.security.access import AccessDenied
+    with session.no_autoflush:
+        claim=session.execute(select(AgentEvaluationClaim).where(AgentEvaluationClaim.id==persistent_id(claim),AgentEvaluationClaim.buyer_mandate_id==buyer_mandate_id,AgentEvaluationClaim.subject_anchor_id==subject_anchor_id,AgentEvaluationClaim.acquisition_type==acquisition_type)).scalar_one_or_none()
+    if claim is None:raise AccessDenied("Access denied.")
     opportunity_kind = _opportunity_kind(opportunity_id)
     e = result.evaluation
 
@@ -570,6 +590,7 @@ class PersistedEvaluationOutcome:
     current_state: CurrentBuyerOpportunityState | None
 
 
+@command('evaluation.run', paid=True)
 def run_persisted_evaluation(
     session: Session, *, mandate, mandate_key: str, buyer_mandate_id: int, mandate_fingerprint: str,
     acquisition_type: str, opportunity, opportunity_fingerprint: str, packet, buyer_fit_assessment,
@@ -589,6 +610,10 @@ def run_persisted_evaluation(
          database transaction is held open here at all.
       5. record_evaluation_outcome - one short DB transaction (history
          insert + claim update + current-state upsert together)."""
+    from app.security.access import require_operator
+    require_operator('evaluation.run', paid=True)
+    from app.services.authorised_reads import mandate_by_id
+    mandate_by_id(session, buyer_mandate_id)
     from app.policy.acquisition_evaluate import AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION, MODEL, evaluate
 
     subject_type, anchor_id, scope_key = resolve_acquisition_subject_key(opportunity.opportunity_id, opportunity.opportunity_type)

@@ -434,6 +434,9 @@ def _individual_claims(structured_output: dict) -> list[str]:
 # --- Generation orchestration --------------------------------------------------
 
 
+from app.security.commands import command
+
+@command('shortlist.intelligence', paid=True)
 def generate_cross_site_intelligence(
     client, report_context: AllocationReportContext, web_context: AllocationWebResearchContext,
 ) -> CrossSiteIntelligenceResult:
@@ -442,6 +445,8 @@ def generate_cross_site_intelligence(
     API exception or a validation rejection both return a result with
     intelligence=None, status recorded, so the caller keeps the
     deterministic report available regardless (Section 35)."""
+    from app.security.access import require_operator
+    require_operator('shortlist.intelligence', paid=True)
     prompt = build_cross_site_prompt(report_context, web_context)
     try:
         response = client.responses.create(

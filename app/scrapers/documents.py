@@ -33,6 +33,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from urllib.parse import urljoin
 
 import requests
@@ -112,18 +113,20 @@ def get_idox_documents(session: requests.Session, summary_url: str) -> list[Coll
     HTTP 429s specifically on this "applicationDetails...activeTab=
     documents" endpoint."""
     docs_url = summary_url.replace("activeTab=summary", "activeTab=documents")
-    response = get_with_retry(session, docs_url, timeout=30)
+    from app.security.outbound import DocumentSession
+    response = get_with_retry(DocumentSession(session), docs_url, timeout=30)
     soup = BeautifulSoup(response.text, "html.parser")
     return _find_document_links(soup, docs_url, referer=docs_url)
 
 
 def _find_anite_search_url(session: requests.Session, summary_url: str) -> str | None:
     docs_tab_url = summary_url.replace("activeTab=summary", "activeTab=externalDocuments")
-    response = session.get(docs_tab_url, timeout=30)
+    from app.security.outbound import DocumentSession
+    response = DocumentSession(session).get(docs_tab_url, timeout=30)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     link = soup.find("a", string=lambda t: t and "View associated documents" in t)
-    return link["href"] if link else None
+    return urljoin(docs_tab_url, link["href"]) if link else None
 
 
 def get_anite_documents(page: Page, session: requests.Session, summary_url: str, dest_dir: Path) -> list[CollectedDocument]:
@@ -139,18 +142,23 @@ def get_anite_documents(page: Page, session: requests.Session, summary_url: str,
     if not search_url:
         return []
 
-    page.goto(search_url, wait_until="networkidle", timeout=30000)
-    try:
-        page.wait_for_selector("#searchResult tbody tr", timeout=10000)
-    except Exception:
-        return []  # no documents lodged for this application yet
+    from app.security.document_browser import document_page
+    with document_page(page, session, [summary_url, search_url]) as (protected, guard):
+        return _anite_documents(protected, search_url, dest_dir, guard)
 
-    try:
+
+def _anite_documents(page, search_url, dest_dir, guard):
+    from app.security.document_browser import DocumentBrowserFailure
+    guard.operation(30)
+    page.goto(search_url, wait_until="networkidle", timeout=30000)
+    guard.check()
+    guard.operation(10)
+    page.wait_for_selector("#searchResult", timeout=10000)
+    if page.locator('select[name="searchResult_length"]').count():
         page.select_option('select[name="searchResult_length"]', "100")
         page.wait_for_load_state("networkidle", timeout=10000)
         page.wait_for_timeout(500)
-    except Exception:
-        pass  # length selector not present - table is short enough to not paginate anyway
+    guard.check()
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     collected: list[CollectedDocument] = []
@@ -164,6 +172,9 @@ def get_anite_documents(page: Page, session: requests.Session, summary_url: str,
             doc_type_raw = cell_texts[0] if cell_texts else ""
             doc_name = cell_texts[4] if len(cell_texts) > 4 and cell_texts[4] else (doc_type_raw or f"document_{i}")
             extension = cell_texts[-1] if cell_texts and cell_texts[-1].startswith(".") else ".pdf"
+
+            if not re.fullmatch(r"\.[A-Za-z0-9]{1,10}", extension):
+                raise DocumentBrowserFailure("Unsafe document extension.")
 
             dedupe_key = (doc_type_raw, doc_name)
             if dedupe_key in seen:
@@ -182,33 +193,50 @@ def get_anite_documents(page: Page, session: requests.Session, summary_url: str,
                 continue
 
             try:
+                guard.operation(15)
                 with page.expect_download(timeout=15000) as dl_info:
                     link.click()
                 download = dl_info.value
                 dest_path = dest_dir / f"{sanitise_filename(doc_name)}{extension}"
-                download.save_as(dest_path)
+                guard.save_download(download, dest_path)
                 collected.append(CollectedDocument(document_name=doc_name, doc_type_raw=doc_type_raw, local_path=dest_path))
             except Exception as e:
-                print(f"    could not download '{doc_name}': {e}")
-                continue
+                guard.check()
+                raise DocumentBrowserFailure("Document download failed.") from e
 
         next_button = page.query_selector("#searchResult_next")
         if not next_button or "disabled" in (next_button.get_attribute("class") or ""):
             break
         try:
+            guard.operation(10)
             next_button.click()
             page.wait_for_load_state("networkidle", timeout=10000)
             page.wait_for_timeout(500)
-        except Exception:
-            break
+        except Exception as exc:
+            guard.check()
+            raise DocumentBrowserFailure("Document pagination failed.") from exc
 
+    guard.check()
     return collected
 
 
-def get_arcus_documents(page: Page, summary_url: str) -> list[CollectedDocument]:
+def get_arcus_documents(page: Page, summary_url: str, session=None) -> list[CollectedDocument]:
     """Salford-style: navigate to the detail page (summary_url IS the full
     detail-page URL for this doc_system, unlike Idox's separate
     activeTab=documents convention), click the Files tab, read the rows."""
+    from app.security.document_browser import document_page
+    owned = session is None
+    session = session if session is not None else requests.Session()
+    try:
+        with document_page(page, session, [summary_url]) as (protected, guard):
+            return _arcus_documents(protected, summary_url, guard)
+    finally:
+        if owned: session.close()
+
+
+def _arcus_documents(page, summary_url, guard):
+    from app.security.document_browser import DocumentBrowserFailure
+    guard.operation(45)
     from app.scrapers.arcus_portal import parse_document_rows  # local import: avoids a scrapers-internal cycle
 
     page.goto(summary_url, wait_until="networkidle", timeout=45000)
@@ -216,9 +244,12 @@ def get_arcus_documents(page: Page, summary_url: str) -> list[CollectedDocument]
     try:
         page.get_by_text("Files", exact=True).click()
         page.wait_for_timeout(1000)
-    except Exception:
-        return []
-    rows = parse_document_rows(page)
+    except Exception as exc:
+        guard.check()
+        raise DocumentBrowserFailure("Document Files tab failed.") from exc
+    guard.check()
+    rows = parse_document_rows(page, document_guard=guard)
+    guard.check()
     return [
         CollectedDocument(document_name=r.document_name, doc_type_raw="", source_url=r.source_url)
         for r in rows
@@ -231,5 +262,5 @@ def discover_documents(
     if council.doc_system == "idox_anite":
         return get_anite_documents(page, session, summary_url, dest_dir)
     if council.doc_system == "arcus":
-        return get_arcus_documents(page, summary_url)
+        return get_arcus_documents(page, summary_url, session)
     return get_idox_documents(session, summary_url)

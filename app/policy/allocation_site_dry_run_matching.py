@@ -325,6 +325,9 @@ def summarize_results(dry_run: dict) -> dict:
 REJECTED_REVIEW_STATUS = "rejected"
 
 
+from app.security.commands import command
+
+@command('matching.write')
 def run_controlled_write(session: Session, *, council_codes: list[str] | None = None) -> dict:
     """PRODUCTION WRITE MODE. Only called with explicit CLI confirmation.
 
@@ -352,6 +355,8 @@ def run_controlled_write(session: Session, *, council_codes: list[str] | None = 
     confirm/reject decision) or review_status already "rejected" means
     SKIP, never overwrite.
     """
+    from app.security.access import require_operator
+    require_operator('matching.write')
     dry_run = run_dry_run_matching(session, council_codes=council_codes)
 
     written_high_confidence: list[int] = []
@@ -449,6 +454,7 @@ def _revalidate_review_candidate(
     return current_candidates[0], None
 
 
+@command('matching.write')
 def confirm_review_candidate(
     session: Session, *, allocation_id: int, expected_site_id: int, confirmed_by: str, note: str,
 ) -> dict:
@@ -462,6 +468,8 @@ def confirm_review_candidate(
     delegate the entire "mark as human-confirmed" behaviour to the
     EXISTING app.policy.site_match_review.confirm_site_match - never
     duplicated here."""
+    from app.security.access import require_operator
+    require_operator('matching.write')
     allocation = session.get(LocalPlanSite, allocation_id)
     if allocation is None:
         return {"success": False, "reason": "Allocation no longer exists."}
@@ -476,6 +484,7 @@ def confirm_review_candidate(
     return {"success": True}
 
 
+@command('matching.write')
 def reject_review_candidate(
     session: Session, *, allocation_id: int, expected_site_id: int, confirmed_by: str, reason: str,
 ) -> dict:
@@ -500,6 +509,8 @@ def reject_review_candidate(
     allowing a different Site to be auto-confirmed later) is not
     representable without the same many-to-many table already flagged as
     architectural backlog - out of scope for this amendment."""
+    from app.security.access import require_operator
+    require_operator('matching.write')
     allocation = session.get(LocalPlanSite, allocation_id)
     if allocation is None:
         return {"success": False, "reason": "Allocation no longer exists."}

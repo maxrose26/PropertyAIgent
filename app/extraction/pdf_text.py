@@ -146,7 +146,13 @@ def download_document(
     council_code: str, reference: str, document_name: str, source_url: str,
     session: requests.Session | None = None, referer: str | None = None,
 ) -> Path | None:
+    from app.security.outbound import destination, DocumentSession
+    destination(source_url)
+    if not re.fullmatch(r"[A-Za-z0-9_-]+",council_code):
+        raise ValueError("Invalid council directory")
     folder = document_dir(council_code, reference)
+    if not folder.resolve().is_relative_to(DATA_DIR.resolve()):
+        raise ValueError("Document destination outside evidence directory")
     # document_name alone isn't guaranteed unique within an application - Idox
     # portals commonly reuse names like "Location Plan" across multiple actual
     # files, and a mis-parsed name column can make EVERY document in an
@@ -175,7 +181,7 @@ def download_document(
     # supply one; this changes nothing about the actual request beyond gaining
     # retry behaviour, since a fresh Session has no meaningful state of its
     # own to preserve here.
-    retry_session = session if session is not None else requests.Session()
+    retry_session = DocumentSession(session)
     # verify=<bundle> rather than requests' default - confirmed a real case
     # (Manchester's Arcus portal) where every single document download
     # failed with SSLCertVerificationError because the server's own TLS
@@ -216,7 +222,7 @@ def download_document(
                     downloaded += len(chunk)
                     if downloaded > MAX_DOWNLOAD_FILE_SIZE:
                         raise ValueError(
-                            f"{source_url} exceeded {MAX_DOWNLOAD_FILE_SIZE} bytes while "
+                            f"Document exceeded {MAX_DOWNLOAD_FILE_SIZE} bytes while "
                             "downloading - aborted to protect process memory"
                         )
                     f.write(chunk)

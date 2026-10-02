@@ -1,0 +1,62 @@
+{
+  "scope": "Dedicated document renderer only; no discovery/status lifecycle changes",
+  "platform": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "required": [
+      "unprivileged seccomp NEW_LISTENER",
+      "no_new_privs",
+      "readable process accounting",
+      "private OS pipes",
+      "process groups",
+      "subreaper"
+    ]
+  },
+  "configuration": {
+    "PROPERTYAIGENT_DOCUMENT_CHROMIUM": "Optional trusted executable path; defaults to installed Playwright chromium executable. No credential."
+  },
+  "new_dependencies": [],
+  "schema_changes": [],
+  "concurrency": "One document renderer per Python process; existing run_daily_councils/run_weekly document work is sequential. No global cross-service resource guarantee.",
+  "fixed_limits": {
+    "cdp_frame_bytes": 33554432,
+    "cdp_queue_bytes": 67108864,
+    "outstanding_requests": 128,
+    "request_ids": 16384,
+    "renderer_rss_bytes": 536870912,
+    "parent_driver_growth_bytes": 268435456,
+    "combined_growth_rss_bytes": 805306368,
+    "temporary_bytes": 536870912,
+    "lifetime_seconds": 300,
+    "sample_seconds": 0.1,
+    "shutdown_seconds": 5,
+    "render_bytes": 20971520,
+    "attachment_bytes": 209715200,
+    "output_journal_bytes": 1048576,
+    "output_journal_records": 128,
+    "processes_including_guardian_and_custodian": 32
+  },
+  "limitations": [
+    "RSS and aggregate disk are sampled fail-closed bounds, not cgroup/kernel aggregate ceilings",
+    "Simultaneous loss of both trusted supervisors is not a demonstrated cleanup guarantee",
+    "Production topology and kernel capability validation remain unauthorised rollout prerequisites"
+  ],
+  "test_entrypoints": [
+    "verification/stage1-bounded-check.sh",
+    "verification/test_stage1_document_process.py",
+    "verification/stage1_document_bootstrap_check.py",
+    "verification/stage1_document_abi_check.py",
+    "verification/stage1_document_cleanup_check.py",
+    "verification/stage1_document_native_matrix_check.py",
+    "verification/stage1_document_native_extra_check.py",
+    "verification/stage1_document_rtc_check.py"
+  ],
+  "preserved_boundaries": [
+    "app/security/access.py unchanged from d9d04b4",
+    "No registry capacity increase",
+    "No dependencies/schema/shared engine changes",
+    "No P0-A or AH migration import",
+    "No production/publication authority"
+  ],
+  "cleanup": "Private file custodian shares original deadline; parent verifies postconditions after reaping before closed receipt and capacity release; failed postcondition quarantines capacity."
+}

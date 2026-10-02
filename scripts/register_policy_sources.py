@@ -23,6 +23,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('register_policy_sources')
 def main() -> None:
     args = parse_args()
     init_db()

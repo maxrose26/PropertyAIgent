@@ -24,92 +24,98 @@ from app.ui.common import (
 )
 from app.ui.shell import empty_state, page_header, wide_canvas
 
-bootstrap()
-session, settings = get_db()
+from app.ui.access import page_scope
+from app.security.access import require_operator, is_operator
+from app.ui import protected_download
 
-# Post-Sprint-4.5b hotfix: this data-review page was never given the
-# page-scoped wide_canvas() override, so its side-by-side comparison rows
-# were confined to the shared shell's 1200px default on wide viewports.
-wide_canvas()
+with page_scope():
+    require_operator("administration.read")
+    bootstrap()
+    with get_db() as (session, settings):
 
-HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
-st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
+        # Post-Sprint-4.5b hotfix: this data-review page was never given the
+        # page-scoped wide_canvas() override, so its side-by-side comparison rows
+        # were confined to the shared shell's 1200px default on wide viewports.
+        wide_canvas()
 
-credits_sidebar(session, settings)
+        HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
+        st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
-suggested = session.execute(
-    select(Application).where(Application.site_link_method == "suggested_fuzzy", Application.site_id.is_(None))
-).scalars().all()
+        credits_sidebar(session, settings)
 
-page_header(
-    f"Site Matching — {len(suggested)} awaiting review",
-    "These couldn't be auto-linked with full confidence - compare the two portal pages below, then "
-    "confirm if they're the same site or reject to keep them separate.",
-    icon="🔗",
-)
+        suggested = session.execute(
+            select(Application).where(Application.site_link_method == "suggested_fuzzy", Application.site_id.is_(None))
+        ).scalars().all()
 
-if not suggested:
-    empty_state("Nothing to review right now", "Every suggested site link has already been resolved.", icon="✅")
-    st.stop()
+        page_header(
+            f"Site Matching — {len(suggested)} awaiting review",
+            "These couldn't be auto-linked with full confidence - compare the two portal pages below, then "
+            "confirm if they're the same site or reject to keep them separate.",
+            icon="🔗",
+        )
 
-for app in suggested:
-    candidate = app.suggested_site
-    candidate_apps = list(candidate.applications) if candidate else []
-    candidate_rep = pick_representative_application(candidate_apps) if candidate_apps else None
+        if not suggested:
+            empty_state("Nothing to review right now", "Every suggested site link has already been resolved.", icon="✅")
+            st.stop()
 
-    district = extract_postcode_district(app.address)
-    confidence_pct = f"{app.site_link_confidence:.0%}" if app.site_link_confidence else "n/a"
-    st.markdown(
-        f"**Suggested reason:** same postcode district ({district or 'n/a'}) "
-        f"and {confidence_pct} address text similarity to the site below."
-    )
+        for app in suggested:
+            candidate = app.suggested_site
+            candidate_apps = list(candidate.applications) if candidate else []
+            candidate_rep = pick_representative_application(candidate_apps) if candidate_apps else None
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**New application: {app.reference}**")
-        st.markdown(app.address or "(no address)")
-        if app.summary_url:
-            st.markdown(f"[Open on planning portal]({app.summary_url})")
-        merged = aggregate_scheme_fields([app])
-        st.caption(f"Total units: {merged['total_units_final'] or 'not yet extracted'} | "
-                   f"Development type: {merged['development_type'] or 'unknown'}")
-    with col2:
-        st.markdown(f"**Existing site: {', '.join(a.reference for a in candidate_apps) or 'unknown'}**")
-        st.markdown(candidate.display_address if candidate else "(unknown)")
-        if candidate_rep and candidate_rep.summary_url:
-            st.markdown(f"[Open on planning portal]({candidate_rep.summary_url})")
-        merged = aggregate_scheme_fields(candidate_apps)
-        # Gate 2B-2A - the same trusted operative total the Site Profile
-        # page would show for this site (consented, else a single active
-        # proposal), not a raw first-non-null merged figure - a reviewer
-        # deciding whether a new filing belongs to this site should see the
-        # same "current total" the rest of the platform trusts. Falls back
-        # to merged's own figure only when candidate_apps is empty or
-        # reconciliation hasn't run (e.g. an all-non-substantive candidate).
-        candidate_facts = build_operative_planning_facts(candidate_apps) if candidate_apps else None
-        candidate_total: int | str | None = None
-        if candidate_facts is not None:
-            if candidate_facts.consented_position.approved_units.state == FACT_RESOLVED:
-                candidate_total = candidate_facts.consented_position.approved_units.value
-            elif (
-                len(candidate_facts.active_positions) == 1
-                and candidate_facts.active_positions[0].proposed_units.state == FACT_RESOLVED
-            ):
-                candidate_total = candidate_facts.active_positions[0].proposed_units.value
-        if candidate_total is None:
-            candidate_total = merged["total_units_final"]
-        st.caption(f"Total units: {candidate_total or 'not yet extracted'} | "
-                   f"Development type: {merged['development_type'] or 'unknown'}")
+            district = extract_postcode_district(app.address)
+            confidence_pct = f"{app.site_link_confidence:.0%}" if app.site_link_confidence else "n/a"
+            st.markdown(
+                f"**Suggested reason:** same postcode district ({district or 'n/a'}) "
+                f"and {confidence_pct} address text similarity to the site below."
+            )
 
-    btn_col1, btn_col2, _ = st.columns([1, 1, 3])
-    with btn_col1:
-        if st.button("Confirm same site", key=f"confirm_{app.id}"):
-            confirm_suggested_link(session, app)
-            session.commit()
-            st.rerun()
-    with btn_col2:
-        if st.button("Reject - different site", key=f"reject_{app.id}"):
-            reject_suggested_link(session, app)
-            session.commit()
-            st.rerun()
-    st.divider()
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**New application: {app.reference}**")
+                st.markdown(app.address or "(no address)")
+                if app.summary_url:
+                    st.markdown(f"[Open on planning portal]({app.summary_url})")
+                merged = aggregate_scheme_fields([app])
+                st.caption(f"Total units: {merged['total_units_final'] or 'not yet extracted'} | "
+                           f"Development type: {merged['development_type'] or 'unknown'}")
+            with col2:
+                st.markdown(f"**Existing site: {', '.join(a.reference for a in candidate_apps) or 'unknown'}**")
+                st.markdown(candidate.display_address if candidate else "(unknown)")
+                if candidate_rep and candidate_rep.summary_url:
+                    st.markdown(f"[Open on planning portal]({candidate_rep.summary_url})")
+                merged = aggregate_scheme_fields(candidate_apps)
+                # Gate 2B-2A - the same trusted operative total the Site Profile
+                # page would show for this site (consented, else a single active
+                # proposal), not a raw first-non-null merged figure - a reviewer
+                # deciding whether a new filing belongs to this site should see the
+                # same "current total" the rest of the platform trusts. Falls back
+                # to merged's own figure only when candidate_apps is empty or
+                # reconciliation hasn't run (e.g. an all-non-substantive candidate).
+                candidate_facts = build_operative_planning_facts(candidate_apps) if candidate_apps else None
+                candidate_total: int | str | None = None
+                if candidate_facts is not None:
+                    if candidate_facts.consented_position.approved_units.state == FACT_RESOLVED:
+                        candidate_total = candidate_facts.consented_position.approved_units.value
+                    elif (
+                        len(candidate_facts.active_positions) == 1
+                        and candidate_facts.active_positions[0].proposed_units.state == FACT_RESOLVED
+                    ):
+                        candidate_total = candidate_facts.active_positions[0].proposed_units.value
+                if candidate_total is None:
+                    candidate_total = merged["total_units_final"]
+                st.caption(f"Total units: {candidate_total or 'not yet extracted'} | "
+                           f"Development type: {merged['development_type'] or 'unknown'}")
+
+            btn_col1, btn_col2, _ = st.columns([1, 1, 3])
+            with btn_col1:
+                if st.button("Confirm same site", key=f"confirm_{app.id}"):
+                    confirm_suggested_link(session, app)
+                    session.commit()
+                    st.rerun()
+            with btn_col2:
+                if st.button("Reject - different site", key=f"reject_{app.id}"):
+                    reject_suggested_link(session, app)
+                    session.commit()
+                    st.rerun()
+            st.divider()

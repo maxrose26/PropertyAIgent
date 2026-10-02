@@ -2448,6 +2448,9 @@ def _resolve_month_ranges(args: argparse.Namespace) -> list[tuple[str, str]]:
     return [(today.replace(day=1).strftime("%d/%m/%Y"), today.strftime("%d/%m/%Y"))]
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('run_weekly')
 def main() -> None:
     args = parse_args()
     log_memory("process.start", council=args.council)
@@ -2721,6 +2724,8 @@ def main() -> None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set in .env")
+        from app.security.access import require_operator
+        require_operator('pipeline.processing', paid=True)
         client = OpenAI(api_key=api_key)
         stage_extraction(session, client, council)
 
@@ -2748,6 +2753,8 @@ def main() -> None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set in .env")
+        from app.security.access import require_operator
+        require_operator('pipeline.processing', paid=True)
         stage_generate_scheme_summaries(session, OpenAI(api_key=api_key), council)
 
     if args.enrich:

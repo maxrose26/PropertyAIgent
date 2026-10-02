@@ -515,6 +515,8 @@ def build_site_profile(
     caller (the Site Profile page, reusing app.ui.common's existing
     helpers) and passed in here, so every tab below reads from the same
     already-computed dicts rather than recomputing them."""
+    from app.security.access import require_admitted
+    require_admitted()
     policy_rows = build_site_policy_intelligence(
         session.execute(select(LocalPlanSite).where(LocalPlanSite.matched_site_id == site.id)).scalars().all()
     )
@@ -618,6 +620,12 @@ def build_site_profile(
         header["primary_reference"] = active_positions[0].reference.value
     else:
         header["primary_reference"] = rep_app.reference if rep_app else None
+    # Navigation follows the same unambiguous application identity as AH.
+    # The separately labelled consented planning facts are not rewritten.
+    from app.reporting.scheme_reconciliation import selected_ah_application_reference
+    current_ah_reference = selected_ah_application_reference(facts)
+    if current_ah_reference is not None:
+        header["primary_reference"] = current_ah_reference
     # planning_status_label IS a substantive scheme fact - CONSENTED vs
     # ACTIVE are never collapsed (Gate 2B-2A Sections 5-7). A single clear
     # active position is shown as-is; several simultaneous active
@@ -746,6 +754,7 @@ def _reconciliation_view(facts) -> dict:
             for p in facts.active_positions
         ],
         "affordable_housing": {
+            "source_selection": [_ah_position(p) for p in getattr(ah, 'source_positions', ())],
             "whole_site": _ah_position(ah.whole_site),
             "phases": [_ah_position(p) for p in ah.phases],
             "active_whole_site": _ah_position(ah.active_whole_site),
@@ -770,6 +779,8 @@ def _ah_position(p) -> dict | None:
     if p is None:
         return None
     return {
+        "assessment": p.assessment.payload() if p.assessment else None,
+        "assessment_label": p.assessment.label() if p.assessment else "AH evidence not qualified",
         "reference": p.application_reference, "scope": p.scope_label, "scope_type": p.scope_type,
         "percentage": p.percentage, "units": p.units, "tenure": p.tenure, "status": p.status,
         "notes": p.notes, "decided_state": p.decided_state,

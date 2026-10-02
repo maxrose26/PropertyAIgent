@@ -453,18 +453,20 @@ def ai_summary_card(
     """The AI-Generated Content treatment (docs/UI_DESIGN_SYSTEM.md) - a
     purple-accented card, always carrying its generation timestamp/model
     (never presented as an unattributed claim), for any narrative content
-    synthesised from this platform's own verified evidence."""
+    synthesised from this platform's own stored evidence."""
     container_key = key or "ai-summary-card"
     with st.container(border=True, key=container_key):
-        st.markdown("🤖 **AI Summary**")
-        st.write(text)
+        st.markdown("🤖 **Historical AI summary — unverified**")
+        st.caption("Stored narrative may contain outdated or unsupported claims. It does not verify affordable counts, legal terms, tenure or acquisition availability. Check the scheme’s current evidence and qualifications.")
+        with st.expander("Read historical narrative (unverified)"):
+            st.write(text)
         meta_bits = [b for b in (
             f"Generated {generated_at}" if generated_at else None,
             model,
             f"prompt {prompt_version}" if prompt_version else None,
         ) if b]
         if meta_bits:
-            st.caption(" · ".join(meta_bits) + " — built from evidence already verified by this platform.")
+            st.caption(" · ".join(meta_bits) + " — historical AI output; source and current status require checking.")
     st.markdown(
         f'<style>.st-key-{container_key} {{ border-left: 4px solid {_CUSTOM_ALERT_STYLE["ai"]["color"]} !important; }}</style>',
         unsafe_allow_html=True,
@@ -533,7 +535,7 @@ def ai_daily_brief_placeholder() -> None:
             st.badge("Evidence-based briefing", icon="📄", color="violet")
         st.write(
             "A short, plain-English summary of what changed across every council and Site this platform "
-            "tracks - written only from evidence already verified elsewhere on this Dashboard, never invented."
+            "tracks. Stored AI narratives require source and current-status checks."
         )
         st.caption("Not yet generated — daily briefing will become available once dashboard aggregation is implemented.")
     st.markdown(
@@ -654,7 +656,7 @@ def ai_summary_carousel(items: list[dict], *, key: str) -> None:
         st.caption(item["council_code"])
         st.write(item["excerpt"])
         meta_bits = [b for b in (f"Generated {relative_time(item['generated_at'])}",) if b]
-        st.caption(" · ".join(meta_bits) + " — built from evidence already verified by this platform.")
+        st.caption(" · ".join(meta_bits) + " — historical AI output; source and current status require checking.")
         if item.get("page"):
             st.page_link(item["page"], label="View source →", query_params=item.get("params") or {})
 
@@ -688,6 +690,9 @@ def quick_actions_panel(items: list[dict]) -> None:
     with st.container(border=True):
         st.markdown("**⚡ Quick Actions**")
         for item in items:
+            from app.security.access import is_operator
+            if item.get('page') in ('pages/4_Council_Dashboard.py','pages/2_Review_Site_Links.py','pages/2b_Review_Allocation_Site_Matches.py') and not is_operator():
+                continue
             st.divider()
             if item.get("page"):
                 st.markdown(f"{item['icon']} **{item['title']}**")
@@ -773,8 +778,8 @@ def _scheme_stack_card(card: dict, *, rank: int, key: str) -> None:
         badge_cols = st.columns(4)
         badge_fields = [
             ("total_units", lambda v: f"{v} units"),
-            ("affordable_units", lambda v: f"{v} affordable"),
-            ("affordable_percentage", lambda v: f"{v:.0f}% affordable"),
+            ("affordable_units", lambda v: f"Reported AH count: {v} (source and scope unverified)"),
+            ("affordable_percentage", lambda v: f"Reported AH percentage: {v:.0f}% (scope unverified)"),
             ("decision_status", lambda v: v),
             ("build_status", lambda v: v),
             ("planning_status", lambda v: v),
@@ -866,11 +871,12 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(card["signal"], "info"), card.get("signal_label") or card["signal"])
         buyer_fit = card.get("buyer_fit")
         if buyer_fit is not None:
-            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), buyer_fit.classification.replace("_", " ").title())
+            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), "Existing-policy fit: " + buyer_fit.classification.replace("_", " ").title())
+            st.caption("This existing-policy result does not verify AH count source or scope, final tenure terms or acquisition availability.")
         if card.get("headline_reason"):
             st.write(card["headline_reason"])
         if buyer_fit is not None and buyer_fit.matches:
-            st.caption("Why it fits: " + " · ".join(buyer_fit.matches[:2]))
+            st.caption("Existing-policy reasons (AH qualification unverified): " + " · ".join(buyer_fit.matches[:2]))
 
         if card.get("metrics"):
             cols = st.columns(len(card["metrics"]))
@@ -902,14 +908,16 @@ def ai_summary_rail(items: list[dict], *, key: str, cycle_seconds: int = 40) -> 
         st.caption("No AI summaries generated yet.")
         return
 
-    st.markdown('<span class="pig-live-dot"></span><span class="pig-live-label">Live</span>', unsafe_allow_html=True)
+    st.markdown('<span class="pig-live-dot"></span><span class="pig-live-label">Stored summaries</span>', unsafe_allow_html=True)
     per_card_seconds = max(cycle_seconds, len(items) * 4) / len(items)
     for i, item in enumerate(items):
         container_key = f"rail-card-{key}-{item['id']}"
         with st.container(border=True, key=container_key):
             st.markdown(f"**{_escape(item['type'])}**")
             st.caption(_escape(item["name"]))
-            st.write(item["excerpt"])
+            st.caption("Historical AI output — unverified; source and current status require checking.")
+            with st.expander("Read historical narrative (unverified)"):
+                st.write(item["excerpt"])
             st.caption(f"Why now: {item['relevance']}")
             meta_col, badge_col = st.columns([3, 2], vertical_alignment="center")
             with meta_col:
@@ -1243,7 +1251,8 @@ def control_relationship_view_card(view) -> None:
 
 def _visual_evidence_card(card: dict, *, width: int = 200) -> None:
     if card.get("image_path") and os.path.exists(card["image_path"]):
-        st.image(card["image_path"], width=width)
+        from app.ui.protected_download import image
+        image(card["image_path"], width=width)
     detail = card["label"]
     if card.get("source_title"):
         detail += f" — {card['source_title']}"

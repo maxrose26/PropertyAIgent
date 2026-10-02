@@ -212,6 +212,9 @@ def run(
     return _EXIT_CODE_BY_OUTCOME.get(outcome.outcome, EXIT_ERROR)
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('refresh_intelligence_application')
 def main(argv: list[str] | None = None) -> int:
     load_dotenv(override=True)
     parser = build_arg_parser()
@@ -227,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
             if not api_key:
                 print("[refresh-intelligence-application] OPENAI_API_KEY is not set.", file=sys.stderr)
                 return EXIT_TARGET_ERROR
+            from app.security.access import require_operator
+            require_operator('pipeline.processing', paid=True)
             client = OpenAI(api_key=api_key)
 
         return run(

@@ -138,6 +138,9 @@ def apply(session, dry_run: bool = False) -> dict:
     }
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('apply_pr2_allocation_match_review')
 def main() -> None:
     args = parse_args()
     init_db()

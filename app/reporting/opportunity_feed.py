@@ -195,6 +195,8 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
         "params": card["params"],
         "when": card["when"],
         "matching_facts": None,
+        "application_reference": card.get("application_reference") or card.get("reference"),
+        "phase_code": card.get("phase_code"),
     }
 
 
@@ -238,15 +240,28 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
     for app in apps:
         apps_by_site.setdefault(app.site_id, []).append(app)
 
-    facts_by_site_id = {}
-    for site_id, site_apps in apps_by_site.items():
-        operative_facts = build_operative_planning_facts(site_apps)
-        facts_by_site_id[site_id] = build_planning_delivery_matching_facts_from_operative(operative_facts, site_apps)
-
+    operative_by_site = {sid: build_operative_planning_facts(rows) for sid, rows in apps_by_site.items()}
+    facts_by_context = {}
     for card in cards:
         site_id_raw = card.get("params", {}).get("site_id")
-        if site_id_raw is not None:
-            card["matching_facts"] = facts_by_site_id.get(int(site_id_raw))
+        if site_id_raw is None:
+            continue
+        site_id = int(site_id_raw)
+        if site_id not in operative_by_site:
+            card["matching_facts"] = None
+            continue
+        reference = card.get("application_reference") or card.get("reference")
+        phase_code = card.get("phase_code")
+        key = (site_id, reference, phase_code)
+        if key not in facts_by_context:
+            facts = build_planning_delivery_matching_facts_from_operative(
+                operative_by_site[site_id], apps_by_site[site_id], application_reference=reference)
+            if phase_code:
+                from dataclasses import replace
+                facts = replace(facts, affordable_unit_count=None, affordable_percentage=None,
+                                affordable_percentage_trusted=False)
+            facts_by_context[key] = facts
+        card["matching_facts"] = facts_by_context[key]
 
 
 def _generic_selection(strategic: list[dict], delivery: list[dict], limit: int) -> list[dict]:
@@ -369,6 +384,8 @@ def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None
     time-bound - before undeveloped phase); scale (capacity/hectares,
     already the tie-break within each source query) is never used to rank
     ACROSS types, only within one."""
+    from app.security.access import require_admitted
+    require_admitted()
     from app.reporting.dashboard import (  # local import: avoids a circular import (dashboard.py may grow a reason to import this module later)
         _approaching_lapse_cards,
         _long_pending_application_cards,

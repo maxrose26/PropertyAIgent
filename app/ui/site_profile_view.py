@@ -17,6 +17,7 @@ import json
 
 import pandas as pd
 import streamlit as st
+from app.ui import safe_table
 
 from app.db.models import Application, Site
 from app.pipeline.lapse_tracking import (
@@ -85,6 +86,12 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
     elif header["decision_status_label"]:
         st.markdown(f"**Decision status:** {header['decision_status_label']}")
 
+    from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
+    assessment = resolve_operative_filter_facts(build_operative_planning_facts(apps)).affordable_assessment
+    st.caption(assessment.label())
+    with st.expander("AH source and uncertainty"):
+        from app.ui.ah_evidence import render_ah_evidence
+        render_ah_evidence(assessment, st)
     phase_breakdown = build_phase_breakdown(site.applications)
     if phase_breakdown:
         section_header("Phase & plot breakdown", icon="🏗️")
@@ -100,7 +107,7 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
             "Status": PHASE_STATUS_LABELS[p["status"]],
             "Applications": len(p["applications"]),
         } for p in phase_breakdown]
-        st.dataframe(pd.DataFrame(phase_rows), use_container_width=True, hide_index=True)
+        safe_table.dataframe(pd.DataFrame(phase_rows), use_container_width=True, hide_index=True)
 
     section_header("Applications", icon="📋")
     groups: dict[str, list[Application]] = {}
@@ -111,7 +118,7 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
         if not group_apps:
             continue
         with st.expander(f"{_DECISION_GROUP_LABELS[key]} ({len(group_apps)})", expanded=key == "granted"):
-            st.dataframe(
+            safe_table.dataframe(
                 _applications_dataframe(group_apps), use_container_width=True, hide_index=True,
                 column_config={"Portal URL": st.column_config.LinkColumn()},
             )
@@ -230,6 +237,9 @@ def _housing_type_section(housing_type: dict) -> None:
 def _affordable_housing_section(mix: dict) -> None:
     section_header("Affordable Housing", icon="🏡")
     scheme = mix["scheme"]
+    if mix.get("affordable_assessment"):
+        from app.ui.ah_evidence import render_ah_evidence
+        render_ah_evidence(mix["affordable_assessment"], st)
     headline = mix["affordable_headline"]
     affordable_headline_tile(headline, mix["percentage_reconciliation"])
     if headline["percentage_is_calculated"]:
@@ -238,15 +248,25 @@ def _affordable_housing_section(mix: dict) -> None:
             "not independently stated in evidence."
         )
     if scheme:
-        detail_bits = []
-        if scheme.affordable_classification_confidence:
-            detail_bits.append(f"confidence: {scheme.affordable_classification_confidence}")
-        if scheme.affordable_data_status:
-            detail_bits.append(f"status: {scheme.affordable_data_status}")
-        if detail_bits:
-            st.caption(" · ".join(detail_bits))
+        # Generic extraction confidence/classification does not qualify a
+        # whole-scheme claim. Use the same scoped assessment as matching/CSV;
+        # a qualified component count survives a disputed whole-scheme label.
+        assessment = mix.get("affordable_assessment")
+        if assessment:
+            st.caption(assessment.label())
+        reported = mix.get("reported_affordable_assessment")
+        if (reported and reported.count.value is not None
+                and (not assessment or (not assessment.count.qualified and
+                     (assessment.count.value != reported.count.value or
+                      assessment.count.application_reference != reported.count.application_reference)))):
+            st.caption("Investigation evidence, not an operative numeric match: " + reported.label())
+        if (not assessment or not assessment.count.qualified
+                or assessment.count.scope_type != "whole_site"
+                or assessment.percentage_review_reason
+                or not mix["percentage_reconciliation"]["percentage_reconciles"]):
+            st.caption("Whole-scheme affordable classification requires source and scope review.")
         if scheme.affordable_classification_evidence:
-            with st.expander("Source evidence"):
+            with st.expander("Reported extraction evidence — source and scope require verification"):
                 st.write(scheme.affordable_classification_evidence)
         if scheme.affordable_status_note:
             status_badge("review")
@@ -256,12 +276,13 @@ def _affordable_housing_section(mix: dict) -> None:
 def _affordable_tenure_section(tenure: dict) -> None:
     section_header("Affordable Tenure", icon="🔑")
     if tenure["has_categories"]:
+        st.caption("Reported tenure evidence; current approved terms and application scope require verification.")
         for category in tenure["categories"]:
             st.markdown(f"- {category}")
     elif tenure["affordable_known_tenure_unknown"]:
         st.info("Affordable tenure not identified")
     else:
-        st.caption("Not applicable - no affordable homes identified for this scheme.")
+        st.caption("Affordable tenure not identified; affordable housing provision remains unresolved.")
 
 
 def _residential_mix_commentary_section(mix: dict) -> None:
@@ -292,7 +313,7 @@ def _evidence_and_reconciliation_section(mix: dict) -> None:
     scheme = mix["scheme"]
     if scheme:
         st.caption(
-            f"Source application: {current_version['reference']} · "
+            f"Source application: {mix.get('extraction_reference') or 'unknown'} · "
             f"reconciliation status: {scheme.unit_reconciliation_status or 'OK'}"
         )
     if current_version["alternatives"]:
@@ -302,7 +323,7 @@ def _evidence_and_reconciliation_section(mix: dict) -> None:
             if alt["total_units_final"] is not None:
                 bits.append(f"{alt['total_units_final']:,} total homes")
             if alt["affordable_units_final"] is not None:
-                bits.append(f"{alt['affordable_units_final']:,} affordable")
+                bits.append(f"{alt['affordable_units_final']:,} reported affordable (source and scope unverified)")
             st.caption(" · ".join(bits) + " — not combined with the current version's figures above.")
 
 
@@ -310,6 +331,9 @@ def _render_residential_mix(mix: dict) -> None:
     """The dedicated Residential Mix Intelligence tab (Sprint 4.4
     Amendment, Part 2/6) - suggested section order, each one degrading
     honestly when its evidence doesn't exist rather than a dead panel."""
+    st.caption("Residential extraction source for totals, housing type and density: "
+               + str(mix.get("extraction_reference") or "unknown")
+               + ". This is separate from the current AH application and is not transferred to its AH position.")
     _residential_mix_overview_section(mix)
     st.divider()
     _bedroom_mix_section(mix["bedroom_mix"])
@@ -410,7 +434,7 @@ def _render_applicant_intelligence(session, apps: list[Application]) -> None:
             entry["raw_names"].add(cleaned)
 
     if not seen_refs:
-        st.info("No applicant/developer organisation identified from this Site's linked Applications.")
+        st.info("No applicant/developer organisation in the linked application-summary fields. Document-backed roles are shown separately when recorded.")
         return
 
     for entry in seen_refs.values():

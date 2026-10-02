@@ -206,6 +206,9 @@ SOURCE TEXT:
 """
 
 
+from app.security.commands import command
+
+@command('plan.extract', paid=True)
 def extract_plan_evidence(client: OpenAI, category: str, source_text: str, usage_sink: list | None = None) -> list[dict]:
     """Runs one targeted extraction pass. Returns a list of fact dicts:
     {"field", "value", "source_page", "source_excerpt", "confidence"} - one

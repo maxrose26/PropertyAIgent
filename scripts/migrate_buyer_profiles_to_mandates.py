@@ -55,6 +55,9 @@ def _print_report(report: dict) -> None:
     print(f"fingerprint_mismatches: {report['fingerprint_mismatches']}")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('migrate_buyer_profiles_to_mandates')
 def main() -> None:
     args = parse_args()
     execute = bool(args.execute and args.confirm == CONFIRM_PHRASE)

@@ -73,120 +73,125 @@ from app.ui.shell import (
     wide_canvas,
 )
 
-bootstrap()
-session, settings = get_db()
-credits_sidebar(session, settings)
+from app.ui.access import page_scope
+from app.security.access import require_operator, is_operator
+from app.ui import protected_download
 
-wide_canvas()
+with page_scope():
+    bootstrap()
+    with get_db() as (session, settings):
+        credits_sidebar(session, settings)
 
-page_header(
-    "Council Intelligence",
-    "Local Plan status, housing position and evidence freshness for every council this platform tracks.",
-    icon="🏛️",
-)
+        wide_canvas()
 
-cards = build_council_overview(session)
-
-if not cards:
-    empty_state(
-        "No councils onboarded yet",
-        "Council Intelligence will appear here once a Local Plan or monitoring source has been onboarded "
-        "for at least one council.",
-        icon="🏛️",
-        show_home_link=False,
-    )
-    st.stop()
-
-
-def _render_council_card(card: dict) -> None:
-    container_key = f"cc-{card['status_color']}-{card['council_code']}"
-    with st.container(border=True, key=container_key):
-        # Header: council name + Planning Readiness chip - the strongest
-        # visual element on the card (Sprint 4.3a, Part 9) - plus a
-        # separate, neutral Joint Plan badge whenever the displayed plan
-        # isn't this council's own (Part 3 - joint-plan participation and
-        # plan status are different pieces of information and must not
-        # replace one another).
-        col_name, col_status = st.columns([3, 2], vertical_alignment="center")
-        with col_name:
-            st.markdown(f"### {card['council_name']}")
-        with col_status:
-            if card["planning_readiness_chip"] is not None:
-                planning_readiness_chip(card["planning_readiness_chip"])
-                if not card["primary_plan_is_own"]:
-                    joint_plan_badge()
-            else:
-                status_badge("info", "No Local Plan yet")
-
-        # Planning Outlook + Why it matters sit directly beneath the
-        # header (Part 9 - "Planning Outlook sits directly beneath"), both
-        # purely deterministic, never AI-generated.
-        planning_outlook_banner(card["planning_outlook"])
-        why_it_matters_line(card["why_it_matters"])
-
-        # Plan line: primary Local Plan name + current stage.
-        st.caption(
-            f"{card['plan_name']} · {card['current_stage']}" if card["plan_name"] else card["current_stage"]
+        page_header(
+            "Council Intelligence",
+            "Local Plan status, housing position and evidence freshness for every council this platform tracks.",
+            icon="🏛️",
         )
 
-        # Headline metrics - STANDARDISED across every card (Part 5): the
-        # same four metrics, same order, never swapped depending on which
-        # evidence happens to be available. "Evidence" is deliberately not
-        # one of these four (kept as secondary information below).
-        row1_col1, row1_col2 = st.columns(2)
-        with row1_col1:
-            five_year_supply_tile(
-                card["five_year_supply_display"],
-                card["five_year_supply_state"],
-                base_date=card["five_year_supply_base_date"],
+        cards = build_council_overview(session)
+
+        if not cards:
+            empty_state(
+                "No councils onboarded yet",
+                "Council Intelligence will appear here once a Local Plan or monitoring source has been onboarded "
+                "for at least one council.",
+                icon="🏛️",
+                show_home_link=False,
             )
-        with row1_col2:
-            stat_tile(
-                "Homes Required",
-                card["housing_requirement_display"] or "Not yet verified",
-                help="Total plan-period figure where stated, otherwise the annual rate.",
-            )
-
-        row2_col1, row2_col2 = st.columns(2)
-        with row2_col1:
-            stat_tile("Strategic allocations", f"{card['allocation_count']:,}")
-        with row2_col2:
-            next_milestone = card["next_milestone_metric"]
-            stat_tile("Next milestone", next_milestone["value"], caption=next_milestone["caption"])
-
-        # Secondary information - kept visible but subordinate to the
-        # headline metrics above (Part 8 - never competes visually with
-        # the headline information).
-        secondary_bits = []
-        if card["expected_adoption_date"]:
-            secondary_bits.append(f"Expected adoption: {card['expected_adoption_date']}")
-        secondary_bits.append(f"Updated {relative_time(card['last_updated'])}")
-        secondary_bits.append(card["evidence_freshness"])
-        st.caption(" · ".join(secondary_bits))
-        if card["has_missing_evidence"]:
-            status_badge("review", "Evidence gaps")
-
-        # AI summary - a short, stored excerpt only; never regenerated here.
-        if card["ai_summary_excerpt"]:
-            ai_badge()
-            st.write(card["ai_summary_excerpt"])
-            st.caption(f"Generated {relative_time(card['ai_summary_generated_at'])}")
-        else:
-            st.caption("No AI summary generated yet for this council's Local Plan.")
-
-        st.page_link(card["page"], label="Open Council →", query_params=card["params"])
+            st.stop()
 
 
-with st.container(key="council-grid"):
-    # A SINGLE st.columns() call for every card, not chunked into groups of
-    # 3 - Streamlit renders each st.columns() call as its own independent
-    # stHorizontalBlock, and CSS Grid's auto-fit only reflows children
-    # WITHIN one such block. Chunking into separate 3-wide Python rows
-    # created one independent grid per chunk, so at a width that only fits
-    # 2 cards per line each 3-card chunk wrapped into its own "2 then 1"
-    # pair rather than the whole card list flowing evenly across full
-    # rows. A single call gives auto-fit every card at once to lay out.
-    cols = st.columns(len(cards))
-    for col, card in zip(cols, cards):
-        with col:
-            _render_council_card(card)
+        def _render_council_card(card: dict) -> None:
+            container_key = f"cc-{card['status_color']}-{card['council_code']}"
+            with st.container(border=True, key=container_key):
+                # Header: council name + Planning Readiness chip - the strongest
+                # visual element on the card (Sprint 4.3a, Part 9) - plus a
+                # separate, neutral Joint Plan badge whenever the displayed plan
+                # isn't this council's own (Part 3 - joint-plan participation and
+                # plan status are different pieces of information and must not
+                # replace one another).
+                col_name, col_status = st.columns([3, 2], vertical_alignment="center")
+                with col_name:
+                    st.markdown(f"### {card['council_name']}")
+                with col_status:
+                    if card["planning_readiness_chip"] is not None:
+                        planning_readiness_chip(card["planning_readiness_chip"])
+                        if not card["primary_plan_is_own"]:
+                            joint_plan_badge()
+                    else:
+                        status_badge("info", "No Local Plan yet")
+
+                # Planning Outlook + Why it matters sit directly beneath the
+                # header (Part 9 - "Planning Outlook sits directly beneath"), both
+                # purely deterministic, never AI-generated.
+                planning_outlook_banner(card["planning_outlook"])
+                why_it_matters_line(card["why_it_matters"])
+
+                # Plan line: primary Local Plan name + current stage.
+                st.caption(
+                    f"{card['plan_name']} · {card['current_stage']}" if card["plan_name"] else card["current_stage"]
+                )
+
+                # Headline metrics - STANDARDISED across every card (Part 5): the
+                # same four metrics, same order, never swapped depending on which
+                # evidence happens to be available. "Evidence" is deliberately not
+                # one of these four (kept as secondary information below).
+                row1_col1, row1_col2 = st.columns(2)
+                with row1_col1:
+                    five_year_supply_tile(
+                        card["five_year_supply_display"],
+                        card["five_year_supply_state"],
+                        base_date=card["five_year_supply_base_date"],
+                    )
+                with row1_col2:
+                    stat_tile(
+                        "Homes Required",
+                        card["housing_requirement_display"] or "Not yet verified",
+                        help="Total plan-period figure where stated, otherwise the annual rate.",
+                    )
+
+                row2_col1, row2_col2 = st.columns(2)
+                with row2_col1:
+                    stat_tile("Strategic allocations", f"{card['allocation_count']:,}")
+                with row2_col2:
+                    next_milestone = card["next_milestone_metric"]
+                    stat_tile("Next milestone", next_milestone["value"], caption=next_milestone["caption"])
+
+                # Secondary information - kept visible but subordinate to the
+                # headline metrics above (Part 8 - never competes visually with
+                # the headline information).
+                secondary_bits = []
+                if card["expected_adoption_date"]:
+                    secondary_bits.append(f"Expected adoption: {card['expected_adoption_date']}")
+                secondary_bits.append(f"Updated {relative_time(card['last_updated'])}")
+                secondary_bits.append(card["evidence_freshness"])
+                st.caption(" · ".join(secondary_bits))
+                if card["has_missing_evidence"]:
+                    status_badge("review", "Evidence gaps")
+
+                # AI summary - a short, stored excerpt only; never regenerated here.
+                if card["ai_summary_excerpt"]:
+                    ai_badge()
+                    st.write(card["ai_summary_excerpt"])
+                    st.caption(f"Generated {relative_time(card['ai_summary_generated_at'])}")
+                else:
+                    st.caption("No AI summary generated yet for this council's Local Plan.")
+
+                st.page_link(card["page"], label="Open Council →", query_params=card["params"])
+
+
+        with st.container(key="council-grid"):
+            # A SINGLE st.columns() call for every card, not chunked into groups of
+            # 3 - Streamlit renders each st.columns() call as its own independent
+            # stHorizontalBlock, and CSS Grid's auto-fit only reflows children
+            # WITHIN one such block. Chunking into separate 3-wide Python rows
+            # created one independent grid per chunk, so at a width that only fits
+            # 2 cards per line each 3-card chunk wrapped into its own "2 then 1"
+            # pair rather than the whole card list flowing evenly across full
+            # rows. A single call gives auto-fit every card at once to lay out.
+            cols = st.columns(len(cards))
+            for col, card in zip(cols, cards):
+                with col:
+                    _render_council_card(card)

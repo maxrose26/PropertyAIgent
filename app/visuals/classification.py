@@ -20,6 +20,7 @@ high-confidence text fact can be (Part 9/Part 10: showing the WRONG image
 is a worse failure than a wrong number).
 """
 from __future__ import annotations
+from app.security.commands import command
 
 import base64
 import json
@@ -114,6 +115,7 @@ def normalise_classification(raw: dict) -> dict:
     }
 
 
+@command("visual.classify", paid=True)
 def classify_page(client: OpenAI, image_path: str, usage_sink: list | None = None) -> dict:
     """Sends ONE rendered page image to the vision model, returns a
     normalised dict: {"is_useful", "image_type", "likely_object", "reason",

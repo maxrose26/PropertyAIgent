@@ -1,0 +1,91 @@
+- list:
+  - link "streamlit app":
+    - /url: https://propertyaigent.onrender.com/
+    - paragraph: streamlit app
+  - link "Dashboard":
+    - /url: https://propertyaigent.onrender.com/Dashboard
+    - paragraph: Dashboard
+  - link "Explore":
+    - /url: https://propertyaigent.onrender.com/Explore
+    - paragraph: Explore
+  - link "Scheme Detail":
+    - /url: https://propertyaigent.onrender.com/Scheme_Detail
+    - paragraph: Scheme Detail
+  - link "b Review Allocation Site Matches":
+    - /url: https://propertyaigent.onrender.com/b_Review_Allocation_Site_Matches
+    - paragraph: b Review Allocation Site Matches
+  - link "Review Site Links":
+    - /url: https://propertyaigent.onrender.com/Review_Site_Links
+    - paragraph: Review Site Links
+  - link "b Shortlist":
+    - /url: https://propertyaigent.onrender.com/b_Shortlist
+    - paragraph: b Shortlist
+  - link "Local Plan Sites":
+    - /url: https://propertyaigent.onrender.com/Local_Plan_Sites
+    - paragraph: Local Plan Sites
+  - link "Council Dashboard":
+    - /url: https://propertyaigent.onrender.com/Council_Dashboard
+    - paragraph: Council Dashboard
+  - link "Council Intelligence":
+    - /url: https://propertyaigent.onrender.com/Council_Intelligence
+    - paragraph: Council Intelligence
+  - link "Council Intelligence Detail":
+    - /url: https://propertyaigent.onrender.com/Council_Intelligence_Detail
+    - paragraph: Council Intelligence Detail
+- generic "keyboard_arrow_right 💳 Credits — 13 remaining":
+  - generic: keyboard_arrow_right
+  - paragraph: 💳 Credits — 13 remaining
+- banner:
+  - button "Main menu":
+- link "← Back to Explore":
+  - /url: Explore
+  - generic: 🔙
+  - paragraph: ← Back to Explore
+- link "Open Council Intelligence →":
+  - /url: Council_Intelligence_Detail?council=stockport
+  - paragraph: Open Council Intelligence →
+- link "View Local Plan Sites →":
+  - /url: Local_Plan_Sites?council=stockport
+  - paragraph: View Local Plan Sites →
+- heading "Land South Of Hyde East And West Of Stockport Road Hyde" [level=1]:
+  - text: Land South Of Hyde East And West Of Stockport Road Hyde
+  - link "Link to heading":
+    - /url: "#land-south-of-hyde-east-and-west-of-stockport-road-hyde"
+- paragraph: stockport · DC/098428
+- paragraph:
+  - generic: ℹ Awaiting decision
+- paragraph:
+  - generic: 🕗 Awaiting decision
+- paragraph: Evidence last updated 13 Sep 2026
+- tablist:
+  - tab "Overview":
+    - paragraph: Overview
+  - tab "Planning Position" [selected]:
+    - paragraph: Planning Position
+  - tab "Policy Position":
+    - paragraph: Policy Position
+  - tab "Ownership & Control":
+    - paragraph: Ownership & Control
+  - tab "Residential Mix Intelligence":
+    - paragraph: Residential Mix Intelligence
+  - tab "Visual Evidence":
+    - paragraph: Visual Evidence
+  - tab "Timeline":
+    - paragraph: Timeline
+  - tab "AI Summary":
+    - paragraph: AI Summary
+- tabpanel "Planning Position":
+  - paragraph:
+    - strong: "Commencement status:"
+    - text: Not yet granted
+  - heading "📋 Applications" [level=2]:
+    - text: 📋 Applications
+    - link "Link to heading":
+      - /url: "#applications"
+  - generic "keyboard_arrow_down Submitted / pending (2)" [active]:
+    - generic: keyboard_arrow_down
+    - paragraph: Submitted / pending (2)
+  - button "Show/hide columns":
+  - button "Download as CSV":
+  - button "Search":
+  - button "Fullscreen":

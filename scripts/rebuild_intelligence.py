@@ -130,6 +130,9 @@ def _print_report(summary: HistoricalRebuildRunSummary) -> None:
     print(f"[rebuild-intelligence] council_distribution={summary.council_distribution}")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('rebuild_intelligence')
 def main(argv: list[str] | None = None) -> int:
     load_dotenv(override=True)
     parser = build_arg_parser()
@@ -147,6 +150,8 @@ def main(argv: list[str] | None = None) -> int:
             print("[rebuild-intelligence] OPENAI_API_KEY is not set - required for a live (non-dry-run) batch.", file=sys.stderr)
             session.close()
             return 1
+        from app.security.access import require_operator
+        require_operator('pipeline.processing', paid=True)
         client = OpenAI(api_key=api_key)
 
     try:

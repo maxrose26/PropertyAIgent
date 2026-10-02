@@ -19,6 +19,9 @@ from app.db.session import get_session, init_db
 from app.extraction.pdf_text import clean_document_text, extract_document_text
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('reextract_failed_documents')
 def main() -> None:
     init_db()
     session = get_session()

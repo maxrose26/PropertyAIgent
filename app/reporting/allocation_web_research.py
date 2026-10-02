@@ -359,6 +359,9 @@ class _IdSequence:
         return f"W{self._n}"
 
 
+from app.security.commands import command
+
+@command('shortlist.research', paid=True)
 def build_allocation_web_research_context(
     client, report_context: AllocationReportContext, *, council_domains: frozenset[str] = frozenset(),
 ) -> AllocationWebResearchContext:
@@ -375,6 +378,8 @@ def build_allocation_web_research_context(
     planningportal.co.uk suffixes already recognised - passed by the caller
     from app.config.load_councils(), never looked up by this module itself
     (kept a pure function of its inputs)."""
+    from app.security.access import require_operator
+    require_operator('shortlist.research', paid=True)
     now = dt.datetime.now(dt.timezone.utc)
     current_year = now.year
     result = AllocationWebResearchContext(research_timestamp=now)

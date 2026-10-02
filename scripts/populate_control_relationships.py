@@ -90,6 +90,9 @@ def _print_report(report) -> None:
             print(f"  - {err}")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('populate_control_relationships')
 def main() -> None:
     args = parse_args()
 

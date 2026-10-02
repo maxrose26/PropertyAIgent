@@ -1,3 +1,4 @@
+-c verification/stage1-requirements.lock
 playwright
 beautifulsoup4
 requests
@@ -14,3 +15,7 @@ pandas
 reportlab
 pytest
 psutil
+
+# Stage 1 native OIDC
+Authlib==1.8.0
+joserfc==1.7.5

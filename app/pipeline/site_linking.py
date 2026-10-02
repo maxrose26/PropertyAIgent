@@ -222,16 +222,24 @@ def link_application_to_site(session: Session, application: Application) -> None
     application.site_link_method = "created"
 
 
+from app.security.commands import command
+
+@command('matching.write')
 def confirm_suggested_link(session: Session, application: Application) -> None:
     """User confirmed a suggested_fuzzy candidate is the same site."""
+    from app.security.access import require_operator
+    require_operator('matching.write')
     if application.suggested_site_id is None:
         return
     application.site_id = application.suggested_site_id
     application.site_link_method = "suggested_fuzzy"  # keep provenance that it started as a suggestion
 
 
+@command('matching.write')
 def reject_suggested_link(session: Session, application: Application) -> None:
     """User rejected a suggested_fuzzy candidate - it's actually a distinct site."""
+    from app.security.access import require_operator
+    require_operator('matching.write')
     normalised = normalise_address(application.address or "")
     site = _create_site(session, application, normalised)
     application.site_id = site.id

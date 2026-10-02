@@ -68,6 +68,9 @@ def _print_report(report) -> None:
               f"-> application {a['application_reference']}")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('dry_run_gm_allocation_site_relationships')
 def main() -> None:
     args = parse_args()
 

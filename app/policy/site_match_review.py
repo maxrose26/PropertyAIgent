@@ -16,6 +16,9 @@ import datetime as dt
 from app.db.models import LocalPlanSite
 
 
+from app.security.commands import command
+
+@command('matching.write')
 def confirm_site_match(session, allocation: LocalPlanSite, confirmed_by: str, note: str) -> None:
     """Marks allocation.matched_site_id as a human-confirmed relationship.
     Requires a non-empty note (the supporting evidence - shared distinctive
@@ -24,17 +27,23 @@ def confirm_site_match(session, allocation: LocalPlanSite, confirmed_by: str, no
     is insufficient"). Leaves matched_site_id/match_confidence exactly as
     they were - this action only changes review_status and adds
     provenance, never the relationship itself."""
+    from app.security.access import require_operator
+    require_operator('matching.write')
+    from app.services.authorised_reads import reload_shared
+    allocation=reload_shared(session,allocation,LocalPlanSite)
     if allocation.matched_site_id is None:
         raise ValueError(f"Allocation {allocation.id} has no matched_site_id - nothing to confirm.")
     if not note or not note.strip():
         raise ValueError("confirm_site_match requires a non-empty note explaining the supporting evidence.")
     allocation.review_status = "confirmed"
-    allocation.confirmed_by = confirmed_by
+    from app.security.access import actor_label
+    allocation.confirmed_by = actor_label()
     allocation.confirmed_at = dt.datetime.now(dt.timezone.utc)
     allocation.match_review_note = note.strip()
     session.commit()
 
 
+@command('matching.write')
 def reject_site_match(session, allocation: LocalPlanSite, confirmed_by: str, reason: str) -> None:
     """Records that a proposed Site match was reviewed and found NOT to
     genuinely relate to this allocation. Unlike VisualEvidence's
@@ -50,6 +59,10 @@ def reject_site_match(session, allocation: LocalPlanSite, confirmed_by: str, rea
     so a future matching pass can see this allocation already had its
     obvious candidate looked at and declined, distinct from one nobody has
     reviewed yet."""
+    from app.security.access import require_operator
+    require_operator('matching.write')
+    from app.services.authorised_reads import reload_shared
+    allocation=reload_shared(session,allocation,LocalPlanSite)
     if allocation.matched_site_id is None:
         raise ValueError(f"Allocation {allocation.id} has no matched_site_id - nothing to reject.")
     if not reason or not reason.strip():
@@ -58,7 +71,8 @@ def reject_site_match(session, allocation: LocalPlanSite, confirmed_by: str, rea
     allocation.matched_site_id = None
     allocation.match_confidence = None
     allocation.review_status = "rejected"
-    allocation.confirmed_by = confirmed_by
+    from app.security.access import actor_label
+    allocation.confirmed_by = actor_label()
     allocation.confirmed_at = dt.datetime.now(dt.timezone.utc)
     allocation.match_review_note = f"Rejected candidate Site {rejected_site_id}: {reason.strip()}"
     session.commit()

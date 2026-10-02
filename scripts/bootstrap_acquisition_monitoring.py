@@ -52,6 +52,9 @@ from app.db.session import get_session
 from app.policy.buyer_profile_store import bootstrap_acquisition_monitoring
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('bootstrap_acquisition_monitoring')
 def main() -> None:
     session = get_session()
     try:

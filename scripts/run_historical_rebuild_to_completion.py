@@ -322,6 +322,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('run_historical_rebuild_to_completion')
 def main(argv: list[str] | None = None) -> int:
     load_dotenv(override=True)
     parser = build_arg_parser()

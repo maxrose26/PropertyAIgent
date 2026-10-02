@@ -37,6 +37,7 @@ import datetime as dt
 from urllib.parse import urljoin
 
 import requests
+from app.security import outbound
 from bs4 import BeautifulSoup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -106,6 +107,9 @@ def discover_policy_pages(html: str, base_url: str) -> list[dict]:
     return list(seen.values())
 
 
+from app.security.commands import command
+
+@command('documents.write')
 def register_candidate_policy_sources(session: Session, council_code: str, candidates: list[dict]) -> list[MonitoredSource]:
     """Registers a new MonitoredSource for every candidate whose URL isn't
     already watched for this council - idempotent, matching
@@ -137,13 +141,14 @@ def register_candidate_policy_sources(session: Session, council_code: str, candi
     return registered
 
 
+@command('documents.write')
 def discover_policy_pages_for_council(session: Session, council_code: str, start_url: str, timeout: int = DEFAULT_TIMEOUT_SECONDS) -> dict:
     """Fetches start_url (a council's own planning-policy landing page),
     finds candidate policy SECTIONS on it, and registers any genuinely
     new ones. Returns {"candidates_found", "new_sources_registered",
     "fetch_failed"}."""
     try:
-        response = requests.get(start_url, timeout=timeout, headers=REQUEST_HEADERS)
+        response = outbound.get(start_url, timeout=timeout, headers=REQUEST_HEADERS)
         response.raise_for_status()
     except requests.RequestException:
         return {"candidates_found": 0, "new_sources_registered": 0, "fetch_failed": True}
@@ -153,6 +158,7 @@ def discover_policy_pages_for_council(session: Session, council_code: str, start
     return {"candidates_found": len(candidates), "new_sources_registered": len(registered), "fetch_failed": False}
 
 
+@command('documents.write')
 def queue_ambiguous_policy_document(session: Session, council_code: str, policy_document_type: str, candidates: list[dict]) -> PolicyChangeEvent:
     """Part 5: "If multiple candidate documents exist: queue for review" -
     never silently picks one. candidates: [{"url", "title"}, ...], at
@@ -179,6 +185,7 @@ def queue_ambiguous_policy_document(session: Session, council_code: str, policy_
     return event
 
 
+@command('documents.write')
 def download_policy_document(session: Session, report: MonitoredReport) -> bool:
     """Downloads report.url to local disk via the SAME downloader every
     other document in this platform already uses

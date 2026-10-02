@@ -30,53 +30,58 @@ from app.ui.map_selection import parse_site_id_param
 from app.ui.shell import empty_state
 from app.ui.site_profile_view import render_site_profile
 
-bootstrap()
-session, settings = get_db()
+from app.ui.access import page_scope
+from app.security.access import require_operator, is_operator
+from app.ui import protected_download
 
-# A path relative to the entrypoint's own directory ("streamlit_app.py")
-# silently failed to resolve when called from a page inside pages/ - Streamlit
-# resolved it relative to this script's directory instead, matching nothing,
-# and fell back to a self-link. An absolute path resolves reliably.
-HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
-st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
+with page_scope():
+    bootstrap()
+    with get_db() as (session, settings):
 
-raw_site_id = st.query_params.get("site_id")
-site_id = parse_site_id_param(raw_site_id)
-if raw_site_id and site_id is None:
-    empty_state(
-        "That link looks broken",
-        "The site id in this URL isn't valid. Search for the site you're looking for, or browse every "
-        "site in Explore.",
-        icon="⚠️",
-    )
-    st.stop()
-if site_id is None:
-    empty_state(
-        "No site selected",
-        "Open a Site Profile by clicking a site on the Explore map or table, or use quick search to jump "
-        "straight to one.",
-        icon="🔍",
-    )
-    st.stop()
+        # A path relative to the entrypoint's own directory ("streamlit_app.py")
+        # silently failed to resolve when called from a page inside pages/ - Streamlit
+        # resolved it relative to this script's directory instead, matching nothing,
+        # and fell back to a self-link. An absolute path resolves reliably.
+        HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
+        st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
 
-site = session.get(Site, site_id)
-if site is None:
-    empty_state(
-        "This site no longer exists",
-        "It may have been merged into another site or removed. Browse Explore to find what you're looking for.",
-        icon="🚫",
-    )
-    st.stop()
+        raw_site_id = st.query_params.get("site_id")
+        site_id = parse_site_id_param(raw_site_id)
+        if raw_site_id and site_id is None:
+            empty_state(
+                "That link looks broken",
+                "The site id in this URL isn't valid. Search for the site you're looking for, or browse every "
+                "site in Explore.",
+                icon="⚠️",
+            )
+            st.stop()
+        if site_id is None:
+            empty_state(
+                "No site selected",
+                "Open a Site Profile by clicking a site on the Explore map or table, or use quick search to jump "
+                "straight to one.",
+                icon="🔍",
+            )
+            st.stop()
 
-credits_sidebar(session, settings)
+        site = session.get(Site, site_id)
+        if site is None:
+            empty_state(
+                "This site no longer exists",
+                "It may have been merged into another site or removed. Browse Explore to find what you're looking for.",
+                icon="🚫",
+            )
+            st.stop()
 
-apps = load_site_applications(session, site_id)
-if not apps:
-    empty_state(
-        "Nothing substantive to show yet",
-        "This site's only linked applications are things like a screening/scoping opinion or consultation "
-        "notice — no substantive scheme behind them yet. Go back and pick another site.",
-        icon="👀",
-    )
-    st.stop()
-render_site_profile(session, settings, site, apps)
+        credits_sidebar(session, settings)
+
+        apps = load_site_applications(session, site_id)
+        if not apps:
+            empty_state(
+                "Nothing substantive to show yet",
+                "This site's only linked applications are things like a screening/scoping opinion or consultation "
+                "notice — no substantive scheme behind them yet. Go back and pick another site.",
+                icon="👀",
+            )
+            st.stop()
+        render_site_profile(session, settings, site, apps)

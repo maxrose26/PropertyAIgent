@@ -102,6 +102,9 @@ class EnrichmentResult:
     contacts: list[EnrichedContact] = field(default_factory=list)
 
 
+from app.security.commands import command
+
+@command('contacts.enrich', paid=True)
 def enrich_company(
     company_name: str,
     ch_api_key: str,
@@ -112,6 +115,8 @@ def enrich_company(
     site_address: str | None = None,
     proposal_summary: str | None = None,
 ) -> EnrichmentResult:
+    from app.security.access import require_operator
+    require_operator('contacts.enrich', paid=True)
     match = companies_house.best_match(ch_api_key, company_name)
 
     officers: list[companies_house.OfficerRecord] = []
@@ -447,11 +452,14 @@ def enrich_company(
     return result
 
 
+@command('contacts.write')
 def upsert_company_from_enrichment(session: Session, name: str, enrichment: EnrichmentResult):
     """Write an EnrichmentResult into companies/officers/contacts, matching
     an existing Company by CH number first, then normalised name. Shared by
     the automatic weekly-pipeline enrichment stage and the Streamlit
     on-demand "Unlock contacts" button, so both stay in sync."""
+    from app.security.access import require_operator
+    require_operator('contacts.write')
     from app.db.models import Company, Contact, Officer, PersonWithSignificantControl  # local import: avoids a UI/pipeline -> db import cycle
 
     normalized = companies_house.normalise_name(name)

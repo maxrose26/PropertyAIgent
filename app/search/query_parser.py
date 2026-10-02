@@ -152,7 +152,12 @@ Query:
 """
 
 
+from app.security.commands import command
+
+@command('search.parse', paid=True)
 def parse_query(client: OpenAI, nl_query: str) -> SearchFilters:
+    from app.security.access import require_operator
+    require_operator('search.parse', paid=True)
     response = client.responses.create(
         model=MODEL,
         input=build_prompt(nl_query),

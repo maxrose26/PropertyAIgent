@@ -846,6 +846,9 @@ def _call_refresh_llm(client: OpenAI, prompt: str) -> dict:
     return json.loads(response.output_text)
 
 
+from app.security.commands import command
+
+@command('pipeline.refresh', paid=True)
 def refresh_intelligence_for_application(
     session, client: OpenAI, application: Application, *,
     generate_summary=None, extra_fields: dict | None = None,

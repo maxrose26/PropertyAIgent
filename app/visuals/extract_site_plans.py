@@ -25,6 +25,8 @@ which a human's decision always protects - see app.visuals.pipeline).
 """
 from __future__ import annotations
 
+from app.security.cli import authorised_cli
+from app.security.access import require_operator
 import argparse
 
 from dotenv import load_dotenv
@@ -81,7 +83,9 @@ def _print_stats(stats: PipelineStats, mode: str) -> None:
         print(f"  ERROR: {error}")
 
 
+@authorised_cli("extract_site_plans")
 def main() -> None:
+    require_operator("visual.classify", paid=True)
     args = parse_args()
     load_dotenv(override=True)
     from app.db.session import get_session, init_db  # local import: keeps this module importable/testable without touching the real DB

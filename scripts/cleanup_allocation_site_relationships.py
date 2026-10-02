@@ -181,6 +181,9 @@ def _run_execute(session) -> None:
     print("PRODUCTION WRITE COMPLETE" if not report.failures else "PRODUCTION WRITE COMPLETE WITH FAILURES - see above")
 
 
+from app.security.cli import authorised_cli
+
+@authorised_cli('cleanup_allocation_site_relationships')
 def main() -> None:
     args = parse_args()
 
