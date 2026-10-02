@@ -5,6 +5,7 @@ already saved by an authorised user cannot be revoked.
 """
 import base64
 import hashlib
+import json
 from pathlib import Path
 import re
 import streamlit as st
@@ -33,7 +34,16 @@ def _payload(data, mime, filename, *, image=False, width=320, key=None):
         raise ValueError('Delivery exceeds the 32 MB pilot limit')
     name = re.sub(r'[^A-Za-z0-9_. -]', '_', str(filename))[:120]
     require_admitted()
-    _DELIVER(data=dict(payload=base64.b64encode(raw).decode('ascii'), mime=mime, filename=name, image=image, width=width), key='delivery-'+actor.lease_id+'-'+str(key or hashlib.sha256(raw).hexdigest()))
+    # Encode the full identity: Streamlit reserves "__" in component IDs.
+    # A readable, delimiter-safe suffix preserves existing delivery selectors;
+    # uniqueness comes from the unambiguously encoded identity, not the suffix.
+    identity = [actor.lease_id, actor.revision,
+                st.session_state.get('active_buyer_key'), key, mime, name,
+                image, width, hashlib.sha256(raw).hexdigest()]
+    digest = hashlib.sha256(json.dumps(identity, ensure_ascii=True,
+                                      separators=(',', ':')).encode()).hexdigest()
+    suffix = re.sub(r'[^A-Za-z0-9]+', '_', str(key or 'payload'))[:80]
+    _DELIVER(data=dict(payload=base64.b64encode(raw).decode('ascii'), mime=mime, filename=name, image=image, width=width), key='delivery-'+digest+'-'+suffix)
 
 
 def download_button(label, data, file_name=None, mime=None, key=None, **kwargs):
@@ -64,4 +74,4 @@ def image(path, width=320):
     with Image.open(source) as raster:
         raster.thumbnail((1600,1600))
         output=io.BytesIO(); raster.convert('RGB').save(output, format='JPEG')
-    _payload(output.getvalue(), 'image/jpeg', 'evidence.jpg', image=True, width=width)
+    _payload(output.getvalue(), 'image/jpeg', 'evidence.jpg', image=True, width=width, key=str(source))
