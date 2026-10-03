@@ -10,6 +10,7 @@ import array
 import ctypes as C
 import errno
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -33,6 +34,47 @@ PROCESS_LIMIT = 32
 REQUEST_LIMIT = 128
 LIFETIME_LIMIT = 300
 SAMPLE_SECONDS = .1
+
+# Reviewed Chrome Headless Shell 153.0.8010.12 only. An unknown executable keeps
+# the original fatal-denial policy; this pin never grants a native syscall.
+STARTUP_CHROMIUM_SHA256 = 'ded93a9c9a53a1ae040f08124badcca95c938e9d5015ff340c3b5538c41bf39e'
+STARTUP_PROBES = frozenset({(16, 3, 0), (16, 526339, 15)})
+
+
+def startup_executable_identity(executable):
+    with executable.open('rb') as stream:
+        before=os.fstat(stream.fileno())
+        digest=hashlib.file_digest(stream,'sha256').hexdigest()
+        after=os.fstat(stream.fileno())
+    identity=lambda s:(s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+    if identity(before)!=identity(after) or identity(after)!=identity(executable.stat()):
+        raise ContainmentError('Chromium executable changed during verification')
+    return identity(after) if digest==STARTUP_CHROMIUM_SHA256 else None
+
+
+class StartupProbes:
+    """Finite audited EPERM classification, never a syscall permission."""
+    def __init__(self,executable_identity):
+        self.executable_identity=executable_identity;self.seen=set()
+
+    def classify(self,notification,report,relay):
+        probe=tuple(notification.data.args[:3])
+        if (self.executable_identity is None or not relay.startup_probes_open or
+            notification.data.arch!=0xc000003e or notification.data.nr!=41 or
+            probe not in STARTUP_PROBES or probe in self.seen):return None
+        try:
+            status=Path(f'/proc/{notification.pid}/status').read_text()
+            tgid=int(next(line.split()[1] for line in status.splitlines() if line.startswith('Tgid:')))
+            root=proc_info(tgid)
+            executable=Path(f'/proc/{notification.pid}/exe').stat()
+            identity=(executable.st_dev,executable.st_ino,executable.st_size,executable.st_mtime_ns,executable.st_ctime_ns)
+            if (tgid!=report['group_host'] or root['start']!=report['group_start'] or
+                root['group']!=report['group_host'] or root['ppid']!=report['guardian_host'] or
+                identity!=self.executable_identity):return None
+        except (OSError,ValueError,StopIteration):return None
+        self.seen.add(probe)
+        return dict(tid=notification.pid,tgid=tgid,start=root['start'],family=probe[0],
+                    type=probe[1],protocol=probe[2],result='EPERM',phase='before-first-browser-response')
 
 class ContainmentError(RuntimeError):
     pass
@@ -156,9 +198,13 @@ def close_except(keep):
 
 class Relay:
     def __init__(self):
+        self.startup_probes_open=True
         self.partial=[bytearray(),bytearray()];self.output=[bytearray(),bytearray()]
         self.pending={};self.seen=set();self.max_queue=0;self.max_frame=0;self.shutdown_requested=False
     def accept(self,direction,data):
+        # Close before forwarding even a partial browser response/event. No
+        # document content can be introduced by the sole startup getVersion.
+        if direction==1 and data:self.startup_probes_open=False
         self.partial[direction].extend(data)
         while b'\0' in self.partial[direction]:
             position=self.partial[direction].index(0)
@@ -170,6 +216,7 @@ class Relay:
             if not isinstance(message,dict):raise ContainmentError('Malformed CDP envelope')
             key=message.get('id');method=message.get('method')
             if direction==0:
+                if self.seen or method!='Browser.getVersion':self.startup_probes_open=False
                 if not isinstance(key,int) or isinstance(key,bool) or (key<=0 and not (key==-9999 and method=='Browser.close')) or key in self.seen or not isinstance(method,str):
                     raise ContainmentError('Stale or malformed CDP request')
                 self.pending[key]=message.get('sessionId');self.seen.add(key)
@@ -330,6 +377,7 @@ def guardian(config_path,arguments):
     if not executable.is_file() or not os.access(executable,os.X_OK):raise ContainmentError('Chromium executable unavailable')
     if any(a.startswith('--remote-debugging-port') for a in arguments) or '--remote-debugging-pipe' not in arguments:
         raise ContainmentError('Network CDP endpoint forbidden')
+    startup_probes=StartupProbes(startup_executable_identity(executable))
     audit_pipes();libc=C.CDLL(None,use_errno=True)
     if libc.prctl(36,1,0,0,0)!=0:raise ContainmentError('Cannot supervise descendants')  # subreaper
     control_parent,control_child=socket.socketpair(socket.AF_UNIX,socket.SOCK_STREAM)
@@ -426,10 +474,16 @@ def guardian(config_path,arguments):
                             wait_clean_exit(child,deadline,check_shutdown)
                             return
                         raise ContainmentError('Native notification failure')
+                    # Attribute while the notifying task is stopped, then deny.
+                    startup_event=startup_probes.classify(notification,report,relay)
                     response=Response(notification.id,0,-errno.EPERM,0)
-                    libc.ioctl(native_fd,0xc0182101,C.byref(response))
+                    if libc.ioctl(native_fd,0xc0182101,C.byref(response))!=0:
+                        raise ContainmentError('Native denial response failed')
                     report['notifications']+=1;report['syscall']=notification.data.nr;report['notification_pid']=notification.pid;report['syscall_arch']=notification.data.arch
                     if notification.data.nr==41:report['socket_family']=notification.data.args[0]
+                    if startup_event is not None:
+                        report.setdefault('startup_probe_denials',[]).append(startup_event)
+                        save();continue
                     raise ContainmentError('Native document transport denied')
                 data=os.read(key.fd,65536)
                 if not data:

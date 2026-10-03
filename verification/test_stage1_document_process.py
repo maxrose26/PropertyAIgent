@@ -6,6 +6,25 @@ import pytest
 from app.security import document_process as dp
 
 
+def test_unknown_binary_cannot_receive_startup_treatment():
+    import sys
+    assert dp.startup_executable_identity(Path(sys.executable)) is None
+
+
+@pytest.mark.parametrize('close_with',['response','partial-response','second-command','content-first'])
+def test_startup_phase_closes_before_forwarding(close_with):
+    relay=dp.Relay()
+    if close_with!='content-first':
+        relay.accept(0,frame({'id':1,'method':'Browser.getVersion'}))
+        assert relay.startup_probes_open
+    if close_with=='response':relay.accept(1,frame({'id':1,'result':{}}))
+    elif close_with=='partial-response':relay.accept(1,b'{')
+    else:relay.accept(0,frame({'id':2,'method':'Target.createTarget','params':{'url':'about:blank'}}))
+    assert not relay.startup_probes_open
+
+
+
+
 def frame(value):
     return json.dumps(value).encode()+b'\0'
 
