@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from urllib3.connection import HTTPSConnection
 from playwright.sync_api import sync_playwright
+from verification.stage1_fixture_descriptors import AccountedFixtureServer,descriptor_snapshot
 from app.security import outbound,document_browser as db
 from app.scrapers.documents import get_anite_documents,get_arcus_documents
 import requests
@@ -80,7 +81,7 @@ class Handler(BaseHTTPRequestHandler):
   self.send_response(status)
   for k,v in headers.items():self.send_header(k,v)
   self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
-server=ThreadingHTTPServer(('127.0.0.1',0),Handler);tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(tmp/'cert.pem',tmp/'key.pem');server.socket=tls.wrap_socket(server.socket,server_side=True);threading.Thread(target=server.serve_forever,daemon=True).start()
+server=AccountedFixtureServer(('127.0.0.1',0),Handler);tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);tls.load_cert_chain(tmp/'cert.pem',tmp/'key.pem');server.socket=tls.wrap_socket(server.socket,server_side=True);threading.Thread(target=server.serve_forever,daemon=True).start()
 port=server.server_address[1];connect=socket.create_connection
 # A fixture bug cannot send Python traffic outside this one local TLS server.
 def audit(event,args):
@@ -97,9 +98,11 @@ try:
   source.cookies.set('portal','original',domain=HOST,path='/',secure=True)
   source.cookies.set('other','secret',domain='unrelated.invalid',path='/',secure=True)
   parent.add_cookies([dict(name='parent',value='only',domain=HOST,path='/',secure=True,httpOnly=True,sameSite='Strict')])
+  baseline_resources=descriptor_snapshot()
   baseline_fds=len(os.listdir('/proc/self/fd'))
   def stable():
    assert browser.contexts==[parent] and parent.pages==[page] and not page.is_closed()
+   server.assert_released(baseline_resources)
    assert len(os.listdir('/proc/self/fd'))==baseline_fds,'Document process/custodian descriptor leak'
   docs=get_anite_documents(page,source,BASE+'/summary?activeTab=summary',OUT/'anite');assert len(docs)==2
   assert all(d.local_path.read_bytes().startswith(b'%PDF-1.4 verified') for d in docs)
