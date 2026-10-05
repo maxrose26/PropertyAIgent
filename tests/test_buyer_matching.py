@@ -178,8 +178,8 @@ def test_missing_phasing_does_not_become_phaseable():
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=3500, has_phasing_evidence=False, opportunity_type=STRATEGIC_LAND))
     assert not any("phase" in m.lower() and "exists" in m.lower() for m in result.matches)
     assert result.is_investigative_exception is True
-    assert any("materially exceeds" in u for u in result.unknown)
-    assert any("Establish whether a suitable development parcel/phase" in i for i in result.investigate)
+    assert any("outside this buyer's discovery range" in i for i in result.investigate)
+    assert any("acquisition sub-scope" in i for i in result.investigate)
 
 
 def test_oversized_allocation_does_not_automatically_become_not_suitable():
@@ -191,14 +191,16 @@ def test_oversized_allocation_does_not_automatically_become_not_suitable():
     # flagged as an investigative exception.
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=3500, opportunity_type=STRATEGIC_LAND, planning_state="adopted_allocation"))
     assert result.classification != NOT_SUITABLE
-    assert result.classification == STRONG_FIT
+    # Stage 2.5A (v6): outside the discovery envelope -> investigate, never STRONG.
+    assert result.classification == INSUFFICIENT_EVIDENCE
     assert result.is_investigative_exception is True
-    assert any("materially exceeds" in u for u in result.unknown)
+    assert any("outside this buyer's discovery range" in i for i in result.investigate)
 
 
 def test_insufficient_parcel_evidence_preserves_uncertainty_not_certainty():
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=3500, opportunity_type=STRATEGIC_LAND, has_phasing_evidence=False))
-    assert any("no phasing/parcel evidence exists" in u for u in result.unknown)
+    assert any("outside this buyer's discovery range" in i and "sub-scope" in i for i in result.investigate)
+    assert not any("phase" in m.lower() and "exists" in m.lower() for m in result.matches)
 
 
 def test_different_profiles_produce_different_conclusions_from_the_same_opportunity():
@@ -358,7 +360,7 @@ def test_affordable_component_in_range_despite_total_exceeding_housing_associati
     # INSUFFICIENT_EVIDENCE on its own.
     nesten = assess_buyer_fit(NESTEN_HOMES, facts)
     assert nesten.is_investigative_exception is True
-    assert nesten.classification == STRONG_FIT
+    assert nesten.classification == INSUFFICIENT_EVIDENCE  # Stage 2.5A: outside discovery 45-110
     assert not any("phase" in m.lower() and "exists" in m.lower() for m in nesten.matches)
 
 
@@ -465,9 +467,12 @@ def test_elton_reservoir_produces_materially_different_conclusions_per_buyer(ses
     # Housebuilder all reach STRONG_FIT (still correctly flagged as an
     # investigative exception - the scale-vs-target and ownership
     # questions remain genuinely open, visible in `unknown`/`investigate`).
-    assert nesten.classification == STRONG_FIT and nesten.is_investigative_exception
+    # Stage 2.5A (v6): 3500 is outside Nesten's and National's discovery
+    # envelopes -> investigate for sub-scope; Strategic Land Buyer's explicit
+    # large-allocation self-qualifying rule is unchanged.
+    assert nesten.classification == INSUFFICIENT_EVIDENCE and nesten.is_investigative_exception
     assert strategic.classification == STRONG_FIT and strategic.is_investigative_exception
-    assert national.classification == STRONG_FIT and national.is_investigative_exception
+    assert national.classification == INSUFFICIENT_EVIDENCE and national.is_investigative_exception
 
     # Housing Association (Section 10): no scheme-specific affordable-unit
     # evidence exists at all for a Local Plan allocation - correctly
@@ -486,7 +491,7 @@ def test_elton_reservoir_produces_materially_different_conclusions_per_buyer(ses
     # Nesten: allocation matches, scale materially exceeds target, no
     # parcel evidence -> visible, investigative, but no longer a reason to
     # withhold STRONG_FIT (never claimed a suitable phase exists).
-    assert any("materially exceeds" in u for u in nesten.unknown)
+    assert any("outside this buyer's discovery range" in i for i in nesten.investigate)
     assert not any("meaningful strategic-land position" in m for m in nesten.matches)
 
     # Every buyer's unresolved ownership/site-linkage gap is now visible as
@@ -501,11 +506,11 @@ def test_elton_reservoir_produces_materially_different_conclusions_per_buyer(ses
     # scale is itself a match, not an open question.
     assert any("meaningful strategic-land position" in m for m in strategic.matches)
     assert any("early-stage position" in m for m in strategic.matches)
-    assert not any("materially exceeds" in u for u in strategic.unknown)
+    assert not any("outside this buyer's discovery range" in i for i in strategic.investigate)
 
     # National Housebuilder: same shape as Nesten (no self-qualifying-scale
     # appetite for this profile) but against its own different range.
-    assert any("materially exceeds" in u for u in national.unknown)
+    assert any("outside this buyer's discovery range" in i for i in national.investigate)
     assert not any("meaningful strategic-land position" in m for m in national.matches)
 
 

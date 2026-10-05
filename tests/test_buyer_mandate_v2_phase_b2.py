@@ -67,6 +67,7 @@ from app.policy.buyer_matching import (
     DEVELOPMENT_STATE_UNDERWAY,
     INSUFFICIENT_EVIDENCE,
     NOT_SUITABLE,
+    POSSIBLE_FIT,
     PLANNING_DELIVERY,
     STRATEGIC_LAND,
     STRONG_FIT,
@@ -143,7 +144,7 @@ def test_policy_version_is_the_current_expected_value():
     # mandatory at the production evaluation boundary + authoritative
     # normalised Local Plan status for strategic land) - see
     # BUYER_MATCHING_POLICY_VERSION's own docstring.
-    assert BUYER_MATCHING_POLICY_VERSION == 5
+    assert BUYER_MATCHING_POLICY_VERSION == 6
 
 
 def test_fingerprint_changes_when_policy_version_changes():
@@ -519,8 +520,12 @@ def test_scale_known_below_soft_target_is_not_insufficient_evidence():
     """(A) Nesten target 50-100: 42 units, known, below target - must NOT
     be INSUFFICIENT_EVIDENCE solely for sitting below a soft target."""
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=42))
-    assert result.classification == STRONG_FIT
-    assert any("below this buyer's target range" in u for u in result.unknown)
+    # Stage 2.5A (v6): 42 is below the 45-110 discovery envelope - the count is
+    # known, so this is an investigative exception, never NOT_SUITABLE.
+    assert result.classification == INSUFFICIENT_EVIDENCE
+    assert result.is_investigative_exception is True
+    assert any("outside this buyer's discovery range" in i for i in result.investigate)
+    assert not any("No trusted unit count" in u for u in result.unknown)
 
 
 def test_scale_known_above_soft_target_is_not_insufficient_evidence():
@@ -530,9 +535,9 @@ def test_scale_known_above_soft_target_is_not_insufficient_evidence():
     target", exactly like 42 above; it is never claimed to be a positive
     commercial recommendation, only correctly not-missing-evidence."""
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=101))
-    assert result.classification == STRONG_FIT
-    assert result.is_investigative_exception is True
-    assert any("materially exceeds this buyer's target range" in u for u in result.unknown)
+    # Stage 2.5A (v6): 101 is inside the 45-110 discovery envelope.
+    assert result.classification == POSSIBLE_FIT
+    assert any("slightly above" in m and "discovery range" in m for m in result.matches)
     assert not any("meaningful strategic-land position" in m or "phase" in m.lower() for m in result.matches)
 
 
@@ -541,10 +546,9 @@ def test_materially_oversized_known_scheme_no_phasing_is_not_insufficient_eviden
     stays an open investigative question (never claimed a suitable phase
     exists) but must not itself force INSUFFICIENT_EVIDENCE."""
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=5000, has_phasing_evidence=False))
-    assert result.classification == STRONG_FIT
+    assert result.classification == INSUFFICIENT_EVIDENCE  # Stage 2.5A (v6)
     assert result.is_investigative_exception is True
-    assert any("materially exceeds" in u for u in result.unknown)
-    assert any("Establish whether a suitable development parcel/phase" in i for i in result.investigate)
+    assert any("outside this buyer's discovery range" in i and "sub-scope" in i for i in result.investigate)
 
 
 def test_genuinely_missing_unit_count_remains_insufficient_evidence():
@@ -692,7 +696,7 @@ def test_matching_policy_version_is_now_3():
     # Superseded by Agent-Ready Fact Foundation's own version 4 bump - see
     # test_policy_version_is_the_current_expected_value above for why 4 is
     # now the correct current value.
-    assert BUYER_MATCHING_POLICY_VERSION == 5
+    assert BUYER_MATCHING_POLICY_VERSION == 6
 
 
 def test_semantic_cleanup_fingerprint_differs_from_prior_policy_version():

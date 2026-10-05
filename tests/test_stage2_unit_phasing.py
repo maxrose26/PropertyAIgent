@@ -136,7 +136,10 @@ def test_k_l_hard_boundary_uses_bounds_soft_discovery_keeps_uncertainty(session)
     fit = assess_buyer_fit(NESTEN_HOMES, facts)
     assert fit.classification != NOT_SUITABLE and fit.is_investigative_exception
     assert facts.unit_count is None and facts.count_assessment == result
-    assert any("uncertain discovery scale" in r for r in fit.unknown)
+    # Stage 2.5A (v6): 100-102 is not wholly within preferred 50-100 but is wholly
+    # within discovery 45-110 -> POSSIBLE_FIT, never STRONG from the rounded 100.
+    assert fit.classification == "POSSIBLE_FIT"
+    assert any("not fully within" in r and "discovery range (45-110 homes)" in r for r in fit.matches)
     # HA metric does not acquire total evidence through the new adapter.
     assert assess_buyer_fit(HOUSING_ASSOCIATION, facts).classification != NOT_SUITABLE
     assert facts.affordable_unit_count is None
@@ -385,8 +388,9 @@ def test_exact_extraction_source_stays_separate_from_newer_portal_and_ah_identit
 
 
 @pytest.mark.parametrize("precision,lower,upper,expected", [
-    ("APPROXIMATE", 100, 102, "INSUFFICIENT_EVIDENCE"),
-    ("RANGE", 45, 55, "INSUFFICIENT_EVIDENCE"),
+    # Stage 2.5A (v6): wholly within discovery 45-110 but not preferred -> POSSIBLE.
+    ("APPROXIMATE", 100, 102, "POSSIBLE_FIT"),
+    ("RANGE", 45, 55, "POSSIBLE_FIT"),
     ("RANGE", 90, 120, "INSUFFICIENT_EVIDENCE"),
     ("RANGE", 110, 120, "INSUFFICIENT_EVIDENCE"),
     ("APPROXIMATE", None, None, "INSUFFICIENT_EVIDENCE"),
@@ -409,7 +413,8 @@ def test_uncertain_scale_fit_uses_evidence_bounds_not_rounded_scalar(precision, 
     assert fit.classification != NOT_SUITABLE
     if precision in ("APPROXIMATE", "RANGE"):
         assert fit.is_investigative_exception and fit.investigate
-        assert any("exact mandate compliance unverified" in r for r in fit.unknown)
+        if expected == "STRONG_FIT":
+            assert any("exact mandate compliance unverified" in r for r in fit.unknown)
         assert not any("sits within" in r for r in fit.matches)
 
 
@@ -1145,3 +1150,243 @@ def test_gate3_h_ah_identity_is_independent_of_count_source_selection(session):
         # Choosing which application the AH figure belongs to never changes the count source.
         assert facts.development_type_raw == default.development_type_raw == "houses"
         assert facts.unit_count == default.unit_count == 440
+
+
+
+# --- Stage 2.5A: buyer discovery envelope & POSSIBLE_FIT (policy v6) ---------
+# Preferred 50-100 (Nesten, soft scale) -> discovery 45-110 (10%, rounded outward).
+
+from dataclasses import replace as _replace
+from types import SimpleNamespace as _NS
+
+from app.policy import buyer_matching as _bm
+from app.policy.buyer_matching import (
+    POSSIBLE_FIT, STRONG_FIT, INSUFFICIENT_EVIDENCE, MatchingFacts, PLANNING_DELIVERY,
+    B2MatchingContext, discovery_bounds,
+)
+from app.reporting.residential_count import CountAssessment
+
+_OUTSIDE = "outside this buyer's discovery range"
+
+
+def _s25_facts(**overrides):
+    base = dict(opportunity_type=PLANNING_DELIVERY, unit_count=75, development_type_raw="houses",
+                is_specialist_development=False, affordable_percentage=30.0, affordable_percentage_trusted=True,
+                affordable_unit_count=None, planning_state="permission_granted", has_identified_planning_activity=True,
+                has_phasing_evidence=False, matched_to_site=True)
+    base.update(overrides)
+    return MatchingFacts(**base)
+
+
+def _range_facts(lower, upper, precision="RANGE"):
+    count = CountAssessment(scope_type="whole_site", scope_label="Whole site", precision=precision,
+                            value=lower, lower=lower, upper=upper, resolution="supported_range")
+    return _s25_facts(unit_count=lower, count_assessment=count)
+
+
+@pytest.mark.parametrize("minimum,maximum,expected", [
+    (50, 100, (45, 110)),
+    (51, 99, (45, 109)),      # 45.9 -> 45 and 108.9 -> 109: rounded outward, never inward
+    (100, 300, (90, 330)),
+    (200, 500, (180, 550)),
+    (None, 100, (None, 110)),  # maximum-only: no invented lower bound
+    (50, None, (45, None)),    # minimum-only: no invented upper bound
+    (None, None, (None, None)),
+])
+def test_s25a_discovery_bounds_are_ten_percent_rounded_outward(minimum, maximum, expected):
+    assert _bm.DEFAULT_DISCOVERY_TOLERANCE_PERCENT == 10
+    assert discovery_bounds(minimum, maximum) == expected
+
+
+@pytest.mark.parametrize("units,expected", [
+    (75, STRONG_FIT), (50, STRONG_FIT), (100, STRONG_FIT),
+    (45, POSSIBLE_FIT), (49, POSSIBLE_FIT), (101, POSSIBLE_FIT), (105, POSSIBLE_FIT), (110, POSSIBLE_FIT),
+    (44, INSUFFICIENT_EVIDENCE), (111, INSUFFICIENT_EVIDENCE), (300, INSUFFICIENT_EVIDENCE),
+])
+def test_s25a_exact_counts_against_preferred_and_discovery(units, expected):
+    fit = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=units))
+    assert fit.classification == expected
+    assert fit.classification != NOT_SUITABLE
+    if expected == POSSIBLE_FIT:
+        side = "below" if units < 50 else "above"
+        assert any(f"{units:,} homes is slightly {side}" in m and "preferred range (50-100 homes)" in m
+                   and "discovery range (45-110 homes)" in m for m in fit.matches)
+    if expected == INSUFFICIENT_EVIDENCE:
+        # A KNOWN count outside discovery: investigate for sub-scope, never "count unknown".
+        assert fit.is_investigative_exception
+        assert any(_OUTSIDE in i and "sub-scope" in i and f"{units:,} homes" in i for i in fit.investigate)
+        assert not any("No trusted unit count" in u or "does not establish" in u for u in fit.unknown)
+
+
+@pytest.mark.parametrize("lower,upper,expected,kind", [
+    (100, 102, POSSIBLE_FIT, "possible"),
+    (48, 52, POSSIBLE_FIT, "possible"),
+    (105, 110, POSSIBLE_FIT, "possible"),
+    (105, 115, INSUFFICIENT_EVIDENCE, "crossing"),
+    (40, 60, INSUFFICIENT_EVIDENCE, "crossing"),
+    (90, 120, INSUFFICIENT_EVIDENCE, "crossing"),
+    (40, 44, INSUFFICIENT_EVIDENCE, "outside"),
+    (111, 120, INSUFFICIENT_EVIDENCE, "outside"),
+    (60, 80, STRONG_FIT, "preferred"),
+])
+def test_s25a_range_evidence_uses_supported_bounds(lower, upper, expected, kind):
+    fit = assess_buyer_fit(NESTEN_HOMES, _range_facts(lower, upper))
+    assert fit.classification == expected
+    assert fit.classification != NOT_SUITABLE and fit.is_investigative_exception
+    if kind == "possible":
+        assert any("not fully within" in m and "discovery range (45-110 homes)" in m for m in fit.matches)
+    elif kind == "crossing":
+        # Uncertain evidence crossing a discovery boundary - distinct wording.
+        assert any("does not establish whether scale is within" in u for u in fit.unknown)
+        assert not any(_OUTSIDE in i for i in fit.investigate)
+    elif kind == "outside":
+        assert any(_OUTSIDE in i for i in fit.investigate)
+        assert not any("does not establish" in u for u in fit.unknown)
+
+
+def test_s25a_rounded_scalar_cannot_override_range_evidence():
+    count = CountAssessment(scope_type="whole_site", scope_label="Whole site", precision="APPROXIMATE",
+                            value=100, lower=100, upper=102, resolution="immaterial_variance")
+    fit = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=100, count_assessment=count))
+    assert fit.classification == POSSIBLE_FIT  # never STRONG from the rounded display value 100
+
+
+def test_s25a_material_conflict_and_unknown_never_possible():
+    conflict = CountAssessment(scope_type="whole_site", scope_label="Whole site", lower=100, upper=180,
+                               resolution="material_conflict", confidence="low")
+    for facts in (_s25_facts(unit_count=100, count_assessment=conflict), _s25_facts(unit_count=None)):
+        fit = assess_buyer_fit(NESTEN_HOMES, facts)
+        assert fit.classification == INSUFFICIENT_EVIDENCE
+        assert any("No trusted unit count" in u for u in fit.unknown)
+        assert not any("discovery range" in m for m in fit.matches)
+
+
+@pytest.mark.parametrize("units,expected", [(45, POSSIBLE_FIT), (44, INSUFFICIENT_EVIDENCE), (109, POSSIBLE_FIT),
+                                            (110, INSUFFICIENT_EVIDENCE), (51, STRONG_FIT), (99, STRONG_FIT)])
+def test_s25a_outward_rounded_boundaries_on_an_uneven_preferred_range(units, expected):
+    policy = _replace(NESTEN_HOMES, target_unit_min=51, target_unit_max=99)
+    assert assess_buyer_fit(policy, _s25_facts(unit_count=units)).classification == expected
+
+
+@pytest.mark.parametrize("affordable,expected_not_suitable", [(49, True), (47, True), (45, True), (50, False), (120, False)])
+def test_s25a_explicit_hard_minimum_is_never_weakened_by_discovery_tolerance(affordable, expected_not_suitable):
+    assert HOUSING_ASSOCIATION.below_minimum_scale_is_exclusion and HOUSING_ASSOCIATION.target_unit_min == 50
+    fit = assess_buyer_fit(HOUSING_ASSOCIATION, _s25_facts(affordable_unit_count=affordable))
+    assert (fit.classification == NOT_SUITABLE) is expected_not_suitable
+    if expected_not_suitable:
+        assert any("below this buyer's minimum requirement of 50" in r for r in fit.does_not_match)
+
+
+def test_s25a_hard_minimum_applies_to_range_evidence_at_the_stated_minimum():
+    policy = _replace(NESTEN_HOMES, below_minimum_scale_is_exclusion=True)
+    assert assess_buyer_fit(policy, _range_facts(40, 49)).classification == NOT_SUITABLE
+    assert assess_buyer_fit(policy, _s25_facts(unit_count=47)).classification == NOT_SUITABLE
+    assert assess_buyer_fit(policy, _s25_facts(unit_count=105)).classification == POSSIBLE_FIT
+
+
+def test_s25a_hard_exclusions_outrank_possible_scale():
+    from app.policy.buyer_profiles import GEOGRAPHY_COUNCILS
+    geo = _replace(NESTEN_HOMES, geography_scope=GEOGRAPHY_COUNCILS, geography_councils=frozenset({"bury"}))
+    outside = assess_buyer_fit(geo, _s25_facts(unit_count=105), context=B2MatchingContext(council_code="trafford"))
+    assert outside.classification == NOT_SUITABLE
+    inside = assess_buyer_fit(geo, _s25_facts(unit_count=105), context=B2MatchingContext(council_code="bury"))
+    assert inside.classification != NOT_SUITABLE
+    assert any("discovery range (45-110 homes)" in m for m in inside.matches)
+    specialist = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105, is_specialist_development=True,
+                                                          development_type_raw="retirement_living"))
+    assert specialist.classification == NOT_SUITABLE
+    wholly_affordable = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105, affordable_percentage=100.0))
+    assert wholly_affordable.classification == NOT_SUITABLE
+
+
+def test_s25a_overall_precedence_strong_possible_and_unresolved_evidence():
+    assert assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=80)).classification == STRONG_FIT
+    assert assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105)).classification == POSSIBLE_FIT
+    unresolved = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105, is_specialist_development=None,
+                                                          development_type_raw=None))
+    assert unresolved.classification == INSUFFICIENT_EVIDENCE  # possible scale never hides a blocking gap
+
+
+def test_s25a_feed_surfaces_possible_between_strong_and_insufficient(monkeypatch):
+    from app.reporting import opportunity_feed
+    from app.policy import buyer_matching_b2_context, buyer_profile_store
+    order = ["insufficient", "not_suitable", "possible_b", "strong", "exception", "possible_a"]
+    fits = {"strong": (STRONG_FIT, False), "possible_a": (POSSIBLE_FIT, False), "possible_b": (POSSIBLE_FIT, True),
+            "exception": (INSUFFICIENT_EVIDENCE, True), "insufficient": (INSUFFICIENT_EVIDENCE, False),
+            "not_suitable": (NOT_SUITABLE, False)}
+    cards = [{"title": name, "matching_facts": object(), "params": {"site_id": i}} for i, name in enumerate(order)]
+    monkeypatch.setattr(buyer_profile_store, "get_buyer_profile_dataclass", lambda session, key: NESTEN_HOMES)
+    monkeypatch.setattr(opportunity_feed, "_attach_planning_delivery_matching_facts", lambda session, delivery: None)
+    by_site = {i: name for i, name in enumerate(order)}
+    monkeypatch.setattr(buyer_matching_b2_context, "evaluate_buyer_fit",
+                        lambda session, profile, facts, site_id=None, allocation_id=None:
+                        _NS(classification=fits[by_site[site_id]][0], is_investigative_exception=fits[by_site[site_id]][1]))
+    ordered, counts = opportunity_feed._buyer_selection(None, [], cards, 10, "nesten_homes")
+    assert [c["title"] for c in ordered] == ["strong", "possible_b", "possible_a", "exception", "insufficient"]
+    assert counts["excluded_not_suitable"] == 1
+    again, _ = opportunity_feed._buyer_selection(None, [], cards, 10, "nesten_homes")
+    assert [c["title"] for c in again] == [c["title"] for c in ordered]
+
+
+def test_s25a_possible_badge_and_label_render():
+    # Read the presentation module's literal mappings without importing Streamlit.
+    import ast
+    from pathlib import Path
+    tree = ast.parse((Path(__file__).resolve().parents[1] / "app" / "ui" / "shell.py").read_text(encoding="utf-8"))
+    literals = {t.id: ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
+                for t in n.targets if isinstance(t, ast.Name) and t.id in ("BUYER_FIT_BADGE_KIND", "_BADGE_KIND_STYLE")}
+    kind = literals["BUYER_FIT_BADGE_KIND"][POSSIBLE_FIT]
+    assert literals["_BADGE_KIND_STYLE"][kind]["label"] == "Possible fit"
+    assert POSSIBLE_FIT.replace("_", " ").title() == "Possible Fit"
+
+
+def test_s25a_onboarding_counts_possible_separately():
+    from app.policy import buyer_profile_store
+    from app.policy.buyer_profile_store import OnboardingBaselineResult
+    result = OnboardingBaselineResult(opportunities_reviewed=3, strong_fit=1, not_suitable=0, insufficient_evidence=1,
+                                      investigative_exceptions=0, summary_line="", possible_fit=1)
+    assert result.possible_fit == 1 and result.strong_fit == 1 and result.insufficient_evidence == 1
+    source = inspect_source(buyer_profile_store)
+    assert "elif assessment.classification == POSSIBLE_FIT:" in source and "possible_fit={possible_fit}" in source
+
+
+def test_s25a_agent_prompt_carries_deterministic_possible_fit():
+    from app.policy.agent_evaluation_prompt import PromptContext, render_prompt
+    def ctx(classification):
+        return PromptContext(buyer_key="nesten_homes", acquisition_type="LAND_SITE_ACQUISITION", opportunity_id="x",
+                             opportunity_type=PLANNING_DELIVERY, mandate_interpretation_lines=(),
+                             buyer_fit_classification=classification, buyer_fit_is_investigative_exception=False,
+                             buyer_fit_matches=(), buyer_fit_does_not_match=(), buyer_fit_unknown=(),
+                             buyer_fit_investigate=(), reference_tokens={})
+    possible = render_prompt(ctx(POSSIBLE_FIT))
+    assert "- classification: POSSIBLE_FIT" in possible
+    assert "NOT verified within its preferred range" in possible and "Do not treat or describe it as a strong" in possible
+    # Other classifications render byte-identically to before (no new line).
+    assert "POSSIBLE_FIT is deterministic" not in render_prompt(ctx(STRONG_FIT))
+    # The model's output schema carries no buyer-fit classification to upgrade.
+    from app.policy import agent_evaluation_result
+    assert "buyer_fit_classification" not in inspect_source(agent_evaluation_result)
+
+
+def inspect_source(module):
+    import inspect
+    return inspect.getsource(module)
+
+
+def test_s25a_fingerprint_ownership(monkeypatch):
+    from app.policy import buyer_profile_store
+    from app.reporting.opportunity_universe import compute_opportunity_fingerprint
+    assert _bm.BUYER_MATCHING_POLICY_VERSION == 6
+    v6 = buyer_profile_store.compute_buyer_mandate_fingerprint(NESTEN_HOMES)
+    fields = {"opportunity_type": PLANNING_DELIVERY, "unit_count": 105, "development_type_raw": "houses"}
+    opportunity_v6 = compute_opportunity_fingerprint(fields)
+    monkeypatch.setattr(buyer_profile_store, "BUYER_MATCHING_POLICY_VERSION", 5)
+    assert buyer_profile_store.compute_buyer_mandate_fingerprint(NESTEN_HOMES) != v6
+    assert compute_opportunity_fingerprint(fields) == opportunity_v6  # policy version never enters it
+    # The agent-evaluation input fingerprint hashes the mandate fingerprint, the
+    # buyer-fit classification and the policy version itself.
+    from app.policy import agent_evaluation_persistence
+    src = inspect_source(agent_evaluation_persistence)
+    assert '"buyer_mandate_matching_fingerprint": mandate_fingerprint' in src
+    assert '"classification": buyer_fit_assessment.classification' in src
+    assert '"buyer_matching_policy_version": BUYER_MATCHING_POLICY_VERSION' in src

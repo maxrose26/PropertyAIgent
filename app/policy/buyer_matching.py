@@ -92,6 +92,10 @@ STRATEGIC_LAND = "strategic_land"
 PLANNING_DELIVERY = "planning_delivery"
 
 STRONG_FIT = "STRONG_FIT"
+# Stage 2.5A: the current subject's evidence-supported scale is outside the
+# buyer's PREFERRED range but wholly inside its DISCOVERY envelope - close
+# enough to surface, never a verified preferred-range fit.
+POSSIBLE_FIT = "POSSIBLE_FIT"
 NOT_SUITABLE = "NOT_SUITABLE"
 INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 
@@ -131,7 +135,41 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # change classification for 3 of the 4 production Buyer Mandates. assess_
 # buyer_fit's own commercial rules, Buyer Mandate fields, and every other
 # domain area were NOT touched by this bump.
-BUYER_MATCHING_POLICY_VERSION = 5  # Scope-aware uncertain discovery; no persisted recomputation
+#
+# Version 5: scope-aware uncertain discovery; no persisted recomputation.
+#
+# Version 6 (Stage 2.5A, Buyer Discovery Envelope): a SOFT preferred scale
+# range now has a separate discovery envelope (DEFAULT_DISCOVERY_TOLERANCE_
+# PERCENT applied independently to each preferred boundary, rounded
+# outward). Inside preferred -> scale supports STRONG_FIT (unchanged);
+# outside preferred but wholly inside discovery -> POSSIBLE_FIT (new); a
+# known current subject outside discovery -> INSUFFICIENT_EVIDENCE as an
+# investigative exception (previously STRONG_FIT with a soft note), because
+# a relevant sub-scope may still exist (Stage 2.5B decomposition). Explicit
+# hard minimums (below_minimum_scale_is_exclusion) still apply at the
+# stated preferred minimum - discovery tolerance never weakens a hard
+# constraint. No mandate field changed; only assess_buyer_fit's
+# interpretation of existing values did.
+BUYER_MATCHING_POLICY_VERSION = 6
+
+# Stage 2.5A default discovery tolerance, an integer percentage so the
+# envelope is computed in exact integer arithmetic (see discovery_bounds).
+# Policy behaviour covered by BUYER_MATCHING_POLICY_VERSION - not a stored
+# or buyer-configurable value yet.
+DEFAULT_DISCOVERY_TOLERANCE_PERCENT = 10
+
+
+def discovery_bounds(minimum, maximum, tolerance_percent=DEFAULT_DISCOVERY_TOLERANCE_PERCENT):
+    """The discovery envelope around a preferred scale range, rounded OUTWARD.
+
+    lower = floor(minimum * (100 - t) / 100), upper = ceil(maximum * (100 + t) / 100),
+    in exact integer arithmetic, so rounding can never narrow the envelope
+    (preferred 51-99 -> 45-109). Either bound may be None (a one-sided range):
+    a missing bound stays missing - nothing is invented for it.
+    """
+    lower = None if minimum is None else (minimum * (100 - tolerance_percent)) // 100
+    upper = None if maximum is None else -((-maximum * (100 + tolerance_percent)) // 100)
+    return lower, upper
 
 # --- Buyer Mandate V2, Phase B2: build_status vocabulary (reused verbatim) --
 #
@@ -902,20 +940,47 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     if assessment is not None:
         # A rounded/stale scalar cannot override the shared evidence assessment.
         scale_value = assessment.exact_value
+    # Stage 2.5A: preferred range vs discovery envelope. Tolerance only widens
+    # SOFT preferences: an explicit hard minimum (below_minimum_scale_is_
+    # exclusion) stays at the buyer's stated minimum.
+    preferred_text = f"{profile.target_unit_min}-{profile.target_unit_max} {unit_noun}"
+    discovery_min, discovery_max = discovery_bounds(profile.target_unit_min, profile.target_unit_max)
+    if profile.below_minimum_scale_is_exclusion:
+        discovery_min = profile.target_unit_min
+    discovery_text = f"{discovery_min}-{discovery_max} {unit_noun}"
+    outside_discovery_text = (
+        f"is outside this buyer's discovery range ({discovery_text}; preferred {preferred_text}) - investigate "
+        f"whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or "
+        f"possible scale fit."
+    )
+    scale_possible = scale_outside_discovery = False
     if scale_value is None and uncertain_scale:
-        if assessment.within_hard_bounds(minimum=profile.target_unit_min,
-                                         maximum=profile.target_unit_max) is not True:
+        preferred_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min, maximum=profile.target_unit_max)
+        discovery_fit = assessment.within_hard_bounds(minimum=discovery_min, maximum=discovery_max)
+        # Existing minimum exclusion remains hard, at the stated minimum.
+        hard_minimum_fit = (assessment.within_hard_bounds(minimum=profile.target_unit_min)
+                            if profile.below_minimum_scale_is_exclusion else True)
+        if hard_minimum_fit is False:
+            does_not_match.append("Supported scale is below this buyer's hard minimum.")
+        elif preferred_fit is True:
+            unknown.append(f"{assessment.label()}: uncertain discovery scale; exact mandate compliance unverified. " + assessment.note())
+        elif discovery_fit is True:
+            scale_possible = True
+            matches.append(
+                f"{assessment.label()} - not fully within this buyer's preferred range ({preferred_text}), but wholly "
+                f"within its discovery range ({discovery_text}). " + assessment.note()
+            )
+        elif discovery_fit is False:
+            scale_outside_discovery = True
+            investigate.append(f"The supported scale ({assessment.label()}) " + outside_discovery_text)
+        else:
             blocking_unknown = True
-        unknown.append(f"{assessment.label()}: uncertain discovery scale; exact mandate compliance unverified. " + assessment.note())
-        # Existing minimum exclusion remains hard. Maxima are existing SOFT
-        # preferences, never relabelled hard limits. Generic explicit numeric
-        # filters use CountAssessment.within_hard_bounds instead.
-        if profile.below_minimum_scale_is_exclusion:
-            minimum_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min)
-            if minimum_fit is False:
-                does_not_match.append("Supported scale is below this buyer's hard minimum.")
-            elif minimum_fit is None:
-                blocking_unknown = True
+            unknown.append(
+                f"{assessment.label()}: the supported evidence does not establish whether scale is within this "
+                f"buyer's discovery range ({discovery_text}). " + assessment.note()
+            )
+        if hard_minimum_fit is None:
+            blocking_unknown = True
         investigate.append("Verify current subject scale before treating this lead as numerically qualified.")
         is_investigative_exception = True
     elif scale_value is None:
@@ -923,43 +988,42 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         blocking_unknown = True
     elif profile.target_unit_min <= scale_value <= profile.target_unit_max:
         matches.append(f"Approximately {scale_value:,} {unit_noun} sits within this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}).")
-    elif scale_value < profile.target_unit_min:
-        # Housing Association amendment: below_minimum_scale_is_exclusion is
-        # False for every housebuilder profile (unchanged "unknown" branch,
-        # never a disqualifier on its own) but True for Housing Association,
-        # whose own brief states a scheme with fewer than 50 affordable
-        # homes is NOT SUITABLE, not merely under-evidenced.
-        if profile.below_minimum_scale_is_exclusion:
-            does_not_match.append(
-                f"Trusted evidence shows only {scale_value:,} {unit_noun}, below this buyer's minimum "
-                f"requirement of {profile.target_unit_min} {unit_noun}."
-            )
-        else:
-            # B2 semantic cleanup (Buyer Fit Classification Audit, Section
-            # 6): scale_value IS KNOWN here - a target range is not
-            # automatically a hard constraint (the audit's own core
-            # principle), so a known below-target scale is a soft/
-            # contextual mismatch, never missing evidence. Text unchanged.
-            unknown.append(f"Approximately {scale_value:,} {unit_noun} is below this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}) - not treated as a disqualifying fact on its own.")
-    else:  # oversized
-        if profile.large_allocation_is_self_qualifying and facts.opportunity_type == STRATEGIC_LAND:
-            matches.append(
-                f"This allocation's own scale (~{scale_value:,} {unit_noun}) represents a meaningful "
-                f"strategic-land position in its own right, independent of whether a specific parcel size "
-                f"is confirmed."
-            )
-        elif facts.has_phasing_evidence:
-            investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
-        else:
-            # B2 semantic cleanup (Buyer Fit Classification Audit, Section
-            # 6): the WHOLE-OPPORTUNITY scale_value is known and known to
-            # exceed target - lack of phasing evidence is a genuine open
-            # question for future acquisition-position investigation ("is
-            # there a suitable phase within this larger scheme?"), never a
-            # reason to call the already-known scale fact "insufficient
-            # evidence" for basic Buyer Fit. Text unchanged.
-            unknown.append(f"Overall scale (~{scale_value:,} {unit_noun}) materially exceeds this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}); no phasing/parcel evidence exists to establish whether a suitable smaller phase could become available.")
+    elif scale_value < profile.target_unit_min and profile.below_minimum_scale_is_exclusion:
+        # Housing Association amendment: an explicit hard minimum (e.g. "fewer
+        # than 50 affordable homes is NOT SUITABLE") - never moved to the
+        # discovery floor.
+        does_not_match.append(
+            f"Trusted evidence shows only {scale_value:,} {unit_noun}, below this buyer's minimum "
+            f"requirement of {profile.target_unit_min} {unit_noun}."
+        )
+    elif discovery_min <= scale_value <= discovery_max:
+        scale_possible = True
+        side = "below" if scale_value < profile.target_unit_min else "above"
+        matches.append(
+            f"{scale_value:,} {unit_noun} is slightly {side} this buyer's preferred range ({preferred_text}), "
+            f"but within its discovery range ({discovery_text})."
+        )
+    elif (scale_value > profile.target_unit_max and profile.large_allocation_is_self_qualifying
+          and facts.opportunity_type == STRATEGIC_LAND):
+        # An explicit mandate rule (unchanged): a large strategic allocation
+        # qualifies in its own right for this buyer, independent of parcel size.
+        matches.append(
+            f"This allocation's own scale (~{scale_value:,} {unit_noun}) represents a meaningful "
+            f"strategic-land position in its own right, independent of whether a specific parcel size "
+            f"is confirmed."
+        )
         investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
+        is_investigative_exception = True
+    else:
+        # Stage 2.5A: a KNOWN count outside the soft discovery envelope. The
+        # count itself is not in doubt; whether the wider scheme contains a
+        # relevant acquisition sub-scope is (Stage 2.5B decomposition), so the
+        # subject stays visible as an investigative exception, never
+        # NOT_SUITABLE and never STRONG/POSSIBLE.
+        scale_outside_discovery = True
+        investigate.append(f"{scale_value:,} {unit_noun} " + outside_discovery_text)
+        if scale_value > profile.target_unit_max and facts.has_phasing_evidence:
+            investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
         is_investigative_exception = True
 
     # --- Ownership/control - allocation-specific, structural gap -----------
@@ -1180,10 +1244,15 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # `unknown` bucket for transparency but never by itself prevents
     # STRONG_FIT for an opportunity that satisfies every classification-
     # driving requirement.
+    # Stage 2.5A precedence: hard exclusion > blocking uncertainty > known
+    # subject outside the soft discovery envelope (investigate for sub-scope)
+    # > within discovery but outside preferred (POSSIBLE_FIT) > STRONG_FIT.
     if does_not_match:
         classification = NOT_SUITABLE
-    elif blocking_unknown:
+    elif blocking_unknown or scale_outside_discovery:
         classification = INSUFFICIENT_EVIDENCE
+    elif scale_possible:
+        classification = POSSIBLE_FIT
     else:
         classification = STRONG_FIT
 
