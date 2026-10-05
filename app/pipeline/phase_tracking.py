@@ -5,6 +5,7 @@ import re
 
 from app.db.models import Application
 from app.pipeline.lapse_tracking import PROGRESS_SIGNAL_CATEGORIES, find_progress_signal_filing
+from app.reporting.residential_count import evidenced_pairs
 from app.scrapers.unit_filter import EXCLUDE_CATEGORIES, extract_unit_counts
 
 PHASE_TOKEN = r"(?:part\s+)?[A-Za-z]{0,4}\d+[A-Za-z]?"
@@ -310,7 +311,7 @@ def summarize_phase_units(breakdown: list[dict], *, non_overlap_evidence: tuple 
         known = [p["unit_count"] for p in rows if p.get("unit_count") is not None]
         # Explicit pair evidence: (left code, right code, provenance). No
         # production adapter invents this from labels/application IDs/dates.
-        pairs = {frozenset((left, right)) for left, right, source in non_overlap_evidence if source}
+        pairs = evidenced_pairs(non_overlap_evidence)
         disjoint = len({r["code"] for r in rows}) == len(rows) and all(frozenset((a["code"], b["code"])) in pairs
                        for i, a in enumerate(rows) for b in rows[i + 1:])
         aggregate = sum(known) if known and disjoint and len(known) == len(rows) else None

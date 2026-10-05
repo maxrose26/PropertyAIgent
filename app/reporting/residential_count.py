@@ -130,6 +130,16 @@ def supported_range(*, lower, upper, sources, scope_type, scope_label, subject_i
                            resolution="supported_range", confidence="medium")
 
 
+def evidenced_pairs(evidence):
+    """Unordered identifier pairs that have explicit, sourced non-overlap evidence.
+
+    The single rule shared by phase aggregation and residual planning-capacity
+    arithmetic: a pair with no provenance is not evidence, and nothing is
+    inferred from labels, references, dates, chronology or arithmetic.
+    """
+    return {frozenset((left, right)) for left, right, source in evidence if source}
+
+
 def aligned_tenure_counts(total, private, affordable):
     """Return a coherent breakdown only with identical source/version identity.
 
