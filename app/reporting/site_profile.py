@@ -34,6 +34,7 @@ from app.pipeline.lapse_tracking import (
     PROGRESS_SIGNAL_CATEGORIES,
     parse_portal_date,
 )
+from app.pipeline.phase_tracking import summarize_phase_units
 from app.policy.site_view import build_site_policy_intelligence
 from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
 from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts, resolve_canonical_decision_status
@@ -196,7 +197,7 @@ def _council_five_year_supply(session: Session, council_code: str, policy_rows: 
 
 def build_opportunity_position(
     *, merged: dict, lapse: dict, phase_breakdown: list[dict], policy_rows: list[dict],
-    council_supply: dict | None, has_missing_evidence: bool,
+    council_supply: dict | None, has_missing_evidence: bool, non_overlap_evidence: tuple = (),
 ) -> dict:
     """A concise, deterministic "Opportunity Position" (Part 4) - never a
     planning-permission prediction. Every reason below is derived from a
@@ -215,8 +216,19 @@ def build_opportunity_position(
     if phase_breakdown:
         approved_commencement_unverified = [p for p in phase_breakdown if p["status"] in ("approved_commencement_unverified", "planning_activity") and p.get("latest_grant")]
         if approved_commencement_unverified:
-            known_units = [p["unit_count"] for p in approved_commencement_unverified if p.get("unit_count")]
-            approved_commencement_unverified_units = sum(known_units) if known_units else None
+            # Phase counts can overlap (a sub-phase may sit inside its phase), so
+            # they are never summed here. The one shared guarded rule
+            # (summarize_phase_units) aggregates only when every counted phase
+            # has a known count and pairwise non-overlap is evidenced through its
+            # explicit non_overlap_evidence contract; production supplies none,
+            # so the aggregate is withheld rather than shown partial or blind.
+            # Rows that rule cannot count (plots, the unphased bucket) or phases
+            # spread across status buckets also leave the sum unverified.
+            subset = summarize_phase_units(approved_commencement_unverified, non_overlap_evidence=non_overlap_evidence)
+            live_buckets = [b for b in (subset["approved_commencement_unverified"], subset["planning_activity"]) if b["phase_count"]]
+            counted_phases = sum(b["phase_count"] for b in live_buckets)
+            if len(live_buckets) == 1 and counted_phases == len(approved_commencement_unverified):
+                approved_commencement_unverified_units = live_buckets[0]["units"]
             unit_bit = f" ({approved_commencement_unverified_units:,} units)" if approved_commencement_unverified_units else ""
             reasons.append(
                 f"{len(approved_commencement_unverified)} phase(s) have permission recorded; physical "

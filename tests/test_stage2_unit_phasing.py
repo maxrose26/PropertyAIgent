@@ -475,3 +475,96 @@ def test_exact_source_rejects_stale_supporter_without_displayed_count(session, m
     profile = _profile_for_sources(session, site, [good, current])
     assert profile["residential_mix"]["extraction_reference"] is None
     assert profile["count_assessment"].exact_value == 100
+
+
+# --- Stage 2.5 preflight gate 1: opportunity-position phase counts are never blindly summed ---
+
+
+def _phase_row(code, units, status="approved_commencement_unverified", kind="phase"):
+    return {"code": code, "kind": kind, "status": status, "unit_count": units, "latest_grant": object(),
+            "label": f"Phase {code}"}
+
+
+def _position_reasons(phase_breakdown, *, merged=None, non_overlap_evidence=()):
+    from app.reporting.site_profile import build_opportunity_position
+    op = build_opportunity_position(
+        merged=merged or {"total_units_final": None},
+        lapse={"status": "not_granted", "build_status": "unknown", "deadline": None},
+        phase_breakdown=phase_breakdown, policy_rows=[], council_supply=None, has_missing_evidence=False,
+        non_overlap_evidence=non_overlap_evidence)
+    return " | ".join(op["reasons"])
+
+
+def test_safe_phase_aggregation_a_evidenced_non_overlap_may_aggregate():
+    text = _position_reasons([_phase_row("2", 180), _phase_row("3", 72)],
+                             non_overlap_evidence=(("2", "3", "synthetic pairwise non-overlap provenance"),))
+    assert "2 phase(s) have permission recorded" in text
+    assert "(252 units)" in text
+
+
+def test_safe_phase_aggregation_b_potential_overlap_never_shows_252():
+    breakdown = [_phase_row("2", 180), _phase_row("2A", 72)]
+    text = _position_reasons(breakdown)
+    assert "252" not in text and "units)" not in text
+    # Phase-status information stays available while the aggregate is unverified.
+    assert "2 phase(s) have permission recorded; physical commencement and availability remain unverified." in text
+    # Evidence about a different pair must not authorise this pair.
+    assert "252" not in _position_reasons(breakdown, non_overlap_evidence=(("2", "9", "synthetic provenance"),))
+    assert "252" not in _position_reasons(breakdown, non_overlap_evidence=(("3", "2A", "synthetic provenance"),))
+    # An evidence pair with no provenance is not evidence.
+    assert "252" not in _position_reasons(breakdown, non_overlap_evidence=(("2", "2A", ""),))
+    assert "252" not in _position_reasons(breakdown, non_overlap_evidence=(("2", "2A", None),))
+
+
+def test_safe_phase_aggregation_c_partial_known_counts_are_withheld():
+    pairs = (("1", "2", "p"), ("1", "3", "p"), ("2", "3", "p"))
+    text = _position_reasons([_phase_row("1", 180), _phase_row("2", 72), _phase_row("3", None)], non_overlap_evidence=pairs)
+    assert "3 phase(s) have permission recorded" in text
+    assert "252" not in text and "units)" not in text
+    # One known and one unknown phase: the known 180 is not a combined total.
+    two = _position_reasons([_phase_row("1", 180), _phase_row("2", None)], non_overlap_evidence=(("1", "2", "p"),))
+    assert "2 phase(s) have permission recorded" in two
+    assert "180" not in two and "units)" not in two
+
+
+def test_safe_phase_aggregation_d_single_known_phase_keeps_its_scoped_count():
+    text = _position_reasons([_phase_row("2", 180)])
+    assert "1 phase(s) have permission recorded" in text
+    assert "(180 units)" in text
+
+
+def test_safe_phase_aggregation_e_parent_phase_and_subphase_stay_scope_separated():
+    merged = {"total_units_final": 2000}
+    breakdown = [_phase_row("2", 180), _phase_row("2A", 72)]
+    text = _position_reasons(breakdown, merged=merged)
+    assert "Major scheme recorded — 2,000 homes." in text
+    assert "252" not in text and "2,252" not in text and "2,180" not in text and "2,072" not in text
+    # Even where the two child scopes are evidenced as independent, the parent is never added or replaced.
+    evidenced = _position_reasons(breakdown, merged=merged, non_overlap_evidence=(("2", "2A", "synthetic provenance"),))
+    assert "Major scheme recorded — 2,000 homes." in evidenced
+    assert "(252 units)" in evidenced
+    assert "2,252" not in evidenced and "2,000 homes" in evidenced and "2,180" not in evidenced
+
+
+def test_safe_phase_aggregation_f_plots_and_mixed_status_buckets_stay_unverified():
+    # A plot row cannot be counted by the shared rule, so it must not leave a partial sum behind.
+    with_plot = [_phase_row("2", 72), _phase_row("5", None, kind="plot")]
+    text = _position_reasons(with_plot, non_overlap_evidence=(("2", "5", "p"),))
+    assert "2 phase(s) have permission recorded" in text and "units)" not in text
+    # An unphased bucket row likewise.
+    unphased = [_phase_row("2", 72), _phase_row("Whole site / unphased", 100)]
+    unphased_text = _position_reasons(unphased, non_overlap_evidence=(("2", "Whole site / unphased", "p"),))
+    assert "units)" not in unphased_text
+    # Phases in different status buckets are not aggregated across buckets.
+    mixed = [_phase_row("2", 180), _phase_row("3", 72, status="planning_activity")]
+    mixed_text = _position_reasons(mixed, non_overlap_evidence=(("2", "3", "p"),))
+    assert "252" not in mixed_text and "units)" not in mixed_text
+
+
+def test_safe_phase_aggregation_g_h_unknown_stays_unknown_and_status_wording_survives():
+    text = _position_reasons([_phase_row("2", None)])
+    assert "1 phase(s) have permission recorded; physical commencement and availability remain unverified." in text
+    assert "0 units" not in text and "units)" not in text
+    # A phase with no recorded grant is not counted as permission recorded at all.
+    ungranted = _position_reasons([{"code": "2", "kind": "phase", "status": "not_yet_approved", "unit_count": 50}])
+    assert "permission recorded" not in ungranted
