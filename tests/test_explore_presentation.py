@@ -134,11 +134,12 @@ def test_removed_fields_remain_in_the_csv_export_row_builder():
     """Part 17/19 - "must remain stored and available elsewhere" -
     build_report_rows (both CSV export buttons' shared source) must still
     carry every field removed from the on-screen table."""
-    start = EXPLORE_SOURCE.index("def build_report_rows(")
-    end = EXPLORE_SOURCE.index("\ndef ", start + 1)
-    body = EXPLORE_SOURCE[start:end]
+    import ast
+    node = next(n for n in ast.walk(ast.parse(EXPLORE_SOURCE)) if isinstance(n, ast.FunctionDef) and n.name == "build_report_rows")
+    body = ast.get_source_segment(EXPLORE_SOURCE, node)
     for removed in COLUMNS_REMOVED_AND_STILL_IN_CSV_EXPORT:
-        assert removed in body, f"{removed} must remain available via CSV export"
+        label = "Reported Tenure (source and scope unverified)" if removed == "Tenure Split" else removed
+        assert label in body, f"{removed} must remain available via CSV export"
 
 
 def test_planning_link_uses_concise_display_text():

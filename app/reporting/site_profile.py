@@ -208,25 +208,25 @@ def build_opportunity_position(
     if total is not None and total >= MAJOR_UNIT_THRESHOLD:
         reasons.append(f"Major scheme recorded — {total:,} homes.")
 
-    approved_not_started_units = None
+    approved_commencement_unverified_units = None
     if phase_breakdown:
-        approved_not_started = [p for p in phase_breakdown if p["status"] == "approved_not_started"]
-        if approved_not_started:
-            known_units = [p["unit_count"] for p in approved_not_started if p.get("unit_count")]
-            approved_not_started_units = sum(known_units) if known_units else None
-            unit_bit = f" ({approved_not_started_units:,} units)" if approved_not_started_units else ""
+        approved_commencement_unverified = [p for p in phase_breakdown if p["status"] in ("approved_commencement_unverified", "planning_activity") and p.get("latest_grant")]
+        if approved_commencement_unverified:
+            known_units = [p["unit_count"] for p in approved_commencement_unverified if p.get("unit_count")]
+            approved_commencement_unverified_units = sum(known_units) if known_units else None
+            unit_bit = f" ({approved_commencement_unverified_units:,} units)" if approved_commencement_unverified_units else ""
             reasons.append(
-                f"{len(approved_not_started)} phase(s) have full planning permission but no confirmed "
-                f"commencement filing since{unit_bit} — an undeveloped phase."
+                f"{len(approved_commencement_unverified)} phase(s) have permission recorded; physical "
+                f"commencement and availability remain unverified{unit_bit}."
             )
     elif lapse["status"] in ("safe", "approaching") and lapse.get("build_status") in (None, "unknown", "no_completions_yet"):
-        reasons.append("Major permitted scheme recorded as not yet commenced.")
+        reasons.append("Permission recorded — physical commencement and availability unverified.")
 
     if lapse["status"] == "approaching" and lapse.get("deadline"):
         deadline = lapse["deadline"]
-        reasons.append(f"Commencement deadline approaching ({deadline.strftime('%d %b %Y')}) with no build activity detected.")
+        reasons.append(f"Assumed permission review date approaching ({deadline.strftime('%d %b %Y')}); three-year assumption, conditions and commencement unverified.")
     elif lapse["status"] == "lapsed":
-        reasons.append("The statutory commencement deadline has passed with no build activity detected — permission may have lapsed.")
+        reasons.append("An assumed three-year review date has passed; legal lapse and physical commencement remain unverified.")
 
     if policy_rows:
         row = policy_rows[0]
@@ -254,11 +254,11 @@ def build_opportunity_position(
         # "Why it matters"/"Investigate next" are grounded in whichever
         # signal is most decision-relevant, in the same priority order the
         # reasons themselves were checked above.
-        if any("undeveloped phase" in r or "not yet commenced" in r for r in reasons):
-            why_it_matters = "A phase or the whole scheme has full permission with no confirmed start of works, which may represent an acquisition opportunity."
+        if any("commencement" in r and "permission" in r.lower() for r in reasons):
+            why_it_matters = "A recorded permission warrants investigation; physical progress and availability still require verification."
             investigate_next = "Confirm current site control and developer intentions before approaching."
-        elif any("deadline" in r or "lapsed" in r for r in reasons):
-            why_it_matters = "The statutory commencement deadline is a real legal event that may affect whether this permission remains valid."
+        elif any("review date" in r for r in reasons):
+            why_it_matters = "An assumed review date is a reason to check permission conditions, not evidence of legal lapse or seller urgency."
             investigate_next = "Check the granted application's own conditions and any recent site activity before relying on this permission."
         elif council_supply is not None and council_supply["years"] < FIVE_YEAR_SUPPLY_WARNING_THRESHOLD:
             why_it_matters = "The council's housing land supply position may increase pressure to bring forward deliverable sites."
@@ -267,7 +267,7 @@ def build_opportunity_position(
             why_it_matters = "Local Plan allocation status indicates the council's own planning intent for this site."
             investigate_next = "Review the Policy Position tab for the allocation's own capacity and progression evidence."
         else:
-            why_it_matters = "Recent evidence indicates a change worth reviewing before drawing conclusions."
+            why_it_matters = "The recorded scale or evidence gaps warrant investigation; no recent change or availability is established."
             investigate_next = "Review the Planning Position tab for the full application history."
 
     return {"headline": headline, "reasons": reasons, "why_it_matters": why_it_matters, "investigate_next": investigate_next}
@@ -389,7 +389,7 @@ def build_site_timeline(
 
     if lapse.get("deadline"):
         entries.append({
-            "icon": "⏰", "label": "Commencement deadline", "when": _as_datetime(lapse["deadline"]),
+            "icon": "⏰", "label": "Assumed permission review date (three years; conditions unverified)", "when": _as_datetime(lapse["deadline"]),
             "detail": f"3 years from {lapse['granted_app'].reference}'s decision" if lapse.get("granted_app") else None,
         })
 
@@ -406,7 +406,7 @@ def build_site_timeline(
             n = len(progress_filings)
             entries.append({
                 "icon": "🏗️",
-                "label": f"{n} commencement/progress filing{'s' if n != 1 else ''} recorded, latest {latest.reference}",
+                "label": f"{n} administrative planning filing{'s' if n != 1 else ''} recorded, latest {latest.reference}",
                 "when": _as_datetime(latest_date), "detail": None,
             })
 
@@ -453,7 +453,7 @@ def build_ai_summary_view(site: Site) -> dict:
     this specific summary."""
     if not site.status_summary:
         return {"has_summary": False, "text": None, "generated_at": None}
-    return {"has_summary": True, "text": site.status_summary, "generated_at": site.status_summary_updated_at}
+    return {"has_summary": False, "text": None, "generated_at": site.status_summary_updated_at, "limitation": "Stored narrative has not been verified against the commercial evidence contract; review required before reuse."}
 
 
 # --- Evidence gaps -----------------------------------------------------------

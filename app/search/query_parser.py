@@ -41,6 +41,7 @@ FILTERS_SCHEMA = {
             "max_affordable_units": {"type": ["integer", "null"]},
             "development_types": {"type": ["array", "null"], "items": {"type": "string"}},
             "exclude_completed": {"type": "boolean"},
+            "require_available": {"type": "boolean"},
             "statuses": {
                 "type": ["array", "null"],
                 "items": {"type": "string", "enum": ["granted", "refused", "withdrawn", "not_yet_decided"]},
@@ -58,7 +59,7 @@ FILTERS_SCHEMA = {
         },
         "required": [
             "query_type", "region", "council_codes", "min_total_units", "max_total_units", "min_affordable_units",
-            "max_affordable_units", "development_types", "exclude_completed", "statuses", "needs_review",
+            "max_affordable_units", "development_types", "exclude_completed", "require_available", "statuses", "needs_review",
             "aggregate_group_by", "aggregate_metric", "aggregate_top_n", "interpretation_notes",
         ],
         "additionalProperties": False,
@@ -77,6 +78,7 @@ class SearchFilters:
     max_affordable_units: int | None = None
     development_types: list[str] = field(default_factory=list)
     exclude_completed: bool = False
+    require_available: bool = False
     statuses: list[str] = field(default_factory=list)
     needs_review: bool | None = None
     aggregate_group_by: str | None = None
@@ -101,7 +103,9 @@ Known regions: {", ".join(known_regions)}
 
 Rules:
 - Only set council_codes if the query names a specific council; otherwise use region.
-- "haven't been completed" / "not yet built" / "still available" -> exclude_completed = true.
+- "haven't been completed" -> exclude_completed = true (does not establish not started).
+- "still available" / "available to buy" -> require_available = true, never infer availability from completion.
+- Availability is not established by existing planning evidence; explain this limitation in interpretation_notes.
 - "50+ affordable units" -> min_affordable_units = 50.
 - "no affordable units" / "zero affordable" / "fully private" -> max_affordable_units = 0.
 - "no more than N affordable units" -> max_affordable_units = N.
@@ -174,6 +178,7 @@ def parse_query(client: OpenAI, nl_query: str) -> SearchFilters:
         max_affordable_units=result.get("max_affordable_units"),
         development_types=result.get("development_types") or [],
         exclude_completed=bool(result.get("exclude_completed")),
+        require_available=bool(result.get("require_available")),
         statuses=result.get("statuses") or [],
         needs_review=result.get("needs_review"),
         aggregate_group_by=result.get("aggregate_group_by"),
@@ -259,3 +264,22 @@ def compute_aggregate_answer(df: pd.DataFrame, filters: SearchFilters) -> Aggreg
     headline = f"**{top_name}** is the most active {group_label}, with **{int(top_value)} {metric_phrase}**."
 
     return AggregateAnswer(headline=headline, ranked=ranked, group_by_column=group_col, metric_column=metric_col)
+
+
+def numeric_unit_mask(values: pd.Series, minimum=None, maximum=None) -> pd.Series:
+    """Explicit numeric bounds exclude unknown/malformed/conflicting totals."""
+    if minimum is None and maximum is None:
+        return pd.Series(True, index=values.index)
+    from app.reporting.commercial_evidence import known_unit_count
+    numeric = values.map(known_unit_count)
+    valid = numeric.notna()
+    if minimum is not None:
+        valid &= numeric.ge(minimum)
+    if maximum is not None:
+        valid &= numeric.le(maximum)
+    return valid.fillna(False)
+
+
+def availability_mask(values: pd.Series) -> pd.Series:
+    """Only an explicit evidenced available state can satisfy availability."""
+    return values.eq("evidenced_available").fillna(False)

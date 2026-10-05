@@ -24,7 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import streamlit as st
 
-from app.db.models import Site
+from sqlalchemy import select
+from app.db.models import Application, Site
+from app.reporting.profile_destination import limited_profile, origin_evidence
+from app.ui.buyer_selector import buyer_selector
 from app.ui.common import bootstrap, credits_sidebar, get_db, load_site_applications
 from app.ui.map_selection import parse_site_id_param
 from app.ui.shell import empty_state
@@ -44,6 +47,10 @@ with page_scope():
         # and fell back to a self-link. An absolute path resolves reliably.
         HOME_PAGE = Path(__file__).resolve().parents[1] / "pages" / "0_Explore.py"
         st.page_link(HOME_PAGE, label="← Back to Explore", icon="🔙")
+
+        if st.query_params.get("origin") == "opportunities":
+            st.page_link(Path(__file__).resolve().parents[1] / "pages" / "00_Dashboard.py", label="← Back to opportunities")
+        buyer_selector(key="site-profile", session=session)
 
         raw_site_id = st.query_params.get("site_id")
         site_id = parse_site_id_param(raw_site_id)
@@ -75,13 +82,36 @@ with page_scope():
 
         credits_sidebar(session, settings)
 
+        reference = st.query_params.get("application_reference")
+        phase_code = st.query_params.get("phase_code")
+        if reference or phase_code:
+            source_apps = session.execute(select(Application).where(
+                Application.site_id == site_id, Application.reference == reference,
+            )).scalars().all() if reference else []
+            origin = origin_evidence(site_id, source_apps, reference, phase_code)
+            st.info(origin["limitation"])
+            if origin["requested_phase"]:
+                st.caption("Requested opportunity scope: " + origin["requested_phase"])
+            if origin["reference"]:
+                st.write("Originating planning reference: " + origin["reference"])
+            if origin["source_url"]:
+                from urllib.parse import urlsplit
+                if urlsplit(origin["source_url"]).scheme in ("https", "http"):
+                    st.link_button("View originating planning source", origin["source_url"])
+
         apps = load_site_applications(session, site_id)
         if not apps:
-            empty_state(
-                "Nothing substantive to show yet",
-                "This site's only linked applications are things like a screening/scoping opinion or consultation "
-                "notice — no substantive scheme behind them yet. Go back and pick another site.",
-                icon="👀",
-            )
+            limited = limited_profile(site, list(site.applications))
+            st.subheader(limited["address"])
+            st.caption(f"Site {limited['site_id']} · {site.council_code}")
+            st.info(limited["limitation"])
+            if limited["reference"]:
+                st.write(f"Linked operative planning reference: {limited['reference']}")
+            if limited["source_url"]:
+                from urllib.parse import urlsplit
+                if urlsplit(limited["source_url"]).scheme in ("https", "http"):
+                    st.link_button("View planning source", limited["source_url"])
+            if limited["lapse"].get("deadline"):
+                st.caption(f"Assumed review date: {limited['lapse']['deadline']}. {limited['lapse']['deadline_note']}")
             st.stop()
         render_site_profile(session, settings, site, apps)

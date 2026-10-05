@@ -3,16 +3,8 @@
 Neither of these needed a scraper rewrite - both are free/cheap UK open-data
 lookups keyed off the site's postcode:
 
-- EPC Open Data register: new dwellings get an Energy Performance
-  Certificate registered around practical completion, so counting EPCs
-  registered at a site's postcode after its decision date is a reasonable
-  proxy for "how much of this has actually been built" - register for a
-  free API key at https://get-energy-performance-data.communities.gov.uk
-  and add EPC_API_KEY to .env (a bearer token - the service migrated off
-  the old epc.opendatacommunities.org domain and its email+key Basic Auth;
-  confirmed the old domain now just redirects to this new one's HTML
-  frontend rather than erroring, so a stale old-style key silently returns
-  a webpage instead of JSON rather than failing loudly).
+- EPC Open Data register: postcode-level certificates are investigative context,
+  not scheme-matched completion evidence.
 - postcodes.io: free, no API key, used purely to plot sites on the map.
 - Nominatim (OpenStreetMap): free, no API key, fallback for sites with no
   postcode in their address at all - common for vacant/greenfield land,
@@ -35,7 +27,6 @@ NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_USER_AGENT = "UKPlanningDealFinder/1.0 (contact: maxrose26@gmail.com)"
 NOMINATIM_MIN_INTERVAL_SECONDS = 1.1
 
-COMPLETION_TOLERANCE = 0.9  # count as "complete" once EPCs found >= 90% of expected units
 
 # Same non-geocodable boilerplate app.pipeline.site_linking.normalise_address
 # strips for site-matching purposes, reused here rather than duplicated -
@@ -113,52 +104,53 @@ def search_epcs(api_key: str, postcode: str) -> list[dict]:
 
 @dataclass
 class BuildStatusResult:
-    status: str  # no_completions_yet | partially_complete | complete | unknown
+    status: str
     epc_count: int
     checked_at: dt.datetime
+    evidence: tuple[dict, ...] = ()
+    evidence_note: str = "Postcode evidence is not matched to this scheme; completion is unverified."
 
 
 def check_build_status(
     api_key: str | None, postcode: str | None,
     expected_units: int | None, decided_after: dt.date | None = None,
 ) -> BuildStatusResult:
+    """Retain postcode certificates as leads, never as scheme completion proof.
+
+    There is no accepted dwelling/phase identity contract at this boundary.
+    Even post-grant certificates cannot establish this scheme's completion.
+    Date-qualified distinct certificates are counted for investigation only.
+    """
     now = dt.datetime.now(dt.timezone.utc)
-
     if not api_key or not postcode:
-        return BuildStatusResult(status="unknown", epc_count=0, checked_at=now)
-
+        return BuildStatusResult("unknown", 0, now)
     try:
         rows = search_epcs(api_key, postcode)
     except Exception:
-        return BuildStatusResult(status="unknown", epc_count=0, checked_at=now)
-
-    if decided_after:
-        filtered = []
-        for row in rows:
-            registered = row.get("registrationDate")
-            try:
-                if registered and dt.date.fromisoformat(registered) >= decided_after:
-                    filtered.append(row)
-            except ValueError:
-                continue
-        rows = filtered or rows  # if date filtering wipes everything out, fall back to unfiltered count
-
-    epc_count = len(rows)
-
-    if epc_count == 0:
-        # NOT "not_started" - an EPC is only lodged near practical
-        # completion (when a unit is ready to occupy/sell), so it lags the
-        # actual start of construction by potentially a year or more. Zero
-        # EPCs only proves "nothing has finished yet" - a site that broke
-        # ground 18 months ago and is mid-build looks identical here to one
-        # that's genuinely untouched. classify_build_status's portal-filing
-        # check is the signal that can positively confirm "underway"; this
-        # value means neither signal fired, not that we've confirmed
-        # nothing has happened.
-        status = "no_completions_yet"
-    elif expected_units and epc_count >= expected_units * COMPLETION_TOLERANCE:
-        status = "complete"
-    else:
-        status = "partially_complete"
-
-    return BuildStatusResult(status=status, epc_count=epc_count, checked_at=now)
+        return BuildStatusResult("unknown", 0, now)
+    if isinstance(decided_after, dt.datetime):
+        decided_after = decided_after.date()
+    evidence, seen, count = [], set(), 0
+    for row in rows:
+        if not isinstance(row, dict):
+            evidence.append({"record": row, "reason": "invalid_record"})
+            continue
+        try:
+            registered = dt.date.fromisoformat(row.get("registrationDate", ""))
+        except (ValueError, TypeError):
+            registered = None
+        # Certificate identity where supplied; exact duplicate payload otherwise.
+        import json
+        identity = str(row.get("lmk-key") or row.get("lmkKey") or json.dumps(row, sort_keys=True))
+        if identity in seen:
+            reason = "duplicate_certificate"
+        elif not isinstance(decided_after, dt.date) or registered is None:
+            reason = "date_scope_unknown"
+        elif registered < decided_after:
+            reason = "pre_grant"
+        else:
+            reason = "post_grant_scheme_match_unverified"
+            count += 1
+        seen.add(identity)
+        evidence.append({"record": row, "reason": reason})
+    return BuildStatusResult("unknown", count, now, tuple(evidence))

@@ -1493,7 +1493,7 @@ def ai_status_summary_view(ai_summary: dict) -> None:
     doesn't support, and why model/prompt version are omitted rather than
     asserted without a stored per-row value."""
     if not ai_summary["has_summary"]:
-        st.info("No AI status summary has been generated yet for this site.")
+        st.info(ai_summary.get("limitation") or "No AI status summary has been generated yet for this site.")
         return
     ai_summary_card(
         ai_summary["text"],

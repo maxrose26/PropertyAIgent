@@ -1184,10 +1184,13 @@ def _resolve_units_from_units_facts(residential: OperativeFact, all_use: Operati
     existing Gate 2B-1 "no new inference" safeguard correctly withholds a
     residential-only figure) - never fabricates a residential split that
     isn't there. Returns (value, kind, is_estimated)."""
+    from app.reporting.commercial_evidence import known_unit_count
+    if residential.state == FACT_CONFLICT:
+        return None, None, False
     if residential.state == FACT_RESOLVED:
-        return residential.value, "residential", residential.confidence == "low"
+        return known_unit_count(residential.value), "residential", residential.confidence == "low"
     if all_use.state == FACT_RESOLVED:
-        return all_use.value, "all_use", all_use.confidence == "low"
+        return known_unit_count(all_use.value), "all_use", all_use.confidence == "low"
     return None, None, False
 
 
@@ -1252,7 +1255,10 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts, *, application
         consented.residential_only_units, consented.all_use_total_units,
     )
     units_source: str | None = "consented" if units is not None else None
-    if units is None and len(active_positions) == 1:
+    if consented.approved_units.state == FACT_CONFLICT:
+        units, units_kind, units_is_estimated = None, None, False
+        units_source = None
+    if units is None and consented.approved_units.state != FACT_CONFLICT and len(active_positions) == 1:
         units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
             active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
         )

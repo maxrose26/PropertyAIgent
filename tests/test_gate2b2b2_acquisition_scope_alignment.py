@@ -159,7 +159,7 @@ def test_lacy_street_shape_folds_into_a_legitimate_whole_site_opportunity_instea
 #        evidence the site has already started) -----------------------------
 
 
-def test_barton_road_shape_plot_10_does_not_survive_and_underway_state_is_never_contradicted(session):
+def test_barton_road_shape_plot_10_does_not_survive_and_admin_activity_retains_unverified_whole_site_lead(session):
     site = _site(session, display_address="Barton Road shape")
     main = _app(
         session, site.id, "FUL/1",
@@ -189,12 +189,12 @@ def test_barton_road_shape_plot_10_does_not_survive_and_underway_state_is_never_
     # No replacement whole-site "undeveloped" card either - the site's own
     # resolved status is genuinely underway, so it correctly produces NO
     # undeveloped_phase card at all, never a contradiction of that state.
-    assert not any(c["params"]["site_id"] == str(site.id) for c in cards)
+    assert any(c["params"]["site_id"] == str(site.id) and "unverified" in c["reason"] for c in cards)
 
     universe = build_current_opportunity_universe(session)
     ids = {r.opportunity_id for r in universe}
     assert planning_delivery_phase_opportunity_id(site.id, "10") not in ids
-    assert planning_delivery_phase_opportunity_id(site.id, UNPHASED_LABEL) not in ids
+    assert planning_delivery_phase_opportunity_id(site.id, UNPHASED_LABEL) in ids
 
 
 # --- 3. Barton Road latent "Plot 43" shape: a single application citing ----

@@ -532,7 +532,7 @@ def _why_it_matters_reasons(card: dict) -> list[str]:
         reasons.append("No linked planning application currently held by the platform for this allocation.")
 
     if card["matched"] and card["lapse_status"] in _NOT_COMMENCED_LAPSE_STATUSES:
-        reasons.append("A linked planning permission exists but has not yet commenced, based on available filing evidence.")
+        reasons.append("A linked planning permission is recorded; physical commencement and availability remain unverified.")
 
     if card["council_five_year_supply"] is not None and card["council_five_year_supply"] < FIVE_YEAR_SUPPLY_WARNING_THRESHOLD:
         reasons.append(
@@ -546,7 +546,7 @@ def _why_it_matters_reasons(card: dict) -> list[str]:
         reasons.append("Suggested allocation mapping is available but has not yet been confirmed.")
 
     if card["is_multi_authority"] and card["major_housing"]:
-        reasons.append("A cross-boundary strategic allocation shared across multiple authorities.")
+        reasons.append("Participates in a joint plan; this allocation’s cross-boundary geography is unverified.")
 
     if not reasons:
         reasons.append("No additional planning signals identified from evidence currently held by the platform.")
@@ -921,7 +921,9 @@ def build_allocation_card(
         "plan_status_bucket": plan_meta["bucket"],
         "plan_status_chip_kind": plan_meta["chip_kind"],
         "is_multi_authority": len(council_codes_on_plan) > 1,
-        "cross_boundary_councils": [c for c in council_codes_on_plan if c != allocation.council_code],
+        "joint_plan_councils": [c for c in council_codes_on_plan if c != allocation.council_code],
+        "cross_boundary_councils": [],
+        "allocation_cross_boundary": None,
         "intended_use": allocation.intended_use,
         "intended_use_label": intended_use_label,
         "development_type": development_type,
@@ -1475,7 +1477,7 @@ CATEGORY_DEFINITIONS: tuple[tuple[str, str, object], ...] = (
     ("emerging", "Emerging", lambda c: c["plan_status_bucket"] == "emerging"),
     ("with_maps", "With Maps", _has_map),
     ("no_linked_application", "No Linked Application", lambda c: not has_trusted_linked_application(c)),
-    ("not_commenced", "Undeveloped / Not Commenced", _not_commenced),
+    ("not_commenced", "Permission — commencement unverified", _not_commenced),
     ("major_housing", "Major Housing Allocations", lambda c: c["major_housing"]),
     ("needs_review", "Needs Review", _needs_review),
 )

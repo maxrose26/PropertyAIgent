@@ -521,7 +521,7 @@ def test_generic_mode_feed_unchanged_by_buyer_profiles_v1(session):
 
 # --- Candidate-pool personalisation (not a re-filter of the generic six) ---
 
-def test_buyer_mode_selects_from_a_larger_pool_than_the_generic_feed(session):
+def test_buyer_mode_selects_from_a_larger_pool_than_the_generic_feed(session, monkeypatch):
     """Proves personalisation happens before final truncation (the brief's
     own "Critical Feed Requirement", opportunity_feed.py's own
     _buyer_selection docstring): build 3 small, in-range, general-needs
@@ -564,6 +564,20 @@ def test_buyer_mode_selects_from_a_larger_pool_than_the_generic_feed(session):
         ))
         nesten_fit_sites.append(site)
     session.commit()
+
+    # This is a pool/ordering test, not AH extraction acceptance. The accepted
+    # producer deliberately withholds legacy percentage scope, so provide an
+    # explicit synthetic qualified MatchingFacts input at that contract boundary.
+    # The buyer classifier and feed selection remain real and fully asserted.
+    from dataclasses import replace
+    import app.policy.buyer_matching as matching
+    original = matching.build_planning_delivery_matching_facts_from_operative
+    def qualified_synthetic_facts(*args, **kwargs):
+        facts = original(*args, **kwargs)
+        if facts.unit_count in (70, 71, 72):
+            return replace(facts, affordable_percentage=25.0, affordable_percentage_trusted=True)
+        return facts
+    monkeypatch.setattr(matching, "build_planning_delivery_matching_facts_from_operative", qualified_synthetic_facts)
 
     generic_feed = build_opportunity_feed(session, limit=6)
     generic_titles = {c["title"] for c in generic_feed["cards"]}

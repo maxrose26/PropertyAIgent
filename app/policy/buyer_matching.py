@@ -84,7 +84,8 @@ from app.policy.buyer_profiles import (
     BuyerMandatePolicy,
 )
 from app.reporting.allocation_development_coverage import NO_IDENTIFIED_ACTIVITY
-from app.reporting.scheme_reconciliation import FACT_RESOLVED
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, FACT_CONFLICT
+from app.reporting.commercial_evidence import known_unit_count
 
 STRATEGIC_LAND = "strategic_land"
 PLANNING_DELIVERY = "planning_delivery"
@@ -404,7 +405,7 @@ def _operative_source_scheme_intelligence(operative_facts, applications_by_id: d
     source = None
     if consented.approved_units.state == FACT_RESOLVED and consented.approved_units.source is not None:
         source = consented.approved_units.source
-    elif len(operative_facts.active_positions) == 1:
+    elif consented.approved_units.state != FACT_CONFLICT and len(operative_facts.active_positions) == 1:
         proposed = operative_facts.active_positions[0].proposed_units
         if proposed.state == FACT_RESOLVED and proposed.source is not None:
             source = proposed.source
@@ -459,9 +460,9 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     # never "latest wins".
     unit_count = None
     if consented.approved_units.state == FACT_RESOLVED:
-        unit_count = consented.approved_units.value
-    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
-        unit_count = active_positions[0].proposed_units.value
+        unit_count = known_unit_count(consented.approved_units.value)
+    elif consented.approved_units.state != FACT_CONFLICT and len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
+        unit_count = known_unit_count(active_positions[0].proposed_units.value)
 
     # --- development type / specialist flag - read from the SAME
     # application the unit figure above came from; never inferred from
@@ -883,7 +884,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         unit_noun = "affordable homes"
         no_count_message = "No trusted affordable-unit count is available to assess against this buyer's target range."
     else:
-        scale_value = facts.unit_count
+        scale_value = known_unit_count(facts.unit_count)
         unit_noun = "homes"
         no_count_message = "No trusted unit count is available to assess against this buyer's target range."
 

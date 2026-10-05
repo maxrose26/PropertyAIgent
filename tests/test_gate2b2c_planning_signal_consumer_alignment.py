@@ -67,8 +67,8 @@ def test_world_of_pets_rm_plus_later_nma_does_not_anchor_on_the_nma(session):
     result = compute_lapse_status([rm, session.query(Application).filter_by(reference="119412/NMA/26").one()], site)
     assert result["granted_app"].reference == "114619/RES/24"
     assert result["deadline"] == dt.date(2028, 3, 27)
-    assert result["status"] == "underway"  # the later NMA is now correctly read as progress evidence
-    assert result["build_status"] == "underway"
+    assert result["deadline_basis"] == "assumed"  # admin activity cannot establish physical commencement
+    assert result["build_status"] == "unknown"
 
 
 # --- 2/3/4. Full permission + later NMA / CND / S73 -------------------------
@@ -181,7 +181,7 @@ def test_genuine_phase_permission_resolves_within_its_own_scope(session):
                       decision="Approve with Conditions", decision_issued_date="Mon 01 Jan 2024")
     result = compute_phase_progress([rm_phase1])
     assert result["latest_grant"].reference == "RES/1"
-    assert result["status"] == "approved_not_started"
+    assert result["status"] == "approved_commencement_unverified"
 
 
 # --- 10/11/12. Sibling phase / plot cannot reset another scope's clock -----
@@ -258,8 +258,8 @@ def test_later_nma_still_provides_valid_progress_evidence_against_the_true_permi
     apps = list(site.applications)
     result = compute_lapse_status(apps, site)
     assert result["granted_app"].reference == "FUL/1"
-    assert result["build_status"] == "underway"
-    assert result["status"] == "underway"
+    assert result["build_status"] == "unknown"
+    assert result["deadline_basis"] == "assumed"
 
 
 def test_later_condition_discharge_still_provides_valid_progress_evidence(session):
@@ -273,7 +273,7 @@ def test_later_condition_discharge_still_provides_valid_progress_evidence(sessio
     apps = list(site.applications)
     result = compute_lapse_status(apps, site)
     assert result["granted_app"].reference == "FUL/1"
-    assert result["build_status"] == "underway"
+    assert result["build_status"] == "unknown"
 
 
 # --- 16/17. RECENT_PERMISSION false/valid ------------------------------------
@@ -313,7 +313,7 @@ def test_false_world_of_pets_style_undeveloped_signal_suppressed(session):
          decision_issued_date="Mon 01 Jun 2024", application_received="Mon 01 Jun 2024")
     apps = list(site.applications)
     result = compute_phase_progress(apps)
-    assert result["status"] == "underway"  # not "approved_not_started"
+    assert result["status"] == "planning_activity"  # administrative evidence only
 
 
 def test_valid_genuinely_undeveloped_permission_preserved(session):
@@ -323,7 +323,7 @@ def test_valid_genuinely_undeveloped_permission_preserved(session):
          application_received="Mon 01 Dec 2023")
     apps = list(site.applications)
     result = compute_phase_progress(apps)
-    assert result["status"] == "approved_not_started"
+    assert result["status"] == "approved_commencement_unverified"
     assert result["latest_grant"].reference == "FUL/1"
 
 

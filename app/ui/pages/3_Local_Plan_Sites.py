@@ -445,9 +445,9 @@ with page_scope():
             if card["progression_signal"]:
                 st.write(f"**Progression signal:** {PROGRESSION_SIGNAL_LABELS.get(card['progression_signal'], card['progression_signal'])}")
             st.write(f"**Allocation review state:** {card['review_status_label']}")
-            if card["is_multi_authority"] and card["cross_boundary_councils"]:
-                other_names = ", ".join(view["council_names"].get(c, c) for c in card["cross_boundary_councils"])
-                st.caption(f"Cross-boundary: this Local Plan is also linked to {other_names}.")
+            if card["is_multi_authority"] and card["joint_plan_councils"]:
+                other_names = ", ".join(view["council_names"].get(c, c) for c in card["joint_plan_councils"])
+                st.caption(f"Joint plan membership (allocation boundary unverified): this Local Plan is also linked to {other_names}.")
             if card.get("development_type"):
                 st.caption(f"🏘️ {card['development_type']}")
             st.write(f"**Intended use:** {card['intended_use_label']}")
@@ -946,6 +946,8 @@ with page_scope():
                     joint_plan_only = st.checkbox("Joint Plan allocations only", value=False, key="alloc-filter-joint")
                 with badge_cols[1]:
                     cross_boundary_only = st.checkbox("Cross-boundary allocations only", value=False, key="alloc-filter-crossboundary")
+                    if cross_boundary_only:
+                        st.caption("Joint-plan membership is not allocation geography. Only evidenced allocation boundaries qualify; unknowns are excluded.")
 
             if st.button("Clear filters", key="alloc-filter-clear"):
                 for key in (

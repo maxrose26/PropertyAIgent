@@ -36,6 +36,7 @@ build_opportunity_feed's own docstring), never a computed ranking.
 from __future__ import annotations
 
 from sqlalchemy import select
+from app.reporting.profile_destination import site_destination
 
 from app.db.models import LocalPlan, LocalPlanSite, Site
 from app.policy.allocation_planning_coverage import (
@@ -192,11 +193,12 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
         "metrics": [("Status", card["metric"])],
         "tags": [OPPORTUNITY_TYPE_LABELS[opportunity_type], *extra_tags],
         "page": card["page"],
-        "params": card["params"],
+        "params": site_destination(card["params"]["site_id"], phase_code=card.get("phase_code"), application_reference=card.get("application_reference") or card.get("reference")) if card.get("params", {}).get("site_id") else card["params"],
         "when": card["when"],
         "matching_facts": None,
         "application_reference": card.get("application_reference") or card.get("reference"),
         "phase_code": card.get("phase_code"),
+        "phase_unit_count": card.get("phase_unit_count"),
     }
 
 
@@ -258,7 +260,10 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
                 operative_by_site[site_id], apps_by_site[site_id], application_reference=reference)
             if phase_code:
                 from dataclasses import replace
-                facts = replace(facts, affordable_unit_count=None, affordable_percentage=None,
+                from app.pipeline.phase_tracking import UNPHASED_LABEL
+                from app.reporting.commercial_evidence import known_unit_count
+                scoped_units = facts.unit_count if phase_code == UNPHASED_LABEL else known_unit_count(card.get("phase_unit_count"))
+                facts = replace(facts, unit_count=scoped_units, affordable_unit_count=None, affordable_percentage=None,
                                 affordable_percentage_trusted=False)
             facts_by_context[key] = facts
         card["matching_facts"] = facts_by_context[key]
@@ -423,8 +428,8 @@ def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None
     )
     long_pending_raw = _long_pending_application_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids)
 
-    lapse = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Approaching lapse"]) for c in lapse_raw]
-    undeveloped = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Undeveloped permission"]) for c in undeveloped_raw]
+    lapse = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Assumed permission review date"]) for c in lapse_raw]
+    undeveloped = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Permission — commencement unverified"]) for c in undeveloped_raw]
     recent_permission = [
         _reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Recent permission"])
         for c in recent_permission_raw

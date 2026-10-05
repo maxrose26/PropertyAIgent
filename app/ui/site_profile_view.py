@@ -96,7 +96,7 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
     if phase_breakdown:
         section_header("Phase & plot breakdown", icon="🏗️")
         unit_summary = summarize_phase_units(phase_breakdown)
-        for bucket_key, label in (("underway", "Under construction"), ("approved_not_started", "Approved, not yet started"), ("not_yet_approved", "Awaiting decision")):
+        for bucket_key, label in (("planning_activity", "Planning activity — commencement unverified"), ("approved_commencement_unverified", "Permission recorded — commencement unverified"), ("not_yet_approved", "Awaiting decision")):
             bucket = unit_summary[bucket_key]
             if bucket["phase_count"]:
                 unit_bit = f"{bucket['units']:,} units" if bucket["units"] else "unit count not confirmed"

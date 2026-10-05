@@ -428,25 +428,16 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
         site_apps = apps_by_site.get(site_id, [])
         rep = pick_representative_application(site_apps)
         si = rep.scheme_intelligence if rep else None
-        # Gate 2B-2B.1 pre-merge remediation - unit_count/affordable_unit_
-        # count/development_type_raw/is_specialist_development below still
-        # come from `si` (this Site's single representative application's
-        # own SchemeIntelligence) exactly as before - those four fields
-        # feed fingerprint_fields just below, and this gate is forbidden
-        # from changing opportunity fingerprints. planning_state is NOT
-        # one of those fingerprinted fields (confirmed: absent from
-        # fingerprint_fields immediately below), so it is resolved here
-        # from the trusted, role-aware, decided-state-aware
-        # OperativePlanningFacts over this Site's FULL application list
-        # (site_apps, already batched above) - the same resolution
-        # build_planning_delivery_matching_facts_from_operative uses for
-        # the live Buyer Fit path - rather than the previous hardcoded
-        # PERMISSION_GRANTED, which this exact object also fed to app.
-        # policy.buyer_profile_store.run_buyer_onboarding_baseline via
-        # OpportunityRecord.matching_facts.
+        # Stage 2 reuses reconciled total units for every qualification consumer.
+        # Other accepted fields retain their existing contracts. Future monitoring
+        # fingerprints may change; historical rows are never rewritten here.
         operative_facts = build_operative_planning_facts(site_apps)
         planning_state = resolve_operative_planning_state(operative_facts)
         facts = build_planning_delivery_matching_facts(si, planning_state=planning_state)
+        # Stage 2: numeric qualification must use the reconciled scope, even
+        # when this changes a future fingerprint. No persisted row is rewritten.
+        from app.reporting.scheme_reconciliation import resolve_operative_filter_facts
+        facts = replace(facts, unit_count=resolve_operative_filter_facts(operative_facts).units)
 
         # compute_lapse_status is pure Python over already-fetched
         # Application rows (no further query) - recomputed here rather

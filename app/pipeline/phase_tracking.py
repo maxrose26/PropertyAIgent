@@ -1,24 +1,4 @@
-"""Phase-level build-progress breakdown for large multi-phase sites.
-
-Large strategic sites are rarely delivered as a single planning application -
-they progress through outline consent, then a series of phase- or plot-
-specific reserved matters / discharge-of-conditions filings, many of which
-explicitly name their phase in the proposal text (confirmed real examples:
-"Reserved Matters application for Phase EV1, EV2 and part EV3 site
-infrastructure and enabling works", "landscaping works adjoining
-infrastructure phase H4"). Grouping a site's applications by phase and
-tracking each phase's own filing history separately - rather than one
-whole-site status - surfaces exactly the kind of buying opportunity being
-looked for: a phase with full planning permission but no commencement/
-discharge-of-conditions filing since is a plot the main developer hasn't
-started, and could plausibly be bought off to de-risk the wider scheme.
-
-Relies on run_weekly.stage_scrape also capturing condition_discharge_or_
-details filings for already-known references (see
-lapse_tracking.PROGRESS_SIGNAL_CATEGORIES) - without those, there's no
-portal-native "has this phase actually started" signal beyond the original
-grant itself.
-"""
+"""Phase-level planning activity. Filings and permission do not prove works or availability."""
 from __future__ import annotations
 
 import re
@@ -49,8 +29,8 @@ UNPHASED_LABEL = "Whole site / unphased"
 
 PHASE_STATUS_LABELS = {
     "not_yet_approved": "⏳ Awaiting decision",
-    "approved_not_started": "🟢 Approved, not yet started",
-    "underway": "🏗️ Underway",
+    "approved_commencement_unverified": "Permission recorded — commencement unverified",
+    "planning_activity": "Planning activity — physical commencement unverified",
 }
 
 
@@ -90,29 +70,7 @@ def group_applications_by_phase(applications: list[Application]) -> dict[tuple[s
 
 
 def compute_phase_progress(applications: list[Application]) -> dict:
-    """One phase's applications -> a progress verdict. Mirrors
-    lapse_tracking.compute_lapse_status's shape but scoped to a single phase
-    rather than the whole site, and without a lapse clock (the whole-site
-    commencement deadline already covers that; a phase adds "has this
-    specific part actually started" instead).
-
-    Gate 2B-2C: the operative anchor within this scope's own `applications`
-    is now app.reporting.scheme_reconciliation.resolve_operative_lapse_
-    anchor's trusted, SUBSTANTIVE-role-only selection, never this
-    function's own former naive "latest application whose decision text
-    says approve/grant" scan - a later NMA/condition-discharge/S73 within
-    this same scope can no longer become the "grant" that determines
-    whether it has started, and - just as importantly - can no longer be
-    EXCLUDED from also counting as valid progress evidence merely because
-    it wrongly became the anchor itself (confirmed real defect: World of
-    Pets' own Reserved Matters grant, followed by several later NMA/
-    condition-discharge filings, previously read "approved_not_started"
-    because the LATEST NMA became `latest_grant` and therefore excluded
-    itself from the progress-filing search - correctly reads "underway"
-    once the TRUE Reserved Matters grant is used as the anchor and the
-    later NMA is evaluated as progress evidence against it instead).
-    Local import for the same circular-import reason app.pipeline.
-    lapse_tracking.compute_lapse_status already documents."""
+    """Separate scoped permission and administrative activity from physical progress."""
     from app.reporting.scheme_reconciliation import FACT_RESOLVED, resolve_operative_lapse_anchor
 
     anchor = resolve_operative_lapse_anchor(applications)
@@ -120,81 +78,53 @@ def compute_phase_progress(applications: list[Application]) -> dict:
         grant_date = anchor.decision_date
         progress_filing = find_progress_signal_filing(applications, grant_date, exclude=anchor.application)
         if progress_filing:
-            return {"status": "underway", "latest_grant": anchor.application, "progress_filing": progress_filing}
+            return {"status": "planning_activity", "latest_grant": anchor.application, "progress_filing": progress_filing}
 
-        return {"status": "approved_not_started", "latest_grant": anchor.application, "progress_filing": None}
+        return {"status": "approved_commencement_unverified", "latest_grant": anchor.application, "progress_filing": None}
 
-    # No TRUSTED substantive grant WITHIN this phase/plot's own applications -
-    # but if it has a
-    # real progress-signal filing (discharge of conditions, amendment)
-    # anyway, that's still unambiguous evidence of active, approved work: a
-    # discharge-of-conditions application cannot exist without an underlying
-    # permission to discharge FROM. Confirmed a real case (Wigan North Leigh
-    # "Plot 41"): three condition-discharge applications, all decided
-    # "Agreed", with no grant of their own attached to this specific plot -
-    # the grant lives on the whole-site outline these filings cite by
-    # reference, not co-located in this group. Without this fallback, plot-
-    # level administrative groups like this were wrongly reported as "not
-    # yet approved" - reading as still-undecided planning applications, when
-    # they're actually clear evidence of work already happening on the
-    # ground.
+    # Administrative-only records establish activity, not a grant or physical works.
     any_progress_filing = next((a for a in applications if a.application_category in PROGRESS_SIGNAL_CATEGORIES), None)
     if any_progress_filing:
-        return {"status": "underway", "latest_grant": None, "progress_filing": any_progress_filing}
+        return {"status": "planning_activity", "latest_grant": None, "progress_filing": any_progress_filing}
 
     return {"status": "not_yet_approved", "latest_grant": None, "progress_filing": None}
 
 
 def _phase_unit_count(apps: list[Application]) -> dict:
-    """Best available "how many units does this phase deliver" figure -
-    grounded-numbers, not guessed. Prefers a real AI-extracted total from a
-    phase application's own downloaded documents (scheme_intelligence,
-    populated once classify_application_category correctly recognises a
-    phase-defining Reserved Matters submission as such rather than as a
-    minor condition-discharge filing - see unit_filter.py); falls back to
-    the same portal-text regex used at scrape time when no document
-    extraction has run yet, which is often already exact for a Reserved
-    Matters application that states its own dwelling count directly (e.g.
-    "...for the erection of 257 dwellings").
+    """A single-scope count only when the eligible source counts agree.
 
-    Only trusts EXCLUDE_CATEGORIES-exempt applications as a unit-count
-    source - confirmed a real case (Wigan North Leigh "Phase 1A"): its own
-    condition-discharge filings (materials/drainage/gas validation, no
-    housing count of their own) already had scheme_intelligence rows from an
-    earlier, unrelated qualifying run, with the AI extraction latching onto
-    an incidental "1" somewhere in a thin administrative document -
-    plausible-looking but meaningless as a unit count. A condition-discharge
-    or amendment filing was never going to state its phase's real unit
-    count in the first place, so it's excluded as a source entirely rather
-    than trusted just because scheme_intelligence happens to exist.
-
-    Also only trusts an application that names this ONE phase alone, not one
-    spanning several at once - confirmed two real cases: a Tameside
-    "Reserved Matters application for Phase EV1, EV2 and part EV3 site
-    infrastructure and enabling works" whose extracted total (2350) is the
-    whole outline's dwelling count, not any one of the three phases' own
-    share, and a Stockport hybrid application covering Phases 5-8 together
-    where phases 5-7 are pure office space (Phase 8 only "office OR
-    residential") - a shared multi-phase filing's own total, genuine or not,
-    doesn't tell you what ANY single one of those phases delivers, so it's
-    excluded as a source for all of them rather than misattributed to each."""
+    Administrative and multi-phase filings cannot supply this scope's total.
+    Conflicting extracted counts, or conflicting portal-only counts, remain
+    unknown. This layer does not invent a supersession relationship.
+    """
     substantive = [
         a for a in apps
         if a.application_category not in EXCLUDE_CATEGORIES
         and len(extract_phase_labels(a.proposal) or extract_phase_labels(a.address)) == 1
     ]
 
-    for app in substantive:
-        si = getattr(app, "scheme_intelligence", None)
-        if si and si.total_units_final:
-            return {"unit_count": si.total_units_final, "unit_count_source": "documents", "unit_count_application": app}
-
-    for app in substantive:
-        counts = extract_unit_counts(app.proposal)
-        if counts:
-            return {"unit_count": max(counts), "unit_count_source": "portal_text", "unit_count_application": app}
-
-    return {"unit_count": None, "unit_count_source": None, "unit_count_application": None}
+    from app.reporting.commercial_evidence import known_unit_count
+    unknown = {"unit_count": None, "unit_count_source": None, "unit_count_application": None}
+    # This helper also decides plot scope, so cannot call scheme reconciliation
+    # (which itself calls this helper). Require agreement among scoped extracted
+    # counts; do not choose the first/largest or invent supersession.
+    documented = [(known_unit_count(a.scheme_intelligence.total_units_final), a)
+                  for a in substantive if a.scheme_intelligence
+                  and a.scheme_intelligence.total_units_final is not None]
+    if documented:
+        distinct = {n for n, _ in documented}
+        if None in distinct or len(distinct) != 1:
+            return unknown
+        n = next(iter(distinct))
+        app = min((a for _, a in documented), key=lambda a: a.reference)
+        return {"unit_count": n, "unit_count_source": "documents", "unit_count_application": app}
+    candidates = [(known_unit_count(n), a) for a in substantive for n in extract_unit_counts(a.proposal)]
+    distinct = {n for n, _ in candidates if n is not None}
+    if len(distinct) == 1:
+        n = next(iter(distinct))
+        app = min((a for value, a in candidates if value == n), key=lambda a: a.reference)
+        return {"unit_count": n, "unit_count_source": "portal_text", "unit_count_application": app}
+    return unknown
 
 
 def is_material_development_parcel(applications: list[Application], *, threshold: int = 10) -> bool:
@@ -391,7 +321,7 @@ def summarize_phase_units(breakdown: list[dict]) -> dict:
 
     return {
         "phase_count": len(phases),
-        "underway": _bucket("underway"),
-        "approved_not_started": _bucket("approved_not_started"),
+        "planning_activity": _bucket("planning_activity"),
+        "approved_commencement_unverified": _bucket("approved_commencement_unverified"),
         "not_yet_approved": _bucket("not_yet_approved"),
     }
