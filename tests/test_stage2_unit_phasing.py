@@ -136,10 +136,21 @@ def test_k_l_hard_boundary_uses_bounds_soft_discovery_keeps_uncertainty(session)
     fit = assess_buyer_fit(NESTEN_HOMES, facts)
     assert fit.classification != NOT_SUITABLE and fit.is_investigative_exception
     assert facts.unit_count is None and facts.count_assessment == result
-    # Stage 2.5A (v6): 100-102 is not wholly within preferred 50-100 but is wholly
-    # within discovery 45-110 -> POSSIBLE_FIT, never STRONG from the rounded 100.
-    assert fit.classification == "POSSIBLE_FIT"
-    assert any("not fully within" in r and "discovery range (45-110 homes)" in r for r in fit.matches)
+    # Stage 2.5A (v6): the SCALE dimension treats 100-102 as within discovery 45-110
+    # but not wholly within preferred 50-100 (a POSSIBLE scale reason, never STRONG
+    # from the rounded 100) ...
+    assert any(r.startswith("~100 homes - not fully within this buyer's preferred range (50-100 homes)")
+               and "wholly within its discovery range (45-110 homes)" in r for r in fit.matches)
+    assert not any("does not establish whether scale is within" in r for r in fit.unknown)
+    assert not any("outside this buyer's discovery range" in r for r in fit.investigate)
+    # ... while two existing, legitimate evidence gaps on this full-pipeline fixture
+    # keep the OVERALL result at INSUFFICIENT_EVIDENCE (blocking outranks POSSIBLE):
+    # the operative adapter never trusts an affordable percentage, and an
+    # immaterial-variance count attributes development type to no single source.
+    assert fit.classification == "INSUFFICIENT_EVIDENCE"
+    assert "Affordable housing proportion has not been confirmed - not assumed to be 0%." in fit.unknown
+    assert ("Development type has not been established with enough confidence to confirm this is "
+            "general-needs housing.") in fit.unknown
     # HA metric does not acquire total evidence through the new adapter.
     assert assess_buyer_fit(HOUSING_ASSOCIATION, facts).classification != NOT_SUITABLE
     assert facts.affordable_unit_count is None
@@ -1314,7 +1325,8 @@ def test_s25a_feed_surfaces_possible_between_strong_and_insufficient(monkeypatch
     fits = {"strong": (STRONG_FIT, False), "possible_a": (POSSIBLE_FIT, False), "possible_b": (POSSIBLE_FIT, True),
             "exception": (INSUFFICIENT_EVIDENCE, True), "insufficient": (INSUFFICIENT_EVIDENCE, False),
             "not_suitable": (NOT_SUITABLE, False)}
-    cards = [{"title": name, "matching_facts": object(), "params": {"site_id": i}} for i, name in enumerate(order)]
+    cards = [{"title": name, "opportunity_type": PLANNING_DELIVERY, "matching_facts": object(), "params": {"site_id": i}}
+             for i, name in enumerate(order)]
     monkeypatch.setattr(buyer_profile_store, "get_buyer_profile_dataclass", lambda session, key: NESTEN_HOMES)
     monkeypatch.setattr(opportunity_feed, "_attach_planning_delivery_matching_facts", lambda session, delivery: None)
     by_site = {i: name for i, name in enumerate(order)}
