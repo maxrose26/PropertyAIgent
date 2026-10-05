@@ -17,7 +17,10 @@ presentation changes applied below.
 """
 from __future__ import annotations
 
-from app.search.query_parser import numeric_unit_mask, availability_mask
+from app.search.query_parser import (
+    COMPLETION_EXCLUSION_NOTICE, COMPLETION_FILTER_CAPTION, COMPLETION_FILTER_LABEL,
+    availability_mask, numeric_unit_mask, verified_completion_exclusion_mask,
+)
 
 import os
 import sys
@@ -442,7 +445,8 @@ with page_scope():
             ah_routes = st.multiselect("AH evidence results", ["meets", "likely_meets", "investigate", "unknown"],
                 default=["meets", "likely_meets"],
                 help="Investigate includes near-threshold estimates; unknown is a separate evidence route, never a numeric match.")
-            exclude_completed = st.checkbox("Hide completed sites", value=False)
+            exclude_completed = st.checkbox(COMPLETION_FILTER_LABEL, value=False)
+            st.caption(COMPLETION_FILTER_CAPTION)
             hide_needs_review = st.checkbox("Hide schemes needing manual review", value=False)
             not_commenced_only = st.checkbox(
                 "Permission recorded — commencement unverified", value=False,
@@ -470,13 +474,13 @@ with page_scope():
             filtered = filtered[filtered["AH Search Outcome"].isin(ah_routes)]
             st.info("Numeric AH matches require source and scope evidence. Select unknown in AH evidence results to investigate reported figures; these are not confirmed numeric matches.")
         if exclude_completed:
-            filtered = filtered[filtered["build_status"] != "complete"]
+            filtered = filtered[verified_completion_exclusion_mask(filtered["build_status"])]
         if hide_needs_review:
             filtered = filtered[~filtered["Needs Review"]]
         if not_commenced_only:
-            # Granted (excludes not_granted) but not confirmed underway - "unknown"
-            # is included too (still granted, decision date just couldn't be
-            # parsed), only "underway" and "not_granted" are excluded.
+            # Granted, with physical status still unknown. Planning activity never
+            # establishes commencement, so in the current evidence model every granted
+            # site qualifies; only a verified physical state could ever exclude one.
             filtered = filtered[(filtered["decision_status"] == "granted") & (filtered["build_status"] == "unknown")]
 
         if nl_filters:
@@ -500,7 +504,8 @@ with page_scope():
                 st.info("Availability is not evidenced by the current planning dataset. Remove the availability requirement to investigate potential leads.")
                 filtered = filtered[availability_mask(pd.Series("unknown", index=filtered.index))]
             if nl_filters.exclude_completed:
-                filtered = filtered[filtered["build_status"] != "complete"]
+                st.info(COMPLETION_EXCLUSION_NOTICE)
+                filtered = filtered[verified_completion_exclusion_mask(filtered["build_status"])]
             if nl_filters.statuses:
                 # Confirmed a real case: "planning approved" parsed correctly into
                 # structured filters (statuses=["granted"]), but this branch didn't

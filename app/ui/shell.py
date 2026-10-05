@@ -1143,9 +1143,9 @@ def site_profile_header(header: dict) -> None:
         badges.append(("info", f"📋 {header['allocation_badge']}"))
 
     if badges:
-        # Equal-width columns clip a long badge (e.g. the build-status
-        # label's "(0 EPCs - may still be under construction)" detail)
-        # with Streamlit's native badge ellipsis - width each column by
+        # Equal-width columns clip a long badge (e.g. a long evidence-
+        # qualified lapse or build-status label) with Streamlit's native
+        # badge ellipsis - width each column by
         # its own label length instead, so a long badge gets the room it
         # needs and short ones stay compact.
         cols = st.columns([max(len(label), 10) for _, label in badges])
