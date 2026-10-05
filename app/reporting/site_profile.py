@@ -612,6 +612,15 @@ def build_site_profile(
         src = active_positions[0].reference.source
         operative_app = next((a for a in all_apps if a.id == src.application_id), None) if src else None
     mix_rep_app = operative_app
+    # Planning/navigation identity can follow a newer portal-only application.
+    # Attribute an exact extracted count to one of its agreeing evidence
+    # applications; the current AH identity remains independently selected below.
+    count_source_ids = [source.application_id for source in current_count.sources]
+    if current_count.exact_value is not None and count_source_ids:
+        count_source_app = next((a for source_id in count_source_ids for a in all_apps
+                                 if a.id == source_id and a.scheme_intelligence is not None), None)
+        if count_source_app is not None and count_source_app.scheme_intelligence is not None:
+            mix_rep_app = count_source_app
 
     header = build_site_header(
         site=site, merged=merged, lapse=lapse, decision_status=decision_status,

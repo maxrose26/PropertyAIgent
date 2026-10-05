@@ -120,3 +120,13 @@ AI regeneration, paid calls, Render change, cron/job execution, deployment, mast
 merge, P0-A activation, AH migration/security change or Stage 3 work was performed.
 Independent review must assess the exact local committed candidate; a local pass
 does not authorise publication, integration or any production activity.
+
+
+### Coverage correction after hosted CI
+
+The 1,040 original and 1,168 amended totals describe selected suites only.
+`tests/test_affordable_housing_scope.py` and the hosted rendered-CSV walkthrough
+were not included. AH-scope preservation above refers to selected consumer tests,
+not the complete AH compatibility gate. See `STAGE2_UNIT_PHASING_AMENDMENT.md`
+for the evidenced omission, stale assertions and real attribution correction.
+Complete `verification/web_ah/check.sh` parity is now a required acceptance gate.

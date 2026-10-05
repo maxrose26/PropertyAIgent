@@ -357,3 +357,28 @@ def test_phase_and_material_plot_same_number_keep_distinct_identity_and_count(se
     assert len({r.opportunity_id for r in own}) == 2
     from app.policy.agent_evaluation_persistence import resolve_acquisition_subject_key
     assert {resolve_acquisition_subject_key(r.opportunity_id, r.opportunity_type)[2] for r in own} == {"3", "plot_3"}
+
+
+@pytest.mark.parametrize("source_count", [1, 2])
+def test_exact_extraction_source_stays_separate_from_newer_portal_and_ah_identity(session, source_count):
+    from app.reporting.site_profile import build_site_profile
+    from app.pipeline.lapse_tracking import compute_lapse_status
+    from app.ui.common import aggregate_scheme_fields
+    site = scheme(session)
+    old = [application(session, site, f"OLD/{n}", 440, decision=None) for n in range(source_count)]
+    for app in old:
+        app.scheme_intelligence.affordable_units_final = 0
+    newer = application(session, site, "NEW/1", None, decision=None)
+    newer.scheme_intelligence = None
+    newer.proposal = "Residential development of 82 homes"
+    newer.application_received = "2026-02-01"
+    session.commit()
+    apps = old + [newer]
+    profile = build_site_profile(session, site, apps, merged=aggregate_scheme_fields(apps), rep_app=newer,
+        lapse=compute_lapse_status(apps, site), phase_breakdown=[], decision_status="pending")
+    assert profile["count_assessment"].exact_value == 440
+    mix = profile["residential_mix"]
+    assert mix["extraction_reference"] in {app.reference for app in old}
+    assert mix["scheme"].total_units_final == 440
+    assert mix["affordable_assessment"].count.application_reference == "NEW/1"
+    assert mix["affordable_assessment"].count.value is None
