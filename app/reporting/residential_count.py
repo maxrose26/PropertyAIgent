@@ -130,14 +130,24 @@ def supported_range(*, lower, upper, sources, scope_type, scope_label, subject_i
                            resolution="supported_range", confidence="medium")
 
 
+def is_meaningful_provenance(value):
+    """True only for a non-empty, non-whitespace string reference.
+
+    Structurally meaningless provenance (True, 1, object(), "", "   ", None) is
+    never evidence. Whether the text is factually authoritative is a later
+    evidence-validation question, not decided here.
+    """
+    return isinstance(value, str) and bool(value.strip())
+
+
 def evidenced_pairs(evidence):
     """Unordered identifier pairs that have explicit, sourced non-overlap evidence.
 
     The single rule shared by phase aggregation and residual planning-capacity
-    arithmetic: a pair with no provenance is not evidence, and nothing is
-    inferred from labels, references, dates, chronology or arithmetic.
+    arithmetic: a pair without meaningful provenance is not evidence, and
+    nothing is inferred from labels, references, dates, chronology or arithmetic.
     """
-    return {frozenset((left, right)) for left, right, source in evidence if source}
+    return {frozenset((left, right)) for left, right, source in evidence if is_meaningful_provenance(source)}
 
 
 def aligned_tenure_counts(total, private, affordable):

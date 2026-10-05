@@ -570,19 +570,24 @@ def test_safe_phase_aggregation_g_h_unknown_stays_unknown_and_status_wording_sur
     assert "permission recorded" not in ungranted
 
 
-# --- Stage 2.5 preflight gate 2: residual planning-capacity safety contract ---
+
+# --- Stage 2.5 preflight gates 2 and 2H: residual planning-capacity safety contract ---
 
 _RC_PARENT = "site:1:whole_site:Whole site"
 _RC_A = "site:1:phase:Phase 2"
 _RC_B = "site:1:phase:Phase 3"
+_RC_R = "site:1:phase:Phase 9"
+_RC_INVENTORY = "synthetic child-set inventory"
+_RC_BAD_PROVENANCE = (True, 1, object(), "", "   ", None)
 
 
 def _rc_count(subject, value, *, metric="total_residential", precision="EXACT", basis="consented",
               resolution=None):
     from app.reporting.residential_count import CountAssessment
     exact = precision == "EXACT"
+    parts = subject.split(":", 3)
     return CountAssessment(
-        scope_type="whole_site" if subject == _RC_PARENT else "phase", scope_label=subject.split(":")[-1],
+        scope_type=parts[2] if len(parts) == 4 else "phase", scope_label=parts[3] if len(parts) == 4 else subject,
         subject_id=subject, metric=metric, precision=precision, value=value,
         lower=value if exact else None, upper=value if exact else None,
         resolution=resolution or ("agreement" if exact else "portal_estimate"),
@@ -596,8 +601,13 @@ def _rc_conflict_parent(lower=500, upper=650):
                            confidence="low", basis="consented")
 
 
-def _rc_contained(*children):
-    return tuple((child, _RC_PARENT, "synthetic containment provenance") for child in children)
+def _rc_contained(*children, parent=_RC_PARENT):
+    return tuple((child, parent, "synthetic containment provenance") for child in children)
+
+
+def _rc_complete(*children, parent=_RC_PARENT, provenance=_RC_INVENTORY):
+    """Explicit sourced evidence that these children are the parent's complete relevant child set."""
+    return ((parent, tuple(children), provenance),)
 
 
 def _rc_assess(parent, children, **evidence):
@@ -607,12 +617,14 @@ def _rc_assess(parent, children, **evidence):
 
 def test_residual_a_simple_safe_case_resolves_planning_capacity():
     from app.reporting.residual_capacity import RESOLVED
-    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A))
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125)],
+                        containment_evidence=_rc_contained(_RC_A), child_set_evidence=_rc_complete(_RC_A))
     assert result.status == RESOLVED and result.resolved
     assert result.residual_planning_capacity == 375 and result.reason == "resolved"
     assert result.metric == "total_residential"
     assert [c.subject_id for c in result.subtracted_children] == [_RC_A]
     assert result.containment_provenance == ((_RC_A, _RC_PARENT),)
+    assert result.child_set_completeness == "established" and result.child_set_provenance == _RC_INVENTORY
     assert result.parent.exact_value == 500
 
 
@@ -623,7 +635,8 @@ def test_residual_a_simple_safe_case_resolves_planning_capacity():
 def test_residual_b_metric_mismatch_is_never_converted(parent_metric, child_metric):
     from app.reporting.residual_capacity import UNVERIFIED
     result = _rc_assess(_rc_count(_RC_PARENT, 500, metric=parent_metric),
-                        [_rc_count(_RC_A, 125, metric=child_metric)], containment_evidence=_rc_contained(_RC_A))
+                        [_rc_count(_RC_A, 125, metric=child_metric)], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A))
     assert result.status == UNVERIFIED and result.reason == "metric_mismatch"
     assert result.residual_planning_capacity is None and not result.resolved
 
@@ -634,7 +647,7 @@ def test_residual_c_containment_must_be_explicitly_evidenced():
     for evidence in ((), ((_RC_A, _RC_PARENT, ""),), ((_RC_A, _RC_PARENT, None),),
                      ((_RC_B, _RC_PARENT, "p"),), ((_RC_A, "site:9:whole_site:Whole site", "p"),),
                      ((_RC_PARENT, _RC_A, "p"),)):
-        result = _rc_assess(parent, [child], containment_evidence=evidence)
+        result = _rc_assess(parent, [child], containment_evidence=evidence, child_set_evidence=_rc_complete(_RC_A))
         assert result.status == UNVERIFIED and result.reason == "containment_not_established", evidence
         assert result.residual_planning_capacity is None
 
@@ -644,7 +657,7 @@ def test_residual_d_children_that_may_overlap_withhold_the_residual():
     parent, children = _rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125), _rc_count(_RC_B, 100)]
     for non_overlap in ((), ((_RC_A, "site:1:phase:Phase 9", "p"),), ((_RC_A, _RC_B, ""),), ((_RC_A, _RC_B, None),)):
         result = _rc_assess(parent, children, containment_evidence=_rc_contained(_RC_A, _RC_B),
-                            non_overlap_evidence=non_overlap)
+                            non_overlap_evidence=non_overlap, child_set_evidence=_rc_complete(_RC_A, _RC_B))
         assert result.status == UNVERIFIED and result.reason == "child_overlap_not_excluded", non_overlap
         assert result.residual_planning_capacity is None
 
@@ -653,25 +666,28 @@ def test_residual_e_explicitly_non_overlapping_children_resolve_and_order_does_n
     from app.reporting.residual_capacity import RESOLVED
     parent, a, b = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125), _rc_count(_RC_B, 100)
     forward = _rc_assess(parent, [a, b], containment_evidence=_rc_contained(_RC_A, _RC_B),
-                         non_overlap_evidence=((_RC_A, _RC_B, "synthetic non-overlap provenance"),))
+                         non_overlap_evidence=((_RC_A, _RC_B, "synthetic non-overlap provenance"),),
+                         child_set_evidence=_rc_complete(_RC_A, _RC_B))
     backward = _rc_assess(parent, [b, a], containment_evidence=tuple(reversed(_rc_contained(_RC_A, _RC_B))),
-                          non_overlap_evidence=((_RC_B, _RC_A, "synthetic non-overlap provenance"),))
+                          non_overlap_evidence=((_RC_B, _RC_A, "synthetic non-overlap provenance"),),
+                          child_set_evidence=_rc_complete(_RC_B, _RC_A))
     assert forward.status == RESOLVED and forward.residual_planning_capacity == 275
     assert forward == backward
 
 
-def test_residual_f_refused_child_never_consumes_capacity():
+def test_residual_f_known_ineligible_child_never_consumes_capacity():
     from app.reporting.residual_capacity import RESOLVED, UNVERIFIED
     parent = _rc_count(_RC_PARENT, 500)
-    for basis in (None, "refused", "withdrawn"):
+    for basis in ("refused", "withdrawn", "superseded"):
         refused = _rc_count(_RC_A, 125, basis=basis)
         alone = _rc_assess(parent, [refused], containment_evidence=_rc_contained(_RC_A))
         assert alone.status == UNVERIFIED and alone.reason == "no_operative_child"
         assert alone.residual_planning_capacity is None
         assert [e.child.subject_id for e in alone.excluded_children] == [_RC_A]
         assert alone.excluded_children[0].reason == "not_operative_approved"
-        # Beside a genuine operative child, the refused value is excluded, not subtracted.
-        mixed = _rc_assess(parent, [refused, _rc_count(_RC_B, 100)], containment_evidence=_rc_contained(_RC_A, _RC_B))
+        # Beside a genuine operative child, the known-ineligible value is excluded, not subtracted.
+        mixed = _rc_assess(parent, [refused, _rc_count(_RC_B, 100)], containment_evidence=_rc_contained(_RC_A, _RC_B),
+                           child_set_evidence=_rc_complete(_RC_A, _RC_B))
         assert mixed.status == RESOLVED and mixed.residual_planning_capacity == 400
         assert [c.subject_id for c in mixed.subtracted_children] == [_RC_B]
         assert [e.child.subject_id for e in mixed.excluded_children] == [_RC_A]
@@ -686,18 +702,19 @@ def test_residual_g_pending_variation_neither_replaces_nor_consumes_approved_cap
     assert result.residual_planning_capacity is None and result.parent.exact_value == 500
     # A pending parent (not an operative approved position) cannot supply capacity either.
     pending_parent = _rc_assess(_rc_count(_RC_PARENT, 500, basis="active"), [_rc_count(_RC_A, 125)],
-                                containment_evidence=_rc_contained(_RC_A))
+                                containment_evidence=_rc_contained(_RC_A), child_set_evidence=_rc_complete(_RC_A))
     assert pending_parent.status == UNVERIFIED and pending_parent.reason == "parent_not_operative_approved"
 
 
 def test_residual_h_material_count_conflict_is_preserved_never_averaged():
     from app.reporting.residual_capacity import MATERIAL_CONFLICT
-    result = _rc_assess(_rc_conflict_parent(), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A))
+    result = _rc_assess(_rc_conflict_parent(), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A))
     assert result.status == MATERIAL_CONFLICT and result.reason == "count_material_conflict"
     assert result.residual_planning_capacity is None
     conflicted_child = _rc_assess(_rc_count(_RC_PARENT, 500),
                                   [_rc_count(_RC_A, None, precision="UNKNOWN", resolution="material_conflict")],
-                                  containment_evidence=_rc_contained(_RC_A))
+                                  containment_evidence=_rc_contained(_RC_A), child_set_evidence=_rc_complete(_RC_A))
     assert conflicted_child.status == MATERIAL_CONFLICT and conflicted_child.residual_planning_capacity is None
 
 
@@ -705,46 +722,53 @@ def test_residual_i_approximate_or_range_counts_never_become_an_exact_residual()
     from app.reporting.residual_capacity import UNVERIFIED
     exact_child = _rc_count(_RC_A, 125)
     for parent in (_rc_count(_RC_PARENT, 500, precision="APPROXIMATE"), _rc_count(_RC_PARENT, 500, precision="RANGE")):
-        result = _rc_assess(parent, [exact_child], containment_evidence=_rc_contained(_RC_A))
+        result = _rc_assess(parent, [exact_child], containment_evidence=_rc_contained(_RC_A),
+                            child_set_evidence=_rc_complete(_RC_A))
         assert result.status == UNVERIFIED and result.reason == "count_not_exact"
         assert result.residual_planning_capacity is None
     approximate_child = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125, precision="APPROXIMATE")],
-                                   containment_evidence=_rc_contained(_RC_A))
+                                   containment_evidence=_rc_contained(_RC_A), child_set_evidence=_rc_complete(_RC_A))
     assert approximate_child.status == UNVERIFIED and approximate_child.residual_planning_capacity is None
 
 
 def test_residual_j_unknown_counts_stay_unknown_not_zero():
     from app.reporting.residual_capacity import UNVERIFIED
     unknown_child = _rc_count(_RC_A, None, precision="UNKNOWN", resolution="insufficient_evidence")
-    result = _rc_assess(_rc_count(_RC_PARENT, 500), [unknown_child], containment_evidence=_rc_contained(_RC_A))
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [unknown_child], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A))
     assert result.status == UNVERIFIED and result.reason == "unknown_count"
     assert result.residual_planning_capacity is None
     unknown_parent = _rc_assess(_rc_count(_RC_PARENT, None, precision="UNKNOWN"), [_rc_count(_RC_A, 125)],
-                                containment_evidence=_rc_contained(_RC_A))
+                                containment_evidence=_rc_contained(_RC_A), child_set_evidence=_rc_complete(_RC_A))
     assert unknown_parent.status == UNVERIFIED and unknown_parent.residual_planning_capacity is None
 
 
 def test_residual_k_children_greater_than_parent_never_give_a_negative_residual():
     from app.reporting.residual_capacity import MATERIAL_CONFLICT, RESOLVED
     parent = _rc_count(_RC_PARENT, 500)
-    single = _rc_assess(parent, [_rc_count(_RC_A, 600)], containment_evidence=_rc_contained(_RC_A))
+    single = _rc_assess(parent, [_rc_count(_RC_A, 600)], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A))
     assert single.status == MATERIAL_CONFLICT and single.reason == "children_exceed_parent"
     assert single.residual_planning_capacity is None
     two = _rc_assess(parent, [_rc_count(_RC_A, 300), _rc_count(_RC_B, 300)],
-                     containment_evidence=_rc_contained(_RC_A, _RC_B), non_overlap_evidence=((_RC_A, _RC_B, "p"),))
+                     containment_evidence=_rc_contained(_RC_A, _RC_B), non_overlap_evidence=((_RC_A, _RC_B, "p"),),
+                     child_set_evidence=_rc_complete(_RC_A, _RC_B))
     assert two.status == MATERIAL_CONFLICT and two.residual_planning_capacity is None
     # A child that consumes exactly the parent leaves zero, never a negative number.
-    full = _rc_assess(parent, [_rc_count(_RC_A, 500)], containment_evidence=_rc_contained(_RC_A))
+    full = _rc_assess(parent, [_rc_count(_RC_A, 500)], containment_evidence=_rc_contained(_RC_A),
+                      child_set_evidence=_rc_complete(_RC_A))
     assert full.status == RESOLVED and full.residual_planning_capacity == 0
 
 
 def test_residual_l_duplicate_child_is_subtracted_once_and_conflicting_duplicates_are_a_conflict():
     from app.reporting.residual_capacity import MATERIAL_CONFLICT, RESOLVED
     parent, child = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125)
-    twice = _rc_assess(parent, [child, child], containment_evidence=_rc_contained(_RC_A))
+    twice = _rc_assess(parent, [child, child], containment_evidence=_rc_contained(_RC_A),
+                       child_set_evidence=_rc_complete(_RC_A))
     assert twice.status == RESOLVED and twice.residual_planning_capacity == 375
     assert len(twice.subtracted_children) == 1
-    differing = _rc_assess(parent, [child, _rc_count(_RC_A, 130)], containment_evidence=_rc_contained(_RC_A))
+    differing = _rc_assess(parent, [child, _rc_count(_RC_A, 130)], containment_evidence=_rc_contained(_RC_A),
+                           child_set_evidence=_rc_complete(_RC_A))
     assert differing.status == MATERIAL_CONFLICT and differing.reason == "conflicting_duplicate_child"
     assert differing.residual_planning_capacity is None
 
@@ -752,14 +776,17 @@ def test_residual_l_duplicate_child_is_subtracted_once_and_conflicting_duplicate
 def test_residual_m_planning_capacity_is_never_availability():
     import dataclasses
     from app.reporting.residual_capacity import ResidualCapacityAssessment
-    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A))
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A))
     assert result.residual_planning_capacity == 375
     assert not any("avail" in field.name.lower() for field in dataclasses.fields(ResidualCapacityAssessment))
     assert result.label() == "375 homes of residual planning capacity (planning capacity only)"
     assert "available" not in result.label().lower()
     assert "not land availability" in result.claim and "ownership" in result.claim and "control" in result.claim
-    assert result.child_set_completeness == "not_established"
-    assert not any(char.isdigit() for char in _rc_assess(_rc_count(_RC_PARENT, 500), []).label())
+    assert result.child_set_completeness == "established"
+    unresolved = _rc_assess(_rc_count(_RC_PARENT, 500), [])
+    assert unresolved.child_set_completeness == "not_established"
+    assert not any(char.isdigit() for char in unresolved.label())
 
 
 def test_residual_identity_guards_and_shared_pair_rule():
@@ -779,3 +806,185 @@ def test_residual_identity_guards_and_shared_pair_rule():
             for code, units in (("2", 180), ("3", 72))]
     assert summarize_phase_units(rows, non_overlap_evidence=(("2", "3", ""),))["approved_commencement_unverified"]["units"] is None
     assert summarize_phase_units(rows, non_overlap_evidence=(("2", "3", "p"),))["approved_commencement_unverified"]["units"] == 252
+
+
+# --- Gate 2H hardening: completeness, site/scope compatibility, provenance, unresolved children ---
+
+
+def test_residual_2h_a_incomplete_child_set_is_not_a_resolved_residual():
+    from app.reporting.residual_capacity import RESOLVED, UNVERIFIED
+    parent, child = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125)
+    for evidence in ((), ((_RC_PARENT, (_RC_A,), ""),), ((_RC_PARENT, (_RC_A,), None),),
+                     (("site:9:whole_site:Whole site", (_RC_A,), _RC_INVENTORY),),
+                     ((_RC_PARENT, _RC_A, _RC_INVENTORY),)):   # a bare string is not a set of child ids
+        result = _rc_assess(parent, [child], containment_evidence=_rc_contained(_RC_A), child_set_evidence=evidence)
+        assert result.status == UNVERIFIED and result.status != RESOLVED, evidence
+        assert result.reason == "child_set_completeness_not_established", evidence
+        assert result.residual_planning_capacity is None and not result.resolved
+        assert result.child_set_completeness == "not_established"
+        assert result.label() == "Residual planning capacity not established"
+        # The supplied-children arithmetic is not exposed as a residual figure.
+        assert [c.subject_id for c in result.subtracted_children] == [_RC_A]
+
+
+def test_residual_2h_b_complete_child_set_resolves():
+    from app.reporting.residual_capacity import RESOLVED
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A, provenance="Approved phasing plan PL/2026/001 table 2"))
+    assert result.resolved and result.residual_planning_capacity == 375
+    assert result.child_set_provenance == "Approved phasing plan PL/2026/001 table 2"
+
+
+def test_residual_2h_b2_omitted_extra_or_conflicting_child_set_evidence_withholds_the_residual():
+    from app.reporting.residual_capacity import UNVERIFIED
+    parent, a, r = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125), _rc_count(_RC_B, 200)
+    # The evidence names a second child that was not supplied: it cannot silently inflate the residual.
+    omitted = _rc_assess(parent, [a], containment_evidence=_rc_contained(_RC_A),
+                         child_set_evidence=_rc_complete(_RC_A, _RC_B))
+    assert omitted.status == UNVERIFIED and omitted.reason == "child_set_mismatch"
+    assert "not supplied" in omitted.explanation and _RC_B in omitted.explanation
+    assert omitted.residual_planning_capacity is None
+    # A supplied child the evidence does not name is also a mismatch.
+    extra = _rc_assess(parent, [a, r], containment_evidence=_rc_contained(_RC_A, _RC_B),
+                       non_overlap_evidence=((_RC_A, _RC_B, "p"),), child_set_evidence=_rc_complete(_RC_A))
+    assert extra.status == UNVERIFIED and extra.reason == "child_set_mismatch"
+    assert "not in the child-set evidence" in extra.explanation
+    # Two evidence statements naming different sets are a conflict.
+    conflicting = _rc_assess(parent, [a], containment_evidence=_rc_contained(_RC_A),
+                             child_set_evidence=_rc_complete(_RC_A) + _rc_complete(_RC_A, _RC_B))
+    assert conflicting.status == UNVERIFIED and conflicting.reason == "child_set_evidence_conflict"
+    assert conflicting.residual_planning_capacity is None
+
+
+def test_residual_2h_c_unresolved_child_eligibility_blocks_a_complete_residual():
+    from app.reporting.residual_capacity import UNVERIFIED
+    parent, a = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125)
+    for basis in (None, "", "granted", "something_else"):
+        unresolved = _rc_count(_RC_B, 100, basis=basis)
+        result = _rc_assess(parent, [a, unresolved], containment_evidence=_rc_contained(_RC_A),
+                            child_set_evidence=_rc_complete(_RC_A, _RC_B))
+        assert result.status == UNVERIFIED and result.reason == "unresolved_child_eligibility", basis
+        assert result.residual_planning_capacity is None and not result.resolved
+        assert [c.subject_id for c in result.unresolved_children] == [_RC_B]
+        assert _RC_B in result.explanation
+
+
+def test_residual_2h_d_known_ineligible_children_do_not_block_when_the_set_is_complete():
+    from app.reporting.residual_capacity import RESOLVED
+    parent, a = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125)
+    for basis in ("refused", "withdrawn", "superseded", "active", "undetermined", "recommendation_only"):
+        known = _rc_count(_RC_R, 100, basis=basis)
+        result = _rc_assess(parent, [a, known], containment_evidence=_rc_contained(_RC_A),
+                            child_set_evidence=_rc_complete(_RC_A, _RC_R))
+        assert result.status == RESOLVED and result.residual_planning_capacity == 375, basis
+        assert [c.subject_id for c in result.subtracted_children] == [_RC_A]
+        assert [e.child.subject_id for e in result.excluded_children] == [_RC_R]
+
+
+def test_residual_2h_e_cross_site_subtraction_is_blocked():
+    from app.reporting.residual_capacity import UNVERIFIED
+    parent_id, child_id = "site:123:whole_site:Whole site", "site:999:phase:Phase 2"
+    result = _rc_assess(_rc_count(parent_id, 500), [_rc_count(child_id, 125)],
+                        containment_evidence=_rc_contained(child_id, parent=parent_id),
+                        child_set_evidence=_rc_complete(child_id, parent=parent_id))
+    assert result.status == UNVERIFIED and result.reason == "site_or_scope_incompatible"
+    assert result.residual_planning_capacity is None and "site 999" in result.explanation
+
+
+def test_residual_2h_f_invalid_scope_direction_and_unparseable_identity_are_blocked():
+    import dataclasses
+    from app.reporting.residual_capacity import RESOLVED, UNVERIFIED
+    cases = [
+        ("site:1:phase:Phase 2", "site:1:whole_site:Whole site"),                  # a whole site is not inside a phase
+        ("site:1:plot:Plot 5", "site:1:phase:Phase 2"),                            # a plot cannot contain a phase
+        (_RC_PARENT, "site:1:whole_site:Other"),                                   # a second whole-site scope
+        (_RC_PARENT, "site:1:unclear:Unclear"),                                    # unclear scope
+        (_RC_PARENT, "site:1:multiple_scopes:Multiple named scopes"),              # multi-scope application
+        (_RC_PARENT, "not-a-site-identity"),                                       # unparseable child
+        ("not-a-site-identity", _RC_A),                                            # unparseable parent
+    ]
+    for parent_id, child_id in cases:
+        result = _rc_assess(_rc_count(parent_id, 500), [_rc_count(child_id, 125)],
+                            containment_evidence=_rc_contained(child_id, parent=parent_id),
+                            child_set_evidence=_rc_complete(child_id, parent=parent_id))
+        assert result.status == UNVERIFIED and result.reason == "site_or_scope_incompatible", (parent_id, child_id)
+        assert result.residual_planning_capacity is None
+    # The identity and the recorded scope type must agree.
+    disagree = dataclasses.replace(_rc_count("site:1:plot:Plot 5", 125), scope_type="phase")
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [disagree], containment_evidence=_rc_contained("site:1:plot:Plot 5"),
+                        child_set_evidence=_rc_complete("site:1:plot:Plot 5"))
+    assert result.status == UNVERIFIED and result.reason == "site_or_scope_incompatible"
+    # A sub-phase inside a phase, and a plot inside a whole site, are valid directions.
+    sub_phase = _rc_assess(_rc_count("site:1:phase:Phase 2", 180), [_rc_count("site:1:phase:Phase 2A", 72)],
+                           containment_evidence=_rc_contained("site:1:phase:Phase 2A", parent="site:1:phase:Phase 2"),
+                           child_set_evidence=_rc_complete("site:1:phase:Phase 2A", parent="site:1:phase:Phase 2"))
+    assert sub_phase.status == RESOLVED and sub_phase.residual_planning_capacity == 108
+
+
+def test_residual_2h_g_h_i_meaningless_provenance_is_rejected_everywhere():
+    from app.reporting.residual_capacity import UNVERIFIED
+    parent, a, b = _rc_count(_RC_PARENT, 500), _rc_count(_RC_A, 125), _rc_count(_RC_B, 100)
+    for bad in _RC_BAD_PROVENANCE:
+        containment = _rc_assess(parent, [a], containment_evidence=((_RC_A, _RC_PARENT, bad),),
+                                 child_set_evidence=_rc_complete(_RC_A))
+        assert containment.status == UNVERIFIED and containment.reason == "containment_not_established", bad
+        overlap = _rc_assess(parent, [a, b], containment_evidence=_rc_contained(_RC_A, _RC_B),
+                             non_overlap_evidence=((_RC_A, _RC_B, bad),), child_set_evidence=_rc_complete(_RC_A, _RC_B))
+        assert overlap.status == UNVERIFIED and overlap.reason == "child_overlap_not_excluded", bad
+        completeness = _rc_assess(parent, [a], containment_evidence=_rc_contained(_RC_A),
+                                  child_set_evidence=_rc_complete(_RC_A, provenance=bad))
+        assert completeness.status == UNVERIFIED and completeness.reason == "child_set_completeness_not_established", bad
+        assert completeness.residual_planning_capacity is None
+
+
+def test_residual_2h_j_meaningful_string_provenance_is_accepted():
+    from app.reporting.residential_count import is_meaningful_provenance
+    from app.reporting.residual_capacity import RESOLVED
+    source = "Decision notice PL/2026/001, condition 4 phasing schedule"
+    assert is_meaningful_provenance(source) and is_meaningful_provenance("  x  ")
+    assert not any(is_meaningful_provenance(bad) for bad in _RC_BAD_PROVENANCE)
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125), _rc_count(_RC_B, 100)],
+                        containment_evidence=tuple((child, _RC_PARENT, source) for child in (_RC_A, _RC_B)),
+                        non_overlap_evidence=((_RC_A, _RC_B, source),),
+                        child_set_evidence=_rc_complete(_RC_A, _RC_B, provenance=source))
+    assert result.status == RESOLVED and result.residual_planning_capacity == 275
+
+
+def test_residual_2h_k_gate1_phase_aggregation_still_accepts_sourced_and_rejects_malformed_provenance():
+    from app.pipeline.phase_tracking import summarize_phase_units
+    rows = [{"code": code, "kind": "phase", "status": "approved_commencement_unverified", "unit_count": units}
+            for code, units in (("2", 180), ("3", 72))]
+    for bad in _RC_BAD_PROVENANCE:
+        assert summarize_phase_units(rows, non_overlap_evidence=(("2", "3", bad),))["approved_commencement_unverified"]["units"] is None
+        assert "252" not in _position_reasons([_phase_row("2", 180), _phase_row("3", 72)],
+                                              non_overlap_evidence=(("2", "3", bad),))
+    good = "Approved boundary schedule rev B"
+    assert summarize_phase_units(rows, non_overlap_evidence=(("2", "3", good),))["approved_commencement_unverified"]["units"] == 252
+    assert "(252 units)" in _position_reasons([_phase_row("2", 180), _phase_row("3", 72)],
+                                              non_overlap_evidence=(("2", "3", good),))
+
+
+def test_residual_2h_l_consented_semantics_make_no_lapse_commencement_or_availability_claim():
+    import app.reporting.residual_capacity as module
+    result = _rc_assess(_rc_count(_RC_PARENT, 500), [_rc_count(_RC_A, 125)], containment_evidence=_rc_contained(_RC_A),
+                        child_set_evidence=_rc_complete(_RC_A))
+    assert result.resolved and module.OPERATIVE_APPROVED_BASIS == "consented"
+    claim = result.claim.lower()
+    for word in ("lapse", "expiry", "commencement", "completion", "availability", "deliverability", "consented"):
+        assert word in claim, word
+    doc = module.__doc__.lower()
+    for phrase in ("unexpired", "commenced", "deliverable", "same real-world development scope", "not solved"):
+        assert phrase in doc, phrase
+    assert not any(word in result.label().lower() for word in ("lapse", "commenc", "complet", "avail", "deliver"))
+
+
+def test_residual_2h_m_vocabulary_matches_the_platform_it_reuses():
+    import app.reporting.residual_capacity as module
+    from app.pipeline.material_change import DECIDED_RECOMMENDATION_ONLY, DECIDED_REFUSED, DECIDED_UNDETERMINED, DECIDED_WITHDRAWN
+    from app.reporting.scheme_reconciliation import SCOPE_PHASE, SCOPE_PLOT, SCOPE_WHOLE_SITE
+    assert (module.SCOPE_WHOLE_SITE, module.SCOPE_PHASE, module.SCOPE_PLOT) == (SCOPE_WHOLE_SITE, SCOPE_PHASE, SCOPE_PLOT)
+    assert module.KNOWN_INELIGIBLE_BASES == {
+        "active", "superseded", DECIDED_REFUSED, DECIDED_WITHDRAWN, DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY}
+    assert "consented" not in module.KNOWN_INELIGIBLE_BASES
+    assert module._parse_subject("site:12:phase:Phase 2A") == ("12", "phase", "Phase 2A")
+    assert module._parse_subject("site:x:phase:Phase 2A") is None and module._parse_subject("phase:2") is None
