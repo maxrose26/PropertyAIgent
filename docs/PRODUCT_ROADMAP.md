@@ -11,6 +11,131 @@ Development Economics  →  AI Decision Support  →  Workflow
 
 ---
 
+## Current Roadmap — Post Stage 2 (Product Owner decision, 5 October 2026)
+
+This section is the authoritative **current sequencing**. Historical gate descriptions below remain useful evidence of how the platform reached this point, but any older “next task” language is superseded where it conflicts with this section.
+
+**Product North Star:** PropertyAIgent continuously turns fragmented planning, ownership and development evidence into ranked acquisition opportunities matched to a buyer’s strategy. Planning evidence is the shared evidence foundation; the primary product object is increasingly a **qualified, buyer-specific acquisition opportunity**, not a planning application.
+
+```text
+Shared market / planning evidence
+        ↓
+Trusted planning subjects
+        ↓
+Acquisition subjects
+        ↓
+Buyer-specific opportunity interpretations
+        ↓
+Ranked opportunities
+        ↓
+Selective deep verification
+        ↓
+Continuous monitoring / re-evaluation
+```
+
+### Current status and sequence
+
+- **Stage 1 production readiness — separate release/infrastructure workstream.** Google owner binding is complete and the Stage 1 application/security boundary is accepted. Supabase’s billing reset is complete but its service restriction and the application-route recovery check remain unresolved at the last verified state. Render master auto-deploy is OFF for the web service and four known cron services. Daily ingestion remains OFF and the daily scraper remains suspended with `/bin/true`. Code maturity must not be confused with production release.
+- **Stage 2 — Commercial Evidence Trust & Opportunity Profile Journeys: COMPLETE, merged to master.** Master integration `3d586a9ffc6edfe2c8d3ef45f7386bb7f3d27589` contains reviewed Stage 2 candidate `43e6ef32b8fa21ba42c5a8b0dca4247a49cd693c`. Stage 2 delivered safer residential-count presentation, approximate same-scope discovery where justified, material-conflict preservation, variation eligibility, parent/phase/sub-phase separation, multiple eligible phase subjects, strict hard-bound qualification, improved count-source provenance, conservative physical-status semantics, withholding of unversioned stored AI narratives, matching policy v5, and expanded hosted Stage 2 / Stage 1 security verification.
+- **Stage 2.5 preflight — REQUIRED before residual-capacity reasoning.** Resolve safe phase aggregation; operative supporting-source preference in buyer matching; fingerprint/monitoring transition for v5 semantics; and the physical-status / “Hide completed sites” UX.
+- **Stage 2.5 — Opportunity Decomposition & Buyer Signals: NEXT product stage.**
+- **Stage 2.6 — Real-World Extraction & Evidence Validation: AFTER 2.5.**
+- **Later — Deep Opportunity Verification Agent.**
+- **Later — Autonomous Acquisition Agent.**
+
+**Existing Acquisition Agent V1/V2 track:** the already-built persistence/recommendation-taxonomy foundations remain reusable platform capability. Its previously documented “approved next sequence” (Benchmark execution/model selection/Scheduled Runner/Human Decision & Feedback) is **not the current implementation sequence** and is superseded where it conflicts with Stage 2.5 → Stage 2.6 above. Benchmark v5 rebaseline remains a required follow-up; Scheduled Runner and Human Decision & Feedback remain later capabilities and require fresh Product Owner authorisation.
+
+Later stages remain subject to Product Owner review; this roadmap does not itself authorise implementation.
+
+### Stage 2.5 — Opportunity Decomposition & Buyer Signals
+
+**Purpose:** convert trusted planning subjects into commercially meaningful acquisition subjects and buyer-specific opportunity interpretations.
+
+**Core principle:** one planning scheme may generate multiple simultaneous buyer-specific acquisition opportunities. Planning progression can create, strengthen, weaken, split, transform or remove different opportunities for different buyers.
+
+Canonical case:
+
+- A **500-home outline permission** later has Reserved Matters approval for a **125-home parcel**.
+- An **SFH investor** may see the ~125-home RM-approved parcel as a stronger near-term acquisition/delivery signal.
+- An **RP / affordable housing provider or fund** may see the affordable component associated with that advanced parcel as a potential opportunity, subject to tenure, quantum, legal-position and package verification.
+- A **housebuilder/developer** may see residual planning capacity of **up to ~375 homes**, but only where trusted compatible scopes genuinely permit subtraction.
+- The **RM-approved parcel itself may still be a developer acquisition opportunity**: Reserved Matters approval does not establish unavailability.
+
+Guardrails:
+
+- planning status ≠ acquisition status;
+- planning capacity ≠ availability;
+- RM approval ≠ unavailable;
+- developer/applicant identity ≠ ownership/control;
+- residual planning capacity ≠ verified acquisition package;
+- parent/phase/sub-phase arithmetic requires compatible, trusted and non-overlapping scope.
+
+#### Buyer preferred range vs discovery range
+
+The **preferred range** and **discovery range** are separate concepts.
+
+Initial Stage 2.5 default: apply a **10% tolerance independently to each preferred-range boundary**.
+
+Example:
+
+- preferred range: **50–100 homes**;
+- lower discovery boundary: 50 − 10% = **45**;
+- upper discovery boundary: 100 + 10% = **110**;
+- discovery range: **45–110 homes**.
+
+Scale interpretation:
+
+- evidence definitely within the preferred range → **STRONG FIT**;
+- evidence outside the preferred range but wholly within discovery tolerance → **POSSIBLE FIT**; for example **105 homes** against preferred **50–100** / discovery **45–110** → **POSSIBLE FIT**;
+- evidence such as **~100–102 homes** against preferred 50–100 / discovery 45–110 → **POSSIBLE FIT**: exact preferred-range compliance is not proven, but the supported range remains inside the accepted discovery envelope;
+- evidence uncertainty crossing the outer discovery boundary, e.g. **105–115** where the discovery maximum is 110 → **INSUFFICIENT EVIDENCE / investigate** for scale;
+- evidence definitely outside the discovery range → scale mismatch;
+- unknown unit count never becomes zero and may remain discoverable where other evidence justifies investigation.
+
+**POSSIBLE FIT** means: *we know enough to say this is sufficiently close to the buyer’s mandate to surface as relevant, but it is not a verified preferred-range fit.* This is distinct from **INSUFFICIENT EVIDENCE**, which means the evidence cannot yet establish whether the opportunity lies inside the accepted discovery envelope.
+
+Unit count alone must not automatically hide a large scheme where a plausible phase, parcel or other acquisition subject may fall within the buyer’s discovery range.
+
+The 10% tolerance is the initial explainable default, not a permanent universal rule. Buyer-configurable and potentially asymmetric discovery ranges are a later capability; do not introduce a complex rule engine prematurely.
+
+#### Mandatory Stage 2.5 preflight
+
+1. **Safe phase aggregation — P0 before residual-capacity logic.** The inherited headline path can sum phase counts without proven non-overlap. A 180-home phase plus a 72-home sub-phase must not become 252 unless evidence proves independent non-overlapping scopes. Reuse the existing guarded aggregation semantics rather than creating a second policy. The unpublished local experimental commit `9cabeed31399a73cec38415f4f5c986624ff53b5` is **not shipped and not part of master**; Stage 2.5 must implement/review/test the correction afresh from master.
+2. **Residual-capacity safety — P0.** Subtraction is allowed only when parent scope, child scope, metric compatibility, containment, non-overlap and version/status relationships support it. Never derive residual opportunity from incompatible or overlapping planning subjects.
+3. **Operative source preference.** Where several applications genuinely support the same count, buyer-matching intelligence should prefer the operative supporting source where established rather than an arbitrary/alphabetical supporter.
+4. **Fingerprint / monitoring transition.** Review the impact of matching policy v5 and residential-count semantics before production recomputation.
+5. **Physical-status UX.** Build status now fails safe to UNKNOWN when evidence is insufficient; review the “Hide completed sites” experience rather than restoring unsafe inference.
+
+#### Conceptual Stage 2.5 opportunity output
+
+The product contract should increasingly expose: acquisition subject; buyer; acquisition type; preferred mandate range; discovery range; evidence-supported scale; fit classification; planning position; acquisition interpretation; availability/control posture; evidence confidence; material unknowns; investigation requirements; and next commercial signal/action.
+
+This is a conceptual product contract, **not** authority for a new database schema.
+
+### Stage 2.6 — Real-World Extraction & Evidence Validation
+
+**Purpose:** test whether PropertyAIgent’s trusted model matches what genuine planning evidence actually says. Stage 2 established safer semantics; Stage 2.5 establishes buyer-specific opportunity interpretation; Stage 2.6 asks whether the underlying real-world facts are correct.
+
+Use a curated Greater Manchester validation set spanning outline/full permission, Reserved Matters, phases/sub-phases/plots, variations and supersession; total/private/affordable units and percentage; tenure and S106/legal position where evidenced; commencement/completion; application status and decision date; operative application; parent/child relationships; developer/applicant and ownership/control where evidenced; freshness; and conflicting evidence.
+
+This is factual product validation against real planning records, not merely software test coverage.
+
+### Later — Deep Opportunity Verification Agent
+
+Selective deeper investigation for commercially interesting opportunities with material unresolved facts. It should verify current planning position, relevant documents, approved quantum, phase/package relationships, affordable obligations, development progress, ownership/control and availability signals; return verified facts, unresolved facts, conflicts, provenance/citations, confidence and buyer implications. It must not become a mechanism for inventing canonical truth over a weak evidence model.
+
+### Later — Autonomous Acquisition Agent
+
+The recurring agent should ultimately monitor **changes to buyer-specific opportunity sets**, not merely new planning applications. A new RM approval may strengthen an SFH opportunity, reduce/redefine a housebuilder residual opportunity, create/strengthen an RP opportunity and weaken/transform a strategic-land opportunity. The long-term loop is shared-evidence monitoring → material-change detection → trusted-fact update → acquisition-subject reassessment → buyer-fit reassessment → opportunity create/transform/retire → selective investigation → commercially meaningful notification.
+
+### Benchmark and release boundaries
+
+- Live buyer matching is **policy v5**. Frozen Agent Evaluation Benchmark expectations retain **v4 provenance** and require a separately reviewed v5 rebaseline before being treated as authoritative for current matching behaviour. Do not silently rewrite benchmark fixtures.
+- Stage 2 being merged to master does **not** mean Stage 2 is deployed. Stage 1 production readiness remains separately gated.
+- Near-term commercial value remains identifying, qualifying, explaining and monitoring acquisition opportunities. Do not pull detailed appraisal, comparables, valuation, financing, CRM or speculative multi-agent infrastructure forward unless they become genuine dependencies.
+
+---
+
 ## Completed / Current Platform
 
 What exists today, in production, verified against the repository (see [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for full functional detail on each):
@@ -113,7 +238,7 @@ Recent acquisition-focused validation of the live platform found PropertyAIgent 
 
 ## Gate 2B — Trusted Opportunity Data (Core Planning Trust Programme Complete)
 
-*(Gate 2B is a sequence of deliberately separate sub-gates, not one monolithic build. The six sub-gates below — 2B-0A through 2B-2C — are **CLOSED**, merged to master and deployed to production: together they form the core planning-trust programme. Gate 2B-0B — originally deferred as "Application Lifecycle History" — is a **promoted follow-on trust capability** within this same programme, not a separate gate after it: see "Gate 2B-0B — Application Lifecycle Intelligence (NEXT)" below.)*
+*(Gate 2B is a sequence of deliberately separate sub-gates, not one monolithic build. The six sub-gates below — 2B-0A through 2B-2C — are **CLOSED**, merged to master and deployed to production: together they form the core planning-trust programme. Gate 2B-0B — originally deferred as "Application Lifecycle History" — is a **promoted follow-on trust capability** within this same programme, not a separate gate after it: see "Gate 2B-0B — Application Lifecycle Intelligence (historical next; superseded)" below.)*
 
 ```
 Council portals + planning documents
@@ -132,7 +257,7 @@ Council portals + planning documents
         ↓
 Trusted Opportunity Data                              — the full programme above; production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`
         ↓
-2B-0B     Application Lifecycle Intelligence          NEXT — durably detect, retain and propagate meaningful lifecycle transitions
+2B-0B     Application Lifecycle Intelligence          HISTORICAL NEXT — superseded by current Stage 2.5 sequence above
         ↓
 Buyer / Acquisition Intelligence                      (Gate 2C onward — see "After 2B")
         ↓
@@ -190,7 +315,7 @@ Autonomous Acquisition Agent + Monitoring/Alerts       (Gate 3 / Gate 5 — see 
 
 **2B-2C — Planning Signal Consumer Alignment. CLOSED.** The commencement/lapse clock, the "has this started" development-progress check, and the recent-permission/undeveloped-permission/approaching-lapse detectors all previously selected their own "operative granted permission" independently and naively — the most recently *decided* application whose decision text merely said "approve"/"grant", with no awareness of planning role. A later NMA, condition discharge, or S73/variation could therefore become the permission that starts or resets the lapse clock, or wrongly suppress genuine post-permission progress evidence, purely by being the most recently decided grant-worded filing (confirmed production defect: World of Pets, and 56 further sites). `app.reporting.scheme_reconciliation.resolve_operative_lapse_anchor` now provides one trusted, role-aware anchor, reused (never re-derived) by `compute_lapse_status` and `compute_phase_progress` alike. A pre-merge semantic review further distinguished `NOT_GRANTED` (no application has been granted at all — a stable, ordinary fact) from `NOT_DETERMINED` (something was granted but is not trustworthy as the operative permission) — eliminating ~125 spurious fingerprint relabellings the first pass had introduced. Production impact at closure: 407 → 389 total opportunities, 178 → 160 planning_delivery, 229 strategic_land unchanged; 11 of 18 `RECENT_PERMISSION` opportunities and 8 `UNDEVELOPED_PERMISSION`/`APPROACHING_LAPSE` opportunities confirmed as false signals and removed; zero unrelated fingerprint fields touched on any surviving opportunity. S73/variation applications require no special-cased code to avoid manufacturing a fresh three-year clock — they were already excluded from the substantive-role set Gate 2B-2A introduced. Comprehensive statutory outline/reserved-matters commencement-period modelling remains explicitly deferred (the platform's uniform +3-year default was found to already resolve correctly for every production case checked, by coincidence of a later Reserved Matters approval naturally outranking its own outline). Production merge: `1eb7e5fb1540127c20b0da88205b9f0e95120da1`.
 
-### Gate 2B-0B — Application Lifecycle Intelligence (NEXT)
+### Gate 2B-0B — Application Lifecycle Intelligence (historical next; superseded)
 
 *(Promoted ahead of deep Gate 2C implementation — Product Owner decision, post Gate 2B-2C. Originally scoped narrowly as "Application Lifecycle History"; re-scoped and broadened at promotion.)*
 
@@ -709,7 +834,7 @@ Maturity is reported against real repository evidence, not against whether a fun
 | Delivery/phasing intelligence | **Not yet built** | 1 (candidate) | Validation hypothesis, not yet confirmed as the priority |
 | Ownership/control intelligence | **Foundation exists** | 1 (candidate) | `ControlRelationship` is Site/Application-scoped; no title/registry resolution. Strengthened by Applicant Intelligence (below) at the organisation level, though this remains distinct from title/registry ownership resolution. |
 | Opportunity identity & change detection | **Built, CLOSED** | Gate 1 / 1C | `app.reporting.opportunity_universe` (5 opportunity types, deterministic fingerprinting) + `app.reporting.opportunity_change` (`BASELINE_EXISTING`/`NEW`/`MATERIALLY_CHANGED`/`UNCHANGED`), weekly production cron |
-| Monitoring (opportunity-level "does this matter" reasoning) | **Foundation built (deterministic); agentic interpretation not yet built** | Gate 1/1C built; agentic layer NEXT-after-2B | Opportunity-level change detection is now built and closed (above); an agent answering "does this change matter for this buyer's mandate" is not yet built |
+| Monitoring (opportunity-level "does this matter" reasoning) | **Foundation built (deterministic); agentic interpretation not yet built** | Gate 1/1C built; historical next-after-2B; superseded by current Stage 2.5 sequence | Opportunity-level change detection is now built and closed (above); an agent answering "does this change matter for this buyer's mandate" is not yet built |
 | NPPF/policy-led opportunity intelligence | **Not yet built** | 1 (candidate) / 1.5 | Only `buffer_percentage` exists today; no versioned national-policy layer |
 | Buyer profiles | **Built, CLOSED (Gate 1); domain split into Buyer + BuyerMandate (Buyer Mandate V2 Phase A)** | Gate 1 | Four pilot profiles (Buyer Profiles V1), now persistent and Workspace-owned. As of Buyer Mandate V2 Phase A, buyer IDENTITY (`Buyer`) and acquisition STRATEGY (`BuyerMandate`, one buyer may own several) are separate tables — see below. geography/tenure/brownfield-greenfield preference remain future work under Buyer Mandate V2 Phase B |
 | Buyer fit | **Built** | Gate 1 (extends Buyer Profiles V1) | `app.policy.buyer_matching.assess_buyer_fit` — deterministic, no LLM, no numeric score |
@@ -720,7 +845,7 @@ Maturity is reported against real repository evidence, not against whether a fun
 | Trusted Consumer Alignment | **CLOSED** | Gate 2B-2B.1 | Buyer Fit, Site Profile Structured Summary and Affordable Homes tile migrated onto Trusted Operative Planning Facts; hardcoded `PERMISSION_GRANTED` fallback removed |
 | Acquisition Opportunity Scope Alignment | **CLOSED** | Gate 2B-2B.2 | Acquisition opportunities scoped to whole-site/material-phase/parcel, never an individual dwelling plot; controlled monitoring-transition mechanism (`app.reporting.opportunity_monitoring_transition`) introduced |
 | Planning Signal Consumer Alignment | **CLOSED — merged `1eb7e5f`** | Gate 2B-2C | `resolve_operative_lapse_anchor` — lapse/recent-permission/undeveloped-permission/approaching-lapse signals use the trusted substantive permission; `NOT_GRANTED` vs `NOT_DETERMINED` distinguished; 11 false RECENT_PERMISSION + 8 false UNDEVELOPED_PERMISSION/APPROACHING_LAPSE opportunities corrected |
-| Application Lifecycle Intelligence | **NEXT — architecture investigation required** | Gate 2B-0B | Promoted ahead of Gate 2C; durable lifecycle-change detection/history/propagation, building on 2B-0A; no schema/implementation authorised yet |
+| Application Lifecycle Intelligence | **Deferred / historical next — superseded by current Stage 2.5 sequence** | Gate 2B-0B | Promoted ahead of Gate 2C; durable lifecycle-change detection/history/propagation, building on 2B-0A; no schema/implementation authorised yet |
 | Acquisition Position Intelligence | **CLOSED (V1) — merged `b1cd861`, production-validated** | Gate 2C | `app.reporting.acquisition_position` — evidence-specific ownership/developer/control facts, no coarse `control_position`, buyer-independent; live-computation V1 bridge; Transaction/Disposition Signals and Buyer Acquisition Type remain not implemented |
 | Opportunity Analyst | **Not yet built** | 1.5 / superseded by Acquisition Agent V1 | Depends on Phase 1 Opportunity Validation's findings; not built ahead of it |
 | Planning due diligence | **Not yet built** | 1.5 | A deeper mode of the Opportunity Analyst, not a separate agent |
@@ -730,7 +855,7 @@ Maturity is reported against real repository evidence, not against whether a fun
 | Agent Evaluation Policy V1 | **CLOSED — PRODUCTION VERIFIED (merged `1d20ef0`, deployed and confirmed live at `propertyaigent.onrender.com` — `Commit: 1d20ef0`, `Environment: Production`; three Product-Owner-reviewed phases: narrow implementation `8ef321e`, commercial-semantic fix `f75e89b`, ownership/role-separation patch `a201d85`)** | After Agent Evaluation Foundation, before Acquisition Agent V1 | The first bounded `EVALUATE(buyer_mandate, acquisition_type, opportunity_packet)` commercial-judgement capability: one gpt-4o-mini call per evaluation, gated by a deterministic **Terminal Hard Exclusion Policy V1** (`app.policy.terminal_hard_exclusion` — an explicit allowlist of trusted Buyer Fit `does_not_match` reasons that may short-circuit the LLM; `NOT_SUITABLE` is never automatically terminal) and a deterministic post-validator (`app.policy.agent_evaluation_validator`) that checks shape/evidence-discipline without re-judging the commercial call itself. Produces `PURSUE`/`VERIFY`/`MONITOR`/`NOT_RELEVANT` plus confidence, a typed `AcquisitionSubject` (`WHOLE_ALLOCATION`/`DEVELOPMENT_SITE`/`PHASE`/`PARCEL_TBD`/`AFFORDABLE_PACKAGE`/`DELIVERY_PIPELINE` — `PARCEL_TBD` never asserts a parcel exists), bounded Next Action/Monitoring Trigger vocabularies, and evidence references validated against a bounded per-evaluation reference-token table (a citation not in that table cannot exist for the model). Technical execution status is kept structurally separate from commercial recommendation via `EvaluationExecutionResult` (`SUCCESS`/`FAILED` + bounded failure reasons) — a technical failure can never surface as a commercial recommendation. `OWNERSHIP_CONTROL_POSTURE` (`INCOMPLETE_NON_BLOCKING`/`EVIDENCED_CONFLICT_POTENTIALLY_BLOCKING`/`ESTABLISHED_SAME_SUBJECT_CONTROL`) is computed purely from existing packet fields (no new evidence source) so ordinary missing ownership/control evidence is never treated as a negative signal, while a genuinely evidenced conflict can still be blocking; role separation (landowner/promoter/applicant/developer/controller are never interchangeable, and developer evidence for one phase is never promoted to whole-allocation control) is enforced at the prompt level, since the current `PacketActorsControl` summary is deliberately role-collapsed. Bounded repair/retry (`MAX_REPAIR_ATTEMPTS=1`); prompt-injection-safe (all opportunity evidence framed as untrusted data). **No baseline, no persistence, no UI** in this closed workstream — confirmed via 121 focused deterministic tests plus bounded, read-only live calibration against production data across all three phases (golden invariant cases, national-housebuilder examples, a 10/10-success long-pending-application reliability check, and a final 5-case production smoke test covering terminal exclusion/incomplete-ownership/`PARCEL_TBD`/named-phase-scope/long-pending categories, all invariants held). Full suite: 3634 passed, 11 pre-existing unrelated environment failures, 0 new failures at every phase. Buyer Fit, Buyer Mandate, `BUYER_MATCHING_POLICY_VERSION` (remains 4), and Gate 2C are unchanged throughout. **Explicitly NOT part of this closed workstream** (each requires its own separate Product Owner authorisation): Agent evaluation persistence/invalidation; a buyer-specific Opportunity Universe materialisation; monitoring-trigger intersection/re-evaluation; a full evaluation baseline (388 × 4 or equivalent); a buyer-facing Agent UI (no PURSUE/VERIFY/MONITOR badges, pipeline, or dashboard); an **Ownership & Control Investigation** capability (a future SHARED evidence/investigation layer — trusted facts collected once about SITE/ALLOCATION → PHASE/PARCEL → LANDOWNER → APPLICANT → PROMOTER → DEVELOPER → CONTROLLER relationships, reused by every buyer-specific interpretation rather than re-investigated per buyer; the buyer-specific Acquisition Agent would decide *whether* to investigate for a given buyer/opportunity, this shared capability would decide *what trusted evidence establishes*; must never infer legal ownership/control from mere applicant/developer naming or document authorship); and **Planning Development Progress Detection** (carried forward unchanged from the Agent Evaluation Foundation row above). |
 | Acquisition Agent V1 — Gate 1 (Persistence Foundation) | **CLOSED — PRODUCTION VERIFIED (merged `bcb9e6b`, deployed and confirmed live at `propertyaigent.onrender.com` — `Commit: bcb9e6b`, `Environment: Production`; three commits across the release: implementation `17e58c7`, pre-merge fixes `c220124`, structured-output-schema provenance `96acb55`)** | After Agent Evaluation Policy V1, before Acquisition Agent V1 Gates 2+ | Turns Agent Evaluation Policy V1's ephemeral `evaluate()` into a persistent capability without changing its commercial semantics at all — 4 new, purely additive tables (`AcquisitionSubjectAnchor`, `AgentEvaluationHistory`, `CurrentBuyerOpportunityState`, `AgentEvaluationClaim`) plus `app.policy.agent_evaluation_persistence`, the service module tying them together. **Durable acquisition-subject identity** (`resolve_acquisition_subject_key`) distinct from the opaque, kind-changing `opportunity_id` string: `site`/`recent_permission`/`long_pending_application` opportunities for the same `Site.id` share one `WHOLE_SITE` subject (a genuine candidate-kind lifecycle transition preserves lineage, per explicit Product Owner instruction), while a named phase is scoped by its own `phase_code` and never collapsed with `WHOLE_SITE` or a different phase; strategic-land allocations use `LocalPlanSite.id` as the safest available anchor today, with the known re-ingestion-duplication limitation documented, not solved (fuzzy matching/entity resolution explicitly out of scope). **Append-only `AgentEvaluationHistory`**, never mutated post-insert, persisting `AgentEvaluationResult`/`EvaluationExecutionResult` verbatim plus full provenance (buyer mandate fingerprint, `evaluation_input_fingerprint`, `evaluation_policy_version`, `prompt_version`, `structured_output_schema_version`, `model_provider`/`model_id`) — a `FAILED` row always carries a `NULL` recommendation, never a fabricated commercial answer. **Materialised `CurrentBuyerOpportunityState`** per (Buyer Mandate × Acquisition Subject × acquisition type): `current_history_id` only ever advances on `SUCCESS`, never on `FAILED` (the prior successful evaluation remains operative), and stays `NULL` (represented honestly) if none has ever succeeded; `NOT_RELEVANT` retained identically to any other recommendation. **`AgentEvaluationClaim`** — a database claim row, not a `pg_advisory_lock` (production `DATABASE_URL` is a Supabase transaction-mode pooler connection, under which session-scoped advisory locks are unsafe), establishing "only one worker may own this evaluation at a time" *before* any OpenAI call, with 30-minute expiry/recovery and an explicit `force=True` reclaim path for both `failed` and `completed` claims (needed since `prompt_version`/`model_id`/`AGENT_EVALUATION_POLICY_VERSION` are deliberately excluded from the auto-invalidating fingerprint — a future controlled prompt/model release must not be blocked indefinitely). **`compute_agent_evaluation_input_fingerprint`** (`AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION = 2`) — a canonical, explicitly-named payload, never a hash of the raw packet and never an unproven reuse of `OpportunityMonitoringState.fingerprint`; a pre-merge completeness audit found and fixed three real gaps (`packet.actors_control.developer_indications`/`conflicts` raw content, `ownership_coverage`, `linked_strategic_allocation_id` — each commercially material even when the computed `ownership_control_posture` alone would not move) plus one precision fix (`development_state` now planning_delivery-only, matching the prompt exactly). `GOVERNING_POLICY_PROMPT_VERSION` and `AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION` (both `= 1`) are the two authorised non-semantic additions to Agent Evaluation Policy V1's own closed modules — pure provenance constants, owned beside `GOVERNING_POLICY`/`OUTPUT_SCHEMA` respectively, never read by any evaluation/validation logic and deliberately excluded from the fingerprint (a prompt or schema change is a **controlled evaluation release**, never automatic market-input invalidation). Production migration applied (`python -m scripts.migrate_schema` — 4 tables created, 0 columns added to any existing table, 0 destructive operations, 0 historical backfill); a bounded, read-only production smoke test confirmed the candidate universe (389 at verification time — dynamic, never hard-coded), all four production Buyer Mandates, subject-identity resolution, and fingerprint computation all function correctly against real data, with the one write (a genuine `AcquisitionSubjectAnchor` identity row) verified and a clearly-fake-marked test claim row explicitly deleted afterward — zero OpenAI calls made. 171 new/updated deterministic tests; full suite 3675 passed, 11 pre-existing unrelated environment failures, 0 new failures throughout. Buyer Fit, Buyer Mandate, Gate 2C, Opportunity Intelligence Packet, Transaction Signals, Opportunity Universe/Monitoring, and `BUYER_MATCHING_POLICY_VERSION` (remains 4) confirmed unchanged via `git diff` across the entire release. **Explicitly NOT part of this closed gate** (each requires its own separate Product Owner authorisation): the Scheduled Acquisition Agent Runner (no cron, no weekly loop, no full-universe evaluation — this gate only provides the service functions a future runner would call); Human Decision & Feedback persistence/UI; Agent Evaluation Benchmark V1; any model comparison or model change (`gpt-4o-mini` unchanged; not yet approved as the *permanent* reasoning model); OpenAI `response.usage`/token-cost capture (would require modifying the closed `EvaluationExecutionResult` contract — reported as a Benchmark V1 prerequisite instead); Buyer Behaviour Engine; Mandate Insights; outcome/CRM tracking; provider abstraction; autonomous investigation; any buyer-facing Agent UI. **Approved next sequence** (Product Owner decision): (1) Agent Evaluation Benchmark V1; (2) select/approve the production OpenAI reasoning model; (3) Scheduled Acquisition Agent Runner; (4) Human Decision & Feedback Foundation — none of these four are started or completed by this closure. |
 | Acquisition Agent V2 — Recommendation Taxonomy | **CLOSED — PRODUCTION VERIFIED (feature `927ec56`, merge `c88fca3`, deployed and confirmed live at `propertyaigent.onrender.com` — `Commit: c88fca3`, `Environment: Production`)** | After Gate 1 (Persistence Foundation), before Benchmark V1 execution | Corrects the Agent recommendation vocabulary discovered while designing Agent Evaluation Benchmark V1's own case set: `RECOMMENDATION_VALUES` changed `{PURSUE, VERIFY, MONITOR, NOT_RELEVANT}` → `{PURSUE, INVESTIGATE, MONITOR, NOT_RELEVANT}`, separating the COMMERCIAL DECISION STATE (recommendation) from WORK REQUIRED TO RESOLVE EVIDENCE (`next_action`, unchanged — `VERIFY_OWNERSHIP`/`VERIFY_CONTROL_POSITION`/`VERIFY_AFFORDABLE_PACKAGE` remain exactly as-is; a `VERIFY_*` action never implies `recommendation=INVESTIGATE`, and validly pairs with either `PURSUE` or `INVESTIGATE` depending on commercial materiality alone). Governing prompt gained the **Commercial Counterparty Principle** (an active, identified developer/applicant can establish a commercially actionable route into an opportunity without proving legal ownership/control — developer/applicant identity is still never proof of ownership or control), lifecycle-aware ownership significance (early strategic land vs. active planning/permissioned site), and an explicit **"planning outcome never establishes land control"** principle (a refused/granted/decided application tells you only about that application's own fate). `AGENT_EVALUATION_POLICY_VERSION`, `GOVERNING_POLICY_PROMPT_VERSION`, `AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION` bumped `1 → 2` together as one controlled release; `AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION` deliberately unchanged (remains `2` — the fingerprint payload never included recommendation/policy version by design, confirmed unaffected). No database migration — `AgentEvaluationHistory.recommendation` is a plain string column; a historical V1 `"VERIFY"` row would remain readable forever alongside a V2 `"INVESTIGATE"` row on the same unmigrated table (proven by dedicated regression tests; production currently holds 0 `AgentEvaluationHistory` rows, so no historical row exists to reconcile). Same release also merges the **Agent Evaluation Benchmark V1 infrastructure** (`benchmark/` package — frozen two-layer case schema, read-only extraction tool, `PASS`/`QUALITY_CONCERN`/`CRITICAL_INCIDENT` scoring with no single weighted score and no auto-disqualification, operator-only runner with dry-run/cost safeguards — plus 14 candidate cases extracted read-only from production and reviewed/corrected across several Product Owner gates) — **Benchmark V1 itself has NOT been executed**; this release is infrastructure + case-set only. Verified in production, read-only, post-deploy: schema verification reports current (no migration required); `RECOMMENDATION_VALUES`/`NEXT_ACTION_VALUES`/all four version constants confirmed via direct inspection of the exact deployed commit; `agent_evaluation_history`/`current_buyer_opportunity_states`/`agent_evaluation_claims` all confirmed at 0 rows (deployment itself made zero writes); `acquisition_subject_anchors` unchanged at 1 row (the pre-existing Gate 1 smoke-test row, not new). Zero OpenAI calls, zero bulk evaluation, zero forced V2 re-evaluation anywhere in this release. Full suite: 3,715 passed, 11 pre-existing unrelated environment failures, 0 new failures. **Explicitly NOT part of this closure**: Benchmark V1 execution/model comparison; production OpenAI reasoning-model selection; the Scheduled Acquisition Agent Runner; the Investigation Agent or any new ownership/control capability; Human Decision & Feedback Foundation. |
-| Acquisition Agent V1 — Gates 2+ | **Not yet built** | After Recommendation Taxonomy V2 above | The Scheduled Runner, Human Decision & Feedback Foundation, and the fuller `AcquisitionAgent(buyer_mandate, opportunity)` capability building on Gate 1's persistence. **Approved next sequence** (Product Owner decision): (1) finalise Agent Evaluation Benchmark V1's case set (several cases still pending Product Owner decision); (2) verify current OpenAI model IDs/Responses API compatibility/pricing immediately before execution (do not assume prior research remains current); (3) dry-run Benchmark V1's cost estimate; (4) execute Benchmark V1; (5) Product Owner model selection; (6) Scheduled Acquisition Agent Runner design; (7) full-market monitoring/relevance-routing architecture — the Runner must NOT be designed as merely "re-evaluate the current ~389 candidates every week": the full Market Evidence Universe (§ above) must remain within the monitoring system's field of view, with change/update detection → trusted fact/lifecycle updates → candidate signal detection → buyer relevance routing → selective Acquisition Agent evaluation, never a fixed periodic re-scan of only the current candidate signal layer; (8) Human Decision & Feedback Foundation. None of these eight are started or completed by this closure. |
+| Acquisition Agent V1 — Gates 2+ | **Not yet built; later capability under current roadmap** | Historical sequence after Recommendation Taxonomy V2; superseded where it conflicts with Stage 2.5 → 2.6 | The Scheduled Runner, Human Decision & Feedback Foundation, and the fuller `AcquisitionAgent(buyer_mandate, opportunity)` capability building on Gate 1's persistence. **Approved next sequence** (Product Owner decision): (1) finalise Agent Evaluation Benchmark V1's case set (several cases still pending Product Owner decision); (2) verify current OpenAI model IDs/Responses API compatibility/pricing immediately before execution (do not assume prior research remains current); (3) dry-run Benchmark V1's cost estimate; (4) execute Benchmark V1; (5) Product Owner model selection; (6) Scheduled Acquisition Agent Runner design; (7) full-market monitoring/relevance-routing architecture — the Runner must NOT be designed as merely "re-evaluate the current ~389 candidates every week": the full Market Evidence Universe (§ above) must remain within the monitoring system's field of view, with change/update detection → trusted fact/lifecycle updates → candidate signal detection → buyer relevance routing → selective Acquisition Agent evaluation, never a fixed periodic re-scan of only the current candidate signal layer; (8) Human Decision & Feedback Foundation. None of these eight are started or completed by this closure. |
 | Acquisition Prioritisation | **Not yet built** | Gate 4, after Gate 3 | Explainable dimensions/bands (Buyer Fit, Planning Readiness, Acquisition Readiness, Evidence Confidence) — no premature numeric score |
 | Acquisition Workflow & Monitoring | **Not yet built** | Gate 5, after Gate 4 | Buyer-facing "what should I know or do" layer, distinct from Gate 2B-0B's factual change detection |
 | Market/comparables | **Not started** | 2 | No sales, rental or comparable data flows into the platform today |
@@ -769,39 +894,10 @@ Initial P0 acceptance cases promoted by the audit include Cross Lane (false zero
 Full specification and implementation boundaries are recorded in [PRODUCT_ROADMAP_ADDENDUM_AFFORDABLE_HOUSING_VERIFICATION.md](PRODUCT_ROADMAP_ADDENDUM_AFFORDABLE_HOUSING_VERIFICATION.md). This roadmap entry is **documentation only** and does not authorise schema changes, production writes, full-corpus reprocessing, scheduled agents or deployment.
 
 
-## Recommended Next Task
+## Historical next-task record — superseded
 
-**Gate 2B-0B — Application Lifecycle Intelligence (architecture investigation only).** Gate 2B is fully closed (2B-0A through 2B-2C, production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`, live at `propertyaigent.onrender.com`). Promoted ahead of Gate 2C by Product Owner decision: the platform can now reliably answer "what does the planning evidence mean?" but not yet "has that evidence changed since we last checked?" The next task is an architecture investigation only — see "Gate 2B-0B — Application Lifecycle Intelligence (NEXT)" above for the full required-investigation scope. **Do not implement Gate 2B-0B yet; no schema or code change is authorised until that investigation is reviewed by the Product Owner.** Separately: platform-wide scheduled status verification stays fail-closed until the production daily-scrape scheduler is proven healthy (operational dependency, not Gate 2B feature work).
+The former “Recommended Next Task” section named Gate 2B-0B as the next architecture investigation. That recommendation is retained only as historical context and is **superseded by the Current Roadmap — Post Stage 2 section above**. Do not use this historical record to infer current implementation authority.
 
-## Approved carry-forward: buyer-specific opportunity sets (2026-10-05)
+## Historical carry-forward — buyer-specific opportunity sets (2026-10-05)
 
-Documented direction only; not implemented by Stage 2.
-One planning scheme may generate multiple simultaneous buyer-specific acquisition
-opportunities. Planning progression can change those opportunities differently
-for each buyer. A 500-home outline followed by a 125-home Reserved Matters parcel
-could imply residual planning capacity up to ~375 homes for a housebuilder
-(availability/control unverified), an advanced ~125-home parcel as a stronger SFH
-investor signal, or an affordable component for an RP/affordable fund subject to
-tenure/package verification. The RM-approved parcel may itself remain a developer
-acquisition opportunity: RM approval does not prove unavailability. These are
-illustrations, not permission to subtract overlapping or unverified scopes.
-
-- Planning status is not acquisition status.
-- Residual planning capacity is not verified available capacity.
-- A planning application is not automatically an acquisition subject.
-- One evidence event may strengthen, weaken, create or transform different
-  buyer-specific opportunities.
-
-Proposed stages:
-- **Stage 2.5 — Opportunity Decomposition & Buyer Signals.**
-- **Stage 2.6 — Real-World Extraction and Evidence Validation.** Carry forward
-  reduced physical-status filter usefulness until independently scoped evidence
-  can be validated; UNKNOWN must never mean not commenced, completed or available.
-- **Later — Deep Opportunity Verification Agent.**
-- **Later — Autonomous Acquisition Agent**, monitoring changes in buyer-specific
-  opportunity sets rather than merely planning applications.
-
-Matching policy v5 is the accepted Stage 2 policy. Frozen v4 Agent Evaluation
-Benchmark expectations require a separately reviewed rebaseline before being
-used as current v5 behavioural expectations. No benchmark fixtures are rewritten.
-Unversioned stored AI narratives remain withheld from trusted buyer presentation.
+This decision has now been promoted into the authoritative Current Roadmap — Post Stage 2 section above. The original carry-forward text is removed here to avoid maintaining two competing current definitions.
