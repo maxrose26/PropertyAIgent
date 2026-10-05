@@ -143,14 +143,14 @@ def test_k_l_hard_boundary_uses_bounds_soft_discovery_keeps_uncertainty(session)
                and "wholly within its discovery range (45-110 homes)" in r for r in fit.matches)
     assert not any("does not establish whether scale is within" in r for r in fit.unknown)
     assert not any("outside this buyer's discovery range" in r for r in fit.investigate)
-    # ... while two existing, legitimate evidence gaps on this full-pipeline fixture
-    # keep the OVERALL result at INSUFFICIENT_EVIDENCE (blocking outranks POSSIBLE):
-    # the operative adapter never trusts an affordable percentage, and an
-    # immaterial-variance count attributes development type to no single source.
-    assert fit.classification == "INSUFFICIENT_EVIDENCE"
+    # ... and, with v6 hardening (N1-B/N2-B), the overall result is POSSIBLE_FIT:
+    # the three agreeing supporters corroborate development type ("houses"), and
+    # the untrusted affordable percentage stays a visible, non-blocking unknown.
+    assert fit.classification == "POSSIBLE_FIT", fit.unknown
+    assert facts.development_type_raw == "houses"
     assert "Affordable housing proportion has not been confirmed - not assumed to be 0%." in fit.unknown
     assert ("Development type has not been established with enough confidence to confirm this is "
-            "general-needs housing.") in fit.unknown
+            "general-needs housing.") not in fit.unknown
     # HA metric does not acquire total evidence through the new adapter.
     assert assess_buyer_fit(HOUSING_ASSOCIATION, facts).classification != NOT_SUITABLE
     assert facts.affordable_unit_count is None
@@ -1402,3 +1402,210 @@ def test_s25a_fingerprint_ownership(monkeypatch):
     assert '"buyer_mandate_matching_fingerprint": mandate_fingerprint' in src
     assert '"classification": buyer_fit_assessment.classification' in src
     assert '"buyer_matching_policy_version": BUYER_MATCHING_POLICY_VERSION' in src
+
+
+
+# --- Stage 2.5A v6 hardening: N1-B (affordable % non-blocking) + N2-B ----------
+# Through the REAL operative matching-facts builder (the live feed path).
+
+from app.policy.buyer_matching import _corroborated_development_type
+
+_AFFORDABLE_UNKNOWN = "Affordable housing proportion has not been confirmed - not assumed to be 0%."
+_AFFORDABLE_INVESTIGATE = "Confirm the affordable housing proportion and whether the scheme is affordable-led."
+_DEV_TYPE_UNKNOWN = ("Development type has not been established with enough confidence to confirm this is "
+                     "general-needs housing.")
+
+
+def _live_facts(apps):
+    return build_planning_delivery_matching_facts_from_operative(build_operative_planning_facts(apps), apps)
+
+
+def _why(fit):
+    return f"{fit.classification}: unknown={fit.unknown} does_not_match={fit.does_not_match}"
+
+
+@pytest.mark.parametrize("units,expected", [(75, "STRONG_FIT"), (105, "POSSIBLE_FIT")])
+def test_n1_untrusted_affordable_percentage_is_visible_but_not_blocking(session, units, expected):
+    site = scheme(session)
+    apps = [application(session, site, f"FULL/{units}", units)]
+    facts = _live_facts(apps)
+    assert facts.unit_count == units and facts.development_type_raw == "houses"
+    assert facts.affordable_percentage_trusted is False and facts.affordable_percentage is None
+    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert fit.classification == expected, _why(fit)
+    assert _AFFORDABLE_UNKNOWN in fit.unknown           # never silently assumed 0%
+    assert _AFFORDABLE_INVESTIGATE in fit.investigate   # gap stays investigable
+    assert facts.affordable_percentage is None          # None never becomes 0
+    assert not fit.does_not_match                       # missing % is not a mismatch either way
+    assert not any("affordable" in m.lower() for m in fit.matches)  # no affordable claim made
+
+
+def test_n1_positive_wholly_affordable_exclusion_still_hard():
+    from app.policy.buyer_matching import MatchingFacts, PLANNING_DELIVERY
+    facts = MatchingFacts(opportunity_type=PLANNING_DELIVERY, unit_count=75, development_type_raw="houses",
+                          is_specialist_development=False, affordable_percentage=100.0, affordable_percentage_trusted=True,
+                          affordable_unit_count=75, planning_state="permission_granted",
+                          has_identified_planning_activity=True, has_phasing_evidence=False, matched_to_site=True)
+    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert fit.classification == NOT_SUITABLE
+    assert any("wholly" in d and "100%" in d for d in fit.does_not_match)
+
+
+@pytest.mark.parametrize("affordable_units,expected", [(None, "INSUFFICIENT_EVIDENCE"), (49, "NOT_SUITABLE")])
+def test_n1_rp_affordable_quantum_requirements_unchanged(affordable_units, expected):
+    from app.policy.buyer_matching import MatchingFacts, PLANNING_DELIVERY
+    facts = MatchingFacts(opportunity_type=PLANNING_DELIVERY, unit_count=150, development_type_raw="houses",
+                          is_specialist_development=False, affordable_percentage=None, affordable_percentage_trusted=False,
+                          affordable_unit_count=affordable_units, planning_state="permission_granted",
+                          has_identified_planning_activity=True, has_phasing_evidence=False, matched_to_site=True)
+    fit = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert fit.classification == expected, _why(fit)
+
+
+def test_n1_rp_with_qualified_affordable_count_is_not_blocked_by_percentage_alone():
+    from app.policy.buyer_matching import MatchingFacts, PLANNING_DELIVERY
+    facts = MatchingFacts(opportunity_type=PLANNING_DELIVERY, unit_count=150, development_type_raw="houses",
+                          is_specialist_development=False, affordable_percentage=None, affordable_percentage_trusted=False,
+                          affordable_unit_count=60, planning_state="permission_granted",
+                          has_identified_planning_activity=True, has_phasing_evidence=False, matched_to_site=True)
+    fit = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
+    assert fit.classification == "STRONG_FIT", _why(fit)
+    assert _AFFORDABLE_UNKNOWN in fit.unknown
+
+
+@pytest.mark.parametrize("affordable_units,expected", [(None, "INSUFFICIENT_EVIDENCE"), (60, "STRONG_FIT")])
+def test_n1_rp_acquisition_type_still_requires_trusted_affordable_quantum(affordable_units, expected):
+    from app.policy.buyer_matching import MatchingFacts, PLANNING_DELIVERY, B2MatchingContext
+    facts = MatchingFacts(opportunity_type=PLANNING_DELIVERY, unit_count=150, development_type_raw="houses",
+                          is_specialist_development=False, affordable_percentage=None, affordable_percentage_trusted=False,
+                          affordable_unit_count=affordable_units, planning_state="permission_granted",
+                          has_identified_planning_activity=True, has_phasing_evidence=False, matched_to_site=True)
+    fit = assess_buyer_fit(HOUSING_ASSOCIATION, facts, context=B2MatchingContext(council_code="bury"))
+    package_reasons = [r for r in fit.matches + fit.unknown if "affordable-housing-package" in r]
+    assert package_reasons, _why(fit)
+    assert fit.classification == expected, _why(fit)
+    if affordable_units is None:
+        assert any("affordable-housing-package" in u for u in fit.unknown)
+    else:
+        assert any("affordable-housing-package" in m for m in fit.matches)
+        assert _AFFORDABLE_UNKNOWN in fit.unknown  # still visible, no longer a second blocker
+
+
+def test_n1_strategic_land_affordable_treatment_unchanged():
+    from app.policy.buyer_matching import MatchingFacts
+    from app.policy.buyer_profiles import STRATEGIC_LAND_BUYER
+    facts = MatchingFacts(opportunity_type="strategic_land", unit_count=3500, development_type_raw="residential",
+                          is_specialist_development=None, affordable_percentage=None, affordable_percentage_trusted=False,
+                          affordable_unit_count=None, planning_state="adopted_allocation",
+                          has_identified_planning_activity=False, has_phasing_evidence=False, matched_to_site=False)
+    fit = assess_buyer_fit(STRATEGIC_LAND_BUYER, facts)
+    assert fit.classification == "STRONG_FIT", _why(fit)
+    assert any("strategic land allocation - not assumed to be 0%" in u for u in fit.unknown)
+    assert _AFFORDABLE_INVESTIGATE not in fit.investigate
+
+
+def _approximate_apps(session, types, order=(0, 1, 2), values=(100, 101, 102)):
+    site = scheme(session)
+    apps = [application(session, site, f"FULL/{n}", n) for n in values]
+    for app, dev in zip(apps, types):
+        app.scheme_intelligence.development_type = dev
+    session.flush()
+    return [apps[i] for i in order]
+
+
+def test_n2_unanimous_supporters_corroborate_development_type(session):
+    apps = _approximate_apps(session, ["houses", "houses", "houses"])
+    facts = _live_facts(apps)
+    assert facts.count_assessment.resolution == "immaterial_variance"
+    assert facts.development_type_raw == "houses" and facts.is_specialist_development is False
+    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    # Scale is POSSIBLE (100-102 within discovery, not wholly preferred); development
+    # type no longer blocks; the affordable gap stays visible and non-blocking.
+    assert fit.classification == "POSSIBLE_FIT", _why(fit)
+    assert _DEV_TYPE_UNKNOWN not in fit.unknown and _AFFORDABLE_UNKNOWN in fit.unknown
+
+
+@pytest.mark.parametrize("types", [["houses", "apartments", "houses"], ["houses", None, "houses"],
+                                   ["houses", "  ", "houses"]])
+def test_n2_disagreement_or_missing_type_fails_closed(session, types):
+    facts = _live_facts(_approximate_apps(session, types))
+    assert facts.development_type_raw is None and facts.is_specialist_development is None
+    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert fit.classification == "INSUFFICIENT_EVIDENCE" and _DEV_TYPE_UNKNOWN in fit.unknown
+
+
+def test_n2_input_order_does_not_change_result(session):
+    forward = _live_facts(_approximate_apps(session, ["houses"] * 3))
+    reverse = _live_facts(_approximate_apps(session, ["houses"] * 3, order=(2, 1, 0)))
+    assert forward.development_type_raw == reverse.development_type_raw == "houses"
+
+
+def test_n2_operative_preference_is_provenance_only_and_requires_support(session):
+    apps = _approximate_apps(session, ["houses", "houses", "houses"])
+    assessment = count_assessment_for_facts(build_operative_planning_facts(apps))
+    by_id = {a.id: a for a in apps}
+    for app in apps:
+        # The value never changes; an operative SUPPORTER is preferred for provenance.
+        result = _corroborated_development_type(assessment, by_id, operative_application_id=app.id)
+        assert result.value == "houses" and result.provenance_reference == app.reference
+    # A non-supporting "operative" application supplies neither value nor provenance.
+    outsider = SimpleNamespace(id=-1, reference="ZZZ", scheme_intelligence=SimpleNamespace(development_type="retirement_living"))
+    result = _corroborated_development_type(assessment, {**by_id, -1: outsider}, operative_application_id=-1)
+    assert result.value == "houses" and result.provenance_reference == min(a.reference for a in apps)
+    # A supporter whose application is missing fails closed rather than being skipped.
+    assert _corroborated_development_type(assessment, {a.id: a for a in apps[:2]}) is None
+
+
+def test_n2_values_compared_as_stored_without_collapsing_representations(session):
+    # No shared domain normaliser exists for development type; differing stored
+    # representations are not treated as agreement (documented limitation).
+    facts = _live_facts(_approximate_apps(session, ["houses", "Houses", "houses"]))
+    assert facts.development_type_raw is None
+
+
+@pytest.mark.parametrize("values", [(200, 201, 202), (100, 102)])
+def test_n2_no_new_tolerance_beyond_the_accepted_set(session, values):
+    facts = _live_facts(_approximate_apps(session, ["houses"] * len(values), order=tuple(range(len(values))), values=values))
+    assert facts.count_assessment.resolution == "material_conflict"
+    assert facts.development_type_raw is None
+
+
+def test_n2_value_only_no_cross_field_borrowing(session):
+    apps = _approximate_apps(session, ["houses"] * 3)
+    for app in apps:
+        app.scheme_intelligence.affordable_percentage_final = 35.0
+        app.scheme_intelligence.affordable_units_final = 35
+    session.flush()
+    facts = _live_facts(apps)
+    assert facts.development_type_raw == "houses"
+    result = _corroborated_development_type(facts.count_assessment, {a.id: a for a in apps})
+    assert type(result)._fields == ("value", "provenance_reference")  # value + reference only, never a row
+    assert isinstance(result.value, str) and isinstance(result.provenance_reference, str)
+    # Corroboration changes development type ONLY: every affordable fact is identical
+    # to the same evidence without corroboration (one supporter's type removed).
+    apps[1].scheme_intelligence.development_type = None
+    session.flush()
+    uncorroborated = _live_facts(apps)
+    assert uncorroborated.development_type_raw is None
+    for field in ("affordable_percentage", "affordable_percentage_trusted", "affordable_unit_count", "unit_count"):
+        assert getattr(facts, field) == getattr(uncorroborated, field)
+    assert facts.affordable_percentage is None and facts.affordable_percentage_trusted is False
+
+
+def test_n2_hard_exclusion_outranks_corroborated_scale_and_type(session):
+    facts = _live_facts(_approximate_apps(session, ["retirement_living"] * 3))
+    assert facts.development_type_raw == "retirement_living" and facts.is_specialist_development is True
+    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert fit.classification == NOT_SUITABLE, _why(fit)
+
+
+def test_n2_exact_count_gate3_selection_unchanged(session):
+    site = scheme(session)
+    a = application(session, site, "A/OLD", 440, date="2026-01-01")
+    b = application(session, site, "Z/CURRENT", 440, date="2026-03-01")
+    a.scheme_intelligence.development_type = "retirement_living"
+    b.scheme_intelligence.development_type = "houses"
+    session.flush()
+    facts = _live_facts([a, b])
+    assert facts.unit_count == 440 and facts.development_type_raw == "houses"
+    assert _corroborated_development_type(facts.count_assessment, {a.id: a, b.id: b}) is None  # exact: not this path

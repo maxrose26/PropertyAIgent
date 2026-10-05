@@ -630,14 +630,16 @@ def test_planning_delivery_wholly_affordable_hard_exclusion_remains_intact():
     assert any("wholly" in d and "100%" in d for d in result.does_not_match)
 
 
-def test_planning_delivery_affordable_percentage_unconfirmed_still_blocks():
-    """(C1) Genuinely unconfirmed affordable percentage for a
-    PLANNING_DELIVERY opportunity (a real, resolvable-by-more-data gap)
-    remains classification-driving - only STRATEGIC_LAND's structurally
-    permanent absence is affected."""
-    result = assess_buyer_fit(NESTEN_HOMES, _facts(affordable_percentage=None, affordable_percentage_trusted=False))
-    assert result.classification == INSUFFICIENT_EVIDENCE
+def test_planning_delivery_affordable_percentage_unconfirmed_is_visible_but_not_blocking():
+    """Stage 2.5A v6 (N1-B, superseding C1): an unconfirmed affordable
+    percentage for a PLANNING_DELIVERY opportunity stays a visible,
+    investigable unknown but no longer blocks Buyer Fit on its own - the
+    wholly-affordable exclusion still needs positive evidence, and affordable
+    QUANTUM requirements (affordable-unit scale) are unchanged."""
+    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=75, affordable_percentage=None, affordable_percentage_trusted=False))
+    assert result.classification == STRONG_FIT
     assert any(u == "Affordable housing proportion has not been confirmed - not assumed to be 0%." for u in result.unknown)
+    assert any("affordable-led" in i for i in result.investigate)
 
 
 def test_strategic_land_specialist_status_unknown_is_not_blocking():

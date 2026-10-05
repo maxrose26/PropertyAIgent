@@ -54,6 +54,7 @@ other way: that module imports build_control_appetite_facts from here).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 from app.policy.buyer_profiles import (
     ACQUISITION_TYPES,
@@ -463,6 +464,52 @@ def _operative_source_scheme_intelligence(operative_facts, applications_by_id: d
     return app.scheme_intelligence if app else None
 
 
+class CorroboratedDevelopmentType(NamedTuple):
+    """A development-type VALUE plus the minimum provenance for it. The count
+    itself is supported by the whole assessment/supporter set; `provenance_
+    reference` only names where this agreed value is cited from."""
+    value: str
+    provenance_reference: str | None
+
+
+def _corroborated_development_type(count_assessment, applications_by_id: dict, *, operative_application_id=None):
+    """Stage 2.5A (v6, N2-B): development type corroborated unanimously by the
+    genuine supporters of an ALREADY-ACCEPTED approximate count, or None.
+
+    CountAssessment owns whether evidence is an accepted approximate count
+    (spec 023's immaterial-variance case); this helper re-decides nothing about
+    counts. Supporters are exactly that assessment's sources. Every supporter
+    must be present and carry the SAME non-blank stored development type -
+    unanimity, never a majority; any missing supporter, null/blank value or
+    disagreement fails closed. Values are compared as stored: no shared domain
+    normaliser exists for development type (the only one is presentation-layer),
+    so representation differences are deliberately NOT collapsed.
+
+    Operative status never overrides disagreement: agreement establishes the
+    value, and the operative application is preferred for provenance only when
+    it is itself a supporter (else Gate 3's reference/ID order). Returns a value
+    and a reference string only - never a SchemeIntelligence row - so no other
+    field (affordable, tenure, bedrooms, ownership, ...) can leak across
+    applications.
+    """
+    if (count_assessment is None or count_assessment.precision != "APPROXIMATE"
+            or count_assessment.resolution != "immaterial_variance" or not count_assessment.sources):
+        return None
+    supporters = []
+    for source in count_assessment.sources:
+        application = applications_by_id.get(source.application_id)
+        scheme = getattr(application, "scheme_intelligence", None)
+        value = getattr(scheme, "development_type", None)
+        if not (isinstance(value, str) and value.strip()):
+            return None
+        supporters.append((application, value))
+    if len({value for _, value in supporters}) != 1:
+        return None
+    provenance = min(supporters, key=lambda item: (item[0].id != operative_application_id,
+                                                   item[0].reference or "", str(item[0].id)))[0]
+    return CorroboratedDevelopmentType(value=supporters[0][1], provenance_reference=provenance.reference)
+
+
 def build_planning_delivery_matching_facts_from_operative(operative_facts, applications: list, *, application_reference=None) -> MatchingFacts:
     """Gate 2B-2B.1 - the trusted-facts-aware counterpart to
     build_planning_delivery_matching_facts above, consuming
@@ -480,19 +527,18 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     report traced to (Former Pendlebury Miners Club: an outline
     application still 'Under Consultation', with no decision at all).
 
-    NOT used by app.reporting.opportunity_universe's fingerprint-field
-    construction (unit_count/affordable_unit_count/development_type_raw/
-    is_specialist_development still come from build_planning_delivery_
-    matching_facts above, reading one representative application's own
-    SchemeIntelligence verbatim, unchanged - Gate 2B-2B.1 is forbidden
-    from changing opportunity fingerprints, and those four fields feed it
-    today). planning_state itself is NOT one of those fingerprinted
-    fields, so opportunity_universe.py now ALSO resolves it correctly, via
-    the shared resolve_operative_planning_state helper below - the same
-    resolution this function uses - passed into build_planning_delivery_
-    matching_facts's own `planning_state` argument at that call site. See
-    this gate's pre-merge remediation report Section C/D for the full
-    fingerprint-safety reasoning."""
+    ALSO used by app.reporting.opportunity_universe's planning-delivery
+    fingerprint-field construction: unit_count, affordable_unit_count,
+    development_type_raw and is_specialist_development in those
+    fingerprint_fields come from THIS function's output (an earlier version
+    of this docstring said otherwise - it was stale). A change to how this
+    function derives those fields is therefore a SOFTWARE derivation change
+    to opportunity fingerprints (e.g. Gate 3's operative-supporter
+    preference; Stage 2.5A N2-B approximate-count development-type
+    corroboration) and must go through the reviewed monitoring-transition
+    rebaseline before ordinary monitoring - never surfaced as a new
+    real-world evidence event. planning_state comes from the shared
+    resolve_operative_planning_state helper below on both paths."""
     consented = operative_facts.consented_position
     active_positions = operative_facts.active_positions
     ah = operative_facts.affordable_housing
@@ -516,6 +562,15 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     applications_by_id = {a.id: a for a in applications}
     source_si = _operative_source_scheme_intelligence(operative_facts, applications_by_id)
     dev_type = source_si.development_type if source_si else None
+    if source_si is None:
+        reference = consented.reference
+        operative_id = (reference.source.application_id
+                        if reference.state == FACT_RESOLVED and reference.source is not None else None)
+        corroborated = _corroborated_development_type(count_assessment, applications_by_id,
+                                                      operative_application_id=operative_id)
+        dev_type = corroborated.value if corroborated else None
+    # Specialist status is derived deterministically from the development-type
+    # value, never borrowed from any application on its own.
     is_specialist = (dev_type in SPECIALIST_DEVELOPMENT_TYPES) if dev_type else None
 
     # AH must belong to the same displayed application, not a prior consent
@@ -861,8 +916,13 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             # Still surfaced for transparency; never assumed 0% or 100%.
             unknown.append("Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.")
         else:
+            # Stage 2.5A (v6, N1-B): a missing/unqualified percentage is a visible
+            # evidence gap, not proof of a problem. It no longer blocks fit on its
+            # own: the wholly-affordable exclusion above still needs positive
+            # evidence, and mandates that need affordable QUANTUM (affordable-unit
+            # scale, AFFORDABLE_HOUSING_PACKAGE) keep those requirements below.
             unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
-            blocking_unknown = True
+            investigate.append("Confirm the affordable housing proportion and whether the scheme is affordable-led.")
     # A trusted, non-100% figure (the normal policy-compliant case) is
     # deliberately NOT added as a "matches"/"does_not_match" reason for any
     # profile - per the brief, the mere presence of policy-compliant
