@@ -820,6 +820,7 @@ def test_card_surfaces_development_coverage_via_allocation_site_relationship(ses
     session.commit()
     session.add(AllocationSiteRelationship(allocation_id=allocation.id, site_id=site.id, evidence_basis="document_confirmed_site"))
     app = _make_app(session, site.id, reference="A/25/099409/RMMAJ")
+    app.proposal = "Full application for residential development"  # synthetic substantive scope evidence
     session.add(SchemeIntelligence(application_id=app.id, total_units_final=244, core_intelligence_complete=True))
     session.commit()
 

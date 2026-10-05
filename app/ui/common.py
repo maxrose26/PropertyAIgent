@@ -457,12 +457,9 @@ def _operative_units_display(facts) -> tuple[bool, str | int | None]:
     case alone."""
     if not facts.resolved_applications:
         return False, None
-    consented = facts.consented_position
-    if consented.approved_units.state == FACT_RESOLVED:
-        return True, consented.approved_units.value
-    if len(facts.active_positions) == 1 and facts.active_positions[0].proposed_units.state == FACT_RESOLVED:
-        return True, facts.active_positions[0].proposed_units.value
-    return True, None
+    from app.reporting.scheme_reconciliation import count_assessment_for_facts
+    assessment = count_assessment_for_facts(facts)
+    return True, assessment.exact_value if assessment.precision == "EXACT" else assessment.label()
 
 
 def render_scheme_detail(session, settings, site: Site, apps: list[Application]) -> None:

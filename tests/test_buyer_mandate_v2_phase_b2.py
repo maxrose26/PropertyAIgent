@@ -143,7 +143,7 @@ def test_policy_version_is_the_current_expected_value():
     # mandatory at the production evaluation boundary + authoritative
     # normalised Local Plan status for strategic land) - see
     # BUYER_MATCHING_POLICY_VERSION's own docstring.
-    assert BUYER_MATCHING_POLICY_VERSION == 4
+    assert BUYER_MATCHING_POLICY_VERSION == 5
 
 
 def test_fingerprint_changes_when_policy_version_changes():
@@ -692,7 +692,7 @@ def test_matching_policy_version_is_now_3():
     # Superseded by Agent-Ready Fact Foundation's own version 4 bump - see
     # test_policy_version_is_the_current_expected_value above for why 4 is
     # now the correct current value.
-    assert BUYER_MATCHING_POLICY_VERSION == 4
+    assert BUYER_MATCHING_POLICY_VERSION == 5
 
 
 def test_semantic_cleanup_fingerprint_differs_from_prior_policy_version():

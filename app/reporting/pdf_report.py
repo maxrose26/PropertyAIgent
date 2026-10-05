@@ -127,7 +127,7 @@ def _or_unknown(value, fallback: str = "not identified") -> str:
 
 def _fmt_scheme(row: dict) -> str:
     units = row.get("Total Units")
-    units_str = f"{int(units)} units" if pd.notna(units) else "unit count unknown"
+    units_str = row.get("Count Display") or (f"{int(units)} units" if pd.notna(units) else "unit count unknown")
     return (
         f"{row.get('Address', 'Unknown address')} ({row.get('Council', '?')}) - {units_str}, "
         f"developer: {_or_unknown(row.get('Developer'))}, "
@@ -327,7 +327,7 @@ def render_pdf(report_rows: list[dict], stats: AggregateStats, narrative: dict[s
         if is_opportunity:
             heading_text += "  ⚑ Buying opportunity"
         units = row.get("Total Units")
-        units_str = f"{int(units)}" if pd.notna(units) else "unknown"
+        units_str = row.get("Count Display") or (f"{int(units)}" if pd.notna(units) else "unknown")
         affordable = row.get("Affordable Units")
         affordable_str = f"{int(affordable)}" if pd.notna(affordable) else "unknown"
         affordable_pct = row.get("Affordable %")

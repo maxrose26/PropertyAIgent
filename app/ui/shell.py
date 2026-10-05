@@ -581,6 +581,10 @@ def opportunity_card(card: dict, *, key: str) -> None:
         col_metric, col_badge = st.columns([2, 2])
         with col_metric:
             st.markdown(f"**{_escape(str(card['metric']))}**")
+            if card.get("count_assessment"):
+                st.caption(card["count_assessment"].label())
+                if card["count_assessment"].note():
+                    st.caption(card["count_assessment"].note())
         with col_badge:
             st.badge(card["badge"], color="blue")
         if card.get("page"):
@@ -777,6 +781,7 @@ def _scheme_stack_card(card: dict, *, rank: int, key: str) -> None:
 
         badge_cols = st.columns(4)
         badge_fields = [
+            ("count_display", str),
             ("total_units", lambda v: f"{v} units"),
             ("affordable_units", lambda v: f"Reported AH count: {v} (source and scope unverified)"),
             ("affordable_percentage", lambda v: f"Reported AH percentage: {v:.0f}% (scope unverified)"),
@@ -784,7 +789,8 @@ def _scheme_stack_card(card: dict, *, rank: int, key: str) -> None:
             ("build_status", lambda v: v),
             ("planning_status", lambda v: v),
         ]
-        shown = [(field, fmt) for field, fmt in badge_fields if card.get(field) not in (None, "", 0)]
+        shown = [(field, fmt) for field, fmt in badge_fields if card.get(field) not in (None, "", 0)
+                 and not (field == "total_units" and card.get("count_display"))]
         for col, (field, fmt) in zip(badge_cols, shown[:4]):
             with col:
                 st.caption(fmt(card[field]))
@@ -846,6 +852,10 @@ def opportunity_category_section(category: dict, *, key: str) -> None:
                     st.markdown(f"**{_escape(card['title'])}**")
                     st.caption(f"{card['subtitle']} · {card['reason']}")
                     st.markdown(f"**{_escape(str(card['metric']))}**")
+            if card.get("count_assessment"):
+                st.caption(card["count_assessment"].label())
+                if card["count_assessment"].note():
+                    st.caption(card["count_assessment"].note())
                     if card.get("page"):
                         st.page_link(card["page"], label="View →", query_params=card.get("params") or {})
 

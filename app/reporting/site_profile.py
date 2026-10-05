@@ -113,6 +113,7 @@ def build_headline_metrics(
     *, operative_total: int | None = None, operative_total_is_estimated: bool = False,
     operative_total_basis: str | None = None, operative_total_not_determined: bool = False,
     affordable_percentage_reconciliation: dict | None = None,
+    count_assessment=None,
 ) -> list[dict]:
     """Four consistent headline tiles (Part 3) - the same set, same order,
     on every Site Profile, never swapped per site depending on which
@@ -141,7 +142,9 @@ def build_headline_metrics(
     #     the unresolved state; do NOT fall back to legacy `merged` facts.
     #   - neither                            -> reconciliation could not
     #     run at all; the legacy `merged` fallback stands.
-    if operative_total is not None:
+    if count_assessment is not None:
+        total_display = count_assessment.label()
+    elif operative_total is not None:
         total_display = _fmt_units(operative_total)
         if total_display and operative_total_is_estimated:
             total_display += " (est.)"
@@ -163,7 +166,7 @@ def build_headline_metrics(
     decision_display = DECISION_STATUS_LABELS.get(decision_status) if decision_status else "Not yet verified"
 
     return [
-        {"label": "Total homes", "value": total_display or "Not yet verified", "caption": None},
+        {"label": "Total homes", "value": total_display or "Not yet verified", "caption": count_assessment.note() if count_assessment else None},
         {"label": "Affordable homes", "value": affordable_value, "caption": affordable_caption},
         {"label": "Decision status", "value": decision_display, "caption": None},
         {"label": "Build status", "value": build_display, "caption": None},
@@ -555,6 +558,10 @@ def build_site_profile(
     # relationship - see app.ui.common.render_scheme_detail's own note).
     all_apps = list(site.applications)
     facts = build_operative_planning_facts(all_apps)
+    from app.reporting.scheme_reconciliation import count_assessment_for_facts
+    current_count = count_assessment_for_facts(facts)
+    merged = {**merged, "total_units_final": current_count.exact_value,
+              "total_units_is_estimated": current_count.precision == "APPROXIMATE"}
     consented = facts.consented_position
     active_positions = facts.active_positions
     _reconciliation_ran = bool(facts.resolved_applications)
@@ -659,7 +666,7 @@ def build_site_profile(
         latest_visual_evidence_at, visual_evidence_count,
     )
     evidence_gaps = build_evidence_gaps(merged, lapse, policy_rows, visual_evidence, ai_summary)
-    residential_mix = build_residential_mix(site, apps, rep_app=mix_rep_app)
+    residential_mix = build_residential_mix(site, all_apps, rep_app=mix_rep_app)
 
     # Operative total for the "Total homes" headline tile: the CONSENTED
     # approved figure where a consent exists; otherwise, ONLY when there is
@@ -668,18 +675,15 @@ def build_site_profile(
     # position's proposed figure. Reconciliation returns not_determined
     # (never a guess) when neither exists - the headline must reflect that,
     # never fall back to aggregate_scheme_fields (Gate 2B-1 Defect 2).
-    operative_total = None
-    operative_total_basis = None
-    operative_total_is_estimated = False
-    if consented.approved_units.state == FACT_RESOLVED:
-        operative_total, operative_total_basis = consented.approved_units.value, "approved"
-    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
-        operative_total = active_positions[0].proposed_units.value
-        operative_total_basis = "proposed"
-        operative_total_is_estimated = active_positions[0].proposed_units.confidence == "low"
-    operative_total_not_determined = bool(_reconciliation_ran and operative_total is None)
+    from app.reporting.scheme_reconciliation import count_assessment_for_facts
+    count_assessment = count_assessment_for_facts(facts)
+    operative_total = count_assessment.exact_value
+    operative_total_basis = count_assessment.basis
+    operative_total_is_estimated = count_assessment.precision == "APPROXIMATE"
+    operative_total_not_determined = operative_total is None
     headline_metrics = build_headline_metrics(
         merged, lapse, decision_status, residential_mix["affordable_headline"],
+        count_assessment=count_assessment,
         operative_total=operative_total, operative_total_is_estimated=operative_total_is_estimated,
         operative_total_basis=operative_total_basis,
         operative_total_not_determined=operative_total_not_determined,
@@ -689,6 +693,7 @@ def build_site_profile(
     return {
         "header": header,
         "headline_metrics": headline_metrics,
+        "count_assessment": count_assessment,
         "opportunity_position": opportunity_position,
         "policy_position": policy_position,
         "visual_evidence": visual_evidence,

@@ -49,6 +49,35 @@ semantics, not acquisition strategy, access control, AH policy or schema.
 
 ## Validation and data boundary
 
+## Bounded unit/phasing amendment (Product Owner approved 2026-10-05)
+
+Continuation base: `090fd06b4573fe82dd09d5460a17a109b07306d3`; preserve it.
+This amendment supersedes the count-agreement paragraph above where stated:
+
+- Resolve counts per subject/scope and metric. Whole-site selection never uses
+  a named child or a multi-phase application as a whole-site total. Scope names
+  do not prove containment, disjointness or saleability.
+- An approved variation can supersede only same-scope approved evidence with
+  an explicit reference link and supported chronology. Pending/refused counts
+  do not change approved counts. Recency alone does not prove supersession.
+- Use a derived EXACT/APPROXIMATE/RANGE/UNKNOWN assessment carrying provenance,
+  bounds, scope, metric, precision and separate confidence. Only the explicitly
+  accepted same-current-scope set {100,101,102} gets the ~100 discovery treatment;
+  no general tolerance is invented. Other differing point counts remain conflict.
+  Source-supported ranges can be represented without inventing a range from conflict.
+- Strict point inputs remain absent for approximate/range/conflict assessments.
+  Explicit hard-bound checks use evidence bounds, never the rounded label.
+  Existing buyer soft preferences can retain uncertain discovery leads; buyer
+  total/affordable metric choice remains unchanged. No mandate schema change.
+- Profile, Explore, reviewed cards/matching/universe and exports share this
+  assessment. Unresolved approved evidence cannot fall back to a live proposal.
+- Retain every eligible phase subject before normal feed limits. Never sum
+  multiple phases without explicit non-overlap evidence; keep individual rows.
+- Tenure figures must share subject/version before forming a combined breakdown.
+  Existing AH qualification/security remains authoritative and unchanged.
+- No schema migration, persisted hierarchy/package model or Level 2 agent.
+  Unknown relationships stay unknown. Any need for those changes returns to REVIEW.
+
 Test deterministic consumers with synthetic adversarial fixtures and offline
 SQLite. Historical site 491/allocation 45 are reported observations, not invented
 production fixtures. Local reproduction of their failure modes verifies code

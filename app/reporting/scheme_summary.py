@@ -157,17 +157,8 @@ def build_summary_prompt(
         operative_status_text = "not yet determined from the evidence held - do not state a planning outcome that isn't shown above."
     else:
         operative_status_text = OPERATIVE_DECISION_STATUS_LABELS[filter_facts.decision_status]
-    if filter_facts.units is not None:
-        scope_units_text = f"{filter_facts.units} total units ({filter_facts.units_source} position)"
-    elif filter_facts.units_not_determined:
-        scope_units_text = "not yet determined from the evidence held - do not state a unit total that isn't shown above"
-    else:
-        # Reconciliation could not run at all (e.g. genuinely no linked
-        # applications) - the only case the legacy merged figure still
-        # stands in for, per the "no fallback after NOT_DETERMINED" rule
-        # (this fallback is for "never ran", never for "ran and found
-        # nothing").
-        scope_units_text = f"{merged.get('total_units_final')} total units (not yet reconciled)"
+    scope_units_text = filter_facts.count_assessment.label() + " " + filter_facts.count_assessment.note()
+
 
     return f"""
 You are writing an internal status note for a UK residential land/planning

@@ -296,6 +296,7 @@ with page_scope():
                         "affordable_percentage_final": filter_facts.affordable_assessment.reported_percentage},
                 lapse=lapse, decision_status=None,
                 local_plan_status=_local_plan_headline_text(local_plan_by_site.get(site.id, [])),
+                count_assessment=filter_facts.count_assessment,
                 operative_total_units=filter_facts.units,
                 operative_total_units_not_determined=filter_facts.units_not_determined,
                 operative_decision_status=decision_status_label,
@@ -317,6 +318,7 @@ with page_scope():
                 # plain number, None when reconciliation ran and genuinely found
                 # none (never a fabricated figure).
                 "Total Units": filter_facts.units,
+                **filter_facts.count_assessment.report_columns(),
                 # True when the resolved figure came from a lower-confidence source
                 # (an active proposal's own extraction, not yet AI-verified to the
                 # same standard as a granted consent) - same boolean shape as
@@ -629,6 +631,7 @@ with page_scope():
                     "Address": site.display_address,
                     "References": ", ".join(sorted(a.reference for a in apps)),
                     "Total Units": report_filter_facts.units,
+                    **report_filter_facts.count_assessment.report_columns(),
                     "Units Estimated": report_filter_facts.units_is_estimated,
                     "Has Active Proposal": report_filter_facts.has_active_proposal,
                     "Active Proposals": report_filter_facts.active_proposal_count,
@@ -911,6 +914,8 @@ with page_scope():
             "Latest Status": "Planning Status", "Decision Status": "Decision", "Portal URL": "Planning portal",
         })
 
+        _display["Units"] = _display["Count Display"]
+
         # Desktop table (Part 17/18/19) - a deliberately short column set: Tenure
         # Split, Units Estimated, Housing Type Note, Landowner, Planning Agent,
         # Housing Association/RP, Data Quality and Needs Review are Part 17's
@@ -963,7 +968,7 @@ with page_scope():
                     # NaN included), which crashed a bare int(NaN). pd.notna() is
                     # the correct missing-value check here.
                     if pd.notna(row["Units"]):
-                        meta_bits.append(f"{int(row['Units']):,} units")
+                        meta_bits.append(str(row["Units"]))
                     from app.reporting.ah_kpi import affordable_count_kpi
                     assessment = row["_ah_assessment"]
                     st.metric("Affordable homes", affordable_count_kpi(assessment))

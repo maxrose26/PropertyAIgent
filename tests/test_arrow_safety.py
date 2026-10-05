@@ -21,7 +21,7 @@ import pyarrow as pa
 import pytest
 from streamlit import dataframe_util
 
-from app.db.models import Application, Site
+from app.db.models import Application, Site, SchemeIntelligence
 from app.pipeline.phase_tracking import PHASE_STATUS_LABELS, build_phase_breakdown
 from app.ui.shell import arrow_safe_count
 
@@ -77,12 +77,16 @@ def _mixed_unit_count_site(session) -> Site:
     conversion before this fix, reproduced with a real Application/Site
     fixture rather than a hand-built dict."""
     site = _make_site(session)
-    _make_app(
+    counted = _make_app(
         session, site.id, "REF/1A",
         proposal="Reserved matters application for Phase 1A for the erection of 245 dwellings",
         decision="Granted", status="Decided", decision_issued_date="2024-01-10",
         application_category="reserved_matters",
     )
+    # Amendment: exact qualification now needs an extracted count. Keep the
+    # real int/None Arrow regression; portal-only estimates have separate tests.
+    session.add(SchemeIntelligence(application_id=counted.id, total_units_final=245))
+    session.commit()
     _make_app(
         session, site.id, "REF/2",
         proposal="Outline application for Phase 2 residential development",

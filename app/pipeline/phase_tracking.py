@@ -91,40 +91,21 @@ def compute_phase_progress(applications: list[Application]) -> dict:
 
 
 def _phase_unit_count(apps: list[Application]) -> dict:
-    """A single-scope count only when the eligible source counts agree.
-
-    Administrative and multi-phase filings cannot supply this scope's total.
-    Conflicting extracted counts, or conflicting portal-only counts, remain
-    unknown. This layer does not invent a supersession relationship.
-    """
-    substantive = [
-        a for a in apps
-        if a.application_category not in EXCLUDE_CATEGORIES
-        and len(extract_phase_labels(a.proposal) or extract_phase_labels(a.address)) == 1
-    ]
-
-    from app.reporting.commercial_evidence import known_unit_count
-    unknown = {"unit_count": None, "unit_count_source": None, "unit_count_application": None}
-    # This helper also decides plot scope, so cannot call scheme reconciliation
-    # (which itself calls this helper). Require agreement among scoped extracted
-    # counts; do not choose the first/largest or invent supersession.
-    documented = [(known_unit_count(a.scheme_intelligence.total_units_final), a)
-                  for a in substantive if a.scheme_intelligence
-                  and a.scheme_intelligence.total_units_final is not None]
-    if documented:
-        distinct = {n for n, _ in documented}
-        if None in distinct or len(distinct) != 1:
-            return unknown
-        n = next(iter(distinct))
-        app = min((a for _, a in documented), key=lambda a: a.reference)
-        return {"unit_count": n, "unit_count_source": "documents", "unit_count_application": app}
-    candidates = [(known_unit_count(n), a) for a in substantive for n in extract_unit_counts(a.proposal)]
-    distinct = {n for n, _ in candidates if n is not None}
-    if len(distinct) == 1:
-        n = next(iter(distinct))
-        app = min((a for value, a in candidates if value == n), key=lambda a: a.reference)
-        return {"unit_count": n, "unit_count_source": "portal_text", "unit_count_application": app}
-    return unknown
+    """Use the same approved/proposed scope contract as every other consumer."""
+    from app.reporting.scheme_reconciliation import scoped_count_assessment
+    from app.reporting.residential_count import CountAssessment
+    eligible = [a for a in apps if len(extract_phase_labels(a.proposal) or extract_phase_labels(a.address)) == 1]
+    labels = {tuple(extract_phase_labels(a.proposal) or extract_phase_labels(a.address))[0] for a in eligible}
+    if len(labels) != 1:
+        assessment = CountAssessment("unclear", "Unresolved phase scope")
+    else:
+        code, kind = next(iter(labels))
+        assessment = scoped_count_assessment(eligible, kind, f"{kind.title()} {code}")
+    source_ids = {p.application_id for p in assessment.sources}
+    source_app = next((a for a in eligible if a.id in source_ids), None)
+    return {"unit_count": assessment.exact_value, "unit_count_source": ("portal_text" if assessment.resolution == "portal_estimate" else "documents") if source_app else None,
+            "unit_count_application": source_app, "count_assessment": assessment,
+            "count_display": assessment.label(), "count_note": assessment.note()}
 
 
 def is_material_development_parcel(applications: list[Application], *, threshold: int = 10) -> bool:
@@ -156,7 +137,16 @@ def is_material_development_parcel(applications: list[Application], *, threshold
     filter, and/or naming several plots at once, already excluded by its
     single-label filter) never does. No LLM, no token-shape guessing."""
     result = _phase_unit_count(applications)
-    return result["unit_count"] is not None and result["unit_count"] >= threshold
+    if result["unit_count"] is not None:
+        return result["unit_count"] >= threshold
+    # Existing portal text can establish parcel scale for GROUPING only; it does
+    # not become a verified count in matching. Administrative/multi-label rows
+    # cannot promote individual plots into acquisition scopes.
+    from app.reporting.scheme_reconciliation import resolve_planning_role, SUBSTANTIVE_ROLES
+    counts = {n for a in applications if resolve_planning_role(a) in SUBSTANTIVE_ROLES
+              and len(extract_phase_labels(a.proposal) or extract_phase_labels(a.address)) == 1
+              for n in extract_unit_counts(a.proposal)}
+    return len(counts) == 1 and next(iter(counts)) >= threshold
 
 
 def group_applications_by_operative_scope(
@@ -214,7 +204,7 @@ def build_phase_breakdown(applications: list[Application]) -> list[dict]:
     a plot is a single dwelling (or a handful) within a phase, not its own
     deliverable unit count worth surfacing separately."""
     groups = group_applications_by_phase(applications)
-    if len(groups) <= 1:
+    if len(groups) <= 1 and all(code == UNPHASED_LABEL for code, _ in groups):
         return []
 
     breakdown = []
@@ -275,7 +265,8 @@ def build_acquisition_scope_breakdown(applications: list[Application]) -> list[d
     exactly the same "does this site have any phase/plot activity worth
     resolving at all" bar build_phase_breakdown already applies, while
     still folding/resolving the groups that make it through."""
-    if len(group_applications_by_phase(applications)) <= 1:
+    raw_groups = group_applications_by_phase(applications)
+    if len(raw_groups) <= 1 and all(code == UNPHASED_LABEL for code, _ in raw_groups):
         return []
     groups = group_applications_by_operative_scope(applications)
 
@@ -292,7 +283,7 @@ def build_acquisition_scope_breakdown(applications: list[Application]) -> list[d
     return breakdown
 
 
-def summarize_phase_units(breakdown: list[dict]) -> dict:
+def summarize_phase_units(breakdown: list[dict], *, non_overlap_evidence: tuple = ()) -> dict:
     """Roll named phases (not plots, not the unphased bucket - see
     build_phase_breakdown's own unit-count scoping) up into three buckets by
     build status: units already underway, units approved but not yet
@@ -311,10 +302,17 @@ def summarize_phase_units(breakdown: list[dict]) -> dict:
 
     def _bucket(status: str) -> dict:
         rows = [p for p in phases if p["status"] == status]
-        known = [p["unit_count"] for p in rows if p.get("unit_count")]
+        known = [p["unit_count"] for p in rows if p.get("unit_count") is not None]
+        # Explicit pair evidence: (left code, right code, provenance). No
+        # production adapter invents this from labels/application IDs/dates.
+        pairs = {frozenset((left, right)) for left, right, source in non_overlap_evidence if source}
+        disjoint = len({r["code"] for r in rows}) == len(rows) and all(frozenset((a["code"], b["code"])) in pairs
+                       for i, a in enumerate(rows) for b in rows[i + 1:])
+        aggregate = sum(known) if known and disjoint and len(known) == len(rows) else None
         return {
             "phase_count": len(rows),
-            "units": sum(known) if known else None,
+            "units": aggregate,
+            "aggregation_state": "resolved" if aggregate is not None else "overlap_or_count_unverified",
             "phases_with_known_units": len(known),
             "phases": rows,
         }

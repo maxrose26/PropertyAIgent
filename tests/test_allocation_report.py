@@ -169,6 +169,7 @@ def test_development_coverage_and_residual_capacity_with_identified_activity(ses
     site = _make_site(session)
     _make_relationship(session, allocation.id, site.id)
     app = _make_app(session, site.id, reference="APP/1")
+    app.proposal = "Full application for residential development"  # synthetic substantive scope evidence
     session.add(SchemeIntelligence(application_id=app.id, total_units_final=300, core_intelligence_complete=True))
     session.commit()
 
@@ -334,6 +335,7 @@ def test_needs_confirmation_relationship_forces_review_required_coverage_not_a_c
     site = _make_site(session)
     _make_relationship(session, allocation.id, site.id, review_status="needs_confirmation")
     app = _make_app(session, site.id, reference="APP/1")
+    app.proposal = "Full application for residential development"  # synthetic substantive scope evidence
     session.add(SchemeIntelligence(application_id=app.id, total_units_final=300, core_intelligence_complete=True))
     session.commit()
 
@@ -549,6 +551,7 @@ def test_review_required_residual_capacity_excluded_from_the_residual_aggregate(
     site = _make_site(session)
     _make_relationship(session, allocation.id, site.id, review_status="needs_confirmation")
     app = _make_app(session, site.id, reference="APP/1")
+    app.proposal = "Full application for residential development"  # synthetic substantive scope evidence
     session.add(SchemeIntelligence(application_id=app.id, total_units_final=300, core_intelligence_complete=True))
     session.commit()
 

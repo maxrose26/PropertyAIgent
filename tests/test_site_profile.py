@@ -145,7 +145,7 @@ def test_build_site_profile_withdrawn_only_site_shows_not_verified_total(session
         decision_status=classify_decision_status(rep_app.decision, rep_app.status),
     )
     total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
-    assert total_tile["value"] == "Not yet verified"
+    assert total_tile["value"] == "Unit count unverified"
     rec = view["scheme_reconciliation"]
     assert rec["consented_position"]["approved_units"]["state"] == "not_determined"
     assert rec["active_positions"] == []  # withdrawn is neither consented nor active
@@ -233,7 +233,7 @@ def test_build_site_profile_eia_screening_only_site_has_no_substantive_headline(
         decision_status=classify_decision_status(rep_app.decision, rep_app.status),
     )
     total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
-    assert total_tile["value"] == "Not yet verified"
+    assert total_tile["value"] == "Unit count unverified"
     assert view["header"]["planning_status_label"] is None  # NOT "Decided"
     assert view["header"]["operative_permission_reference"] is None
     rec = view["scheme_reconciliation"]

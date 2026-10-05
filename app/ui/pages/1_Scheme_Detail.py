@@ -92,6 +92,13 @@ with page_scope():
             st.info(origin["limitation"])
             if origin["requested_phase"]:
                 st.caption("Requested opportunity scope: " + origin["requested_phase"])
+                from app.pipeline.phase_tracking import build_acquisition_scope_breakdown
+                selected_scope = next((p for p in build_acquisition_scope_breakdown(list(site.applications))
+                                       if p["code"] == phase_code), None)
+                if selected_scope and selected_scope.get("count_assessment"):
+                    scoped_count = selected_scope["count_assessment"]
+                    st.write(f"{selected_scope['label']}: {scoped_count.label()}")
+                    st.caption(scoped_count.note() or "Planning evidence subject; package availability unverified.")
             if origin["reference"]:
                 st.write("Originating planning reference: " + origin["reference"])
             if origin["source_url"]:

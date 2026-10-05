@@ -65,6 +65,7 @@ def _make_application(session, council_code: str, reference: str, site_id: int |
     app = Application(
         council_code=council_code, reference=reference, site_id=site_id,
         estimated_unit_count=estimated_unit_count, application_received=received,
+        proposal="Full application for residential development",
     )
     session.add(app)
     session.flush()
@@ -286,7 +287,9 @@ def test_representative_application_prefers_complete_extraction(session):
     session.commit()
 
     summary = summarise_site_activity(site, [app_incomplete, app_complete])
-    assert summary.capacity == 150
+    # Representative display identity remains; conflicting totals cannot become
+    # allocation coverage merely because one extraction finished first.
+    assert summary.capacity is None and not summary.capacity_known
     assert summary.representative_application.id == app_complete.id
 
 

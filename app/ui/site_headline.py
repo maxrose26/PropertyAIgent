@@ -42,6 +42,7 @@ def build_site_headline(
     operative_total_units: int | None = None,
     operative_total_units_not_determined: bool = False,
     operative_decision_status: str | None = None,
+    count_assessment=None,
 ) -> dict:
     """Pure - shapes already-computed values into a stable headline dict.
     Every field is either a real value or None - never a placeholder string
@@ -93,6 +94,7 @@ def build_site_headline(
         else (DECISION_STATUS_LABELS.get(decision_status) if decision_status else None)
     )
     return {
+        **({"count_display": count_assessment.label(), "count_note": count_assessment.note()} if count_assessment else {}),
         "site_id": site_id,
         "address": address or None,
         "council": council_label or None,
@@ -150,7 +152,11 @@ def format_site_tooltip(headline: dict) -> str:
     if headline.get("council"):
         lines.append(_clean_text(headline["council"], max_length=50))
 
-    if headline.get("total_units") is not None:
+    if headline.get("count_display"):
+        lines.append(headline["count_display"])
+        if headline.get("count_note"):
+            lines.append(headline["count_note"])
+    elif headline.get("total_units") is not None:
         n = headline["total_units"]
         text = f"{n} unit{'s' if n != 1 else ''}"
         if headline.get("units_estimated"):

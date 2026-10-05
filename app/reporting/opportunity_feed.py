@@ -190,7 +190,7 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
         "signal": None,
         "signal_label": None,
         "headline_reason": card["reason"],
-        "metrics": [("Status", card["metric"])],
+        "metrics": [("Status", card["metric"])] + ([("Scale", card["count_assessment"].label())] if card.get("count_assessment") else []),
         "tags": [OPPORTUNITY_TYPE_LABELS[opportunity_type], *extra_tags],
         "page": card["page"],
         "params": site_destination(card["params"]["site_id"], phase_code=card.get("phase_code"), application_reference=card.get("application_reference") or card.get("reference")) if card.get("params", {}).get("site_id") else card["params"],
@@ -199,6 +199,7 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
         "application_reference": card.get("application_reference") or card.get("reference"),
         "phase_code": card.get("phase_code"),
         "phase_unit_count": card.get("phase_unit_count"),
+        "count_assessment": card.get("count_assessment"),
     }
 
 
@@ -256,17 +257,27 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
         phase_code = card.get("phase_code")
         key = (site_id, reference, phase_code)
         if key not in facts_by_context:
+            operative = operative_by_site[site_id]
+            assessment = card.get("count_assessment")
+            if phase_code and assessment is not None:
+                from app.reporting.scheme_reconciliation import planning_facts_for_scope
+                operative = planning_facts_for_scope(operative, assessment.scope_type, assessment.scope_label)
             facts = build_planning_delivery_matching_facts_from_operative(
-                operative_by_site[site_id], apps_by_site[site_id], application_reference=reference)
+                operative, apps_by_site[site_id], application_reference=reference)
             if phase_code:
                 from dataclasses import replace
                 from app.pipeline.phase_tracking import UNPHASED_LABEL
                 from app.reporting.commercial_evidence import known_unit_count
                 scoped_units = facts.unit_count if phase_code == UNPHASED_LABEL else known_unit_count(card.get("phase_unit_count"))
-                facts = replace(facts, unit_count=scoped_units, affordable_unit_count=None, affordable_percentage=None,
+                facts = replace(facts, unit_count=scoped_units, count_assessment=card.get("count_assessment") if phase_code != UNPHASED_LABEL else facts.count_assessment, affordable_unit_count=None, affordable_percentage=None,
                                 affordable_percentage_trusted=False)
             facts_by_context[key] = facts
         card["matching_facts"] = facts_by_context[key]
+        card["count_assessment"] = facts_by_context[key].count_assessment
+        assessment = card["count_assessment"]
+        if assessment is not None:
+            card["metrics"] = [(k, v) for k, v in card.get("metrics", []) if k not in ("Scale", "Count evidence")] + [("Scale", assessment.label()), ("Count evidence", assessment.note())]
+            card["count_note"] = assessment.note()
 
 
 def _generic_selection(strategic: list[dict], delivery: list[dict], limit: int) -> list[dict]:
@@ -460,6 +471,7 @@ def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None
     }
 
     if buyer_key is None:
+        _attach_planning_delivery_matching_facts(session, delivery)
         ordered = _generic_selection(strategic, delivery, limit)
     else:
         ordered, buyer_counts = _buyer_selection(session, strategic, delivery, limit, buyer_key)
