@@ -322,7 +322,7 @@ def resolve_planning_role(app: Application) -> str:
     ):
         return ROLE_CONDITION_DISCHARGE
 
-    if category == "variation_or_amendment" or any(
+    if category == "variation_or_amendment" or "section 73" in text or text.startswith("s73 ") or any(
         k in app_type for k in ("non-material amendment", "non material amendment", "section 73", "s73",
                                 "variation of condition", "removal of condition", "minor material amendment")
     ):
@@ -465,6 +465,7 @@ class OperativeFact:
     confidence: str = "none"  # high | medium | low | none
     reason: str = ""
     conflicts: tuple[FactPosition, ...] = ()
+    count_assessment: object = None
 
     @property
     def determined(self) -> bool:
@@ -535,6 +536,7 @@ class OperativePlanningFacts:
     active_positions: tuple[ActivePosition, ...]
     affordable_housing: AffordableHousingSummary
     scope_note: str
+    selected_scope: tuple[str, str] | None = None
 
 
 # --- Ranking helpers --------------------------------------------------
@@ -565,13 +567,19 @@ def _position(rs: ResolvedApplication, value: object) -> FactPosition:
 def _scheme_total_units(rs: ResolvedApplication) -> int | None:
     si = rs.scheme
     if si is not None and si.total_units_final is not None:
-        return int(si.total_units_final)
+        from app.reporting.commercial_evidence import known_unit_count
+        return known_unit_count(si.total_units_final)
     return None
 
 
 def _portal_estimated_units(rs: ResolvedApplication) -> int | None:
     v = rs.application.estimated_unit_count
-    return int(v) if v is not None else None
+    from app.reporting.commercial_evidence import known_unit_count
+    if v is not None:
+        return known_unit_count(v)
+    from app.scrapers.unit_filter import extract_unit_counts
+    counts = {known_unit_count(n) for n in extract_unit_counts(rs.application.proposal)}
+    return next(iter(counts)) if len(counts) == 1 and None not in counts else None
 
 
 def _s73_addresses_units(rs: ResolvedApplication) -> bool:
@@ -611,7 +619,7 @@ def _resolve_reference_and_status(resolved: list[ResolvedApplication]) -> tuple[
         superseded = [g for g in granted if g.id != lead.id]
         reason = f"latest granted substantive application ({lead.role})"
         if superseded:
-            reason += f"; supersedes {', '.join(g.reference for g in superseded)}"
+            reason += f"; other granted applications retained: {', '.join(g.reference for g in superseded)}"
         ref_fact = OperativeFact(
             fact="consented_reference", state=FACT_RESOLVED, value=lead.reference,
             source=_position(lead, lead.reference), confidence="high", reason=reason,
@@ -743,69 +751,104 @@ def resolve_operative_lapse_anchor(applications: list[Application]) -> Operative
     )
 
 
+def _count_fact(assessment, *, name="approved_residential_units"):
+    """Exact-only compatibility fact; discovery retains its own assessment."""
+    from app.reporting.residential_count import CountAssessment
+    value = assessment.exact_value
+    conflict = assessment.resolution in ("material_conflict", "immaterial_variance", "malformed_evidence")
+    return OperativeFact(
+        fact=name, state=FACT_RESOLVED if value is not None else FACT_CONFLICT if conflict else FACT_NOT_DETERMINED,
+        value=value, source=assessment.sources[0] if value is not None and assessment.sources else None,
+        confidence=assessment.confidence, reason=assessment.note() or assessment.resolution,
+        conflicts=assessment.sources if conflict else (), count_assessment=assessment,
+    )
+
+
 def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[OperativeFact, tuple[FactPosition, ...]]:
-    """Approved residential units, where consent exists. Eligible sources:
-    granted substantive applications, plus an S73/variation ONLY where it
-    demonstrably addresses units (safeguard). Returns (operative fact,
-    superseded positions)."""
-    eligible = [
-        r for r in resolved
-        if (r.is_substantive and r.decided_state == DECIDED_GRANTED and _scheme_total_units(r) is not None)
-        or _s73_addresses_units(r)
-    ]
-    if not eligible:
-        any_grant = any(r.is_substantive and r.decided_state == DECIDED_GRANTED for r in resolved)
-        return (
-            OperativeFact(
-                fact="approved_residential_units", state=FACT_NOT_DETERMINED,
-                reason=("a substantive permission is granted but no residential unit figure has been extracted from it"
-                        if any_grant else "no granted substantive application - no approved unit count exists yet"),
-            ),
-            (),
-        )
+    """Approved, scope-local evidence. Dates never establish supersession alone."""
+    import re
+    from app.reporting.residential_count import assess_positions
+    scopes = {(r.scope_type, r.scope_label) for r in resolved}
+    scope_type, scope_label = next(iter(scopes)) if len(scopes) == 1 else (SCOPE_UNCLEAR, "Whole site")
+    eligible = [r for r in resolved if r.decided_state == DECIDED_GRANTED
+                and (r.is_substantive or _s73_addresses_units(r))]
+    # An explicit variation reference plus chronology establishes which SAME
+    # scope consent is varied. Unknown links do not supersede another figure.
+    superseded_ids = set()
+    for variation in eligible:
+        if variation.role != ROLE_S73_VARIATION or not variation.decision_date:
+            continue
+        for base in eligible:
+            if base.id == variation.id or (base.scope_type, base.scope_label) != (variation.scope_type, variation.scope_label):
+                continue
+            linked = re.search(r"(?<![A-Za-z0-9/])" + re.escape(base.reference) + r"(?![A-Za-z0-9/])",
+                               variation.application.proposal or "", re.I)
+            if linked and base.decision_date and variation.decision_date > base.decision_date:
+                superseded_ids.add(base.id)
+    superseded = tuple(_position(r, _scheme_total_units(r)) for r in eligible
+                       if r.id in superseded_ids and _scheme_total_units(r) is not None)
+    current = [r for r in eligible if r.id not in superseded_ids]
+    # Preserve malformed extracted evidence rather than hiding it with a valid peer.
+    positions = [_position(r, r.scheme.total_units_final) for r in current
+                 if r.scheme is not None and r.scheme.total_units_final is not None]
+    estimated = not positions
+    if estimated:
+        positions = [_position(r, _portal_estimated_units(r)) for r in current if r.is_substantive and _portal_estimated_units(r) is not None]
+    subject = f"site:{resolved[0].application.site_id}:{scope_type}:{scope_label}" if resolved else ""
+    assessment = assess_positions(positions, scope_type=scope_type, scope_label=scope_label,
+                                  subject_id=subject, basis="consented", superseded=superseded,
+                                  metric="all_use_units" if _has_specialist_component(current, None) else "total_residential")
+    if estimated and assessment.precision in ("EXACT", "APPROXIMATE"):
+        from dataclasses import replace
+        assessment = replace(assessment, precision="APPROXIMATE", lower=None, upper=None,
+                             resolution="portal_estimate", confidence="low")
+    return _count_fact(assessment), superseded
 
-    def rank(r: ResolvedApplication) -> tuple:
-        return (r.role == ROLE_S73_VARIATION, r.decision_date or dt.date.min, r.received, r.id)
 
-    ranked = sorted(eligible, key=rank, reverse=True)
-    operative = ranked[0]
-    op_value = _scheme_total_units(operative)
+def _site_scope_rows(resolved):
+    """Site context never borrows a named child or a multi-scope application's count."""
+    return [r for r in resolved if r.scope_type in (SCOPE_WHOLE_SITE, SCOPE_UNCLEAR)]
 
-    same_scope_top = [
-        r for r in ranked
-        if r.scope_type == operative.scope_type and r.scope_label == operative.scope_label
-        and (r.decision_date or dt.date.min) == (operative.decision_date or dt.date.min)
-        and (r.role == ROLE_S73_VARIATION) == (operative.role == ROLE_S73_VARIATION)
-    ]
-    distinct = {_scheme_total_units(r) for r in same_scope_top}
-    if len(distinct) > 1:
-        positions = tuple(_position(r, _scheme_total_units(r)) for r in same_scope_top)
-        return (
-            OperativeFact(
-                fact="approved_residential_units", state=FACT_CONFLICT, conflicts=positions,
-                reason="two equally-authoritative applications state different approved unit counts for the same "
-                       "scope and neither supersedes the other - manual verification required",
-            ),
-            (),
-        )
 
-    superseded = tuple(
-        _position(r, _scheme_total_units(r))
-        for r in ranked[1:]
-        if _scheme_total_units(r) is not None and _scheme_total_units(r) != op_value
-    )
-    reason = f"granted {operative.role} {operative.reference}"
-    if operative.role == ROLE_S73_VARIATION:
-        reason = f"S73/variation {operative.reference} carries its own extracted unit figure - it varies the approved count"
-    if superseded:
-        reason += f"; earlier/other figures ({', '.join(str(p.value) for p in superseded)}) retained as superseded"
-    return (
-        OperativeFact(
-            fact="approved_residential_units", state=FACT_RESOLVED, value=op_value,
-            source=_position(operative, op_value), confidence="high", reason=reason,
-        ),
-        superseded,
-    )
+def count_assessment_for_facts(facts):
+    """One read contract shared by profile, search, matching and export.
+
+    The existence of approved evidence blocks proposed fallback even when that
+    approved count is missing/conflicting. A named active scope cannot fill a
+    whole-site count. Explicit phase callers use scoped_count_assessment.
+    """
+    from app.reporting.residential_count import CountAssessment
+    rows = list(facts.resolved_applications) if facts.selected_scope else _site_scope_rows(list(facts.resolved_applications))
+    approved = facts.consented_position.approved_units.count_assessment
+    if any(r.decided_state == DECIDED_GRANTED and (r.is_substantive or r.role == ROLE_S73_VARIATION) for r in rows):
+        return approved or CountAssessment(SCOPE_UNCLEAR, "Whole site")
+    active = [p for p in facts.active_positions if facts.selected_scope or p.scope_type in (SCOPE_WHOLE_SITE, SCOPE_UNCLEAR)]
+    if len(active) == 1 and active[0].proposed_units.count_assessment is not None:
+        return active[0].proposed_units.count_assessment
+    return approved or CountAssessment(SCOPE_UNCLEAR, "Whole site")
+
+
+def planning_facts_for_scope(facts, scope_type, scope_label):
+    """Explicit existing evidence subject, never a fabricated saleable package."""
+    from dataclasses import replace
+    rows = [r for r in facts.resolved_applications if (r.scope_type, r.scope_label) == (scope_type, scope_label)]
+    return replace(facts, resolved_applications=tuple(rows), selected_scope=(scope_type, scope_label),
+                   consented_position=_resolve_consented_position(rows, scoped=True),
+                   active_positions=_resolve_active_positions(rows))
+
+
+def scoped_count_assessment(applications, scope_type, scope_label):
+    """Called after grouping, including plot materiality: no recursive grouping."""
+    rows = [ResolvedApplication(a, resolve_planning_role(a), resolve_decided_state(a), scope_type, scope_label)
+            for a in applications]
+    approved, _ = _resolve_approved_units(rows)
+    if any(r.decided_state == DECIDED_GRANTED and (r.is_substantive or r.role == ROLE_S73_VARIATION) for r in rows):
+        return approved.count_assessment
+    live = [r for r in rows if (r.is_substantive or r.role == ROLE_S73_VARIATION)
+            and r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)]
+    if live:
+        return _build_active_position(live, scope_type, scope_label).proposed_units.count_assessment
+    return approved.count_assessment
 
 
 def _has_specialist_component(resolved: list[ResolvedApplication], operative_source_id: int | None) -> bool:
@@ -899,7 +942,8 @@ def _resolve_all_use_total(approved_or_proposed: OperativeFact, basis: str) -> O
     )
 
 
-def _resolve_consented_position(resolved: list[ResolvedApplication]) -> ConsentedPosition:
+def _resolve_consented_position(resolved: list[ResolvedApplication], *, scoped=False) -> ConsentedPosition:
+    resolved = resolved if scoped else _site_scope_rows(resolved)
     reference, status = _resolve_reference_and_status(resolved)
     approved, superseded = _resolve_approved_units(resolved)
     all_use = _resolve_all_use_total(approved, "approved")
@@ -937,21 +981,19 @@ def _build_active_position(group: list[ResolvedApplication], scope_type: str, sc
                + (" - recommendation is never treated as permission" if lead.decided_state == DECIDED_RECOMMENDATION_ONLY else ""),
     )
 
-    if lead not in with_fig:
-        proposed = OperativeFact(
-            fact="proposed_residential_units", state=FACT_NOT_DETERMINED,
-            reason=f"a substantive application is live in scope {scope_label} but no residential unit figure has "
-                   f"been extracted or estimated for it yet",
-        )
-    else:
-        extracted = _scheme_total_units(lead)
-        value = extracted if extracted is not None else _portal_estimated_units(lead)
-        proposed = OperativeFact(
-            fact="proposed_residential_units", state=FACT_RESOLVED, value=value,
-            source=_position(lead, value), confidence="high" if extracted is not None else "low",
-            reason=(f"most recent live substantive application in scope {scope_label}: {lead.reference}"
-                    + ("" if extracted is not None else " (portal-listing estimate only - not document-verified)")),
-        )
+    from dataclasses import replace
+    from app.reporting.residential_count import assess_positions
+    extracted_rows = [r for r in group if r.scheme is not None and r.scheme.total_units_final is not None]
+    positions = [_position(r, r.scheme.total_units_final) for r in extracted_rows]
+    if not positions:
+        positions = [_position(r, _portal_estimated_units(r)) for r in group if _portal_estimated_units(r) is not None]
+    assessment = assess_positions(positions, scope_type=scope_type, scope_label=scope_label,
+                                  subject_id=f"site:{lead.application.site_id}:{scope_type}:{scope_label}",
+                                  basis="active", confidence="high" if extracted_rows else "low",
+                                  metric="all_use_units" if _has_specialist_component(group, None) else "total_residential")
+    if not extracted_rows and assessment.precision == "EXACT":
+        assessment = replace(assessment, precision="APPROXIMATE", lower=None, upper=None, resolution="portal_estimate")
+    proposed = _count_fact(assessment, name="proposed_residential_units")
 
     all_use = _resolve_all_use_total(proposed, "proposed")
     residential_only = _resolve_residential_only([lead], proposed)
@@ -968,7 +1010,7 @@ def _resolve_active_positions(resolved: list[ResolvedApplication]) -> tuple[Acti
     """Gate 2B-2A Section 7 - zero, one, or several simultaneous active
     substantive planning proposals, one per distinct scope. Never reduced
     to a single "most recent" answer across scopes."""
-    live = [r for r in resolved if r.is_substantive and r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)]
+    live = [r for r in resolved if (r.is_substantive or r.role == ROLE_S73_VARIATION) and r.decided_state in (DECIDED_UNDETERMINED, DECIDED_RECOMMENDATION_ONLY)]
     if not live:
         return ()
     by_scope: dict[tuple[str, str], list[ResolvedApplication]] = {}
@@ -1052,6 +1094,8 @@ def _resolve_scopes(applications: list[Application]) -> dict[int, tuple[str, str
             code, kind = labels[0]
             stype = SCOPE_PHASE if kind == "phase" else SCOPE_PLOT
             out[a.id] = (stype, f"{'Phase' if kind == 'phase' else 'Plot'} {code}")
+        elif len(labels) > 1:
+            out[a.id] = ("multiple_scopes", "Multiple named scopes (extent unverified)")
         elif named:
             out[a.id] = (SCOPE_WHOLE_SITE, "Whole site")
         else:
@@ -1173,6 +1217,7 @@ class OperativeFilterFacts:
     affordable_percentage_reconciles: bool = True
     affordable_assessment: object = None
     other_application_ah_reports: str = ""
+    count_assessment: object = None
 
 
 def _resolve_units_from_units_facts(residential: OperativeFact, all_use: OperativeFact) -> tuple[int | None, str | None, bool]:
@@ -1184,10 +1229,13 @@ def _resolve_units_from_units_facts(residential: OperativeFact, all_use: Operati
     existing Gate 2B-1 "no new inference" safeguard correctly withholds a
     residential-only figure) - never fabricates a residential split that
     isn't there. Returns (value, kind, is_estimated)."""
+    from app.reporting.commercial_evidence import known_unit_count
+    if residential.state == FACT_CONFLICT:
+        return None, None, False
     if residential.state == FACT_RESOLVED:
-        return residential.value, "residential", residential.confidence == "low"
+        return known_unit_count(residential.value), "residential", residential.confidence == "low"
     if all_use.state == FACT_RESOLVED:
-        return all_use.value, "all_use", all_use.confidence == "low"
+        return known_unit_count(all_use.value), "all_use", all_use.confidence == "low"
     return None, None, False
 
 
@@ -1248,15 +1296,11 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts, *, application
     if decision_status is None:
         decision_status = NOT_DETERMINED_DECISION_STATUS
 
-    units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
-        consented.residential_only_units, consented.all_use_total_units,
-    )
-    units_source: str | None = "consented" if units is not None else None
-    if units is None and len(active_positions) == 1:
-        units, units_kind, units_is_estimated = _resolve_units_from_units_facts(
-            active_positions[0].residential_only_units, active_positions[0].all_use_total_units,
-        )
-        units_source = "active" if units is not None else None
+    count_assessment = count_assessment_for_facts(facts)
+    units = count_assessment.exact_value
+    units_source = count_assessment.basis
+    units_kind = ("all_use" if count_assessment.metric == "all_use_units" else "residential") if units is not None else None
+    units_is_estimated = count_assessment.precision == "APPROXIMATE"
     units_not_determined = bool(reconciliation_ran and units is None)
 
     active_units: int | None = None
@@ -1319,6 +1363,7 @@ def resolve_operative_filter_facts(facts: OperativePlanningFacts, *, application
             if prior.count.value is not None or prior.reported_percentage is not None or prior.reported_tenure:
                 other_reports.append(prior.label())
     return OperativeFilterFacts(
+        count_assessment=count_assessment,
         other_application_ah_reports=" | ".join(other_reports),
         affordable_assessment=assessment,
         decision_status=decision_status,

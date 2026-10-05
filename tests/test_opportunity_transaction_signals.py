@@ -177,23 +177,23 @@ def test_recent_permission_absent_when_nothing_granted(session):
 
 # --- F. NON-REGRESSION: APPROACHING_IMPLEMENTATION_DEADLINE -----------------
 
-def test_approaching_implementation_deadline_present_near_lapse(session):
+def test_assumed_near_date_does_not_establish_statutory_deadline(session):
     site = _site(session)
     near_lapse_decision = dt.date.today() - dt.timedelta(days=3 * 365 - 20)
     _grant(session, site, decision_date=near_lapse_decision)
     opp = _FakeOpportunity("planning_delivery:site:1", PLANNING_DELIVERY)
     signals = build_transaction_signals(session, opp, applications=_apps_for(session, site), site=site, scope_verified=True)
-    assert signals.approaching_implementation_deadline.state == PRESENT
+    assert signals.approaching_implementation_deadline.state == UNKNOWN
     assert signals.raw_lapse_status == "approaching"
 
 
-def test_approaching_implementation_deadline_absent_when_comfortably_distant(session):
+def test_assumed_distant_date_does_not_disprove_statutory_deadline(session):
     site = _site(session)
     recent_decision = dt.date.today() - dt.timedelta(days=60)
     _grant(session, site, decision_date=recent_decision)
     opp = _FakeOpportunity("planning_delivery:site:1", PLANNING_DELIVERY)
     signals = build_transaction_signals(session, opp, applications=_apps_for(session, site), site=site, scope_verified=True)
-    assert signals.approaching_implementation_deadline.state == ABSENT
+    assert signals.approaching_implementation_deadline.state == UNKNOWN
     assert signals.raw_lapse_status == "safe"
 
 

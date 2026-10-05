@@ -1,0 +1,17 @@
+{
+  "D01_epc_status": "unknown",
+  "D01_count": 0,
+  "D02_build_states": {
+    "unknown": "unknown",
+    "complete": "unknown"
+  },
+  "D03_review_label": "\u23f0 Assumed permission review date approaching",
+  "D03_basis": "assumed",
+  "W01_surfaced": 1,
+  "W01_visible_applications": 0,
+  "W01_limited_destination": true,
+  "D04_joint_membership": true,
+  "D04_cross_boundary_councils": [],
+  "D05_summary": "needs_review",
+  "D05_status": "needs_review"
+}

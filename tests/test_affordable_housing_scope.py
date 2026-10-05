@@ -462,10 +462,13 @@ def test_non_affordable_prompt_sections_unchanged(session):
     phase_breakdown = build_phase_breakdown([app])
     prompt = build_summary_prompt(site, [app], merged, lapse, phase_breakdown)
 
-    # Gate 2B-2B.1 - SCHEME SCOPE now states the trusted operative
-    # (consented) unit figure explicitly, not merged's legacy figure, and
-    # a new OPERATIVE PLANNING POSITION line states the reconciled status.
-    assert "SCHEME SCOPE: 45 total units (consented position), developer Example Developer Ltd" in prompt
+    # Spec 023 intentionally supersedes the legacy scalar prose. Preserve the
+    # non-AH facts while checking the approved residential discovery wording;
+    # whitespace around the optional count note is not a product contract.
+    scope = next(line for line in prompt.splitlines() if line.startswith("SCHEME SCOPE:"))
+    count, developer = scope.removeprefix("SCHEME SCOPE:").split(", developer ", 1)
+    assert count.strip() == "45 homes"
+    assert developer == "Example Developer Ltd"
     assert "OPERATIVE PLANNING POSITION: Granted" in prompt
     assert "RECOMMENDATION DIRECTION: approval" in prompt
     assert "ALL 1 LINKED APPLICATIONS ON THIS SITE" in prompt

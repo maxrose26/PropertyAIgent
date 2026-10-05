@@ -457,12 +457,9 @@ def _operative_units_display(facts) -> tuple[bool, str | int | None]:
     case alone."""
     if not facts.resolved_applications:
         return False, None
-    consented = facts.consented_position
-    if consented.approved_units.state == FACT_RESOLVED:
-        return True, consented.approved_units.value
-    if len(facts.active_positions) == 1 and facts.active_positions[0].proposed_units.state == FACT_RESOLVED:
-        return True, facts.active_positions[0].proposed_units.value
-    return True, None
+    from app.reporting.scheme_reconciliation import count_assessment_for_facts
+    assessment = count_assessment_for_facts(facts)
+    return True, assessment.exact_value if assessment.precision == "EXACT" else assessment.label()
 
 
 def render_scheme_detail(session, settings, site: Site, apps: list[Application]) -> None:
@@ -552,13 +549,13 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     # only the applications that survived the qualifying-scheme filter.
     lapse = compute_lapse_status(site.applications, site)
     phase_breakdown = build_phase_breakdown(site.applications)
-    unstarted_phase_count = sum(1 for p in phase_breakdown if p["status"] == "approved_not_started")
+    unstarted_phase_count = sum(1 for p in phase_breakdown if p["status"] in ("approved_commencement_unverified", "planning_activity") and p.get("latest_grant"))
 
     lapse_label = LAPSE_STATUS_LABELS[lapse["status"]]
     if lapse["deadline"]:
         granted_ref = lapse["granted_app"].reference if lapse["granted_app"] else "?"
         st.markdown(
-            f"**Commencement status:** {lapse_label} — 3-year deadline "
+            f"**Commencement status:** {lapse_label} — assumed three-year review date (conditions unverified) "
             f"{lapse['deadline'].strftime('%d %b %Y')} (from {granted_ref}'s decision)"
         )
     else:
@@ -577,11 +574,7 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         # narrative layer over data already shown elsewhere on this page
         # (phase breakdown, application history, planning stage, expected
         # decision date).
-        ai_summary_card(
-            site.status_summary,
-            generated_at=site.status_summary_updated_at.strftime("%d %b %Y") if site.status_summary_updated_at else None,
-            key=f"ai-summary-{site.id}",
-        )
+        st.info("Stored narrative requires review against the commercial evidence contract before reuse; underlying planning evidence remains available below.")
 
         # Both the expanded state and any pending result message are tracked
         # in session_state, not just returned inline - confirmed a real bug:
@@ -644,35 +637,20 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
                 return f"{unit_bit} across {phase_word}"
             return f"{phase_word} (unit count not confirmed)"
 
-        underway_text = _bucket_text(unit_summary["underway"])
-        available_text = _bucket_text(unit_summary["approved_not_started"])
+        underway_text = _bucket_text(unit_summary["planning_activity"])
+        available_text = _bucket_text(unit_summary["approved_commencement_unverified"])
         awaiting_text = _bucket_text(unit_summary["not_yet_approved"])
 
         if underway_text:
-            st.markdown(f"🏗️ **Under construction:** {underway_text}")
+            st.markdown(f"🏗️ **Planning activity (not proof of construction):** {underway_text}")
         if available_text:
-            st.markdown(f"🎯 **Approved, not yet started:** {available_text}")
+            st.markdown(f"🎯 **Permission recorded — commencement unverified:** {available_text}")
         if awaiting_text:
             st.markdown(f"⏳ **Awaiting decision:** {awaiting_text}")
 
-        if unit_summary["approved_not_started"]["phase_count"]:
-            # A single material operation anywhere on the site saves the
-            # WHOLE permission from lapsing under UK planning law - there's
-            # then no statutory deadline forcing the developer to start the
-            # rest. That cuts both ways: it means "Build underway" is not a
-            # signal the whole site is progressing, and - because there's no
-            # legal urgency left pushing the developer to build out the
-            # remaining phases - an unstarted phase can sit indefinitely
-            # without them ever being forced to act, which if anything makes
-            # it a more durable acquisition opportunity, not a
-            # time-pressured one.
-            st.info(
-                "🎯 The phase(s) above with full planning permission but no start of works are a "
-                "potential land-buying opportunity - and because a single material operation elsewhere "
-                "on the site already protects the whole permission from lapsing, there's no legal "
-                "deadline forcing the current developer to act on them. They could remain available "
-                "indefinitely (see Phase & plot breakdown below for details)."
-            )
+        if unit_summary["approved_commencement_unverified"]["phase_count"]:
+            st.info("Potential phase leads — physical commencement, land control and availability remain unverified. Check permission conditions and phase scope before making legal or acquisition assumptions.")
+
 
     if merged.get("external_consultation_source"):
         st.warning(
@@ -686,24 +664,8 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         st.warning(f"⚠️ **Manual review needed:** {merged['affordable_status_note']}")
 
     if any(a.application_category == "reserved_matters" for a in apps):
-        # Reaching reserved matters (detailed layout/scale/appearance/
-        # landscaping) means someone has already committed real design cost
-        # for this scheme - that essentially never happens speculatively
-        # before land control is settled, so it's a strong signal the land
-        # has already changed hands (or the original promoter is building it
-        # out themselves). The pure land-acquisition opportunity is
-        # therefore likely gone - but this is exactly the stage at which
-        # forward-funding deals happen instead: registered providers
-        # routinely acquire S106 affordable blocks, and PRS/BTR investors
-        # forward-fund private blocks, once the detailed design is locked.
-        # Reframe rather than hide the scheme.
-        st.info(
-            "🏗️ **Land opportunity likely closed** — this scheme has reached Reserved Matters stage, which "
-            "means detailed design work has already been committed to (essentially never done speculatively "
-            "before land control is settled). But this is exactly the stage at which forward-funding deals "
-            "happen: affordable unit blocks are often available to registered providers, and private blocks "
-            "to PRS/BTR investors, once the detailed design is locked."
-        )
+        st.info("Reserved Matters activity is recorded. It does not establish ownership, land control, physical commencement or whether an acquisition opportunity is available.")
+
 
     with st.expander(f"Application history ({len(apps)})", expanded=len(apps) > 1):
         history_rows = [{
@@ -725,13 +687,12 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
         if plot_count:
             label_bits.append(f"{plot_count} named plot{'s' if plot_count != 1 else ''}")
         label = f"Phase & plot breakdown ({', '.join(label_bits)}"
-        label += f", {unstarted_phase_count} not yet started)" if unstarted_phase_count else ")"
+        label += f", {unstarted_phase_count} commencement unverified)" if unstarted_phase_count else ")"
         with st.expander(label, expanded=bool(unstarted_phase_count)):
             if unstarted_phase_count:
                 st.info(
-                    f"🎯 {unstarted_phase_count} group(s) have full planning permission but no "
-                    f"commencement/discharge-of-conditions filing since - the main developer "
-                    f"hasn't started these yet, a potential acquisition opportunity."
+                    f"{unstarted_phase_count} group(s) have permission recorded; physical "
+                    "commencement, completion and availability remain unverified."
                 )
             phase_rows = []
             for phase in phase_breakdown:
@@ -786,9 +747,7 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
             st.markdown(f"**Build status:** {BUILD_STATUS_LABELS[lapse['build_status']]}")
             if lapse["build_status"] == "no_completions_yet":
                 st.caption(
-                    "ℹ️ An EPC is only lodged near practical completion, so this only means no unit here has "
-                    "finished yet - construction could genuinely be well underway with no EPCs lodged and no "
-                    "portal filing on record. Treat this as \"not confirmed complete\", not \"confirmed unstarted\"."
+                    "Postcode EPC evidence does not establish this scheme’s physical progress or completion."
                 )
             if lapse["granted_app"] and lapse["granted_app"].decision_issued_date:
                 st.markdown(f"**Decision date:** {lapse['granted_app'].decision_issued_date}")

@@ -221,7 +221,7 @@ def test_reshape_signal_card_never_invents_a_signal_for_planning_delivery():
     assert card["metrics"] == [("Status", "50 days left")]
     assert "Planning / delivery" in card["tags"] and "Approaching lapse" in card["tags"]
     assert card["page"] == "pages/1_Scheme_Detail.py"
-    assert card["params"] == {"site_id": "1"}
+    assert card["params"] == {"site_id": "1", "origin": "opportunities"}
 
 
 def test_approaching_lapse_site_appears_in_the_feed_as_a_planning_delivery_card(session):

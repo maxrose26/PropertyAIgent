@@ -34,11 +34,8 @@ from reportlab.platypus import (
 
 MODEL = "gpt-4o-mini"
 
-# Mirrors app.pipeline.lapse_tracking's own framing - a scheme approaching or
-# past its commencement deadline is a genuine acquisition signal (the
-# landowner may need to re-apply, sell, or risk losing the consent), and a
-# not-yet-decided scheme is the earliest possible point to get involved
-# before anyone else has committed capital.
+# These are leads for checking permission conditions, not evidence of lapse,
+# seller pressure, availability or ownership. Internal keys remain compatible.
 BUYING_OPPORTUNITY_LAPSE_STATUSES = {"approaching", "lapsed"}
 BUYING_OPPORTUNITY_DECISION_STATUSES = {"not_yet_decided"}
 
@@ -46,7 +43,7 @@ BUYING_OPPORTUNITY_DECISION_STATUSES = {"not_yet_decided"}
 @dataclass
 class AggregateStats:
     site_count: int
-    total_units: int
+    total_units: int | None
     total_affordable_units: int
     total_private_units: int | None
     overall_affordable_pct: float | None
@@ -56,6 +53,7 @@ class AggregateStats:
     early_stage_count: int
     top_councils: list[tuple[str, int]]
     top_developers: list[tuple[str, int]]
+    unknown_total_schemes: int = 0
     largest_schemes: list[dict] = field(default_factory=list)
     opportunity_schemes: list[dict] = field(default_factory=list)
 
@@ -65,7 +63,9 @@ def compute_aggregate_stats(df: pd.DataFrame, top_n: int = 5, highlight_n: int =
     site-level dataframe streamlit_app.py already builds (has Total Units/
     Affordable Units/Private Units/decision_status/lapse_status/Council/
     Developer columns)."""
-    total_units = int(df["Total Units"].fillna(0).sum())
+    from app.reporting.commercial_evidence import known_unit_count
+    known_totals = df["Total Units"].map(known_unit_count)
+    total_units = int(known_totals.sum()) if known_totals.notna().any() else None
     total_affordable = int(df["Affordable Units"].fillna(0).sum())
     # The accepted AH projection deliberately labels legacy private counts as
     # unverified. Never upgrade that column or derive a private count by subtraction.
@@ -99,6 +99,7 @@ def compute_aggregate_stats(df: pd.DataFrame, top_n: int = 5, highlight_n: int =
     return AggregateStats(
         site_count=len(df),
         total_units=total_units,
+        unknown_total_schemes=int(known_totals.isna().sum()),
         total_affordable_units=total_affordable,
         total_private_units=total_private,
         overall_affordable_pct=overall_pct,
@@ -126,7 +127,7 @@ def _or_unknown(value, fallback: str = "not identified") -> str:
 
 def _fmt_scheme(row: dict) -> str:
     units = row.get("Total Units")
-    units_str = f"{int(units)} units" if pd.notna(units) else "unit count unknown"
+    units_str = row.get("Count Display") or (f"{int(units)} units" if pd.notna(units) else "unit count unknown")
     return (
         f"{row.get('Address', 'Unknown address')} ({row.get('Council', '?')}) - {units_str}, "
         f"developer: {_or_unknown(row.get('Developer'))}, "
@@ -153,20 +154,21 @@ invent a different figure.
 
 VERIFIED AGGREGATE FIGURES (do not alter these numbers):
 - Schemes in this report: {stats.site_count}
-- Total units across all schemes: {stats.total_units}
+- Sum of known unit counts: {_or_unknown(stats.total_units, "unknown")}
+- Schemes with unknown total units (excluded from that sum): {stats.unknown_total_schemes}
 - Total affordable units: {stats.total_affordable_units} ({stats.overall_affordable_pct}% of total, where known)
 - Total private units: {_or_unknown(stats.total_private_units, 'unknown (no qualified private-unit count)')}
 - Decision status breakdown: {stats.decision_counts}
-- Lapse/commencement risk breakdown: {stats.lapse_counts}
-- Schemes approaching or past their commencement deadline (landowner may need to sell or re-apply): {stats.lapsing_count}
-- Schemes not yet decided (earliest-stage opportunity, nothing committed yet): {stats.early_stage_count}
+- Assumed permission review-date breakdown: {stats.lapse_counts}
+- Schemes approaching or past an assumed three-year permission review date (conditions and legal lapse unverified): {stats.lapsing_count}
+- Schemes not yet decided (planning decision outstanding; ownership and commitments unknown): {stats.early_stage_count}
 - Most active councils by scheme count: {top_councils_str}
 - Most active developers by scheme count: {top_developers_str}
 
 LARGEST SCHEMES IN THIS SET (by unit count):
 {largest_str}
 
-FLAGGED BUYING OPPORTUNITIES (lapsing/approaching deadline, or not yet decided):
+LEADS FOR INVESTIGATION (assumed review date approaching/passed, or decision outstanding):
 {opportunities_str}
 
 Write two fields, each 2-4 sentences of genuine analytical prose, not a
@@ -176,10 +178,11 @@ executive_summary: Synthesise the overall picture - scale of opportunity
 (units/affordable split), where activity is concentrated, and the general
 mix of decision stages.
 
-buying_opportunities_and_risks: Explain what the lapsing/approaching-deadline
-schemes mean as an acquisition signal (the landowner may need to sell or
-re-apply rather than lose the consent), and what the not-yet-decided schemes
-represent as an earlier-stage opportunity. Name a small number of the most
+buying_opportunities_and_risks: Explain why checking permission conditions and
+current progress is useful for schemes near/past an ASSUMED three-year review
+date. This is not an evidenced statutory deadline, legal lapse, seller pressure
+or availability. An outstanding decision is planning context only. Do not infer
+ownership, land control, physical commencement or completion from these records. Name a small number of the most
 notable specific schemes from the flagged list above, not all of them.
 """
 
@@ -241,10 +244,10 @@ def _styles():
 # LAPSE_STATUS_LABELS (which is used in the Streamlit UI, where emoji render
 # fine) rather than deriving one from the other by string-stripping.
 _LAPSE_STATUS_TEXT_LABELS = {
-    "lapsed": "Permission may have lapsed",
-    "approaching": "Commencement deadline approaching",
-    "underway": "Build underway",
-    "safe": "OK",
+    "lapsed": "Assumed review date passed; legal lapse unverified",
+    "approaching": "Assumed permission review date approaching",
+    "underway": "Unverified legacy underway classification",
+    "safe": "Assumed review date outside warning window",
     "not_granted": "Not yet granted",
     "unknown": "Unknown",
 }
@@ -253,10 +256,10 @@ _LAPSE_STATUS_TEXT_LABELS = {
 # mirroring app.pipeline.lapse_tracking.BUILD_STATUS_LABELS without its
 # emoji.
 _BUILD_STATUS_TEXT_LABELS = {
-    "underway": "Underway (filing detected)",
-    "complete": "Complete (EPC)",
-    "partially_complete": "Partially complete (EPC)",
-    "no_completions_yet": "No completions yet (0 EPCs - may still be under construction)",
+    "underway": "Unverified legacy underway classification",
+    "complete": "Unverified legacy EPC completion classification",
+    "partially_complete": "Unverified legacy EPC partial-completion classification",
+    "no_completions_yet": "No matching completion evidence; physical status unknown",
     "unknown": "Unknown",
 }
 
@@ -272,12 +275,13 @@ def _stats_table(stats: AggregateStats, styles) -> Table:
 
     rows = [
         ("Schemes", str(stats.site_count)),
-        ("Total units", f"{stats.total_units:,}"),
+        ("Known units", f"{stats.total_units:,}" if stats.total_units is not None else "Unknown"),
+        ("Schemes with unknown totals", str(stats.unknown_total_schemes)),
         ("Affordable units", f"{stats.total_affordable_units:,}" + (f" ({stats.overall_affordable_pct}%)" if stats.overall_affordable_pct is not None else "")),
         ("Private units", f"{stats.total_private_units:,}" if stats.total_private_units is not None else "Unknown"),
         ("Decision status", _labelled(stats.decision_counts, DECISION_STATUS_LABELS)),
-        ("Lapse/commencement risk", _labelled(stats.lapse_counts, _LAPSE_STATUS_TEXT_LABELS)),
-        ("Buying opportunities flagged", f"{stats.lapsing_count} lapsing/approaching + {stats.early_stage_count} not yet decided"),
+        ("Assumed permission review", _labelled(stats.lapse_counts, _LAPSE_STATUS_TEXT_LABELS)),
+        ("Leads for investigation", f"{stats.lapsing_count} assumed review dates approaching/passed + {stats.early_stage_count} not yet decided; legal lapse and availability unverified"),
     ]
     data = [[Paragraph(label, label_style), Paragraph(value, value_style)] for label, value in rows]
     table = Table(data, colWidths=[55 * mm, 115 * mm])
@@ -323,7 +327,7 @@ def render_pdf(report_rows: list[dict], stats: AggregateStats, narrative: dict[s
         if is_opportunity:
             heading_text += "  ⚑ Buying opportunity"
         units = row.get("Total Units")
-        units_str = f"{int(units)}" if pd.notna(units) else "unknown"
+        units_str = row.get("Count Display") or (f"{int(units)}" if pd.notna(units) else "unknown")
         affordable = row.get("Affordable Units")
         affordable_str = f"{int(affordable)}" if pd.notna(affordable) else "unknown"
         affordable_pct = row.get("Affordable %")

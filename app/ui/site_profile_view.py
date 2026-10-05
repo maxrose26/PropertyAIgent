@@ -96,14 +96,17 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
     if phase_breakdown:
         section_header("Phase & plot breakdown", icon="🏗️")
         unit_summary = summarize_phase_units(phase_breakdown)
-        for bucket_key, label in (("underway", "Under construction"), ("approved_not_started", "Approved, not yet started"), ("not_yet_approved", "Awaiting decision")):
+        for bucket_key, label in (("planning_activity", "Planning activity — commencement unverified"), ("approved_commencement_unverified", "Permission recorded — commencement unverified"), ("not_yet_approved", "Awaiting decision")):
             bucket = unit_summary[bucket_key]
             if bucket["phase_count"]:
-                unit_bit = f"{bucket['units']:,} units" if bucket["units"] else "unit count not confirmed"
+                unit_bit = f"{bucket['units']:,} units" if bucket["units"] is not None else "unit count not confirmed"
                 st.caption(f"**{label}:** {bucket['phase_count']} phase(s), {unit_bit}")
+                if bucket["phase_count"] > 1 and bucket.get("aggregation_state") != "resolved":
+                    st.caption("Phase overlap or counts are unverified; individual phase figures are not added.")
         phase_rows = [{
             "Phase / plot": p["label"],
-            "Units": arrow_safe_count(p.get("unit_count"), "—" if p["kind"] == "phase" else ""),
+            "Units": p.get("count_display") or arrow_safe_count(p.get("unit_count"), "—" if p["kind"] == "phase" else ""),
+            "Count evidence": p.get("count_note", ""),
             "Status": PHASE_STATUS_LABELS[p["status"]],
             "Applications": len(p["applications"]),
         } for p in phase_breakdown]
@@ -202,7 +205,7 @@ def _residential_mix_overview_section(mix: dict) -> None:
     totals = mix["overview_totals"]
     cols = st.columns(3)
     with cols[0]:
-        stat_tile("Total homes", f"{totals['total_homes']:,}" if totals["total_homes"] is not None else "Not yet verified")
+        stat_tile("Total homes", totals.get("count_display") or (f"{totals['total_homes']:,}" if totals["total_homes"] is not None else "Not yet verified"), caption=totals.get("count_note"))
     with cols[1]:
         affordable_headline_tile(mix["affordable_headline"], mix["percentage_reconciliation"])
     with cols[2]:
@@ -317,7 +320,7 @@ def _evidence_and_reconciliation_section(mix: dict) -> None:
             f"reconciliation status: {scheme.unit_reconciliation_status or 'OK'}"
         )
     if current_version["alternatives"]:
-        st.markdown("**Alternative / superseded application versions on this site**")
+        st.markdown("**Other application evidence on this site — supersession not assumed**")
         for alt in current_version["alternatives"]:
             bits = [alt["reference"]]
             if alt["total_units_final"] is not None:

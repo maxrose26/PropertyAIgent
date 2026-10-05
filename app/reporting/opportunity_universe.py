@@ -420,6 +420,7 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             ownership_count_by_site[cr.site_id] = ownership_count_by_site.get(cr.site_id, 0) + 1
 
     records: list[OpportunityRecord] = []
+    operative_by_site = {}
     for card, kind in tagged:
         site_id = int(card["params"]["site_id"])
         site = sites_by_id.get(site_id)
@@ -428,25 +429,20 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
         site_apps = apps_by_site.get(site_id, [])
         rep = pick_representative_application(site_apps)
         si = rep.scheme_intelligence if rep else None
-        # Gate 2B-2B.1 pre-merge remediation - unit_count/affordable_unit_
-        # count/development_type_raw/is_specialist_development below still
-        # come from `si` (this Site's single representative application's
-        # own SchemeIntelligence) exactly as before - those four fields
-        # feed fingerprint_fields just below, and this gate is forbidden
-        # from changing opportunity fingerprints. planning_state is NOT
-        # one of those fingerprinted fields (confirmed: absent from
-        # fingerprint_fields immediately below), so it is resolved here
-        # from the trusted, role-aware, decided-state-aware
-        # OperativePlanningFacts over this Site's FULL application list
-        # (site_apps, already batched above) - the same resolution
-        # build_planning_delivery_matching_facts_from_operative uses for
-        # the live Buyer Fit path - rather than the previous hardcoded
-        # PERMISSION_GRANTED, which this exact object also fed to app.
-        # policy.buyer_profile_store.run_buyer_onboarding_baseline via
-        # OpportunityRecord.matching_facts.
-        operative_facts = build_operative_planning_facts(site_apps)
+        # Stage 2 reuses reconciled total units for every qualification consumer.
+        # Other accepted fields retain their existing contracts. Future monitoring
+        # fingerprints may change; historical rows are never rewritten here.
+        if site_id not in operative_by_site:
+            operative_by_site[site_id] = build_operative_planning_facts(site_apps)
+        operative_facts = operative_by_site[site_id]
+        if kind == "phase" and card.get("count_assessment"):
+            from app.reporting.scheme_reconciliation import planning_facts_for_scope
+            count_scope = card["count_assessment"]
+            operative_facts = planning_facts_for_scope(operative_facts, count_scope.scope_type, count_scope.scope_label)
         planning_state = resolve_operative_planning_state(operative_facts)
-        facts = build_planning_delivery_matching_facts(si, planning_state=planning_state)
+        from app.policy.buyer_matching import build_planning_delivery_matching_facts_from_operative
+        facts = build_planning_delivery_matching_facts_from_operative(operative_facts, site_apps,
+                    application_reference=card.get("application_reference") or card.get("reference"))
 
         # compute_lapse_status is pure Python over already-fetched
         # Application rows (no further query) - recomputed here rather
@@ -498,8 +494,10 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             # separate "whole site" figure to prefer it over.
             if phase_code != UNPHASED_LABEL:
                 phase_unit_count = card.get("phase_unit_count")
-                facts = replace(facts, unit_count=phase_unit_count)
+                facts = replace(facts, unit_count=phase_unit_count, count_assessment=card.get("count_assessment"),
+                                affordable_unit_count=None, affordable_percentage=None, affordable_percentage_trusted=False)
                 fingerprint_fields["unit_count"] = phase_unit_count
+                fingerprint_fields["affordable_unit_count"] = None
         elif kind == "recent_permission":
             opportunity_id = planning_delivery_recent_permission_opportunity_id(site_id)
             # The grant date itself is a STABLE fact (never a live
@@ -524,6 +522,7 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             # co-pending one takes over) registers as a material change.
             fingerprint_fields["submitted_date"] = card.get("when")
 
+        fingerprint_fields["residential_count"] = facts.count_assessment.fingerprint() if facts.count_assessment else None
         records.append(OpportunityRecord(
             opportunity_id=opportunity_id,
             opportunity_type=PLANNING_DELIVERY,

@@ -40,7 +40,7 @@ def test_headline_with_complete_data():
 
     tooltip = format_site_tooltip(headline)
     for expected in ("1 Sanderling Road, Stockport", "Stockport Metropolitan Borough Council",
-                      "150 units", "Affordable: 30 (20%)", "Bloor Homes", "Granted", "Allocated (HOM 2.1"):
+                      "150 units", "Reported AH count: 30 (source and scope unverified)", "Bloor Homes", "Granted", "Allocated (HOM 2.1"):
         assert expected in tooltip
 
 

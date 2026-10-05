@@ -834,7 +834,7 @@ def build_ai_summary_carousel_items(session: Session, limit: int = 8) -> list[di
     ] + [
         {
             "id": f"carousel-site-{s.id}", "type": "Site Summary", "name": s.display_address,
-            "council_code": s.council_code, "excerpt": _excerpt(s.status_summary),
+            "council_code": s.council_code, "excerpt": "Stored narrative is unverified against the commercial evidence contract; review structured evidence in the profile.",
             "generated_at": s.status_summary_updated_at, "model": None,
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(s.id)},
         }
@@ -909,6 +909,7 @@ def _scheme_card(
         "council_code": app.council_code,
         "address": app.address,
         "total_units": total_units,
+        "count_display": filter_facts.count_assessment.label() if operative_facts is not None else None,
         "affordable_units": affordable_units,
         "affordable_percentage": affordable_percentage,
         "planning_status": app.status,
@@ -1074,16 +1075,16 @@ _OPPORTUNITY_SECTION_ORDER = (
 )
 _OPPORTUNITY_SECTION_META = {
     "approaching_lapse": {
-        "heading": "Approaching lapse date",
-        "explanation": f"Full permissions with no build activity detected, within {LAPSE_WARNING_DAYS} days of their statutory commencement deadline.",
+        "heading": "Assumed permission review date",
+        "explanation": f"Permissions within {LAPSE_WARNING_DAYS} days of an assumed three-year review date; conditions and commencement unverified.",
     },
     "low_supply": {
         "heading": "Low housing supply",
         "explanation": "Councils with a verified five-year housing land supply position below five years.",
     },
     "undeveloped_phase": {
-        "heading": "Undeveloped phase / remaining delivery",
-        "explanation": "Multi-phase schemes with a named phase that has full permission but no commencement filing since.",
+        "heading": "Permission recorded — commencement unverified",
+        "explanation": "Named phases with permission recorded and commencement unverified.",
     },
     "allocations_without_application": {
         "heading": "Allocations without planning applications",
@@ -1133,8 +1134,8 @@ def _approaching_lapse_cards(session: Session, limit: int) -> list[dict]:
         grant_date = parse_portal_date(result["granted_app"].decision_issued_date) if result["granted_app"] else None
         scored.append((days_left, {
             "id": f"opp-lapse-{site.id}", "title": site.display_address, "subtitle": site.council_code,
-            "reason": f"Commencement deadline {result['deadline'].strftime('%d %b %Y')} - no build activity detected since the grant",
-            "metric": f"{days_left} day{'s' if days_left != 1 else ''} left",
+            "reason": f"Assumed permission review date {result['deadline'].strftime('%d %b %Y')} — three years from decision; conditions, commencement and availability unverified",
+            "metric": f"{days_left} day{'s' if days_left != 1 else ''} to assumed review date",
             "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else None,
             "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
             "application_reference": result["granted_app"].reference if result["granted_app"] else None,
@@ -1157,10 +1158,9 @@ def _low_supply_cards(session: Session, limit: int) -> list[dict]:
 
 
 def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
-    """Bounded to Sites with 2+ linked applications -
-    build_acquisition_scope_breakdown needs multiple filings to detect a
-    phase at all, and returns [] for a single-application site by its own
-    definition. One batched query for every Application/Site involved;
+    """Sites with multiple filings or an explicit named phase/parcel.
+    A sole named phase must not be lost merely for lacking a parent filing.
+    One batched query for every Application/Site involved;
     phase detection itself (app.pipeline.phase_tracking) is pure Python
     over already-fetched rows, never a further query per site.
 
@@ -1181,7 +1181,9 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
     for a in apps:
         by_site.setdefault(a.site_id, []).append(a)
 
-    candidate_site_ids = [sid for sid, group in by_site.items() if len(group) >= 2]
+    from app.pipeline.phase_tracking import extract_phase_labels, acquisition_scope_key
+    candidate_site_ids = [sid for sid, group in by_site.items() if len(group) >= 2
+                          or any(extract_phase_labels(a.proposal) or extract_phase_labels(a.address) for a in group)]
     if not candidate_site_ids:
         return []
     sites = {s.id: s for s in session.execute(select(Site).where(Site.id.in_(candidate_site_ids))).scalars()}
@@ -1192,32 +1194,34 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
         if site is None:
             continue
         breakdown = build_acquisition_scope_breakdown(by_site[site_id])
-        undeveloped = [row for row in breakdown if row["status"] == "approved_not_started"]
+        undeveloped = [row for row in breakdown if row["status"] in ("approved_commencement_unverified", "planning_activity") and row.get("latest_grant")]
         if not undeveloped:
             continue
-        phase = undeveloped[0]
-        grant_date = (
-            parse_portal_date(phase["latest_grant"].decision_issued_date) if phase.get("latest_grant") else None
-        )
-        cards.append({
-            "id": f"opp-phase-{site.id}-{phase['code']}", "title": f"{site.display_address} — {phase['label']}",
-            "subtitle": site.council_code,
-            "reason": f"{phase['label']} has full permission but no commencement filing detected since the grant",
-            "metric": f"{len(undeveloped)} phase(s) not yet started" if len(undeveloped) > 1 else "Not yet started",
-            "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else site.updated_at,
-            "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
-            "application_reference": phase["latest_grant"].reference if phase.get("latest_grant") else None,
-            "phase_code": phase["code"],
-            # Gate 2B-2B.2 - this scope's OWN deterministically supported
-            # unit count (None if genuinely unknown), never the whole
-            # site's total. Consumed by app.reporting.opportunity_universe.
-            # _planning_delivery_universe so a named phase/material-parcel
-            # opportunity's unit_count reflects its own scope rather than
-            # inheriting an unrelated whole-site figure - see that
-            # module's own Gate 2B-2B.2 remediation for why this can't
-            # simply be recomputed there from the card alone.
-            "phase_unit_count": phase.get("unit_count"),
-        })
+        for phase in undeveloped:
+            scope_key = acquisition_scope_key(phase)
+            grant_date = (
+                parse_portal_date(phase["latest_grant"].decision_issued_date) if phase.get("latest_grant") else None
+            )
+            cards.append({
+                "id": f"opp-phase-{site.id}-{scope_key}", "title": f"{site.display_address} — {phase['label']}",
+                "subtitle": site.council_code,
+                "reason": f"{phase['label']} has permission recorded; physical commencement and availability unverified",
+                "metric": f"{len(undeveloped)} phase(s) with commencement unverified" if len(undeveloped) > 1 else "Commencement unverified",
+                "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else site.updated_at,
+                "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
+                "application_reference": phase["latest_grant"].reference if phase.get("latest_grant") else None,
+                "phase_code": scope_key,
+                # Gate 2B-2B.2 - this scope's OWN deterministically supported
+                # unit count (None if genuinely unknown), never the whole
+                # site's total. Consumed by app.reporting.opportunity_universe.
+                # _planning_delivery_universe so a named phase/material-parcel
+                # opportunity's unit_count reflects its own scope rather than
+                # inheriting an unrelated whole-site figure - see that
+                # module's own Gate 2B-2B.2 remediation for why this can't
+                # simply be recomputed there from the card alone.
+                "phase_unit_count": phase.get("unit_count"),
+                "count_assessment": phase.get("count_assessment"),
+            })
     cards.sort(key=lambda c: _naive(c["when"]), reverse=True)
     return cards[:limit]
 
@@ -1228,7 +1232,7 @@ def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: 
     measured between a fresh grant and the two signals above: approaching
     lapse needs the commencement deadline within ~180 days (i.e. ~2.5+
     years after grant); undeveloped permission needs 2+ applications AND a
-    detected "approved_not_started" phase. A site with exactly one granted
+    detected "approved_commencement_unverified" phase. A site with exactly one granted
     application - or several, but none yet forming a detected phase - has
     NO route into the opportunity universe at all without this signal,
     regardless of scale or commercial relevance.

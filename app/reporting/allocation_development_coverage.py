@@ -235,16 +235,10 @@ def summarise_site_activity(
     own docstring), falling back to the portal-derived
     estimated_unit_count only when no reconciled figure exists yet."""
     rep = pick_representative_application(applications) if applications else None
-    capacity: int | None = None
-    capacity_known = False
-    if rep is not None:
-        si = getattr(rep, "scheme_intelligence", None)
-        if si is not None and si.total_units_final is not None:
-            capacity = si.total_units_final
-            capacity_known = True
-        elif rep.estimated_unit_count is not None:
-            capacity = rep.estimated_unit_count
-            capacity_known = True
+    from app.reporting.scheme_reconciliation import build_operative_planning_facts, count_assessment_for_facts
+    assessment = count_assessment_for_facts(build_operative_planning_facts(applications))
+    capacity = assessment.exact_value
+    capacity_known = capacity is not None
     return SiteActivitySummary(
         site_id=site.id, site=site, applications=applications,
         representative_application=rep, capacity_known=capacity_known, capacity=capacity,

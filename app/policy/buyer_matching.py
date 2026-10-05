@@ -84,7 +84,8 @@ from app.policy.buyer_profiles import (
     BuyerMandatePolicy,
 )
 from app.reporting.allocation_development_coverage import NO_IDENTIFIED_ACTIVITY
-from app.reporting.scheme_reconciliation import FACT_RESOLVED
+from app.reporting.scheme_reconciliation import FACT_RESOLVED, FACT_CONFLICT
+from app.reporting.commercial_evidence import known_unit_count
 
 STRATEGIC_LAND = "strategic_land"
 PLANNING_DELIVERY = "planning_delivery"
@@ -129,7 +130,7 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # change classification for 3 of the 4 production Buyer Mandates. assess_
 # buyer_fit's own commercial rules, Buyer Mandate fields, and every other
 # domain area were NOT touched by this bump.
-BUYER_MATCHING_POLICY_VERSION = 4
+BUYER_MATCHING_POLICY_VERSION = 5  # Scope-aware uncertain discovery; no persisted recomputation
 
 # --- Buyer Mandate V2, Phase B2: build_status vocabulary (reused verbatim) --
 #
@@ -193,6 +194,7 @@ class MatchingFacts:
     # "active positions" to report.
     has_active_proposal: bool = False
     active_proposal_count: int = 0
+    count_assessment: object = None
 
 
 def build_strategic_land_matching_facts(allocation, coverage, phasing) -> MatchingFacts:
@@ -404,7 +406,7 @@ def _operative_source_scheme_intelligence(operative_facts, applications_by_id: d
     source = None
     if consented.approved_units.state == FACT_RESOLVED and consented.approved_units.source is not None:
         source = consented.approved_units.source
-    elif len(operative_facts.active_positions) == 1:
+    elif consented.approved_units.state != FACT_CONFLICT and len(operative_facts.active_positions) == 1:
         proposed = operative_facts.active_positions[0].proposed_units
         if proposed.state == FACT_RESOLVED and proposed.source is not None:
             source = proposed.source
@@ -457,11 +459,9 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     # re-derived from scratch. Multiple simultaneous active proposals with
     # no consent leave unit_count None/not-determined - never summed,
     # never "latest wins".
-    unit_count = None
-    if consented.approved_units.state == FACT_RESOLVED:
-        unit_count = consented.approved_units.value
-    elif len(active_positions) == 1 and active_positions[0].proposed_units.state == FACT_RESOLVED:
-        unit_count = active_positions[0].proposed_units.value
+    from app.reporting.scheme_reconciliation import count_assessment_for_facts
+    count_assessment = count_assessment_for_facts(operative_facts)
+    unit_count = count_assessment.exact_value
 
     # --- development type / specialist flag - read from the SAME
     # application the unit figure above came from; never inferred from
@@ -488,6 +488,7 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     affordable_trusted = False
 
     return MatchingFacts(
+        count_assessment=count_assessment,
         opportunity_type=PLANNING_DELIVERY,
         unit_count=unit_count,
         development_type_raw=dev_type,
@@ -883,11 +884,32 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         unit_noun = "affordable homes"
         no_count_message = "No trusted affordable-unit count is available to assess against this buyer's target range."
     else:
-        scale_value = facts.unit_count
+        scale_value = known_unit_count(facts.unit_count)
         unit_noun = "homes"
         no_count_message = "No trusted unit count is available to assess against this buyer's target range."
 
-    if scale_value is None:
+    assessment = facts.count_assessment if profile.scale_metric != AFFORDABLE_UNITS else None
+    uncertain_scale = assessment is not None and assessment.precision in ("APPROXIMATE", "RANGE")
+    if assessment is not None:
+        # A rounded/stale scalar cannot override the shared evidence assessment.
+        scale_value = assessment.exact_value
+    if scale_value is None and uncertain_scale:
+        if assessment.within_hard_bounds(minimum=profile.target_unit_min,
+                                         maximum=profile.target_unit_max) is not True:
+            blocking_unknown = True
+        unknown.append(f"{assessment.label()}: uncertain discovery scale; exact mandate compliance unverified. " + assessment.note())
+        # Existing minimum exclusion remains hard. Maxima are existing SOFT
+        # preferences, never relabelled hard limits. Generic explicit numeric
+        # filters use CountAssessment.within_hard_bounds instead.
+        if profile.below_minimum_scale_is_exclusion:
+            minimum_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min)
+            if minimum_fit is False:
+                does_not_match.append("Supported scale is below this buyer's hard minimum.")
+            elif minimum_fit is None:
+                blocking_unknown = True
+        investigate.append("Verify current subject scale before treating this lead as numerically qualified.")
+        is_investigative_exception = True
+    elif scale_value is None:
         unknown.append(no_count_message)
         blocking_unknown = True
     elif profile.target_unit_min <= scale_value <= profile.target_unit_max:

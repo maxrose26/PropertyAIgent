@@ -66,7 +66,7 @@ def build_summary_prompt(
         phase_text = "\n".join(phase_lines)
 
         # Rolled-up totals by build status, computed the same way the
-        # Streamlit "Under construction / Approved, not yet started / Awaiting
+        # Streamlit "Planning activity / Permission recorded — commencement unverified / Awaiting
         # decision" banner is - a phase with no confirmed unit count still
         # counts toward its bucket's phase count, it just can't add to that
         # bucket's unit total, so the model is never handed a fabricated sum.
@@ -82,8 +82,8 @@ def build_summary_prompt(
 
         rollup_lines = [
             line for line in (
-                _bucket_line("Underway", unit_summary["underway"]),
-                _bucket_line("Approved, not yet started", unit_summary["approved_not_started"]),
+                _bucket_line("Planning activity — commencement unverified", unit_summary["planning_activity"]),
+                _bucket_line("Permission recorded — commencement unverified", unit_summary["approved_commencement_unverified"]),
                 _bucket_line("Awaiting decision", unit_summary["not_yet_approved"]),
             ) if line
         ]
@@ -157,17 +157,8 @@ def build_summary_prompt(
         operative_status_text = "not yet determined from the evidence held - do not state a planning outcome that isn't shown above."
     else:
         operative_status_text = OPERATIVE_DECISION_STATUS_LABELS[filter_facts.decision_status]
-    if filter_facts.units is not None:
-        scope_units_text = f"{filter_facts.units} total units ({filter_facts.units_source} position)"
-    elif filter_facts.units_not_determined:
-        scope_units_text = "not yet determined from the evidence held - do not state a unit total that isn't shown above"
-    else:
-        # Reconciliation could not run at all (e.g. genuinely no linked
-        # applications) - the only case the legacy merged figure still
-        # stands in for, per the "no fallback after NOT_DETERMINED" rule
-        # (this fallback is for "never ran", never for "ran and found
-        # nothing").
-        scope_units_text = f"{merged.get('total_units_final')} total units (not yet reconciled)"
+    scope_units_text = filter_facts.count_assessment.label() + " " + filter_facts.count_assessment.note()
+
 
     return f"""
 You are writing an internal status note for a UK residential land/planning
@@ -217,22 +208,14 @@ covering:
    the council or a statutory estimate (the wording in brackets tells you
    which). If no application shows an expected decision figure, don't
    mention one.
-3. If phases or plots were named above: which specific ones show confirmed
-   activity (a discharge-of-conditions or amendment filed against them, i.e.
-   status "Underway") versus which have full permission but NO such filing
-   yet (status "Approved, not yet started") - name the actual phase/plot
-   labels, don't speak generically.
-4. The acquisition opportunity is ONLY the phase(s)/plot(s) whose status is
-   literally "Approved, not yet started" (🟢 in the breakdown above) - full
-   permission, nothing built, no legal deadline forcing the developer to
-   act once something else on the site has already started. Do NOT call an
-   "Underway" phase/plot an opportunity or "undeveloped" under any
-   circumstance, even if its own unit count is unconfirmed - underway means
-   it already has confirmed activity, full stop. If NO phase/plot has
-   "Approved, not yet started" status, say plainly that there is currently
-   no undeveloped phase-level opportunity on this site - do not invent one.
-5. If a UNIT TOTALS BY STATUS section is present, state the underway and
-   approved-not-yet-started unit figures using those exact numbers. If a
+3. Distinguish administrative planning activity from physical commencement. Neither
+   filing activity nor its absence proves that works have started or not started.
+4. Permission/phase leads can warrant investigation, but availability, land control,
+   legal lapse and completion remain unverified. Reserved Matters does not establish
+   ownership. Dates calculated as grant plus three years are assumptions, never
+   statutory deadlines or proof of seller urgency. Postcode EPCs do not prove delivery.
+5. If a UNIT TOTALS BY STATUS section is present, state the planning-activity and
+   permission-with-commencement-unverified unit figures using those exact numbers. If a
    bucket's unit count wasn't confirmed, say so rather than guessing - name
    the phase and describe the count as unconfirmed, don't omit it or invent
    a figure.

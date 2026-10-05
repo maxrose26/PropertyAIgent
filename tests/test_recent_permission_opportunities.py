@@ -69,7 +69,7 @@ def test_recent_grant_with_no_build_evidence_is_a_candidate(session):
     assert any(c["params"]["site_id"] == str(site.id) for c in cards)
 
 
-def test_recent_grant_underway_is_excluded(session):
+def test_recent_grant_underway_unverified_evidence_retains_lead(session):
     site = _make_granted_site(session, months_ago=2)
     # "underway" is derived from a portal progress-signal filing, not a raw
     # Site field - simplest deterministic way to trigger it in a fixture is
@@ -85,19 +85,19 @@ def test_recent_grant_underway_is_excluded(session):
     ))
     session.commit()
     cards = _recent_permission_cards(session, None)
-    assert not any(c["params"]["site_id"] == str(site.id) for c in cards)
+    assert any(c["params"]["site_id"] == str(site.id) for c in cards)
 
 
-def test_recent_grant_partially_complete_is_excluded(session):
+def test_recent_grant_partially_complete_unverified_evidence_retains_lead(session):
     site = _make_granted_site(session, months_ago=2, build_status="partially_complete")
     cards = _recent_permission_cards(session, None)
-    assert not any(c["params"]["site_id"] == str(site.id) for c in cards)
+    assert any(c["params"]["site_id"] == str(site.id) for c in cards)
 
 
-def test_recent_grant_complete_is_excluded(session):
+def test_recent_grant_complete_unverified_evidence_retains_lead(session):
     site = _make_granted_site(session, months_ago=2, build_status="complete")
     cards = _recent_permission_cards(session, None)
-    assert not any(c["params"]["site_id"] == str(site.id) for c in cards)
+    assert any(c["params"]["site_id"] == str(site.id) for c in cards)
 
 
 def test_refused_application_is_excluded(session):
@@ -369,7 +369,7 @@ def test_new_detector_expands_the_universe_with_no_cap(session):
 
 # --- Fingerprinting --------------------------------------------------------
 
-def test_build_status_change_alters_the_fingerprint(session):
+def test_unverified_build_status_change_does_not_invent_material_change(session):
     site = _make_granted_site(session, months_ago=2, build_status=None)
     universe_before = build_current_opportunity_universe(session)
     record_before = next(r for r in universe_before if r.opportunity_id == planning_delivery_recent_permission_opportunity_id(site.id))
@@ -380,7 +380,7 @@ def test_build_status_change_alters_the_fingerprint(session):
     record_after = next((r for r in universe_after if r.opportunity_id == planning_delivery_recent_permission_opportunity_id(site.id)), None)
     assert record_after is not None
     from app.reporting.opportunity_universe import compute_opportunity_fingerprint
-    assert compute_opportunity_fingerprint(record_before.fingerprint_fields) != compute_opportunity_fingerprint(record_after.fingerprint_fields)
+    assert compute_opportunity_fingerprint(record_before.fingerprint_fields) == compute_opportunity_fingerprint(record_after.fingerprint_fields)
 
 
 def test_identical_rescan_produces_an_unchanged_fingerprint(session):

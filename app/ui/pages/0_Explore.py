@@ -17,6 +17,8 @@ presentation changes applied below.
 """
 from __future__ import annotations
 
+from app.search.query_parser import numeric_unit_mask, availability_mask
+
 import os
 import sys
 from pathlib import Path
@@ -294,6 +296,7 @@ with page_scope():
                         "affordable_percentage_final": filter_facts.affordable_assessment.reported_percentage},
                 lapse=lapse, decision_status=None,
                 local_plan_status=_local_plan_headline_text(local_plan_by_site.get(site.id, [])),
+                count_assessment=filter_facts.count_assessment,
                 operative_total_units=filter_facts.units,
                 operative_total_units_not_determined=filter_facts.units_not_determined,
                 operative_decision_status=decision_status_label,
@@ -315,6 +318,7 @@ with page_scope():
                 # plain number, None when reconciliation ran and genuinely found
                 # none (never a fabricated figure).
                 "Total Units": filter_facts.units,
+                **filter_facts.count_assessment.report_columns(),
                 # True when the resolved figure came from a lower-confidence source
                 # (an active proposal's own extraction, not yet AI-verified to the
                 # same standard as a granted consent) - same boolean shape as
@@ -441,15 +445,12 @@ with page_scope():
             exclude_completed = st.checkbox("Hide completed sites", value=False)
             hide_needs_review = st.checkbox("Hide schemes needing manual review", value=False)
             not_commenced_only = st.checkbox(
-                "Show only schemes not yet commenced", value=False,
-                help="Full permission granted, but no construction activity detected - the developer has the "
-                     "right to build but isn't yet, whether or not the 3-year deadline is close. Excludes "
-                     "schemes still awaiting a decision (not an acquisition opportunity yet) and ones already "
-                     "confirmed underway.",
+                "Permission recorded — commencement unverified", value=False,
+                help="Planning permission recorded; physical commencement and availability remain unverified.",
             )
 
         filtered = df[df["Council"].isin(councils) & df["Housing Type"].isin(housing_types)]
-        filtered = filtered[filtered["Total Units"].fillna(0) >= min_units]
+        filtered = filtered[numeric_unit_mask(filtered["Total Units"], minimum=min_units if min_units > 0 else None)]
         # Manual and parsed constraints are assessed jointly against the same claim.
         ah_minima = [min_affordable] if use_ah_minimum else []
         ah_maxima = [max_affordable] if use_ah_maximum else []
@@ -476,7 +477,7 @@ with page_scope():
             # Granted (excludes not_granted) but not confirmed underway - "unknown"
             # is included too (still granted, decision date just couldn't be
             # parsed), only "underway" and "not_granted" are excluded.
-            filtered = filtered[~filtered["lapse_status"].isin(["not_granted", "underway"])]
+            filtered = filtered[(filtered["decision_status"] == "granted") & (filtered["build_status"] == "unknown")]
 
         if nl_filters:
             # `if nl_filters.X:` treats a legitimate 0 as "not set" and silently
@@ -489,12 +490,15 @@ with page_scope():
             if nl_filters.council_codes:
                 filtered = filtered[filtered["Council"].isin(nl_filters.council_codes)]
             if nl_filters.min_total_units is not None:
-                filtered = filtered[filtered["Total Units"].fillna(0) >= nl_filters.min_total_units]
+                filtered = filtered[numeric_unit_mask(filtered["Total Units"], minimum=nl_filters.min_total_units)]
             if nl_filters.max_total_units is not None:
-                filtered = filtered[filtered["Total Units"].fillna(0) <= nl_filters.max_total_units]
+                filtered = filtered[numeric_unit_mask(filtered["Total Units"], maximum=nl_filters.max_total_units)]
             # AH constraints have already been assessed jointly above.
             if nl_filters.development_types:
                 filtered = filtered[filtered["Development Type"].isin(nl_filters.development_types)]
+            if nl_filters.require_available:
+                st.info("Availability is not evidenced by the current planning dataset. Remove the availability requirement to investigate potential leads.")
+                filtered = filtered[availability_mask(pd.Series("unknown", index=filtered.index))]
             if nl_filters.exclude_completed:
                 filtered = filtered[filtered["build_status"] != "complete"]
             if nl_filters.statuses:
@@ -627,6 +631,7 @@ with page_scope():
                     "Address": site.display_address,
                     "References": ", ".join(sorted(a.reference for a in apps)),
                     "Total Units": report_filter_facts.units,
+                    **report_filter_facts.count_assessment.report_columns(),
                     "Units Estimated": report_filter_facts.units_is_estimated,
                     "Has Active Proposal": report_filter_facts.has_active_proposal,
                     "Active Proposals": report_filter_facts.active_proposal_count,
@@ -661,7 +666,7 @@ with page_scope():
                     "build_status": lapse["build_status"],
                     "Lapse Risk": LAPSE_STATUS_LABELS[lapse["status"]],
                     "lapse_status": lapse["status"],
-                    "Commencement Deadline": lapse["deadline"].strftime("%d %b %Y") if lapse["deadline"] else None,
+                    "Assumed Permission Review Date": lapse["deadline"].strftime("%d %b %Y") if lapse["deadline"] else None,
                     "Data Quality": merged["data_quality_status"],
                     "Portal URL": rep_app.summary_url if rep_app else None,
                     # Per-application breakdown for the PDF report only (dropped
@@ -909,6 +914,8 @@ with page_scope():
             "Latest Status": "Planning Status", "Decision Status": "Decision", "Portal URL": "Planning portal",
         })
 
+        _display["Units"] = _display["Count Display"]
+
         # Desktop table (Part 17/18/19) - a deliberately short column set: Tenure
         # Split, Units Estimated, Housing Type Note, Landowner, Planning Agent,
         # Housing Association/RP, Data Quality and Needs Review are Part 17's
@@ -961,7 +968,7 @@ with page_scope():
                     # NaN included), which crashed a bare int(NaN). pd.notna() is
                     # the correct missing-value check here.
                     if pd.notna(row["Units"]):
-                        meta_bits.append(f"{int(row['Units']):,} units")
+                        meta_bits.append(str(row["Units"]))
                     from app.reporting.ah_kpi import affordable_count_kpi
                     assessment = row["_ah_assessment"]
                     st.metric("Affordable homes", affordable_count_kpi(assessment))

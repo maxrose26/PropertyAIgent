@@ -772,7 +772,7 @@ def test_ai_summary_prompt_context_uses_operative_facts(session):
     phase_breakdown = build_phase_breakdown([app])
     prompt = build_summary_prompt(site, [app], merged, lapse, phase_breakdown)
 
-    assert "SCHEME SCOPE: 45 total units (consented position)" in prompt
+    assert "SCHEME SCOPE: 45 homes" in prompt
     assert "OPERATIVE PLANNING POSITION: Granted" in prompt
 
 
@@ -791,8 +791,8 @@ def test_withdrawn_evidence_cannot_become_current_scheme_truth_in_ai_prompt_cont
     phase_breakdown = build_phase_breakdown([app])
     prompt = build_summary_prompt(site, [app], merged, lapse, phase_breakdown)
 
-    assert "not yet determined from the evidence held" in prompt
-    assert "OPERATIVE PLANNING POSITION: not yet determined" in prompt or "not yet determined from the evidence held" in prompt
+    assert "Unit count unverified" in prompt
+    assert "OPERATIVE PLANNING POSITION: Withdrawn" in prompt  # terminal status is known; current count is not
 
 
 # --- 24-26: Non-regression ---------------------------------------------------

@@ -159,7 +159,7 @@ def test_lacy_street_shape_folds_into_a_legitimate_whole_site_opportunity_instea
 #        evidence the site has already started) -----------------------------
 
 
-def test_barton_road_shape_plot_10_does_not_survive_and_underway_state_is_never_contradicted(session):
+def test_barton_road_shape_plot_10_does_not_survive_and_admin_activity_retains_unverified_whole_site_lead(session):
     site = _site(session, display_address="Barton Road shape")
     main = _app(
         session, site.id, "FUL/1",
@@ -189,12 +189,12 @@ def test_barton_road_shape_plot_10_does_not_survive_and_underway_state_is_never_
     # No replacement whole-site "undeveloped" card either - the site's own
     # resolved status is genuinely underway, so it correctly produces NO
     # undeveloped_phase card at all, never a contradiction of that state.
-    assert not any(c["params"]["site_id"] == str(site.id) for c in cards)
+    assert any(c["params"]["site_id"] == str(site.id) and "unverified" in c["reason"] for c in cards)
 
     universe = build_current_opportunity_universe(session)
     ids = {r.opportunity_id for r in universe}
     assert planning_delivery_phase_opportunity_id(site.id, "10") not in ids
-    assert planning_delivery_phase_opportunity_id(site.id, UNPHASED_LABEL) not in ids
+    assert planning_delivery_phase_opportunity_id(site.id, UNPHASED_LABEL) in ids
 
 
 # --- 3. Barton Road latent "Plot 43" shape: a single application citing ----
@@ -374,13 +374,13 @@ def test_genuine_material_development_parcel_with_plot_wording_survives(session)
     assert is_material_development_parcel(groups[("1", "plot")]) is True
 
     cards = _undeveloped_phase_cards(session, None)
-    plot_card = _phase_card(cards, "1")
+    plot_card = _phase_card(cards, "plot_1")
     assert plot_card is not None
     assert plot_card["phase_unit_count"] == 120
 
     universe = build_current_opportunity_universe(session)
     by_id = {r.opportunity_id: r for r in universe}
-    plot_id = planning_delivery_phase_opportunity_id(site.id, "1")
+    plot_id = planning_delivery_phase_opportunity_id(site.id, "plot_1")
     assert plot_id in by_id
     assert by_id[plot_id].fingerprint_fields["unit_count"] == 120
 

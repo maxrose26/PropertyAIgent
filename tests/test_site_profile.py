@@ -145,7 +145,7 @@ def test_build_site_profile_withdrawn_only_site_shows_not_verified_total(session
         decision_status=classify_decision_status(rep_app.decision, rep_app.status),
     )
     total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
-    assert total_tile["value"] == "Not yet verified"
+    assert total_tile["value"] == "Unit count unverified"
     rec = view["scheme_reconciliation"]
     assert rec["consented_position"]["approved_units"]["state"] == "not_determined"
     assert rec["active_positions"] == []  # withdrawn is neither consented nor active
@@ -233,7 +233,7 @@ def test_build_site_profile_eia_screening_only_site_has_no_substantive_headline(
         decision_status=classify_decision_status(rep_app.decision, rep_app.status),
     )
     total_tile = next(m for m in view["headline_metrics"] if m["label"] == "Total homes")
-    assert total_tile["value"] == "Not yet verified"
+    assert total_tile["value"] == "Unit count unverified"
     assert view["header"]["planning_status_label"] is None  # NOT "Decided"
     assert view["header"]["operative_permission_reference"] is None
     rec = view["scheme_reconciliation"]
@@ -297,21 +297,21 @@ def test_opportunity_position_approaching_lapse_flagged():
     op = build_opportunity_position(
         merged=merged, lapse=lapse, phase_breakdown=[], policy_rows=[], council_supply=None, has_missing_evidence=False,
     )
-    assert any("deadline" in r.lower() for r in op["reasons"])
+    assert any("assumed permission review date" in r.lower() for r in op["reasons"])
 
 
 def test_opportunity_position_undeveloped_phase_flagged():
     merged = {"total_units_final": 300}
     lapse = {"status": "underway", "build_status": "underway", "deadline": None}
     phase_breakdown = [
-        {"status": "approved_not_started", "unit_count": 50, "kind": "phase", "code": "1"},
+        {"status": "approved_commencement_unverified", "latest_grant": object(), "unit_count": 50, "kind": "phase", "code": "1"},
         {"status": "underway", "unit_count": 100, "kind": "phase", "code": "2"},
     ]
     op = build_opportunity_position(
         merged=merged, lapse=lapse, phase_breakdown=phase_breakdown, policy_rows=[], council_supply=None,
         has_missing_evidence=False,
     )
-    assert any("undeveloped phase" in r.lower() for r in op["reasons"])
+    assert any("commencement and availability remain unverified" in r.lower() for r in op["reasons"])
     assert op["why_it_matters"]
     assert op["investigate_next"]
 
@@ -476,9 +476,9 @@ def test_timeline_aggregates_repeated_progress_filings_into_one_entry(session):
     session.commit()
     lapse = compute_lapse_status([app], site)
     entries = build_site_timeline(session, site, [app], lapse, [], None, None, 0)
-    progress_entries = [e for e in entries if "progress filing" in e["label"]]
+    progress_entries = [e for e in entries if "administrative planning filing" in e["label"]]
     assert len(progress_entries) == 1
-    assert "4 commencement/progress filings" in progress_entries[0]["label"]
+    assert "4 administrative planning filings" in progress_entries[0]["label"]
 
 
 def test_timeline_includes_policy_events_scoped_to_this_sites_allocation(session):
@@ -512,11 +512,13 @@ def test_ai_summary_view_honest_when_none_stored(session):
     assert view["text"] is None
 
 
-def test_ai_summary_view_shows_stored_text_and_timestamp(session):
+def test_ai_summary_view_withholds_unversioned_text_but_preserves_timestamp(session):
     site = _make_site(session, status_summary="A concise status note.", status_summary_updated_at=_now())
     view = build_ai_summary_view(site)
-    assert view["has_summary"] is True
-    assert view["text"] == "A concise status note."
+    assert view["has_summary"] is False
+    assert view["text"] is None
+    assert "review required" in view["limitation"]
+    assert site.status_summary == "A concise status note."
     assert view["generated_at"] is not None
 
 

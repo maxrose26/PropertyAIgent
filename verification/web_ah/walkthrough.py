@@ -145,8 +145,11 @@ focus_index=next(i for i,r in table(explore).reset_index(drop=True).iterrows() i
 explore.session_state[next(d.key for d in explore.dataframe if str(d.key).startswith('sites_table_'))]={'selection':{'rows':[focus_index]}}
 run(explore)
 inline=json.dumps(values(explore)); (OUT/'explore-single-focus.json').write_text(inline)
-assert 'Historical AI summary' in inline and 'unverified' in inline
-assert any(e.label=='Read historical narrative (unverified)' and not e.proto.expanded for e in explore.expander)
+# Spec 023 withholds this unversioned inline narrative until reviewed.
+# Preserve the AH safeguard by proving the unsupported claim is not rendered.
+assert 'Stored narrative requires review against the commercial evidence contract before reuse' in inline
+assert '72 affordable retirement apartments legally secured; whole scheme 100% affordable.' not in inline
+assert not any(e.label=='Read historical narrative (unverified)' for e in explore.expander)
 assert 'reported; source and scope unverified' in inline
 assert 'operative terms unverified' in inline
 assert 'AH source link: not available' in inline
@@ -250,8 +253,15 @@ for sid in (78,25,32,107):
         ah_tiles=[block for block in detail.get('flex_container') if any(c.value=='Affordable homes' for c in block.get('caption')) and len(block.get('markdown'))==1]
         assert ah_tiles and all('>N/A</div>' in block.get('markdown')[0].value for block in ah_tiles)
     if sid==32:
-        assert any('26 (proposed)' in x for x in values(detail)['markdown'])
+        # CountAssessment supplies discovery scale; planning state stays separate.
+        assert any('>26 homes</div>' in x for x in values(detail)['markdown'])
+        assert any('Awaiting decision' in x for x in values(detail)['markdown'])
+        assert not any('Permission granted' in x for x in values(detail)['markdown'])
     if sid==107:
+        # New portal-only 82-home proposal must not steal the attribution of
+        # the old extracted 440 count, nor inherit that application's 0 AH.
+        assert any('>440 homes</div>' in x for x in values(detail)['markdown'])
+        assert not any('>82 homes</div>' in x for x in values(detail)['markdown'])
         assert 'stockport \u00b7 DC/098428' in '\n'.join(values(detail)['caption'])
         assert 'Current preferred version: **DC/098428**' in '\n'.join(values(detail)['caption'])
         assert 'Source application: DC/095922' in '\n'.join(values(detail)['caption'])

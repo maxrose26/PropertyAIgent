@@ -284,8 +284,10 @@ def test_recency_is_only_a_tie_break_between_equivalent_sources(session):
                  application_received="Mon 01 Jan 2020")
     _intel(session, newer, total_units_final=44)
     facts = build_operative_planning_facts([older, newer])
-    assert facts.consented_position.approved_units.value == 44
-    assert any(p.value == 40 for p in facts.consented_position.superseded_units)
+    # Bounded amendment: recency alone cannot prove count supersession.
+    assert facts.consented_position.approved_units.state == FACT_CONFLICT
+    assert {p.value for p in facts.consented_position.approved_units.conflicts} == {40, 44}
+    assert facts.consented_position.superseded_units == ()
 
 
 # --- 4. non-substantive guardrail (G1, G2) --------------------------------
@@ -485,8 +487,11 @@ def test_genuine_development_phase_remains_independently_scoped(session):
              status="Decided", decision="Granted", decision_issued_date="Wed 01 Jan 2024")
     _intel(session, a, total_units_final=80)
     facts = build_operative_planning_facts([a])
-    assert facts.consented_position.reference.source.scope_type == SCOPE_PHASE
-    assert facts.consented_position.reference.source.scope_label == "Phase EV1"
+    assert facts.resolved_applications[0].scope_type == SCOPE_PHASE
+    assert facts.resolved_applications[0].scope_label == "Phase EV1"
+    assert facts.consented_position.approved_units.value is None
+    from app.pipeline.phase_tracking import build_phase_breakdown
+    assert build_phase_breakdown([a])[0]["unit_count"] == 80
 
 
 def test_individual_dwelling_plot_does_not_create_a_peer_scope(session):
@@ -535,8 +540,10 @@ def test_material_development_parcel_remains_independently_scoped(session):
                 status="Decided", decision="Granted", decision_issued_date="Wed 01 Jan 2024")
     _intel(session, perm, total_units_final=45)
     facts = build_operative_planning_facts([perm])
-    assert facts.consented_position.reference.source.scope_type == SCOPE_PLOT
-    assert facts.consented_position.approved_units.value == 45
+    assert facts.resolved_applications[0].scope_type == SCOPE_PLOT
+    assert facts.consented_position.approved_units.value is None
+    from app.pipeline.phase_tracking import build_acquisition_scope_breakdown
+    assert build_acquisition_scope_breakdown([perm])[0]["unit_count"] == 45
 
 
 def test_uncertain_plot_wording_produces_uncertainty_not_fabricated_phase(session):

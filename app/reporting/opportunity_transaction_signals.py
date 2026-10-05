@@ -344,7 +344,9 @@ def build_transaction_signals(
             recent_permission = SignalValue.absent(f"The operative permission was decided on {decision_date.isoformat()}, outside the platform's {RECENT_PERMISSION_WINDOW_MONTHS}-calendar-month recency window.")
 
     # --- APPROACHING_IMPLEMENTATION_DEADLINE (UNCHANGED) --------------------
-    if lapse_status == "approaching":
+    if lapse_result.get("deadline_basis") == "assumed":
+        approaching_implementation_deadline = SignalValue.unknown("Only an assumed three-year review date exists; permission conditions and lawful implementation are unverified.")
+    elif lapse_status == "approaching":
         approaching_implementation_deadline = SignalValue.present(f"The statutory commencement deadline ({deadline.isoformat() if deadline else 'unknown'}) is within the platform's lapse-warning window.")
     elif lapse_status in ("underway", "safe", "lapsed"):
         approaching_implementation_deadline = SignalValue.absent("The deadline is not currently within the platform's lapse-warning window (already underway, comfortably distant, or already passed).")
@@ -442,7 +444,7 @@ def build_transaction_signals(
         ownership_or_control_evidence_changed=ownership_signal,
         raw_lapse_status=lapse_status,
         raw_implementation_deadline=deadline,
-        raw_build_status=build_status,
+        raw_build_status=lapse_result.get("raw_build_status", build_status),
         raw_decision_date=decision_date,
         raw_last_change_reasons=last_change_reasons,
         coverage_checked_at=coverage_checked_at,

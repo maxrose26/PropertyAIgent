@@ -546,7 +546,8 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
     `apps` list - this module iterates that same already-loaded data, not a
     fresh query per application."""
     from app.reporting.scheme_reconciliation import build_operative_planning_facts, resolve_operative_filter_facts
-    assessment = resolve_operative_filter_facts(build_operative_planning_facts(apps)).affordable_assessment
+    filter_facts = resolve_operative_filter_facts(build_operative_planning_facts(apps))
+    assessment = filter_facts.affordable_assessment
     current_ah_app = next((a for a in apps if a.reference == assessment.count.application_reference), None)
     current_version = build_current_version(site, apps, current_ah_app or rep_app)
     if rep_app is not None and current_ah_app is not rep_app:
@@ -573,6 +574,9 @@ def build_residential_mix(site: Site, apps: list[Application], *, rep_app: Appli
     housing_type = build_housing_type(scheme)
     density = build_density(scheme)
     overview_totals = build_overview_totals(scheme, affordable_headline)
+    overview_totals["total_homes"] = filter_facts.units
+    overview_totals["count_display"] = filter_facts.count_assessment.label()
+    overview_totals["count_note"] = filter_facts.count_assessment.note()
     ai_commentary = build_ai_commentary_view(site)
     # Gate 2B-2B.1 final closure micro-fix - the SAME trusted arithmetic-
     # reconciliation/explicit-evidence check app.reporting.scheme_

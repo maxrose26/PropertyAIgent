@@ -1,0 +1,19 @@
+{
+  "D01_epc_status": "complete",
+  "D01_count": 10,
+  "D02_build_states": {
+    "unknown": "underway",
+    "complete": "underway"
+  },
+  "D03_review_label": "\u23f0 Commencement deadline approaching",
+  "D03_basis": null,
+  "W01_surfaced": 1,
+  "W01_visible_applications": 0,
+  "W01_limited_destination": false,
+  "D04_joint_membership": true,
+  "D04_cross_boundary_councils": [
+    "othercouncil"
+  ],
+  "D05_summary": "confirmed",
+  "D05_status": "needs_review"
+}

@@ -15,6 +15,7 @@ _PORTAL_DATE_FORMATS = [
     "%a %d %b %Y",  # Idox: "Tue 21 Apr 2026" - plain string comparison sorts
                     # on the day-of-week prefix, not the actual date, so this
                     # must be parsed properly rather than compared as text.
+    "%Y-%m-%d",
     "%d/%m/%Y",     # Arcus's "Valid Date" field: "16/8/2024" - no day name,
                     # no zero-padding. Confirmed real bug: every Arcus
                     # council's dates were silently parsing to date.min here
@@ -30,7 +31,7 @@ _PORTAL_DATE_FORMATS = [
 def parse_portal_date(value: str | None) -> dt.date:
     if not value:
         return dt.date.min
-    stripped = value.strip()
+    stripped = str(value).strip()
     for fmt in _PORTAL_DATE_FORMATS:
         try:
             return dt.datetime.strptime(stripped, fmt).date()
@@ -39,13 +40,8 @@ def parse_portal_date(value: str | None) -> dt.date:
     return dt.date.min
 
 
-# Most full planning permissions carry a standard condition requiring
-# development to commence within 3 years of the decision date (unless a
-# different period is expressly stated - we don't have condition-level
-# detail to know when that's varied, so this is a reasonable default, not a
-# guarantee). No construction detected as that deadline approaches or
-# passes is a genuine acquisition signal: the landowner may need to
-# re-apply, sell, or risk losing the consent entirely.
+# A three-year review assumption only. Permission-specific conditions and lawful
+# implementation are not established; this is not a statutory deadline or urgency.
 GRANTED_KEYWORDS = ["approve", "grant"]
 COMMENCEMENT_YEARS = 3
 LAPSE_WARNING_DAYS = 180  # ~6 months out
@@ -93,10 +89,10 @@ def get_expected_decision(app: Application) -> dict:
     return {"date": None, "source": None}
 
 LAPSE_STATUS_LABELS = {
-    "lapsed": "⚠️ Permission may have lapsed",
-    "approaching": "⏰ Commencement deadline approaching",
-    "underway": "🏗️ Build underway",
-    "safe": "OK",
+    "lapsed": "⚠️ Assumed permission review date passed — legal lapse unverified",
+    "approaching": "⏰ Assumed permission review date approaching",
+    "underway": "Unverified legacy underway classification",
+    "safe": "Assumed review date outside warning window",
     "not_granted": "Not yet granted",
     "unknown": "Unknown",
     # Gate 2B-2C - distinct from "not_granted" (nothing has been granted at
@@ -131,14 +127,7 @@ def is_granted_decision(decision: str | None) -> bool:
     return any(kw in decision_lower for kw in GRANTED_KEYWORDS)
 
 
-# Categories that indicate an application is a follow-on administrative
-# filing against an already-granted permission, rather than a new proposal.
-# A developer filing one of these is the clearest available portal-native
-# evidence that a scheme is actually moving, not just approved on paper -
-# these are essentially never filed speculatively. Single-sourced here
-# (rather than in app.pipeline.phase_tracking, which uses it too) since
-# lapse_tracking is the lower-level module both phase_tracking and this
-# whole-site build-status check depend on.
+# Administrative filings establish planning activity only, never physical works.
 PROGRESS_SIGNAL_CATEGORIES = {"condition_discharge_or_details", "variation_or_amendment"}
 
 
@@ -159,42 +148,26 @@ def find_progress_signal_filing(
 
 
 BUILD_STATUS_LABELS = {
-    "underway": "🏗️ Underway (filing detected)",
-    "complete": "✅ Complete (EPC)",
-    "partially_complete": "🏗️ Partially complete (EPC)",
+    "underway": "Unverified legacy underway classification",
+    "complete": "Unverified legacy EPC completion classification",
+    "partially_complete": "Unverified legacy EPC partial-completion classification",
     # Deliberately not "Not started" - an EPC is only lodged near practical
     # completion, so 0 EPCs only proves nothing has finished yet, not that
     # construction hasn't begun (a site mid-build with no logged portal
     # filing looks identical to a genuinely untouched one here).
-    "no_completions_yet": "❔ No completions yet (0 EPCs - may still be under construction)",
+    "no_completions_yet": "No matching completion evidence — physical status unknown",
     "unknown": "Unknown",
 }
 
 
 def classify_build_status(applications: list[Application], site: Site, since: dt.date | None) -> str:
-    """Combines two independent "has this actually been built" signals:
+    """Current storage contains unscoped EPC-derived states, not verified works.
 
-    1. Portal-native progress-signal filing (see PROGRESS_SIGNAL_CATEGORIES
-       above) - free, always available, no API key needed. Its PRESENCE is
-       strong positive evidence of "underway", but its ABSENCE doesn't prove
-       nothing has started (not every site generates one of these filings),
-       so this can only ever confirm "underway", never "not started".
-    2. EPC Open Data (site.build_status, set by
-       app.pipeline.run_weekly.stage_check_build_status) - new dwellings get
-       an EPC registered near completion, so this is the only signal that
-       can distinguish "complete"/"not started" - but needs a free
-       EPC_API_KEY (bearer token) in .env, from
-       https://get-energy-performance-data.communities.gov.uk, to be
-       anything but "unknown".
-
-    Portal evidence of "underway" takes priority when both are present -
-    it's the more direct signal and doesn't depend on external API setup.
+    Administrative activity cannot promote or override a physical status. Keep
+    raw persisted evidence untouched; expose it separately as unverified context.
+    No accepted independently scoped completion writer exists in this schema.
     """
-    if since:
-        filing = find_progress_signal_filing(applications, since)
-        if filing:
-            return "underway"
-    return site.build_status or "unknown"
+    return "unknown"
 
 
 DECISION_STATUS_LABELS = {
@@ -294,17 +267,17 @@ def compute_lapse_status(applications: list[Application], site: Site) -> dict:
     anchor = resolve_operative_lapse_anchor(applications)
     if anchor.state != FACT_RESOLVED:
         status = "not_determined" if anchor.any_granted else "not_granted"
-        return {"status": status, "deadline": None, "granted_app": None, "build_status": "unknown"}
+        return {"deadline_basis": "unknown", "deadline_note": "No dated operative permission is established.", "availability": "unknown", "raw_build_status": site.build_status, "status": status, "deadline": None, "granted_app": None, "build_status": "unknown"}
 
     decision_date = anchor.decision_date
     if decision_date is None or decision_date == dt.date.min:
-        return {"status": "unknown", "deadline": None, "granted_app": anchor.application, "build_status": "unknown"}
+        return {"deadline_basis": "unknown", "deadline_note": "The operative decision date is unknown.", "availability": "unknown", "raw_build_status": site.build_status, "status": "unknown", "deadline": None, "granted_app": anchor.application, "build_status": "unknown"}
 
     deadline = _resolve_lapse_deadline(decision_date)
 
     build_status = classify_build_status(applications, site, decision_date)
     if build_status in ("underway", "partially_complete", "complete"):
-        return {"status": "underway", "deadline": deadline, "granted_app": anchor.application, "build_status": build_status}
+        return {"deadline_basis": "assumed", "deadline_note": "Assumes three years from the operative decision; permission conditions and lawful implementation are unverified.", "availability": "unknown", "raw_build_status": site.build_status, "status": "underway", "deadline": deadline, "granted_app": anchor.application, "build_status": build_status}
 
     days_left = (deadline - dt.date.today()).days
     if days_left < 0:
@@ -313,4 +286,4 @@ def compute_lapse_status(applications: list[Application], site: Site) -> dict:
         status = "approaching"
     else:
         status = "safe"
-    return {"status": status, "deadline": deadline, "granted_app": anchor.application, "build_status": build_status}
+    return {"deadline_basis": "assumed", "deadline_note": "Assumes three years from the operative decision; permission conditions and lawful implementation are unverified.", "availability": "unknown", "raw_build_status": site.build_status, "status": status, "deadline": deadline, "granted_app": anchor.application, "build_status": build_status}

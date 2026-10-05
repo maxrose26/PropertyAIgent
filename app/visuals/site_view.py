@@ -28,7 +28,11 @@ def _current_non_rejected(session, **filters) -> list[VisualEvidence]:
 
 
 def _split_primary(images: list[VisualEvidence]) -> dict:
-    primary = next((img for img in images if img.is_primary), None)
+    primary = next((img for img in images if img.is_primary and img.review_status == "confirmed"), None)
+    if primary is None:
+        primary = next((img for img in images if img.review_status == "confirmed"), None)
+    if primary is None:
+        primary = next((img for img in images if img.is_primary), None)
     others = [img for img in images if img is not primary]
     # Confirmed images first, then by descending AI confidence - matches
     # app.visuals.primary_selection's own ranking bias so the thumbnail
@@ -105,7 +109,7 @@ def build_allocation_visual_summaries(session, allocation_ids: list[int]) -> dic
 
     for allocation_id, images in grouped.items():
         split = _split_primary(images)
-        has_confirmed = (split["primary"] is not None) or any(img.review_status == "confirmed" for img in split["others"])
+        has_confirmed = any(img.review_status == "confirmed" for img in images)
         status = "confirmed" if has_confirmed else "needs_review"
         result[allocation_id] = {"status": status, "primary": split["primary"], "others": split["others"]}
     return result
