@@ -772,3 +772,36 @@ Full specification and implementation boundaries are recorded in [PRODUCT_ROADMA
 ## Recommended Next Task
 
 **Gate 2B-0B — Application Lifecycle Intelligence (architecture investigation only).** Gate 2B is fully closed (2B-0A through 2B-2C, production merge `1eb7e5fb1540127c20b0da88205b9f0e95120da1`, live at `propertyaigent.onrender.com`). Promoted ahead of Gate 2C by Product Owner decision: the platform can now reliably answer "what does the planning evidence mean?" but not yet "has that evidence changed since we last checked?" The next task is an architecture investigation only — see "Gate 2B-0B — Application Lifecycle Intelligence (NEXT)" above for the full required-investigation scope. **Do not implement Gate 2B-0B yet; no schema or code change is authorised until that investigation is reviewed by the Product Owner.** Separately: platform-wide scheduled status verification stays fail-closed until the production daily-scrape scheduler is proven healthy (operational dependency, not Gate 2B feature work).
+
+## Approved carry-forward: buyer-specific opportunity sets (2026-10-05)
+
+Documented direction only; not implemented by Stage 2.
+One planning scheme may generate multiple simultaneous buyer-specific acquisition
+opportunities. Planning progression can change those opportunities differently
+for each buyer. A 500-home outline followed by a 125-home Reserved Matters parcel
+could imply residual planning capacity up to ~375 homes for a housebuilder
+(availability/control unverified), an advanced ~125-home parcel as a stronger SFH
+investor signal, or an affordable component for an RP/affordable fund subject to
+tenure/package verification. The RM-approved parcel may itself remain a developer
+acquisition opportunity: RM approval does not prove unavailability. These are
+illustrations, not permission to subtract overlapping or unverified scopes.
+
+- Planning status is not acquisition status.
+- Residual planning capacity is not verified available capacity.
+- A planning application is not automatically an acquisition subject.
+- One evidence event may strengthen, weaken, create or transform different
+  buyer-specific opportunities.
+
+Proposed stages:
+- **Stage 2.5 — Opportunity Decomposition & Buyer Signals.**
+- **Stage 2.6 — Real-World Extraction and Evidence Validation.** Carry forward
+  reduced physical-status filter usefulness until independently scoped evidence
+  can be validated; UNKNOWN must never mean not commenced, completed or available.
+- **Later — Deep Opportunity Verification Agent.**
+- **Later — Autonomous Acquisition Agent**, monitoring changes in buyer-specific
+  opportunity sets rather than merely planning applications.
+
+Matching policy v5 is the accepted Stage 2 policy. Frozen v4 Agent Evaluation
+Benchmark expectations require a separately reviewed rebaseline before being
+used as current v5 behavioural expectations. No benchmark fixtures are rewritten.
+Unversioned stored AI narratives remain withheld from trusted buyer presentation.

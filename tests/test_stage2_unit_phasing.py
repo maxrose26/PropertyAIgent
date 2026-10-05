@@ -382,3 +382,96 @@ def test_exact_extraction_source_stays_separate_from_newer_portal_and_ah_identit
     assert mix["scheme"].total_units_final == 440
     assert mix["affordable_assessment"].count.application_reference == "NEW/1"
     assert mix["affordable_assessment"].count.value is None
+
+
+@pytest.mark.parametrize("precision,lower,upper,expected", [
+    ("APPROXIMATE", 100, 102, "INSUFFICIENT_EVIDENCE"),
+    ("RANGE", 45, 55, "INSUFFICIENT_EVIDENCE"),
+    ("RANGE", 90, 120, "INSUFFICIENT_EVIDENCE"),
+    ("RANGE", 110, 120, "INSUFFICIENT_EVIDENCE"),
+    ("APPROXIMATE", None, None, "INSUFFICIENT_EVIDENCE"),
+    ("UNKNOWN", None, None, "INSUFFICIENT_EVIDENCE"),
+    ("RANGE", 70, 80, "STRONG_FIT"),
+    ("EXACT", 100, 100, "STRONG_FIT"),
+])
+def test_uncertain_scale_fit_uses_evidence_bounds_not_rounded_scalar(precision, lower, upper, expected):
+    from app.reporting.residential_count import CountAssessment
+    from app.policy.buyer_matching import MatchingFacts, PLANNING_DELIVERY
+    count = CountAssessment(scope_type="whole_site", scope_label="Whole site", precision=precision,
+                            value=100, lower=lower, upper=upper)
+    facts = MatchingFacts(opportunity_type=PLANNING_DELIVERY, unit_count=100,
+        count_assessment=count, affordable_unit_count=None, development_type_raw="houses", is_specialist_development=False,
+        affordable_percentage=30.0, affordable_percentage_trusted=True,
+        planning_state="permission_granted", has_identified_planning_activity=True,
+        has_phasing_evidence=False, matched_to_site=True)
+    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    assert fit.classification == expected
+    assert fit.classification != NOT_SUITABLE
+    if precision in ("APPROXIMATE", "RANGE"):
+        assert fit.is_investigative_exception and fit.investigate
+        assert any("exact mandate compliance unverified" in r for r in fit.unknown)
+        assert not any("sits within" in r for r in fit.matches)
+
+
+def _profile_for_sources(session, site, apps):
+    from app.reporting.site_profile import build_site_profile
+    from app.pipeline.lapse_tracking import compute_lapse_status
+    from app.ui.common import aggregate_scheme_fields
+    return build_site_profile(session, site, apps, merged=aggregate_scheme_fields(apps), rep_app=apps[-1],
+        lapse=compute_lapse_status(apps, site), phase_breakdown=[], decision_status="granted")
+
+
+def test_exact_source_prefers_operative_supporter_over_alphabetical_first(session):
+    site = scheme(session)
+    older = application(session, site, "A/OLD", 100)
+    current = application(session, site, "Z/CURRENT", 100, date="2026-02-01")
+    session.commit()
+    profile = _profile_for_sources(session, site, [older, current])
+    assert profile["count_assessment"].exact_value == 100
+    assert profile["residential_mix"]["extraction_reference"] == current.reference
+    assert len(profile["count_assessment"].sources) == 2
+
+
+@pytest.mark.parametrize("multiple_active", [False, True])
+def test_exact_source_without_operative_identity_has_deterministic_supporting_fallback(session, monkeypatch, multiple_active):
+    import app.reporting.site_profile as sp
+    site = scheme(session)
+    apps = [application(session, site, ref, 100) for ref in ("Z/1", "A/1")]
+    session.commit()
+    facts = build_operative_planning_facts(apps)
+    active = ()
+    if multiple_active:
+        # Two active positions cannot establish a single operative identity.
+        pending = application(session, site, "PENDING", 100, decision=None)
+        position = build_operative_planning_facts([pending]).active_positions[0]
+        active = tuple(replace(position, reference=replace(position.reference,
+                       source=replace(position.reference.source, application_id=a.id), value=a.reference))
+                       for a in apps)
+    # No established operative reference; count evidence itself remains intact.
+    facts = replace(facts, consented_position=replace(facts.consented_position,
+                    reference=replace(facts.consented_position.reference, state="not_determined", source=None)),
+                    active_positions=active)
+    monkeypatch.setattr(sp, "build_operative_planning_facts", lambda _: facts)
+    for order in (apps, list(reversed(apps))):
+        profile = _profile_for_sources(session, site, order)
+        assert profile["residential_mix"]["extraction_reference"] == "A/1"
+        assert profile["count_assessment"].exact_value == 100
+
+
+def test_exact_source_rejects_stale_supporter_without_displayed_count(session, monkeypatch):
+    import app.reporting.site_profile as sp
+    site = scheme(session)
+    good = application(session, site, "A/GOOD", 100)
+    current = application(session, site, "Z/CURRENT", 100, date="2026-02-01")
+    session.commit()
+    facts = build_operative_planning_facts([good, current])
+    monkeypatch.setattr(sp, "build_operative_planning_facts", lambda _: facts)
+    current.scheme_intelligence.total_units_final = 82
+    profile = _profile_for_sources(session, site, [good, current])
+    assert profile["count_assessment"].exact_value == 100
+    assert profile["residential_mix"]["extraction_reference"] == "A/GOOD"
+    assert profile["residential_mix"]["affordable_assessment"].count.application_reference == "Z/CURRENT"
+    good.scheme_intelligence.total_units_final = 82
+    profile = _profile_for_sources(session, site, [good, current])
+    assert profile["residential_mix"]["extraction_reference"] is None
+    assert profile["count_assessment"].exact_value == 100

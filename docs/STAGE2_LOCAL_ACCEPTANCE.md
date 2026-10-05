@@ -130,3 +130,47 @@ were not included. AH-scope preservation above refers to selected consumer tests
 not the complete AH compatibility gate. See `STAGE2_UNIT_PHASING_AMENDMENT.md`
 for the evidenced omission, stale assertions and real attribution correction.
 Complete `verification/web_ah/check.sh` parity is now a required acceptance gate.
+
+## Final pre-merge reconciliation (2026-10-05)
+
+Parent candidate: `fb34e61fe9db67a815e4d9efc156370fb23e0525`.
+The corrected prior selected local acceptance/regression suite was **1,170**,
+not every repository test. This reconciliation adds 12 focused fit/provenance
+cases; selected total **1,182** = 112 commercial/unit/phasing + 861 relevant
+business/UI regressions + 199 Stage 1 security + 10 lifecycle/journey tests.
+All final results: zero failures/errors/skips. The 12 new cases also pass alone
+(38 other unit/phasing cases deselected). No benchmark rebaseline was run.
+The broader 861 invocation remains the exact documented selection in
+`STAGE2_UNIT_PHASING_AMENDMENT.md`.
+
+Hosted coverage is a separate gate. The existing AH web-only acceptance workflow
+now additionally runs **Stage 2 commercial evidence and Stage 1 security (offline)**
+on push and pull_request, bounded to 15 minutes, with read-only repository
+permissions and no persisted checkout credentials. Its exact command is:
+
+```sh
+bash verification/stage2/check.sh INTERPRETER OUTPUT_DIRECTORY
+```
+
+This runs all three requested Stage 2 files (commercial evidence, unit/phasing,
+profile journey), the Stage 1 access/buyer-scope/call-site/command security suite,
+and UI session lifecycle. Each test subprocess uses env-i, synthetic SQLite,
+existing synthetic admission fixtures and syscall-denied outbound networking.
+Pinned dependency installation is the existing setup step; no production secrets,
+paid calls or deployment steps are added. Local hosted-command parity: 112 + 199
++ 10 passed. Existing full AH command parity remains independently required:
+
+```sh
+bash verification/web_ah/check.sh INTERPRETER OUTPUT_DIRECTORY
+```
+
+Result: 257 passed plus 10 subtests, followed by successful actual rendered CSV
+walkthrough. These overlap the selected suite and are not added to its total.
+Local parity does not claim hosted success for the new descendant; inspect exact
+head-SHA workflow results after publication.
+
+Commercial boundaries preserved: unknown physical status does not mean available,
+not commenced or completed; unversioned narratives stay withheld; matching policy
+v5 remains unchanged. Frozen v4 Agent Evaluation Benchmark expectations require a
+separately reviewed rebaseline. Roadmap stages 2.5/2.6 and later opportunity agents
+are documented only in PRODUCT_ROADMAP.md; no implementation is included.

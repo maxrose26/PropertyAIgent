@@ -30,3 +30,25 @@ jobs:
           path: ${{ runner.temp }}/ah-web-evidence
           if-no-files-found: error
           retention-days: 7
+  stage2-security:
+    name: Stage 2 commercial evidence and Stage 1 security (offline)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned dependencies
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/stage2-venv"
+      - name: Offline Stage 2, Stage 1 security and journeys
+        run: bash verification/stage2/check.sh "$RUNNER_TEMP/stage2-venv/bin/python" "$RUNNER_TEMP/stage2-evidence"
+      - name: Test summary
+        if: always()
+        run: python3 verification/ci/summary.py "$RUNNER_TEMP/stage2-evidence" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage2-security-${{ github.sha }}
+          path: ${{ runner.temp }}/stage2-evidence
+          if-no-files-found: error
+          retention-days: 7

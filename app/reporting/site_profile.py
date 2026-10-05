@@ -582,11 +582,9 @@ def build_site_profile(
 
     # The application whose coherent scheme_intelligence record represents
     # the scheme for residential-mix / affordable-headline purposes - the
-    # CONSENTED position if one exists, else the first ACTIVE position (an
-    # arbitrary but stable choice among possibly several - see
-    # header["planning_status_label"] below for how multiple active
-    # positions are represented honestly rather than silently reduced to
-    # one).
+    # CONSENTED position if one exists, else an unambiguous ACTIVE position.
+    # Multiple active scopes do not establish one operative extraction.
+    # AH identity is independently selected by build_residential_mix.
     #
     # Gate 2B-2B.1 (Sections 12-13, 29 "no fallback after NOT_DETERMINED"):
     # this used to fall back to the raw `rep_app` (pick_representative_
@@ -608,19 +606,29 @@ def build_site_profile(
     operative_app = None
     if consented.reference.state == FACT_RESOLVED and consented.reference.source is not None:
         operative_app = next((a for a in all_apps if a.id == consented.reference.source.application_id), None)
-    elif active_positions and active_positions[0].reference.state == FACT_RESOLVED:
+    elif len(active_positions) == 1 and active_positions[0].reference.state == FACT_RESOLVED:
         src = active_positions[0].reference.source
         operative_app = next((a for a in all_apps if a.id == src.application_id), None) if src else None
     mix_rep_app = operative_app
     # Planning/navigation identity can follow a newer portal-only application.
     # Attribute an exact extracted count to one of its agreeing evidence
     # applications; the current AH identity remains independently selected below.
-    count_source_ids = [source.application_id for source in current_count.sources]
-    if current_count.exact_value is not None and count_source_ids:
-        count_source_app = next((a for source_id in count_source_ids for a in all_apps
-                                 if a.id == source_id and a.scheme_intelligence is not None), None)
-        if count_source_app is not None and count_source_app.scheme_intelligence is not None:
-            mix_rep_app = count_source_app
+    if current_count.exact_value is not None:
+        from app.reporting.commercial_evidence import known_unit_count
+        count_source_ids = {source.application_id for source in current_count.sources
+                            if known_unit_count(source.value) == current_count.exact_value}
+        supporting_apps = [a for a in all_apps if a.id in count_source_ids
+                           and a.scheme_intelligence is not None
+                           and known_unit_count(a.scheme_intelligence.total_units_final)
+                           == current_count.exact_value]
+        # Prefer the established operative identity only among actual supporters.
+        # Otherwise retain a deterministic evidence-only fallback; never change
+        # the count or borrow a non-supporting application's extraction.
+        mix_rep_app = next((a for a in supporting_apps if operative_app is not None
+                             and a.id == operative_app.id), None)
+        if mix_rep_app is None:
+            mix_rep_app = next(iter(sorted(supporting_apps,
+                                key=lambda a: (a.reference or "", str(a.id)))), None)
 
     header = build_site_header(
         site=site, merged=merged, lapse=lapse, decision_status=decision_status,

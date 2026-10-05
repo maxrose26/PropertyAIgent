@@ -890,7 +890,13 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
 
     assessment = facts.count_assessment if profile.scale_metric != AFFORDABLE_UNITS else None
     uncertain_scale = assessment is not None and assessment.precision in ("APPROXIMATE", "RANGE")
+    if assessment is not None:
+        # A rounded/stale scalar cannot override the shared evidence assessment.
+        scale_value = assessment.exact_value
     if scale_value is None and uncertain_scale:
+        if assessment.within_hard_bounds(minimum=profile.target_unit_min,
+                                         maximum=profile.target_unit_max) is not True:
+            blocking_unknown = True
         unknown.append(f"{assessment.label()}: uncertain discovery scale; exact mandate compliance unverified. " + assessment.note())
         # Existing minimum exclusion remains hard. Maxima are existing SOFT
         # preferences, never relabelled hard limits. Generic explicit numeric

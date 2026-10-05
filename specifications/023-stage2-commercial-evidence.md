@@ -91,3 +91,17 @@ transition review before any production recomputation; do not emit this as a new
 real-world planning event.
 Inventory any persisted derived-data carry-forward separately; exact affected
 production row counts cannot be supplied without an authorised future query.
+
+## Final pre-merge reconciliation (2026-10-05)
+
+Uncertain residential scale remains discoverable, but cannot yield unqualified
+STRONG_FIT when its supported bounds do not establish the buyer's target range.
+Use the existing INSUFFICIENT_EVIDENCE classification and investigative reasons;
+soft targets do not become hard exclusions. Fully contained bounds can support
+fit with uncertainty disclosed. Rounded/stale scalars cannot override assessment
+bounds; unknown stays unknown. Buyer total/affordable metric selection is unchanged.
+
+For an exact count, prefer the established operative application among genuine
+supporting extractions. Otherwise use deterministic supporting-reference/ID order.
+Never attribute a count to a source without that count, or change the resolved
+count to obtain a preferred source. AH identity remains independently selected.
