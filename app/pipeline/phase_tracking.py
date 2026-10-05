@@ -34,6 +34,11 @@ PHASE_STATUS_LABELS = {
 }
 
 
+def acquisition_scope_key(row: dict) -> str:
+    """Keep existing phase IDs; material plots must not collide with phases."""
+    return f"plot_{row['code']}" if row["kind"] == "plot" else row["code"]
+
+
 def extract_phase_labels(text: str | None) -> list[tuple[str, str]]:
     """All phase/plot codes explicitly named in the text, in first-seen
     order, as (code, kind) pairs where kind is "phase" or "plot" - a single

@@ -295,3 +295,65 @@ def test_duplicate_phase_scope_is_never_aggregated_even_with_pair_token(session)
     row = build_phase_breakdown(apps)[0]
     bucket = summarize_phase_units([row, row], non_overlap_evidence=(("3", "3", "synthetic"),))["approved_commencement_unverified"]
     assert bucket["units"] is None
+
+
+def test_category_navigation_and_count_text_stay_inside_each_card(monkeypatch):
+    from contextlib import contextmanager, nullcontext
+    from app.ui import shell
+    from app.reporting.residential_count import CountAssessment
+    class UI:
+        def __init__(self):
+            self.stack, self.links, self.captions = [], [], []
+        @contextmanager
+        def container(self, **kwargs):
+            self.stack.append(kwargs["key"])
+            try:
+                yield
+            finally:
+                self.stack.pop()
+        def columns(self, spec, **kwargs):
+            return [nullcontext() for _ in range(spec if isinstance(spec, int) else len(spec))]
+        def markdown(self, *args, **kwargs):
+            pass
+        def badge(self, *args, **kwargs):
+            pass
+        def caption(self, text):
+            self.captions.append((self.stack[-1], text))
+        def page_link(self, page, **kwargs):
+            self.links.append((self.stack[-1], page, kwargs["query_params"]))
+    ui = UI()
+    monkeypatch.setattr(shell, "st", ui)
+    exact = CountAssessment("whole_site", "Whole site", precision="EXACT", value=102, lower=102, upper=102)
+    approximate = replace(exact, precision="APPROXIMATE", value=100, lower=100, upper=102, resolution="immaterial_variance")
+    cards = [dict(id=str(i), title="Synthetic", subtitle="Council", reason="Evidence", metric="Permission",
+                  count_assessment=count, page="pages/1_Scheme_Detail.py", params={"site_id": str(i)})
+             for i, count in enumerate((exact, approximate, None), 1)]
+    shell.opportunity_category_section(dict(key="phase", heading="Phases", count=3, explanation="Synthetic",
+                                            available=True, cards=cards), key="test")
+    assert [(context, params) for context, _, params in ui.links] == [
+        (f"opp-cat-card-test-{i}", {"site_id": str(i)}) for i in range(1, 4)]
+    assert ("opp-cat-card-test-1", "102 homes") in ui.captions
+    assert ("opp-cat-card-test-2", "Current evidence varies slightly: 100–102.") in ui.captions
+
+
+def test_phase_and_material_plot_same_number_keep_distinct_identity_and_count(session):
+    from app.reporting.opportunity_universe import build_current_opportunity_universe
+    from app.pipeline.phase_tracking import acquisition_scope_key, build_acquisition_scope_breakdown
+    site = scheme(session)
+    application(session, site, "PHASE/3", 180, phase="3")
+    plot = application(session, site, "PLOT/3", 72)
+    plot.proposal = "Full application for Plot 3 comprising 72 dwellings"
+    session.commit()
+    raw = _undeveloped_phase_cards(session, 100)
+    assert {c["phase_code"] for c in raw} == {"3", "plot_3"}
+    assert len({c["id"] for c in raw}) == 2
+    cards = [_reshape_signal_card(c, opportunity_type="planning_delivery", extra_tags=[]) for c in raw]
+    _attach_planning_delivery_matching_facts(session, cards)
+    assert {c["params"]["phase_code"]: c["matching_facts"].unit_count for c in cards} == {"3": 180, "plot_3": 72}
+    rows = build_acquisition_scope_breakdown(list(site.applications))
+    assert {acquisition_scope_key(r): r["label"] for r in rows} == {"3": "Phase 3", "plot_3": "Plot 3"}
+    records = build_current_opportunity_universe(session)
+    own = [r for r in records if r.opportunity_id.startswith(f"planning_delivery:phase:{site.id}:")]
+    assert len({r.opportunity_id for r in own}) == 2
+    from app.policy.agent_evaluation_persistence import resolve_acquisition_subject_key
+    assert {resolve_acquisition_subject_key(r.opportunity_id, r.opportunity_type)[2] for r in own} == {"3", "plot_3"}

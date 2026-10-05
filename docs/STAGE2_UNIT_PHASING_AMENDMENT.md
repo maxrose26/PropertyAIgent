@@ -73,7 +73,7 @@ socketpair but denies network connects/datagram sends. No paid/production calls.
 
 Test selections:
 - Focused: `test_stage2_commercial_evidence.py` (62 original) and
-  `test_stage2_unit_phasing.py` (34 amendment/adversarial cases).
+  `test_stage2_unit_phasing.py` (36 amendment/adversarial cases).
 - Business/UI: original 769-case selection recorded in
   `stage2-evidence/regressions.xml`, plus `test_residential_mix.py` and
   `test_allocation_development_coverage.py` (92 additional cases).
@@ -116,3 +116,11 @@ The new assessment fingerprint retains bounds/precision/scope so a change from
 approximate to conflict is visible. Historical rows are untouched. A separately
 reviewed semantic transition/rebaseline is needed before production recomputation;
 do not report these code-driven differences as new real-world planning events.
+
+Independent review of the first descendant found a secondary category renderer
+navigation regression. The continuation restores links regardless of count/note
+and tests all three cases inside the correct card container. Material plot
+identities now use `plot_<code>` to avoid colliding with an identically numbered
+phase when all eligible subjects are emitted; ordinary phase IDs are unchanged.
+This also requires explicit production identity-transition review before any
+future monitoring recomputation. No stored anchors or evaluations are rewritten.

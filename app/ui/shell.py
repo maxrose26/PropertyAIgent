@@ -852,10 +852,10 @@ def opportunity_category_section(category: dict, *, key: str) -> None:
                     st.markdown(f"**{_escape(card['title'])}**")
                     st.caption(f"{card['subtitle']} · {card['reason']}")
                     st.markdown(f"**{_escape(str(card['metric']))}**")
-            if card.get("count_assessment"):
-                st.caption(card["count_assessment"].label())
-                if card["count_assessment"].note():
-                    st.caption(card["count_assessment"].note())
+                    if card.get("count_assessment"):
+                        st.caption(card["count_assessment"].label())
+                        if card["count_assessment"].note():
+                            st.caption(card["count_assessment"].note())
                     if card.get("page"):
                         st.page_link(card["page"], label="View →", query_params=card.get("params") or {})
 

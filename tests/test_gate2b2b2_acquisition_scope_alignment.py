@@ -374,13 +374,13 @@ def test_genuine_material_development_parcel_with_plot_wording_survives(session)
     assert is_material_development_parcel(groups[("1", "plot")]) is True
 
     cards = _undeveloped_phase_cards(session, None)
-    plot_card = _phase_card(cards, "1")
+    plot_card = _phase_card(cards, "plot_1")
     assert plot_card is not None
     assert plot_card["phase_unit_count"] == 120
 
     universe = build_current_opportunity_universe(session)
     by_id = {r.opportunity_id: r for r in universe}
-    plot_id = planning_delivery_phase_opportunity_id(site.id, "1")
+    plot_id = planning_delivery_phase_opportunity_id(site.id, "plot_1")
     assert plot_id in by_id
     assert by_id[plot_id].fingerprint_fields["unit_count"] == 120
 

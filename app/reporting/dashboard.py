@@ -1181,7 +1181,7 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
     for a in apps:
         by_site.setdefault(a.site_id, []).append(a)
 
-    from app.pipeline.phase_tracking import extract_phase_labels
+    from app.pipeline.phase_tracking import extract_phase_labels, acquisition_scope_key
     candidate_site_ids = [sid for sid, group in by_site.items() if len(group) >= 2
                           or any(extract_phase_labels(a.proposal) or extract_phase_labels(a.address) for a in group)]
     if not candidate_site_ids:
@@ -1198,18 +1198,19 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
         if not undeveloped:
             continue
         for phase in undeveloped:
+            scope_key = acquisition_scope_key(phase)
             grant_date = (
                 parse_portal_date(phase["latest_grant"].decision_issued_date) if phase.get("latest_grant") else None
             )
             cards.append({
-                "id": f"opp-phase-{site.id}-{phase['code']}", "title": f"{site.display_address} — {phase['label']}",
+                "id": f"opp-phase-{site.id}-{scope_key}", "title": f"{site.display_address} — {phase['label']}",
                 "subtitle": site.council_code,
                 "reason": f"{phase['label']} has permission recorded; physical commencement and availability unverified",
                 "metric": f"{len(undeveloped)} phase(s) with commencement unverified" if len(undeveloped) > 1 else "Commencement unverified",
                 "when": dt.datetime.combine(grant_date, dt.time.min) if grant_date else site.updated_at,
                 "page": "pages/1_Scheme_Detail.py", "params": {"site_id": str(site.id)},
                 "application_reference": phase["latest_grant"].reference if phase.get("latest_grant") else None,
-                "phase_code": phase["code"],
+                "phase_code": scope_key,
                 # Gate 2B-2B.2 - this scope's OWN deterministically supported
                 # unit count (None if genuinely unknown), never the whole
                 # site's total. Consumed by app.reporting.opportunity_universe.
