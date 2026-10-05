@@ -46,7 +46,6 @@ from app.policy.allocation_planning_coverage import (
 )
 from app.reporting.allocation_development_coverage import (
     INSUFFICIENT_EVIDENCE,
-    POSSIBLE_FIT,
     INVESTIGATE,
     LOWER_PRIORITY,
     MONITOR,
@@ -61,6 +60,7 @@ from app.reporting.allocation_discovery import (
 )
 from app.policy.buyer_matching import (
     NOT_SUITABLE,
+    POSSIBLE_FIT,
     STRONG_FIT,
     build_strategic_land_matching_facts,
 )
