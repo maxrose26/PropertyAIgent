@@ -36,6 +36,7 @@ from app.pipeline.lapse_tracking import (
 )
 from app.pipeline.phase_tracking import summarize_phase_units
 from app.policy.site_view import build_site_policy_intelligence
+from app.reporting.residential_count import select_count_supporting_source
 from app.reporting.residential_mix import build_residential_mix, format_affordable_tile
 from app.reporting.scheme_reconciliation import FACT_RESOLVED, build_operative_planning_facts, resolve_canonical_decision_status
 from app.visuals import IMAGE_TYPE_LABELS
@@ -626,21 +627,13 @@ def build_site_profile(
     # Attribute an exact extracted count to one of its agreeing evidence
     # applications; the current AH identity remains independently selected below.
     if current_count.exact_value is not None:
-        from app.reporting.commercial_evidence import known_unit_count
-        count_source_ids = {source.application_id for source in current_count.sources
-                            if known_unit_count(source.value) == current_count.exact_value}
-        supporting_apps = [a for a in all_apps if a.id in count_source_ids
-                           and a.scheme_intelligence is not None
-                           and known_unit_count(a.scheme_intelligence.total_units_final)
-                           == current_count.exact_value]
-        # Prefer the established operative identity only among actual supporters.
-        # Otherwise retain a deterministic evidence-only fallback; never change
-        # the count or borrow a non-supporting application's extraction.
-        mix_rep_app = next((a for a in supporting_apps if operative_app is not None
-                             and a.id == operative_app.id), None)
-        if mix_rep_app is None:
-            mix_rep_app = next(iter(sorted(supporting_apps,
-                                key=lambda a: (a.reference or "", str(a.id)))), None)
+        # One shared rule (also used by buyer matching): only an application that
+        # actually supports the count may be attributed it; the established operative
+        # identity is preferred only among those supporters, else a deterministic
+        # fallback. Never changes the count or borrows a non-supporting extraction.
+        mix_rep_app = select_count_supporting_source(
+            current_count, all_apps,
+            operative_application_id=operative_app.id if operative_app is not None else None)
 
     header = build_site_header(
         site=site, merged=merged, lapse=lapse, decision_status=decision_status,

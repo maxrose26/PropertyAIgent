@@ -86,6 +86,7 @@ from app.policy.buyer_profiles import (
 from app.reporting.allocation_development_coverage import NO_IDENTIFIED_ACTIVITY
 from app.reporting.scheme_reconciliation import FACT_RESOLVED, FACT_CONFLICT
 from app.reporting.commercial_evidence import known_unit_count
+from app.reporting.residential_count import select_count_supporting_source
 
 STRATEGIC_LAND = "strategic_land"
 PLANNING_DELIVERY = "planning_delivery"
@@ -403,16 +404,24 @@ def _operative_source_scheme_intelligence(operative_facts, applications_by_id: d
     (e.g. genuinely NOT_DETERMINED, or multiple simultaneous active
     proposals with no single one to attribute development type to)."""
     consented = operative_facts.consented_position
-    source = None
+    count_fact = operative_reference = None
     if consented.approved_units.state == FACT_RESOLVED and consented.approved_units.source is not None:
-        source = consented.approved_units.source
+        count_fact, operative_reference = consented.approved_units, consented.reference
     elif consented.approved_units.state != FACT_CONFLICT and len(operative_facts.active_positions) == 1:
-        proposed = operative_facts.active_positions[0].proposed_units
-        if proposed.state == FACT_RESOLVED and proposed.source is not None:
-            source = proposed.source
-    if source is None:
+        position = operative_facts.active_positions[0]
+        if position.proposed_units.state == FACT_RESOLVED and position.proposed_units.source is not None:
+            count_fact, operative_reference = position.proposed_units, position.reference
+    if count_fact is None:
         return None
-    app = applications_by_id.get(source.application_id)
+    # SUPPORT FIRST, operative preference second (one shared rule, also used by the site
+    # profile): the source is an application that actually supports the resolved count,
+    # preferring the trusted operative application among supporters, never the first
+    # alphabetical agreeing source and never a non-supporting application. This changes
+    # only WHICH supporting application development type is read from, never the count.
+    operative_id = (operative_reference.source.application_id
+                    if operative_reference.state == FACT_RESOLVED and operative_reference.source is not None else None)
+    app = select_count_supporting_source(count_fact.count_assessment, applications_by_id.values(),
+                                         operative_application_id=operative_id)
     return app.scheme_intelligence if app else None
 
 

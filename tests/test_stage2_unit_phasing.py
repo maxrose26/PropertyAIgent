@@ -988,3 +988,160 @@ def test_residual_2h_m_vocabulary_matches_the_platform_it_reuses():
     assert "consented" not in module.KNOWN_INELIGIBLE_BASES
     assert module._parse_subject("site:12:phase:Phase 2A") == ("12", "phase", "Phase 2A")
     assert module._parse_subject("site:x:phase:Phase 2A") is None and module._parse_subject("phase:2") is None
+
+
+
+# --- Stage 2.5 preflight gate 3: operative supporting-source preference (support first) ---
+
+
+def _cs_app(app_id, reference, total, *, scheme=True):
+    return SimpleNamespace(id=app_id, reference=reference,
+                           scheme_intelligence=SimpleNamespace(total_units_final=total) if scheme else None)
+
+
+def _cs_count(value, source_ids, *, metric="total_residential", precision="EXACT", source_values=None):
+    from app.reporting.residential_count import CountAssessment
+    exact = precision == "EXACT"
+    sources = tuple(SimpleNamespace(application_id=i, value=(source_values or {}).get(i, value)) for i in source_ids)
+    return CountAssessment(scope_type="whole_site", scope_label="Whole site", subject_id="site:1:whole_site:Whole site",
+                           metric=metric, precision=precision, value=value, lower=value if exact else None,
+                           upper=value if exact else None, resolution="agreement" if exact else "portal_estimate",
+                           confidence="high", sources=sources, basis="consented")
+
+
+def _cs_select(count, applications, operative=None):
+    from app.reporting.residential_count import select_count_supporting_source
+    chosen = select_count_supporting_source(count, applications, operative_application_id=operative)
+    return chosen.id if chosen is not None else None
+
+
+def test_gate3_a_operative_supporter_is_preferred_over_alphabetical_first():
+    apps = [_cs_app(1, "Z/CURRENT", 440), _cs_app(2, "A/OLD", 440)]
+    count = _cs_count(440, (1, 2))
+    assert _cs_select(count, apps, operative=1) == 1
+    # Without an operative supporter the deterministic fallback is reference order, not authority.
+    assert _cs_select(count, apps, operative=None) == 2
+
+
+def test_gate3_b_non_supporting_operative_never_receives_attribution():
+    apps = [_cs_app(1, "Z/CURRENT", 82), _cs_app(2, "A/OLD", 440)]
+    assert _cs_select(_cs_count(440, (2,)), apps, operative=1) == 2
+    # Even if the operative application is listed among the sources, its own different value disqualifies it.
+    assert _cs_select(_cs_count(440, (1, 2), source_values={1: 82}), apps, operative=1) == 2
+    # An application whose own total matches but which is not one of the count's sources does not support it.
+    both_440 = [_cs_app(1, "Z/CURRENT", 440), _cs_app(2, "A/OLD", 440)]
+    assert _cs_select(_cs_count(440, (2,)), both_440, operative=1) == 2
+
+
+def test_gate3_c_multiple_agreeing_without_operative_use_a_deterministic_genuine_supporter():
+    apps = [_cs_app(5, "B/2", 440), _cs_app(9, "A/1", 440)]
+    count = _cs_count(440, (5, 9))
+    assert _cs_select(count, apps) == 9 and _cs_select(count, list(reversed(apps))) == 9
+    # An operative id that is not a supporter changes nothing.
+    assert _cs_select(count, apps, operative=99) == 9
+    # Equal references fall back to identifier order; the result is still the same for any input order.
+    twins = [_cs_app(1, "M/1", 440), _cs_app(2, "M/1", 440)]
+    twin_count = _cs_count(440, (1, 2))
+    assert _cs_select(twin_count, twins) == _cs_select(twin_count, list(reversed(twins))) == 1
+
+
+def test_gate3_d_single_supporter_is_selected():
+    apps = [_cs_app(1, "Z/CURRENT", 82), _cs_app(2, "B/ONLY", 440)]
+    assert _cs_select(_cs_count(440, (2,)), apps) == 2
+    assert _cs_select(_cs_count(440, (2,)), apps, operative=2) == 2
+
+
+def test_gate3_e_newer_non_supporter_cannot_steal_attribution():
+    apps = [_cs_app(1, "Z/NEW", 82), _cs_app(2, "A/OLD", 440)]
+    count = _cs_count(440, (2,))
+    assert _cs_select(count, apps, operative=1) == 2 and _cs_select(count, apps) == 2
+
+
+def test_gate3_f_selection_is_independent_of_input_order():
+    import itertools
+    apps = [_cs_app(1, "Z/CURRENT", 440), _cs_app(2, "A/OLD", 440), _cs_app(3, "M/MID", 440), _cs_app(4, "B/NO", 82)]
+    for operative in (None, 1, 2, 3, 4, 99):
+        results = set()
+        for ordered_apps in itertools.permutations(apps):
+            for source_ids in ((1, 2, 3), (3, 2, 1), (2, 1, 3)):
+                results.add(_cs_select(_cs_count(440, source_ids), list(ordered_apps), operative=operative))
+        assert len(results) == 1, operative
+
+
+def test_gate3_g_metric_separation_and_count_support_are_required():
+    apps = [_cs_app(1, "Z/CURRENT", 440), _cs_app(2, "A/OLD", 440)]
+    # A private or affordable count is never attributed to a source through the total-units field.
+    for metric in ("private_units", "affordable_units"):
+        assert _cs_select(_cs_count(440, (1, 2), metric=metric), apps, operative=1) is None
+    assert _cs_select(_cs_count(440, (1, 2), metric="all_use_units"), apps, operative=1) == 1
+    # Only an exact count can be attributed; no count means no source.
+    assert _cs_select(_cs_count(440, (1, 2), precision="APPROXIMATE"), apps, operative=1) is None
+    assert _cs_select(_cs_count(None, (1, 2), precision="UNKNOWN"), apps, operative=1) is None
+    assert _cs_select(None, apps, operative=1) is None
+    # An application with no extracted scheme intelligence supports nothing.
+    assert _cs_select(_cs_count(440, (1,)), [_cs_app(1, "Z", None, scheme=False)], operative=1) is None
+
+
+def test_gate3_shared_rule_is_the_single_implementation():
+    import app.policy.buyer_matching as buyer_matching
+    import app.reporting.residential_count as residential_count
+    import app.reporting.site_profile as site_profile
+    assert (buyer_matching.select_count_supporting_source is residential_count.select_count_supporting_source
+            is site_profile.select_count_supporting_source)
+
+
+def _gate3_facts(apps, **kwargs):
+    return build_planning_delivery_matching_facts_from_operative(build_operative_planning_facts(apps), apps, **kwargs)
+
+
+def test_gate3_i_buyer_matching_reads_development_type_from_the_operative_supporter(session):
+    site = scheme(session)
+    old = application(session, site, "A/OLD", 440, date="2026-01-01")
+    current = application(session, site, "Z/CURRENT", 440, date="2026-03-01")
+    old.scheme_intelligence.development_type = "retirement_living"
+    current.scheme_intelligence.development_type = "houses"
+    session.flush()
+    for ordered in ([old, current], [current, old]):
+        facts = _gate3_facts(ordered)
+        assert facts.unit_count == 440
+        # The alphabetically-first agreeing source (A/OLD, a specialist type) must not win over the operative one.
+        assert facts.development_type_raw == "houses" and facts.is_specialist_development is False
+
+
+def test_gate3_b_buyer_matching_never_borrows_from_a_non_supporting_operative_application(session):
+    site = scheme(session)
+    supporter = application(session, site, "A/OLD", 440, date="2026-01-01")
+    operative = application(session, site, "Z/CURRENT", None, date="2026-03-01")   # latest grant, no extracted count
+    supporter.scheme_intelligence.development_type = "houses"
+    operative.scheme_intelligence.development_type = "retirement_living"
+    session.flush()
+    facts = _gate3_facts([supporter, operative])
+    assert facts.unit_count == 440
+    assert facts.development_type_raw == "houses" and facts.is_specialist_development is False
+
+
+def test_gate3_e_newer_pending_application_does_not_steal_buyer_matching_attribution(session):
+    site = scheme(session)
+    old = application(session, site, "A/OLD", 440, date="2026-01-01")
+    newer = application(session, site, "Z/NEW", 82, decision=None)
+    old.scheme_intelligence.development_type = "houses"
+    newer.scheme_intelligence.development_type = "retirement_living"
+    session.flush()
+    facts = _gate3_facts([old, newer])
+    assert facts.unit_count == 440
+    assert facts.development_type_raw == "houses" and facts.is_specialist_development is False
+
+
+def test_gate3_h_ah_identity_is_independent_of_count_source_selection(session):
+    site = scheme(session)
+    old = application(session, site, "A/OLD", 440, date="2026-01-01")
+    current = application(session, site, "Z/CURRENT", 440, date="2026-03-01")
+    old.scheme_intelligence.development_type = "retirement_living"
+    current.scheme_intelligence.development_type = "houses"
+    session.flush()
+    default = _gate3_facts([old, current])
+    for reference in ("A/OLD", "Z/CURRENT"):
+        facts = _gate3_facts([old, current], application_reference=reference)
+        # Choosing which application the AH figure belongs to never changes the count source.
+        assert facts.development_type_raw == default.development_type_raw == "houses"
+        assert facts.unit_count == default.unit_count == 440
