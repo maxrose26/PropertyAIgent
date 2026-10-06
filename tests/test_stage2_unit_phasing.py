@@ -16,6 +16,11 @@ from app.reporting.opportunity_feed import _reshape_signal_card, _attach_plannin
 from app.policy.buyer_matching import build_planning_delivery_matching_facts_from_operative, assess_buyer_fit, NOT_SUITABLE
 from app.policy.buyer_profiles import NESTEN_HOMES, HOUSING_ASSOCIATION
 
+# Generic synthetic 50-100 buyer: these tests exercise the v6 preferred/discovery mechanics and the
+# hard-exclusion precedence, not the real Nesten brief (canonical Nesten is 50-200; see
+# tests/test_nesten_canonical_mandate.py).
+NESTEN_50_100_SYNTHETIC = replace(NESTEN_HOMES, target_unit_max=100, wholly_affordable_is_exclusion=True)
+
 
 def scheme(session):
     site = Site(council_code="testcouncil", canonical_address="synthetic scope", display_address="Synthetic scope")
@@ -133,7 +138,7 @@ def test_k_l_hard_boundary_uses_bounds_soft_discovery_keeps_uncertainty(session)
     assert result.within_hard_bounds(maximum=99) is False
     assert result.within_hard_bounds(minimum=50, maximum=102) is True
     facts = build_planning_delivery_matching_facts_from_operative(build_operative_planning_facts(apps), apps)
-    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, facts)
     assert fit.classification != NOT_SUITABLE and fit.is_investigative_exception
     assert facts.unit_count is None and facts.count_assessment == result
     # Stage 2.5A (v6): the SCALE dimension treats 100-102 as within discovery 45-110
@@ -419,7 +424,7 @@ def test_uncertain_scale_fit_uses_evidence_bounds_not_rounded_scalar(precision, 
         affordable_percentage=30.0, affordable_percentage_trusted=True,
         planning_state="permission_granted", has_identified_planning_activity=True,
         has_phasing_evidence=False, matched_to_site=True)
-    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, facts)
     assert fit.classification == expected
     assert fit.classification != NOT_SUITABLE
     if precision in ("APPROXIMATE", "RANGE"):
@@ -1215,7 +1220,7 @@ def test_s25a_discovery_bounds_are_ten_percent_rounded_outward(minimum, maximum,
     (44, INSUFFICIENT_EVIDENCE), (111, INSUFFICIENT_EVIDENCE), (300, INSUFFICIENT_EVIDENCE),
 ])
 def test_s25a_exact_counts_against_preferred_and_discovery(units, expected):
-    fit = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=units))
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=units))
     assert fit.classification == expected
     assert fit.classification != NOT_SUITABLE
     if expected == POSSIBLE_FIT:
@@ -1241,7 +1246,7 @@ def test_s25a_exact_counts_against_preferred_and_discovery(units, expected):
     (60, 80, STRONG_FIT, "preferred"),
 ])
 def test_s25a_range_evidence_uses_supported_bounds(lower, upper, expected, kind):
-    fit = assess_buyer_fit(NESTEN_HOMES, _range_facts(lower, upper))
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _range_facts(lower, upper))
     assert fit.classification == expected
     assert fit.classification != NOT_SUITABLE and fit.is_investigative_exception
     if kind == "possible":
@@ -1258,7 +1263,7 @@ def test_s25a_range_evidence_uses_supported_bounds(lower, upper, expected, kind)
 def test_s25a_rounded_scalar_cannot_override_range_evidence():
     count = CountAssessment(scope_type="whole_site", scope_label="Whole site", precision="APPROXIMATE",
                             value=100, lower=100, upper=102, resolution="immaterial_variance")
-    fit = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=100, count_assessment=count))
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=100, count_assessment=count))
     assert fit.classification == POSSIBLE_FIT  # never STRONG from the rounded display value 100
 
 
@@ -1289,7 +1294,7 @@ def test_s25a_explicit_hard_minimum_is_never_weakened_by_discovery_tolerance(aff
 
 
 def test_s25a_hard_minimum_applies_to_range_evidence_at_the_stated_minimum():
-    policy = _replace(NESTEN_HOMES, below_minimum_scale_is_exclusion=True)
+    policy = _replace(NESTEN_50_100_SYNTHETIC, below_minimum_scale_is_exclusion=True)
     assert assess_buyer_fit(policy, _range_facts(40, 49)).classification == NOT_SUITABLE
     assert assess_buyer_fit(policy, _s25_facts(unit_count=47)).classification == NOT_SUITABLE
     assert assess_buyer_fit(policy, _s25_facts(unit_count=105)).classification == POSSIBLE_FIT
@@ -1297,23 +1302,23 @@ def test_s25a_hard_minimum_applies_to_range_evidence_at_the_stated_minimum():
 
 def test_s25a_hard_exclusions_outrank_possible_scale():
     from app.policy.buyer_profiles import GEOGRAPHY_COUNCILS
-    geo = _replace(NESTEN_HOMES, geography_scope=GEOGRAPHY_COUNCILS, geography_councils=frozenset({"bury"}))
+    geo = _replace(NESTEN_50_100_SYNTHETIC, geography_scope=GEOGRAPHY_COUNCILS, geography_councils=frozenset({"bury"}))
     outside = assess_buyer_fit(geo, _s25_facts(unit_count=105), context=B2MatchingContext(council_code="trafford"))
     assert outside.classification == NOT_SUITABLE
     inside = assess_buyer_fit(geo, _s25_facts(unit_count=105), context=B2MatchingContext(council_code="bury"))
     assert inside.classification != NOT_SUITABLE
     assert any("discovery range (45-110 homes)" in m for m in inside.matches)
-    specialist = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105, is_specialist_development=True,
+    specialist = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=105, is_specialist_development=True,
                                                           development_type_raw="retirement_living"))
     assert specialist.classification == NOT_SUITABLE
-    wholly_affordable = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105, affordable_percentage=100.0))
+    wholly_affordable = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=105, affordable_percentage=100.0))
     assert wholly_affordable.classification == NOT_SUITABLE
 
 
 def test_s25a_overall_precedence_strong_possible_and_unresolved_evidence():
-    assert assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=80)).classification == STRONG_FIT
-    assert assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105)).classification == POSSIBLE_FIT
-    unresolved = assess_buyer_fit(NESTEN_HOMES, _s25_facts(unit_count=105, is_specialist_development=None,
+    assert assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=80)).classification == STRONG_FIT
+    assert assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=105)).classification == POSSIBLE_FIT
+    unresolved = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, _s25_facts(unit_count=105, is_specialist_development=None,
                                                           development_type_raw=None))
     assert unresolved.classification == INSUFFICIENT_EVIDENCE  # possible scale never hides a blocking gap
 
@@ -1431,7 +1436,7 @@ def test_n1_untrusted_affordable_percentage_is_visible_but_not_blocking(session,
     facts = _live_facts(apps)
     assert facts.unit_count == units and facts.development_type_raw == "houses"
     assert facts.affordable_percentage_trusted is False and facts.affordable_percentage is None
-    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, facts)
     assert fit.classification == expected, _why(fit)
     assert _AFFORDABLE_UNKNOWN in fit.unknown           # never silently assumed 0%
     assert _AFFORDABLE_INVESTIGATE in fit.investigate   # gap stays investigable
@@ -1446,7 +1451,7 @@ def test_n1_positive_wholly_affordable_exclusion_still_hard():
                           is_specialist_development=False, affordable_percentage=100.0, affordable_percentage_trusted=True,
                           affordable_unit_count=75, planning_state="permission_granted",
                           has_identified_planning_activity=True, has_phasing_evidence=False, matched_to_site=True)
-    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, facts)
     assert fit.classification == NOT_SUITABLE
     assert any("wholly" in d and "100%" in d for d in fit.does_not_match)
 
@@ -1518,7 +1523,7 @@ def test_n2_unanimous_supporters_corroborate_development_type(session):
     facts = _live_facts(apps)
     assert facts.count_assessment.resolution == "immaterial_variance"
     assert facts.development_type_raw == "houses" and facts.is_specialist_development is False
-    fit = assess_buyer_fit(NESTEN_HOMES, facts)
+    fit = assess_buyer_fit(NESTEN_50_100_SYNTHETIC, facts)
     # Scale is POSSIBLE (100-102 within discovery, not wholly preferred); development
     # type no longer blocks; the affordable gap stays visible and non-blocking.
     assert fit.classification == "POSSIBLE_FIT", _why(fit)

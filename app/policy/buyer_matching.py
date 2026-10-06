@@ -188,6 +188,13 @@ DEVELOPMENT_STATE_UNKNOWN = "unknown"
 _DEVELOPMENT_STARTED_STATES = frozenset({DEVELOPMENT_STATE_UNDERWAY, DEVELOPMENT_STATE_PARTIALLY_COMPLETE, DEVELOPMENT_STATE_COMPLETE})
 
 
+# Whether trusted, same-scope, EXACT counts establish that the acquisition subject is wholly affordable.
+# The exact proposition we know - never a percentage. Derived by derive_whole_site_affordable_state().
+AFFORDABLE_STATE_WHOLLY = "WHOLLY_AFFORDABLE"
+AFFORDABLE_STATE_NOT_WHOLLY = "NOT_WHOLLY_AFFORDABLE"
+AFFORDABLE_STATE_UNKNOWN = "UNKNOWN"
+
+
 @dataclass(frozen=True)
 class MatchingFacts:
     """The minimum safe attribute set for buyer matching, for ONE
@@ -235,6 +242,9 @@ class MatchingFacts:
     has_active_proposal: bool = False
     active_proposal_count: int = 0
     count_assessment: object = None
+    # Evidence plumbing only (v6, unchanged policy semantics): see derive_whole_site_affordable_state. Not an
+    # opportunity-fingerprint input. UNKNOWN is the default for every builder that cannot prove it.
+    whole_site_affordable_state: str = AFFORDABLE_STATE_UNKNOWN
 
 
 def build_strategic_land_matching_facts(allocation, coverage, phasing) -> MatchingFacts:
@@ -510,6 +520,48 @@ def _corroborated_development_type(count_assessment, applications_by_id: dict, *
     return CorroboratedDevelopmentType(value=supporters[0][1], provenance_reference=provenance.reference)
 
 
+def derive_whole_site_affordable_state(count_assessment, ah_assessment, *, current_scope: bool) -> str:
+    """WHOLLY_AFFORDABLE / NOT_WHOLLY_AFFORDABLE / UNKNOWN for ONE acquisition subject.
+
+    Answers one question only: do trusted, SAME-SCOPE, EXACT counts establish that every residential unit is
+    affordable? It derives no percentage, tenure or S106 reading and never treats a missing figure as zero or
+    a reported percentage as trusted. Any doubt is UNKNOWN. Required, all of:
+      - TOTAL: an EXACT total-RESIDENTIAL CountAssessment (metric total_residential - an all-use or mixed-use
+        total is a different quantity) in a confirmed whole_site or phase scope;
+      - AFFORDABLE: a qualified, verified, EXACT affordable claim with no conflicting alternatives, belonging to a
+        current (not withdrawn/refused) application;
+      - SAME SCOPE: the claim's scope_type equals the total's (a phase claim must also carry the same label), and
+        the claim's application is one of the applications that SUPPORT the total - parent and child counts, or
+        counts from unrelated applications, are never mixed.
+    """
+    if count_assessment is None or ah_assessment is None or not current_scope:
+        return AFFORDABLE_STATE_UNKNOWN
+    if (count_assessment.precision != "EXACT" or count_assessment.exact_value is None
+            or getattr(count_assessment, "metric", None) != "total_residential"
+            or count_assessment.scope_type not in ("whole_site", "phase")):
+        return AFFORDABLE_STATE_UNKNOWN
+    claim = ah_assessment.count
+    if (ah_assessment.alternatives or claim.state == "conflicting" or not claim.qualified
+            or claim.qualifier != "exact" or claim.state != "verified"):
+        return AFFORDABLE_STATE_UNKNOWN
+    if claim.scope_type != count_assessment.scope_type:
+        return AFFORDABLE_STATE_UNKNOWN
+    if count_assessment.scope_type == "phase" and (
+            str(claim.scope_label or "").strip().casefold() != str(count_assessment.scope_label or "").strip().casefold()):
+        return AFFORDABLE_STATE_UNKNOWN
+    supporting_references = {getattr(source, "application_reference", None) for source in count_assessment.sources}
+    supporting_references.discard(None)
+    if claim.application_reference not in supporting_references:
+        return AFFORDABLE_STATE_UNKNOWN
+    total, affordable = count_assessment.exact_value, claim.value
+    if (isinstance(affordable, bool) or not isinstance(affordable, (int, float)) or affordable != int(affordable)
+            or affordable < 0 or total <= 0):
+        return AFFORDABLE_STATE_UNKNOWN
+    if affordable > total:
+        return AFFORDABLE_STATE_UNKNOWN  # self-contradictory evidence is never resolved by guessing
+    return AFFORDABLE_STATE_WHOLLY if affordable == total else AFFORDABLE_STATE_NOT_WHOLLY
+
+
 def build_planning_delivery_matching_facts_from_operative(operative_facts, applications: list, *, application_reference=None) -> MatchingFacts:
     """Gate 2B-2B.1 - the trusted-facts-aware counterpart to
     build_planning_delivery_matching_facts above, consuming
@@ -588,6 +640,8 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
     # Count evidence never independently establishes percentage scope.
     affordable_pct = None
     affordable_trusted = False
+    # What trusted same-scope EXACT counts DO establish is the proposition "wholly affordable or not".
+    whole_site_affordable_state = derive_whole_site_affordable_state(count_assessment, assessment, current_scope=current_scope)
 
     return MatchingFacts(
         count_assessment=count_assessment,
@@ -604,6 +658,7 @@ def build_planning_delivery_matching_facts_from_operative(operative_facts, appli
         matched_to_site=True,
         has_active_proposal=len(active_positions) >= 1,
         active_proposal_count=len(active_positions),
+        whole_site_affordable_state=whole_site_affordable_state,
     )
 
 
@@ -892,17 +947,34 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # Housing Association amendment: deliberately reversed polarity for a
     # buyer whose own primary requirement IS affordable housing - see
     # BuyerMandatePolicy.wholly_affordable_is_exclusion's own docstring.
-    if facts.affordable_percentage is not None and facts.affordable_percentage >= WHOLLY_AFFORDABLE_THRESHOLD:
+    wholly_by_percentage = facts.affordable_percentage is not None and facts.affordable_percentage >= WHOLLY_AFFORDABLE_THRESHOLD
+    wholly_by_counts = facts.whole_site_affordable_state == AFFORDABLE_STATE_WHOLLY
+    if wholly_by_percentage or wholly_by_counts:
+        # The percentage wording is kept where a trusted percentage exists; same-scope exact counts state the
+        # proposition without inventing a percentage.
+        descriptor = (f"wholly ({facts.affordable_percentage:.0f}%)" if wholly_by_percentage
+                      else "wholly (every residential unit is affordable)")
         if profile.wholly_affordable_is_exclusion:
             does_not_match.append(
-                f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
+                f"Trusted evidence shows this is a {descriptor} affordable-led "
                 f"scheme, not open-market residential development."
             )
-        else:
+        elif profile.scale_metric == AFFORDABLE_UNITS:
+            # Only a buyer whose OWN scale is measured in affordable homes (Housing Association) reads
+            # wholly-affordable evidence as on-strategy.
             matches.append(
-                f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
+                f"Trusted evidence shows this is a {descriptor} affordable-led "
                 f"scheme, directly relevant to this buyer's affordable-housing focus."
             )
+        else:
+            # No stated exclusion AND no stated affordable-housing focus (e.g. Nesten, whose real brief is
+            # silent on affordable composition): visible context only - never a match, never an exclusion.
+            unknown.append(
+                f"Trusted evidence shows this is a {descriptor} affordable-led "
+                f"scheme; this buyer has not stated an exclusion for it, so it is context to investigate, "
+                f"not a fit signal."
+            )
+            investigate.append("Confirm the affordable composition and whether the scheme suits this buyer's requirement.")
     elif not facts.affordable_percentage_trusted:
         if facts.opportunity_type == STRATEGIC_LAND:
             # B2 semantic cleanup (Buyer Fit Classification Audit, Section

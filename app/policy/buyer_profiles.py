@@ -367,19 +367,27 @@ NESTEN_HOMES = BuyerMandatePolicy(
     buyer_type="Regional housebuilder",
     primary_requirement="Residential development land",
     target_unit_min=50,
-    target_unit_max=100,
+    target_unit_max=200,
     scale_metric=TOTAL_UNITS,
     accepted_planning_states=frozenset({PERMISSION_GRANTED, ADOPTED_ALLOCATION, EMERGING_ALLOCATION}),
     treats_no_activity_as_positive=False,
     large_allocation_is_self_qualifying=False,
     specialist_development_is_exclusion=True,
-    wholly_affordable_is_exclusion=True,
+    wholly_affordable_is_exclusion=False,
     below_minimum_scale_is_exclusion=False,
     notes=(
         "Brief: \"residential sites with planning permission; OR sites allocated for residential "
         "development\" - read as accepting both adopted and emerging allocation status, since the brief "
         "does not restrict Nesten to adopted-only allocations. No affordable-percentage threshold below "
-        "100% is implemented (brief: \"do NOT invent an affordable-percentage threshold below 100%\")."
+        "100% is implemented (brief: \"do NOT invent an affordable-percentage threshold below 100%\"). "
+        "Real Nesten Land Requirements (Product Owner-supplied, authoritative): 50-200 single-family homes "
+        "(preferred scale 50-200); acquire or joint venture; consented or promotable land; typically "
+        "~2-10+ hectares (5-25+ acres); focus on South East, South West, North West and Northern England; "
+        "well-connected locations with family-housing demand and employment access; deliverability "
+        "considerations (access, drainage/flood, utilities, public transport, schools/GP, S106/CIL, open "
+        "space, biodiversity net gain). Site size, region, infrastructure and JV are CONTEXT for "
+        "investigation, not deterministic matching rules. The brief states no affordable-housing "
+        "exclusion, so wholly-affordable evidence is context to investigate, not a hard exclusion."
     ),
     # Phase B1 defaults - structural only, NOT yet read by assess_buyer_fit.
     # Geography: the original brief never stated any geographic restriction

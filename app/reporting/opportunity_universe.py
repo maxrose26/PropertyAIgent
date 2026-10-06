@@ -494,8 +494,10 @@ def _planning_delivery_universe(session) -> list[OpportunityRecord]:
             # separate "whole site" figure to prefer it over.
             if phase_code != UNPHASED_LABEL:
                 phase_unit_count = card.get("phase_unit_count")
+                from app.policy.buyer_matching import AFFORDABLE_STATE_UNKNOWN
                 facts = replace(facts, unit_count=phase_unit_count, count_assessment=card.get("count_assessment"),
-                                affordable_unit_count=None, affordable_percentage=None, affordable_percentage_trusted=False)
+                                affordable_unit_count=None, affordable_percentage=None, affordable_percentage_trusted=False,
+                                whole_site_affordable_state=AFFORDABLE_STATE_UNKNOWN)  # a phase never inherits whole-site AH
                 fingerprint_fields["unit_count"] = phase_unit_count
                 fingerprint_fields["affordable_unit_count"] = None
         elif kind == "recent_permission":

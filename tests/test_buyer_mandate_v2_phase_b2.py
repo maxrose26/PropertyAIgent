@@ -490,7 +490,8 @@ def test_c_otherwise_not_suitable_from_hard_contradiction_stays_not_suitable():
     """(C) A genuine hard contradiction (100% affordable-led, an explicit
     exclusion for this buyer) must remain NOT_SUITABLE regardless of any
     soft-preference gap elsewhere."""
-    policy = replace(NESTEN_HOMES, target_unit_min=50, target_unit_max=100, development_state_appetite=UNCOMMENCED_PREFERRED)
+    policy = replace(NESTEN_HOMES, target_unit_min=50, target_unit_max=100, development_state_appetite=UNCOMMENCED_PREFERRED,
+                     wholly_affordable_is_exclusion=True)  # explicit exclusion mandate; canonical Nesten has none
     facts = _facts(unit_count=70, is_specialist_development=False, affordable_percentage=100.0, affordable_percentage_trusted=True, planning_state=PERMISSION_GRANTED)
     result = assess_buyer_fit(policy, facts, context=B2MatchingContext(development_state=None))
     assert result.classification == NOT_SUITABLE
@@ -534,7 +535,7 @@ def test_scale_known_above_soft_target_is_not_insufficient_evidence():
     arbitrary tolerance is invented - 101 is simply "known and outside
     target", exactly like 42 above; it is never claimed to be a positive
     commercial recommendation, only correctly not-missing-evidence."""
-    result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=101))
+    result = assess_buyer_fit(replace(NESTEN_HOMES, target_unit_max=100), _facts(unit_count=101))  # generic synthetic 50-100 buyer
     # Stage 2.5A (v6): 101 is inside the 45-110 discovery envelope.
     assert result.classification == POSSIBLE_FIT
     assert any("slightly above" in m and "discovery range" in m for m in result.matches)
@@ -625,7 +626,8 @@ def test_strategic_land_structurally_unavailable_affordable_percentage_is_not_bl
 def test_planning_delivery_wholly_affordable_hard_exclusion_remains_intact():
     """(C1) The generic planning-delivery wholly-affordable hard exclusion
     (which the strategic-land fix must never weaken) is unaffected."""
-    result = assess_buyer_fit(NESTEN_HOMES, _facts(affordable_percentage=100.0, affordable_percentage_trusted=True))
+    result = assess_buyer_fit(replace(NESTEN_HOMES, wholly_affordable_is_exclusion=True),
+                              _facts(affordable_percentage=100.0, affordable_percentage_trusted=True))  # an exclusion mandate
     assert result.classification == NOT_SUITABLE
     assert any("wholly" in d and "100%" in d for d in result.does_not_match)
 
