@@ -35,8 +35,10 @@ of availability, ownership or control, transaction structure, willingness to sel
 geometry. It is a **read model** recomputed from evidence (like opportunities today), not a
 persisted hierarchy.
 
-**Family** — the set of acquisition subjects that share one planning site (or one strategic
-allocation) and its evidenced links. Ranking and display operate at family level.
+**Family** — either a **planning family** (the acquisition subjects of one planning site) or a
+**strategic family** (one strategic allocation, canonical and never duplicated). The two may cross-link
+through existing evidenced links but are independently identified and monitored. Ranking and display
+operate at family level.
 
 **Evidence guardrails (inherited, unchanged):** planning status ≠ acquisition status; planning
 capacity ≠ availability; Reserved Matters approval ≠ unavailable; developer/applicant identity ≠
@@ -262,7 +264,9 @@ how `derive_whole_site_affordable_state` is tested.
   (whole site, other evidenced phases, components, affordable package when enabled).
 - **Residual planning capacity** is shown as intelligence in the family, never as a subject.
 - **Ranking operates at family level.** A parent and child never count as two independent top-level
-  opportunities. A strategic parent may coexist within the family.
+  opportunities. Strategic and planning families coexist and may cross-link (see the decided
+  strategic-family rule below); a strategic allocation is never a subject duplicated into each linked
+  site's family.
 - **Deterministic best-subject precedence** (each step breaks ties of the previous; the result is a total
   order within one family):
   1. buyer-fit rank, highest first: `STRONG_FIT`; `POSSIBLE_FIT`; `INSUFFICIENT_EVIDENCE` **with** the
@@ -277,11 +281,24 @@ how `derive_whole_site_affordable_state` is tested.
   parent and child are never ranked separately.)
 - Display per subject: kind, units with precision, relationship to parent ("contained in …"),
   evidence confidence, buyer fit, investigation requirements, and the overlap notice above.
-- **Open decision (REVIEW):** the family boundary between a strategic allocation and its linked
-  planning sites. Default proposed: the allocation is a related subject of each linked site's family
-  only where an existing evidenced link exists, and an allocation with no linked site is its own
-  one-subject family. A multi-site allocation must not be double-listed as an independent top-level
-  row for the same buyer.
+- **DECIDED (Product Owner): strategic families are canonical and distinct from planning families.**
+  A strategic allocation has **ONE canonical strategic family**. It is **not** duplicated as a related
+  acquisition subject inside every linked planning-site family.
+
+  ```
+  STRATEGIC FAMILY               PLANNING FAMILY
+  Allocation A                   Site X
+    relationships:                 subjects:
+      → matched planning Site X      → whole site
+      → matched planning Site Y      → evidenced phases / components
+  ```
+
+  The two kinds of family **may cross-link** through the existing evidenced allocation–site links, but
+  they remain **independently identifiable and independently monitored**. The same strategic allocation
+  must never become multiple top-level opportunities merely because it links to several planning sites.
+  The strategic family's canonical identity is the existing `strategic_land:allocation:{allocation_id}`
+  (unchanged; no per-site copies); a planning family shows the link as a labelled cross-reference, not as
+  one of its own subjects. An allocation with no linked site is simply a one-subject strategic family.
 
 No UI is implemented by this specification.
 
@@ -492,7 +509,9 @@ bounded to execute independently.
 
 ## Open decisions for REVIEW
 
-1. Family boundary between strategic allocations and linked planning sites (see Family feed contract).
+1. ~~Family boundary between strategic allocations and linked planning sites~~ — **DECIDED** by the
+   Product Owner (see Family feed contract): one canonical strategic family per allocation, cross-linked to
+   planning families, never duplicated per linked site.
 2. Delimiter-safe encoding details (percent-encoding vs a slug) and reserved anchor prefixes (G1).
 3. Whether G1A corrects phase granularity or keeps it with an explicit per-site rule (G1A).
 4. The post-G4 mixed-specialist decision and any v7 transition.
