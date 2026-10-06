@@ -128,20 +128,12 @@ def resolve_acquisition_subject_key(opportunity_id: str, opportunity_type: str) 
     ALLOCATION. Never queries the database - the opportunity_id string
     already carries everything needed (see app.reporting.opportunity_
     universe's own *_opportunity_id() constructors)."""
-    parts = opportunity_id.split(":")
-    kind = parts[1]
-    anchor_id = int(parts[2])
-
-    if opportunity_type == STRATEGIC_LAND:
-        return (STRATEGIC_LAND, anchor_id, WHOLE_ALLOCATION)
-
-    if kind == "phase":
-        phase_code = parts[3]
-        return (PLANNING_DELIVERY, anchor_id, phase_code)
-
-    # "site" | "recent_permission" | "long_pending_application" - see
-    # docstring: these three deliberately share one WHOLE_SITE subject.
-    return (PLANNING_DELIVERY, anchor_id, WHOLE_SITE)
+    # Stage 2.5B G1 (spec 025): strict parsing. Unknown kinds, malformed ids, an id/type mismatch and recognised-
+    # but-not-yet-emit-capable future kinds RAISE (app.reporting.acquisition_subjects.SubjectIdentityError) - the
+    # old fall-through that anchored ANY other kind to WHOLE_SITE is gone. Every existing id resolves to exactly
+    # the anchor it always did (including today's truncation of a phase code containing ":", pinned by tests).
+    from app.reporting.acquisition_subjects import parse_opportunity_id, resolve_anchor_key
+    return resolve_anchor_key(parse_opportunity_id(opportunity_id), opportunity_type)
 
 
 from app.security.commands import command
@@ -188,7 +180,9 @@ def _opportunity_kind(opportunity_id: str) -> str:
     "site", "phase", "recent_permission", "long_pending_application",
     "allocation") - denormalised onto history/current-state rows for
     cheap filtering without re-parsing the string every read."""
-    return opportunity_id.split(":")[1]
+    # Stage 2.5B G1: strict (unknown/malformed ids raise); identical to the old split for every existing id.
+    from app.reporting.acquisition_subjects import parse_opportunity_id
+    return parse_opportunity_id(opportunity_id).kind
 
 
 # --- Evaluation input fingerprint (Gate 1, Section 16/17/18) ----------------
