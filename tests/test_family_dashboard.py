@@ -109,27 +109,51 @@ def test_wider_permission_label_has_no_unphased_wording_and_lifecycle_only_has_n
     assert lifecycle_only and all(f.phasing_context is None for f in lifecycle_only)
 
 
-def test_unphased_bucket_alone_is_never_evidence_of_phasing(world):
-    from app.pipeline.phase_tracking import UNPHASED_LABEL
+def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
+    """V7A: the presentation consumes the ONE derived fact (attached to each card by the family feed). CURRENT only; historical-only, none, a missing fact, and every
+    strategic family show no current-evidence label - whatever the cards' own phase codes or scopes look like."""
+    from app.policy.buyer_matching import (
+        AcquisitionPhasingEvidence, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED,
+    )
     from app.reporting.opportunity_families import FamilySubject, OpportunityFamily, RelatedSubject, SLOT_LIFECYCLE, SLOT_PHASE, ID_SYSTEM_FEED
-    from app.reporting.residential_count import CountAssessment
 
-    def subject(key, slot, code, scope_type):
-        card = {"phase_code": code, "count_assessment": CountAssessment(scope_type=scope_type, scope_label="x")}
+    def subject(key, slot, state):
+        card = {"phase_code": "2" if slot == SLOT_PHASE else None}
+        if state is not None:
+            card["acquisition_phasing"] = AcquisitionPhasingEvidence(state)
         return FamilySubject(domain="planning_delivery", anchor_id=1, subject_key=key, slot=slot, fit="INSUFFICIENT_EVIDENCE", source=card, id_system=ID_SYSTEM_FEED)
-    lifecycle, unphased = subject("opp-lapse-1", SLOT_LIFECYCLE, None, "whole_site"), subject(f"opp-phase-1-{UNPHASED_LABEL}", SLOT_PHASE, UNPHASED_LABEL, "whole_site")
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), lifecycle, (RelatedSubject(unphased, "INSUFFICIENT"),))) is False
-    real_phase = subject("opp-phase-1-2", SLOT_PHASE, "2", "phase")
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), real_phase, (RelatedSubject(lifecycle, "INSUFFICIENT"),))) is True
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), real_phase, ())) is True      # one genuine phase is sufficient on its own
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), unphased, ())) is False       # the unphased bucket alone never is
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), lifecycle, ())) is False      # lifecycle/whole only: no label
-    no_assessment = FamilySubject(domain="planning_delivery", anchor_id=1, subject_key="opp-phase-1-3", slot=SLOT_PHASE, fit="INSUFFICIENT_EVIDENCE",
-                                  source={"phase_code": "3", "count_assessment": None}, id_system=ID_SYSTEM_FEED)
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), no_assessment, ())) is False  # no phase-scope assessment: nothing is claimed
+
+    def family(state):
+        phase, lifecycle = subject("opp-phase-1-2", SLOT_PHASE, state), subject("opp-lapse-1", SLOT_LIFECYCLE, state)
+        return OpportunityFamily(("planning_delivery", 1), phase, (RelatedSubject(lifecycle, "INSUFFICIENT"),))
+    assert fp.phasing_evidenced(family(PHASING_CURRENT_EVIDENCED_PHASE)) is True
+    assert fp.phasing_context(family(PHASING_CURRENT_EVIDENCED_PHASE)) == "Phased delivery evidenced."
+    assert fp.phasing_context(family(PHASING_CURRENTNESS_UNKNOWN)) == "Phase evidence identified — current status unverified."   # the weaker label, same fact
+    assert fp.phasing_evidenced(family(PHASING_CURRENTNESS_UNKNOWN)) is False                                                    # never the CURRENT label
+    for not_current in (PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, PHASING_DOCUMENTED, None):
+        assert fp.phasing_evidenced(family(not_current)) is False, not_current       # historical / none / reserved documented / fact missing: no current label
+        assert fp.phasing_context(family(not_current)) is None, not_current
+    single = OpportunityFamily(("planning_delivery", 1), subject("opp-phase-1-2", SLOT_PHASE, PHASING_CURRENT_EVIDENCED_PHASE), ())
+    assert fp.phasing_evidenced(single) is True                                          # one genuine phase subject is sufficient on its own
+    lifecycle_only = OpportunityFamily(("planning_delivery", 1), subject("opp-lapse-1", SLOT_LIFECYCLE, PHASING_NONE_IDENTIFIED), ())
+    assert fp.phasing_evidenced(lifecycle_only) is False
     strategic = FamilySubject(domain="strategic_land", anchor_id=1, subject_key="opp-feed-alloc-1", slot="ALLOCATION", fit="INSUFFICIENT_EVIDENCE",
-                              source={"phase_code": "3", "count_assessment": CountAssessment(scope_type="phase", scope_label="x")}, id_system=ID_SYSTEM_FEED)
-    assert fp.phasing_evidenced(OpportunityFamily(("strategic_land", 1), strategic, ())) is False         # a strategic allocation is never labelled phased
+                              source={"acquisition_phasing": AcquisitionPhasingEvidence(PHASING_CURRENT_EVIDENCED_PHASE)}, id_system=ID_SYSTEM_FEED)
+    assert fp.phasing_evidenced(OpportunityFamily(("strategic_land", 1), strategic, ())) is False   # a strategic allocation is never labelled phased
+
+
+def test_end_to_end_an_undated_phase_shows_the_weak_label_and_an_address_only_phase_shows_none(world):
+    from app.db.models import Application
+    undated = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    world.session.query(Application).filter(Application.site_id == undated.id, Application.reference.like("RM/%")).update({"decision_issued_date": None})
+    address_only = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    rm = world.session.query(Application).filter(Application.site_id == address_only.id, Application.reference.like("RM/%")).one()
+    rm.proposal = "Reserved matters for 30 dwellings"
+    rm.address = "Phase 2, Mill Lane, Anytown"
+    world.session.commit()
+    labels = {f.title: f.phasing_context for f in view_of(world, 10).families}
+    assert labels[f"Site {undated.id}"] == "Phase evidence identified — current status unverified."
+    assert labels.get(f"Site {address_only.id}") is None
 
 
 # --- strategic ------------------------------------------------------------------------------------------------------------------------
@@ -167,7 +191,7 @@ def test_fit_labels_use_the_existing_language_and_no_policy_is_changed():
     assert fp.fit_label("STRONG_FIT", False) == "Strong fit" and fp.fit_label("POSSIBLE_FIT", False) == "Possible fit"
     assert fp.fit_label("INSUFFICIENT_EVIDENCE", True) == "Investigate" and fp.fit_label("INSUFFICIENT_EVIDENCE", False) == "Insufficient evidence"
     assert fp.fit_label("NOT_SUITABLE", False) == "Not suitable"
-    assert BUYER_MATCHING_POLICY_VERSION == 6
+    assert BUYER_MATCHING_POLICY_VERSION == 7
 
 
 def test_presenter_does_not_import_policy_g2_or_do_arithmetic_on_units():

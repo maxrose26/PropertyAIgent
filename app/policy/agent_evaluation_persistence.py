@@ -91,7 +91,11 @@ MODEL_PROVIDER_OPENAI = "openai"
 # control developer_indications/ownership_coverage/conflicts and linked_
 # strategic_allocation_id, three real gaps the audit found - see compute_
 # agent_evaluation_input_fingerprint's own docstring for the full account.
-AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION = 2
+#
+# Bumped 2 -> 3 (Stage 2.5B V7A): the payload gained the explicit planning-delivery acquisition phasing state and its self-scope guard
+# (opportunity_facts.acquisition_phasing_state / acquisition_phasing_self_scope), so a phasing-state change can never hide behind reason text alone.
+# It does NOT touch the opportunity evidence fingerprint (OpportunityMonitoringState.fingerprint is unchanged).
+AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION = 3
 
 # --- Acquisition Subject scope keys (Gate 1, Section 3/4) -------------------
 WHOLE_SITE = "WHOLE_SITE"
@@ -312,6 +316,8 @@ def compute_agent_evaluation_input_fingerprint(
         payload["opportunity_facts"]["operative_planning_state"] = _fact_value_pair(packet.operative_planning_state)
         payload["opportunity_facts"]["recommendation_direction"] = _fact_value_pair(packet.recommendation_direction)
         payload["opportunity_facts"]["affordable_housing_status"] = _fact_value_pair(packet.affordable_housing_status)
+        payload["opportunity_facts"]["acquisition_phasing_state"] = packet.acquisition_phasing_state
+        payload["opportunity_facts"]["acquisition_phasing_self_scope"] = packet.acquisition_phasing_self_scope
 
     s = packet.transaction_signals
     payload["transaction_signals"] = {

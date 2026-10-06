@@ -227,7 +227,7 @@ def test_percentage_path_for_hand_built_facts_is_unchanged():
 # --- policy / fingerprint boundaries ---------------------------------------------------------------------------------
 
 def test_policy_version_and_fingerprint_inputs_are_unchanged():
-    assert BUYER_MATCHING_POLICY_VERSION == 6
+    assert BUYER_MATCHING_POLICY_VERSION == 7   # moved 6 -> 7 by V7A (reason wording only); the hard-exclusion semantics asserted here are unchanged
     import ast
     import app.reporting.opportunity_universe as universe
     key_sets = []

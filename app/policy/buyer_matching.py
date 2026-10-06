@@ -151,7 +151,16 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # stated preferred minimum - discovery tolerance never weakens a hard
 # constraint. No mandate field changed; only assess_buyer_fit's
 # interpretation of existing values did.
-BUYER_MATCHING_POLICY_VERSION = 6
+#
+# Version 7 (Stage 2.5B V7A, planning-delivery phasing evidence): classification and the
+# investigative flag are UNCHANGED from v6; the evidence-aware REASON for an oversized
+# planning-delivery wider subject (above the discovery maximum) now depends on an explicit
+# context fact (B2MatchingContext.acquisition_phasing): current evidenced child phase /
+# (reserved) documented phasing / historical-only / none identified - the speculative "investigate
+# whether a relevant phase exists" claim is gone for those subjects. A known scale BELOW the
+# discovery minimum gets neutral wording. Strategic subjects and affordable-unit buyers keep
+# their v6 semantics. Opportunity evidence fingerprints are unaffected (matching-only change).
+BUYER_MATCHING_POLICY_VERSION = 7
 
 # Stage 2.5A default discovery tolerance, an integer percentage so the
 # envelope is computed in exact integer arithmetic (see discovery_bounds).
@@ -761,6 +770,26 @@ def build_control_appetite_facts(acquisition_facts) -> ControlAppetiteFacts:
     )
 
 
+# Stage 2.5B V7A - planning-delivery ACQUISITION phasing evidence (deliberately NOT MatchingFacts.has_phasing_evidence,
+# which means Local Plan allocation phasing for strategic subjects). One minimal fact: the evidence state for the wider
+# development. DOCUMENTED_PHASING is reserved for Stage 2.6 qualified evidence and has no producer yet.
+PHASING_CURRENT_EVIDENCED_PHASE = "CURRENT_EVIDENCED_PHASE"
+PHASING_CURRENTNESS_UNKNOWN = "PHASE_EVIDENCE_CURRENTNESS_UNKNOWN"   # a qualifying granted phase exists but its date evidence cannot establish whether it is current
+PHASING_HISTORICAL_ONLY = "HISTORICAL_PHASE_ONLY"
+PHASING_DOCUMENTED = "DOCUMENTED_PHASING"
+PHASING_NONE_IDENTIFIED = "NONE_IDENTIFIED"
+PHASING_STATES = frozenset({PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_HISTORICAL_ONLY, PHASING_DOCUMENTED, PHASING_NONE_IDENTIFIED})
+
+
+@dataclass(frozen=True)
+class AcquisitionPhasingEvidence:
+    state: str
+
+    def __post_init__(self):
+        if self.state not in PHASING_STATES:
+            raise ValueError(f"unknown acquisition phasing state {self.state!r}")
+
+
 @dataclass(frozen=True)
 class B2MatchingContext:
     """Buyer Mandate V2, Phase B2 - the single OPTIONAL bundle of trusted
@@ -796,6 +825,13 @@ class B2MatchingContext:
     development_state: str | None = None  # one of the DEVELOPMENT_STATE_* constants above, or None (not computed)
     control_facts: ControlAppetiteFacts | None = None
     development_state_scope_verified: bool = False
+    # V7A. None = not supplied (neutral wording; never a "none identified" claim). The subject_* fields are the explicit self-scope
+    # guard inputs: the phasing state describes the WIDER development, so it must never be applied to a subject that IS a phase
+    # scope (subject_phase_scope_key) or that is application-anchored (recent permission / long-pending application) on a site with
+    # CURRENT evidence (it cannot be shown not to be that phase).
+    acquisition_phasing: AcquisitionPhasingEvidence | None = None
+    subject_phase_scope_key: str | None = None
+    subject_application_anchored: bool = False
 
 
 @dataclass(frozen=True)
@@ -816,6 +852,39 @@ def _planning_state_label(state: str) -> str:
         OTHER_OR_UNKNOWN: "an unclassified planning position",
         PLANNING_ACTIVE_PROPOSAL: "an active planning application, not yet decided",
     }.get(state, state)
+
+
+_PHASING_TAILS = {
+    PHASING_CURRENT_EVIDENCED_PHASE: "Phased delivery is evidenced; assess the evidenced phase scope(s) separately. Availability is unverified.",
+    PHASING_DOCUMENTED: "A phased-delivery strategy is evidenced; a buyer-relevant acquisition scope has not yet been established.",
+    PHASING_CURRENTNESS_UNKNOWN: ("Phase evidence exists, but its current implementation status cannot be established from the available dates; "
+                                  "decomposition remains unverified."),
+    PHASING_HISTORICAL_ONLY: ("Historic phasing evidence exists, but the phase permission's assumed implementation date has passed and its current "
+                              "implementation status is unverified; no current phasing evidence has been identified, and decomposition remains unverified."),
+    PHASING_NONE_IDENTIFIED: "No current phasing evidence has been identified in the qualified records; decomposition remains unverified.",
+}
+_SELF_SCOPE_TAIL = "This subject's own scope is a named phase; no evidence of further decomposition has been identified."
+_NEUTRAL_TAIL = "Decomposition remains unverified."
+
+
+def subject_is_self_scope(facts: MatchingFacts, context: B2MatchingContext | None) -> bool:
+    """The explicit deterministic self-scope guard (V7A): True when the subject being assessed IS (or cannot be shown not to be) a phase scope."""
+    if context is None:
+        return False
+    if context.subject_phase_scope_key is not None:
+        return True
+    assessment = facts.count_assessment
+    if assessment is not None and getattr(assessment, "scope_type", None) == "phase":
+        return True
+    evidence = context.acquisition_phasing
+    return bool(context.subject_application_anchored and evidence is not None and evidence.state == PHASING_CURRENT_EVIDENCED_PHASE)
+
+
+def _phasing_tail(facts: MatchingFacts, context: B2MatchingContext | None) -> str:
+    if subject_is_self_scope(facts, context):
+        return _SELF_SCOPE_TAIL
+    evidence = context.acquisition_phasing if context is not None else None
+    return _PHASING_TAILS.get(evidence.state, _NEUTRAL_TAIL) if evidence is not None else _NEUTRAL_TAIL
 
 
 def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context: B2MatchingContext | None = None) -> BuyerFitAssessment:
@@ -1085,6 +1154,19 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         f"whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or "
         f"possible scale fit."
     )
+    # V7A: outside-discovery reasons. ABOVE the discovery maximum a planning-delivery wider subject (TOTAL-units buyers) gets the phasing-evidence-aware
+    # wording; every other above-maximum subject (strategic, affordable-unit buyers) keeps the v6 wording; BELOW the discovery minimum the wording is neutral for
+    # everyone. Classification and the investigative flag are unchanged from v6.
+    planning_total_units = facts.opportunity_type == PLANNING_DELIVERY and profile.scale_metric != AFFORDABLE_UNITS
+
+    def _outside_reason(prefix: str, above: bool, *, legacy_prefix: str) -> str:
+        if not above:
+            return f"{prefix} is below this buyer's discovery range ({discovery_text}; preferred {preferred_text})."
+        if planning_total_units:
+            return (f"{prefix} is outside this buyer's discovery range ({discovery_text}; preferred {preferred_text}). "
+                    + _phasing_tail(facts, context))
+        return f"{legacy_prefix} " + outside_discovery_text
+
     scale_possible = scale_outside_discovery = False
     if scale_value is None and uncertain_scale:
         preferred_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min, maximum=profile.target_unit_max)
@@ -1104,7 +1186,9 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             )
         elif discovery_fit is False:
             scale_outside_discovery = True
-            investigate.append(f"The supported scale ({assessment.label()}) " + outside_discovery_text)
+            above = discovery_max is not None and assessment.lower is not None and assessment.lower > discovery_max
+            investigate.append(_outside_reason(f"The supported scale ({assessment.label()})", above,
+                                               legacy_prefix=f"The supported scale ({assessment.label()})"))
         else:
             blocking_unknown = True
             unknown.append(
@@ -1153,8 +1237,9 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         # subject stays visible as an investigative exception, never
         # NOT_SUITABLE and never STRONG/POSSIBLE.
         scale_outside_discovery = True
-        investigate.append(f"{scale_value:,} {unit_noun} " + outside_discovery_text)
-        if scale_value > profile.target_unit_max and facts.has_phasing_evidence:
+        above = discovery_max is not None and scale_value > discovery_max
+        investigate.append(_outside_reason(f"Scale ({scale_value:,} {unit_noun})", above, legacy_prefix=f"{scale_value:,} {unit_noun}"))
+        if scale_value > profile.target_unit_max and facts.has_phasing_evidence and not planning_total_units:
             investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
         is_investigative_exception = True
 

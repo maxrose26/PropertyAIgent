@@ -96,6 +96,8 @@ class _FakeFingerprintPacket:
         self.actors_control = _FakeActorsControl()
         self.linked_strategic_allocation_id = None
         self.transaction_signals = _FakeTransactionSignals()
+        self.acquisition_phasing_state = None
+        self.acquisition_phasing_self_scope = False
         for k, v in overrides.items():
             setattr(self, k, v)
 
@@ -399,7 +401,7 @@ def test_linked_strategic_allocation_id_change_alters_fingerprint():
 
 def test_fingerprint_version_constant_was_bumped_for_this_payload_shape_change():
     from app.policy.agent_evaluation_persistence import AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION
-    assert AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION == 2
+    assert AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION == 3   # V7A: explicit acquisition phasing state added to the payload
 
 
 # --- Section 33: persistence --------------------------------------------------

@@ -368,7 +368,10 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
         if card["opportunity_type"] == STRATEGIC_LAND:
             assessment = evaluate_buyer_fit(session, profile, facts, allocation_id=int(card["params"]["allocation_id"]))
         else:
-            assessment = evaluate_buyer_fit(session, profile, facts, site_id=int(card["params"]["site_id"]))
+            from app.reporting.acquisition_phasing import subject_scope_for_feed_card
+            phase_scope_key, application_anchored = subject_scope_for_feed_card(card)
+            assessment = evaluate_buyer_fit(session, profile, facts, site_id=int(card["params"]["site_id"]),
+                                            subject_phase_scope_key=phase_scope_key, subject_application_anchored=application_anchored)
         card["buyer_fit"] = assessment
         if assessment.classification == NOT_SUITABLE:
             excluded_not_suitable += 1

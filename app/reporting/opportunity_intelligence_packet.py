@@ -57,7 +57,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from app.db.models import Application, LocalPlan, LocalPlanSite, Site
-from app.policy.buyer_matching import PLANNING_DELIVERY, STRATEGIC_LAND, B2MatchingContext, MatchingFacts, OTHER_OR_UNKNOWN
+from app.policy.buyer_matching import PLANNING_DELIVERY, STRATEGIC_LAND, B2MatchingContext, MatchingFacts, OTHER_OR_UNKNOWN, subject_is_self_scope
 from app.policy.buyer_matching_b2_context import build_b2_context
 from app.reporting.acquisition_position import build_acquisition_position_facts
 from app.reporting.opportunity_transaction_signals import TransactionSignals, build_transaction_signals
@@ -177,6 +177,11 @@ class OpportunityIntelligencePacket:
     # confirmed inactivity; evidence changing is not the same claim as
     # ownership changing).
     transaction_signals: TransactionSignals
+
+    # --- V7A planning-delivery acquisition phasing context (buyer-independent evidence state + the subject-scope guard) ---
+    # Explicit so the agent-evaluation fingerprint can never be blind to a phasing-state change that only shows up as reason text.
+    acquisition_phasing_state: str | None = None
+    acquisition_phasing_self_scope: bool = False
 
 
 def _scheme_intelligence_field(applications, field_name: str) -> str | None:
@@ -374,4 +379,7 @@ def build_opportunity_intelligence_packet(
         linked_strategic_allocation_id=linked_strategic_allocation_id,
         linked_strategic_allocation_name=linked_strategic_allocation_name,
         transaction_signals=transaction_signals,
+        acquisition_phasing_state=(
+            context.acquisition_phasing.state if opportunity.opportunity_type != STRATEGIC_LAND and context.acquisition_phasing is not None else None),
+        acquisition_phasing_self_scope=(opportunity.opportunity_type != STRATEGIC_LAND and subject_is_self_scope(facts, context)),
     )

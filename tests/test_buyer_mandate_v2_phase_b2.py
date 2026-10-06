@@ -144,7 +144,7 @@ def test_policy_version_is_the_current_expected_value():
     # mandatory at the production evaluation boundary + authoritative
     # normalised Local Plan status for strategic land) - see
     # BUYER_MATCHING_POLICY_VERSION's own docstring.
-    assert BUYER_MATCHING_POLICY_VERSION == 6
+    assert BUYER_MATCHING_POLICY_VERSION == 7
 
 
 def test_fingerprint_changes_when_policy_version_changes():
@@ -525,7 +525,8 @@ def test_scale_known_below_soft_target_is_not_insufficient_evidence():
     # known, so this is an investigative exception, never NOT_SUITABLE.
     assert result.classification == INSUFFICIENT_EVIDENCE
     assert result.is_investigative_exception is True
-    assert any("outside this buyer's discovery range" in i for i in result.investigate)
+    assert any("below this buyer's discovery range" in i for i in result.investigate)   # V7A: neutral below-minimum wording
+    assert not any("sub-scope" in i or "phase" in i.lower() for i in result.investigate)
     assert not any("No trusted unit count" in u for u in result.unknown)
 
 
@@ -549,7 +550,8 @@ def test_materially_oversized_known_scheme_no_phasing_is_not_insufficient_eviden
     result = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=5000, has_phasing_evidence=False))
     assert result.classification == INSUFFICIENT_EVIDENCE  # Stage 2.5A (v6)
     assert result.is_investigative_exception is True
-    assert any("outside this buyer's discovery range" in i and "sub-scope" in i for i in result.investigate)
+    assert any("outside this buyer's discovery range" in i and "Decomposition remains unverified" in i for i in result.investigate)   # V7A: no speculative sub-scope claim
+    assert not any("sub-scope" in i for i in result.investigate)
 
 
 def test_genuinely_missing_unit_count_remains_insufficient_evidence():
@@ -700,7 +702,7 @@ def test_matching_policy_version_is_now_3():
     # Superseded by Agent-Ready Fact Foundation's own version 4 bump - see
     # test_policy_version_is_the_current_expected_value above for why 4 is
     # now the correct current value.
-    assert BUYER_MATCHING_POLICY_VERSION == 6
+    assert BUYER_MATCHING_POLICY_VERSION == 7
 
 
 def test_semantic_cleanup_fingerprint_differs_from_prior_policy_version():

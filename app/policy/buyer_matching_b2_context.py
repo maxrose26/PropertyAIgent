@@ -89,6 +89,7 @@ def build_b2_context_for_strategic_land(session, allocation_id: int) -> B2Matchi
 
 def build_b2_context_for_planning_delivery(
     session, site_id: int, *, development_state_scope_verified: bool = False,
+    subject_phase_scope_key: str | None = None, subject_application_anchored: bool = False,
 ) -> B2MatchingContext:
     """The PLANNING_DELIVERY half of build_b2_context, extracted as its
     own primitive (Agent-Ready Fact Foundation) for the same reason as
@@ -104,7 +105,11 @@ def build_b2_context_for_planning_delivery(
     kinds) simply leaves it unset, which can never cause an incorrect
     hard rejection (see assess_buyer_fit's own STRATEGIC_LAND_CONTROL
     scope-safety rule). Read-only; identical logic to build_b2_context's
-    own former inline body."""
+    own former inline body.
+
+    V7A: also derives the planning-delivery ACQUISITION phasing evidence (app.reporting.acquisition_phasing - pure, from the applications already loaded
+    here, no extra query) and carries the explicit self-scope guard inputs (`subject_phase_scope_key`, `subject_application_anchored`) so the matcher never
+    applies sibling-aware phasing wording to a subject that is itself a phase scope."""
     site = session.get(Site, site_id)
     applications = session.execute(select(Application).where(Application.site_id == site_id)).scalars().all()
 
@@ -122,11 +127,15 @@ def build_b2_context_for_planning_delivery(
     acquisition_facts = build_acquisition_position_facts(session, applications)
     control_facts = build_control_appetite_facts(acquisition_facts)
 
+    from app.reporting.acquisition_phasing import derive_acquisition_phasing_evidence
     return B2MatchingContext(
         council_code=council_code,
         development_state=development_state,
         control_facts=control_facts,
         development_state_scope_verified=development_state_scope_verified,
+        acquisition_phasing=derive_acquisition_phasing_evidence(applications, site),
+        subject_phase_scope_key=subject_phase_scope_key,
+        subject_application_anchored=subject_application_anchored,
     )
 
 
@@ -193,7 +202,11 @@ def build_b2_context(session, opportunity_id: str, opportunity_type: str) -> B2M
     else:  # "recent_permission" / "long_pending_application"
         development_state_scope_verified = False
 
-    return build_b2_context_for_planning_delivery(session, site_id, development_state_scope_verified=development_state_scope_verified)
+    from app.reporting.acquisition_phasing import subject_scope_for_opportunity_id
+    phase_scope_key, application_anchored = subject_scope_for_opportunity_id(opportunity_id)
+    return build_b2_context_for_planning_delivery(
+        session, site_id, development_state_scope_verified=development_state_scope_verified,
+        subject_phase_scope_key=phase_scope_key, subject_application_anchored=application_anchored)
 
 
 def evaluate_buyer_fit(
@@ -207,6 +220,8 @@ def evaluate_buyer_fit(
     allocation_id: int | None = None,
     site_id: int | None = None,
     development_state_scope_verified: bool = False,
+    subject_phase_scope_key: str | None = None,
+    subject_application_anchored: bool = False,
 ) -> BuyerFitAssessment:
     """THE one supported production entry point for evaluating Buyer Fit
     (Agent-Ready Fact Foundation, P0-2 - see this module's own docstring
@@ -245,7 +260,9 @@ def evaluate_buyer_fit(
         elif allocation_id is not None:
             context = build_b2_context_for_strategic_land(session, allocation_id)
         elif site_id is not None:
-            context = build_b2_context_for_planning_delivery(session, site_id, development_state_scope_verified=development_state_scope_verified)
+            context = build_b2_context_for_planning_delivery(
+                session, site_id, development_state_scope_verified=development_state_scope_verified,
+                subject_phase_scope_key=subject_phase_scope_key, subject_application_anchored=subject_application_anchored)
         else:
             raise ValueError(
                 "evaluate_buyer_fit requires one of: context, opportunity_id+opportunity_type, allocation_id, or site_id"

@@ -4,8 +4,8 @@ Turns the accepted ``build_buyer_opportunity_families`` result into plain, deter
 the family already contains; it never re-ranks subjects, never changes a buyer-fit classification, never infers a relationship (G2 is not consumed),
 never sums or subtracts unit counts and never claims availability. Business logic stays here, out of the UI.
 
-Phasing (product principle: evidenced phasing is acquisition-INVESTIGATION evidence, not availability): only Level 1 is presented - a family with more
-at least one ACTUAL phase subject (not the unphased bucket) - even a family containing only that single phase - is labelled "Phased delivery evidenced." Nothing more is
+Phasing (product principle: evidenced phasing is acquisition-INVESTIGATION evidence, not availability): only CURRENT Level 1 is presented - the shared derived fact
+(app.reporting.acquisition_phasing) says a genuine, granted, non-lapsed named phase exists - labelled "Phased delivery evidenced." Nothing more is
 claimed. Level 2 (documented phasing without a child subject) is NOT presented: no accepted structured signal exists (spec 025, G3b Slice 2).
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ from app.reporting.opportunity_families import OVERLAP_WARNING, SLOT_PHASE, STRA
 logger = logging.getLogger(__name__)
 
 PHASING_CONTEXT = "Phased delivery evidenced."
+PHASING_CONTEXT_CURRENTNESS_UNKNOWN = "Phase evidence identified — current status unverified."
 RELATIONSHIP_NOTE = "Related opportunity subjects within this development."
 POLICY_CAVEAT = "This existing-policy result does not verify AH count source or scope, final tenure terms or acquisition availability."
 FAMILY_ERROR_MESSAGE = ("Acquisition-family results are temporarily unavailable for this buyer. "
@@ -115,19 +116,30 @@ def _subject_view(subject) -> SubjectView:
         tags=tuple(card.get("tags") or ()), page=card.get("page"), params=dict(card.get("params") or {}))
 
 
+def phasing_context(family: OpportunityFamily) -> str | None:
+    """The phasing label for a family, from the SHARED fact only: CURRENT -> "Phased delivery evidenced."; PHASE_EVIDENCE_CURRENTNESS_UNKNOWN -> the weaker
+    "Phase evidence identified — current status unverified."; historical-only, none, reserved documented, a missing fact and every strategic family -> no label."""
+    if family.family_key[0] == STRATEGIC_LAND:
+        return None
+    from app.reporting.acquisition_phasing import phasing_state_of
+    for member in family.members:
+        state = phasing_state_of((member.source or {}).get("acquisition_phasing"))
+        if state is not None:
+            return {"CURRENT_EVIDENCED_PHASE": PHASING_CONTEXT, "PHASE_EVIDENCE_CURRENTNESS_UNKNOWN": PHASING_CONTEXT_CURRENTNESS_UNKNOWN}.get(state)
+    return None
+
+
 def phasing_evidenced(family: OpportunityFamily) -> bool:
-    """Level 1 ONLY: at least one member is an actual phase subject (never the unphased bucket; its own count assessment must be of phase scope). One
-    genuine phase is sufficient on its own - the absence of a wider-parent subject from the family does not negate the evidence a phase represents - but it
-    establishes ONLY that phased delivery is evidenced (no parent, other phase, residual, availability, disposal, ownership, non-overlap or geometry).
-    Every strategic family and every lifecycle/whole-only family return False."""
+    """The Slice 2 label consumes the SHARED derived fact (app.reporting.acquisition_phasing, attached to each planning-delivery card by the family feed): True only for
+    CURRENT_EVIDENCED_PHASE (a genuine named phase with a substantive granted anchor that is not assumed-lapsed). Historical-only, none-identified, a missing fact and every strategic
+    family are False. The rule lives only in that module - never duplicated here or in the matcher. The state describes the wider development, so it is identical for every member."""
     if family.family_key[0] == STRATEGIC_LAND:
         return False
+    from app.reporting.acquisition_phasing import is_current_evidenced_phase
     for member in family.members:
-        card = member.source or {}
-        assessment = card.get("count_assessment")
-        if (member.slot == SLOT_PHASE and card.get("phase_code") not in (None, UNPHASED_LABEL)
-                and assessment is not None and assessment.scope_type == "phase"):
-            return True
+        evidence = (member.source or {}).get("acquisition_phasing")
+        if evidence is not None:
+            return is_current_evidenced_phase(evidence)
     return False
 
 
@@ -145,7 +157,7 @@ def present_family(family: OpportunityFamily, site) -> FamilyView:
     multi = len(family.members) > 1
     return FamilyView(
         family_id=f"{family.family_key[0]}-{family.family_key[1]}", title=title, subtitle=subtitle, is_strategic=strategic, best=best, related=related,
-        phasing_context=PHASING_CONTEXT if phasing_evidenced(family) else None,
+        phasing_context=phasing_context(family),
         relationship_note=RELATIONSHIP_NOTE if multi and not strategic else None,
         overlap_warning=OVERLAP_WARNING if multi else None)
 

@@ -1,0 +1,320 @@
+[
+  {
+    "buyer": "national_housebuilder",
+    "case_id": "pd_hard_deterministic_exclusion",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "NOT_SUITABLE",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "planning_delivery:phase:281:1",
+    "principal_v6_scale_reasons": [
+      "140 homes is outside this buyer's discovery range (180-550 homes; preferred 200-500 homes) - investigate whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or possible scale fit."
+    ],
+    "reconstruction": "incomplete",
+    "scale_outcome_v6": "below_discovery_min",
+    "scale_value": 140,
+    "v6_basis": "inferred_from_frozen_terminal_exclusion",
+    "v6_classification": "NOT_SUITABLE",
+    "v6_investigative": false,
+    "v7_below_minimum_wording_relevant": true,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "nesten_homes",
+    "case_id": "pd_monitor_pending_application_decision",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "INSUFFICIENT_EVIDENCE",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [
+      "Confirm the affordable housing proportion and whether the scheme is affordable-led."
+    ],
+    "opportunity": "planning_delivery:long_pending_application:61",
+    "principal_v6_scale_reasons": [
+      "No trusted unit count is available to assess against this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "scale_unknown",
+    "scale_value": null,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": false,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "housing_association",
+    "case_id": "pd_monitor_shaped_recent_permission",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "INSUFFICIENT_EVIDENCE",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [
+      "Confirm the affordable housing proportion and whether the scheme is affordable-led."
+    ],
+    "opportunity": "planning_delivery:recent_permission:140",
+    "principal_v6_scale_reasons": [
+      "No trusted affordable-unit count is available to assess against this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "scale_unknown",
+    "scale_value": null,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": false,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "national_housebuilder",
+    "case_id": "pd_recent_permission_seed",
+    "changed_v4_to_v6": true,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "planning_delivery:recent_permission:460",
+    "principal_v6_scale_reasons": [
+      "23 homes is outside this buyer's discovery range (180-550 homes; preferred 200-500 homes) - investigate whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or possible scale fit."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "below_discovery_min",
+    "scale_value": 23,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": true,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "national_housebuilder",
+    "case_id": "pd_strong_pursue_candidate",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "INSUFFICIENT_EVIDENCE",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [
+      "Confirm the affordable housing proportion and whether the scheme is affordable-led."
+    ],
+    "opportunity": "planning_delivery:site:491",
+    "principal_v6_scale_reasons": [
+      "No trusted unit count is available to assess against this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "scale_unknown",
+    "scale_value": null,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": false,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "national_housebuilder",
+    "case_id": "pd_wider_site_context_different_mandate",
+    "changed_v4_to_v6": true,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "planning_delivery:site:526",
+    "principal_v6_scale_reasons": [
+      "990 homes is outside this buyer's discovery range (180-550 homes; preferred 200-500 homes) - investigate whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or possible scale fit."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_discovery_max",
+    "scale_value": 990,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": true
+  },
+  {
+    "buyer": "strategic_land_buyer",
+    "case_id": "sl_adopted_allocation_confirmed_activity",
+    "changed_v4_to_v6": true,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "strategic_land:allocation:57",
+    "principal_v6_scale_reasons": [
+      "60 homes is outside this buyer's discovery range (90-330 homes; preferred 100-300 homes) - investigate whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or possible scale fit."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "below_discovery_min",
+    "scale_value": 60,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "strategic_land_buyer",
+    "case_id": "sl_emerging_allocation_with_activity",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "strategic_land:allocation:210",
+    "principal_v6_scale_reasons": [
+      "This allocation's own scale (~1,400 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "Establish whether a suitable development parcel/phase could become available within this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_max_strategic_self_qualifying_route",
+    "scale_value": 1400,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "STRONG_FIT",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "national_housebuilder",
+    "case_id": "sl_matched_pair_national_housebuilder",
+    "changed_v4_to_v6": true,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "strategic_land:allocation:213",
+    "principal_v6_scale_reasons": [
+      "600 homes is outside this buyer's discovery range (180-550 homes; preferred 200-500 homes) - investigate whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or possible scale fit."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_discovery_max",
+    "scale_value": 600,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "strategic_land_buyer",
+    "case_id": "sl_matched_pair_strategic_land_buyer",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "strategic_land:allocation:213",
+    "principal_v6_scale_reasons": [
+      "This allocation's own scale (~600 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "Establish whether a suitable development parcel/phase could become available within this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_max_strategic_self_qualifying_route",
+    "scale_value": 600,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "STRONG_FIT",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "strategic_land_buyer",
+    "case_id": "sl_ordinary_emerging_no_activity",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "strategic_land:allocation:37",
+    "principal_v6_scale_reasons": [
+      "This allocation's own scale (~550 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "Establish whether a suitable development parcel/phase could become available within this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_max_strategic_self_qualifying_route",
+    "scale_value": 550,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "STRONG_FIT",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "strategic_land_buyer",
+    "case_id": "sl_very_large_allocation_parcel_level",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "strategic_land:allocation:136",
+    "principal_v6_scale_reasons": [
+      "This allocation's own scale (~15,000 homes) represents a meaningful strategic-land position in its own right, independent of whether a specific parcel size is confirmed.",
+      "Establish whether a suitable development parcel/phase could become available within this buyer's target range."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_max_strategic_self_qualifying_route",
+    "scale_value": 15000,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "STRONG_FIT",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  },
+  {
+    "buyer": "nesten_homes",
+    "case_id": "xc_developer_identity_no_control",
+    "changed_v4_to_v6": true,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": true,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "planning_delivery:long_pending_application:104",
+    "principal_v6_scale_reasons": [
+      "675 homes is outside this buyer's discovery range (45-220 homes; preferred 50-200 homes) - investigate whether a relevant phase or acquisition sub-scope exists; this subject is not itself a preferred or possible scale fit."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "above_discovery_max",
+    "scale_value": 675,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "INSUFFICIENT_EVIDENCE",
+    "v6_investigative": true,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": true
+  },
+  {
+    "buyer": "national_housebuilder",
+    "case_id": "xc_evidenced_conflict_developer_names",
+    "changed_v4_to_v6": false,
+    "frozen_classification": "STRONG_FIT",
+    "frozen_investigative": false,
+    "frozen_policy_version": 4,
+    "non_scale_reasons_only_in_frozen_v4": [],
+    "non_scale_reasons_only_in_v6": [],
+    "opportunity": "planning_delivery:phase:67:3B",
+    "principal_v6_scale_reasons": [
+      "Approximately 295 homes sits within this buyer's target range (200-500 homes)."
+    ],
+    "reconstruction": "complete",
+    "scale_outcome_v6": "within_preferred",
+    "scale_value": 295,
+    "v6_basis": "reconstructed_assess_buyer_fit",
+    "v6_classification": "STRONG_FIT",
+    "v6_investigative": false,
+    "v7_below_minimum_wording_relevant": false,
+    "v7_phasing_delta_relevant": false
+  }
+]
