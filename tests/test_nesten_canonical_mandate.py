@@ -30,7 +30,7 @@ def _facts(**overrides) -> MatchingFacts:
 
 
 def test_policy_version_is_unchanged_by_the_mandate_correction():
-    assert BUYER_MATCHING_POLICY_VERSION == 6
+    assert BUYER_MATCHING_POLICY_VERSION == 7   # the mandate correction itself changed no version; V7A (phasing reason wording) moved 6 -> 7
 
 
 def test_canonical_nesten_preferred_scale_is_50_to_200():
@@ -59,7 +59,8 @@ def test_exact_counts_outside_discovery_are_investigative_not_strong_or_possible
     fit = assess_buyer_fit(NESTEN_HOMES, _facts(unit_count=units))
     assert fit.classification == INSUFFICIENT_EVIDENCE
     assert fit.is_investigative_exception is True
-    assert any("outside this buyer's discovery range (45-220 homes; preferred 50-200 homes)" in i for i in fit.investigate)
+    word = "below" if units < 45 else "outside"        # V7A: below the discovery minimum has its own neutral wording
+    assert any(f"{word} this buyer's discovery range (45-220 homes; preferred 50-200 homes)" in i for i in fit.investigate)
 
 
 def test_wholly_affordable_evidence_alone_no_longer_hard_excludes_nesten():

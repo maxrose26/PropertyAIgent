@@ -102,7 +102,7 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
         if kind == STRATEGIC_LAND:
             context = build_b2_context_for_strategic_land(session, anchor_id)
         else:
-            context = build_b2_context_for_planning_delivery(session, anchor_id)
+            context = build_b2_context_for_planning_delivery(session, anchor_id)   # the SITE-level context; the subject-scope guard is applied per subject below
         if memoise_context:
             contexts[key] = context
         return context
@@ -115,7 +115,12 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
         if card["opportunity_type"] == STRATEGIC_LAND:
             context = _context(STRATEGIC_LAND, int(card["params"]["allocation_id"]))
         else:
-            context = _context(PLANNING_DELIVERY, int(card["params"]["site_id"]))
+            from dataclasses import replace
+            from app.reporting.acquisition_phasing import subject_scope_for_feed_card
+            phase_scope_key, application_anchored = subject_scope_for_feed_card(card)
+            context = replace(_context(PLANNING_DELIVERY, int(card["params"]["site_id"])),
+                              subject_phase_scope_key=phase_scope_key, subject_application_anchored=application_anchored)
+            card["acquisition_phasing"] = context.acquisition_phasing   # the single shared fact the Slice 2 presentation label consumes
         card["buyer_fit"] = evaluate_buyer_fit(session, profile, facts, context=context)
         evaluated.append(card)
 

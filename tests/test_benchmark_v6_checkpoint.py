@@ -18,9 +18,16 @@ def rows():
     return {r["case_id"]: r for r in ckpt.build_checkpoint()}
 
 
-def test_the_recorded_checkpoint_is_exactly_what_the_harness_regenerates():
-    recorded = json.loads((ROOT / "benchmark/checkpoints/v6_checkpoint.json").read_text(encoding="utf-8"))
-    assert recorded == json.loads(json.dumps(ckpt.build_checkpoint(), sort_keys=True))
+def test_current_matching_keeps_every_recorded_v6_classification_flag_and_scale_outcome():
+    """The checkpoint was recorded under v6 (commit before the V7A policy change). The harness now runs CURRENT (v7) matching; V7A changes only reason WORDING, so
+    classification, the investigative flag and the scale outcome of all 14 cases must equal the recorded v6 values (the Product Owner's 'flags equal accepted v6' pin)."""
+    recorded = {r["case_id"]: r for r in json.loads((ROOT / "benchmark/checkpoints/v6_checkpoint.json").read_text(encoding="utf-8"))}
+    current = rows()
+    assert set(recorded) == set(current)
+    for case_id, row in recorded.items():
+        for field in ("v6_classification", "v6_investigative", "scale_outcome_v6", "buyer", "frozen_classification", "frozen_investigative",
+                      "v7_phasing_delta_relevant", "v7_below_minimum_wording_relevant", "reconstruction"):
+            assert current[case_id][field] == row[field], (case_id, field)
 
 
 def test_all_fourteen_cases_are_covered_and_every_frozen_snapshot_is_v4():

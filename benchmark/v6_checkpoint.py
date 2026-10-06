@@ -1,4 +1,8 @@
-"""Stage 2.5B V7A pre-implementation checkpoint: what does CURRENT (v6) buyer matching say about the 14 frozen benchmark cases?
+"""Stage 2.5B V7A pre-implementation checkpoint: what does buyer matching say about the 14 frozen benchmark cases?
+
+The recorded benchmark/checkpoints/v6_checkpoint.json was generated under policy v6 BEFORE any V7A change (it is the immediate pre-v7 result). This harness always runs the
+CURRENT matcher; tests/test_benchmark_v6_checkpoint.py pins that classification, the investigative flag and the scale outcome of every case still equal the recorded v6 values
+under v7 (V7A changes reason wording only), while the principal reason TEXT is allowed to differ.
 
 READ-ONLY and deterministic: no database, no network, no model call, no production read, and the frozen fixtures are never modified. The frozen cases are
 v4 snapshots; their raw MatchingFacts were not captured, so each case's facts are RECONSTRUCTED from the captured Layer A / provenance values (unit count,

@@ -1228,9 +1228,14 @@ def test_s25a_exact_counts_against_preferred_and_discovery(units, expected):
         assert any(f"{units:,} homes is slightly {side}" in m and "preferred range (50-100 homes)" in m
                    and "discovery range (45-110 homes)" in m for m in fit.matches)
     if expected == INSUFFICIENT_EVIDENCE:
-        # A KNOWN count outside discovery: investigate for sub-scope, never "count unknown".
+        # A KNOWN count outside discovery stays investigative, never "count unknown". V7A: above the maximum with no phasing context the wording is neutral
+        # (no speculative sub-scope claim); below the minimum it is the neutral below-range wording.
         assert fit.is_investigative_exception
-        assert any(_OUTSIDE in i and "sub-scope" in i and f"{units:,} homes" in i for i in fit.investigate)
+        if units < 45:
+            assert any("below this buyer's discovery range" in i and f"{units:,} homes" in i for i in fit.investigate)
+        else:
+            assert any(_OUTSIDE in i and "Decomposition remains unverified" in i and f"{units:,} homes" in i for i in fit.investigate)
+        assert not any("sub-scope" in i for i in fit.investigate)
         assert not any("No trusted unit count" in u or "does not establish" in u for u in fit.unknown)
 
 
@@ -1256,7 +1261,7 @@ def test_s25a_range_evidence_uses_supported_bounds(lower, upper, expected, kind)
         assert any("does not establish whether scale is within" in u for u in fit.unknown)
         assert not any(_OUTSIDE in i for i in fit.investigate)
     elif kind == "outside":
-        assert any(_OUTSIDE in i for i in fit.investigate)
+        assert any(_OUTSIDE in i or "below this buyer's discovery range" in i for i in fit.investigate)
         assert not any("does not establish" in u for u in fit.unknown)
 
 
@@ -1336,7 +1341,7 @@ def test_s25a_feed_surfaces_possible_between_strong_and_insufficient(monkeypatch
     monkeypatch.setattr(opportunity_feed, "_attach_planning_delivery_matching_facts", lambda session, delivery: None)
     by_site = {i: name for i, name in enumerate(order)}
     monkeypatch.setattr(buyer_matching_b2_context, "evaluate_buyer_fit",
-                        lambda session, profile, facts, site_id=None, allocation_id=None:
+                        lambda session, profile, facts, site_id=None, allocation_id=None, **_kw:
                         _NS(classification=fits[by_site[site_id]][0], is_investigative_exception=fits[by_site[site_id]][1]))
     ordered, counts = opportunity_feed._buyer_selection(None, [], cards, 10, "nesten_homes")
     assert [c["title"] for c in ordered] == ["strong", "possible_b", "possible_a", "exception", "insufficient"]
@@ -1393,7 +1398,7 @@ def inspect_source(module):
 def test_s25a_fingerprint_ownership(monkeypatch):
     from app.policy import buyer_profile_store
     from app.reporting.opportunity_universe import compute_opportunity_fingerprint
-    assert _bm.BUYER_MATCHING_POLICY_VERSION == 6
+    assert _bm.BUYER_MATCHING_POLICY_VERSION == 7
     v6 = buyer_profile_store.compute_buyer_mandate_fingerprint(NESTEN_HOMES)
     fields = {"opportunity_type": PLANNING_DELIVERY, "unit_count": 105, "development_type_raw": "houses"}
     opportunity_v6 = compute_opportunity_fingerprint(fields)
