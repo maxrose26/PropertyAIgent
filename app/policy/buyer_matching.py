@@ -898,11 +898,22 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
                 f"scheme, not open-market residential development."
             )
-        else:
+        elif profile.scale_metric == AFFORDABLE_UNITS:
+            # Only a buyer whose OWN scale is measured in affordable homes (Housing Association) reads
+            # wholly-affordable evidence as on-strategy.
             matches.append(
                 f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
                 f"scheme, directly relevant to this buyer's affordable-housing focus."
             )
+        else:
+            # No stated exclusion AND no stated affordable-housing focus (e.g. Nesten, whose real brief is
+            # silent on affordable composition): visible context only - never a match, never an exclusion.
+            unknown.append(
+                f"Trusted evidence shows this is a wholly ({facts.affordable_percentage:.0f}%) affordable-led "
+                f"scheme; this buyer has not stated an exclusion for it, so it is context to investigate, "
+                f"not a fit signal."
+            )
+            investigate.append("Confirm the affordable composition and whether the scheme suits this buyer's requirement.")
     elif not facts.affordable_percentage_trusted:
         if facts.opportunity_type == STRATEGIC_LAND:
             # B2 semantic cleanup (Buyer Fit Classification Audit, Section

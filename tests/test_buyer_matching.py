@@ -74,7 +74,7 @@ def test_exactly_four_pilot_profiles_with_correct_ranges_and_appetite():
     assert set(BUYER_PROFILES) == {"nesten_homes", "strategic_land_buyer", "national_housebuilder", "housing_association"}
     assert len(BUYER_PROFILE_ORDER) == 4
 
-    assert (NESTEN_HOMES.target_unit_min, NESTEN_HOMES.target_unit_max) == (50, 100)
+    assert (NESTEN_HOMES.target_unit_min, NESTEN_HOMES.target_unit_max) == (50, 200)  # real Nesten brief: 50-200 single-family homes
     assert (STRATEGIC_LAND_BUYER.target_unit_min, STRATEGIC_LAND_BUYER.target_unit_max) == (100, 300)
     assert (NATIONAL_HOUSEBUILDER.target_unit_min, NATIONAL_HOUSEBUILDER.target_unit_max) == (200, 500)
     assert (HOUSING_ASSOCIATION.target_unit_min, HOUSING_ASSOCIATION.target_unit_max) == (50, 300)
@@ -113,10 +113,14 @@ def test_housing_association_reverses_the_housebuilder_exclusion_polarity():
     """Housing Association amendment: the three profile-level flags this
     amendment introduces must have exactly the opposite polarity from every
     housebuilder profile - not merely "unset", a deliberate reversal."""
-    for profile in (NESTEN_HOMES, STRATEGIC_LAND_BUYER, NATIONAL_HOUSEBUILDER):
+    for profile in (STRATEGIC_LAND_BUYER, NATIONAL_HOUSEBUILDER):
         assert profile.specialist_development_is_exclusion is True
         assert profile.wholly_affordable_is_exclusion is True
         assert profile.below_minimum_scale_is_exclusion is False
+    # Nesten: the real brief states no affordable-housing exclusion, so that rule was removed for Nesten only.
+    assert NESTEN_HOMES.specialist_development_is_exclusion is True
+    assert NESTEN_HOMES.wholly_affordable_is_exclusion is False
+    assert NESTEN_HOMES.below_minimum_scale_is_exclusion is False
     assert HOUSING_ASSOCIATION.specialist_development_is_exclusion is False
     assert HOUSING_ASSOCIATION.wholly_affordable_is_exclusion is False
     assert HOUSING_ASSOCIATION.below_minimum_scale_is_exclusion is True
@@ -148,7 +152,7 @@ def test_development_type_exclusion():
 
 
 def test_wholly_affordable_exclusion():
-    result = assess_buyer_fit(NESTEN_HOMES, _facts(affordable_percentage=100.0))
+    result = assess_buyer_fit(NATIONAL_HOUSEBUILDER, _facts(affordable_percentage=100.0))
     assert result.classification == NOT_SUITABLE
     assert any("100%" in r for r in result.does_not_match)
 
@@ -243,7 +247,9 @@ def test_focus_school_is_not_a_strong_nesten_fit(session):
 
     assert result.classification == NOT_SUITABLE
     assert any("specialist" in r for r in result.does_not_match)
-    assert any("100%" in r for r in result.does_not_match)
+    # Nesten's real brief states no affordable exclusion: 100% affordable is visible context, not a hard exclusion.
+    assert not any("100%" in r for r in result.does_not_match)
+    assert any("100%" in u and "not a fit signal" in u for u in result.unknown)
     # Must not fabricate ownership/control certainty from the applicant's
     # name alone (the brief's own explicit instruction) - no reason
     # anywhere in this assessment claims Anwyl proves ownership/control.
@@ -295,9 +301,12 @@ def test_focus_school_same_evidence_opposite_buyer_effect(session):
     nesten = assess_buyer_fit(NESTEN_HOMES, facts)
     housing_association = assess_buyer_fit(HOUSING_ASSOCIATION, facts)
 
-    # Nesten: 100% affordable remains a hard exclusion (unchanged).
+    # Nesten: still NOT_SUITABLE, now on the specialist ground alone (its wholly-affordable exclusion was
+    # removed - the real brief is silent on it); National Housebuilder keeps the hard 100% exclusion.
     assert nesten.classification == NOT_SUITABLE
-    assert any("100%" in r for r in nesten.does_not_match)
+    assert any("specialist" in r for r in nesten.does_not_match)
+    assert not any("100%" in r for r in nesten.does_not_match)
+    assert any("100%" in r for r in assess_buyer_fit(NATIONAL_HOUSEBUILDER, facts).does_not_match)
 
     # Housing Association: 100% affordable is NOT a negative - it is
     # explicit positive evidence instead.
