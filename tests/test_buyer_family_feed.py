@@ -230,7 +230,7 @@ def test_g_h_a_family_is_excluded_only_if_every_subject_is_not_suitable(world):
     assert result["excluded_family_keys"] == (("planning_delivery", allx.id),)
     counts = result["counts"]
     assert counts["families_considered"] == 2 and counts["families_shown"] == 1 and counts["families_excluded_not_suitable"] == 1
-    assert counts["subjects_considered"] == 6 and counts["subjects_without_matching_facts"] == 0
+    assert counts["subjects_considered"] == 6 and "subjects_without_matching_facts" not in counts
     assert_equals_oracle(world)
 
 
@@ -541,3 +541,71 @@ def test_family_limit_applies_to_families_not_cards(world):
     result = build(world, limit=2)
     assert len(result["families"]) == 2 and result["counts"]["families_considered"] == 5 and result["counts"]["subjects_considered"] == 15
     assert result["counts"]["families_shown"] == 2
+
+
+# --- missing matching facts fail closed (Product Owner decision 1) ---------------------------------------------------------------------
+
+def _strip_facts(monkeypatch, predicate):
+    real = bff._attach_planning_delivery_matching_facts
+
+    def attach(session, cards):
+        real(session, cards)
+        for card in cards:
+            if predicate(card):
+                card["matching_facts"] = None
+    monkeypatch.setattr(bff, "_attach_planning_delivery_matching_facts", attach)
+
+
+def test_missing_facts_on_a_lifecycle_subject_fail_closed(world, monkeypatch):
+    s = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    _strip_facts(monkeypatch, lambda c: c["id"] == f"opp-lapse-{s.id}")
+    with pytest.raises(bff.MissingFamilySubjectMatchingFacts) as caught:
+        build(world)
+    assert caught.value.subject_id == f"opp-lapse-{s.id}" and caught.value.subject_type == PLANNING_DELIVERY
+
+
+def test_missing_facts_on_a_phase_subject_fail_closed_and_no_partial_family_is_returned(world, monkeypatch):
+    s = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    healthy = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="S", phase="S")
+    _strip_facts(monkeypatch, lambda c: c["id"].startswith(f"opp-phase-{s.id}-") and c.get("phase_code") != "Whole site / unphased")
+    result = None
+    with pytest.raises(bff.MissingFamilySubjectMatchingFacts) as caught:
+        result = build(world)                    # a STRONG phase was the family's best subject: it must not be dropped silently
+    assert caught.value.subject_id.startswith(f"opp-phase-{s.id}-")
+    assert result is None and healthy.id         # nothing partial (not even the healthy family) is returned
+
+
+def test_missing_facts_on_a_strategic_subject_fail_closed(world, monkeypatch):
+    a = world.allocation(capacity=8400, fit="S")
+    real = bff._complete_strategic_cards
+    monkeypatch.setattr(bff, "_complete_strategic_cards", lambda session, **kw: [dict(c, matching_facts=None) for c in real(session, **kw)])
+    with pytest.raises(bff.MissingFamilySubjectMatchingFacts) as caught:
+        build(world)
+    assert caught.value.subject_id == f"opp-feed-alloc-{a.id}" and caught.value.subject_type == STRATEGIC_LAND
+
+
+def test_missing_facts_do_not_fall_back_to_the_legacy_feed_and_legacy_keeps_its_skip_behaviour(world, monkeypatch):
+    s = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="S", phase="S")
+    import app.reporting.opportunity_feed as legacy_feed
+    called = {"legacy": 0}
+    real_legacy = legacy_feed.build_opportunity_feed
+    real_attach = legacy_feed._attach_planning_delivery_matching_facts
+
+    def counting_legacy(*a, **k):
+        called["legacy"] += 1
+        return real_legacy(*a, **k)
+
+    def strip_all(session, cards):
+        real_attach(session, cards)
+        for card in cards:
+            card["matching_facts"] = None
+    monkeypatch.setattr(legacy_feed, "build_opportunity_feed", counting_legacy)
+    with monkeypatch.context() as scoped:
+        scoped.setattr(bff, "_attach_planning_delivery_matching_facts", strip_all)
+        with pytest.raises(bff.MissingFamilySubjectMatchingFacts):
+            build(world)
+    assert called["legacy"] == 0                 # no silent legacy fallback
+    with monkeypatch.context() as scoped:        # legacy buyer feed: cards without facts are skipped, no error (unchanged behaviour)
+        scoped.setattr(legacy_feed, "_attach_planning_delivery_matching_facts", strip_all)
+        legacy = real_legacy(world.session, limit=6, buyer_key=BUYER)
+    assert legacy["cards"] == [] and s.id

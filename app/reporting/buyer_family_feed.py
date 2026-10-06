@@ -36,6 +36,16 @@ from app.reporting.opportunity_feed import (
 STRATEGIC_PAGE_SIZE = 500  # each page's cost only; the loop continues to the true end of the candidate set
 
 
+class MissingFamilySubjectMatchingFacts(ValueError):
+    """An otherwise eligible subject has no matching facts, so it cannot be evaluated. Omitting it could change the representative, the
+    family fit, the related subjects, terminal exclusion and the top-N, so family mode FAILS CLOSED (no skip, no partial family, no legacy
+    fallback). Carries only non-sensitive identity: the feed-card id and subject type."""
+
+    def __init__(self, subject_id: str, subject_type: str):
+        self.subject_id, self.subject_type = subject_id, subject_type
+        super().__init__(f"eligible {subject_type} subject {subject_id!r} has no matching facts; family result would be partial")
+
+
 class UnknownBuyerProfile(ValueError):
     """The buyer key does not resolve to an active profile. Family mode never degrades to an empty/legacy result."""
 
@@ -98,12 +108,10 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
         return context
 
     evaluated: list[dict] = []
-    without_facts = 0
     for card in (*strategic, *delivery):
         facts = card.get("matching_facts")
         if facts is None:
-            without_facts += 1  # as in the legacy path a subject without facts is not evaluable - but it is counted, not hidden
-            continue
+            raise MissingFamilySubjectMatchingFacts(str(card.get("id")), str(card.get("opportunity_type")))   # never skipped
         if card["opportunity_type"] == STRATEGIC_LAND:
             context = _context(STRATEGIC_LAND, int(card["params"]["allocation_id"]))
         else:
@@ -122,7 +130,6 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
         "families_shown": len(shown),
         "families_excluded_not_suitable": len(excluded),
         "subjects_considered": len(subjects),
-        "subjects_without_matching_facts": without_facts,
         "strategic_land": len(strategic),
         "approaching_lapse": len(lapse_raw),
         "undeveloped_phase": len(undeveloped_raw),

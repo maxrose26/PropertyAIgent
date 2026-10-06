@@ -578,8 +578,11 @@ Direction: **Option A — complete/unbounded family construction** (approved for
    (buyer, allocation_id) for strategic, because the context function's inputs are otherwise identical. `MatchingFacts` are never memoised across subjects;
    no global/process cache; nothing persisted.
 9. **Counts (additive; legacy card counts untouched).** `families_considered`, `families_shown`, `families_excluded_not_suitable` (a family for which **every**
-   buyer-relevant subject is NOT_SUITABLE), `subjects_considered`, plus the per-detector subject counts. A subject with no matching facts (as in the legacy path)
-   is not evaluable; it is counted (`subjects_without_matching_facts`), never silently dropped.
+   buyer-relevant subject is NOT_SUITABLE), `subjects_considered`, plus the per-detector subject counts. An eligible subject with **no matching facts** makes family mode **fail closed**
+   with the typed `MissingFamilySubjectMatchingFacts` (non-sensitive identity only): omitting it could change the representative, family fit, related
+   subjects, terminal exclusion and top-N, so it is never skipped, never yields a partial family and never falls back to the legacy cards (the legacy
+   card feed keeps its own skip behaviour, unchanged). The family order stays G3a's: fit bucket, then the lexical `(domain, anchor_id)` key - deterministic
+   only, no commercial meaning (no strategic-first, planning-first, numeric-id or pool-order rule).
 10. **Verification.** An independent unbounded reference oracle in tests (family membership, representative, family fit, related roles, exclusion, top-N);
     adversarial fixtures where the legacy bounded feed differs from the oracle and the new path equals it; precedence regression cases; fail-closed tests;
     generic-feed preservation; memoisation on/off equivalence; no model/paid calls.
