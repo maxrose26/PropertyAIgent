@@ -1535,8 +1535,9 @@ def test_n2_disagreement_or_missing_type_fails_closed(session, types):
 
 
 def test_n2_input_order_does_not_change_result(session):
-    forward = _live_facts(_approximate_apps(session, ["houses"] * 3))
-    reverse = _live_facts(_approximate_apps(session, ["houses"] * 3, order=(2, 1, 0)))
+    apps = _approximate_apps(session, ["houses"] * 3)  # one evidence set, two input orders
+    forward = _live_facts(apps)
+    reverse = _live_facts(list(reversed(apps)))
     assert forward.development_type_raw == reverse.development_type_raw == "houses"
 
 
