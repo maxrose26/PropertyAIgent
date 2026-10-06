@@ -325,7 +325,17 @@ No UI is implemented by this specification.
 
 ### G1A — Opportunity Kind / Monitoring Identity Normalisation (dedicated gate)
 
-**CURRENT BEHAVIOUR (verified):** `_opportunity_kind_prefix(id) = id.rsplit(":", 1)[0]` and
+**IMPLEMENTATION OUTCOME (G1A, Option B — canonical domain+kind detector identity):**
+`opportunity_detector_identity(id)` returns `{domain}:{kind}` (the four three-segment shapes are identical to the
+old prefix; phase ids now map to `planning_delivery:phase` instead of `planning_delivery:phase:{site}`). It is shared
+by the tracked-detector set and by the classification of universe records, and the classification decision is a pure
+seam, `plan_opportunity_changes`, reusable by the future G1B dry-run. An existing persisted row that cannot be parsed
+falls back, explicitly, to the legacy prefix (and a non-string row is skipped); a CURRENT universe id that cannot be
+parsed raises before any monitoring state is written. The old `_opportunity_kind_prefix` helper has been removed (the
+text below describes the behaviour that existed when this specification was written). No schema, fingerprint, id,
+anchor or version change.
+
+**CURRENT BEHAVIOUR WHEN THIS SPECIFICATION WAS WRITTEN (verified):** `_opportunity_kind_prefix(id) = id.rsplit(":", 1)[0]` and
 `sync_opportunity_monitoring_state` treats an opportunity as part of a **detector baseline run** when
 its prefix is not among the prefixes already tracked.
 
@@ -374,7 +384,8 @@ and needs separate approval.**
 
 ## Implementation gates (each separately approved; none is authorised by this document)
 
-Dependency order: **G1 → G1A → G2 → G3 → G4 → post-G4 decision → G5 → G6 → G7 → G8.** Any boundary change
+Dependency order: **G1 → G1A → G2 → G3 → G4 → post-G4 decision → G5 → G6 → G7 → G8**, with **G1B** (below) a
+deferred monitoring-tooling gate and the **Option C decision** a hard gate before first real emission. Any boundary change
 needs a specification amendment first. Every gate lists objective, boundary, likely files, tests,
 acceptance and stop conditions.
 
@@ -396,6 +407,29 @@ acceptance and stop conditions.
 - **Tests:** current prefix behaviour pinned for all five shapes (including phase ids with `:`); the corrected rule; **no existing tracked or live opportunity can become falsely NEW**; untracked-but-live phase ids baselined by reviewed manifest before the corrected rule runs.
 - **Acceptance:** documented before/after semantics; dry-run transition report; fingerprint unchanged.
 - **Stop:** any path by which an existing opportunity could become NEW, or an unreviewed baselining-semantics change.
+
+### G1B — Monitoring Baseline Impact / Dry-Run Tooling (FUTURE; not authorised)
+- **Objective:** a read-only preview of what the ordinary monitoring sync would do, so a release can be reviewed before it runs.
+- **Boundary:** MUST reuse `plan_opportunity_changes` (the same pure classifier as the real sync, so preview and execution cannot drift);
+  **performs no writes in dry-run mode**; reports live untracked ids **by canonical detector**; previews `BASELINE_EXISTING` vs `NEW`;
+  **previews the one-off phase `NEW` wave caused by G1A** (phases at sites with no phase rows, formerly baselined per site); supports construction
+  of a reviewed transition manifest; enforces the rule that **a detector manifest covers ALL untracked live ids for that detector, or NONE**
+  (any partial pre-created row activates the whole detector and turns the rest `NEW`).
+- **Production reads:** any production read for G1B requires separate Product Owner authority.
+- **Likely files:** a new read-only reporting module/script reusing `app/reporting/opportunity_change.py`, tests.
+- **Stop:** any write in dry-run mode, a re-implementation of the classifier, or a production read without authority.
+- **Status:** monitoring infrastructure is **paused**; G1B is deliberately not started.
+
+### Option C — pre-emission decision gate (HARD GATE; not a gate to implement now)
+Before the **first real emission** of `MIXED_COMPONENT` or `AFFORDABLE_PACKAGE`, REVIEW must explicitly decide whether
+(a) the bounded **zero-subject false-baseline edge** is acceptable (a detector baselined with zero subjects makes its first genuinely later
+subject read `BASELINE_EXISTING`; bounded to one subject per kind) or (b) **persisted detector activation/version state** is commercially
+necessary. No schema is introduced now.
+
+### Failure mode 7 — monitoring id vs acquisition-subject anchor (UNRESOLVED; separate future decision)
+Monitoring is keyed by **opportunity id** while agent evaluation is keyed by the **acquisition-subject anchor**. A lifecycle change
+(`site` ↔ `recent_permission` ↔ `long_pending_application`) therefore creates a new monitoring id while retaining the same underlying anchor.
+This is **not** solved by G1A and must be recorded and decided separately; no gate in this specification resolves it.
 
 ### G2 — Evidence relationship contract
 - **Objective:** an explicit evidence input type for containment, non-overlap and child-set completeness, an unambiguous mapping from a subject to its parent `CountAssessment.subject_id` (inventory #15), and adapters using **existing evidence only** (e.g. existing application linking where it names the parent).

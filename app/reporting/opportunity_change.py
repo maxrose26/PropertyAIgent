@@ -223,11 +223,6 @@ def _legacy_kind_prefix(opportunity_id: str) -> str:
     return opportunity_id.rsplit(":", 1)[0]
 
 
-# Retained name: the previous private helper, now an alias of the legacy fallback (no current caller relies on
-# its old per-site phase granularity).
-_opportunity_kind_prefix = _legacy_kind_prefix
-
-
 def tracked_detector_identities(opportunity_ids) -> set[str]:
     """The set of detector identities that already have at least one persisted monitoring row.
 
@@ -240,7 +235,13 @@ def tracked_detector_identities(opportunity_ids) -> set[str]:
         try:
             tracked.add(opportunity_detector_identity(opportunity_id))
         except UnparseableOpportunityId:
-            tracked.add(_legacy_kind_prefix(opportunity_id))
+            if isinstance(opportunity_id, str):
+                tracked.add(_legacy_kind_prefix(opportunity_id))
+            # A non-string persisted id (None or otherwise) cannot identify any detector: it is skipped, so
+            # malformed HISTORICAL state never crashes the sync inside this fallback. (CURRENT universe ids are
+            # validated separately and still raise.) NOTE: a malformed string's legacy prefix can coincide with a
+            # canonical detector identity (e.g. "planning_delivery:site:abc" -> "planning_delivery:site") and then
+            # activates that detector, exactly as before G1A - deterministic and pinned by tests.
     return tracked
 
 

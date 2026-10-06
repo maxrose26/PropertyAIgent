@@ -231,3 +231,40 @@ def test_a_future_detector_with_no_rows_baselines_all_pre_existing_subjects_toge
     _stub_universe(monkeypatch, *[_record(o) for o in first], _record(later))
     sync_opportunity_monitoring_state(session)
     assert _classification(session, later) == NEW
+
+
+# --- historical-row hardening (non-string rows; fallback collision) ------------------------------------------------------------
+
+def test_non_string_historical_ids_are_skipped_by_the_fallback_and_never_crash():
+    assert tracked_detector_identities([None, 5, b"x", "planning_delivery:phase:281:1"]) == {"planning_delivery:phase"}
+    assert tracked_detector_identities([None]) == set()  # nothing identifiable -> no detector is activated
+
+
+def test_a_malformed_historical_row_whose_legacy_prefix_collides_with_a_canonical_detector_is_deterministic(session, monkeypatch):
+    """Pre-G1A behaviour, preserved and pinned: the legacy prefix of 'planning_delivery:site:abc' is exactly the
+    canonical site detector identity, so such a historical row activates the site detector. This is deterministic and
+    only ever applies to PERSISTED rows; the same id as a CURRENT universe record still raises."""
+    collider = "planning_delivery:site:abc"
+    with pytest.raises(UnparseableOpportunityId):
+        opportunity_detector_identity(collider)
+    assert tracked_detector_identities([collider]) == {"planning_delivery:site"}
+    _seed(session, collider)
+    later_site = planning_delivery_site_opportunity_id(2)
+    _stub_universe(monkeypatch, _record(later_site))
+    counts = sync_opportunity_monitoring_state(session)
+    assert counts["new"] == 1 and counts["baseline_existing"] == 0
+    assert _classification(session, later_site) == NEW
+    # a malformed id that does NOT collide leaves the detector inactive (first run still baselines)
+    assert tracked_detector_identities(["planning_delivery:site:61:extra"]) == {"planning_delivery:site:61"}
+
+
+def test_a_colliding_malformed_id_as_a_current_record_still_fails_loudly(session, monkeypatch):
+    _stub_universe(monkeypatch, _record("planning_delivery:site:abc"))
+    with pytest.raises(UnparseableOpportunityId):
+        sync_opportunity_monitoring_state(session)
+    assert session.execute(select(OpportunityMonitoringState)).scalars().all() == []
+
+
+def test_the_dead_legacy_alias_is_gone():
+    assert not hasattr(oc, "_opportunity_kind_prefix")
+    assert callable(oc._legacy_kind_prefix)  # the explicit historical-row fallback remains
