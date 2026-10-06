@@ -109,3 +109,19 @@ def test_real_brief_context_is_recorded_in_the_mandate_notes_without_new_rules()
         assert expected in notes
     # Context only: no region, site-size or JV matching rule exists.
     assert NESTEN_HOMES.geography_scope == "ALL_CURRENT_COVERAGE" and not NESTEN_HOMES.geography_councils
+
+
+def test_mixed_specialist_parent_remains_excluded_pending_stage_2_5b_decomposition():
+    """INTENTIONALLY TEMPORARY (Product Owner Decision 3, deferred to Stage 2.5B).
+
+    The accepted product intent is that a mixed specialist + conventional residential PARENT should not be
+    hard-excluded for Nesten merely because a specialist component exists; Stage 2.5B acquisition-subject
+    decomposition owns finding the relevant conventional sub-scope. The current pre-decomposition architecture
+    has one yes/no specialist flag per mandate and treats the mixed development types as specialist, so the
+    parent stays hard-excluded here. This test pins that known limitation so a change is deliberate. When Stage
+    2.5B lands, UPDATE this test with the new behaviour - do not simply delete it.
+    """
+    for mixed in ("mixed_retirement_and_market_housing", "mixed_specialist_and_market_housing"):
+        fit = assess_buyer_fit(NESTEN_HOMES, _facts(is_specialist_development=True, development_type_raw=mixed))
+        assert fit.classification == NOT_SUITABLE
+        assert any("specialist" in r for r in fit.does_not_match)

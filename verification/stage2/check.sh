@@ -7,7 +7,7 @@ output=$(realpath "$output")
 env -i HOME=/tmp PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
  "$interpreter" verification/stage1_spawn_offline_pytest.py -q -p no:cacheprovider -p verification.stage1_preservation_plugin \
  tests/test_stage2_commercial_evidence.py tests/test_stage2_unit_phasing.py \
- tests/test_buyer_matching.py tests/test_buyer_mandate_v2_phase_b2.py tests/test_nesten_canonical_mandate.py \
+ tests/test_buyer_matching.py tests/test_buyer_mandate_v2_phase_b2.py tests/test_nesten_canonical_mandate.py tests/test_wholly_affordable_state.py \
  --junitxml="$output/stage2.xml" | tee "$output/stage2.log"
 env -i HOME=/tmp PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
  "$interpreter" verification/stage1_spawn_offline_pytest.py -q -p no:cacheprovider \
