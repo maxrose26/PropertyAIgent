@@ -618,9 +618,13 @@ INSUFFICIENT_EVIDENCE/NOT_SUITABLE, investigative classification, reasons or ran
 **STAGE 2.5B - PHASING INVESTIGATION POLICY**, will decide deterministically how Levels 1-3 affect investigative classification, reasons, ranking and
 parent-vs-child interpretation.
 
-**Level 1 display rule (conservative, no new inference):** the family contains **more than one subject** and at least one is an **actual phase** subject
-(`slot == PHASE`, its scope key is not the unphased bucket, and its count assessment scope type is `phase`). Wording: "Phased delivery evidenced." A family with a
-single subject (including a sole phase) shows no phasing label; strategic families are never labelled phased (linked planning sites do not make an allocation
+**Level 1 display rule (conservative, no new inference):** the family contains at least one **actual phase** subject
+(`slot == PHASE`, its scope key is not the unphased bucket, and its count assessment scope type is `phase`). The unphased wider-scope subject is labelled simply
+"Wider permission" - its lack of phase scope does not establish that the development is unphased. Wording: "Phased delivery evidenced." **One genuine phase subject is
+sufficient on its own**: a phase-only family with one phase, Phase 1 + Phase 2, and parent + phase all show it (the absence of a wider-parent subject does not negate
+the evidence a phase represents), while a lifecycle/whole-only family shows no label. A phase establishes ONLY that phased delivery is evidenced - not a parent
+subject, another phase, further buyer-sized phases, residual capacity, availability, disposal intent, ownership/control, non-overlap or parcel geometry. Strategic
+families are never labelled phased (linked planning sites do not make an allocation
 phased). Forbidden wording: "suitable for subdivision", "remaining", "other phases available", "sold in phases", any family total.
 
 **Existing structured phasing signals (inventory; none accepted for Level 2):** (a) the strategic-allocation Local Plan phasing classification

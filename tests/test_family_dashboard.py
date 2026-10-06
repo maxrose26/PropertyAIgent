@@ -90,10 +90,23 @@ def test_large_site_with_no_phasing_evidence_is_a_compact_single_subject_family_
     assert family.best.fit_label == "Insufficient evidence"                      # the existing v6 result, unchanged
 
 
-def test_single_phase_subject_family_shows_no_phasing_label(world):
+def test_one_genuine_phase_subject_alone_shows_the_phasing_label_without_fabricating_a_parent(world):
     world.site(rm_age=300, rm_phase="Phase 1", phase="S", units_rm=80)
     family = view_of(world).families[0]
-    assert len(family.related) == 0 and family.phasing_context is None
+    assert family.phasing_context == fp.PHASING_CONTEXT                      # one genuine phase is sufficient on its own
+    assert len(family.related) == 0 and family.overlap_warning is None       # no synthetic parent / second subject, no overlap note
+    assert family.best.label.startswith("Phase") and "wider" not in family.best.label.lower()
+
+
+def test_wider_permission_label_has_no_unphased_wording_and_lifecycle_only_has_no_label(world):
+    world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    family = view_of(world).families[0]
+    labels = [family.best.label] + [r.label for r in family.related]
+    assert "Wider permission" in labels and not any("unphased" in label.lower() for label in labels)
+    assert fp.PHASING_CONTEXT not in labels
+    world.site(outline_age=LAPSE_AGE, parent="I", units_out=500)                 # lifecycle/whole only: no label
+    lifecycle_only = [f for f in view_of(world).families if f.best.label.startswith("Permission approaching")]
+    assert lifecycle_only and all(f.phasing_context is None for f in lifecycle_only)
 
 
 def test_unphased_bucket_alone_is_never_evidence_of_phasing(world):
@@ -108,7 +121,15 @@ def test_unphased_bucket_alone_is_never_evidence_of_phasing(world):
     assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), lifecycle, (RelatedSubject(unphased, "INSUFFICIENT"),))) is False
     real_phase = subject("opp-phase-1-2", SLOT_PHASE, "2", "phase")
     assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), real_phase, (RelatedSubject(lifecycle, "INSUFFICIENT"),))) is True
-    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), real_phase, ())) is False     # a single subject never shows the label
+    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), real_phase, ())) is True      # one genuine phase is sufficient on its own
+    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), unphased, ())) is False       # the unphased bucket alone never is
+    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), lifecycle, ())) is False      # lifecycle/whole only: no label
+    no_assessment = FamilySubject(domain="planning_delivery", anchor_id=1, subject_key="opp-phase-1-3", slot=SLOT_PHASE, fit="INSUFFICIENT_EVIDENCE",
+                                  source={"phase_code": "3", "count_assessment": None}, id_system=ID_SYSTEM_FEED)
+    assert fp.phasing_evidenced(OpportunityFamily(("planning_delivery", 1), no_assessment, ())) is False  # no phase-scope assessment: nothing is claimed
+    strategic = FamilySubject(domain="strategic_land", anchor_id=1, subject_key="opp-feed-alloc-1", slot="ALLOCATION", fit="INSUFFICIENT_EVIDENCE",
+                              source={"phase_code": "3", "count_assessment": CountAssessment(scope_type="phase", scope_label="x")}, id_system=ID_SYSTEM_FEED)
+    assert fp.phasing_evidenced(OpportunityFamily(("strategic_land", 1), strategic, ())) is False         # a strategic allocation is never labelled phased
 
 
 # --- strategic ------------------------------------------------------------------------------------------------------------------------

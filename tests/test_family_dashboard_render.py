@@ -60,6 +60,7 @@ def test_a_large_parent_with_a_strong_phase_renders_phase_headline_phasing_overl
     assert len(at.expander) == 1 and at.expander[0].label.startswith("Related acquisition subjects (")
     assert not at.expander[0].proto.expanded                     # collapsed by default
     assert "640" not in text and "360" not in text               # no family total, no residual
+    assert "Wider permission" in text and "unphased" not in text.lower()
     assert text.count("Best acquisition subject for this buyer") == 1
     assert_no_forbidden(text)
 
@@ -80,6 +81,15 @@ def test_d_phase_only_family_renders_no_whole_site_subject(world):
     text, _ = render(view_of(world).families[0])
     assert "whole site" not in text.lower() and "unphased" not in text.lower() and "Phased delivery evidenced." in text
     assert_no_forbidden(text)
+
+
+def test_one_genuine_phase_alone_renders_the_label_compactly_with_no_parent_residual_or_availability_claim(world):
+    world.site(rm_age=300, rm_phase="Phase 1", phase="S", units_rm=80)
+    text, at = render(view_of(world).families[0])
+    assert "Phased delivery evidenced." in text and OVERLAP_WARNING not in text and len(at.expander) == 0
+    assert "wider" not in text.lower() and "unphased" not in text.lower() and "Strong fit" in text
+    assert_no_forbidden(text)
+    assert "residual" not in text.lower() and "parcel" not in text.lower()
 
 
 def test_single_subject_large_site_is_compact_with_no_phasing_overlap_or_expander(world):
