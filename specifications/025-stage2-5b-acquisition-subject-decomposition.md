@@ -661,6 +661,47 @@ access refusals (Stage 1) are not swallowed. Generic views are unaffected.
 `app/ui/shell.py` renders them; the buyer branch of `app/ui/pages/00_Dashboard.py` calls them. **Stop:** any change to fit/ranking/policy, any relationship claim,
 any family total or "remaining" claim, any Level 2 display without an accepted structured signal, any legacy fallback.
 
+#### V7A — phasing fact + matcher semantics (Product Owner decisions; `BUYER_MATCHING_POLICY_VERSION` 6 → 7)
+Authorised after a read-only **v6 benchmark checkpoint** (recorded in `benchmark/checkpoints/v6_checkpoint.json`; the 14 frozen cases are v4 snapshots, their fixtures are untouched, and
+v4 → v6 changes are never attributed to v7). **Not authorised:** persisted family monitoring, V7B family fan-out, V7C production-transition execution, any deployment, any production read.
+
+**Fingerprint ownership (Option D).** OPPORTUNITY EVIDENCE fingerprint = objective evidence of that opportunity (unchanged; no sibling/family phasing state enters it, no persisted family state).
+FAMILY / ACQUISITION CONTEXT = related evidenced acquisition subjects. AGENT-EVALUATION fingerprint = buyer/policy evaluation of the current evidence and the relevant acquisition context
+(it gains the explicit phasing state; payload version 2 → 3).
+
+**B′ contract.** For an oversized PLANNING-DELIVERY wider subject **above the buyer's discovery maximum** (TOTAL-units buyers), classification stays INSUFFICIENT_EVIDENCE and the
+investigative flag stays TRUE at every level; only the evidence-aware reason changes: Level 1 (CURRENT evidenced child phase) "phased delivery is evidenced; assess the evidenced phase
+scope(s) separately; availability is unverified"; Level 2 (DOCUMENTED phasing; reserved for Stage 2.6 qualified evidence, **dormant** — no accepted producer exists) "a phased-delivery strategy
+is evidenced; a buyer-relevant acquisition scope has not yet been established"; Level 3 (no current qualified phasing evidence) "no current phasing evidence has been identified in the qualified
+records; decomposition remains unverified" — missing evidence is NOT evidence that the scheme is unphased, and the wording never says "unphased development".
+
+**Current / historical / none.** A phase is CURRENT only if it is a genuine named phase scope (never the unphased bucket), has a substantive GRANTED anchor, and is not classified `lapsed` by the
+existing accepted lapse model (the assumed three-year date; implementation unverified). Refused, withdrawn, undecided, recommendation-only and non-substantive-only (conditions/NMA) groups
+never qualify. States: `CURRENT_EVIDENCED_PHASE` > `HISTORICAL_PHASE_ONLY` (only assumed-lapsed granted phases exist; follows the Level-3 classification/flag semantics; the wording acknowledges
+historic evidence without asserting legal lapse) > `NONE_IDENTIFIED`; `DOCUMENTED_PHASING` is reserved. No new public fit tier. A hard-excluded (NOT_SUITABLE) CURRENT phase still evidences phased
+delivery and never promotes the parent.
+
+**Minimal fact.** `AcquisitionPhasingEvidence(state)` only (no scope list: the matcher needs none). It is a context fact (`B2MatchingContext.acquisition_phasing`), derived by ONE pure function
+(`app/reporting/acquisition_phasing.py`, no database/model call) from already-loaded site applications by the context builders; `assess_buyer_fit` stays pure. The strategic
+`has_phasing_evidence` (Local Plan allocation phasing) is not reused or overloaded; strategic routes and strategic phasing are unchanged.
+
+**Self-scope guard.** Sibling-aware wording applies only to the oversized WIDER subject. It is NOT applied to a phase subject, to an application-anchored subject (recent permission / long-pending
+application) on a site with CURRENT evidence (it cannot be shown not to be that phase), or to any subject whose own scope is a named phase; such subjects are matched on their own evidence with
+neutral self-scope wording. The guard is an explicit deterministic input (`subject_phase_scope_key`, `subject_application_anchored`) plus the subject's own count-assessment scope; it never relies on UI.
+
+**Below-minimum wording.** For a known scale BELOW the discovery minimum the wording is neutral ("Scale (N homes) is below this buyer's discovery range…") and never suggests phasing, combining sites,
+aggregation or another route; classification and investigative flag are unchanged from v6. Above-maximum keeps the B′ wording. The direction is decided from the discovery bounds.
+
+**Buyers.** Planning-delivery phasing semantics apply to TOTAL-units scale matching (tested for Nesten and National Housebuilder). Housing Association (affordable-unit metric) and Strategic Land Buyer /
+strategic allocations keep their v6 semantics and wording (a phase never establishes an affordable package; Local Plan phasing is never consumed through the new field).
+
+**Presentation.** The Slice 2 label "Phased delivery evidenced." consumes the SAME derived state (CURRENT only); historical-only and none show no current-evidence label. One semantic source of truth.
+
+**v7 consequences (recorded, nothing executed).** Every mandate matching fingerprint changes once (policy version is its first key) → controlled reassessment; agent-evaluation fingerprints change
+(policy version, reason text, explicit phasing state); benchmark Layer B is superseded; opportunity evidence fingerprints, subject/family ids and monitoring detector identities are unchanged. Stage 2.6
+Level-2 boundary: a qualified evidence record (source/document identity, type, scope, provenance, final qualification status, stable evidence fingerprint) states only the FACT that a source describes phased
+delivery; Stage 2.5B interprets it. **Deferred:** V7B family fan-out, V7C transition tooling, persisted family monitoring.
+
 ### G4 — Subject-level MatchingFacts/context adapter
 - **Objective:** a dedicated subject facts builder and context handling; match existing phase/whole subjects independently, with parent evidence as labelled context.
 - **Boundary:** no policy change (still v6); no new kinds emitted; migrates inventory #3 and #4 to the strict parser.
