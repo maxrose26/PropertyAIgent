@@ -906,6 +906,48 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
             st.page_link(card["page"], label="View opportunity →", query_params=card.get("params") or {})
 
 
+def _family_subject_badge(subject) -> None:
+    status_badge(BUYER_FIT_BADGE_KIND.get(subject.fit_key, "info"), subject.fit_label)
+
+
+def opportunity_family_card(view, *, key: str) -> None:
+    """One buyer-dashboard item per OpportunityFamily (Stage 2.5B G3b Slice 2) - ``view`` is app.reporting.family_presentation.FamilyView; this only renders
+    it (no ranking, no policy, no arithmetic). Hierarchy: development context -> BEST ACQUISITION SUBJECT for this buyer -> phasing context (only when the
+    presenter qualified it) -> overlap note -> collapsed related subjects. A single-subject family stays compact (no expander, no overlap note)."""
+    best = view.best
+    with st.container(border=True, key=f"opp-family-{key}-{view.family_id}"):
+        st.markdown(f"##### {_escape(view.title)}")
+        if view.subtitle:
+            st.caption(view.subtitle)
+        st.caption("Best acquisition subject for this buyer")
+        st.markdown(f"**{_escape(best.label)}**" + (f" — {_escape(best.scale)}" if best.scale else ""))
+        if best.signal_label:
+            status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(best.signal_key, "info"), best.signal_label)
+        _family_subject_badge(best)
+        if best.headline_reason:
+            st.write(best.headline_reason)
+        if best.reasons:
+            st.caption("Existing-policy reasons: " + " · ".join(best.reasons))
+        st.caption(view.caveat)
+        if best.metrics:
+            cols = st.columns(len(best.metrics))
+            for col, (label, value) in zip(cols, best.metrics):
+                with col:
+                    stat_tile(label, value)
+        if view.phasing_context:
+            st.info(view.phasing_context, icon="🧩")
+        if view.overlap_warning:
+            st.caption(view.overlap_warning)
+        if view.related:
+            with st.expander(f"Related acquisition subjects ({len(view.related)})"):
+                if view.relationship_note:
+                    st.caption(view.relationship_note)
+                for subject in view.related:
+                    st.markdown(f"**{_escape(subject.label)}**" + (f" — {_escape(subject.scale)}" if subject.scale else "") + f" · {_escape(subject.fit_label)}")
+        if best.page:
+            st.page_link(best.page, label="View opportunity →", query_params=best.params or {})
+
+
 def ai_summary_rail(items: list[dict], *, key: str, cycle_seconds: int = 40) -> None:
     """The right-hand Recent AI Summaries rail (Dashboard refinement, Parts
     7-9) - a static vertical stack (every item visible at once, no
