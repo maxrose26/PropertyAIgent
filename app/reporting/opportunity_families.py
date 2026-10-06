@@ -21,7 +21,11 @@ Decisions implemented (Product Owner):
   * a family is terminally NOT_SUITABLE only if every member is;
   * unit counts are NEVER summed or subtracted - the model carries no unit field at all, so no total or residual can
     exist, and the overlap state states that same-site subjects may overlap;
-  * conflicting lifecycle representations (which the universe/feed precedence never produces) FAIL CLOSED.
+  * conflicting lifecycle representations (which the universe/feed precedence never produces) FAIL CLOSED;
+  * one grouping call must use ONE canonical subject-id representation (opportunity-universe ids OR feed-card ids): a mixture
+    FAILS CLOSED (it would double-list one subject under two keys);
+  * the final stable-key tie-break is LEXICAL/STRING order (so '...A10' sorts before '...A9'): deterministic only, with no
+    commercial meaning.
 """
 from __future__ import annotations
 
@@ -51,6 +55,9 @@ ROLE_INSUFFICIENT_INVESTIGATIVE = "INSUFFICIENT_INVESTIGATIVE"
 ROLE_INSUFFICIENT = "INSUFFICIENT"
 ROLE_NOT_SUITABLE = "NOT_SUITABLE"
 
+ID_SYSTEM_OPPORTUNITY = "opportunity"   # opportunity-universe ids (planning_delivery:site:61 ...)
+ID_SYSTEM_FEED = "feed"                 # feed-card ids (opp-lapse-61 ...)
+
 OVERLAP_SINGLE_SUBJECT = "SINGLE_SUBJECT"
 OVERLAP_MAY_OVERLAP = "MAY_OVERLAP_NO_EVIDENCE"
 OVERLAP_WARNING = "Related subjects may overlap — do not add unit counts."
@@ -74,6 +81,10 @@ class UnsupportedSubject(FamilyInputError):
     pass
 
 
+class MixedIdentitySystems(FamilyInputError):
+    pass
+
+
 # --- model -----------------------------------------------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -88,6 +99,7 @@ class FamilySubject:
     investigative: bool = False      # BuyerFitAssessment.is_investigative_exception
     count_precision: str | None = None  # CountAssessment.precision, if known
     source: object = field(default=None, compare=False, repr=False)
+    id_system: str = ID_SYSTEM_OPPORTUNITY  # which id representation subject_key uses; one per grouping call
 
     def __post_init__(self):
         if self.domain not in (PLANNING_DELIVERY, STRATEGIC_LAND):
@@ -105,6 +117,8 @@ class FamilySubject:
             raise UnsupportedSubject("investigative must be a bool")
         if self.count_precision is not None and self.count_precision not in _COUNT_PRECISIONS:
             raise UnsupportedSubject(f"unknown count precision {self.count_precision!r}")
+        if self.id_system not in (ID_SYSTEM_OPPORTUNITY, ID_SYSTEM_FEED):
+            raise UnsupportedSubject(f"unknown id system {self.id_system!r}")
 
     @property
     def family_key(self) -> tuple[str, int]:
@@ -179,7 +193,8 @@ def evidence_rank(count_precision: str | None) -> int:
 def subject_order_key(subject: FamilySubject) -> tuple:
     """Total order within a family: fit, evidence quality, then the stable key. There is NO commercial-specificity or subject-kind
     term: specificity applies only to an evidence-qualified relationship (G2), which G3a does not have. The key has no commercial
-    meaning - it only makes the result reproducible irrespective of input order."""
+    meaning - it only makes the result reproducible irrespective of input order. The key is compared as a plain STRING
+    (lexical, not natural number order: '...A10' sorts before '...A9')."""
     return (fit_rank(subject.fit, subject.investigative), evidence_rank(subject.count_precision), subject.subject_key)
 
 
@@ -202,9 +217,15 @@ def group_into_families(subjects: Iterable[FamilySubject]) -> list[OpportunityFa
     duplicate a family); a same-key subject with different fields, a second distinct lifecycle representation for one site, or two
     distinct subjects for one allocation raise. Families are ordered by fit bucket, then family key - no new scoring."""
     unique: dict[str, FamilySubject] = {}
+    systems: set[str] = set()
     for subject in subjects:
         if not isinstance(subject, FamilySubject):
             raise UnsupportedSubject(f"expected FamilySubject, got {type(subject).__name__}")
+        systems.add(subject.id_system)
+        if len(systems) > 1:
+            raise MixedIdentitySystems(
+                "one grouping call must use one canonical subject-id representation "
+                "(opportunity-universe ids or feed-card ids, not both)")
         existing = unique.get(subject.subject_key)
         if existing is None:
             unique[subject.subject_key] = subject
@@ -249,13 +270,17 @@ def subject_from_opportunity_id(opportunity_id: str, *, fit: str, investigative:
     else:  # pragma: no cover - parse_opportunity_id already rejects anything else
         raise UnsupportedSubject(f"unsupported kind {parsed.kind!r}")
     return FamilySubject(domain=parsed.domain, anchor_id=parsed.anchor_id, subject_key=opportunity_id, slot=slot, fit=fit,
-                         investigative=investigative, count_precision=count_precision, source=source)
+                         investigative=investigative, count_precision=count_precision, source=source,
+                         id_system=ID_SYSTEM_OPPORTUNITY)
 
 
 # Existing feed-card id shapes (app.reporting.dashboard / opportunity_feed). The card id is the explicit stable subject key.
-_FEED_LIFECYCLE_RE = re.compile(r"^opp-(?:lapse|recent-permission|long-pending)-(\d+)$")
-_FEED_PHASE_RE = re.compile(r"^opp-phase-(\d+)-(.+)$")
-_FEED_ALLOCATION_RE = re.compile(r"^opp-feed-alloc-(\d+)$")
+# Numeric ids must be CANONICAL positive integers ('opp-lapse-3', never 'opp-lapse-03').
+_CANON = r"([1-9][0-9]*)"
+_FEED_LIFECYCLE_RE = re.compile(rf"^opp-(?:lapse|recent-permission|long-pending)-{_CANON}$")
+_FEED_PHASE_RE = re.compile(rf"^opp-phase-{_CANON}-(.+)$")
+_FEED_ALLOCATION_RE = re.compile(rf"^opp-feed-alloc-{_CANON}$")
+_CANON_FULL_RE = re.compile(r"^[1-9][0-9]*$")
 
 
 def subject_from_feed_card(card: Mapping) -> FamilySubject:
@@ -271,10 +296,9 @@ def subject_from_feed_card(card: Mapping) -> FamilySubject:
     precision = getattr(card.get("count_assessment"), "precision", None)
 
     def _as_id(value):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            raise UnsupportedSubject(f"feed card {card_id!r} has a non-numeric id {value!r}") from None
+        if isinstance(value, bool) or not (isinstance(value, int) or (isinstance(value, str) and _CANON_FULL_RE.match(value))):
+            raise UnsupportedSubject(f"feed card {card_id!r} has a non-canonical id {value!r}")
+        return int(value)
 
     match = _FEED_ALLOCATION_RE.match(card_id)
     if match:
@@ -287,8 +311,13 @@ def subject_from_feed_card(card: Mapping) -> FamilySubject:
         if not match:
             match = _FEED_PHASE_RE.match(card_id)
             slot = SLOT_PHASE
-            if match and not card.get("phase_code"):
-                raise UnsupportedSubject(f"feed phase card {card_id!r} has no phase_code")
+            if match:
+                phase_code = card.get("phase_code")
+                if not phase_code:
+                    raise UnsupportedSubject(f"feed phase card {card_id!r} has no phase_code")
+                if phase_code != match.group(2):  # the id-encoded scope and phase_code must agree exactly; never pick one
+                    raise UnsupportedSubject(
+                        f"feed phase card {card_id!r} id scope {match.group(2)!r} disagrees with phase_code {phase_code!r}")
         if not match:
             raise UnsupportedSubject(f"unrecognised feed card id {card_id!r}")
         domain, anchor = PLANNING_DELIVERY, int(match.group(1))
@@ -297,4 +326,5 @@ def subject_from_feed_card(card: Mapping) -> FamilySubject:
     if card.get("opportunity_type") != domain:
         raise UnsupportedSubject(f"feed card {card_id!r} opportunity_type does not match its id")
     return FamilySubject(domain=domain, anchor_id=anchor, subject_key=card_id, slot=slot, fit=fit_object.classification,
-                         investigative=bool(fit_object.is_investigative_exception), count_precision=precision, source=card)
+                         investigative=bool(fit_object.is_investigative_exception), count_precision=precision, source=card,
+                         id_system=ID_SYSTEM_FEED)

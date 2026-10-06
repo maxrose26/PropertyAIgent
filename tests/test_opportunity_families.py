@@ -375,3 +375,77 @@ def test_synthetic_parent_plus_phase_are_related_by_family_only():
     assert family.representative.subject_key == phase_id(100, "1")
     assert [r.subject.subject_key for r in family.related] == [site_id(100)]
     assert family.overlap_state == OVERLAP_MAY_OVERLAP
+
+
+# --- G3a final hardening ---------------------------------------------------------------------------------------------------------------------
+
+def test_mixing_opportunity_ids_and_feed_card_ids_in_one_call_fails_closed():
+    universe_phase = subj(phase_id(5, "1"), S)
+    feed_phase = subject_from_feed_card(_card("opp-phase-5-1", site=5, phase="1"))
+    # they would otherwise sit in ONE family as two phase members - one subject double-listed under two keys
+    with pytest.raises(fam.MixedIdentitySystems):
+        group_into_families([universe_phase, feed_phase])
+    with pytest.raises(fam.MixedIdentitySystems):
+        group_into_families([feed_phase, universe_phase])  # order-independent
+    # an allocation supplied through both systems also fails (rather than silently becoming two subjects)
+    with pytest.raises(fam.MixedIdentitySystems):
+        group_into_families([subj(allocation_id(213), S), subject_from_feed_card(_card("opp-feed-alloc-213", allocation=213))])
+
+
+def test_one_id_system_per_call_still_works_for_either_system():
+    assert len(group_into_families([subj(phase_id(5, "1"), S), subj(phase_id(6, "1"), S)])) == 2
+    feed = [subject_from_feed_card(_card("opp-phase-5-1", site=5, phase="1")), subject_from_feed_card(_card("opp-lapse-6", site=6))]
+    assert len(group_into_families(feed)) == 2
+    assert {s.id_system for s in feed} == {fam.ID_SYSTEM_FEED}
+
+
+def test_id_system_is_part_of_subject_equality_and_validated():
+    assert subj(site_id(5), S).id_system == fam.ID_SYSTEM_OPPORTUNITY
+    with pytest.raises(UnsupportedSubject):
+        FamilySubject("planning_delivery", 5, "k", fam.SLOT_LIFECYCLE, S, id_system="other")
+
+
+@pytest.mark.parametrize("card_id,phase", [
+    ("opp-phase-5-1", "2"), ("opp-phase-5-A", "a"), ("opp-phase-5-plot_A1", "A1"), ("opp-phase-5-1", "1 "),
+])
+def test_a_feed_phase_card_whose_id_scope_and_phase_code_disagree_fails_closed(card_id, phase):
+    with pytest.raises(UnsupportedSubject):
+        subject_from_feed_card(_card(card_id, site=5, phase=phase))
+
+
+def test_a_feed_phase_card_with_agreeing_scope_is_accepted_including_unusual_scope_keys():
+    for scope in ("1", "3B", "plot_A1", "EV-1", "Whole site / unphased"):
+        subject = subject_from_feed_card(_card(f"opp-phase-5-{scope}", site=5, phase=scope))
+        assert subject.subject_key == f"opp-phase-5-{scope}" and subject.slot == fam.SLOT_PHASE
+
+
+@pytest.mark.parametrize("bad_id,site,alloc", [
+    ("opp-lapse-03", 3, None), ("opp-recent-permission-007", 7, None), ("opp-long-pending-00", 0, None),
+    ("opp-phase-05-1", 5, None), ("opp-feed-alloc-007", None, 7), ("opp-lapse-0", 0, None), ("opp-lapse-+3", 3, None),
+])
+def test_non_canonical_numeric_feed_ids_fail_closed(bad_id, site, alloc):
+    card = _card(bad_id, site=site, allocation=alloc, phase="1" if "phase" in bad_id else None)
+    with pytest.raises(UnsupportedSubject):
+        subject_from_feed_card(card)
+
+
+def test_non_canonical_numeric_params_fail_closed_and_canonical_ones_are_accepted():
+    card = _card("opp-lapse-3", site=3)
+    card["params"] = {"site_id": "03"}
+    with pytest.raises(UnsupportedSubject):
+        subject_from_feed_card(card)
+    card["params"] = {"site_id": 3}
+    assert subject_from_feed_card(card).anchor_id == 3
+    card["params"] = {"site_id": True}
+    with pytest.raises(UnsupportedSubject):
+        subject_from_feed_card(card)
+
+
+def test_the_stable_key_tie_break_is_lexical_not_natural_order():
+    family = one([subj(phase_id(5, "A10"), S), subj(phase_id(5, "A9"), S)])
+    assert family.representative.subject_key == phase_id(5, "A10")  # '...A10' < '...A9' as strings; deterministic only
+
+
+def test_the_canonical_opportunity_universe_id_grammar_is_unchanged():
+    assert site_id(5) == "planning_delivery:site:5" and phase_id(5, "A:1") == "planning_delivery:phase:5:A:1"
+    assert subject_from_opportunity_id(phase_id(5, "A:1"), fit=S).subject_key == "planning_delivery:phase:5:A:1"

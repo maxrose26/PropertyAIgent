@@ -161,7 +161,7 @@ migration is owned by the gate named in its inventory row.
 | 10 | `app/db/models.py`: `OpportunityMonitoringState.opportunity_id` `String(200)` unique; `AgentEvaluationHistory.opportunity_id` `String(200)` and `opportunity_kind` `String(50)`; `CurrentBuyerOpportunityState.current_opportunity_kind` `String(50)` | length limits | New ids ≤ 200, kind names ≤ 50. No schema change. |
 | 11 | `app/policy/acquisition_evaluate.py`, `agent_evaluation_prompt.py`, `agent_evaluation_result.py` | id is an opaque key/label; anchor derived through #1 | Compatible once #1 is strict. |
 | 12 | `app/reporting/opportunity_transaction_signals.py` (L248–301) | looks up `OpportunityMonitoringState` by id for "ownership/control evidence changed" | A new subject has no monitoring row yet: signal must be UNKNOWN/ABSENT, never "changed". |
-| 13 | `app/reporting/opportunity_feed.py` | builds/attaches facts per card | Becomes family-aware only in G3. |
+| 13 | `app/reporting/opportunity_feed.py` | builds/attaches facts per card | Becomes family-aware only in G3b (G3a is a pure model with no feed integration). |
 | 14 | `benchmark/extraction.py`, `benchmark/benchmark_case.py`, `scripts/run_agent_evaluation_benchmark.py` | id is a provenance label; extraction looks the id up in the live universe | Compatible; new kinds only resolvable if they exist in the universe. |
 | 15 | `app/reporting/residual_capacity.py` `_parse_subject` (L148–155) | a **different grammar**: the `CountAssessment.subject_id` `site:{site_id}:{scope_type}:{scope_label}`, parsed with `split(":", 3)`; the label may contain `:` | Not an opportunity id. It matters because **parent identity in this specification is defined as the specific parent `CountAssessment` (its `subject_id`)**. The mapping from an opportunity/subject id to the parent `CountAssessment.subject_id` is a **G2 deliverable** and must be unambiguous before any child relationship is created. |
 
@@ -329,7 +329,12 @@ No UI is implemented by this specification.
    exclusion state. An "incomplete family" warning is not an acceptable final substitute.
 9. **Phase-only sites** remain valid families; the family header may use site-level contextual metadata, which does not create a whole-site
    subject.
-10. **G2 is deferred.** G3a implements no containment, no "pursuant to outline application" phrase support, no RM → VAR → OUT chains and
+10. **Identity-system and ordering notes (G3a).** One grouping invocation must use **one canonical subject-id representation** — all
+    opportunity-universe ids **or** all feed-card ids, never a mixture; a mixture **fails closed** (it would otherwise double-list one
+    subject under two keys). The final **stable-key tie-break is lexical/string order** (so `…A10` sorts before `…A9`): deterministic only,
+    with no commercial meaning. A feed phase card's id-encoded scope must **agree** with its `phase_code`, and feed-card numeric ids must be
+    canonical (`opp-lapse-3`, not `opp-lapse-03`); disagreement or non-canonical ids fail closed. The canonical opportunity-universe id grammar is unchanged.
+11. **G2 is deferred.** G3a implements no containment, no "pursuant to outline application" phrase support, no RM → VAR → OUT chains and
     makes no `CONTAINED_IN` claim.
 
 ## Monitoring identity
