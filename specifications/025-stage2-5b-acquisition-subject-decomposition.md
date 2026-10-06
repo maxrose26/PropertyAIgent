@@ -466,13 +466,68 @@ Monitoring is keyed by **opportunity id** while agent evaluation is keyed by the
 (`site` ↔ `recent_permission` ↔ `long_pending_application`) therefore creates a new monitoring id while retaining the same underlying anchor.
 This is **not** solved by G1A and must be recorded and decided separately; no gate in this specification resolves it.
 
-### G2 — Evidence relationship contract
-- **Objective:** an explicit evidence input type for containment, non-overlap and child-set completeness, an unambiguous mapping from a subject to its parent `CountAssessment.subject_id` (inventory #15), and adapters using **existing evidence only** (e.g. existing application linking where it names the parent).
-- **Boundary:** no production evidence manufactured; no inference from wording, dates, sizes or addresses; fails closed (UNVERIFIED).
-- **Likely files:** `app/reporting/residual_capacity.py` (consumer only), new relationship-evidence module, `app/pipeline/site_linking.py` (read-only use), tests.
-- **Tests:** real-shaped sites with no evidence stay UNVERIFIED; injected sourced evidence resolves; ambiguous parent → no relationship; two RM applications sharing a phase code → no relationship until an evidence rule exists.
-- **Acceptance:** every relationship carries provenance; none created without it.
-- **Stop:** any inference.
+### G2 — Evidence relationship contract (v1: evidence-qualified `CONTAINED_IN` only)
+
+**Principle (Product Owner):** derive only **evidence-qualified** relationships between already-known subjects. G2 prefers **NO RELATIONSHIP**
+over a **plausible but unproven** one. No schema, no persistence, no production read.
+
+**`CONTAINED_IN`** means: the available evidence establishes that the child planning scope is pursued **pursuant to** the identified parent
+permission/count scope. It does **not** establish ownership, availability, transaction structure, **non-overlap with sibling subjects**,
+completeness of child phases, residual capacity, or parcel geometry.
+
+**Qualified direct-parent rule (all must hold, otherwise no relationship):**
+1. the child is a `phase` `CountAssessment` scope;
+2. a supporting source application of the child is **reserved matters** (the existing `resolve_planning_role`);
+3. that application's proposal contains **exactly one distinct qualifying parent citation** (all qualifying citations are scanned; see below);
+4. the citation is a **full formatted planning reference** that **exactly equals** the reference of an existing application on the **same council
+   and site** (no fuzzy matching; no inferred prefixes or year components);
+5. that cited application is a **supporting source of the selected parent `CountAssessment`**;
+6. the parent `CountAssessment` is **EXACT**, **operative/consented**, **`whole_site`** scope and a compatible residential metric
+   (`total_residential`, for child and parent);
+7. exactly one parent `CountAssessment` qualifies (several qualifying parents → no relationship).
+
+**Phrase scanner (dedicated, reviewed; NOT `extract_parent_reference`'s first-match behaviour):** it inspects ALL matches in the text. A citation
+qualifies only through one of these semantic phrases followed by a formatted reference: "pursuant to … permission <ref>", "pursuant to … approval
+<ref>", "following … approval <ref>", and (explicitly authorised, because captured evidence shows this wording exists) "pursuant to outline
+application <ref>" (and the hybrid equivalent). The phrase alone is **never** sufficient: every gate above still applies. Normalisation is minimal
+and documented: trim whitespace and trailing punctuation only; the comparison with an existing reference is **exact and case-sensitive**.
+
+**Rejected / deferred (not qualified containment):** bare numeric citations; "relating to"; "in association with"; variation, non-material
+amendment and discharge-of-condition children (they are not reserved matters); a smaller unit count; a later date; reserved-matters status by
+itself; a similar address; the same site; phase wording; counts that happen to add up. **No multi-hop chains** (RM → VAR → OUT or any other): the
+child must directly cite the qualifying parent, and a variation may be that direct parent only if it **independently** satisfies the parent
+`CountAssessment` requirements; G2 never traverses from it to another permission.
+
+**Ambiguity:** if more than one **distinct** qualifying parent reference is present, there is no relationship (reason `AMBIGUOUS_CITATIONS`); G2
+never chooses the first textual or regex match, the newest, the oldest, the operative-looking or the highest-count candidate. A citation repeated
+identically counts once.
+
+**Parent identity:** the relationship names the specific parent `CountAssessment.subject_id` (`site:{site_id}:{scope_type}:{scope_label}`), not merely
+a `site_id`, and retains the parent supporting application reference. The existing read-model fields carry this; no schema.
+
+**Pure relationship record** (derived each build, never persisted, no id, no confidence score because only qualified relationships are emitted):
+`relationship` (`CONTAINED_IN` only), `child_subject_id`, `parent_subject_id`, `child_application_reference`, `parent_application_reference`, `basis`
+(`RM_DIRECT_PARENT_CITATION`), `provenance` (the matched phrase).
+
+**Reason codes** (diagnostic, deterministic, not user-facing): `NO_CITATION`, `BARE_DIGIT_CITATION`, `UNSPECIFIED_RELATION`, `NOT_RESERVED_MATTERS`,
+`AMBIGUOUS_CITATIONS`, `CITED_APPLICATION_NOT_FOUND`, `CITED_NOT_PARENT_COUNT_SOURCE`, `PARENT_SCOPE_NOT_WHOLE_SITE`, `PARENT_NOT_EXACT_OPERATIVE`,
+`MULTIPLE_PARENT_ASSESSMENTS`, plus `CHILD_NOT_PHASE_SCOPE`, `NO_CHILD_SOURCE`, `METRIC_NOT_COMPATIBLE`, `PARENT_SITE_MISMATCH`.
+
+**Non-overlap boundary:** G2 v1 does **not** infer non-overlap. Siblings remain potentially overlapping; `evidenced_pairs` stays an explicit evidence
+input with no production producer; no sum, no residual, no child-set completeness.
+
+**No consumers in G2:** it is not wired into G3a family grouping, the feed, the dashboard, buyer matching, monitoring or residual calculation.
+
+- **Objective:** a pure module deriving evidence-qualified `CONTAINED_IN` records (and diagnostic reason codes) from supplied applications and count assessments.
+- **Boundary:** no database/session/network; no `site_linking` change; no schema; no persistence; no consumer.
+- **Likely files:** `app/reporting/subject_relationships.py` (new), `tests/test_subject_relationships.py`, `verification/stage2/check.sh`.
+- **Tests:** the full matrix in the G2 request — qualified RM + direct exact parent → `CONTAINED_IN`; the authorised "pursuant to outline application" phrase
+  qualifies only when every gate passes; bare digit, "relating to", "in association with", variation/NMA/discharge children, the false "(12345)",
+  absent/other-site/other-council citations, a citation not supporting the parent count, approximate / unclear-scope / non-operative parents, two
+  distinct citations, a repeated citation, no chain traversal, exact `CountAssessment.subject_id`, no non-overlap or residual output, no schema; the
+  captured (truncated) site 281 wording yields no relationship.
+- **Acceptance:** no relationship without every gate; every record carries provenance; hosted CI green.
+- **Stop:** any inference from wording, size, date, address or RM status alone; any chain traversal; any non-overlap inference; any schema.
 
 ### G3a — Opportunity family grouping: pure model
 - **Objective:** group **existing** subjects into planning/strategic families and select the buyer-specific representative; no new subjects.
