@@ -37,13 +37,14 @@ Continuous monitoring / re-evaluation
 
 - **Stage 1 production readiness — separate release/infrastructure workstream.** Google owner binding is complete and the Stage 1 application/security boundary is accepted. Supabase’s billing reset is complete but its service restriction and the application-route recovery check remain unresolved at the last verified state. Render master auto-deploy is OFF for the web service and four known cron services. Daily ingestion remains OFF and the daily scraper remains suspended with `/bin/true`. Code maturity must not be confused with production release.
 - **Stage 2 — Commercial Evidence Trust & Opportunity Profile Journeys: COMPLETE, merged to master.** Master integration `3d586a9ffc6edfe2c8d3ef45f7386bb7f3d27589` contains reviewed Stage 2 candidate `43e6ef32b8fa21ba42c5a8b0dca4247a49cd693c`. Stage 2 delivered safer residential-count presentation, approximate same-scope discovery where justified, material-conflict preservation, variation eligibility, parent/phase/sub-phase separation, multiple eligible phase subjects, strict hard-bound qualification, improved count-source provenance, conservative physical-status semantics, withholding of unversioned stored AI narratives, matching policy v5, and expanded hosted Stage 2 / Stage 1 security verification.
-- **Stage 2.5 preflight — REQUIRED before residual-capacity reasoning.** Resolve safe phase aggregation; operative supporting-source preference in buyer matching; fingerprint/monitoring transition for v5 semantics; and the physical-status / “Hide completed sites” UX.
-- **Stage 2.5 — Opportunity Decomposition & Buyer Signals: NEXT product stage.**
+- **Stage 2.5 preflight — ACCEPTED (Gates 1, 2/2H, 3, 4, 5/5B) on branch `stage2.5/opportunity-decomposition`; not merged, not deployed.**
+- **Stage 2.5A — Buyer discovery envelope, POSSIBLE_FIT, matching policy v6 — ACCEPTED on the same branch at `b0001c7`; not merged, not deployed.** Authoritative contract: `specifications/024-stage2-5-buyer-discovery-and-opportunity-decomposition.md`; evidence: `docs/STAGE2_5_ACCEPTANCE.md`.
+- **Stage 2.5B — Acquisition-subject decomposition: NOT YET IMPLEMENTED.**
 - **Stage 2.6 — Real-World Extraction & Evidence Validation: AFTER 2.5.**
 - **Later — Deep Opportunity Verification Agent.**
 - **Later — Autonomous Acquisition Agent.**
 
-**Existing Acquisition Agent V1/V2 track:** the already-built persistence/recommendation-taxonomy foundations remain reusable platform capability. Its previously documented “approved next sequence” (Benchmark execution/model selection/Scheduled Runner/Human Decision & Feedback) is **not the current implementation sequence** and is superseded where it conflicts with Stage 2.5 → Stage 2.6 above. Benchmark v5 rebaseline remains a required follow-up; Scheduled Runner and Human Decision & Feedback remain later capabilities and require fresh Product Owner authorisation.
+**Existing Acquisition Agent V1/V2 track:** the already-built persistence/recommendation-taxonomy foundations remain reusable platform capability. Its previously documented “approved next sequence” (Benchmark execution/model selection/Scheduled Runner/Human Decision & Feedback) is **not the current implementation sequence** and is superseded where it conflicts with Stage 2.5 → Stage 2.6 above. A reviewed v4→v6 benchmark rebaseline remains a required follow-up (superseding the earlier v5 rebaseline note); Scheduled Runner and Human Decision & Feedback remain later capabilities and require fresh Product Owner authorisation.
 
 Later stages remain subject to Product Owner review; this roadmap does not itself authorise implementation.
 
@@ -89,7 +90,7 @@ Scale interpretation:
 - evidence outside the preferred range but wholly within discovery tolerance → **POSSIBLE FIT**; for example **105 homes** against preferred **50–100** / discovery **45–110** → **POSSIBLE FIT**;
 - evidence such as **~100–102 homes** against preferred 50–100 / discovery 45–110 → **POSSIBLE FIT**: exact preferred-range compliance is not proven, but the supported range remains inside the accepted discovery envelope;
 - evidence uncertainty crossing the outer discovery boundary, e.g. **105–115** where the discovery maximum is 110 → **INSUFFICIENT EVIDENCE / investigate** for scale;
-- evidence definitely outside the discovery range → scale mismatch;
+- evidence definitely outside the discovery range → *superseded by spec 024:* INSUFFICIENT EVIDENCE / investigate for a soft-range buyer (the subject may contain a relevant sub-scope), never STRONG or POSSIBLE, and NOT_SUITABLE only via an explicit hard buyer rule;
 - unknown unit count never becomes zero and may remain discoverable where other evidence justifies investigation.
 
 **POSSIBLE FIT** means: *we know enough to say this is sufficiently close to the buyer’s mandate to surface as relevant, but it is not a verified preferred-range fit.* This is distinct from **INSUFFICIENT EVIDENCE**, which means the evidence cannot yet establish whether the opportunity lies inside the accepted discovery envelope.
@@ -98,7 +99,7 @@ Unit count alone must not automatically hide a large scheme where a plausible ph
 
 The 10% tolerance is the initial explainable default, not a permanent universal rule. Buyer-configurable and potentially asymmetric discovery ranges are a later capability; do not introduce a complex rule engine prematurely.
 
-#### Mandatory Stage 2.5 preflight
+#### Mandatory Stage 2.5 preflight (historical planning list — all items ACCEPTED; see spec 024)
 
 1. **Safe phase aggregation — P0 before residual-capacity logic.** The inherited headline path can sum phase counts without proven non-overlap. A 180-home phase plus a 72-home sub-phase must not become 252 unless evidence proves independent non-overlapping scopes. Reuse the existing guarded aggregation semantics rather than creating a second policy. The unpublished local experimental commit `9cabeed31399a73cec38415f4f5c986624ff53b5` is **not shipped and not part of master**; Stage 2.5 must implement/review/test the correction afresh from master.
 2. **Residual-capacity safety — P0.** Subtraction is allowed only when parent scope, child scope, metric compatibility, containment, non-overlap and version/status relationships support it. Never derive residual opportunity from incompatible or overlapping planning subjects.
@@ -130,7 +131,7 @@ The recurring agent should ultimately monitor **changes to buyer-specific opport
 
 ### Benchmark and release boundaries
 
-- Live buyer matching is **policy v5**. Frozen Agent Evaluation Benchmark expectations retain **v4 provenance** and require a separately reviewed v5 rebaseline before being treated as authoritative for current matching behaviour. Do not silently rewrite benchmark fixtures.
+- Deployed production buyer matching is still the previously released policy. **Policy v6 is accepted on the Stage 2.5 branch only** (spec 024). Frozen Agent Evaluation Benchmark expectations retain **v4 provenance** and require a separately reviewed v4→v6 rebaseline before being treated as authoritative. Before production recomputation: Category A + B monitoring-transition rebaseline and v6 mandate re-onboarding (spec 024). Do not silently rewrite benchmark fixtures.
 - Stage 2 being merged to master does **not** mean Stage 2 is deployed. Stage 1 production readiness remains separately gated.
 - Near-term commercial value remains identifying, qualifying, explaining and monitoring acquisition opportunities. Do not pull detailed appraisal, comparables, valuation, financing, CRM or speculative multi-agent infrastructure forward unless they become genuine dependencies.
 
