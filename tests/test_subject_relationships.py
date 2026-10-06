@@ -356,3 +356,74 @@ def test_site_281_a_synthetic_full_phrase_citing_the_variation_needs_the_variati
     child_count, parent_count = _site_281_counts(("VAR/349651/22",))
     result = derive_containment(child_count, [parent_count], _site_281_apps(full))
     assert result.reason == sr.REASON_QUALIFIED and result.relationship.parent_application_reference == "VAR/349651/22"
+
+
+# --- hardening: D1 reference length safety, D3 operative-basis drift, D4 real-object adapter -------------------------------------------
+
+def test_d1_a_supported_length_reference_still_matches():
+    for ref in ("OUT/1", "A/1/2", "A/1/2/3", "A/1/2/3/4"):
+        assert [c.reference for c in scan_parent_citations(f"pursuant to approval {ref}").qualifying] == [ref]
+
+
+@pytest.mark.parametrize("over_long", ["OUT/1/2/3/4/5", "OUT/1/2/3/4/5/6", "OUT/1/2/3/4/55", "OUT-1-2-3-4-5"])
+def test_d1_an_over_long_reference_is_rejected_not_truncated_to_a_shorter_prefix(over_long):
+    scan = scan_parent_citations(f"Reserved matters pursuant to outline permission {over_long}")
+    assert scan.qualifying == ()
+    prefix = "/".join(over_long.split("/")[:5]) if "/" in over_long else "-".join(over_long.split("-")[:5])
+    assert prefix not in [c.reference for c in scan.qualifying]
+
+
+def test_d1_an_over_long_reference_cannot_contain_into_a_real_shorter_reference():
+    apps = [app("OUT/1/2/3/4", OUTLINE, "Outline"), app("RES/2", RM, "Reserved matters pursuant to outline permission OUT/1/2/3/4/5")]
+    result = derive_containment(child(), [parent(refs=("OUT/1/2/3/4",))], apps)
+    assert_none(result, sr.REASON_NO_CITATION)
+
+
+def test_d1_exact_equality_remains_mandatory():
+    apps = [app("OUT/1/2/3/4", OUTLINE, "Outline"), app("RES/2", RM, QUALIFIED_TEXT.replace("OUT/1", "out/1/2/3/4"))]
+    assert_none(derive_containment(child(), [parent(refs=("OUT/1/2/3/4",))], apps), sr.REASON_CITED_APPLICATION_NOT_FOUND)
+
+
+def test_d3_the_operative_basis_assumption_is_bound_to_the_canonical_constant():
+    from app.reporting.residual_capacity import OPERATIVE_APPROVED_BASIS
+    assert sr.BASIS_CONSENTED == OPERATIVE_APPROVED_BASIS == "consented"
+    # and the real producer of operative counts still stamps that basis
+    import app.reporting.scheme_reconciliation as rec
+    assert 'basis="consented"' in inspect.getsource(rec) or "OPERATIVE_APPROVED_BASIS" in inspect.getsource(rec)
+
+
+def test_d4_real_repository_objects_supply_everything_g2_consumes():
+    """Real Application ORM objects (transient - no database), real ResolvedApplication, real FactPosition and a CountAssessment built by
+    the real assess_positions producer: the runtime shape exposes reference, site_id, council_code, proposal, role and source references."""
+    from app.db.models import Application
+    from app.reporting.residential_count import assess_positions
+    from app.reporting.residual_capacity import OPERATIVE_APPROVED_BASIS
+    from app.reporting.scheme_reconciliation import (
+        FactPosition, ResolvedApplication, resolve_planning_role, ROLE_RESERVED_MATTERS,
+    )
+    outline = Application(id=1, council_code="testcouncil", reference="OUT/345898/20", site_id=SITE, application_type="Outline",
+                          proposal="Outline application for up to 400 dwellings", status="Decided", decision="Approved")
+    rm = Application(id=2, council_code="testcouncil", reference="RES/2", site_id=SITE,
+                     application_type="Approval of Reserved Matters",
+                     proposal="Reserved matters for Phase 1 pursuant to outline planning permission OUT/345898/20",
+                     status="Decided", decision="Approved")
+    resolved = [ResolvedApplication(application=a, role=resolve_planning_role(a), decided_state="approved", scope_type="whole_site",
+                                    scope_label="Whole site") for a in (outline, rm)]
+    assert resolved[1].role == ROLE_RESERVED_MATTERS == sr.ROLE_RESERVED_MATTERS
+
+    def position(res, scope, label, value):
+        return FactPosition(value=value, application_id=res.id, application_reference=res.reference, planning_role=res.role,
+                            decided_state=res.decided_state, scope_type=scope, scope_label=label, decision_date=None,
+                            status_verified_at=None, independently_verified=False, relationship_level="exact", relationship_method=None)
+
+    parent_count = assess_positions([position(resolved[0], "whole_site", "Whole site", 400)], scope_type="whole_site",
+                                    scope_label="Whole site", subject_id=f"site:{SITE}:whole_site:Whole site", basis=OPERATIVE_APPROVED_BASIS)
+    child_count = assess_positions([position(resolved[1], "phase", "Phase 1", 140)], scope_type="phase", scope_label="Phase 1",
+                                   subject_id=f"site:{SITE}:phase:Phase 1", basis=OPERATIVE_APPROVED_BASIS)
+    # the adapter reads these from the REAL shapes (ResolvedApplication delegates to the nested ORM Application)
+    assert sr._field(resolved[1], "site_id") == SITE and sr._field(resolved[1], "council_code") == "testcouncil"
+    assert "pursuant" in sr._field(resolved[1], "proposal") and sr._field(resolved[1], "reference") == "RES/2"
+    result = derive_containment(child_count, [parent_count], resolved)
+    assert result.reason == sr.REASON_QUALIFIED
+    assert result.relationship.parent_subject_id == f"site:{SITE}:whole_site:Whole site"
+    assert result.relationship.parent_application_reference == "OUT/345898/20"

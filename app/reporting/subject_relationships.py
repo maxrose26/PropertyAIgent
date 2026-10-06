@@ -71,10 +71,11 @@ REASONS = frozenset({
 
 # --- phrase scanner (dedicated; scans ALL matches) -------------------------------------------------------------------------------------
 
-# A formatted reference (letters/digits joined by '/' or '-', 2-5 parts). It can capture hyphenated words, so the exact-equality
+# A formatted reference (letters/digits joined by '/' or '-', 2-5 parts). The trailing lookahead makes an OVER-LONG candidate (a 6th
+# component, or any backtracked shorter fragment) fail to match at all: it is REJECTED, never truncated into a shorter reference. It can capture hyphenated words, so the exact-equality
 # gate against an existing application reference is MANDATORY. (Same shape as app.pipeline.site_linking's formatted pattern,
 # duplicated here so G2 neither imports nor changes site_linking.)
-_REF = r"([A-Za-z0-9]+(?:[/-][A-Za-z0-9]+){1,4})"
+_REF = r"([A-Za-z0-9]+(?:[/-][A-Za-z0-9]+){1,4})(?![A-Za-z0-9]|[/-][A-Za-z0-9])"
 _NO = r"\s*(?:ref\.?|reference|no\.?)?\s*:?\s*\(?"
 
 _QUALIFYING_PATTERNS = (
