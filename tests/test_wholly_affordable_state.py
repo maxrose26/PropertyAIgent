@@ -228,10 +228,37 @@ def test_percentage_path_for_hand_built_facts_is_unchanged():
 
 def test_policy_version_and_fingerprint_inputs_are_unchanged():
     assert BUYER_MATCHING_POLICY_VERSION == 6
+    import ast
     import app.reporting.opportunity_universe as universe
-    assert "whole_site_affordable_state" not in inspect.getsource(universe)  # not an opportunity-fingerprint input
+    key_sets = []
+    for node in ast.walk(ast.parse(inspect.getsource(universe))):
+        if (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "fingerprint_fields" for t in node.targets)
+                and isinstance(node.value, ast.Dict)):
+            key_sets.append({k.value for k in node.value.keys if isinstance(k, ast.Constant)})
+    assert key_sets and all("whole_site_affordable_state" not in keys for keys in key_sets)  # not a fingerprint input
+    planning_delivery = [k for k in key_sets if "affordable_unit_count" in k]
+    assert planning_delivery and {"unit_count", "affordable_unit_count", "development_type_raw", "is_specialist_development"} <= planning_delivery[0]
     assert MatchingFacts(
         opportunity_type=PLANNING_DELIVERY, unit_count=None, development_type_raw=None, is_specialist_development=None,
         affordable_percentage=None, affordable_percentage_trusted=False, affordable_unit_count=None,
         planning_state="other_or_unknown", has_identified_planning_activity=None, has_phasing_evidence=False,
         matched_to_site=False).whole_site_affordable_state == AFFORDABLE_STATE_UNKNOWN
+
+
+def test_a_phase_card_never_inherits_the_whole_site_affordable_state(session, monkeypatch):
+    """Regression (independent review): the feed's phase-card path resets every other whole-site affordable field;
+    the new state must be reset there too, or a phase opportunity would be excluded on its PARENT's counts."""
+    import app.policy.buyer_matching as buyer_matching
+    from app.reporting.opportunity_feed import _attach_planning_delivery_matching_facts
+    apps = _site_with_outline_and_phase(session)
+    site_id = apps[0].site_id
+    monkeypatch.setattr(buyer_matching, "derive_whole_site_affordable_state", lambda *a, **k: AFFORDABLE_STATE_WHOLLY)
+    whole_site_card = {"params": {"site_id": str(site_id)}, "application_reference": "OUT/1"}
+    phase_card = {"params": {"site_id": str(site_id)}, "application_reference": "RM/2", "phase_code": "1",
+                  "phase_unit_count": 40,
+                  "count_assessment": CountAssessment(scope_type="phase", scope_label="Phase 1", metric="total_residential",
+                                                      precision="EXACT", value=40, lower=40, upper=40, resolution="agreement",
+                                                      confidence="high", sources=())}
+    _attach_planning_delivery_matching_facts(session, [whole_site_card, phase_card])
+    assert whole_site_card["matching_facts"].whole_site_affordable_state == AFFORDABLE_STATE_WHOLLY  # control
+    assert phase_card["matching_facts"].whole_site_affordable_state == AFFORDABLE_STATE_UNKNOWN

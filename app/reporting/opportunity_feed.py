@@ -270,8 +270,10 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
                 from app.pipeline.phase_tracking import UNPHASED_LABEL
                 from app.reporting.commercial_evidence import known_unit_count
                 scoped_units = facts.unit_count if phase_code == UNPHASED_LABEL else known_unit_count(card.get("phase_unit_count"))
+                from app.policy.buyer_matching import AFFORDABLE_STATE_UNKNOWN
                 facts = replace(facts, unit_count=scoped_units, count_assessment=card.get("count_assessment") if phase_code != UNPHASED_LABEL else facts.count_assessment, affordable_unit_count=None, affordable_percentage=None,
-                                affordable_percentage_trusted=False)
+                                affordable_percentage_trusted=False,
+                                whole_site_affordable_state=AFFORDABLE_STATE_UNKNOWN)  # a phase never inherits whole-site AH
             facts_by_context[key] = facts
         card["matching_facts"] = facts_by_context[key]
         card["count_assessment"] = facts_by_context[key].count_assessment
