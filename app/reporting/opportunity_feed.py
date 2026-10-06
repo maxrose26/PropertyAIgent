@@ -97,6 +97,12 @@ def _strategic_land_cards(session, limit: int) -> list[dict]:
         .order_by(LocalPlanSite.minimum_dwellings.desc(), LocalPlanSite.id.desc())
         .limit(max(limit * 3, 12))  # overfetch: some candidates will be filtered out by _FEED_ELIGIBLE_SIGNALS below
     ).scalars().all()
+    return _strategic_cards_for_candidates(session, candidates, limit)
+
+
+def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], limit: int | None) -> list[dict]:
+    """Eligibility + card shaping for an already-selected candidate list (code motion out of `_strategic_land_cards`, behaviour
+    unchanged). ``limit=None`` (family mode only) disables the card-count cut; the signal eligibility filter always applies."""
     if not candidates:
         return []
 
@@ -112,7 +118,7 @@ def _strategic_land_cards(session, limit: int) -> list[dict]:
 
     cards: list[dict] = []
     for a in candidates:
-        if len(cards) >= limit:
+        if limit is not None and len(cards) >= limit:
             break
         result = coverage_by_id.get(a.id)
         if result is None:
@@ -380,53 +386,16 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
     return ordered, {"excluded_not_suitable": excluded_not_suitable}
 
 
-def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None) -> dict:
-    """The Dashboard's own opportunity feed. Returns {"cards": [...],
-    "counts": {...}, "buyer_key": buyer_key} - counts cover every candidate
-    considered (not just the ones shown), so a caller can show an honest
-    "N more" / "view all" line without re-querying.
-
-    Generic mode (buyer_key=None, the default - unchanged from Opportunity
-    Experience V2): candidate pool size equals `limit` itself, and
-    selection/ordering is exactly _generic_selection above - byte-for-byte
-    the same behaviour this function always had.
-
-    Buyer mode (buyer_key set - Buyer Profiles V1): the candidate pool is
-    deliberately widened to a fixed, bounded ceiling (never unbounded/a
-    full-platform search - "preserve bounded performance" per the brief)
-    so buyer-fit selection has a genuinely larger universe to choose the
-    strongest opportunities from, not just the generic top-6 re-filtered -
-    see _buyer_selection's own docstring for the selection/ordering rule.
-
-    Sort order within generic mode (transparent, never a score - Step 8):
-    strategic land (INVESTIGATE, then MONITOR) first, since this
-    workstream's own product review found strategic Local Plan
-    opportunities specifically buried under a technical category label
-    and asked for them promoted; then planning/delivery items in their own
-    existing, already-sorted order (approaching lapse - genuinely
-    time-bound - before undeveloped phase); scale (capacity/hectares,
-    already the tie-break within each source query) is never used to rank
-    ACROSS types, only within one."""
-    from app.security.access import require_admitted
-    require_admitted()
+def _planning_delivery_cards(session, pool_limit: int | None):
+    """The four planning/delivery detectors, their canonical precedence exclusions and the unified card reshaping (code motion out of
+    build_opportunity_feed; behaviour unchanged). ``pool_limit=None`` (family mode) takes each detector's COMPLETE population - the
+    detectors already read their whole population and only slice at the end - so the exclusion sets are complete too."""
     from app.reporting.dashboard import (  # local import: avoids a circular import (dashboard.py may grow a reason to import this module later)
         _approaching_lapse_cards,
         _long_pending_application_cards,
         _recent_permission_cards,
         _undeveloped_phase_cards,
     )
-
-    # Buyer mode needs a materially larger pool to select FROM (the
-    # brief's own "Critical Feed Requirement") - a fixed, documented
-    # ceiling, not the display limit itself and not unbounded. This
-    # bounded-feed pool is a deliberately DIFFERENT, narrower concern from
-    # app.reporting.opportunity_universe's own ALWAYS-complete canonical
-    # read model (Gate 1) - the Dashboard's own UI feed stays intentionally
-    # bounded exactly as before Gate 1C, now just with a fourth type also
-    # drawing from the same bounded pool.
-    pool_limit = limit if buyer_key is None else max(limit * 8, 40)
-
-    strategic = _strategic_land_cards(session, pool_limit)
     lapse_raw = _approaching_lapse_cards(session, pool_limit)
     undeveloped_raw = _undeveloped_phase_cards(session, pool_limit)
     # Gate 1C - recent_permission never duplicates a site the two
@@ -468,6 +437,51 @@ def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None
     # finds a genuine long_pending_application STRONG_FIT regardless of
     # this ordering, since it buckets by classification, not list position.
     delivery = [*lapse, *undeveloped, *recent_permission, *long_pending]
+    return lapse_raw, undeveloped_raw, recent_permission_raw, long_pending_raw, delivery
+
+
+def build_opportunity_feed(session, limit: int = 6, buyer_key: str | None = None) -> dict:
+    """The Dashboard's own opportunity feed. Returns {"cards": [...],
+    "counts": {...}, "buyer_key": buyer_key} - counts cover every candidate
+    considered (not just the ones shown), so a caller can show an honest
+    "N more" / "view all" line without re-querying.
+
+    Generic mode (buyer_key=None, the default - unchanged from Opportunity
+    Experience V2): candidate pool size equals `limit` itself, and
+    selection/ordering is exactly _generic_selection above - byte-for-byte
+    the same behaviour this function always had.
+
+    Buyer mode (buyer_key set - Buyer Profiles V1): the candidate pool is
+    deliberately widened to a fixed, bounded ceiling (never unbounded/a
+    full-platform search - "preserve bounded performance" per the brief)
+    so buyer-fit selection has a genuinely larger universe to choose the
+    strongest opportunities from, not just the generic top-6 re-filtered -
+    see _buyer_selection's own docstring for the selection/ordering rule.
+
+    Sort order within generic mode (transparent, never a score - Step 8):
+    strategic land (INVESTIGATE, then MONITOR) first, since this
+    workstream's own product review found strategic Local Plan
+    opportunities specifically buried under a technical category label
+    and asked for them promoted; then planning/delivery items in their own
+    existing, already-sorted order (approaching lapse - genuinely
+    time-bound - before undeveloped phase); scale (capacity/hectares,
+    already the tie-break within each source query) is never used to rank
+    ACROSS types, only within one."""
+    from app.security.access import require_admitted
+    require_admitted()
+
+    # Buyer mode needs a materially larger pool to select FROM (the
+    # brief's own "Critical Feed Requirement") - a fixed, documented
+    # ceiling, not the display limit itself and not unbounded. This
+    # bounded-feed pool is a deliberately DIFFERENT, narrower concern from
+    # app.reporting.opportunity_universe's own ALWAYS-complete canonical
+    # read model (Gate 1) - the Dashboard's own UI feed stays intentionally
+    # bounded exactly as before Gate 1C, now just with a fourth type also
+    # drawing from the same bounded pool.
+    pool_limit = limit if buyer_key is None else max(limit * 8, 40)
+
+    strategic = _strategic_land_cards(session, pool_limit)
+    lapse_raw, undeveloped_raw, recent_permission_raw, long_pending_raw, delivery = _planning_delivery_cards(session, pool_limit)
 
     counts = {
         "strategic_land": len(strategic),

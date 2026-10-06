@@ -542,14 +542,54 @@ input with no production producer; no sum, no residual, no child-set completenes
 - **Acceptance:** all of the above, hosted CI green, no schema.
 - **Stop:** any G2 containment logic, phrase-parser change, new kind, universe/feed/dashboard/monitoring change, or production read.
 
-### G3b — Opportunity family grouping: feed integration (FUTURE; not authorised)
+### G3b — Opportunity family grouping: feed integration
 - **Objective:** make the buyer-facing feed show **one top-level row per family** with the representative plus related subjects.
 - **Hard acceptance requirements:** families built from the **complete** relevant subject set (or a proof that the bounded pool cannot change
   the best subject, family fit, also-STRONG/POSSIBLE list or exclusion state); buyer-mode integration; family-level counts including migration of
   `excluded_not_suitable` from card to family semantics; strategic-family canonicalisation; deterministic cross-family ordering (fit bucket, then
   family key); no unit summation; the UI overlap warning "Related subjects may overlap — do not add unit counts."
-- **Likely files:** `app/reporting/opportunity_feed.py`, `app/ui/pages/00_Dashboard.py`, tests.
 - **Stop:** a bounded pool that can change a family result, any summed overlapping units, or an "incomplete family" warning used as the final substitute.
+
+#### G3b Slice 1 — complete buyer-family feed DATA MODEL (Product Owner decisions; additive, not user-facing)
+Authorised scope: an **additive** buyer-family result built alongside the existing buyer card feed. **Not authorised in Slice 1:** any dashboard/UI
+change, any G2 consumption, any change to the generic/non-buyer feed, the legacy card counts or `build_opportunity_feed`'s meaning.
+Direction: **Option A — complete/unbounded family construction** (approved for the current pilot scale; correctness over the old bounded optimisation).
+
+1. **Completeness over the old pool.** The legacy `max(8 x limit, 40)` pool is NOT authoritative for family mode (it can omit members or phase-only
+   families, change the representative, family fit, terminal exclusion and the top-N). Family mode builds from the **complete eligible subject population**
+   before buyer-fit grouping, ranking and limit.
+2. **Complete detector populations.** Lapse: complete. Phase: complete. Recent-permission: complete after the canonical precedence exclusions. Long-pending:
+   complete after the canonical precedence exclusions. Strategic: complete across the eligible strategic population. No pool limit before family
+   construction; the requested limit is applied ONLY after fit evaluation, grouping, representative selection and family ordering (limit 6 = six
+   **families**).
+3. **Canonical lifecycle precedence (approved visible correction).** A site covered by a (complete) lapse or phase detector never reappears as
+   recent-permission or long-pending merely because its earlier card fell outside a bounded slice. Pinned by tests. Generic/non-buyer behaviour is unchanged.
+4. **Strategic eligibility preserved.** The existing strategic eligibility (`_FEED_ELIGIBLE_SIGNALS`, the matched-site and minimum-dwellings filter) and card
+   shaping are unchanged: completeness means evaluating the complete population that satisfies that contract, **not** turning every allocation into an
+   opportunity. The capacity-ordered SQL `LIMIT`/pre-filter truncation is replaced by a completeness-preserving keyset-paged read (as the universe does),
+   with feed eligibility applied across all pages. Universe records are not reused (they bypass feed eligibility). One allocation id = one strategic
+   subject = one strategic family; several site relationships cannot duplicate it.
+5. **Family order.** Family fit bucket, then the deterministic family key. No commercial score, no strategic-first special case, no pool-order tie-break.
+6. **Integrity errors fail closed.** A G3a integrity violation (conflicting lifecycle representations, conflicting strategic subjects, mixed id systems,
+   malformed adapter identity) or an unresolvable buyer profile raises a typed/explicit error. There is **no** silent fallback to the legacy card feed.
+7. **G2 not consumed.** No `CONTAINED_IN` label, no specificity tie-break, no phrase scanning; family membership is independent of G2 and family
+   construction succeeds without the G2 module.
+8. **Request-scoped memoisation.** The B2 context may be memoised for one family-feed request only, by (buyer, site_id) for planning-delivery and
+   (buyer, allocation_id) for strategic, because the context function's inputs are otherwise identical. `MatchingFacts` are never memoised across subjects;
+   no global/process cache; nothing persisted.
+9. **Counts (additive; legacy card counts untouched).** `families_considered`, `families_shown`, `families_excluded_not_suitable` (a family for which **every**
+   buyer-relevant subject is NOT_SUITABLE), `subjects_considered`, plus the per-detector subject counts. An eligible subject with **no matching facts** makes family mode **fail closed**
+   with the typed `MissingFamilySubjectMatchingFacts` (non-sensitive identity only): omitting it could change the representative, family fit, related
+   subjects, terminal exclusion and top-N, so it is never skipped, never yields a partial family and never falls back to the legacy cards (the legacy
+   card feed keeps its own skip behaviour, unchanged). The family order stays G3a's: fit bucket, then the lexical `(domain, anchor_id)` key - deterministic
+   only, no commercial meaning (no strategic-first, planning-first, numeric-id or pool-order rule).
+10. **Verification.** An independent unbounded reference oracle in tests (family membership, representative, family fit, related roles, exclusion, top-N);
+    adversarial fixtures where the legacy bounded feed differs from the oracle and the new path equals it; precedence regression cases; fail-closed tests;
+    generic-feed preservation; memoisation on/off equivalence; no model/paid calls.
+- **Boundary:** no schema, no fingerprint/monitoring change, no policy-version change, no new opportunity kinds, no residual, no unit summation, no production read.
+- **Likely files:** `app/reporting/buyer_family_feed.py` (new, additive), `app/reporting/opportunity_feed.py` (behaviour-preserving extraction of the shared
+  card-building steps only), tests, `verification/stage2/check.sh`.
+- **Stop:** any dashboard change; any change to generic feed behaviour; any bounded pool before grouping; any G2 coupling.
 
 ### G4 — Subject-level MatchingFacts/context adapter
 - **Objective:** a dedicated subject facts builder and context handling; match existing phase/whole subjects independently, with parent evidence as labelled context.
