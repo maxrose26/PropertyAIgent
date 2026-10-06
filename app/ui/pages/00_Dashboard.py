@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import streamlit as st
 
 from app.reporting.dashboard import build_dashboard
+from app.reporting.family_presentation import build_buyer_family_dashboard_view
 from app.reporting.opportunity_feed import build_opportunity_feed
 from app.ui.buyer_selector import buyer_selector
 from app.ui.common import bootstrap, credits_sidebar, get_db
@@ -50,6 +51,7 @@ from app.ui.shell import (
     ai_summary_rail,
     empty_state,
     metric_row,
+    opportunity_family_card,
     opportunity_feed_card,
     page_header,
     quick_actions_panel,
@@ -151,35 +153,40 @@ with page_scope():
             # buyer specifically - see app.reporting.opportunity_feed.
             # build_opportunity_feed's own docstring for exactly what changes.
             buyer_key = buyer_selector(key="dashboard", session=session)
-            opportunity_feed = build_opportunity_feed(session, buyer_key=buyer_key)
-            counts = opportunity_feed["counts"]
-            if buyer_key is None:
+            if buyer_key is not None:
+                # Stage 2.5B G3b Slice 2 - the BUYER dashboard shows one item per OpportunityFamily (complete, never the old bounded card pool).
+                # Family construction that fails closed shows an operator-safe message; it never falls back to the legacy buyer cards.
+                family_view = build_buyer_family_dashboard_view(session, buyer_key)
+                if family_view.error:
+                    st.warning(family_view.error)
+                else:
+                    st.caption(family_view.caption)
+                    st.caption(family_view.subject_caption)
+                    if not family_view.families:
+                        st.caption("Nothing to investigate right now.")
+                    for family in family_view.families:
+                        opportunity_family_card(family, key="dashboard")
+            else:
+                opportunity_feed = build_opportunity_feed(session, buyer_key=None)
+                counts = opportunity_feed["counts"]
                 st.caption(
                     f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
                     f"{counts['undeveloped_phase']} permission(s), commencement unverified · "
                     f"{counts.get('recent_permission', 0)} recent permission · "
                     f"{counts.get('long_pending_application', 0)} long-pending application identified across the platform."
-                )
-            else:
-                st.caption(
-                    f"{counts['strategic_land']} strategic land · {counts['approaching_lapse']} approaching lapse · "
-                    f"{counts['undeveloped_phase']} permission(s), commencement unverified · "
-                    f"{counts.get('recent_permission', 0)} recent permission · "
-                    f"{counts.get('long_pending_application', 0)} long-pending application considered · "
-                    f"{counts.get('excluded_not_suitable', 0)} excluded as not suitable for this buyer."
-                )
-            if not opportunity_feed["cards"]:
-                st.caption("Nothing to investigate right now.")
-            else:
-                # Full main-column width, one card per row (Step 25/26) - a
-                # 2-column grid left a strategic-land card's own 3 metrics (site
-                # area, plan-period capacity, wider capacity - Wharfside's own
-                # real shape) cramped into roughly a sixth of the page width at a
-                # normal laptop width, with values wrapping mid-word. One column
-                # gives every metric tile room to read cleanly without a broader
-                # responsive redesign.
-                for card in opportunity_feed["cards"]:
-                    opportunity_feed_card(card, key="dashboard")
+                    )
+                if not opportunity_feed["cards"]:
+                    st.caption("Nothing to investigate right now.")
+                else:
+                    # Full main-column width, one card per row (Step 25/26) - a
+                    # 2-column grid left a strategic-land card's own 3 metrics (site
+                    # area, plan-period capacity, wider capacity - Wharfside's own
+                    # real shape) cramped into roughly a sixth of the page width at a
+                    # normal laptop width, with values wrapping mid-word. One column
+                    # gives every metric tile room to read cleanly without a broader
+                    # responsive redesign.
+                    for card in opportunity_feed["cards"]:
+                        opportunity_feed_card(card, key="dashboard")
             st.page_link("pages/3_Local_Plan_Sites.py", label="View all Local Plan opportunities →", icon="🗺️")
 
             st.divider()

@@ -591,6 +591,72 @@ Direction: **Option A — complete/unbounded family construction** (approved for
   card-building steps only), tests, `verification/stage2/check.sh`.
 - **Stop:** any dashboard change; any change to generic feed behaviour; any bounded pool before grouping; any G2 coupling.
 
+#### G3b Slice 2 — buyer dashboard family rendering (PRESENTATION ONLY)
+Authorised after Slice 1 merged. Replaces the **buyer** dashboard's flat acquisition cards with one item per `OpportunityFamily`. Generic/non-buyer feed and
+the legacy `build_opportunity_feed` are unchanged. No G2 consumption, no buyer-fit/policy change, no `BUYER_MATCHING_POLICY_VERSION` change, no new
+extraction, no schema, no fingerprint/monitoring change.
+
+**Primary user question:** "Why is PropertyAIgent showing me this development, and what exactly within it might I pursue?"
+
+**Product principle — evidenced phasing is acquisition-investigation evidence (not availability).** An evidenced phase shows the wider development is being
+delivered through at least one distinct smaller scope, which can make it more relevant to investigate than an otherwise identical scheme with no phasing
+evidence. It does **not** prove that the phase is for sale, that the developer intends to dispose of it, that other buyer-sized parcels exist, that the rest
+will be subdivided, ownership/control, transaction availability, residual capacity, non-overlap or parcel geometry.
+
+**Phasing evidence ladder (product distinction; policy consequences are a SEPARATE later gate):**
+- **Level 1 - evidenced child phase.** An actual phase subject is already evidenced (e.g. parent 500 homes, Phase 1 125 homes). The phase is assessed independently
+  against the mandate; the wider development may be worth investigating because phased delivery is evidenced. No other parcel, residual or availability is inferred.
+- **Level 2 - documented phasing, no established child subject.** Planning/portal/document evidence explicitly states phased delivery but no sufficiently evidenced
+  individual subject exists (planning statement, Design & Access Statement, committee report, decision notice/condition requiring a phasing plan, a phasing plan,
+  portal proposal text). May warrant investigation; **no synthetic phase, count, parcel size or availability**. **Not displayed in Slice 2**: no accepted,
+  provenance-backed structured site-level phasing signal exists today (inventory below). PENDING STAGE 2.6 EVIDENCE QUALIFICATION.
+- **Level 3 - no phasing/decomposition evidence.** A scheme merely larger than the mandate. Large scheme != divisible opportunity; no investigative decomposition route
+  is manufactured from scale alone.
+
+**Slice 2 policy boundary.** Slice 2 only PRESENTS Level 1 phasing context already present in the family. It does not change STRONG_FIT/POSSIBLE_FIT/
+INSUFFICIENT_EVIDENCE/NOT_SUITABLE, investigative classification, reasons or ranking, and does not bump the policy version. A separate post-Slice-2 gate,
+**STAGE 2.5B - PHASING INVESTIGATION POLICY**, will decide deterministically how Levels 1-3 affect investigative classification, reasons, ranking and
+parent-vs-child interpretation.
+
+**Level 1 display rule (conservative, no new inference):** the family contains **more than one subject** and at least one is an **actual phase** subject
+(`slot == PHASE`, its scope key is not the unphased bucket, and its count assessment scope type is `phase`). Wording: "Phased delivery evidenced." A family with a
+single subject (including a sole phase) shows no phasing label; strategic families are never labelled phased (linked planning sites do not make an allocation
+phased). Forbidden wording: "suitable for subdivision", "remaining", "other phases available", "sold in phases", any family total.
+
+**Existing structured phasing signals (inventory; none accepted for Level 2):** (a) the strategic-allocation Local Plan phasing classification
+(`allocation_discovery` `phasing`, surfaced as `MatchingFacts.has_phasing_evidence` for allocations only) - plan-period trajectory evidence about an allocation, not
+development phased delivery, and used by v6 for strategic subjects only; (b) the AI image type `phasing_plan` on `VisualEvidence` - AI classification, unqualified;
+(c) planning/delivery `MatchingFacts.has_phasing_evidence` is hard-coded False. Level 2 is therefore not implemented; no weak heuristic, no arbitrary document-text
+scan, no model call.
+
+**Stage 2.6 carry-forward.** Stage 2.6 should assess qualified extraction of phasing evidence from planning statements, Design & Access Statements, committee
+reports, decision notices, phasing plans, reserved-matters documents and relevant portal proposal text, distinguishing **FACT** ("the document states that
+development is phased" - may become qualified evidence) from **INFERENCE** ("there may be a buyer-sized acquisition opportunity" - acquisition reasoning).
+
+**Family UX contract.** One top-level item per family: (1) DEVELOPMENT/FAMILY CONTEXT - existing safe site fields only (title, location, council); not a synthetic
+whole-site subject, and a phase-only family shows no fabricated "Whole site" subject; (2) BEST ACQUISITION SUBJECT FOR THIS BUYER - the G3a representative, never
+re-ranked: label/type, unit count with honest precision (existing count wording: exact / approximate / range / unverified; never a family total), existing fit
+language (Strong fit / Possible fit / Investigate / Insufficient evidence; Not suitable only in related lists), key deterministic reasons and the existing
+policy caveat; (3) PHASING CONTEXT - only where Level 1 qualifies; (4) RELATED ACQUISITION SUBJECTS - compact/collapsed by default (also strong, also possible,
+investigative/insufficient, not suitable where it helps explain the development); label/type, units/precision, fit, investigation state only; no internal subject
+keys, detector ids, reason codes or fingerprints; (5) OVERLAP - for more than one subject: "Related subjects may overlap — do not add unit counts." A single-subject
+family stays compact (no expander, no overlap note, no phasing label). A strategic family stays one canonical strategic item keeping its existing strategic
+information, with no planning-delivery terminology forced on it.
+
+**Relationships.** G2 is not consumed. Family membership means only "these subjects share the same planning-site family"; permitted wording is neutral ("Related
+opportunity subjects within this development"). No "contained in / pursuant to" claim.
+
+**Counts.** The buyer dashboard moves from card semantics to family semantics: families considered / shown / excluded as not suitable, subjects considered, and the
+per-detector figures explicitly labelled as SUBJECT counts. A family is terminally not suitable only when every buyer-relevant subject is NOT_SUITABLE.
+
+**Error state.** If family construction fails (integrity error, missing facts, unresolvable buyer) the buyer dashboard shows a concise operator-safe message that
+acquisition-family results are temporarily unavailable. It never falls back to the legacy buyer cards and exposes no traceback, database detail or internal ids;
+access refusals (Stage 1) are not swallowed. Generic views are unaffected.
+
+**Architecture.** Business logic stays out of the UI: a pure presenter (`app/reporting/family_presentation.py`) turns the family result into plain view models;
+`app/ui/shell.py` renders them; the buyer branch of `app/ui/pages/00_Dashboard.py` calls them. **Stop:** any change to fit/ranking/policy, any relationship claim,
+any family total or "remaining" claim, any Level 2 display without an accepted structured signal, any legacy fallback.
+
 ### G4 — Subject-level MatchingFacts/context adapter
 - **Objective:** a dedicated subject facts builder and context handling; match existing phase/whole subjects independently, with parent evidence as labelled context.
 - **Boundary:** no policy change (still v6); no new kinds emitted; migrates inventory #3 and #4 to the strict parser.
