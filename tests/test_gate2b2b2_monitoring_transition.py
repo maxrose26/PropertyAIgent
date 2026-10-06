@@ -113,11 +113,14 @@ def _make_rebaseline_shape(session) -> tuple[Site, str, int]:
 def test_replacement_id_baselines_without_new_on_next_ordinary_sync(session):
     site, opportunity_id = _make_replacement_shape(session)
 
-    # Establish this detector kind's own baseline first (mirrors real
-    # production state, where planning_delivery:phase:* rows already
-    # exist) so an untracked id would ordinarily read NEW, not
-    # BASELINE_EXISTING, if left untouched - the scenario this transition
-    # exists to correct.
+    # Activate the phase DETECTOR first (mirrors real production state, where
+    # planning_delivery:phase:* rows already exist). Since Stage 2.5B G1A the
+    # monitoring detector identity is domain+kind ("planning_delivery:phase"),
+    # NOT per site, so this row - seeded on a DIFFERENT site - activates the
+    # detector and an untracked phase id would ordinarily read NEW, not
+    # BASELINE_EXISTING, if left untouched: the scenario this transition exists
+    # to correct. (Before G1A this comment described the intent but the per-site
+    # prefix meant the id would actually have read BASELINE_EXISTING.)
     _seed_tracked_row(session, "planning_delivery:phase:424242:Whole site / unphased")
 
     manifest = MonitoringTransitionManifest(replacement_ids=frozenset({opportunity_id}))
@@ -315,13 +318,12 @@ def test_id_in_multiple_categories_fails_closed(session):
 
 def test_normal_new_behaviour_is_unaffected_by_the_transition_module(session):
     site, opportunity_id = _make_replacement_shape(session)
-    # _opportunity_kind_prefix strips only the FINAL ":"-separated segment
-    # (the phase code), so for a "planning_delivery:phase:{site_id}:{code}"
-    # id, baseline-run detection is scoped PER SITE, not per detector
-    # family - seed a DIFFERENT phase code on the SAME site to correctly
-    # establish that this site's own "phase" kind already has a tracked
-    # baseline, so the opportunity actually under test is genuinely NEW,
-    # not this run's first-ever baseline.
+    # Detector identity is domain+kind ("planning_delivery:phase", Stage 2.5B
+    # G1A), so ANY tracked phase row activates the phase detector - on this
+    # site or any other (tests/test_monitoring_detector_identity.py proves the
+    # cross-site case). Seeding a different phase code on the SAME site is kept
+    # here as the original, still-valid way to make the opportunity under test
+    # genuinely NEW rather than this run's first-ever baseline.
     _seed_tracked_row(session, planning_delivery_phase_opportunity_id(site.id, "OTHER"))
 
     # No transition applied at all - a genuinely new, untracked opportunity

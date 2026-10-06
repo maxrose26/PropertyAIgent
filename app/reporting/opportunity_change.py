@@ -38,7 +38,7 @@ distinct, persisted classification for exactly this - never NEW. This is
 not derived from timestamp ordering or from which script happened to run
 first ("do NOT rely solely on ordering/timestamp luck"): sync_opportunity_
 monitoring_state below determines, PER DETECTOR KIND (see
-_opportunity_kind_prefix), whether THIS call is establishing that kind's
+opportunity_detector_identity - canonical domain+kind, G1A), whether THIS call is establishing that kind's
 own baseline for the first time - has ANY opportunity of that exact
 detector kind ever been tracked before, regardless of whether OTHER kinds
 already have. An empty table trivially means every kind is untracked
@@ -60,6 +60,9 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from app.db.models import OpportunityMonitoringState, utcnow
+from app.reporting.acquisition_subjects import (
+    KIND_ALLOCATION, KIND_PHASE, LIFECYCLE_KINDS, NEW_KINDS, PLANNING_DELIVERY, STRATEGIC_LAND,
+)
 from app.reporting.opportunity_universe import (
     OpportunityRecord,
     build_current_opportunity_universe,
@@ -174,18 +177,88 @@ def classify_opportunity_change(
     return OpportunityChangeResult(classification=MATERIALLY_CHANGED, reasons=reasons, fingerprint=fingerprint)
 
 
-def _opportunity_kind_prefix(opportunity_id: str) -> str:
-    """The detector-FAMILY portion of a stable identity string - e.g.
-    "strategic_land:allocation", "planning_delivery:site",
-    "planning_delivery:phase", "planning_delivery:recent_permission" (the
-    numeric/site-specific final segment stripped). Used ONLY to answer
-    "has ANY opportunity this detector kind ever produced been tracked
-    before" - see sync_opportunity_monitoring_state's own "DETECTOR-
-    EXPANSION BASELINING" docstring section for why this, not a single
-    whole-table flag, is the correct baseline signal. Never persisted as
-    its own column - always recomputed from opportunity_id, which already
-    carries this information verbatim."""
+class UnparseableOpportunityId(ValueError):
+    """An opportunity id whose canonical detector identity (domain + kind) cannot be established."""
+
+
+def opportunity_detector_identity(opportunity_id: str) -> str:
+    """The canonical MONITORING DETECTOR identity of an opportunity id: ``{domain}:{kind}`` (Stage 2.5B G1A).
+
+    A detector is the class of opportunity-producing logic, never a subject: the site, allocation, phase
+    code or future scope must not alter it. ``planning_delivery:site:61`` -> ``planning_delivery:site``;
+    ``planning_delivery:phase:281:1`` -> ``planning_delivery:phase`` (NOT ``...:phase:281``);
+    ``strategic_land:allocation:57`` -> ``strategic_land:allocation``; a future ``component`` or
+    ``affordable_package`` subject id likewise maps to ``planning_delivery:<kind>``.
+
+    Deliberately lightweight (no decoding or length validation - those belong to the strict G1 parser and
+    must not become sync failure modes): it checks the segment shape monitoring needs and raises
+    UnparseableOpportunityId otherwise. For the four three-segment legacy shapes the result is identical to
+    the previous ``rsplit(":", 1)[0]`` prefix; only phase ids change. A phase code may itself contain ':'."""
+    if not isinstance(opportunity_id, str) or not opportunity_id:
+        raise UnparseableOpportunityId(f"opportunity id must be a non-empty string, got {opportunity_id!r}")
+    parts = opportunity_id.split(":")
+    if len(parts) < 3 or not parts[2] or not (parts[2].isascii() and parts[2].isdigit()):
+        raise UnparseableOpportunityId(f"opportunity id {opportunity_id!r} has no numeric subject segment")
+    domain, kind = parts[0], parts[1]
+    if domain == STRATEGIC_LAND:
+        shape_ok = kind == KIND_ALLOCATION and len(parts) == 3
+    elif domain == PLANNING_DELIVERY:
+        if kind in LIFECYCLE_KINDS:
+            shape_ok = len(parts) == 3
+        elif kind == KIND_PHASE or kind in NEW_KINDS:
+            shape_ok = len(parts) >= 4 and bool(":".join(parts[3:]))
+        else:
+            shape_ok = False
+    else:
+        shape_ok = False
+    if not shape_ok:
+        raise UnparseableOpportunityId(f"opportunity id {opportunity_id!r} is not a recognised monitoring shape")
+    return f"{domain}:{kind}"
+
+
+def _legacy_kind_prefix(opportunity_id: str) -> str:
+    """The pre-G1A prefix, ``rsplit(":", 1)[0]``. Used ONLY as the explicit fallback for an EXISTING persisted
+    monitoring row whose id cannot be parsed under the lightweight rule, so historical state can never crash a
+    sync. Never used for current universe records."""
     return opportunity_id.rsplit(":", 1)[0]
+
+
+# Retained name: the previous private helper, now an alias of the legacy fallback (no current caller relies on
+# its old per-site phase granularity).
+_opportunity_kind_prefix = _legacy_kind_prefix
+
+
+def tracked_detector_identities(opportunity_ids) -> set[str]:
+    """The set of detector identities that already have at least one persisted monitoring row.
+
+    For an EXISTING row whose id cannot be parsed, the legacy prefix is used (explicit, tested fallback).
+    NOTE (pre-created-row rule): ANY row of a detector - including a partial manifest/seed row - makes that
+    whole detector 'active', so every other untracked id of the same detector then classifies NEW. Deployment
+    manifests for a detector must therefore cover ALL of its untracked live ids, or none (carried to G1B)."""
+    tracked: set[str] = set()
+    for opportunity_id in opportunity_ids:
+        try:
+            tracked.add(opportunity_detector_identity(opportunity_id))
+        except UnparseableOpportunityId:
+            tracked.add(_legacy_kind_prefix(opportunity_id))
+    return tracked
+
+
+def plan_opportunity_changes(universe, existing_by_id, tracked_detectors):
+    """PURE classification of every current universe record - the single decision function shared by the real
+    sync and (later) the G1B dry-run baseline-impact report, so preview and execution cannot drift.
+
+    No session, no writes. Returns ``[(record, previous_state_or_None, OpportunityChangeResult)]``.
+    A CURRENT record whose detector identity cannot be parsed RAISES (UnparseableOpportunityId) before any
+    plan is returned: a malformed current identity is a code/data defect and must stop the sync - it is never
+    silently baselined, classified NEW or given monitoring state."""
+    identities = [opportunity_detector_identity(record.opportunity_id) for record in universe]
+    plan = []
+    for record, identity in zip(universe, identities):
+        previous = existing_by_id.get(record.opportunity_id)
+        result = classify_opportunity_change(record, previous, is_baseline_run=identity not in tracked_detectors)
+        plan.append((record, previous, result))
+    return plan
 
 
 def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) -> dict[str, int]:
@@ -203,8 +276,9 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
     behaviour here).
 
     DETECTOR-EXPANSION BASELINING (Gate 1C, Section 16 - release-critical):
-    baseline detection is scoped PER DETECTOR KIND (see
-    _opportunity_kind_prefix above), never a single whole-table flag. The
+    baseline detection is scoped PER DETECTOR (canonical identity
+    domain+kind, see opportunity_detector_identity above - NOT a string
+    prefix of the id), never a single whole-table flag. The
     original Gate 1 mechanism ("is OpportunityMonitoringState currently
     empty") only ever correctly handles the very first sync against a
     brand-new table - it does NOT handle a genuinely different later
@@ -236,10 +310,9 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
     # scoped against. At current/near-term scale (hundreds of rows) this
     # is a trivial single query; a future high-volume gate could narrow
     # this to distinct kind-prefixes directly if it ever needs to.
-    tracked_kind_prefixes = {
-        _opportunity_kind_prefix(oid)
-        for oid in session.execute(select(OpportunityMonitoringState.opportunity_id)).scalars()
-    }
+    tracked_detectors = tracked_detector_identities(
+        session.execute(select(OpportunityMonitoringState.opportunity_id)).scalars()
+    )
 
     existing_by_id = {
         s.opportunity_id: s
@@ -250,11 +323,11 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
         ).scalars()
     } if universe else {}
 
+    # Classify EVERYTHING first (pure; raises on a malformed current id before any row is written), then apply.
+    plan = plan_opportunity_changes(universe, existing_by_id, tracked_detectors)
+
     counts = {BASELINE_EXISTING: 0, NEW: 0, MATERIALLY_CHANGED: 0, UNCHANGED: 0}
-    for record in universe:
-        previous = existing_by_id.get(record.opportunity_id)
-        is_baseline_run_for_this_kind = _opportunity_kind_prefix(record.opportunity_id) not in tracked_kind_prefixes
-        result = classify_opportunity_change(record, previous, is_baseline_run=is_baseline_run_for_this_kind)
+    for record, previous, result in plan:
         counts[result.classification] += 1
 
         if previous is None:
