@@ -161,7 +161,7 @@ migration is owned by the gate named in its inventory row.
 | 10 | `app/db/models.py`: `OpportunityMonitoringState.opportunity_id` `String(200)` unique; `AgentEvaluationHistory.opportunity_id` `String(200)` and `opportunity_kind` `String(50)`; `CurrentBuyerOpportunityState.current_opportunity_kind` `String(50)` | length limits | New ids ≤ 200, kind names ≤ 50. No schema change. |
 | 11 | `app/policy/acquisition_evaluate.py`, `agent_evaluation_prompt.py`, `agent_evaluation_result.py` | id is an opaque key/label; anchor derived through #1 | Compatible once #1 is strict. |
 | 12 | `app/reporting/opportunity_transaction_signals.py` (L248–301) | looks up `OpportunityMonitoringState` by id for "ownership/control evidence changed" | A new subject has no monitoring row yet: signal must be UNKNOWN/ABSENT, never "changed". |
-| 13 | `app/reporting/opportunity_feed.py` | builds/attaches facts per card | Becomes family-aware only in G3. |
+| 13 | `app/reporting/opportunity_feed.py` | builds/attaches facts per card | Becomes family-aware only in G3b (G3a is a pure model with no feed integration). |
 | 14 | `benchmark/extraction.py`, `benchmark/benchmark_case.py`, `scripts/run_agent_evaluation_benchmark.py` | id is a provenance label; extraction looks the id up in the live universe | Compatible; new kinds only resolvable if they exist in the universe. |
 | 15 | `app/reporting/residual_capacity.py` `_parse_subject` (L148–155) | a **different grammar**: the `CountAssessment.subject_id` `site:{site_id}:{scope_type}:{scope_label}`, parsed with `split(":", 3)`; the label may contain `:` | Not an opportunity id. It matters because **parent identity in this specification is defined as the specific parent `CountAssessment` (its `subject_id`)**. The mapping from an opportunity/subject id to the parent `CountAssessment.subject_id` is a **G2 deliverable** and must be unambiguous before any child relationship is created. |
 
@@ -267,18 +267,20 @@ how `derive_whole_site_affordable_state` is tested.
   opportunities. Strategic and planning families coexist and may cross-link (see the decided
   strategic-family rule below); a strategic allocation is never a subject duplicated into each linked
   site's family.
-- **Deterministic best-subject precedence** (each step breaks ties of the previous; the result is a total
-  order within one family):
-  1. buyer-fit rank, highest first: `STRONG_FIT`; `POSSIBLE_FIT`; `INSUFFICIENT_EVIDENCE` **with** the
-     investigative flag (`BuyerFitAssessment.is_investigative_exception`); `INSUFFICIENT_EVIDENCE`
-     **without** it. `NOT_SUITABLE` is never best unless every subject in the family is `NOT_SUITABLE`
-     (steps 2–4 then order the `NOT_SUITABLE` subjects);
-  2. count evidence tier: EXACT before APPROXIMATE before UNKNOWN;
-  3. fixed kind rank (more specific evidenced scope first): `PHASE`, `MIXED_COMPONENT`,
-     `AFFORDABLE_PACKAGE`, `WHOLE_SITE`, `STRATEGIC_PARENT`;
-  4. ascending scope key.
-  (Cross-family ordering is by the best subject's step-1 rank and then the feed's existing ordering; a
-  parent and child are never ranked separately.)
+- **Deterministic representative-subject order (Product Owner Decision 4)** — each step breaks ties of the previous:
+  1. **buyer fit**, highest first: `STRONG_FIT` > `POSSIBLE_FIT` > `INSUFFICIENT_EVIDENCE` **with** the investigative
+     exception (`BuyerFitAssessment.is_investigative_exception`) > `INSUFFICIENT_EVIDENCE` **without** it > `NOT_SUITABLE`;
+  2. **count evidence quality**: `EXACT` > `APPROXIMATE` (including a bounded `RANGE`) > `UNKNOWN`;
+  3. **commercial specificity**: ONLY where an **evidence-qualified relationship** exists (G2) may a more-specific child outrank its
+     parent when the preceding dimensions tie. G3a has no G2 relationships, so G3a MUST NOT invent parent/child specificity and
+     this step has no effect there; **no fixed subject-kind rank is used**;
+  4. a **stable deterministic key**, final tie-break only, with no commercial meaning (G3a: the subject's own canonical
+     identity string — the opportunity id, or the feed card id for feed subjects).
+  (Cross-family ordering, where fit buckets tie, is simply the family key; no new commercial scoring model.)
+- **Representative is not the only opportunity (Decision 5).** The representative is the headline subject for this buyer; every
+  other non-`NOT_SUITABLE` subject of the family stays available as a related subject, and subjects sharing `STRONG_FIT` /
+  `POSSIBLE_FIT` with the representative are surfaced as "also STRONG_FIT" / "also POSSIBLE_FIT". A parent is never hidden because a
+  child won a tie, nor a child because a parent did.
 - Display per subject: kind, units with precision, relationship to parent ("contained in …"),
   evidence confidence, buyer fit, investigation requirements, and the overlap notice above.
 - **DECIDED (Product Owner): strategic families are canonical and distinct from planning families.**
@@ -301,6 +303,39 @@ how `derive_whole_site_affordable_state` is tested.
   one of its own subjects. An allocation with no linked site is simply a one-subject strategic family.
 
 No UI is implemented by this specification.
+
+### Opportunity-family decisions (Product Owner; G3a/G3b)
+
+1. **A family is a grouping/read-model concept, not an acquisition subject.** It does not imply a whole-site opportunity exists; a
+   phase-only site is a valid family (e.g. Site X with Phase 1 and Phase 2) with **no** whole-site subject, and none is synthesised.
+2. **Planning family identity = (`planning_delivery`, `site_id`).** Grouping does **not** establish containment or non-overlap.
+   Lifecycle representations stay subject to the existing detector precedence (at most one of lapse/recent-permission/long-pending
+   per site); phase subjects may coexist with a lifecycle subject where one genuinely exists. If conflicting lifecycle
+   representations are ever supplied, G3a fails closed rather than choosing one.
+3. **Strategic family identity = (`strategic_land`, `allocation_id`).** One allocation id is one strategic family; multiple
+   relationship rows or linked planning sites never duplicate it. Planning and strategic families stay separate identities and may later
+   cross-link; they are not merged in G3a.
+4. **Representative order** as above (fit, evidence quality, relationship-qualified specificity, stable key).
+5. **Representative ≠ only opportunity** (also-STRONG / also-POSSIBLE; nothing hidden).
+6. **Family `NOT_SUITABLE` only if every buyer-relevant subject is `NOT_SUITABLE`**; any STRONG/POSSIBLE/INSUFFICIENT subject means the
+   family is not terminally excluded. G3a may compute this pure state; live dashboard/feed count semantics are **not** altered until G3b.
+7. **No unit summation.** G3a never calculates or displays a family unit total; same-site subjects may overlap, and without G2 non-overlap
+   evidence they are never summed. The model exposes an overlap-safety state sufficient for the wording
+   "Related subjects may overlap — do not add unit counts."
+8. **Complete-family requirement.** Final buyer-facing families must be built from the **complete** relevant subject set; a bounded
+   candidate pool can omit a better subject and so choose the wrong representative. G3a is pure and operates on whatever complete iterable
+   it is given. **G3b hard acceptance requirement:** build families from an unbounded/complete relevant subject source, or *prove* the bounded
+   optimisation cannot omit a member capable of changing the best subject, family fit, the also-STRONG/POSSIBLE list or the family
+   exclusion state. An "incomplete family" warning is not an acceptable final substitute.
+9. **Phase-only sites** remain valid families; the family header may use site-level contextual metadata, which does not create a whole-site
+   subject.
+10. **Identity-system and ordering notes (G3a).** One grouping invocation must use **one canonical subject-id representation** — all
+    opportunity-universe ids **or** all feed-card ids, never a mixture; a mixture **fails closed** (it would otherwise double-list one
+    subject under two keys). The final **stable-key tie-break is lexical/string order** (so `…A10` sorts before `…A9`): deterministic only,
+    with no commercial meaning. A feed phase card's id-encoded scope must **agree** with its `phase_code`, and feed-card numeric ids must be
+    canonical (`opp-lapse-3`, not `opp-lapse-03`); disagreement or non-canonical ids fail closed. The canonical opportunity-universe id grammar is unchanged.
+11. **G2 is deferred.** G3a implements no containment, no "pursuant to outline application" phrase support, no RM → VAR → OUT chains and
+    makes no `CONTAINED_IN` claim.
 
 ## Monitoring identity
 
@@ -384,7 +419,7 @@ and needs separate approval.**
 
 ## Implementation gates (each separately approved; none is authorised by this document)
 
-Dependency order: **G1 → G1A → G2 → G3 → G4 → post-G4 decision → G5 → G6 → G7 → G8**, with **G1B** (below) a
+Dependency order: **G1 → G1A → G3a → G2 → G3b → G4 → post-G4 decision → G5 → G6 → G7 → G8** (G3a is implemented before G2; G3b does not depend on G2, which only enriches the relationship line), with **G1B** (below) a
 deferred monitoring-tooling gate and the **Option C decision** a hard gate before first real emission. Any boundary change
 needs a specification amendment first. Every gate lists objective, boundary, likely files, tests,
 acceptance and stop conditions.
@@ -439,13 +474,27 @@ This is **not** solved by G1A and must be recorded and decided separately; no ga
 - **Acceptance:** every relationship carries provenance; none created without it.
 - **Stop:** any inference.
 
-### G3 — Opportunity family grouping
-- **Objective:** group **existing** whole-site and phase opportunities into families; no new subjects.
-- **Boundary:** read-side grouping and the best-subject precedence only; no new ids, no fingerprint change, no UI redesign beyond what grouping requires.
-- **Likely files:** `app/reporting/opportunity_feed.py`, new family module, tests.
-- **Tests:** one family per site; no double ranking; no summed overlapping counts; the precedence order is total and reproducible; per-buyer selection.
-- **Acceptance:** a parent and child never appear as two top-level opportunities for one buyer; the overlap notice appears when non-overlap is not evidenced.
-- **Stop:** a parent and child both ranked top-level, or any displayed sum of overlapping counts.
+### G3a — Opportunity family grouping: pure model
+- **Objective:** group **existing** subjects into planning/strategic families and select the buyer-specific representative; no new subjects.
+- **Boundary:** a pure module with no database/session/network, no feed/dashboard/UI integration, no new opportunity kinds, no
+  synthetic whole-site subject, no containment, no unit arithmetic, no change to the universe, monitoring, matching, schema or fingerprints.
+  Input is a narrow protocol (not Streamlit/feed internals), with small pure adapters from an existing opportunity id or feed-card dict.
+- **Likely files:** `app/reporting/opportunity_families.py` (new), `tests/test_opportunity_families.py`, `verification/stage2/check.sh`.
+- **Tests:** deterministic family identity; site grouping; phase-only family; lifecycle + phases; different sites; strategic canonicalisation
+  and duplicate-link input; fit and investigative precedence; evidence-tier and stable-key tie-breaks; input-order independence; related
+  subjects retained and also-STRONG/POSSIBLE roles; mixed and all-`NOT_SUITABLE` family fit; no unit total; no residual arithmetic; no
+  containment claim; existing ids unchanged; no new kinds; conflicting lifecycle fails closed.
+- **Acceptance:** all of the above, hosted CI green, no schema.
+- **Stop:** any G2 containment logic, phrase-parser change, new kind, universe/feed/dashboard/monitoring change, or production read.
+
+### G3b — Opportunity family grouping: feed integration (FUTURE; not authorised)
+- **Objective:** make the buyer-facing feed show **one top-level row per family** with the representative plus related subjects.
+- **Hard acceptance requirements:** families built from the **complete** relevant subject set (or a proof that the bounded pool cannot change
+  the best subject, family fit, also-STRONG/POSSIBLE list or exclusion state); buyer-mode integration; family-level counts including migration of
+  `excluded_not_suitable` from card to family semantics; strategic-family canonicalisation; deterministic cross-family ordering (fit bucket, then
+  family key); no unit summation; the UI overlap warning "Related subjects may overlap — do not add unit counts."
+- **Likely files:** `app/reporting/opportunity_feed.py`, `app/ui/pages/00_Dashboard.py`, tests.
+- **Stop:** a bounded pool that can change a family result, any summed overlapping units, or an "incomplete family" warning used as the final substitute.
 
 ### G4 — Subject-level MatchingFacts/context adapter
 - **Objective:** a dedicated subject facts builder and context handling; match existing phase/whole subjects independently, with parent evidence as labelled context.
