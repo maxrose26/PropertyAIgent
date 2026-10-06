@@ -15,8 +15,8 @@ import pytest
 
 import app.policy.buyer_matching as bm
 from app.policy.buyer_matching import (
-    BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY,
-    PHASING_NONE_IDENTIFIED, PLANNING_DELIVERY, STRATEGIC_LAND, AcquisitionPhasingEvidence, B2MatchingContext, MatchingFacts, assess_buyer_fit,
+    BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_DOCUMENTED,
+    PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, PLANNING_DELIVERY, STRATEGIC_LAND, AcquisitionPhasingEvidence, B2MatchingContext, MatchingFacts, assess_buyer_fit,
     subject_is_self_scope,
 )
 from app.policy.buyer_profiles import (
@@ -25,7 +25,7 @@ from app.policy.buyer_profiles import (
 from app.reporting.residential_count import CountAssessment
 
 ROOT = Path(__file__).resolve().parents[1]
-STATES = (PHASING_CURRENT_EVIDENCED_PHASE, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED)
+STATES = (PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED)
 
 
 def facts(**overrides) -> MatchingFacts:
@@ -55,6 +55,7 @@ def investigate(profile, f, context):
     (PHASING_CURRENT_EVIDENCED_PHASE, "Phased delivery is evidenced; assess the evidenced phase scope(s) separately. Availability is unverified."),
     (PHASING_DOCUMENTED, "A phased-delivery strategy is evidenced; a buyer-relevant acquisition scope has not yet been established."),
     (PHASING_HISTORICAL_ONLY, "Historic phasing evidence exists"),
+    (PHASING_CURRENTNESS_UNKNOWN, "Phase evidence exists, but its current implementation status cannot be established from the available dates; decomposition remains unverified."),
     (PHASING_NONE_IDENTIFIED, "No current phasing evidence has been identified in the qualified records; decomposition remains unverified."),
     (None, "Decomposition remains unverified."),
 ])
@@ -64,13 +65,23 @@ def test_oversized_wider_subject_gets_the_phasing_aware_reason_with_unchanged_cl
     assert (result.classification, result.is_investigative_exception) == (INSUFFICIENT_EVIDENCE, True)      # equal to accepted v6 at EVERY level
     assert f"Scale ({units:,} homes) is outside this buyer's discovery range ({floor})." in text and needle in text
     assert "investigate whether a relevant phase" not in text and "sub-scope" not in text                    # the speculative claim is gone
-    assert "unphased" not in text.lower() and "probably" not in text.lower() and "available" not in text.lower().replace("availability is unverified", "")
+    assert "unphased" not in text.lower() and "probably" not in text.lower() and "available" not in text.lower().replace("availability is unverified", "").replace("from the available dates", "")
 
 
 def test_level_three_stays_investigative_and_never_says_the_scheme_is_unphased():
     result, text = investigate(NESTEN_HOMES, facts(unit_count=600), ctx(PHASING_NONE_IDENTIFIED))
     assert result.is_investigative_exception is True and result.classification == INSUFFICIENT_EVIDENCE
     assert "No current phasing evidence has been identified" in text and "unphased" not in text.lower()
+
+
+def test_currentness_unknown_wording_claims_nothing_beyond_unverified_status():
+    result, text = investigate(NESTEN_HOMES, facts(unit_count=600), ctx(PHASING_CURRENTNESS_UNKNOWN))
+    assert (result.classification, result.is_investigative_exception) == (INSUFFICIENT_EVIDENCE, True)
+    tail = text.split("preferred 50-200 homes). ")[1].lower().replace("from the available dates", "")      # the approved wording itself says "available dates"
+    for forbidden in ("phased delivery is evidenced", "historic", "lapsed", "expired", "available", "remaining", "another", "unphased", "assess the evidenced"):
+        assert forbidden not in tail, forbidden
+    _, own = investigate(NESTEN_HOMES, facts(unit_count=300, count_assessment=exact("phase", "Phase 1", 300)), ctx(PHASING_CURRENTNESS_UNKNOWN, subject_phase_scope_key="1"))
+    assert "own scope is a named phase" in own and "current implementation status" not in own     # the self-scope guard still applies
 
 
 def test_historical_wording_acknowledges_history_without_asserting_legal_lapse():

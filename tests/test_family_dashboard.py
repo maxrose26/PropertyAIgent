@@ -113,7 +113,7 @@ def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
     """V7A: the presentation consumes the ONE derived fact (attached to each card by the family feed). CURRENT only; historical-only, none, a missing fact, and every
     strategic family show no current-evidence label - whatever the cards' own phase codes or scopes look like."""
     from app.policy.buyer_matching import (
-        AcquisitionPhasingEvidence, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED,
+        AcquisitionPhasingEvidence, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED,
     )
     from app.reporting.opportunity_families import FamilySubject, OpportunityFamily, RelatedSubject, SLOT_LIFECYCLE, SLOT_PHASE, ID_SYSTEM_FEED
 
@@ -127,8 +127,12 @@ def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
         phase, lifecycle = subject("opp-phase-1-2", SLOT_PHASE, state), subject("opp-lapse-1", SLOT_LIFECYCLE, state)
         return OpportunityFamily(("planning_delivery", 1), phase, (RelatedSubject(lifecycle, "INSUFFICIENT"),))
     assert fp.phasing_evidenced(family(PHASING_CURRENT_EVIDENCED_PHASE)) is True
+    assert fp.phasing_context(family(PHASING_CURRENT_EVIDENCED_PHASE)) == "Phased delivery evidenced."
+    assert fp.phasing_context(family(PHASING_CURRENTNESS_UNKNOWN)) == "Phase evidence identified — current status unverified."   # the weaker label, same fact
+    assert fp.phasing_evidenced(family(PHASING_CURRENTNESS_UNKNOWN)) is False                                                    # never the CURRENT label
     for not_current in (PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, PHASING_DOCUMENTED, None):
         assert fp.phasing_evidenced(family(not_current)) is False, not_current       # historical / none / reserved documented / fact missing: no current label
+        assert fp.phasing_context(family(not_current)) is None, not_current
     single = OpportunityFamily(("planning_delivery", 1), subject("opp-phase-1-2", SLOT_PHASE, PHASING_CURRENT_EVIDENCED_PHASE), ())
     assert fp.phasing_evidenced(single) is True                                          # one genuine phase subject is sufficient on its own
     lifecycle_only = OpportunityFamily(("planning_delivery", 1), subject("opp-lapse-1", SLOT_LIFECYCLE, PHASING_NONE_IDENTIFIED), ())
@@ -136,6 +140,20 @@ def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
     strategic = FamilySubject(domain="strategic_land", anchor_id=1, subject_key="opp-feed-alloc-1", slot="ALLOCATION", fit="INSUFFICIENT_EVIDENCE",
                               source={"acquisition_phasing": AcquisitionPhasingEvidence(PHASING_CURRENT_EVIDENCED_PHASE)}, id_system=ID_SYSTEM_FEED)
     assert fp.phasing_evidenced(OpportunityFamily(("strategic_land", 1), strategic, ())) is False   # a strategic allocation is never labelled phased
+
+
+def test_end_to_end_an_undated_phase_shows_the_weak_label_and_an_address_only_phase_shows_none(world):
+    from app.db.models import Application
+    undated = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    world.session.query(Application).filter(Application.site_id == undated.id, Application.reference.like("RM/%")).update({"decision_issued_date": None})
+    address_only = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    rm = world.session.query(Application).filter(Application.site_id == address_only.id, Application.reference.like("RM/%")).one()
+    rm.proposal = "Reserved matters for 30 dwellings"
+    rm.address = "Phase 2, Mill Lane, Anytown"
+    world.session.commit()
+    labels = {f.title: f.phasing_context for f in view_of(world, 10).families}
+    assert labels[f"Site {undated.id}"] == "Phase evidence identified — current status unverified."
+    assert labels.get(f"Site {address_only.id}") is None
 
 
 # --- strategic ------------------------------------------------------------------------------------------------------------------------

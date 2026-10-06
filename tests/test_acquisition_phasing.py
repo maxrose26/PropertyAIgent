@@ -16,7 +16,7 @@ from sqlalchemy import event
 import app.reporting.acquisition_phasing as ap
 from app.db.models import Application, SchemeIntelligence, Site
 from app.policy.buyer_matching import (
-    PHASING_CURRENT_EVIDENCED_PHASE, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, AcquisitionPhasingEvidence,
+    PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_DOCUMENTED, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, AcquisitionPhasingEvidence,
 )
 
 TODAY = dt.date.today()
@@ -28,9 +28,12 @@ def portal(days_ago: int) -> str:
     return (TODAY - dt.timedelta(days=days_ago)).strftime("%a %d %b %Y")
 
 
-def app(i, proposal, *, decision="Granted", age=300, application_type=RM, status="Decided", site_id=1):
+def app(i, proposal, *, decision="Granted", age=300, application_type=RM, status="Decided", site_id=1, address=None, date="auto"):
+    issued = portal(age) if decision else None
+    if date != "auto":
+        issued = date                                          # None / unparseable text: an undated or unreadable decision date
     return Application(id=i, council_code="testcouncil", reference=f"R/{i}", site_id=site_id, proposal=proposal, application_type=application_type, status=status,
-                       decision=decision, decision_issued_date=portal(age) if decision else None, application_received=portal((age or 0) + 90))
+                       decision=decision, decision_issued_date=issued, application_received=portal((age or 0) + 90), address=address)
 
 
 SITE = Site(id=1, council_code="testcouncil", canonical_address="x", display_address="X")
@@ -65,6 +68,39 @@ def test_f_an_assumed_lapsed_granted_phase_is_historical_not_current():
 def test_g_current_wins_over_historical():
     apps = [app(1, "Reserved matters for Phase 1", age=LAPSED_AGE + 100), app(2, "Reserved matters for Phase 2", age=100)]
     assert state(apps) == PHASING_CURRENT_EVIDENCED_PHASE
+
+
+@pytest.mark.parametrize("date", [None, "", "not a date", "00/00/0000"])
+def test_c_an_undated_or_unreadable_granted_phase_is_currentness_unknown_never_current_and_never_historical(date):
+    result = state([app(1, "Reserved matters for Phase 2 of 30 dwellings", date=date)])
+    assert result == PHASING_CURRENTNESS_UNKNOWN and result not in (PHASING_CURRENT_EVIDENCED_PHASE, PHASING_HISTORICAL_ONLY)
+
+
+def test_h_i_j_state_precedence_current_then_unknown_then_historical_then_none():
+    current = app(1, "Reserved matters for Phase 1", age=100)
+    unknown = app(2, "Reserved matters for Phase 2", date=None)
+    historical = app(3, "Reserved matters for Phase 3", age=LAPSED_AGE)
+    refused = app(4, "Reserved matters for Phase 4", decision="Refused")
+    assert state([current, unknown, historical]) == PHASING_CURRENT_EVIDENCED_PHASE                 # H: current + unknown
+    assert state([unknown, historical]) == PHASING_CURRENTNESS_UNKNOWN                              # I: unknown + historical
+    assert state([historical]) == PHASING_HISTORICAL_ONLY                                           # J
+    assert state([refused]) == PHASING_NONE_IDENTIFIED
+    for order in ([unknown, historical, refused], [refused, historical, unknown], [historical, unknown]):
+        assert state(order) == PHASING_CURRENTNESS_UNKNOWN                                          # deterministic whatever the input order
+
+
+def test_k_an_address_label_alone_never_establishes_a_phase_for_any_state():
+    for age, date in ((100, "auto"), (LAPSED_AGE, "auto"), (100, None)):
+        applications = [app(1, "Reserved matters for 30 dwellings", age=age, date=date, address="Phase 1, Orchard Way, Anytown")]
+        assert state(applications) == PHASING_NONE_IDENTIFIED, (age, date)
+    outline_plus_address = [app(1, "Outline erection of 400 dwellings", application_type=OUTLINE, age=800),
+                            app(2, "Reserved matters for 30 dwellings", age=100, address="Phase 2 land at Mill Lane")]
+    assert state(outline_plus_address) == PHASING_NONE_IDENTIFIED
+
+
+def test_l_a_proposal_scope_phase_with_a_neutral_address_qualifies():
+    assert state([app(1, "Reserved matters for Phase 1 of 60 dwellings", address="Land at Orchard Way, Anytown")]) == PHASING_CURRENT_EVIDENCED_PHASE
+    assert state([app(1, "Reserved matters for Phase 1 of 60 dwellings", address="Phase 9, Mill Lane")]) == PHASING_CURRENT_EVIDENCED_PHASE   # the proposal is the source
 
 
 def test_the_unphased_bucket_never_qualifies_as_a_child_phase():

@@ -681,6 +681,15 @@ never qualify. States: `CURRENT_EVIDENCED_PHASE` > `HISTORICAL_PHASE_ONLY` (only
 historic evidence without asserting legal lapse) > `NONE_IDENTIFIED`; `DOCUMENTED_PHASING` is reserved. No new public fit tier. A hard-excluded (NOT_SUITABLE) CURRENT phase still evidences phased
 delivery and never promotes the parent.
 
+**Evidence hardening (Product Owner, post-review).** (1) An UNDATED (or unparseable) granted phase is neither current nor historical: it is the explicit fourth state
+`PHASE_EVIDENCE_CURRENTNESS_UNKNOWN` ("a qualifying substantive phase grant exists, but the available date/status evidence cannot establish whether it remains current"). Site-level precedence
+is deterministic: CURRENT > CURRENTNESS_UNKNOWN > HISTORICAL > NONE (an unknown phase is never downgraded to history by a sibling, nor upgraded to current); `DOCUMENTED_PHASING` stays reserved.
+Matcher wording keeps INSUFFICIENT_EVIDENCE + investigative: "Phase evidence exists, but its current implementation status cannot be established from the available dates; decomposition remains
+unverified." The self-scope guard still applies. (2) ADDRESS text alone never establishes a phase for acquisition-phasing evidence: the phase identity comes from the application PROPOSAL scope only
+(the address may remain supporting/display context elsewhere). One shared derivation serves the family feed, legacy buyer feed, agent packet/onboarding and the Slice 2 label; tightening it may
+remove a label that was shown before (evidence safety over label coverage). Slice 2 labels: CURRENT -> "Phased delivery evidenced."; CURRENTNESS_UNKNOWN -> "Phase evidence identified — current
+status unverified."; historical-only / none / reserved documented -> no label. The explicit state enters the agent-evaluation fingerprint; opportunity evidence fingerprints are unchanged.
+
 **Minimal fact.** `AcquisitionPhasingEvidence(state)` only (no scope list: the matcher needs none). It is a context fact (`B2MatchingContext.acquisition_phasing`), derived by ONE pure function
 (`app/reporting/acquisition_phasing.py`, no database/model call) from already-loaded site applications by the context builders; `assess_buyer_fit` stays pure. The strategic
 `has_phasing_evidence` (Local Plan allocation phasing) is not reused or overloaded; strategic routes and strategic phasing are unchanged.

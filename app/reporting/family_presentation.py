@@ -19,6 +19,7 @@ from app.reporting.opportunity_families import OVERLAP_WARNING, SLOT_PHASE, STRA
 logger = logging.getLogger(__name__)
 
 PHASING_CONTEXT = "Phased delivery evidenced."
+PHASING_CONTEXT_CURRENTNESS_UNKNOWN = "Phase evidence identified — current status unverified."
 RELATIONSHIP_NOTE = "Related opportunity subjects within this development."
 POLICY_CAVEAT = "This existing-policy result does not verify AH count source or scope, final tenure terms or acquisition availability."
 FAMILY_ERROR_MESSAGE = ("Acquisition-family results are temporarily unavailable for this buyer. "
@@ -115,6 +116,19 @@ def _subject_view(subject) -> SubjectView:
         tags=tuple(card.get("tags") or ()), page=card.get("page"), params=dict(card.get("params") or {}))
 
 
+def phasing_context(family: OpportunityFamily) -> str | None:
+    """The phasing label for a family, from the SHARED fact only: CURRENT -> "Phased delivery evidenced."; PHASE_EVIDENCE_CURRENTNESS_UNKNOWN -> the weaker
+    "Phase evidence identified — current status unverified."; historical-only, none, reserved documented, a missing fact and every strategic family -> no label."""
+    if family.family_key[0] == STRATEGIC_LAND:
+        return None
+    from app.reporting.acquisition_phasing import phasing_state_of
+    for member in family.members:
+        state = phasing_state_of((member.source or {}).get("acquisition_phasing"))
+        if state is not None:
+            return {"CURRENT_EVIDENCED_PHASE": PHASING_CONTEXT, "PHASE_EVIDENCE_CURRENTNESS_UNKNOWN": PHASING_CONTEXT_CURRENTNESS_UNKNOWN}.get(state)
+    return None
+
+
 def phasing_evidenced(family: OpportunityFamily) -> bool:
     """The Slice 2 label consumes the SHARED derived fact (app.reporting.acquisition_phasing, attached to each planning-delivery card by the family feed): True only for
     CURRENT_EVIDENCED_PHASE (a genuine named phase with a substantive granted anchor that is not assumed-lapsed). Historical-only, none-identified, a missing fact and every strategic
@@ -143,7 +157,7 @@ def present_family(family: OpportunityFamily, site) -> FamilyView:
     multi = len(family.members) > 1
     return FamilyView(
         family_id=f"{family.family_key[0]}-{family.family_key[1]}", title=title, subtitle=subtitle, is_strategic=strategic, best=best, related=related,
-        phasing_context=PHASING_CONTEXT if phasing_evidenced(family) else None,
+        phasing_context=phasing_context(family),
         relationship_note=RELATIONSHIP_NOTE if multi and not strategic else None,
         overlap_warning=OVERLAP_WARNING if multi else None)
 

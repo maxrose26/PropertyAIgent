@@ -774,10 +774,11 @@ def build_control_appetite_facts(acquisition_facts) -> ControlAppetiteFacts:
 # which means Local Plan allocation phasing for strategic subjects). One minimal fact: the evidence state for the wider
 # development. DOCUMENTED_PHASING is reserved for Stage 2.6 qualified evidence and has no producer yet.
 PHASING_CURRENT_EVIDENCED_PHASE = "CURRENT_EVIDENCED_PHASE"
+PHASING_CURRENTNESS_UNKNOWN = "PHASE_EVIDENCE_CURRENTNESS_UNKNOWN"   # a qualifying granted phase exists but its date evidence cannot establish whether it is current
 PHASING_HISTORICAL_ONLY = "HISTORICAL_PHASE_ONLY"
 PHASING_DOCUMENTED = "DOCUMENTED_PHASING"
 PHASING_NONE_IDENTIFIED = "NONE_IDENTIFIED"
-PHASING_STATES = frozenset({PHASING_CURRENT_EVIDENCED_PHASE, PHASING_HISTORICAL_ONLY, PHASING_DOCUMENTED, PHASING_NONE_IDENTIFIED})
+PHASING_STATES = frozenset({PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_HISTORICAL_ONLY, PHASING_DOCUMENTED, PHASING_NONE_IDENTIFIED})
 
 
 @dataclass(frozen=True)
@@ -856,6 +857,8 @@ def _planning_state_label(state: str) -> str:
 _PHASING_TAILS = {
     PHASING_CURRENT_EVIDENCED_PHASE: "Phased delivery is evidenced; assess the evidenced phase scope(s) separately. Availability is unverified.",
     PHASING_DOCUMENTED: "A phased-delivery strategy is evidenced; a buyer-relevant acquisition scope has not yet been established.",
+    PHASING_CURRENTNESS_UNKNOWN: ("Phase evidence exists, but its current implementation status cannot be established from the available dates; "
+                                  "decomposition remains unverified."),
     PHASING_HISTORICAL_ONLY: ("Historic phasing evidence exists, but the phase permission's assumed implementation date has passed and its current "
                               "implementation status is unverified; no current phasing evidence has been identified, and decomposition remains unverified."),
     PHASING_NONE_IDENTIFIED: "No current phasing evidence has been identified in the qualified records; decomposition remains unverified.",
