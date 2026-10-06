@@ -53,7 +53,7 @@ import json
 from sqlalchemy import select
 
 from app.db.models import Buyer, BuyerMandate, Council, Workspace, utcnow
-from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, STRONG_FIT
+from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, INSUFFICIENT_EVIDENCE, NOT_SUITABLE, POSSIBLE_FIT, STRONG_FIT
 from app.policy.buyer_matching_b2_context import build_b2_context, evaluate_buyer_fit
 from app.policy.buyer_profiles import (
     ACQUISITION_TYPES,
@@ -529,10 +529,11 @@ class OnboardingBaselineResult:
     assess_buyer_fit... do not create a numeric score") - counts only,
     never a score or ranking."""
 
-    __slots__ = ("opportunities_reviewed", "strong_fit", "not_suitable", "insufficient_evidence", "investigative_exceptions", "summary_line")
+    __slots__ = ("opportunities_reviewed", "strong_fit", "not_suitable", "insufficient_evidence", "investigative_exceptions", "summary_line", "possible_fit")
 
-    def __init__(self, opportunities_reviewed: int, strong_fit: int, not_suitable: int, insufficient_evidence: int, investigative_exceptions: int, summary_line: str):
+    def __init__(self, opportunities_reviewed: int, strong_fit: int, not_suitable: int, insufficient_evidence: int, investigative_exceptions: int, summary_line: str, possible_fit: int = 0):
         self.opportunities_reviewed = opportunities_reviewed
+        self.possible_fit = possible_fit
         self.strong_fit = strong_fit
         self.not_suitable = not_suitable
         self.insufficient_evidence = insufficient_evidence
@@ -590,12 +591,14 @@ def run_buyer_onboarding_baseline(
     if contexts is None:
         contexts = {o.opportunity_id: build_b2_context(session, o.opportunity_id, o.opportunity_type) for o in universe}
 
-    strong_fit = not_suitable = insufficient_evidence = investigative_exceptions = 0
+    strong_fit = possible_fit = not_suitable = insufficient_evidence = investigative_exceptions = 0
     for opportunity in universe:
         context = contexts.get(opportunity.opportunity_id)
         assessment = evaluate_buyer_fit(session, policy, opportunity.matching_facts, context=context)
         if assessment.classification == STRONG_FIT:
             strong_fit += 1
+        elif assessment.classification == POSSIBLE_FIT:
+            possible_fit += 1
         elif assessment.classification == NOT_SUITABLE:
             not_suitable += 1
         elif assessment.classification == INSUFFICIENT_EVIDENCE:
@@ -604,7 +607,7 @@ def run_buyer_onboarding_baseline(
             investigative_exceptions += 1
 
     summary_line = (
-        f"reviewed={len(universe)} strong_fit={strong_fit} not_suitable={not_suitable} "
+        f"reviewed={len(universe)} strong_fit={strong_fit} possible_fit={possible_fit} not_suitable={not_suitable} "
         f"insufficient_evidence={insufficient_evidence} investigative_exceptions={investigative_exceptions}"
     )
 
@@ -616,7 +619,7 @@ def run_buyer_onboarding_baseline(
     return OnboardingBaselineResult(
         opportunities_reviewed=len(universe), strong_fit=strong_fit, not_suitable=not_suitable,
         insufficient_evidence=insufficient_evidence, investigative_exceptions=investigative_exceptions,
-        summary_line=summary_line,
+        summary_line=summary_line, possible_fit=possible_fit,
     )
 
 

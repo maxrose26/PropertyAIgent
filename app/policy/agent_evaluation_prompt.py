@@ -697,6 +697,10 @@ def render_prompt(context: PromptContext) -> str:
     lines.append("")
     lines.append("BUYER FIT (screening context, NOT the recommendation):")
     lines.append(f"- classification: {context.buyer_fit_classification}")
+    if context.buyer_fit_classification == "POSSIBLE_FIT":
+        # Stage 2.5A: deterministic and final - never restated as a stronger fit.
+        lines.append("- POSSIBLE_FIT is deterministic: scale is within this buyer's discovery range but NOT "
+                     "verified within its preferred range. Do not treat or describe it as a strong or preferred fit.")
     lines.append(f"- is_investigative_exception: {context.buyer_fit_is_investigative_exception}")
     lines.append("- matches: see buyer_fit.matches[i] reference tokens below")
     lines.append("- unknown: see buyer_fit.unknown[i] reference tokens below")

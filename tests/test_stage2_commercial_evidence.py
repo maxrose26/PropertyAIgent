@@ -254,3 +254,97 @@ def test_phase_unknown_count_does_not_inherit_whole_site_in_feed(session):
     card={"params":{"site_id":str(site.id)},"phase_code":"1","application_reference":grant.reference,"phase_unit_count":None}
     _attach_planning_delivery_matching_facts(session,[card])
     assert card["matching_facts"].unit_count is None
+
+
+# --- Gate 5B: evidence-aware completion filtering -------------------------
+# Only verified completion may be hidden; unknown physical status is never read as
+# incomplete, uncommenced or available, and always stays visible.
+
+import ast
+from pathlib import Path
+
+from app.search import query_parser
+from app.search.query_parser import (
+    COMPLETION_EXCLUSION_NOTICE, COMPLETION_FILTER_CAPTION, COMPLETION_FILTER_LABEL,
+    filters_from_result, verified_completion_exclusion_mask,
+)
+
+_EXPLORE = Path(__file__).resolve().parents[1] / "app" / "ui" / "pages" / "0_Explore.py"
+
+
+def _explore_calls(attr):
+    tree = ast.parse(_EXPLORE.read_text(encoding="utf-8"))
+    return [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            and isinstance(n.func.value, ast.Name) and n.func.value.id == "st" and n.func.attr == attr]
+
+
+def test_gate5b_a_checkbox_uses_evidence_aware_completion_wording():
+    assert COMPLETION_FILTER_LABEL == "Hide sites with verified completion evidence"
+    source = _EXPLORE.read_text(encoding="utf-8")
+    assert "Hide completed sites" not in source
+    checkbox_labels = [c.args[0].id for c in _explore_calls("checkbox") if c.args and isinstance(c.args[0], ast.Name)]
+    assert "COMPLETION_FILTER_LABEL" in checkbox_labels
+    captions = [c.args[0].id for c in _explore_calls("caption") if c.args and isinstance(c.args[0], ast.Name)]
+    assert "COMPLETION_FILTER_CAPTION" in captions
+
+
+@pytest.mark.parametrize("state", ["unknown", None, "no_completions_yet", "underway", "partially_complete", ""])
+def test_gate5b_b_exclude_completed_keeps_every_non_verified_completion_row(state):
+    assert verified_completion_exclusion_mask(pd.Series([state])).tolist() == [True]
+
+
+def test_gate5b_c_explicitly_complete_row_is_removed_under_existing_contract():
+    frame = pd.DataFrame({"build_status": ["complete", "unknown", None, "complete"], "site": [1, 2, 3, 4]})
+    kept = frame[verified_completion_exclusion_mask(frame["build_status"])]
+    assert kept["site"].tolist() == [2, 3]
+
+
+def test_gate5b_c_all_unknown_universe_is_left_intact():
+    frame = pd.DataFrame({"build_status": ["unknown"] * 5})
+    assert verified_completion_exclusion_mask(frame["build_status"]).all()
+
+
+def test_gate5b_d_natural_language_intent_still_maps_to_exclude_completed():
+    assert filters_from_result({"exclude_completed": True}).exclude_completed is True
+    assert filters_from_result({}).exclude_completed is False
+    prompt_source = Path(query_parser.__file__).read_text(encoding="utf-8")
+    assert "\"haven't been completed\" -> exclude_completed = true" in prompt_source
+
+
+def test_gate5b_e_natural_language_exclusion_shows_evidence_notice():
+    tree = ast.parse(_EXPLORE.read_text(encoding="utf-8"))
+    branches = [n for n in ast.walk(tree) if isinstance(n, ast.If) and isinstance(n.test, ast.Attribute)
+                and n.test.attr == "exclude_completed" and isinstance(n.test.value, ast.Name) and n.test.value.id == "nl_filters"]
+    assert len(branches) == 1
+    body_calls = [n for stmt in branches[0].body for n in ast.walk(stmt) if isinstance(n, ast.Call)]
+    assert any(isinstance(c.func, ast.Attribute) and c.func.attr == "info" and c.args
+               and isinstance(c.args[0], ast.Name) and c.args[0].id == "COMPLETION_EXCLUSION_NOTICE" for c in body_calls)
+    assert any(isinstance(c.func, ast.Name) and c.func.id == "verified_completion_exclusion_mask" for c in body_calls)
+    assert "unknown physical status remain included" in COMPLETION_EXCLUSION_NOTICE
+
+
+@pytest.mark.parametrize("text", [COMPLETION_FILTER_LABEL, COMPLETION_FILTER_CAPTION, COMPLETION_EXCLUSION_NOTICE])
+def test_gate5b_f_wording_never_equates_unknown_with_incomplete(text):
+    lowered = text.lower()
+    assert "verified completion evidence" in lowered
+    for claim in ("are incomplete", "not completed", "not complete", "uncommenced", "not started",
+                  "available", "completion is not verified for any site"):
+        assert claim not in lowered
+    assert "incomplete" not in lowered or "does not prove" in lowered
+
+
+def test_gate5b_g_unknown_physical_status_never_matches_or_hard_mismatches():
+    from dataclasses import replace
+    from app.policy.buyer_matching import B2MatchingContext, assess_buyer_fit
+    from app.policy.buyer_profiles import (
+        NESTEN_HOMES, STRATEGIC_LAND_BUYER, UNCOMMENCED_PREFERRED, UNDERWAY_ACCEPTABLE, UNDERWAY_PREFERRED,
+    )
+    from tests.test_buyer_mandate_v2_phase_b2 import _facts
+    for base in (NESTEN_HOMES, STRATEGIC_LAND_BUYER):
+        for appetite in (UNCOMMENCED_PREFERRED, UNDERWAY_ACCEPTABLE, UNDERWAY_PREFERRED):
+            policy = replace(base, development_state_appetite=appetite)
+            for state in ("unknown", None):
+                result = assess_buyer_fit(policy, _facts(), context=B2MatchingContext(development_state=state,
+                                                                                      development_state_scope_verified=True))
+                assert not any("underway or further" in m for m in result.does_not_match + result.matches)
+                assert not any("preference is not met" in u for u in result.unknown)

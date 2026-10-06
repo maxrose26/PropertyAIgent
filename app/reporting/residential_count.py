@@ -130,6 +130,64 @@ def supported_range(*, lower, upper, sources, scope_type, scope_label, subject_i
                            resolution="supported_range", confidence="medium")
 
 
+def is_meaningful_provenance(value):
+    """True only for a non-empty, non-whitespace string reference.
+
+    Structurally meaningless provenance (True, 1, object(), "", "   ", None) is
+    never evidence. Whether the text is factually authoritative is a later
+    evidence-validation question, not decided here.
+    """
+    return isinstance(value, str) and bool(value.strip())
+
+
+def evidenced_pairs(evidence):
+    """Unordered identifier pairs that have explicit, sourced non-overlap evidence.
+
+    The single rule shared by phase aggregation and residual planning-capacity
+    arithmetic: a pair without meaningful provenance is not evidence, and
+    nothing is inferred from labels, references, dates, chronology or arithmetic.
+    """
+    return {frozenset((left, right)) for left, right, source in evidence if is_meaningful_provenance(source)}
+
+
+# Metrics whose count comes from an application's total_units_final. A private or
+# affordable count must never be attributed to a source through that field.
+COUNT_SOURCE_METRICS = frozenset({"total_residential", "all_use_units"})
+
+
+def select_count_supporting_source(count_assessment, applications, *, operative_application_id=None):
+    """The application a displayed exact residential count may be attributed to, or None.
+
+    Support first, operative preference second. Only an application that actually
+    supports the exact count qualifies: it is one of the count's own sources AND its
+    extracted total equals that count. Among genuine supporters the trusted operative
+    application is preferred when it is one of them; otherwise a deterministic
+    reference/ID order picks one. That fallback is merely deterministic - it does not
+    mean the chosen application has more commercial authority. An application that is
+    operative, newer, older or alphabetically convenient but does NOT support the count
+    never receives attribution. Never changes or recomputes the count itself.
+    """
+    if count_assessment is None or count_assessment.metric not in COUNT_SOURCE_METRICS:
+        return None
+    exact = count_assessment.exact_value
+    if exact is None:
+        return None
+    source_ids = {source.application_id for source in count_assessment.sources
+                  if known_unit_count(source.value) == exact}
+    supporters = []
+    for application in applications:
+        scheme = getattr(application, "scheme_intelligence", None)
+        if application.id in source_ids and scheme is not None and known_unit_count(scheme.total_units_final) == exact:
+            supporters.append(application)
+    if not supporters:
+        return None
+    if operative_application_id is not None:
+        for application in supporters:
+            if application.id == operative_application_id:
+                return application
+    return min(supporters, key=lambda application: (application.reference or "", str(application.id)))
+
+
 def aligned_tenure_counts(total, private, affordable):
     """Return a coherent breakdown only with identical source/version identity.
 

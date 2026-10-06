@@ -60,6 +60,7 @@ from app.reporting.allocation_discovery import (
 )
 from app.policy.buyer_matching import (
     NOT_SUITABLE,
+    POSSIBLE_FIT,
     STRONG_FIT,
     build_strategic_land_matching_facts,
 )
@@ -311,8 +312,10 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
 
     Ordering (deterministic, documented, never a score):
       1. STRONG_FIT
-      2. INSUFFICIENT_EVIDENCE marked as an investigative exception
-      3. INSUFFICIENT_EVIDENCE, not an investigative exception
+      2. POSSIBLE_FIT (Stage 2.5A: within the discovery envelope, outside
+         the preferred range - surfaced, never verified preferred fit)
+      3. INSUFFICIENT_EVIDENCE marked as an investigative exception
+      4. INSUFFICIENT_EVIDENCE, not an investigative exception
     NOT_SUITABLE opportunities are excluded from the personalised feed
     entirely (the count is still reported - see the returned counts dict -
     so nothing is silently dropped from view; a buyer-fit assessment is
@@ -334,7 +337,7 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
         return [], {"excluded_not_suitable": 0}
     _attach_planning_delivery_matching_facts(session, delivery)
 
-    strong, exception, insufficient = [], [], []
+    strong, possible, exception, insufficient = [], [], [], []
     excluded_not_suitable = 0
     for card in (*strategic, *delivery):
         facts = card.get("matching_facts")
@@ -364,12 +367,14 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
             continue
         if assessment.classification == STRONG_FIT:
             strong.append(card)
+        elif assessment.classification == POSSIBLE_FIT:
+            possible.append(card)
         elif assessment.is_investigative_exception:
             exception.append(card)
         else:
             insufficient.append(card)
 
-    ordered = (strong + exception + insufficient)[:limit]
+    ordered = (strong + possible + exception + insufficient)[:limit]
     return ordered, {"excluded_not_suitable": excluded_not_suitable}
 
 

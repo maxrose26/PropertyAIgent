@@ -94,6 +94,8 @@ production row counts cannot be supplied without an authorised future query.
 
 ## Final pre-merge reconciliation (2026-10-05)
 
+> Superseded for buyer-fit classification by spec 024 (Stage 2.5A, policy v6): supported bounds wholly inside the 10% discovery envelope but not the preferred range now yield POSSIBLE_FIT; the evidence semantics below are unchanged.
+
 Uncertain residential scale remains discoverable, but cannot yield unqualified
 STRONG_FIT when its supported bounds do not establish the buyer's target range.
 Use the existing INSUFFICIENT_EVIDENCE classification and investigative reasons;

@@ -167,7 +167,11 @@ def parse_query(client: OpenAI, nl_query: str) -> SearchFilters:
         input=build_prompt(nl_query),
         text={"format": {"type": "json_schema", "name": FILTERS_SCHEMA["name"], "schema": FILTERS_SCHEMA["schema"], "strict": True}},
     )
-    result = json.loads(response.output_text)
+    return filters_from_result(json.loads(response.output_text))
+
+
+def filters_from_result(result: dict) -> SearchFilters:
+    """Maps one structured parser result onto SearchFilters - pure, no model call."""
     return SearchFilters(
         query_type=result.get("query_type") or "filter",
         region=result.get("region"),
@@ -283,3 +287,16 @@ def numeric_unit_mask(values: pd.Series, minimum=None, maximum=None) -> pd.Serie
 def availability_mask(values: pd.Series) -> pd.Series:
     """Only an explicit evidenced available state can satisfy availability."""
     return values.eq("evidenced_available").fillna(False)
+
+
+# Completion filtering hides only verified completion. Unknown physical status is
+# never read as incomplete, uncommenced or available, so it always stays visible.
+COMPLETION_FILTER_LABEL = "Hide sites with verified completion evidence"
+COMPLETION_FILTER_CAPTION = "Only sites with verified completion evidence are hidden. Sites with unknown physical status remain visible."
+COMPLETION_EXCLUSION_NOTICE = ("Sites with unknown physical status remain included: absence of verified completion "
+                               "evidence does not prove that a site is incomplete.")
+
+
+def verified_completion_exclusion_mask(build_status: pd.Series) -> pd.Series:
+    """Rows to keep when excluding completed sites: only an explicit "complete" is removed."""
+    return ~build_status.eq("complete").fillna(False)
