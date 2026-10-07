@@ -102,5 +102,9 @@
   "scripts/validate_v7_discovery.py": {
     "command": "validate_v7_discovery",
     "required_scope": "launch:validate_v7_discovery"
+  },
+  "scripts/sync_nesten_mandate.py": {
+    "command": "sync_nesten_mandate",
+    "required_scope": "launch:sync_nesten_mandate"
   }
 }
