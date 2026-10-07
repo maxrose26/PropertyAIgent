@@ -1209,7 +1209,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     elif scale_value is None and uncertain_scale:
         preferred_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min, maximum=profile.target_unit_max)
         discovery_fit = assessment.within_hard_bounds(minimum=discovery_min, maximum=discovery_max)
-        if discovery_fit is None and discovery_max is not None and assessment.lower is not None and assessment.lower > discovery_max:
+        if discovery_fit is None and facts.opportunity_type == STRATEGIC_LAND and discovery_max is not None and assessment.lower is not None and assessment.lower > discovery_max:
             discovery_fit = False   # v8: an open-ended floor ('at least N') wholly above the discovery maximum PROVES the scale is outside it; no ceiling is needed for that conclusion
         # Existing minimum exclusion remains hard, at the stated minimum.
         hard_minimum_fit = (assessment.within_hard_bounds(minimum=profile.target_unit_min)
