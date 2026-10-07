@@ -678,6 +678,16 @@ def has_sufficient_context_for_summary(session: Session, allocation: LocalPlanSi
     return context.allocation_capacity_value is not None or context.number_of_related_sites > 0
 
 
+AI_SUMMARY_REQUIRES_REFRESH_TEXT = "AI summary requires refresh."
+
+
+def summary_requires_refresh(summary: AllocationIntelligenceSummary | None) -> bool:
+    """v8 release safety: a persisted narrative generated under a DIFFERENT prompt version than the current one was written under an older grounding contract (e.g. before v9 stopped giving
+    the model a residual figure) and must NOT be displayed or exported as current intelligence. The stored row is preserved untouched (never deleted, never regenerated here); only presentation
+    is suppressed until an authorised refresh. A row with no narrative is not 'stale' - it is simply absent."""
+    return bool(summary is not None and summary.headline and summary.prompt_version != PROMPT_VERSION)
+
+
 def get_allocation_summary(session: Session, allocation_id: int) -> AllocationIntelligenceSummary | None:
     """The one lookup path for an allocation's current (at most one row,
     per the table's own unique constraint) persisted summary."""

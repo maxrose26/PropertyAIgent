@@ -330,6 +330,8 @@ with page_scope():
 
                 if entry.ai_intelligence.available:
                     st.markdown(f"**AI Allocation Intelligence:** {entry.ai_intelligence.headline}")
+                elif entry.ai_intelligence.requires_refresh:
+                    st.caption("AI summary requires refresh.")
                 else:
                     st.caption("AI allocation summary not yet generated.")
 

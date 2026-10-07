@@ -60,7 +60,9 @@ from app.reporting.allocation_discovery import (
     PLAN_STATUS_META,
     format_capacity,
 )
-from app.reporting.allocation_intelligence_summary import _clean_portal_value, get_allocation_summaries
+from app.reporting.allocation_intelligence_summary import (
+    AI_SUMMARY_REQUIRES_REFRESH_TEXT, _clean_portal_value, get_allocation_summaries, summary_requires_refresh,
+)
 from app.reporting.ownership_control import get_allocations_control_intelligence
 
 # --- Report-entry value objects (Section 6/7) --------------------------------
@@ -143,6 +145,7 @@ class AllocationIntelligenceSnapshot:
     key_uncertainties: list[str] = field(default_factory=list)
     investigation_priorities: list[str] = field(default_factory=list)
     generated_at: dt.datetime | None = None
+    requires_refresh: bool = False      # a stored narrative exists but was generated under an older prompt version: its text is deliberately NOT carried here
 
 
 @dataclass(frozen=True)
@@ -445,7 +448,10 @@ def build_allocation_report_context(session: Session, allocation_ids: list[int])
         linked_application_count = sum(len(s.applications) for s in site_summaries)
 
         summary_row = summaries_by_allocation.get(allocation.id)
-        if summary_row is not None and summary_row.headline:
+        if summary_requires_refresh(summary_row):
+            # v8 release safety: never expose a narrative generated under an older prompt version as current intelligence (the stored row is untouched).
+            ai_intelligence = AllocationIntelligenceSnapshot(available=False, requires_refresh=True)
+        elif summary_row is not None and summary_row.headline:
             ai_intelligence = AllocationIntelligenceSnapshot(
                 available=True,
                 headline=summary_row.headline,
@@ -657,7 +663,7 @@ def to_csv_rows(context: AllocationReportContext) -> list[dict]:
             "Known Developer(s)": _format_ownership_evidence(entry.trusted_ownership_evidence, role="DEVELOPER"),
             "Ownership / Control Evidence": _format_ownership_evidence(entry.ownership_evidence),
             "AI Intelligence Headline": entry.ai_intelligence.headline or "",
-            "AI Summary Available": "Yes" if entry.ai_intelligence.available else "No",
+            "AI Summary Available": "Yes" if entry.ai_intelligence.available else ("Requires refresh" if entry.ai_intelligence.requires_refresh else "No"),
         })
     return rows
 

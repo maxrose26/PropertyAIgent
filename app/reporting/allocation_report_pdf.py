@@ -350,7 +350,8 @@ def _ai_intelligence_section(styles, entry: AllocationReportEntry) -> list:
     story = [Paragraph("AI Allocation Intelligence", styles["AllocationHeading"])]
     ai = entry.ai_intelligence
     if not ai.available:
-        story.append(Paragraph(AI_INTELLIGENCE_UNAVAILABLE_TEXT, styles["AllocationBody"]))
+        from app.reporting.allocation_intelligence_summary import AI_SUMMARY_REQUIRES_REFRESH_TEXT
+        story.append(Paragraph(AI_SUMMARY_REQUIRES_REFRESH_TEXT if ai.requires_refresh else AI_INTELLIGENCE_UNAVAILABLE_TEXT, styles["AllocationBody"]))
         return story
 
     story.append(Paragraph(f"<b>{_e(ai.headline)}</b>", styles["AllocationBody"]))

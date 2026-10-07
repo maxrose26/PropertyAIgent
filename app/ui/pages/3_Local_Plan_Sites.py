@@ -52,7 +52,9 @@ from app.reporting.allocation_discovery import (
     total_homes_kpi_caption,
     total_homes_kpi_label,
 )
-from app.reporting.allocation_intelligence_summary import get_allocation_summary, is_allocation_summary_stale
+from app.reporting.allocation_intelligence_summary import (
+    AI_SUMMARY_REQUIRES_REFRESH_TEXT, get_allocation_summary, is_allocation_summary_stale, summary_requires_refresh,
+)
 from app.policy.allocation_planning_coverage import (
     PLANNING_ACTIVITY_COVERAGE_LABELS,
     classify_planning_activity_coverage,
@@ -401,7 +403,11 @@ with page_scope():
             # OpenAI - Section 8's own "opening an allocation page must NOT
             # normally call OpenAI" rule.
             ai_summary_row = get_allocation_summary(session, allocation_id)
-            if ai_summary_row is not None and ai_summary_row.headline:
+            if summary_requires_refresh(ai_summary_row):
+                # v8 release safety: a narrative generated under an older prompt version is NOT shown as current intelligence. The stored row is preserved; refresh is a separate, authorised, paid action.
+                with st.expander("AI narrative", icon="🤖", expanded=False):
+                    st.caption(AI_SUMMARY_REQUIRES_REFRESH_TEXT)
+            elif ai_summary_row is not None and ai_summary_row.headline:
                 with st.expander("AI narrative", icon="🤖", expanded=False):
                     stale = is_allocation_summary_stale(session, allocation_row)
                     if stale:

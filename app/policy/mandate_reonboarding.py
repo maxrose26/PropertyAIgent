@@ -84,6 +84,7 @@ class _Entry:
     # and the (bounded) list of those deltas. Oracles that do not categorise are counted under UNSPECIFIED.
     parity_categories: dict = field(default_factory=dict)
     expected_deltas: list = field(default_factory=list)
+    old_updated_at: dt.datetime | None = None      # `BuyerMandate.updated_at` has an ORM onupdate, so the forward write advances it; recorded so the rollback is byte-exact
 
 
 @dataclass
@@ -112,9 +113,10 @@ class ReonboardingPlan:
         }
         return hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
 
-    def report(self, *, mode: str) -> dict:
+    def report(self, *, mode: str, applied_at: dt.datetime | None = None) -> dict:
         return {
-            "report_version": REPORT_VERSION, "mode": mode, "read_only": mode == "dry_run", "universe_size": self.universe_size,
+            "report_version": REPORT_VERSION, "mode": mode,
+            "applied_onboarding_completed_at": applied_at.isoformat() if applied_at is not None else None, "read_only": mode == "dry_run", "universe_size": self.universe_size,
             "stale_mandates": [_entry_report(e) for e in self.entries], "fresh_mandates_untouched": self.fresh_mandates,
             "parity": {
                 "status": self.parity_status, "boundary": "classification and investigative flag per opportunity, same universe (reason text excluded)",
@@ -152,6 +154,11 @@ def _entry_report(entry: _Entry) -> dict:
     delta = {key: {"old": old.get(key), "new": new.get(key)} for key in sorted(set(old) | set(new)) if old.get(key) != new.get(key)}
     return {
         "buyer_key": entry.buyer_key, "mandate_id": entry.mandate.id,
+        # EXACT values of the three columns this transition owns, before and after: the source of the deterministic rollback (app.policy.mandate_reonboarding_rollback). Non-secret hashes / counts / timestamps.
+        "restore_snapshot": {
+            "old_matching_fingerprint": entry.old_fingerprint, "old_onboarding_completed_at": entry.old_completed_at.isoformat() if entry.old_completed_at else None,
+            "old_onboarding_summary": entry.old_summary, "old_updated_at": entry.old_updated_at.isoformat() if entry.old_updated_at else None,
+            "proposed_matching_fingerprint": entry.proposed_fingerprint, "proposed_onboarding_summary": entry.proposed_summary},
         "old_fingerprint_id": _short(entry.old_fingerprint), "proposed_fingerprint_id": _short(entry.proposed_fingerprint),
         "old_onboarding_completed_at": entry.old_completed_at.isoformat() if entry.old_completed_at else None,
         "old_summary": entry.old_summary, "proposed_summary": entry.proposed_summary, "opportunities_reviewed": entry.reviewed,
@@ -204,7 +211,7 @@ def compute_reonboarding_plan(session, *, page_size=DEFAULT_STRATEGIC_LAND_PAGE_
         entry = _Entry(buyer_key=buyer.buyer_key, mandate=mandate, old_fingerprint=mandate.matching_fingerprint,
                        proposed_fingerprint=compute_buyer_mandate_fingerprint(policy), old_completed_at=mandate.onboarding_completed_at,
                        old_summary=mandate.onboarding_summary, proposed_summary=result.summary_line, reviewed=result.opportunities_reviewed,
-                       parity_status=PARITY_NOT_AVAILABLE,
+                       parity_status=PARITY_NOT_AVAILABLE, old_updated_at=mandate.updated_at,
                        outcomes_digest=hashlib.sha256(json.dumps(sorted([i, a.classification, bool(a.is_investigative_exception)] for i, a in assessments)).encode("utf-8")).hexdigest())
         if parity_oracle is not None:
             entry.parity_status = PARITY_PASSED
@@ -273,4 +280,4 @@ def apply_stale_mandate_reonboarding(session, *, confirm: str, expected_plan_dig
     except BaseException:
         session.rollback()
         raise
-    return plan.report(mode="applied")
+    return plan.report(mode="applied", applied_at=now)

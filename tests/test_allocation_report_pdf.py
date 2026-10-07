@@ -95,6 +95,9 @@ def _make_control(session, *, site_id, entity_name_raw, role, evidence_category,
 
 
 def _make_summary(session, allocation_id, *, headline="Test headline.", overview="Test overview.", status="ok", **kwargs) -> AllocationIntelligenceSummary:
+    # v8 release safety: a narrative is shown as current intelligence only if it was generated under the CURRENT prompt version, so a fixture standing for a current summary records it.
+    from app.reporting.allocation_intelligence_summary import PROMPT_VERSION
+    kwargs.setdefault("prompt_version", PROMPT_VERSION)
     row = AllocationIntelligenceSummary(
         allocation_id=allocation_id, headline=headline, overview=overview, status=status, **kwargs,
     )
