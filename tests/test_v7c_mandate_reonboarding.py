@@ -6,6 +6,7 @@ phrase and the REVIEWED plan digest, and commit exactly once; no ordinary monito
 from __future__ import annotations
 
 import inspect
+import json
 
 import pytest
 from sqlalchemy import event, func, select
@@ -16,7 +17,7 @@ import app.reporting.opportunity_change as oc
 import app.reporting.opportunity_universe as universe_module
 from app.db.models import AgentEvaluationClaim, AgentEvaluationHistory, BuyerMandate, OpportunityMonitoringState
 from app.policy.mandate_reonboarding import (
-    CONFIRM_PHRASE, PARITY_MISMATCH, PARITY_NOT_AVAILABLE, PARITY_PASSED, ParityVerdict, ReonboardingRefused, apply_stale_mandate_reonboarding,
+    CONFIRM_PHRASE, PARITY_FAILED, PARITY_NOT_AVAILABLE, PARITY_PASSED, ParityVerdict, ReonboardingRefused, apply_stale_mandate_reonboarding,
     plan_stale_mandate_reonboarding,
 )
 from tests.test_buyer_family_feed import LAPSE_AGE, World
@@ -146,13 +147,13 @@ def test_a_parity_mismatch_fails_closed_and_is_reported_per_opportunity(seeded):
     def bad(policy, record, context, assessment):
         return ParityVerdict(classification_equal=False, investigative_equal=True, detail="synthetic divergence")
     report = plan_stale_mandate_reonboarding(seeded, parity_oracle=bad)
-    assert report["parity"]["status"] == PARITY_MISMATCH and report["can_apply"] is False
+    assert report["parity"]["status"] == PARITY_FAILED and report["can_apply"] is False
     entry = report["stale_mandates"][0]
-    assert entry["parity"]["status"] == PARITY_MISMATCH and entry["parity"]["mismatches"][0]["classification_equal"] is False
+    assert entry["parity"]["status"] == PARITY_FAILED and entry["parity"]["classification_mismatches"] == report["universe_size"] and entry["parity"]["mismatches_listed"][0]["opportunity_id"]
     before = baseline_columns(seeded)
     with pytest.raises(ReonboardingRefused) as refused:
         apply_stale_mandate_reonboarding(seeded, confirm=CONFIRM_PHRASE, expected_plan_digest=report["plan_digest"], parity_oracle=bad)
-    assert "MISMATCH" in str(refused.value) and baseline_columns(seeded) == before
+    assert "FAILED" in str(refused.value) and baseline_columns(seeded) == before
 
 
 def test_parity_is_checked_for_every_opportunity_of_every_mandate_on_the_same_universe(seeded):
@@ -162,7 +163,7 @@ def test_parity_is_checked_for_every_opportunity_of_every_mandate_on_the_same_un
         return ParityVerdict(True, True)
     report = plan_stale_mandate_reonboarding(seeded, parity_oracle=recording)
     assert len(seen) == 4 * report["universe_size"] and report["parity"]["status"] == PARITY_PASSED
-    assert all(e["parity"]["opportunities_checked"] == report["universe_size"] for e in report["stale_mandates"])
+    assert all(e["parity"]["opportunities_compared"] == report["universe_size"] for e in report["stale_mandates"])
     assert {row[1] for row in seen if row[0] == "nesten_homes"} == {row[1] for row in seen if row[0] == "housing_association"}   # one shared universe
 
 
@@ -254,7 +255,7 @@ def test_the_tool_has_no_model_network_or_sync_dependency_and_registers_authoris
     clis = json.loads((root / "verification/stage1_cli_manifest.json").read_text())
     assert clis["scripts/reonboard_stale_mandates.py"]["required_scope"] == "launch:reonboard_stale_mandates"
     script = (root / "scripts/reonboard_stale_mandates.py").read_text()
-    assert "authorised_cli('reonboard_stale_mandates')" in script and "--apply" in script and "PARITY_ORACLE = None" in script
+    assert "authorised_cli('reonboard_stale_mandates')" in script and "--apply" in script and "PARITY_ORACLE = v6_parity_oracle" in script
 
 
 def test_bootstrap_is_preserved_and_documented_as_not_the_approved_transition_path():
@@ -280,3 +281,106 @@ def test_the_existing_command_boundaries_of_the_onboarding_functions_are_unchang
     services = json.loads((Path(__file__).resolve().parents[1] / "verification/stage1_service_manifest.json").read_text())["app/policy/buyer_profile_store.py"]
     assert services["run_buyer_onboarding_baseline"] == "buyer.write"
     assert getattr(store.run_buyer_onboarding_baseline, "__wrapped__", None) is not None          # the command wrapper is actually applied
+
+
+# --- V7C parity oracle wiring (the TEMPORARY frozen v6 oracle) and digest binding -------------------------------------------------------------
+
+from verification.transition.v6_parity import v6_parity_oracle   # noqa: E402  (transition-only; tests and the CLI script are its only callers)
+
+
+def test_the_real_frozen_v6_oracle_passes_on_the_same_universe_and_a_passing_run_lists_no_per_opportunity_lines(seeded):
+    report = plan_stale_mandate_reonboarding(seeded, parity_oracle=v6_parity_oracle)
+    assert report["parity"]["status"] == PARITY_PASSED and report["can_apply"] is True
+    assert report["parity"]["opportunities_compared"] == 4 * report["universe_size"] > 0
+    assert report["parity"]["classification_mismatches"] == report["parity"]["investigative_mismatches"] == 0
+    assert all(e["parity"]["mismatches_listed"] == [] and e["parity"]["status"] == PARITY_PASSED for e in report["stale_mandates"])      # no redundant PASS lines
+    applied = apply_stale_mandate_reonboarding(seeded, confirm=CONFIRM_PHRASE, expected_plan_digest=report["plan_digest"], parity_oracle=v6_parity_oracle)
+    assert applied["mode"] == "applied" and plan_stale_mandate_reonboarding(seeded, parity_oracle=v6_parity_oracle)["stale_mandates"] == []
+
+
+def test_the_cli_wires_the_frozen_oracle_and_the_application_package_does_not():
+    import scripts.reonboard_stale_mandates as script
+    assert script.PARITY_ORACLE is v6_parity_oracle
+    import ast
+    tree = ast.parse(inspect.getsource(mr))
+    imported = {n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)} | {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+    assert not any(m.startswith("verification") for m in imported)
+
+
+def test_one_mismatching_opportunity_fails_the_plan_reports_non_secret_detail_and_blocks_apply(seeded):
+    flipped = {}
+
+    def one_bad(policy, record, context, assessment):
+        verdict = v6_parity_oracle(policy, record, context, assessment)
+        flipped.setdefault("target", (policy.key, record.opportunity_id))                      # the first (mandate, opportunity) pair, flipped EVERY time it recurs
+        if (policy.key, record.opportunity_id) == flipped["target"]:
+            flipped["id"] = record.opportunity_id
+            return ParityVerdict(False, True, "synthetic", v6_classification="STRONG_FIT", v7_classification=assessment.classification,
+                                 v6_investigative=False, v7_investigative=bool(assessment.is_investigative_exception))
+        return verdict
+    report = plan_stale_mandate_reonboarding(seeded, parity_oracle=one_bad)
+    assert report["parity"]["status"] == PARITY_FAILED and report["parity"]["classification_mismatches"] == 1 and report["parity"]["investigative_mismatches"] == 0
+    listed = [m for e in report["stale_mandates"] for m in e["parity"]["mismatches_listed"]]
+    assert len(listed) == 1 and set(listed[0]) == {"buyer_key", "mandate_id", "opportunity_id", "v6_classification", "v7_classification", "v6_investigative", "v7_investigative", "detail"}
+    assert listed[0]["opportunity_id"] == flipped["id"]
+    before = baseline_columns(seeded)
+    with pytest.raises(ReonboardingRefused) as refused:
+        apply_stale_mandate_reonboarding(seeded, confirm=CONFIRM_PHRASE, expected_plan_digest=report["plan_digest"], parity_oracle=one_bad)
+    assert "FAILED" in str(refused.value) and baseline_columns(seeded) == before
+
+
+def digest(session, **kw):
+    return plan_stale_mandate_reonboarding(session, parity_oracle=kw.pop("oracle", v6_parity_oracle), **kw)["plan_digest"]
+
+
+def test_the_digest_binds_the_reviewed_plan_every_apply_relevant_input_changes_it(seeded, monkeypatch):
+    from app.db.models import Application
+    base = digest(seeded)
+    assert digest(seeded) == base                                                              # stable when nothing changed
+    changes = {}
+
+    # 1. opportunity universe identity: a new opportunity
+    _make_site(seeded, unit_count=61)
+    changes["universe: new opportunity"] = digest(seeded)
+    # 2. opportunity evidence (same ids, different fingerprint): a decision changes
+    seeded.query(Application).filter(Application.reference.like("OUT/%")).first().decision = "Refused"
+    seeded.commit()
+    changes["universe: evidence change"] = digest(seeded)
+    # 3. proposed mandate fingerprint / outcomes: a mandate field changes
+    nesten = mandates(seeded)["nesten_homes"]
+    nesten.target_unit_max = nesten.target_unit_max + 17
+    seeded.commit()
+    changes["mandate: field change"] = digest(seeded)
+    # 4. stale mandate set: one mandate becomes fresh
+    store.run_buyer_onboarding_baseline(seeded, mandates(seeded)["housing_association"])
+    changes["stale set: a mandate onboarded"] = digest(seeded)
+    # 5. stored (old) fingerprint of a stale mandate
+    strategic = mandates(seeded)["strategic_land_buyer"]
+    strategic.matching_fingerprint = "f" * 64
+    seeded.commit()
+    changes["old fingerprint"] = digest(seeded)
+    # 6. parity result
+    changes["parity: failed"] = digest(seeded, oracle=lambda p, r, c, a: ParityVerdict(False, True))
+    changes["parity: not available"] = digest(seeded, oracle=None)
+    # 7. policy version
+    import app.policy.buyer_matching as bm
+    monkeypatch.setattr(bm, "BUYER_MATCHING_POLICY_VERSION", bm.BUYER_MATCHING_POLICY_VERSION + 1)
+    monkeypatch.setattr(store, "BUYER_MATCHING_POLICY_VERSION", bm.BUYER_MATCHING_POLICY_VERSION)
+    changes["policy version"] = digest(seeded)
+    values = [base, *changes.values()]
+    assert len(set(values)) == len(values), {k: v == base for k, v in changes.items()}          # every mutation yields a DIFFERENT digest (and each differs from the others)
+    assert all(len(v) == 64 for v in values)
+
+
+def test_a_reviewed_digest_does_not_apply_after_any_drift_and_the_digest_contains_no_secret_material(seeded):
+    report = plan_stale_mandate_reonboarding(seeded, parity_oracle=v6_parity_oracle)
+    nesten = mandates(seeded)["nesten_homes"]
+    nesten.target_unit_min = nesten.target_unit_min + 1                                         # mandate drift after review
+    seeded.commit()
+    before = baseline_columns(seeded)
+    with pytest.raises(ReonboardingRefused) as refused:
+        apply_stale_mandate_reonboarding(seeded, confirm=CONFIRM_PHRASE, expected_plan_digest=report["plan_digest"], parity_oracle=v6_parity_oracle)
+    assert "plan changed since the reviewed dry run" in str(refused.value) and baseline_columns(seeded) == before
+    text = json.dumps(report)
+    for forbidden in ("password", "secret", "token", "api_key", "OPENAI"):
+        assert forbidden.lower() not in text.lower()

@@ -5,7 +5,7 @@
     python -m scripts.reonboard_stale_mandates --apply --confirm "<phrase>" --expect-digest <plan_digest from the reviewed dry run>
 
 No ordinary monitoring sync, no reseed, no scraping/ingestion, no model call. Apply refuses unless the confirm phrase and the REVIEWED plan digest match, the same-universe v6/v7 parity
-check passes (no oracle is configured yet - REVIEW decision pending - so apply currently refuses by design), and the Stage 1 checks pass; it then commits once for all mandates.
+check passes (the TEMPORARY frozen v6 oracle in verification/transition; any mismatch fails closed), and the Stage 1 checks pass; it then commits once for all mandates.
 Operator-authorised launch only (`launch:reonboard_stale_mandates`). Production execution needs separate REVIEW authority.
 """
 from __future__ import annotations
@@ -16,8 +16,9 @@ import json
 from app.db.session import get_session
 from app.policy.mandate_reonboarding import CONFIRM_PHRASE, apply_stale_mandate_reonboarding, plan_stale_mandate_reonboarding
 from app.security.cli import authorised_cli
+from verification.transition.v6_parity import v6_parity_oracle
 
-PARITY_ORACLE = None   # REVIEW decision pending: no independent same-universe v6 comparison exists yet, so apply cannot pass parity
+PARITY_ORACLE = v6_parity_oracle   # TEMPORARY transition-only frozen v6 oracle (verification/transition); the application itself never imports it
 
 
 @authorised_cli('reonboard_stale_mandates')
