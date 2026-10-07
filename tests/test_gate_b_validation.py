@@ -6,6 +6,7 @@ no unit summation / residual / availability inference, Housing Association not i
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import re
 import socket
@@ -419,29 +420,70 @@ def test_the_scale_bands_are_derived_from_the_mandate_and_partition_every_count_
     assert runner.scale_band(150, bands) == "preferred_range_added_by_correction" and runner.scale_band(None, bands) is None
 
 
-def test_the_counterfactual_evaluates_the_same_universe_with_only_the_two_pre_correction_rules(world, monkeypatch):
-    import dataclasses
-
+def test_the_counterfactual_evaluates_the_same_universe_with_only_the_pre_correction_rules(world, monkeypatch):
     import app.reporting.buyer_family_feed as bff
     seed(world)
     seen = []
     real = bff.evaluate_buyer_families
 
     def spy(session, buyer_key, inputs, limit=6, **kwargs):
-        seen.append((buyer_key, kwargs.get("profile")))
+        seen.append((buyer_key, kwargs.get("profile"), kwargs.get("contexts"), inputs))
         return real(session, buyer_key, inputs, limit, **kwargs)
     monkeypatch.setattr(runner, "evaluate_buyer_families", spy)
     artifact = run(world.session, nesten_index=True, counterfactual_old_nesten=True)
-    stored = next(p for b, p in seen if b == "nesten_homes" and p is None)                          # the real evaluation resolved the stored mandate
-    assert stored is None
-    override = [p for b, p in seen if b == "nesten_homes" and p is not None]
-    assert len(override) == 1 and (override[0].target_unit_max, override[0].wholly_affordable_is_exclusion) == (100, True)
-    assert override[0].target_unit_min == 50 and override[0].scale_metric == "total_units"
+    nesten_calls = [c for c in seen if c[0] == "nesten_homes"]
+    assert len(nesten_calls) == 4 and nesten_calls[0][1] is None                                      # the real evaluation resolves the STORED mandate (no override)
+    overrides = [(p.target_unit_max, p.wholly_affordable_is_exclusion) for _, p, _, _ in nesten_calls[1:]]
+    assert overrides == [(100, True), (100, False), (200, True)]                                      # full pre-correction rules; scale alone; the exclusion alone
+    for _, p, _, _ in nesten_calls[1:]:
+        assert p.target_unit_min == 50 and p.scale_metric == "total_units" and p.specialist_development_is_exclusion is True
+    assert len({id(c[2]) for c in nesten_calls}) == 1 and len({id(c[3]) for c in nesten_calls}) == 1   # the SAME shared contexts and the SAME already-loaded inputs
     block = artifact["nesten"]["counterfactual_old_nesten"]
     assert block["label"].startswith("COUNTERFACTUAL ONLY - NOT A VALIDATION RESULT") and block["assumed_old_rules"] == {"target_unit_max": 100, "wholly_affordable_is_exclusion": True}
     assert artifact["buyers"]["nesten_homes"]["mandate"]["preferred_max"] == 200                      # the validation result still uses the STORED (corrected) mandate
+    assert "ONLY validation" in artifact["nesten"]["result_basis"]["validation_result"] and "COUNTERFACTUAL ONLY" in artifact["nesten"]["result_basis"]["counterfactual_fields"]
     assert all("counterfactual_family_fit" in r for r in artifact["nesten"]["family_index"])
     assert sum(block["family_fit_matrix"].values()) == len(artifact["nesten"]["family_index"])
+    stage = next(s for s in artifact["efficiency"]["stages"] if s["stage"] == "counterfactual_old_nesten")
+    assert stage["queries"] <= 2                                                                      # no second broad scan: the contexts are already built
+    assert artifact["efficiency"]["statement_kinds"].get("SELECT", 0) > 0 and set(artifact["efficiency"]["statement_kinds"]) <= {"SELECT", "SET", "SHOW", "PRAGMA"}
+
+
+def test_enabling_the_flags_changes_reporting_only_and_never_the_validation_result(world):
+    seed(world)
+    plain = run(world.session)
+    rich = run(world.session, nesten_index=True, counterfactual_old_nesten=True)
+    for artifact in (plain, rich):
+        artifact["efficiency"] = None
+    added = {"family_index", "scale_cohorts", "counterfactual_old_nesten", "result_basis"}
+    assert {k: v for k, v in rich["nesten"].items() if k not in added} == plain["nesten"]
+    assert {k: v for k, v in rich.items() if k != "nesten"} == {k: v for k, v in plain.items() if k != "nesten"}     # buyers, aggregates, cohorts, metadata: identical
+
+
+def test_the_attribution_is_decided_by_single_factor_evaluations_with_the_real_matcher():
+    from app.policy.buyer_matching import MatchingFacts, assess_buyer_fit
+    from app.reporting.residential_count import CountAssessment
+    base = BUYER_PROFILES["nesten_homes"]
+    rules = {"full": dict(target_unit_max=100, wholly_affordable_is_exclusion=True), "scale": dict(target_unit_max=100), "affordable": dict(wholly_affordable_is_exclusion=True)}
+
+    def label(policy, units, affordable_pct):
+        from benchmark.v7.cases import pd
+        assessment = CountAssessment(scope_type="whole_site", scope_label="x", precision="EXACT", value=units, lower=units, upper=units, resolution="agreement", confidence="high")
+        facts = MatchingFacts(**pd(unit_count=units, count_assessment=assessment, affordable_percentage=affordable_pct, affordable_unit_count=units))
+        result = assess_buyer_fit(policy, facts)
+        return runner._fit_label_of({"fit": result.classification, "investigative": result.is_investigative_exception})
+
+    def attribution(units, affordable_pct):
+        current = label(base, units, affordable_pct)
+        views = {k: label(dataclasses.replace(base, **v), units, affordable_pct) for k, v in rules.items()}
+        return current, views["full"], runner.attribute_difference(current, views["full"], views["scale"], views["affordable"])
+    assert attribution(150, 30.0) == ("STRONG_FIT", "INSUFFICIENT_EVIDENCE+investigative", runner.ATTRIBUTION_SCALE)           # only the 100 vs 200 maximum matters
+    assert attribution(60, 100.0)[2] == runner.ATTRIBUTION_AFFORDABLE and attribution(60, 100.0)[1] == "NOT_SUITABLE"          # only the exclusion matters
+    assert attribution(150, 100.0) == ("STRONG_FIT", "NOT_SUITABLE+investigative", runner.ATTRIBUTION_NOT_ISOLATED)             # BOTH rules interact (exclusion + above-envelope scale): honestly not isolated
+    assert attribution(75, 30.0) == ("STRONG_FIT", "STRONG_FIT", None)                                                           # nothing changed: no attribution
+    assert runner.attribute_difference("STRONG_FIT", "INSUFFICIENT_EVIDENCE", "POSSIBLE_FIT", "NOT_SUITABLE") == runner.ATTRIBUTION_NOT_ISOLATED
+    assert runner.attribute_difference("STRONG_FIT", "NOT_SUITABLE", "NOT_SUITABLE", "NOT_SUITABLE") == runner.ATTRIBUTION_EITHER
+    assert runner.attribute_difference("STRONG_FIT", "NOT_SUITABLE", None, None) == runner.ATTRIBUTION_NOT_ISOLATED                  # missing single-factor evidence is never guessed
 
 
 def test_counterfactual_delta_separates_changed_from_unchanged_identities():

@@ -246,19 +246,48 @@ def _fit_label_of(subject: dict) -> str:
     return subject["fit"] + ("+investigative" if subject["investigative"] else "")
 
 
-def index_record(analysis: dict, sites: dict, old: dict | None = None) -> dict:
+ATTRIBUTION_EITHER, ATTRIBUTION_SCALE, ATTRIBUTION_AFFORDABLE, ATTRIBUTION_NOT_ISOLATED = "EITHER_FACTOR_SUFFICIENT", "SCALE_100_VS_200", "WHOLLY_AFFORDABLE_EXCLUSION", "CAUSE_NOT_ISOLATED"
+
+
+def attribute_difference(current: str, full_old: str, scale_only: str | None, affordable_only: str | None) -> str | None:
+    """Why does the full counterfactual (both pre-correction rules) differ from the CURRENT corrected result? Decided only from two single-factor counterfactual evaluations of the same facts:
+    a factor is the cause only if applying it ALONE reproduces the full counterfactual fit. If neither does alone (an interaction) the answer is CAUSE_NOT_ISOLATED - never a guess."""
+    if full_old == current:
+        return None
+    scale_ok, affordable_ok = scale_only == full_old, affordable_only == full_old
+    if scale_ok and affordable_ok:
+        return ATTRIBUTION_EITHER
+    if scale_ok:
+        return ATTRIBUTION_SCALE
+    if affordable_ok:
+        return ATTRIBUTION_AFFORDABLE
+    return ATTRIBUTION_NOT_ISOLATED
+
+
+def index_record(analysis: dict, sites: dict, old: dict | None = None, scale_only: dict | None = None, affordable_only: dict | None = None) -> dict:
     """A compact record of EVERY subject of a family (the Nesten family index): identity, scale/precision, fit; with the counterfactual fit when supplied. No totals, no residuals."""
     family = analysis["family"]
     subjects = [subject_record(m) for m in (family.representative, *[r.subject for r in family.related])]
     old_subjects = {} if old is None else {s["subject_key"]: s for s in old["subjects"]}
+    scale_subjects = {} if scale_only is None else {s["subject_key"]: s for s in scale_only["subjects"]}
+    affordable_subjects = {} if affordable_only is None else {s["subject_key"]: s for s in affordable_only["subjects"]}
+    representative = family.representative.subject_key
     record = {"family_id": f"{family.family_key[0]}:{family.family_key[1]}", **{k: v for k, v in _site_context(sites, family).items() if k != "allocation_id"},
-              "family_fit": _fit_label_of({"fit": family.representative.fit, "investigative": family.representative.investigative}), "representative": family.representative.subject_key,
+              "family_fit": _fit_label_of({"fit": family.representative.fit, "investigative": family.representative.investigative}), "family_classification": family.representative.fit,
+              "family_investigative": bool(family.representative.investigative), "representative": representative,
               "qualified_phasing_state": analysis["state"], "oversized_wider": analysis["oversized_wider"], "has_phase_subject": analysis["has_phase_subject"],
-              "subjects": [{"subject_key": s["subject_key"], "slot": s["slot"], "named_phase": s["named_phase"], "label": s["label"], "fit": _fit_label_of(s), "count": s["count"],
-                            **({"counterfactual_fit": _fit_label_of(old_subjects[s["subject_key"]])} if s["subject_key"] in old_subjects else {})} for s in subjects]}
+              "subjects": [{"subject_key": s["subject_key"], "slot": s["slot"], "named_phase": s["named_phase"], "label": s["label"], "fit": _fit_label_of(s), "classification": s["fit"],
+                            "investigative": s["investigative"], "is_family_representative": s["subject_key"] == representative, "count": s["count"],
+                            **({"counterfactual_fit": _fit_label_of(old_subjects[s["subject_key"]]),
+                                "counterfactual_attribution": attribute_difference(_fit_label_of(s), _fit_label_of(old_subjects[s["subject_key"]]),
+                                                                                   _fit_label_of(scale_subjects[s["subject_key"]]) if s["subject_key"] in scale_subjects else None,
+                                                                                   _fit_label_of(affordable_subjects[s["subject_key"]]) if s["subject_key"] in affordable_subjects else None)}
+                               if s["subject_key"] in old_subjects else {})} for s in subjects]}
     if old is not None:
         record["counterfactual_family_fit"] = old["family_fit"]
         record["counterfactual_representative"] = old["representative"]
+        record["counterfactual_family_attribution"] = attribute_difference(record["family_fit"], old["family_fit"], None if scale_only is None else scale_only["family_fit"],
+                                                                           None if affordable_only is None else affordable_only["family_fit"])
     return record
 
 
@@ -316,20 +345,27 @@ def nesten_scale_cohorts(index: list, policy, old_max: int) -> dict:
 
 def counterfactual_delta(index: list) -> dict:
     families, subjects, changed = Counter(), Counter(), []
+    family_attribution, subject_attribution = Counter(), Counter()
     for record in index:
         if "counterfactual_family_fit" not in record:
             continue
         families[f"{record['counterfactual_family_fit']} -> {record['family_fit']}"] += 1
-        moved = [{"subject_key": s["subject_key"], "label": s["label"], "scale": s["count"]["display"], "precision": s["count"]["precision"], "counterfactual_fit": s["counterfactual_fit"], "fit": s["fit"]}
+        if record.get("counterfactual_family_attribution"):
+            family_attribution[record["counterfactual_family_attribution"]] += 1
+        moved = [{"subject_key": s["subject_key"], "label": s["label"], "scale": s["count"]["display"], "precision": s["count"]["precision"], "counterfactual_fit": s["counterfactual_fit"], "attribution": s.get("counterfactual_attribution"), "fit": s["fit"]}
                  for s in record["subjects"] if s.get("counterfactual_fit") not in (None, s["fit"])]
         for s in record["subjects"]:
             if "counterfactual_fit" in s:
                 subjects[f"{s['counterfactual_fit']} -> {s['fit']}"] += 1
+                if s.get("counterfactual_attribution"):
+                    subject_attribution[s["counterfactual_attribution"]] += 1
         if record["counterfactual_family_fit"] != record["family_fit"] or record["counterfactual_representative"] != record["representative"] or moved:
             changed.append({"family_id": record["family_id"], "council_code": record["council_code"], "title": record["title"], "counterfactual_family_fit": record["counterfactual_family_fit"],
                             "family_fit": record["family_fit"], "counterfactual_representative": record["counterfactual_representative"], "representative": record["representative"],
-                            "subjects_changed": moved})
-    return {"family_fit_matrix": dict(sorted(families.items())), "subject_fit_matrix": dict(sorted(subjects.items())), "changed_families_total": len(changed), "changed_families": changed}
+                            "family_attribution": record.get("counterfactual_family_attribution"), "subjects_changed": moved})
+    return {"family_fit_matrix": dict(sorted(families.items())), "subject_fit_matrix": dict(sorted(subjects.items())), "changed_families_total": len(changed), "changed_families": changed,
+            "family_difference_attribution": dict(sorted(family_attribution.items())), "subject_difference_attribution": dict(sorted(subject_attribution.items())),
+            "attribution_method": "single-factor counterfactual evaluations of the same facts: a factor is named only if applying it alone reproduces the full counterfactual; otherwise EITHER_FACTOR_SUFFICIENT or CAUSE_NOT_ISOLATED"}
 
 
 def _legacy_window(session, buyer_key: str, window: int):
@@ -410,14 +446,20 @@ def run_validation(session, *, real: bool, code_sha: str | None = None, shortlis
                       "comparison_counts_in_new_window": {k: counts.get(k, 0) for k in (NEWLY_SURFACED, BETTER_REPRESENTED, DEDUPLICATED, COMPARABLE)}, "comparison_caveat": COMPARISON_CAVEAT,
                       "legacy_window": None if legacy is None else {"window": legacy["window"], "cards_returned": legacy["cards_returned"], "malformed_legacy_cards": legacy["malformed_legacy_cards"]}}
             if nesten_index or counterfactual_old_nesten:
-                old_views = {}
-                if counterfactual_old_nesten:                       # same universe, same facts, same contexts: only the two pre-correction matching rules differ (labelled counterfactual)
-                    old_policy = dataclasses.replace(profiles[PRIMARY_BUYER], **COUNTERFACTUAL_OLD_NESTEN)
-                    old_result = evaluate_buyer_families(session, PRIMARY_BUYER, inputs, 10 ** 9, contexts=contexts, include_excluded=True, profile=old_policy)
-                    old_analyses = [analyse_family(f) for f in [*old_result["families"], *old_result["excluded_families"]]]
-                    old_views = {a["family"].family_key: _old_view(a, sites) for a in old_analyses}
+                old_views, scale_views, affordable_views = {}, {}, {}
+                if counterfactual_old_nesten:                       # same universe, same facts, same contexts: only the pre-correction matching rules differ (labelled counterfactual)
+                    def counterfactual_views(rules):
+                        result = evaluate_buyer_families(session, PRIMARY_BUYER, inputs, 10 ** 9, contexts=contexts, include_excluded=True,
+                                                         profile=dataclasses.replace(profiles[PRIMARY_BUYER], **rules))
+                        found = [analyse_family(f) for f in [*result["families"], *result["excluded_families"]]]
+                        return found, {a["family"].family_key: _old_view(a, sites) for a in found}
+                    old_analyses, old_views = counterfactual_views(COUNTERFACTUAL_OLD_NESTEN)
+                    _, scale_views = counterfactual_views({"target_unit_max": COUNTERFACTUAL_OLD_NESTEN["target_unit_max"]})                               # scale alone (affordable exclusion stays corrected)
+                    _, affordable_views = counterfactual_views({"wholly_affordable_is_exclusion": COUNTERFACTUAL_OLD_NESTEN["wholly_affordable_is_exclusion"]})   # exclusion alone (scale stays corrected)
                     instrument.snapshot("counterfactual_old_nesten")
-                index = [index_record(a, sites, old_views.get(a["family"].family_key)) for a in analyses]
+                index = [index_record(a, sites, old_views.get(a["family"].family_key), scale_views.get(a["family"].family_key), affordable_views.get(a["family"].family_key)) for a in analyses]
+                nesten["result_basis"] = {"validation_result": "the stored corrected Nesten mandate exactly as read from the database (buyers.nesten_homes.mandate): the ONLY validation / production / current result",
+                                          "counterfactual_fields": "every field or section prefixed counterfactual_ (and nesten.counterfactual_old_nesten) is COUNTERFACTUAL ONLY - NOT A VALIDATION RESULT"}
                 nesten["family_index"] = index
                 nesten["scale_cohorts"] = nesten_scale_cohorts(index, profiles[PRIMARY_BUYER], COUNTERFACTUAL_OLD_NESTEN["target_unit_max"])
                 if counterfactual_old_nesten:
