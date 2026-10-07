@@ -52,7 +52,7 @@ def test_explicit_synthetic_qualified_evidence_produces_r1_with_the_canonical_20
 
 def test_database_completeness_same_site_arithmetic_and_labels_cannot_satisfy_the_predicates():
     p, c = parent(500), child("1", 300)
-    only_containment = ResidualEvidenceFor = ro.ResidualEvidence(containment=containment_for(p, [c]))
+    only_containment = ro.ResidualEvidence(containment=containment_for(p, [c]))
     q = ro.qualify_residual(p, [c], only_containment)
     assert q.level == ro.LEVEL_R2 and q.predicate(ro.CHILD_SET_COMPLETE).state == ro.UNKNOWN
     # counts that add up exactly (300 of 500) and a phase label ("Phase 1") are not completeness evidence

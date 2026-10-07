@@ -140,13 +140,30 @@ def test_the_residual_work_did_not_touch_the_pinned_supporting_modules():
     ((bm.STRONG_FIT, True), (bm.STRONG_FIT, False), UNEXPECTED_REGRESSION),                # an investigative flag may be added, never removed
     ((bm.STRONG_FIT, False), (bm.POSSIBLE_FIT, False), UNEXPECTED_REGRESSION),             # no other downgrade
 ])
-def test_expected_strategic_delta_is_narrowed_to_the_two_approved_transitions(monkeypatch, v7, v8, expected):
+def test_expected_strategic_delta_is_narrowed_to_the_approved_transitions_a_b(monkeypatch, v7, v8, expected):
     import verification.transition.v7_parity as parity
     policy, facts = BUYER_PROFILES["nesten_homes"], _strategic_facts(150, None, None)       # an open floor: non-EXACT, not the preserved route
     real = bm.assess_buyer_fit(policy, facts)
     monkeypatch.setattr(parity, "frozen_v7_assess_buyer_fit", lambda p, f, context=None: dataclasses.replace(real, classification=v7[0], is_investigative_exception=v7[1]))
     forged = dataclasses.replace(real, classification=v8[0], is_investigative_exception=v8[1])
     assert differential_category(policy, facts, None, forged)[0] == (EQUAL if v7 == v8 else expected)
+
+
+@pytest.mark.parametrize("figures,precision,v7,v8,expected", [
+    ((None, 0, 1), "UNKNOWN", (bm.INSUFFICIENT_EVIDENCE, True), (bm.INSUFFICIENT_EVIDENCE, False), EXPECTED_STRATEGIC_DELTA),     # (c) malformed drops the scalar-derived flag
+    ((150, None, None), "RANGE", (bm.INSUFFICIENT_EVIDENCE, True), (bm.INSUFFICIENT_EVIDENCE, False), UNEXPECTED_REGRESSION),     # (c) does NOT cover a usable (open-floor) capacity
+    ((80, None, 150), "RANGE", (bm.STRONG_FIT, False), (bm.POSSIBLE_FIT, True), EXPECTED_STRATEGIC_DELTA),                         # (d) bounded range STRONG -> POSSIBLE + flag
+    ((80, None, 150), "RANGE", (bm.STRONG_FIT, False), (bm.POSSIBLE_FIT, False), UNEXPECTED_REGRESSION),                           # (d) requires the flag
+    ((150, None, None), "RANGE", (bm.STRONG_FIT, False), (bm.POSSIBLE_FIT, True), UNEXPECTED_REGRESSION),                          # (d) does NOT cover an open floor
+])
+def test_transitions_c_and_d_are_bounded_to_their_capacity_kind(monkeypatch, figures, precision, v7, v8, expected):
+    import verification.transition.v7_parity as parity
+    policy, facts = BUYER_PROFILES["nesten_homes"], _strategic_facts(*figures)
+    assert facts.count_assessment.precision == precision
+    real = bm.assess_buyer_fit(policy, facts)
+    monkeypatch.setattr(parity, "frozen_v7_assess_buyer_fit", lambda p, f, context=None: dataclasses.replace(real, classification=v7[0], is_investigative_exception=v7[1]))
+    forged = dataclasses.replace(real, classification=v8[0], is_investigative_exception=v8[1])
+    assert differential_category(policy, facts, None, forged)[0] == expected
 
 
 def test_exhaustive_strategic_grid_has_no_unexpected_regression_and_no_new_not_suitable():
