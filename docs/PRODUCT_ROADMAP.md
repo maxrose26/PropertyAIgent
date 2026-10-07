@@ -11,9 +11,26 @@ Development Economics  →  AI Decision Support  →  Workflow
 
 ---
 
-## Current Roadmap — Post Stage 2 (Product Owner decision, 5 October 2026)
+## Product Owner decision record — 7 October 2026
 
-This section is the authoritative **current sequencing**. Historical gate descriptions below remain useful evidence of how the platform reached this point, but any older “next task” language is superseded where it conflicts with this section.
+**APPROVED ROADMAP SEQUENCING.** This dated record is the current authority for sequencing where earlier checkpoints below conflict. Historical decisions and their outstanding acceptance criteria are retained, not rewritten or silently completed.
+
+- Production release: `22636ddab7e0af9b6220c6466d400bc1ec98aafc`.
+- **Stage 2.5B is COMPLETE within its accepted deployed scope.** The v8 production transition, monitoring rebaseline, mandate re-onboarding and final Gate B validation are completed and accepted. They must not be reopened or repeated for this follow-up. This does not complete every future capability described in Specification 025.
+- **Explainable Mandate Fit is the next specification gate:** a bounded Stage 2.5B presentation follow-up aligned with the existing Stage 6 buyer UI/UX objectives. See [Specification 028](../specifications/028-explainable-mandate-fit-and-qualified-investigation.md).
+- A **targeted Stage 2.6 evidence-validation slice is sequenced ahead of Stage 2.5C**. Its scope and acceptance criteria require separate REVIEW approval; implementation is not authorised.
+- **Stage 2.5C remains PAUSED. Commercial acquisition ranking remains ON HOLD** pending evidence-quality and buyer-validation gates. Mandate compatibility is not acquisition quality, ownership/control or availability.
+- **Stage 4 operational-safety acceptance remains mandatory before any scheduled ingestion or monitoring activation. All production crons remain suspended.** No operational activation is authorised.
+
+**NOT YET AUTHORISED IMPLEMENTATION.** This decision authorises recording these decisions and preparing the explainability specification only. Specification approval, application implementation, integration and deployment remain separate gates. No matcher policy, buyer mandate, family/subject identity, ranking, enrichment, schema, paid calls, Stage 2.5C/2.6 implementation or production operation is authorised by this record.
+
+Traceability: Product Owner approval of the Roadmap & Stage-Gate Reconciliation and the instruction "Record Approved Roadmap Decisions + Prepare Explainability Specification", 7 October 2026. Accepted Stage 2.5B-R findings: 43 Strong / 8 Possible Nesten families; 20 complete and 31 partial retained explanations; 14 meaningful recorded investigation signals and 37 contextual-only families. These are historical investigation results, not future production test targets. Applicant-role and ownership/control cohort coverage remains unestablished. No claim of ranking readiness follows.
+
+The existing Stage 1 security/access safeguards, accepted v8 classification, family construction/order and release safeguards remain binding. Unfinished original source-validation, performance, accessibility, operational and pilot gates are not marked complete here.
+
+## Historical checkpoint — Post Stage 2 (Product Owner decision, 5 October 2026)
+
+This section records the **5 October checkpoint**, including statuses as known then. The dated 7 October decision above governs current sequencing and accepted release status. The earlier decisions and capability requirements below remain evidence; their unfinished acceptance criteria are not waived.
 
 **Product North Star:** PropertyAIgent continuously turns fragmented planning, ownership and development evidence into ranked acquisition opportunities matched to a buyer’s strategy. Planning evidence is the shared evidence foundation; the primary product object is increasingly a **qualified, buyer-specific acquisition opportunity**, not a planning application.
 
