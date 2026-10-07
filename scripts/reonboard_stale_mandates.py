@@ -4,8 +4,8 @@
     python -m scripts.reonboard_stale_mandates --buyer nesten_homes  # restrict to named buyers (repeatable)
     python -m scripts.reonboard_stale_mandates --apply --confirm "<phrase>" --expect-digest <plan_digest from the reviewed dry run>
 
-No ordinary monitoring sync, no reseed, no scraping/ingestion, no model call. Apply refuses unless the confirm phrase and the REVIEWED plan digest match, the same-universe v6/v7 parity
-check passes (the TEMPORARY frozen v6 oracle in verification/transition; any mismatch fails closed), and the Stage 1 checks pass; it then commits once for all mandates.
+No ordinary monitoring sync, no reseed, no scraping/ingestion, no model call. Apply refuses unless the confirm phrase and the REVIEWED plan digest match, the same-universe v7/v8 differential
+check passes (the TEMPORARY frozen v7 oracle in verification/transition: only the approved narrow strategic deltas are allowed, the report counts them by category; any other difference fails closed), and the Stage 1 checks pass; it then commits once for all mandates.
 Operator-authorised launch only (`launch:reonboard_stale_mandates`). Production execution needs separate REVIEW authority.
 """
 from __future__ import annotations

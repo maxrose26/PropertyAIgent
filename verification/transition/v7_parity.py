@@ -75,7 +75,8 @@ def v7_parity_oracle(policy, record, context, v8_assessment) -> ParityVerdict:
     """Re-onboarding oracle: acceptable when equal or an EXPECTED strategic delta; anything else is a parity failure."""
     category, v7 = differential_category(policy, record.matching_facts, context, v8_assessment)
     if category != UNEXPECTED_REGRESSION:
-        return ParityVerdict(True, True, detail=category)
+        return ParityVerdict(True, True, detail=category, v6_classification=v7.classification, v7_classification=v8_assessment.classification,
+                             v6_investigative=bool(v7.is_investigative_exception), v7_investigative=bool(v8_assessment.is_investigative_exception))
     return ParityVerdict(v7.classification == v8_assessment.classification, bool(v7.is_investigative_exception) == bool(v8_assessment.is_investigative_exception),
                          detail="v7 oracle differs from v8 outside the approved strategic deltas", v6_classification=v7.classification, v7_classification=v8_assessment.classification,
                          v6_investigative=bool(v7.is_investigative_exception), v7_investigative=bool(v8_assessment.is_investigative_exception))
