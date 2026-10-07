@@ -541,7 +541,6 @@ class OnboardingBaselineResult:
         self.summary_line = summary_line
 
 
-@command('buyer.write')
 def evaluate_policy_over_universe(session, policy, universe, contexts) -> list[tuple[str, object]]:
     """The deterministic per-opportunity Buyer Fit pass of an onboarding baseline, factored out of run_buyer_onboarding_baseline UNCHANGED so the standalone V7C-2
     re-onboarding plans with exactly the same evaluation (never a second implementation): [(opportunity_id, assessment)] in universe order."""
@@ -577,6 +576,7 @@ def summarise_onboarding_assessments(assessments) -> "OnboardingBaselineResult":
     )
 
 
+@command('buyer.write')
 def run_buyer_onboarding_baseline(
     session, mandate: BuyerMandate, *,
     page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE,

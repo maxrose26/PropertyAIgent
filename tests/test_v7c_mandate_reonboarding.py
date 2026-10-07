@@ -263,3 +263,20 @@ def test_bootstrap_is_preserved_and_documented_as_not_the_approved_transition_pa
     assert "NOT the approved v7 transition path" in (Path(__file__).resolve().parents[1] / "scripts/bootstrap_acquisition_monitoring.py").read_text()
     source = inspect.getsource(store.bootstrap_acquisition_monitoring)
     assert "sync_opportunity_monitoring_state(session, page_size=page_size)" in source and "seed_default_buyer_profiles(session, workspace)" in source   # semantics unchanged
+
+
+def test_the_existing_command_boundaries_of_the_onboarding_functions_are_unchanged():
+    """The helper extraction must not move the @command('buyer.write') decorator: run_buyer_onboarding_baseline keeps its operator check, session protection and audit log
+    (and stays registered in the Stage 1 service manifest); the new pure helpers are plain functions called from inside commands."""
+    import ast
+    import json
+    import textwrap
+    from pathlib import Path
+    tree = ast.parse(Path(inspect.getsourcefile(store)).read_text(encoding="utf-8"))
+    decorated = {n.name: [ast.unparse(d) for d in n.decorator_list] for n in tree.body if isinstance(n, ast.FunctionDef)}
+    assert decorated["run_buyer_onboarding_baseline"] == ["command('buyer.write')"]
+    assert decorated["bootstrap_acquisition_monitoring"] == ["command('buyer.write')"]
+    assert decorated["evaluate_policy_over_universe"] == [] and decorated["summarise_onboarding_assessments"] == []
+    services = json.loads((Path(__file__).resolve().parents[1] / "verification/stage1_service_manifest.json").read_text())["app/policy/buyer_profile_store.py"]
+    assert services["run_buyer_onboarding_baseline"] == "buyer.write"
+    assert getattr(store.run_buyer_onboarding_baseline, "__wrapped__", None) is not None          # the command wrapper is actually applied
