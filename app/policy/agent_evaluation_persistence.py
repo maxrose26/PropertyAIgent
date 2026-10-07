@@ -97,6 +97,10 @@ MODEL_PROVIDER_OPENAI = "openai"
 # It does NOT touch the opportunity evidence fingerprint (OpportunityMonitoringState.fingerprint is unchanged).
 AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION = 3
 
+
+class StaleMandateBaseline(RuntimeError):
+    """Raised by run_persisted_evaluation when the mandate's onboarding baseline is stale (V7C guard). Deterministic message; nothing has been written or called."""
+
 # --- Acquisition Subject scope keys (Gate 1, Section 3/4) -------------------
 WHOLE_SITE = "WHOLE_SITE"
 WHOLE_ALLOCATION = "WHOLE_ALLOCATION"
@@ -613,7 +617,12 @@ def run_persisted_evaluation(
     from app.security.access import require_operator
     require_operator('evaluation.run', paid=True)
     from app.services.authorised_reads import mandate_by_id
-    mandate_by_id(session, buyer_mandate_id)
+    mandate_row = mandate_by_id(session, buyer_mandate_id)
+    # V7C stale-mandate guard: a mandate whose onboarding baseline is stale (never onboarded, or its fingerprint no longer matches the current policy/fields) is a MIXED-version
+    # state - no paid evaluation may be persisted from it. Refused deterministically BEFORE any subject-anchor write, claim, history write or model call; it never re-onboards.
+    from app.policy.buyer_profile_store import is_buyer_mandate_baseline_stale
+    if is_buyer_mandate_baseline_stale(mandate_row):
+        raise StaleMandateBaseline("Agent evaluation refused: the mandate's onboarding baseline is stale; re-onboard the mandate under the current policy first.")
     from app.policy.acquisition_evaluate import AGENT_EVALUATION_OUTPUT_SCHEMA_VERSION, MODEL, evaluate
 
     subject_type, anchor_id, scope_key = resolve_acquisition_subject_key(opportunity.opportunity_id, opportunity.opportunity_type)

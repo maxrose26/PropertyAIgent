@@ -541,6 +541,41 @@ class OnboardingBaselineResult:
         self.summary_line = summary_line
 
 
+def evaluate_policy_over_universe(session, policy, universe, contexts) -> list[tuple[str, object]]:
+    """The deterministic per-opportunity Buyer Fit pass of an onboarding baseline, factored out of run_buyer_onboarding_baseline UNCHANGED so the standalone V7C-2
+    re-onboarding plans with exactly the same evaluation (never a second implementation): [(opportunity_id, assessment)] in universe order."""
+    return [
+        (opportunity.opportunity_id, evaluate_buyer_fit(session, policy, opportunity.matching_facts, context=contexts.get(opportunity.opportunity_id)))
+        for opportunity in universe
+    ]
+
+
+def summarise_onboarding_assessments(assessments) -> "OnboardingBaselineResult":
+    """The onboarding summary/counts (same arithmetic and summary_line format as before the extraction)."""
+    strong_fit = possible_fit = not_suitable = insufficient_evidence = investigative_exceptions = 0
+    for _opportunity_id, assessment in assessments:
+        if assessment.classification == STRONG_FIT:
+            strong_fit += 1
+        elif assessment.classification == POSSIBLE_FIT:
+            possible_fit += 1
+        elif assessment.classification == NOT_SUITABLE:
+            not_suitable += 1
+        elif assessment.classification == INSUFFICIENT_EVIDENCE:
+            insufficient_evidence += 1
+        if assessment.is_investigative_exception:
+            investigative_exceptions += 1
+    reviewed = len(assessments)
+    summary_line = (
+        f"reviewed={reviewed} strong_fit={strong_fit} possible_fit={possible_fit} not_suitable={not_suitable} "
+        f"insufficient_evidence={insufficient_evidence} investigative_exceptions={investigative_exceptions}"
+    )
+    return OnboardingBaselineResult(
+        opportunities_reviewed=reviewed, strong_fit=strong_fit, not_suitable=not_suitable,
+        insufficient_evidence=insufficient_evidence, investigative_exceptions=investigative_exceptions,
+        summary_line=summary_line, possible_fit=possible_fit,
+    )
+
+
 @command('buyer.write')
 def run_buyer_onboarding_baseline(
     session, mandate: BuyerMandate, *,
@@ -591,36 +626,14 @@ def run_buyer_onboarding_baseline(
     if contexts is None:
         contexts = {o.opportunity_id: build_b2_context(session, o.opportunity_id, o.opportunity_type) for o in universe}
 
-    strong_fit = possible_fit = not_suitable = insufficient_evidence = investigative_exceptions = 0
-    for opportunity in universe:
-        context = contexts.get(opportunity.opportunity_id)
-        assessment = evaluate_buyer_fit(session, policy, opportunity.matching_facts, context=context)
-        if assessment.classification == STRONG_FIT:
-            strong_fit += 1
-        elif assessment.classification == POSSIBLE_FIT:
-            possible_fit += 1
-        elif assessment.classification == NOT_SUITABLE:
-            not_suitable += 1
-        elif assessment.classification == INSUFFICIENT_EVIDENCE:
-            insufficient_evidence += 1
-        if assessment.is_investigative_exception:
-            investigative_exceptions += 1
-
-    summary_line = (
-        f"reviewed={len(universe)} strong_fit={strong_fit} possible_fit={possible_fit} not_suitable={not_suitable} "
-        f"insufficient_evidence={insufficient_evidence} investigative_exceptions={investigative_exceptions}"
-    )
+    result = summarise_onboarding_assessments(evaluate_policy_over_universe(session, policy, universe, contexts))
 
     mandate.matching_fingerprint = compute_buyer_mandate_fingerprint(policy)
     mandate.onboarding_completed_at = utcnow()
-    mandate.onboarding_summary = summary_line
+    mandate.onboarding_summary = result.summary_line
     session.commit()
 
-    return OnboardingBaselineResult(
-        opportunities_reviewed=len(universe), strong_fit=strong_fit, not_suitable=not_suitable,
-        insufficient_evidence=insufficient_evidence, investigative_exceptions=investigative_exceptions,
-        summary_line=summary_line, possible_fit=possible_fit,
-    )
+    return result
 
 
 def is_buyer_mandate_baseline_stale(mandate: BuyerMandate) -> bool:
@@ -650,7 +663,11 @@ is_buyer_profile_baseline_stale = is_buyer_mandate_baseline_stale
 
 @command('buyer.write')
 def bootstrap_acquisition_monitoring(session, *, page_size: int = DEFAULT_STRATEGIC_LAND_PAGE_SIZE) -> dict:
-    """The single Gate 1 entry point (scripts.bootstrap_acquisition_
+    """NOTE (Stage 2.5B V7C): this is NOT the approved v7 transition path. It runs the ORDINARY global monitoring sync first, reseeds the default profiles, has no
+    dry-run and (via run_buyer_onboarding_baseline) commits once per mandate. It is kept unchanged for backwards compatibility; the approved path is the standalone
+    app.policy.mandate_reonboarding (dry-run by default, no sync, no reseed, one commit).
+
+    The single Gate 1 entry point (scripts.bootstrap_acquisition_
     monitoring's own only call) - the ONE canonical, safe sequence (Gate 1
     amendment, Product Owner review), now operating on Buyer/BuyerMandate:
 

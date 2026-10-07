@@ -161,8 +161,13 @@ def _build_case(session, *, opportunity_id_fn=planning_delivery_site_opportunity
     facts = build_planning_delivery_matching_facts_from_operative(operative, apps)
     opp = _FakeOpp(opportunity_id_fn(site.id), PLANNING_DELIVERY, facts)
     mandate_row = _seed_mandate(session)
-    from app.policy.buyer_profile_store import mandate_to_policy
+    from app.policy.buyer_profile_store import compute_buyer_mandate_fingerprint, mandate_to_policy
     mandate = mandate_to_policy(mandate_row)
+    # V7C: a stale (never-onboarded) mandate is refused by run_persisted_evaluation, so these fixtures use an ONBOARDED, fresh mandate.
+    from app.db.models import utcnow
+    mandate_row.matching_fingerprint = compute_buyer_mandate_fingerprint(mandate)
+    mandate_row.onboarding_completed_at = utcnow()
+    session.commit()
     context = build_b2_context_for_planning_delivery(session, site.id)
     packet = build_opportunity_intelligence_packet(session, opp, context=context)
     assessment = evaluate_buyer_fit(session, mandate, facts, site_id=site.id)
@@ -534,8 +539,13 @@ def test_candidate_representation_can_change_while_subject_lineage_remains(sessi
     operative = build_operative_planning_facts(apps)
     facts = build_planning_delivery_matching_facts_from_operative(operative, apps)
     mandate_row = _seed_mandate(session)
-    from app.policy.buyer_profile_store import mandate_to_policy
+    from app.policy.buyer_profile_store import compute_buyer_mandate_fingerprint, mandate_to_policy
     mandate = mandate_to_policy(mandate_row)
+    # V7C: a stale (never-onboarded) mandate is refused by run_persisted_evaluation, so these fixtures use an ONBOARDED, fresh mandate.
+    from app.db.models import utcnow
+    mandate_row.matching_fingerprint = compute_buyer_mandate_fingerprint(mandate)
+    mandate_row.onboarding_completed_at = utcnow()
+    session.commit()
     context = build_b2_context_for_planning_delivery(session, site.id)
 
     opp1 = _FakeOpp(planning_delivery_long_pending_application_opportunity_id(site.id), PLANNING_DELIVERY, facts)
