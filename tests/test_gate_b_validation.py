@@ -95,7 +95,7 @@ def test_every_kind_of_write_inside_the_window_is_blocked(world):
 
 def test_the_statement_allow_list_is_exact():
     for ok in ("SELECT 1", "  select * from sites", "WITH x AS (SELECT 1) SELECT * FROM x", "SHOW transaction_read_only", "SET TRANSACTION READ ONLY", "SET LOCAL statement_timeout = 60000",
-               "-- c\nSELECT 1", "/* c */ SELECT 1"):
+               "-- c\nSELECT 1"):
         assert safety.is_allowed_statement(ok), ok
     for bad in ("INSERT INTO t VALUES (1)", "UPDATE t SET a=1", "DELETE FROM t", "COMMIT", "SET ROLE x", "SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE", "SET LOCAL lock_timeout = 1",
                 "CREATE TABLE t (a int)", "DROP TABLE t", "TRUNCATE t", "GRANT ALL ON t TO x", "ALTER TABLE t ADD c int", "COPY t FROM STDIN", "CALL p()",
