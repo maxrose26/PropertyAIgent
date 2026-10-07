@@ -98,5 +98,9 @@
   "scripts/reonboard_stale_mandates.py": {
     "command": "reonboard_stale_mandates",
     "required_scope": "launch:reonboard_stale_mandates"
+  },
+  "scripts/validate_v7_discovery.py": {
+    "command": "validate_v7_discovery",
+    "required_scope": "launch:validate_v7_discovery"
   }
 }
