@@ -162,6 +162,8 @@ with page_scope():
                 else:
                     st.caption(family_view.caption)
                     st.caption(family_view.subject_caption)
+                    if family_view.route_caption:
+                        st.caption(family_view.route_caption)
                     if not family_view.families:
                         st.caption("Nothing to investigate right now.")
                     for family in family_view.families:

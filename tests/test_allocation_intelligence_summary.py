@@ -92,7 +92,8 @@ def _make_relationship(session, *, allocation_id, site_id, review_status="auto_a
 
 
 def _make_app_with_capacity(session, site_id, reference, units, *, council_code="testcouncil") -> Application:
-    app = Application(council_code=council_code, reference=reference, site_id=site_id)
+    app = Application(council_code=council_code, reference=reference, site_id=site_id, decision="Granted", decision_issued_date="Mon 01 Jan 2024",
+                      proposal=f"Erection of {units} dwellings")
     session.add(app)
     session.commit()
     session.add(SchemeIntelligence(application_id=app.id, total_units_final=units, core_intelligence_complete=True))
@@ -637,21 +638,21 @@ def test_dry_run_performs_zero_writes(session, monkeypatch):
     monkeypatch.setattr(cli, "init_db", lambda: None)
     monkeypatch.setattr(cli, "get_session", lambda: session)
 
-    cli.main()
+    cli.main.__wrapped__()
     assert get_allocation_summary(session, allocation.id) is None
 
 
 def test_execute_without_exact_confirm_phrase_fails_closed(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["generate_allocation_intelligence_summaries.py", "--execute", "--confirm", "WRONG"])
     with pytest.raises(SystemExit) as exc:
-        cli.main()
+        cli.main.__wrapped__()
     assert exc.value.code == 2
 
 
 def test_execute_with_missing_confirm_fails_closed(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["generate_allocation_intelligence_summaries.py", "--execute"])
     with pytest.raises(SystemExit) as exc:
-        cli.main()
+        cli.main.__wrapped__()
     assert exc.value.code == 2
 
 

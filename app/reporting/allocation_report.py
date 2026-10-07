@@ -596,7 +596,7 @@ def _format_ownership_evidence(entries: list[OwnershipEvidenceEntry], *, role: s
 
 CSV_COLUMNS = [
     "Authority", "Local Plan", "Allocation Reference", "Allocation Name", "Plan Status", "Intended Use",
-    "Allocation Capacity", "Planning Activity", "Identified Application Capacity", "Indicative Residual Capacity",
+    "Allocation Capacity", "Planning Activity", "Identified Application Capacity", "Potential Residual Scope",
     "Development Coverage %", "Linked Application Count", "Known Applicant(s)", "Known Developer(s)",
     "Ownership / Control Evidence", "AI Intelligence Headline", "AI Summary Available",
 ]
@@ -607,6 +607,12 @@ CSV_COLUMNS = [
 _NO_ACTIVITY_LABEL = "No identified activity"
 _ACTIVITY_IDENTIFIED_LABEL = "Activity identified"
 _REVIEW_REQUIRED_LABEL = "Review required"
+
+
+def potential_residual_scope_text(entry: AllocationReportEntry) -> str:
+    from app.reporting.residual_opportunity import potential_residual_label
+    return potential_residual_label(entry.development_coverage_classification, entry.capacity_accounting_status, entry.indicative_residual_capacity,
+                                    entry.linked_application_count)
 
 
 def _planning_activity_label(entry: AllocationReportEntry) -> str:
@@ -637,9 +643,7 @@ def to_csv_rows(context: AllocationReportContext) -> list[dict]:
             "Identified Application Capacity": (
                 entry.identified_application_capacity if entry.identified_application_capacity is not None else ""
             ),
-            "Indicative Residual Capacity": (
-                entry.indicative_residual_capacity if entry.indicative_residual_capacity is not None else ""
-            ),
+            "Potential Residual Scope": potential_residual_scope_text(entry),       # V8-B: R2 investigation context (no number)
             "Development Coverage %": (
                 f"{entry.development_coverage_percentage:.0%}" if entry.development_coverage_percentage is not None else ""
             ),

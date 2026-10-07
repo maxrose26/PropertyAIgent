@@ -30,7 +30,7 @@ def _facts(**overrides) -> MatchingFacts:
 
 
 def test_policy_version_is_unchanged_by_the_mandate_correction():
-    assert BUYER_MATCHING_POLICY_VERSION == 7   # the mandate correction itself changed no version; V7A (phasing reason wording) moved 6 -> 7
+    assert BUYER_MATCHING_POLICY_VERSION == 8   # the mandate correction itself changed no version; V7A (phasing reason wording) moved 6 -> 7
 
 
 def test_canonical_nesten_preferred_scale_is_50_to_200():

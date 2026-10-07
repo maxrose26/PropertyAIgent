@@ -209,7 +209,7 @@ def test_automatic_refresh_selects_allocation_made_stale_by_new_trusted_applicat
     session.commit()
 
     # New trusted Application -> Site now has capacity -> fingerprint moves.
-    app = Application(council_code="testcouncil", reference="APP/NEW", site_id=site.id)
+    app = Application(council_code="testcouncil", reference="APP/NEW", site_id=site.id, decision="Granted", decision_issued_date="Mon 01 Jan 2024", proposal="Erection of 120 dwellings")
     session.add(app)
     session.commit()
     session.add(SchemeIntelligence(application_id=app.id, total_units_final=120, core_intelligence_complete=True))
@@ -432,7 +432,7 @@ def test_process_intelligence_backlog_defaults_to_allocation_summaries_disabled(
     def _boom(api_key):
         raise AssertionError("must not create an OpenAI client when allocation summary refresh is disabled")
 
-    run = process_intelligence_backlog(
+    run = process_intelligence_backlog.__wrapped__(
         session, {"testcouncil": _council_config()}, ["testcouncil"],
         max_extractions=0, max_summaries=0, max_intelligence_refresh=0,
         client_factory=_boom,
@@ -451,7 +451,7 @@ def test_process_intelligence_backlog_respects_explicit_opt_in(session, monkeypa
 
     context = build_allocation_context(session, allocation)
     client = _CountingFakeClient(_good_output_for(context))
-    run = process_intelligence_backlog(
+    run = process_intelligence_backlog.__wrapped__(
         session, {"testcouncil": _council_config()}, ["testcouncil"],
         max_extractions=0, max_summaries=0, max_intelligence_refresh=0,
         max_allocation_summaries=DEFAULT_MAX_ALLOCATION_SUMMARIES_PER_RUN,

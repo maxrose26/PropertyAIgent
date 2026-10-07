@@ -100,6 +100,12 @@ def _strategic_land_cards(session, limit: int) -> list[dict]:
     return _strategic_cards_for_candidates(session, candidates, limit)
 
 
+def _allocation_residual_text(coverage):
+    from app.reporting.residual_opportunity import allocation_residual_context
+    context = allocation_residual_context(coverage)
+    return context.text if context else None
+
+
 def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], limit: int | None) -> list[dict]:
     """Eligibility + card shaping for an already-selected candidate list (code motion out of `_strategic_land_cards`, behaviour
     unchanged). ``limit=None`` (family mode only) disables the card-count cut; the signal eligibility filter always applies."""
@@ -125,7 +131,8 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             continue
         plan = plans_by_id.get(a.local_plan_id)
         plan_meta = PLAN_STATUS_META.get(plan.status if plan else None, PLAN_STATUS_META[None])
-        opportunity = build_opportunity_signal(
+        from app.reporting.opportunity_signal import build_neutral_opportunity_signal
+        opportunity = build_neutral_opportunity_signal(
             plan_status_bucket=plan_meta["bucket"], coverage=result["coverage"], phasing=result["phasing"],
         )
         if opportunity["signal"] not in _FEED_ELIGIBLE_SIGNALS:
@@ -135,6 +142,8 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
         activity_coverage = classify_planning_activity_coverage(result["coverage"])
         capacity = format_capacity(a)
         range_labels = capacity_range_labels(capacity, a.source_excerpt)
+        from app.reporting.strategic_capacity import strategic_scale_view
+        scale_view = strategic_scale_view(a)          # the figure(s) AND their basis: plan-stated and unverified (presentation only; matching is unchanged)
 
         # Site area always shown - "Not yet verified" rather than omitted
         # when absent, never a bare 0 ha (matches the Opportunity Profile's
@@ -148,8 +157,7 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             # single figure - the same rule the Opportunity Profile detail
             # page uses (never a different label for the same fact shown
             # in two places).
-            capacity_label = "Capacity (range)" if capacity["kind"] == "range" else "Capacity"
-            metrics.append((capacity_label, capacity["display"]))
+            metrics.append(("Plan-stated capacity (unverified)", scale_view["figure"]))
 
         tags = [OPPORTUNITY_TYPE_LABELS[STRATEGIC_LAND], plan_meta["label"], PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification]]
 
@@ -166,6 +174,8 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             "tags": tags,
             "page": "pages/3_Local_Plan_Sites.py",
             "params": {"allocation_id": str(a.id)},
+            "strategic_scale": scale_view,
+            "potential_residual": _allocation_residual_text(result["coverage"]),   # V8-B R2 investigation context (no number); the coverage subtraction is only the trigger
             "when": a.updated_at,
             # Buyer Profiles V1 - computed here, once, from the exact same
             # allocation/coverage/phasing objects already in scope in this
@@ -210,7 +220,7 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
     }
 
 
-def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None:
+def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> dict:
     """Buyer Profiles V1 - batched, additive enrichment of already-built
     planning/delivery cards with a MatchingFacts reader, mutating each
     card's own "matching_facts" key in place. Never touches app.reporting.
@@ -239,7 +249,7 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
 
     site_ids = {int(c["params"]["site_id"]) for c in cards if c.get("params", {}).get("site_id")}
     if not site_ids:
-        return
+        return {}
 
     apps = session.execute(
         select(Application)
@@ -251,12 +261,17 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
         apps_by_site.setdefault(app.site_id, []).append(app)
 
     operative_by_site = {sid: build_operative_planning_facts(rows) for sid, rows in apps_by_site.items()}
+    consent_role_by_site = {}
+    for sid, operative in operative_by_site.items():              # the planning ROLE of the operative consented application (route derivation input; presentation only)
+        position = operative.consented_position
+        consent_role_by_site[sid] = position.reference.source.planning_role if position.exists and position.reference.source is not None else None
     facts_by_context = {}
     for card in cards:
         site_id_raw = card.get("params", {}).get("site_id")
         if site_id_raw is None:
             continue
         site_id = int(site_id_raw)
+        card["consent_role"] = consent_role_by_site.get(site_id)
         if site_id not in operative_by_site:
             card["matching_facts"] = None
             continue
@@ -287,6 +302,7 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
         if assessment is not None:
             card["metrics"] = [(k, v) for k, v in card.get("metrics", []) if k not in ("Scale", "Count evidence")] + [("Scale", assessment.label()), ("Count evidence", assessment.note())]
             card["count_note"] = assessment.note()
+    return operative_by_site      # V8-B: the per-site operative facts, so the residual ladder reuses this one read (no second query)
 
 
 def _generic_selection(strategic: list[dict], delivery: list[dict], limit: int) -> list[dict]:

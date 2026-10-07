@@ -246,6 +246,17 @@ def compute_opportunity_fingerprint(fingerprint_fields: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def strategic_capacity_fingerprint_fields(facts) -> dict:
+    """V8: the v8 matcher reads the plan-stated capacity KIND (exact / range / open floor / open ceiling / approximate / unknown), but ``unit_count`` is only the legacy scalar, so
+    'exact 150' and 'minimum-only 150' (materially different v8 semantics) would fingerprint identically. The kind is added ONLY when it is not EXACT: an exact capacity - whose
+    scalar IS the whole fact - keeps its pre-v8 fingerprint byte-for-byte (no churn); every non-exact kind gains one ``capacity_semantics`` entry, so a change of kind with an unchanged
+    scalar is detected. Transition consequence: strategic allocations with a non-exact capacity get a one-time fingerprint change, which the v8 policy transition re-evaluates anyway."""
+    assessment = getattr(facts, "count_assessment", None)
+    if assessment is None or assessment.precision == "EXACT":
+        return {}
+    return {"capacity_semantics": {"precision": assessment.precision, "value": assessment.value, "lower": assessment.lower, "upper": assessment.upper}}
+
+
 def _strategic_land_records_for_page(session, candidates: list[LocalPlanSite]) -> list[OpportunityRecord]:
     """The per-page processing step - identical logic to what a single,
     unpaginated pass used to do, just scoped to one page's worth of
@@ -288,6 +299,7 @@ def _strategic_land_records_for_page(session, candidates: list[LocalPlanSite]) -
             "site_area_hectares": a.site_area_hectares,
             "green_belt_status": a.green_belt_status,
         }
+        fingerprint_fields.update(strategic_capacity_fingerprint_fields(facts))
         records.append(OpportunityRecord(
             opportunity_id=strategic_land_opportunity_id(a.id),
             opportunity_type=STRATEGIC_LAND,

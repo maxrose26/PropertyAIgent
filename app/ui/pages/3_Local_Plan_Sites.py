@@ -70,6 +70,7 @@ from app.reporting.ownership_control import (
     get_allocation_control_intelligence,
 )
 from app.reporting.residential_mix import build_residential_mix
+from app.reporting.residual_opportunity import ALLOCATION_R2_TEXT, allocation_residual_context
 from app.ui.common import PROGRESSION_SIGNAL_LABELS, bootstrap, credits_sidebar, get_db, pick_representative_application
 from app.ui.shortlist import (
     SHORTLIST_SESSION_KEY,
@@ -567,17 +568,11 @@ with page_scope():
                 with cov_cols[1]:
                     if coverage.development_coverage_percentage is not None:
                         stat_tile("Development coverage", f"{coverage.development_coverage_percentage:.0%}")
-                    if coverage.indicative_residual_capacity is not None:
-                        stat_tile("Indicative residual capacity", f"~{coverage.indicative_residual_capacity:,} homes")
                 st.markdown(f"**{PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification]}**")
                 st.caption(activity_coverage.reason)
                 if coverage.note:
                     st.caption(coverage.note)
-                if coverage.indicative_residual_capacity:
-                    st.caption(
-                        f"Approximately {coverage.indicative_residual_capacity:,} homes of allocation capacity are not "
-                        "currently accounted for by identified planning activity."
-                    )
+                st.caption("Planning activity figures are shown as evidence only; no residual or available land is inferred from them.")
 
                 section_header("Planning activity detail", icon="🏗️")
                 st.caption(
@@ -706,12 +701,9 @@ with page_scope():
 
                 for residual_section in residual_sections:
                     st.divider()
-                    st.markdown("**Residual allocation capacity**")
-                    if residual_section.residual_capacity:
-                        st.caption(
-                            f"Approximately {residual_section.residual_capacity:,} homes of allocation capacity are not "
-                            "currently accounted for by identified planning activity."
-                        )
+                    st.markdown("**Potential residual scope**")
+                    if allocation_residual_context(coverage):      # the internal figure is only a trigger; V8-B shows R2 investigation context, never the quantity
+                        st.caption(ALLOCATION_R2_TEXT)
                     st.caption("Ownership & Control")
                     st.caption(EMPTY_STATE_ALLOCATION_RESIDUAL)
                     if residual_section.show_ownership_intelligence_gap_cue:

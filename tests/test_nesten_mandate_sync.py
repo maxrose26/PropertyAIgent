@@ -115,7 +115,7 @@ def test_the_exact_field_diff_is_the_three_accepted_changes_and_unchanged_fields
     assert all(d["reason"] and "UNAPPROVED" not in d["reason"] and "f8e1c9b" in d["reason"] for d in diff.values())
     assert "target_unit_min" not in diff                                                                    # 50 -> 50 is omitted
     assert report["derived"] == {"discovery_before": (45, 110), "discovery_after": (45, 220)}
-    assert report["matching_policy_version"] == 7
+    assert report["matching_policy_version"] == 8
 
 
 # --- dry-run default, determinism ----------------------------------------------------------------------------------------------------------

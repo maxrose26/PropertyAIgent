@@ -38,6 +38,7 @@ from app.db.models import AllocationSiteRelationship, LocalPlan, LocalPlanSite, 
 from app.extraction.local_plan import assess_delivery_scope
 from app.pipeline.lapse_tracking import BUILD_STATUS_LABELS, compute_lapse_status
 from app.reporting.allocation_development_coverage import build_allocation_development_coverage, build_opportunity_signal
+from app.reporting.residual_opportunity import potential_residual_label as _potential_residual_label
 from app.ui.common import load_applications_for_sites
 from app.visuals import IMAGE_TYPE_LABELS
 from app.visuals.site_view import build_allocation_visual_summaries, build_plan_wide_policies_map
@@ -124,8 +125,6 @@ def format_development_coverage_summary(card: dict) -> dict | None:
         lines.append(f"{coverage.identified_application_capacity:,} / ~{coverage.allocation_capacity:,} homes identified")
     if coverage.development_coverage_percentage is not None:
         lines.append(f"~{coverage.development_coverage_percentage:.0%} accounted for")
-    if coverage.indicative_residual_capacity:
-        lines.append(f"Indicative residual: ~{coverage.indicative_residual_capacity:,} homes")
 
     phasing = card.get("phasing")
     if phasing:
@@ -995,7 +994,8 @@ def build_allocation_card(
         phasing = development_coverage["phasing"]
         card["development_coverage"] = coverage
         card["phasing"] = phasing
-        card["opportunity"] = build_opportunity_signal(
+        from app.reporting.opportunity_signal import build_neutral_opportunity_signal
+        card["opportunity"] = build_neutral_opportunity_signal(
             plan_status_bucket=plan_meta["bucket"], coverage=coverage, phasing=phasing,
         )
     else:
@@ -1077,7 +1077,7 @@ def build_matching_attributes(card: dict) -> dict:
 # membership and passing the result in.
 TABLE_CORE_COLUMNS = [
     "Allocation / Site", "Authority", "Plan Status", "Capacity", "Planning Activity",
-    "Development Coverage %", "Indicative Residual Capacity", "Shortlisted",
+    "Development Coverage %", "Potential Residual Scope", "Shortlisted",
 ]
 TABLE_SECONDARY_COLUMNS = ["Local Plan", "Intended Use"]
 
@@ -1100,9 +1100,10 @@ def build_table_row(card: dict, *, shortlisted: bool) -> dict:
             f"{coverage.development_coverage_percentage:.0%}"
             if coverage and coverage.development_coverage_percentage is not None else "Not determined"
         ),
-        "Indicative Residual Capacity": (
-            f"{coverage.indicative_residual_capacity:,}"
-            if coverage and coverage.indicative_residual_capacity is not None else "Not determined"
+        "Potential Residual Scope": (       # V8-B: R2 investigation context, never the internal subtraction
+            _potential_residual_label(getattr(coverage, "development_coverage_classification", None), getattr(coverage, "capacity_accounting_status", None),
+                                      getattr(coverage, "indicative_residual_capacity", None), getattr(coverage, "number_of_sites_with_planning_activity", 0))
+            if coverage else "Not determined"
         ),
         "Local Plan": card["plan_name"],
         "Intended Use": card["intended_use_label"],

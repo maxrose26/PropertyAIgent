@@ -255,7 +255,7 @@ def test_the_tool_has_no_model_network_or_sync_dependency_and_registers_authoris
     clis = json.loads((root / "verification/stage1_cli_manifest.json").read_text())
     assert clis["scripts/reonboard_stale_mandates.py"]["required_scope"] == "launch:reonboard_stale_mandates"
     script = (root / "scripts/reonboard_stale_mandates.py").read_text()
-    assert "authorised_cli('reonboard_stale_mandates')" in script and "--apply" in script and "PARITY_ORACLE = v6_parity_oracle" in script
+    assert "authorised_cli('reonboard_stale_mandates')" in script and "--apply" in script and "PARITY_ORACLE = v7_parity_oracle" in script
 
 
 def test_bootstrap_is_preserved_and_documented_as_not_the_approved_transition_path():
@@ -286,6 +286,7 @@ def test_the_existing_command_boundaries_of_the_onboarding_functions_are_unchang
 # --- V7C parity oracle wiring (the TEMPORARY frozen v6 oracle) and digest binding -------------------------------------------------------------
 
 from verification.transition.v6_parity import v6_parity_oracle   # noqa: E402  (transition-only; tests and the CLI script are its only callers)
+from verification.transition.v7_parity import v7_parity_oracle   # noqa: E402
 
 
 def test_the_real_frozen_v6_oracle_passes_on_the_same_universe_and_a_passing_run_lists_no_per_opportunity_lines(seeded):
@@ -300,7 +301,7 @@ def test_the_real_frozen_v6_oracle_passes_on_the_same_universe_and_a_passing_run
 
 def test_the_cli_wires_the_frozen_oracle_and_the_application_package_does_not():
     import scripts.reonboard_stale_mandates as script
-    assert script.PARITY_ORACLE is v6_parity_oracle
+    assert script.PARITY_ORACLE is v7_parity_oracle
     import ast
     tree = ast.parse(inspect.getsource(mr))
     imported = {n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)} | {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}

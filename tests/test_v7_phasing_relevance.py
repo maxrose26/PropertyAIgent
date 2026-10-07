@@ -158,7 +158,7 @@ def test_classification_and_investigative_flag_are_unchanged_from_v6_for_every_r
         before = (v7.classification, v7.is_investigative_exception, tuple(v7.matches), tuple(v7.unknown), tuple(v7.investigate), tuple(v7.does_not_match))
         phasing_is_acquisition_relevant(profile, f, ctx)                                 # pure: calling the rule changes nothing
         assert before == (v7.classification, v7.is_investigative_exception, tuple(v7.matches), tuple(v7.unknown), tuple(v7.investigate), tuple(v7.does_not_match))
-    assert bm.BUYER_MATCHING_POLICY_VERSION == 7
+    assert bm.BUYER_MATCHING_POLICY_VERSION == 8
 
 
 def test_the_phasing_evidence_states_and_derivation_are_unchanged():

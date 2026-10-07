@@ -216,7 +216,7 @@ def test_fit_labels_use_the_existing_language_and_no_policy_is_changed():
     assert fp.fit_label("STRONG_FIT", False) == "Strong fit" and fp.fit_label("POSSIBLE_FIT", False) == "Possible fit"
     assert fp.fit_label("INSUFFICIENT_EVIDENCE", True) == "Investigate" and fp.fit_label("INSUFFICIENT_EVIDENCE", False) == "Insufficient evidence"
     assert fp.fit_label("NOT_SUITABLE", False) == "Not suitable"
-    assert BUYER_MATCHING_POLICY_VERSION == 7
+    assert BUYER_MATCHING_POLICY_VERSION == 8
 
 
 def test_presenter_does_not_import_policy_g2_or_do_arithmetic_on_units():

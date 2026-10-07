@@ -115,7 +115,7 @@ def test_6_trusted_full_site_application_maps_to_full():
                           number_of_related_sites=1, number_of_linked_applications=1, number_of_sites_with_planning_activity=1)
     result = classify_planning_activity_coverage(coverage)
     assert result.classification == FULL
-    assert "95%" in result.reason
+    assert "95%" not in result.reason and "Planning activity has been identified" in result.reason      # no capacity-percentage inference is presented
 
 
 def test_7_no_matched_site_maps_to_none_found_with_correct_wording():
@@ -141,7 +141,8 @@ def test_9_trusted_partial_application_partial():
     coverage = _coverage(PARTIAL_COVERAGE, development_coverage_percentage=0.3, indicative_residual_capacity=700)
     result = classify_planning_activity_coverage(coverage)
     assert result.classification == PARTIAL
-    assert "700" in result.reason
+    assert "700" not in result.reason and "30%" not in result.reason                                   # no residual-homes / coverage arithmetic is presented
+    assert "available or unplanned" in result.reason                                                    # states the NON-inference explicitly
 
 
 def test_9b_substantially_covered_also_maps_to_partial():

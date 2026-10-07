@@ -229,7 +229,7 @@ class RelatedApplicationSummary:
 
 @dataclass(frozen=True)
 class SiteControlSection:
-    """One Site's (or the allocation's residual land's) ownership/control
+    """One Site's (or the allocation's potential residual scope's) ownership/control
     summary within an allocation's Ownership & Control view (Section 6/7) -
     `groups` is always empty for a residual section; a residual section
     never carries any relationship evidence, by construction.
@@ -435,7 +435,7 @@ def get_allocation_control_intelligence(
     ]
     if indicative_residual_capacity:
         sections.append(SiteControlSection(
-            label="Residual allocation capacity", site_id=None, is_residual=True, groups=[],
+            label="Potential residual scope", site_id=None, is_residual=True, groups=[],
             residual_capacity=indicative_residual_capacity, show_ownership_intelligence_gap_cue=True,
         ))
     return sections

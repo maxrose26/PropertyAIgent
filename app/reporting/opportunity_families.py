@@ -48,6 +48,7 @@ FITS = (STRONG_FIT, POSSIBLE_FIT, INSUFFICIENT_EVIDENCE, NOT_SUITABLE)
 SLOT_LIFECYCLE = "LIFECYCLE"    # the one whole-site lifecycle slot per site (site / recent_permission / long_pending)
 SLOT_PHASE = "PHASE"            # a named phase / scope card
 SLOT_ALLOCATION = "ALLOCATION"  # a strategic allocation
+SLOT_RESIDUAL = "RESIDUAL"      # V8-B: an R1 DERIVED residual subject (never persisted); R2 is context only and is never a subject
 
 ROLE_ALSO_STRONG_FIT = "ALSO_STRONG_FIT"
 ROLE_ALSO_POSSIBLE_FIT = "ALSO_POSSIBLE_FIT"
@@ -108,7 +109,7 @@ class FamilySubject:
             raise UnsupportedSubject(f"anchor id {self.anchor_id!r} is not a valid id")
         if not isinstance(self.subject_key, str) or not self.subject_key or self.subject_key != self.subject_key.strip():
             raise UnsupportedSubject("subject_key must be a non-empty, trimmed string")
-        allowed = {SLOT_ALLOCATION} if self.domain == STRATEGIC_LAND else {SLOT_LIFECYCLE, SLOT_PHASE}
+        allowed = {SLOT_ALLOCATION} if self.domain == STRATEGIC_LAND else {SLOT_LIFECYCLE, SLOT_PHASE, SLOT_RESIDUAL}
         if self.slot not in allowed:
             raise UnsupportedSubject(f"slot {self.slot!r} is not valid for domain {self.domain!r}")
         if self.fit not in FITS:
@@ -280,6 +281,7 @@ _CANON = r"([1-9][0-9]*)"
 _FEED_LIFECYCLE_RE = re.compile(rf"^opp-(?:lapse|recent-permission|long-pending)-{_CANON}$")
 _FEED_PHASE_RE = re.compile(rf"^opp-phase-{_CANON}-(.+)$")
 _FEED_ALLOCATION_RE = re.compile(rf"^opp-feed-alloc-{_CANON}$")
+_FEED_RESIDUAL_RE = re.compile(rf"^opp-residual-{_CANON}-([0-9a-f]{{20}})$")
 _CANON_FULL_RE = re.compile(r"^[1-9][0-9]*$")
 
 
@@ -308,6 +310,11 @@ def subject_from_feed_card(card: Mapping) -> FamilySubject:
     else:
         match = _FEED_LIFECYCLE_RE.match(card_id)
         slot = SLOT_LIFECYCLE
+        if not match:
+            match = _FEED_RESIDUAL_RE.match(card_id)
+            slot = SLOT_RESIDUAL
+            if match and (card.get("residual_subject_id") or "").rsplit(":", 1)[-1] != match.group(2):
+                raise UnsupportedSubject(f"feed residual card {card_id!r} does not carry its derived residual identity")
         if not match:
             match = _FEED_PHASE_RE.match(card_id)
             slot = SLOT_PHASE

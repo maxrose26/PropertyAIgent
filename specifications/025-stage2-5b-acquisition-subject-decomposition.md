@@ -816,3 +816,166 @@ bounded to execute independently.
 5. Evaluation-fingerprint version impact (verified at implementation).
 6. Whether a second RM application sharing a phase code is a scope collision requiring its own
    evidence rule (G2).
+
+
+## Final slice — opportunity routes and strategic scale integrity
+
+Status: **IMPLEMENTED (presentation/representation) — matching integration is a SEPARATE decision (see "Policy version").** Accepted by REVIEW after the strategic-allocation architecture investigation.
+
+### Opportunity-route taxonomy (a derived label; never a rank)
+
+Three dimensions are kept separate and are never collapsed into one score: **A. opportunity route** (what kind of acquisition opportunity), **B. buyer fit** (STRONG_FIT / POSSIBLE_FIT / INSUFFICIENT_EVIDENCE / NOT_SUITABLE plus the investigative flag), **C. evidence / readiness** (how strong the underlying evidence is; this slice only states the basis honestly and adds no score).
+
+> **OPPORTUNITY ROUTE IS NOT A RANK. A STRATEGIC ALLOCATION IS NOT AUTOMATICALLY WEAKER OR STRONGER THAN A CONSENTED SITE. BUYER FIT AND EVIDENCE MATURITY ARE SEPARATE CONCEPTS.**
+
+| Route | Deterministic source (existing architecture) |
+|---|---|
+| `STRATEGIC_ALLOCATION` | a strategic-land card (a Local Plan allocation) |
+| `PHASE_OR_PLOT` (subtype PHASE or PLOT) | a planning subject scoped to a **named** phase or a **material plot** (any phase code other than the unphased bucket); a plot code is `plot_`-prefixed by the existing scope resolution. A plot is a valid subject but **not** phasing evidence |
+| `OUTLINE_CONSENTED_SITE` | a wider planning subject whose operative **consented** position (`scheme_reconciliation.build_operative_planning_facts`) is an outline permission (`planning_role == "outline"`, from the portal Application Type first) |
+| `CONSENTED_SITE` | the same, where the consented position is full / hybrid / reserved matters / other substantive |
+| `UNCLASSIFIED_PLANNING_ROUTE` | fail-closed neutral value: no resolved consented position (e.g. a pending application) or no role evidence — never guessed |
+| (promotable land) | **Stage 2.5C — not represented** |
+
+"Consented site" deliberately carries the caveat *"whether development has started is not verified"*: the architecture holds no positive "development not started" fact (absence of commencement evidence is an evidence gap, never confirmed non-commencement), so the Product Owner wording "development not started" is **not** claimed. No route is derived by a model or heuristic over free text beyond the existing deterministic role classifier. The route is computed in `app.reporting.opportunity_route`, carried only in presentation, and is never an input to fit, ordering, family or subject identity, opportunity fingerprints, monitoring or phasing evidence (tested).
+
+### Strategic scale semantics (plan-stated, unverified)
+
+A strategic allocation stores up to three plan-stated figures. Representation through the existing count semantics (`app.reporting.strategic_capacity`; source semantics from `format_capacity` / `kpi_capacity_contribution`):
+
+| Stored figures | Representation |
+|---|---|
+| minimum = maximum | `EXACT` (the plan states one figure as floor and ceiling) — still plan-stated and unverified |
+| minimum < maximum | `RANGE lower=min upper=max` (an indicative figure inside it is recorded, never averaged) |
+| minimum only | open-ended `RANGE lower=min upper=None` — a **floor**; never exact |
+| maximum only | open-ended `RANGE upper=max` — a ceiling only |
+| indicative only | `APPROXIMATE value=indicative` (unbounded estimate) |
+| nothing | `UNKNOWN` |
+| non-positive / non-integer figure, minimum > maximum, an indicative figure outside the stated floor/ceiling or different from an equal min/max | `UNKNOWN` (fail closed) |
+
+Wording is always qualified: *"Plan-stated capacity: 150 homes — unverified"*, *"Plan-stated range: 60–300 homes — unverified"*, *"Plan-stated minimum: 100 homes — unverified"*, and so on. It never says a bare number, and implies no permission, deliverability, ownership, availability, promoter interest or commencement. A strategic STRONG_FIT is **not** removed because the opportunity is strategic: it states a plan-stated capacity fits and nothing blocks it; it is not buyer-ready or independently verified.
+
+### Residual-capacity contract (SUPERSEDES the earlier "residual-inference prohibition"; DESIGN — implemented in V8-B and the final hardening; where this section differs, the V8-B and final-hardening sections govern)
+
+The earlier ruling to neutralise residual capacity product-wide is **WITHDRAWN**. Residual capacity is commercially valuable acquisition intelligence (e.g. an outline permission for 500 homes with an evidenced subordinate reserved-matters scope of 300 may leave an apparent ~200 residual that is not visible as a standalone application). The governing principle is:
+
+> **PRESERVE RESIDUAL INTELLIGENCE. REMOVE UNJUSTIFIED RESIDUAL CERTAINTY.**
+
+The defect is never the calculation; it is presenting a *derived* residual as if it proved available land, ownership/control, a legally separate parcel, guaranteed undeveloped capacity, willingness to sell or a non-overlapping planning scope. Until the inventory-driven redesign is implemented, the user-facing neutralisation made earlier on this branch is **provisional** and is to be replaced surface-by-surface by the ladder below (a surface keeps a residual figure only where it meets the contract; otherwise it becomes potential-residual investigation context; if a surface cannot express the distinction safely the number is hidden there but the intelligence is preserved elsewhere).
+
+**Four separate dimensions (never collapsed into one score):** A. opportunity route (what kind of proposition), B. buyer fit, C. evidence / readiness, D. **availability / control** (is there evidence the opportunity is actually available or controllable — absent for a derived residual).
+
+**Taxonomy (current):** CONSENTED_SITE, OUTLINE_CONSENTED_SITE, PHASE_OR_PLOT, **RESIDUAL_OPPORTUNITY** (a DERIVED lead: qualified planning evidence indicates part of a wider planning scope may not yet be accounted for by identified subordinate scopes; not automatically a Strong Fit), STRATEGIC_ALLOCATION, UNCLASSIFIED_PLANNING_ROUTE; PROMOTABLE_LAND is Stage 2.5C. Strategic allocations remain separate families; allocation capacity minus planning-permission capacity is **never** automatically a qualified residual.
+
+**Qualification ladder (proposed; implement only where existing evidence supports it):**
+
+| Level | Meaning | Output |
+|---|---|---|
+| R1 QUALIFIED RESIDUAL | confirmed wider/parent scope; confirmed subordinate relationship (deterministic provenance, e.g. an exact reserved-matters citation of the outline); compatible unit metrics; sufficiently reliable counts; no unresolved overlap/conflict among subtracted scopes | `RESIDUAL_OPPORTUNITY` with an **apparent** residual count. *(Reconciled in the final hardening: V8-B derives an R1 count only from EXACT inputs; an approximate or range input is R2/R3, never an approximate residual - see "V8-B" below.)* |
+| R2 POTENTIAL RESIDUAL | evidence suggests part of the wider development may remain outside identified subordinate planning activity, but safe arithmetic cannot be established | "investigate potential residual opportunity", **no trusted count** |
+| R3 NO RESIDUAL CONCLUSION | insufficient, incomparable or conflicting evidence | no residual proposition |
+
+**Safe-arithmetic rules:** subtraction never occurs merely because two records are linked to the same site. A. Outline 500 + RM 300 evidenced subordinate -> potentially R1 (~200 apparent). B. Outline 500 + RM1 300 + RM2 250 with unknown relationship -> never -50; R2/R3. C. Allocation 1,000 + full permission 600 without comparable-scope proof -> no residual. D. Parent 500 + proven distinct, non-overlapping Phase 1 200 + Phase 2 150 -> potentially ~150, only if the evidence contract proves subtraction valid. E. Parent 500 + amended application 500 -> never subtracted to zero. F. Approximate child -> no residual count (R2 where containment is evidenced, else R3; an approximate residual is NOT implemented - reconciled in the final hardening). G. Different metrics -> no subtraction. H. A child that may supersede another -> no double subtraction.
+
+**Negative-inference controls (every residual):** a residual does NOT prove land is available, the owner will sell, the buyer can acquire it, a separate title or parcel geometry exists, independent deliverability, that permission remains available for exactly that residual, that no development has commenced, or that the residual is contiguous. User-facing wording: e.g. *"RESIDUAL OPPORTUNITY — Possible fit — Apparent residual capacity: ~200 homes — derived from a 500-home wider permission and an evidenced 300-home subordinate scope; availability, ownership and precise remaining scope are unverified."*
+
+**Open PRODUCT DECISIONS (not chosen silently):** (1) the buyer-fit ceiling for a qualified residual — whether R1 with exact compatible inputs may reach STRONG_FIT or every derived residual caps at POSSIBLE_FIT initially; (2) whether residual-specific representative policy is needed (a residual could be the family representative using existing fit/evidence ordering; no new ranking tier is introduced); (3) residual subject identity — A. derived FamilySubject (needs a new id kind, which the G1 strict parser currently rejects), B. presentation-only analytical child, C. an existing subject mechanism; smallest option without schema or persistence is B, promoting to A only once R1 is stable; (4) AI-summary grounding: a QUALIFIED residual may state the deterministic inputs, the apparent calculation and caveats; a POTENTIAL residual only "planning evidence suggests a possible residual scope requiring investigation"; an unqualified residual must never be invented (tests, no model call).
+
+### Strategic / planning separation and cross-reference
+
+Strategic allocations remain separate opportunity families; they are **not** consolidated into planning families (investigation finding; this restates the existing decision above). Accepted allocation↔planning relationships may later be shown as a neutral cross-reference (`ALLOCATION_CONTEXT` / related planning development): informational only, never affecting fit, ranking, counts or the family representative; no containment, ownership or availability implied. **Deferred.**
+
+### Policy version and v8 matching semantics (approved in principle: BUYER_MATCHING_POLICY_VERSION 7 -> 8)
+
+Representing strategic capacity with proper count semantics changes buyer-fit output for the same stored evidence, so the matching policy version moves 7 -> 8 (REVIEW approved in principle). If a qualified-residual matching change is ALSO introduced before v8 is released it joins the same v8 contract (no v9), with strategic-scale and residual test coverage kept logically separate. Route, wording and the scale view themselves remain presentation and change no fingerprint.
+
+**Strategic scale in the matcher (ordinary bounded-scale buyers):** EXACT -> the existing preferred/discovery logic; APPROXIMATE -> the existing uncertainty logic; RANGE -> evaluated as a range; OPEN FLOOR (minimum only) and OPEN CEILING (maximum only) are never exact; UNKNOWN never becomes STRONG merely through the absence of contradictory evidence. For Nesten a minimum-only 150 does not become STRONG merely because 150 lies inside 50-200 (the true capacity may exceed the discovery maximum); a maximum-only figure is never treated as exact.
+
+**Strategic Land Buyer large-allocation route (``large_allocation_is_self_qualifying``) is preserved without falsifying counts:** the route fires only where the evidence PROVES the approved threshold, which is the existing one (scale above the mandate's discovery maximum): EXACT above it; RANGE or OPEN FLOOR whose **lower bound** is above it; never an OPEN CEILING; never an APPROXIMATE/unbounded estimate; never UNKNOWN or malformed; a range that crosses the threshold cannot prove it and stays uncertain. No count is ever converted to an exact value to preserve the route.
+
+**Transition gate:** a **frozen v7 matcher oracle** (verification/transition, pinned to the exact accepted pre-v8 source commit/blob/function hash/dependencies; the v6 oracle is NOT reused) with a v7->v8 differential gate that permits only the approved delta categories STRATEGIC_CAPACITY_SEMANTICS, STRATEGIC_LARGE_ALLOCATION_ROUTE_PRESERVATION and (if implemented) QUALIFIED_RESIDUAL_OPPORTUNITY. Any unrelated planning-delivery classification or investigative-flag change fails the gate.
+
+**Benchmark:** the v4 fixtures, the v6 checkpoint and the approved v7 benchmark are preserved untouched; a separate PROPOSED v8 benchmark (strategic cases 1-14 and residual cases 15-24) is returned to REVIEW with ``approved_by_product_owner`` false.
+
+### Roadmap boundaries
+
+2.5B — relationships between already-known subjects and honest deterministic representation (this slice). 2.5C — promotable-land intelligence (allocation/promotable land as an acquisition opportunity itself; promotion, constraints, ownership/promoter context). 2.6 — qualified documentary evidence (verified capacity provenance, documentary phasing, affordable evidence).
+
+### Performance record (not optimised here)
+
+~2,829 Nesten queries over 429 families at the corrected Gate B run (about 6.6 per family; planning contexts ~12–13 queries each; ~one constant-result control lookup per allocation). Future: request-scoped context reuse, batching by site ids, removing constant-result per-allocation lookups.
+
+## V8-A checkpoint: strategic scale matching, frozen v7 oracle, differential gate
+
+- `BUYER_MATCHING_POLICY_VERSION` 7 -> 8. Strategic allocation facts carry `count_assessment` (plan-stated, unverified) instead of the legacy `maximum or minimum` scalar; `unit_count` is retained for display/fingerprint continuity only.
+- Semantics: exact -> unchanged; open floor / open ceiling / malformed -> INSUFFICIENT_EVIDENCE (never a fabricated count). An open floor wholly above the discovery maximum proves the scale is outside discovery (no ceiling needed). The Strategic Land Buyer large-allocation route is preserved only where the plan-stated LOWER bound is itself above the discovery maximum.
+- Frozen v7 oracle: `verification/transition/frozen_v7_matcher.py` (verbatim `assess_buyer_fit` at 60dcbd99, function sha256 `a2bf0d22...`, 19 definition pins + 5 whole-file pins); `v7_parity.py` feeds it strategic facts with `count_assessment=None`.
+- Differential categories: EQUAL; EXPECTED_STRATEGIC_DELTA (strategic, non-EXACT capacity, not the preserved route); UNEXPECTED_REGRESSION (any planning-delivery difference, any EXACT-strategic difference, any preserved-route difference). Residual-subject additions are classified in V8-B.
+- Finding for REVIEW: ranges now evaluate through the existing uncertain-scale block, so S3/S4 (range inside / crossing preferred) keep their classification but gain the investigative flag. Recorded, not changed.
+- (Completed in V8-B and the final hardening below.) Was remaining: R1/R2/R3 residual ladder (R1 capped at POSSIBLE_FIT), derived residual subject, residual evidence fingerprint, per-surface table, AI-summary grounding, fingerprint assessment (opportunity fingerprints use only `unit_count`: a capacity-kind change with an unchanged scalar is not detected by monitoring - to be reported/fixed).
+
+
+## V8-B: residual opportunity ladder (dormant R1, context-only R2) - final contract
+
+Decision (Product Owner / REVIEW): R1 is built as a DORMANT capability; R2 is investigation CONTEXT, not a subject. Supersedes the "R2 = INSUFFICIENT_EVIDENCE + investigative subject" draft above.
+
+### Ladder
+- **R1 QUALIFIED RESIDUAL** - the only level that creates a `RESIDUAL_OPPORTUNITY` derived `FamilySubject` (slot `RESIDUAL`, id kind `residual`, never persisted, never emit-capable into persistence). Needs every predicate TRUE. Carries a derived exact residual count, identity, evidence fingerprint. Buyer fit is capped at **POSSIBLE_FIT** (`app.policy.residual_fit`, a wrapper over the unchanged v8 matcher: a would-be STRONG is reported as POSSIBLE with a stated reason; never via fake unknowns). Production availability today: NONE (dormant by evidence).
+- **R2 POTENTIAL RESIDUAL SIGNAL** - context only: no subject, no subject id, no fingerprint, no trusted count, no fit of its own, never a family representative, never a route. Shown as "Potential residual scope - investigate". Attached to the existing planning family (planning: containment evidenced, safe arithmetic not) or strategic allocation (internal coverage heuristic is PARTIAL).
+- **R3 NO CONCLUSION** - nothing. Missing evidence is never zero; a zero, negative, conflicting, metric-mismatched or unevidenced result creates no residual proposition.
+
+### Predicates (each TRUE / FALSE / UNKNOWN with a provenance basis; UNKNOWN never becomes TRUE)
+PARENT_SCOPE_QUALIFIED, CHILD_RELATIONSHIP_QUALIFIED (explicit CONTAINED_IN evidence), COUNT_METRICS_COMPATIBLE, COUNT_PRECISION_COMPATIBLE (every count EXACT), NO_SUPERSESSION_CONFLICT, SIBLING_NON_OVERLAP_ESTABLISHED, CHILD_SET_COMPLETE. Implemented in `app.reporting.residual_opportunity` over the existing safety primitive `assess_residual_planning_capacity` (unchanged).
+- **CHILD_SET_COMPLETE** means sourced planning evidence names the complete relevant child set of the parent (`(parent_id, child_ids, provenance)`); the supplied children must equal that set exactly. It never means "all children in our database", same-site membership, arithmetic that nearly sums, or phase labels.
+- **SIBLING_NON_OVERLAP_ESTABLISHED** needs explicit sourced pair evidence for every child pair (a single contributing child has no sibling). Never inferred from labels, references, addresses, dates or arithmetic.
+- Production evidence producer: `production_residual_evidence` supplies G2 containment ONLY (`derive_containment`, RM direct-parent citation). Completeness and non-overlap have NO producer; the single injection point for a later qualified (Stage 2.6) producer is the `evidence_provider` argument of `build_site_residuals` / `load_buyer_family_inputs`. No Stage 2.6 extraction, no model call, no schema.
+- Limitation recorded: the shared provenance rule accepts any non-blank string, so a future producer is responsible for qualified provenance.
+
+### R1 arithmetic and precision
+`residual = parent exact count - sum(distinct contained operative child exact counts)`; the same child subject supplied twice is one subject; a whole-site "amendment" is not a containable child (no double subtraction); children exceeding the parent are a conflict (R3), never negative; zero residual -> R3. If any input is approximate / a range / open-ended, no residual is derived (Part 39 challenge: a safe residual RANGE is possible in principle but is NOT implemented; such cases are R2 where containment is evidenced, else R3). An exact residual is never forced.
+
+### Identity and evidence fingerprint (R1 only)
+- Identity: `planning_delivery:residual:{site_id}:{sha256(v, parent subject id, sorted unique child subject ids)[:20]}` - from the qualified child set, not the residual number; stable under child reordering and duplicates; moves with the parent scope or the child set.
+- Evidence fingerprint (sha256 over canonical JSON): version; level; parent (id, metric, exact value, source application references); each child (id, exact value, references); the containment, non-overlap and child-set evidence actually used (with provenance); the residual value. EXCLUDES buyer, fit, wording, rank, timestamps. Moves on parent/child count, source reference, relationship, completeness or non-overlap evidence changes.
+- R2 has neither. Monitoring implication: opportunity fingerprints of existing subjects are unchanged by R2 (the R2 text is presentation context on the card, not a fingerprint input); a derived R1 subject is not persisted or monitored in this slice.
+
+### Family integration and representative
+The R1 subject joins the existing planning family of its site (`group_into_families`, slot `RESIDUAL`); no new family, strategic families untouched, no residual-specific rank: representative order stays fit > count evidence > key. A genuine STRONG phase/plot/permission outranks a POSSIBLE R1; a POSSIBLE R1 may represent an otherwise investigative/insufficient family. R2 never participates.
+
+### Allocation residual
+The Stage 3A allocation-minus-planning arithmetic stays internal (it still selects the signal) and is only a TRIGGER for R2 context (`is_potential_residual_scope`: PARTIAL_COVERAGE, status ok, positive subtraction, activity > 0). It is never copied into any result, never reaches buyer matching and never becomes R1 or a trusted count.
+
+### Surface table (current -> R1 / R2 / R3)
+| Surface | Before V8-B | R1 | R2 | R3 |
+|---|---|---|---|---|
+| Buyer family feed / dashboard | neutral "planning activity" line | derived subject "Derived residual capacity (N homes, derived, apparent)" + caveat, route RESIDUAL_OPPORTUNITY | "Potential residual scope - investigate" info line on the family | nothing |
+| Strategic card / opportunity signal | neutral planning-activity line | n/a (allocation is never R1) | R2 text replaces the coverage-percentage reason (partial coverage only) | neutral line |
+| Gate 4B coverage reasons | neutral + "No residual or available land is inferred" | n/a | unchanged (factual) | unchanged |
+| Allocation discovery table/CSV | "Indicative Residual Capacity: N" | n/a | "Potential Residual Scope: Potential residual scope - investigate" | "Not indicated" |
+| Allocation report CSV / PDF (summary, per-allocation, overview) | residual number, summed total | n/a | label only; overview counts allocations with potential scope; no sum | "Not indicated" |
+| Shortlist tile | "Indicative residual ~N" | n/a | "Potential residual scope" label | "Not indicated" |
+| Local Plan Sites page (ownership/control residual section) | "Residual allocation capacity: ~N homes not accounted for" | n/a | heading "Potential residual scope" + R2 text, no number | no residual text |
+| Cross-site AI grounding | "indicative residual capacity: N" + numeric allow-list | n/a | "potential residual scope - investigate (a distinct residual scope and its capacity are not yet established)"; residual number removed from allow-list | nothing |
+| Allocation AI summary grounding | "Indicative residual allocation capacity: N" | n/a | number-free context line; rule 0 forbids subtraction/availability inference | "none indicated - make no residual statement" |
+| Site profile `assess_delivery_scope` | no residual | unchanged (not integrated this slice; reported) | - | - |
+
+Prompt versions: allocation summary `v8 -> v9`; cross-site `v1 -> v2` (stale summaries regenerate under the existing staleness check). Buyer matching policy stays at v8.
+
+### Strategic fingerprint correction (carry-forward)
+`strategic_capacity_fingerprint_fields` adds one `capacity_semantics` entry (precision, value, lower, upper) ONLY for non-EXACT strategic capacities. Exact capacities keep their pre-v8 fingerprint byte-for-byte; every non-exact kind gains a one-time fingerprint change (these are exactly the subjects whose v8 matching differs, re-evaluated at the v8 transition anyway). No planning fingerprint changes.
+
+### Narrowed differential allow-list (carry-forward)
+`EXPECTED_STRATEGIC_DELTA` = non-EXACT strategic capacity, not the preserved Strategic Land Buyer route, AND exactly one of: (a) investigative flag added on an unchanged classification; (b) STRONG/POSSIBLE -> INSUFFICIENT_EVIDENCE; (c) unknown/malformed capacity staying INSUFFICIENT but dropping the investigative flag v7 derived from an unusable scalar; (d) bounded RANGE STRONG -> POSSIBLE with the flag added. Any upgrade, any new NOT_SUITABLE, any removed flag on a usable capacity, any planning-delivery difference is UNEXPECTED_REGRESSION. `MatchingFacts` and `B2MatchingContext` (live imports of the frozen v7 oracle) are pinned by sha256 in `verification/transition/v7_parity.py`.
+
+### Performance
+No new database reads: the residual ladder reuses the per-site `OperativePlanningFacts` the family feed already computes (`_attach_planning_delivery_matching_facts` now returns them). In-memory work is per site with a phase child (one `scoped_count_assessment` per phase + one `derive_containment` per child). The existing per-card/per-site context memoisation is unchanged; nothing was optimised. No N+1 introduced.
+
+
+## Final pre-merge hardening (Product Owner decisions)
+
+1. **Residual identity (final).** Same parent scope + same qualified child set + changed parent COUNT -> the SAME residual subject id and a CHANGED evidence fingerprint. A changed parent SCOPE identity (or child set) -> a new subject id. Identity answers "which derived proposition is this?"; the fingerprint answers "has the evidence supporting it materially changed?". Pinned by `tests/test_v8c_final_hardening.py`.
+2. **v7 -> v8 differential (final).** Transitions (c) and (d) are approved and stay bounded: (c) only for UNKNOWN (malformed) capacity; (d) only for a bounded RANGE with both bounds and the flag added. No generic "strategic therefore expected" rule exists; an unexpected NOT_SUITABLE, planning-delivery delta, exact-strategic delta or preserved Strategic Land route delta each FAIL (proved in `test_the_four_unexpected_regression_classes_each_fail`).
+3. **R2 wording (final).** Planning: "Potential residual scope — investigate. A wider permission and subordinate planning activity are identified, but a distinct residual acquisition scope and its capacity are not yet established." Allocation: "... Planning evidence indicates partial development coverage, but a distinct residual acquisition scope and its capacity are not yet established." R2 text never asserts that a residual exists, a count, availability, ownership, a separate parcel or title, remaining land or a further phase ("remaining acquisition scope" removed everywhere). A string-literal sweep over every residual surface is a test.
+4. **`_children_for` stays strict** (operative-approved children only). **Stage 2.6 limitation (recorded):** refused or superseded children, documentary complete child sets and richer scope relationships are Stage 2.6 work; they must not be anticipated by weakening current qualification.
+5. **Benchmark.** The 24-row v8 expectation table is APPROVED by the Product Owner exactly as reported at `8fd1c7d` (`approved_by_product_owner = true`); `EXPECTATION_DIGEST_AT_APPROVAL` pins the approved expectation fields and a change fails its test (the expectation is never edited to fit the code).
+6. **AI / prompt contract (tests in hosted CI).** R2: the allocation-summary prompt supplies no residual count (the 1,000 / 600 example never shows 400), contains no instruction to calculate one, explicitly prohibits deriving a residual by subtraction and any availability / ownership / title / geometry / further-phase inference, and labels the proposition potential only. R3: "none indicated - make no residual statement". R1: a qualified residual may be given to a model only through `r1_prompt_fact` as derived (apparent) with the approved caveat (no prompt uses R1 today). Factual allocation capacity, identified capacity and coverage percentage remain in the prompt; the model-output validator does not whitelist a residual figure. Local Plan AI-summary tests had stale fixtures (applications without a decision or proposal carry no trusted count since Gate 2B; CLI/command tests called wrapped commands without a machine scope; fixture outputs cited the old residual figure) - fixed without weakening any assertion, and all five AI-summary files now run in hosted CI.

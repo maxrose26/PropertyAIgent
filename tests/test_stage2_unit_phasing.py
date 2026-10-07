@@ -1398,7 +1398,7 @@ def inspect_source(module):
 def test_s25a_fingerprint_ownership(monkeypatch):
     from app.policy import buyer_profile_store
     from app.reporting.opportunity_universe import compute_opportunity_fingerprint
-    assert _bm.BUYER_MATCHING_POLICY_VERSION == 7
+    assert _bm.BUYER_MATCHING_POLICY_VERSION == 8
     v6 = buyer_profile_store.compute_buyer_mandate_fingerprint(NESTEN_HOMES)
     fields = {"opportunity_type": PLANNING_DELIVERY, "unit_count": 105, "development_type_raw": "houses"}
     opportunity_v6 = compute_opportunity_fingerprint(fields)

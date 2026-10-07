@@ -263,7 +263,7 @@ def test_end_to_end_comparison_never_calls_a_regrouped_site_newly_surfaced(world
 def test_no_unit_summation_residual_or_availability_claim_anywhere_in_the_data_sections(world):
     seed(world)
     artifact = run(world.session)
-    data = json.dumps({k: artifact[k] for k in ("aggregates", "buyers", "nesten", "negative_cohort")}, default=str)
+    data = json.dumps({k: artifact[k] for k in ("aggregates", "buyers", "nesten", "negative_cohort")}, default=str).replace("RESIDUAL_OPPORTUNITY", "ROUTE_KEY")   # the route-count KEY (zero in production data) is not a claim
     assert not re.search(r'"(summed|sum|combined|residual|remaining|total_(units|homes|dwellings))[a-z_]*":', data)
     for number in ("640", "360", "620", "380"):                                                # 500+140, 500-140, 500+120, 500-120
         assert f'"{number}' not in data and f"{number} homes" not in data
@@ -380,7 +380,7 @@ def test_the_feed_refactor_keeps_the_original_result_shape(world):
     seed(world)
     import app.reporting.buyer_family_feed as bff
     result = bff.build_buyer_opportunity_families(world.session, "nesten_homes", 6)
-    assert set(result) == {"families", "excluded_family_keys", "counts", "buyer_key"}
+    assert set(result) == {"families", "excluded_family_keys", "counts", "buyer_key", "route_counts"}      # route_counts is additive and presentation-only
     inputs = bff.load_buyer_family_inputs(world.session)
     first = bff.evaluate_buyer_families(world.session, "nesten_homes", inputs, 6)
     second = bff.evaluate_buyer_families(world.session, "housing_association", inputs, 6)

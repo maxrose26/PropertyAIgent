@@ -79,6 +79,10 @@ def mandate_digest(policy) -> str:
 
 def _count_record(card: dict) -> dict:
     assessment = card.get("count_assessment")
+    scale = card.get("strategic_scale")
+    if assessment is None and scale is not None:               # strategic allocation: the stored plan figure(s) AND their basis (plan-stated, unverified) - reported, never summed
+        return {"display": scale["display"], "precision": scale["precision"], "value": scale["value"], "lower": scale["lower"], "upper": scale["upper"], "scope": "allocation",
+                "basis": scale["basis"], "verified": scale["verified"]}
     if assessment is None:
         return {"display": None, "precision": None, "value": None, "lower": None, "upper": None, "scope": None}
     return {"display": assessment.label(), "precision": assessment.precision, "value": assessment.value, "lower": assessment.lower, "upper": assessment.upper, "scope": assessment.scope_type}
@@ -90,7 +94,9 @@ def subject_record(member) -> dict:
     record = {"subject_key": member.subject_key, "slot": member.slot, "named_phase": _is_named_phase(member), "label": _subject_label(member, card), "fit": fit.classification,
               "investigative": bool(fit.is_investigative_exception), "phasing_relevant": card.get("acquisition_phasing_relevant"),
               "reasons": {"matches": list(fit.matches), "unknown": list(fit.unknown), "investigate": list(fit.investigate), "does_not_match": list(fit.does_not_match)}}
-    record.update({"count": _count_record(card)})
+    from app.reporting.opportunity_route import derive_opportunity_route
+    route = derive_opportunity_route(card)
+    record.update({"count": _count_record(card), "route": route.route, "route_subtype": route.subtype})
     return record
 
 
@@ -232,7 +238,9 @@ def population(analyses: list[dict]) -> dict:
     planning = [a for a in analyses if a["domain"] != STRATEGIC_LAND]
     oversized = [a for a in planning if a["oversized_wider"]]
     by_state = Counter(a["state"] or "FACT_MISSING" for a in oversized)
-    return {"families_evaluated": len(analyses), "strategic_families": len(analyses) - len(planning), "planning_delivery_families": len(planning),
+    from app.reporting.opportunity_route import derive_opportunity_route, route_counts
+    return {"route_counts": route_counts(derive_opportunity_route(a["family"].representative.source or {}).route for a in analyses),
+            "families_evaluated": len(analyses), "strategic_families": len(analyses) - len(planning), "planning_delivery_families": len(planning),
             "fit": {b: buckets.get(b, 0) for b in ("STRONG_FIT", "POSSIBLE_FIT", "INSUFFICIENT_INVESTIGATIVE", "INSUFFICIENT", "NOT_SUITABLE")},
             "phase_only_families": sum(a["phase_only"] for a in analyses), "oversized_wider_families": len(oversized),
             "oversized_wider_by_qualified_phasing_state": {s: by_state.get(s, 0) for s in (*STATES, "FACT_MISSING")},
@@ -277,7 +285,7 @@ def index_record(analysis: dict, sites: dict, old: dict | None = None, scale_onl
               "family_investigative": bool(family.representative.investigative), "representative": representative,
               "qualified_phasing_state": analysis["state"], "oversized_wider": analysis["oversized_wider"], "has_phase_subject": analysis["has_phase_subject"],
               "subjects": [{"subject_key": s["subject_key"], "slot": s["slot"], "named_phase": s["named_phase"], "label": s["label"], "fit": _fit_label_of(s), "classification": s["fit"],
-                            "investigative": s["investigative"], "is_family_representative": s["subject_key"] == representative, "count": s["count"],
+                            "investigative": s["investigative"], "is_family_representative": s["subject_key"] == representative, "count": s["count"], "route": s["route"], "route_subtype": s["route_subtype"],
                             **({"counterfactual_fit": _fit_label_of(old_subjects[s["subject_key"]]),
                                 "counterfactual_attribution": attribute_difference(_fit_label_of(s), _fit_label_of(old_subjects[s["subject_key"]]),
                                                                                    _fit_label_of(scale_subjects[s["subject_key"]]) if s["subject_key"] in scale_subjects else None,

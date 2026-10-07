@@ -160,7 +160,7 @@ INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 # whether a relevant phase exists" claim is gone for those subjects. A known scale BELOW the
 # discovery minimum gets neutral wording. Strategic subjects and affordable-unit buyers keep
 # their v6 semantics. Opportunity evidence fingerprints are unaffected (matching-only change).
-BUYER_MATCHING_POLICY_VERSION = 7
+BUYER_MATCHING_POLICY_VERSION = 8
 
 # Stage 2.5A default discovery tolerance, an integer percentage so the
 # envelope is computed in exact integer arithmetic (see discovery_bounds).
@@ -263,6 +263,7 @@ def build_strategic_land_matching_facts(allocation, coverage, phasing) -> Matchi
     opportunity_feed/allocation_discovery already builds
     ({"classification": ..., "evidence": [...]})."""
     from app.reporting.allocation_discovery import PLAN_STATUS_META
+    from app.reporting.strategic_capacity import strategic_capacity_assessment
 
     # Scale: prefer the stated maximum (the ceiling a buyer would actually
     # need to fit within), falling back to the minimum when no maximum is
@@ -336,6 +337,9 @@ def build_strategic_land_matching_facts(allocation, coverage, phasing) -> Matchi
         has_identified_planning_activity=has_activity,
         has_phasing_evidence=has_phasing,
         matched_to_site=allocation.matched_site_id is not None,
+        # v8: the allocation's stored plan figures through the EXISTING count semantics (exact / range / open floor / open ceiling / approximate / unknown), plan-stated and unverified.
+        # unit_count keeps the legacy scalar (display / fingerprint continuity only; the matcher reads the assessment).
+        count_assessment=strategic_capacity_assessment(allocation),
     )
 
 
@@ -1191,9 +1195,22 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         return f"{legacy_prefix} " + outside_discovery_text
 
     scale_possible = scale_outside_discovery = False
-    if scale_value is None and uncertain_scale:
+    if (scale_value is None and uncertain_scale and facts.opportunity_type == STRATEGIC_LAND and profile.large_allocation_is_self_qualifying
+            and assessment.precision == "RANGE" and assessment.lower is not None and discovery_max is not None and assessment.lower > discovery_max):
+        # v8: the explicit large-allocation route (unchanged threshold: scale above the discovery maximum) fires on a range / open floor ONLY where the evidence PROVES it - the plan-stated
+        # LOWER bound is itself above the threshold. An open ceiling, an unbounded estimate, an unknown/malformed figure or a range that crosses the threshold cannot prove it. No count is
+        # ever converted to an exact value to preserve the route.
+        matches.append(
+            f"This allocation's plan-stated scale ({assessment.label()}) is wholly above this buyer's discovery range, representing a meaningful "
+            f"strategic-land position in its own right, independent of whether a specific parcel size is confirmed."
+        )
+        investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
+        is_investigative_exception = True
+    elif scale_value is None and uncertain_scale:
         preferred_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min, maximum=profile.target_unit_max)
         discovery_fit = assessment.within_hard_bounds(minimum=discovery_min, maximum=discovery_max)
+        if discovery_fit is None and facts.opportunity_type == STRATEGIC_LAND and discovery_max is not None and assessment.lower is not None and assessment.lower > discovery_max:
+            discovery_fit = False   # v8: an open-ended floor ('at least N') wholly above the discovery maximum PROVES the scale is outside it; no ceiling is needed for that conclusion
         # Existing minimum exclusion remains hard, at the stated minimum.
         hard_minimum_fit = (assessment.within_hard_bounds(minimum=profile.target_unit_min)
                             if profile.below_minimum_scale_is_exclusion else True)

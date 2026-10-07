@@ -218,7 +218,7 @@ def test_a_current_phase_makes_the_family_strong_through_the_phase_without_promo
 
 def test_policy_is_v7_and_the_mandate_fingerprint_moves_with_it(monkeypatch):
     from app.policy import buyer_profile_store
-    assert BUYER_MATCHING_POLICY_VERSION == 7
+    assert BUYER_MATCHING_POLICY_VERSION == 8
     v7 = buyer_profile_store.compute_buyer_mandate_fingerprint(NESTEN_HOMES)
     monkeypatch.setattr(buyer_profile_store, "BUYER_MATCHING_POLICY_VERSION", 6)
     assert buyer_profile_store.compute_buyer_mandate_fingerprint(NESTEN_HOMES) != v7

@@ -99,7 +99,9 @@ def test_strategic_land_card_falls_back_to_generic_capacity_label_without_plan_p
     card = next(c for c in feed["cards"] if c["id"] == f"opp-feed-alloc-{allocation.id}")
     metric_labels = [label for label, _ in card["metrics"]]
     assert "Plan-period capacity" not in metric_labels
-    assert "Capacity (range)" in metric_labels
+    assert "Capacity (range)" not in metric_labels                                                       # Stage 2.5B final slice: one honest label for the basis
+    assert ("Plan-stated capacity (unverified)", "3,000–4,000 homes") in card["metrics"]                # the range is shown AS a range, labelled plan-stated and unverified
+    assert card["strategic_scale"]["kind"] == "range" and card["strategic_scale"]["verified"] is False
 
 
 def test_strategic_land_card_shows_not_yet_verified_for_missing_hectares(session):
