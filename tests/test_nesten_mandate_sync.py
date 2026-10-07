@@ -211,10 +211,26 @@ def apply_nothing_changed(session, report):
     assert reviewed(session)["plan_digest"] == report["plan_digest"]
 
 
+def test_the_dry_run_reports_the_baseline_and_rule_fingerprint_identifiers(seeded):
+    row = mandates(seeded)["nesten_homes"]
+    report = reviewed(seeded)
+    baseline = report["baseline"]
+    assert baseline["stored_baseline_fingerprint_id"] == row.matching_fingerprint[:12] and len(baseline["stored_baseline_fingerprint_id"]) == 12
+    assert baseline["onboarding_completed_at"].startswith("2026-09-20")
+    assert baseline["current_rules_fingerprint_id"] == baseline["stored_baseline_fingerprint_id"]                      # fresh baseline: the stored baseline equals the current (old) rules
+    proposed = baseline["proposed_rules_fingerprint_id"]
+    assert len(proposed) == 12 and proposed != baseline["current_rules_fingerprint_id"] and baseline["stale_after_correction"] is True
+    apply(seeded, report)
+    row = mandates(seeded)["nesten_homes"]
+    assert store.compute_buyer_mandate_fingerprint(store.mandate_to_policy(row))[:12] == proposed                          # exactly what a later re-onboarding would stamp
+    assert row.matching_fingerprint[:12] == baseline["stored_baseline_fingerprint_id"]                                      # the old baseline is still the OLD one
+    assert "fingerprint" not in " ".join(report["blocking_reasons"])
+
+
 def test_the_digest_binds_identity_policy_version_diff_and_expected_states(seeded):
     base = compute_mandate_sync_plan(seeded, "nesten_homes")
     for attribute, value in (("mandate_id", 999), ("buyer_id", 999), ("workspace_id", 999), ("stored_sha256", "x"), ("proposed_sha256", "x"), ("expected_old_sha256", "x"),
-                             ("diff", [{"field": "target_unit_max", "old": 100, "proposed": 300, "reason": "r"}]), ("status", "DRIFT")):
+                             ("diff", [{"field": "target_unit_max", "old": 100, "proposed": 300, "reason": "r"}]), ("status", "DRIFT"), ("stored_baseline_fingerprint_id", "abcdef012345")):
         mutated = dataclasses.replace(base, **{attribute: value})
         assert mutated.digest() != base.digest(), attribute
     assert "BUYER_MATCHING_POLICY_VERSION" in inspect.getsource(ms.MandateSyncPlan.digest)
