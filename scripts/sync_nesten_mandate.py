@@ -36,6 +36,12 @@ def parse_args(argv=None):
 @authorised_cli('sync_nesten_mandate')
 def main(argv=None) -> int:
     args = parse_args(argv)
+    handle = None
+    if args.audit_out is not None:                                                    # create the audit file BEFORE any write, so a bad path can never follow a committed apply
+        args.audit_out.mkdir(parents=True, exist_ok=True)
+        mode = "applied" if args.apply else "dry_run"
+        target = args.audit_out / f"nesten_mandate_sync_{mode}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+        handle = open(target, "x", encoding="utf-8", newline="\n")                   # never overwrite an audit file
     session = get_session()
     try:
         if args.apply:
@@ -46,10 +52,8 @@ def main(argv=None) -> int:
         session.close()
     text = json.dumps(report, indent=2, sort_keys=True, default=str)
     print(text)
-    if args.audit_out is not None:
-        args.audit_out.mkdir(parents=True, exist_ok=True)
-        target = args.audit_out / f"nesten_mandate_sync_{report['mode']}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
-        with open(target, "x", encoding="utf-8", newline="\n") as handle:           # never overwrite an audit file
+    if handle is not None:
+        with handle:
             handle.write(text + "\n")
         print(target, file=sys.stderr)
     return 0

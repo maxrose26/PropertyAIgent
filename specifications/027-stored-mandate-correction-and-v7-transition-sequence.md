@@ -40,7 +40,7 @@ Selects only. The report is deterministic and non-secret: the field-level diff (
 
 ## Apply
 
-Stage 1 operator command check (`@command('buyer.write')`), the exact confirm phrase, the digest of the **reviewed** plan, and READY status (stored state == the expected old state, resulting state == the pinned approved state). One transaction: the row is re-read under a row lock and re-verified, only the approved columns are written, one commit; any failure rolls back. A changed stored mandate between review and apply refuses. Nesten is the only target; applying the reviewed Nesten plan to any other buyer refuses. The command does **not** re-onboard, run monitoring, reseed, call a model, scrape or alert.
+Stage 1 operator command check (`@command('buyer.write')`), the exact confirm phrase, the digest of the **reviewed** plan, and READY status (stored state == the expected old state, resulting state == the pinned approved state). One transaction: the row is re-read under a row lock and re-verified, only the approved columns are written, one commit; any failure rolls back. (The row's automatic `updated_at` stamp changes with the write; that is the ORM audit stamp, not a preserved field.) A changed stored mandate between review and apply refuses. Nesten is the only target; applying the reviewed Nesten plan to any other buyer refuses. The command does **not** re-onboard, run monitoring, reseed, call a model, scrape or alert.
 
 ## Baseline after correction: recommendation A
 

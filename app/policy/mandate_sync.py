@@ -205,7 +205,7 @@ def apply_mandate_sync(session, *, buyer_key: str, confirm: str, expected_plan_d
     try:
         with session.no_autoflush:
             row = session.execute(select(BuyerMandate).where(BuyerMandate.id == plan.mandate_id).with_for_update().execution_options(populate_existing=True)).scalar_one()
-        if policy_sha256(mandate_to_policy(row)) != plan.stored_sha256:                 # re-verified under the row lock, inside the same transaction
+        if policy_sha256(mandate_to_policy(row)) != plan.stored_sha256 or row.status != "active" or row.mandate_key != DEFAULT_MANDATE_KEY:   # re-verified under the row lock, same transaction
             raise MandateSyncRefused(["stored mandate changed between plan and write"])
         for entry in plan.diff:
             if entry["field"] not in approved:                                          # defence in depth: the plan already refuses unapproved fields

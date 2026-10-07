@@ -271,6 +271,54 @@ def test_a_successful_correction_makes_the_old_baseline_stale_without_touching_i
     assert store.compute_buyer_mandate_fingerprint(store.mandate_to_policy(row)) != row.matching_fingerprint
 
 
+def test_a_mandate_with_no_baseline_or_an_already_stale_baseline_is_handled_sensibly(seeded):
+    row = mandates(seeded)["nesten_homes"]
+    row.matching_fingerprint, row.onboarding_completed_at, row.onboarding_summary = None, None, None
+    seeded.commit()
+    report = reviewed(seeded)
+    assert report["baseline"]["stored_baseline_present"] is False and report["baseline"]["stale_before"] is True and report["baseline"]["stale_after_correction"] is True
+    apply(seeded, report)
+    row = mandates(seeded)["nesten_homes"]
+    assert (row.matching_fingerprint, row.onboarding_completed_at, row.onboarding_summary) == (None, None, None)     # still never onboarded: nothing was stamped
+    assert store.is_buyer_mandate_baseline_stale(row) is True
+
+
+def test_an_already_stale_baseline_stays_untouched_and_stale(seeded):
+    row = mandates(seeded)["nesten_homes"]
+    row.matching_fingerprint = "f" * 64                                                                  # a baseline from some other (older) rule set
+    seeded.commit()
+    report = reviewed(seeded)
+    assert report["baseline"]["stale_before"] is True and report["status"] == "READY"
+    apply(seeded, report)
+    assert mandates(seeded)["nesten_homes"].matching_fingerprint == "f" * 64 and store.is_buyer_mandate_baseline_stale(mandates(seeded)["nesten_homes"]) is True
+
+
+def test_an_archived_mandate_is_never_a_target(seeded):
+    row = mandates(seeded)["nesten_homes"]
+    row.status = "archived"
+    seeded.commit()
+    report = reviewed(seeded)
+    assert report["status"] == "MANDATE_NOT_FOUND" and not report["applicable"]
+    with pytest.raises(MandateSyncRefused):
+        apply(seeded, report)
+
+
+def test_the_audit_file_is_created_before_any_write_and_never_overwritten(seeded, tmp_path, monkeypatch):
+    import scripts.sync_nesten_mandate as cli
+    monkeypatch.setattr(cli, "get_session", lambda: seeded)
+    monkeypatch.setattr(seeded, "close", lambda: None)
+    out = tmp_path / "audit"
+    assert cli.main.__wrapped__(["--audit-out", str(out)]) == 0
+    first = sorted(out.iterdir())
+    assert len(first) == 1 and json.loads(first[0].read_text(encoding="utf-8"))["mode"] == "dry_run"
+    report = json.loads(first[0].read_text(encoding="utf-8"))
+    blocker = tmp_path / "blocked"
+    blocker.write_text("not a directory")
+    with pytest.raises(OSError):                                                                      # an unusable audit path aborts BEFORE the apply can commit
+        cli.main.__wrapped__(["--apply", "--confirm", CONFIRM_PHRASE, "--expect-digest", report["plan_digest"], "--audit-out", str(blocker)])
+    assert mandates(seeded)["nesten_homes"].target_unit_max == 100
+
+
 def test_correction_does_not_reonboard_monitor_reseed_or_call_a_model(seeded, monkeypatch):
     def forbidden(name):
         def boom(*a, **k):
