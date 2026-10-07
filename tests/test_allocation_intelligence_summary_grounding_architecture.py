@@ -73,9 +73,13 @@ def _make_relationship(session, *, allocation_id, site_id, review_status="auto_a
 
 def _make_app(session, site_id, reference, *, units=None, status=None, decision=None, decision_issued_date=None,
               application_category=None, complete=True, council_code="testcouncil", applicant_name_raw=None) -> Application:
+    # Since the decided-state-aware reconciliation (Gate 2B), an application with no decision and no status carries no trusted unit count. These fixtures mean 'a trusted
+    # application with this capacity', so a bare units= application is a GRANTED one (explicit status/decision arguments are never overridden).
+    if units is not None and status is None and decision is None:
+        decision, decision_issued_date = "Granted", decision_issued_date or "Mon 01 Jan 2024"
     app = Application(council_code=council_code, reference=reference, site_id=site_id, status=status, decision=decision,
                        decision_issued_date=decision_issued_date, application_category=application_category,
-                       applicant_name_raw=applicant_name_raw)
+                       applicant_name_raw=applicant_name_raw, proposal=f"Erection of {units} dwellings" if units is not None else None)
     session.add(app)
     session.commit()
     if units is not None:
@@ -205,20 +209,19 @@ def test_several_semantically_equivalent_summaries_all_pass(session):
 
     variants = [
         "Of the allocation's 750-home capacity, 124 homes are already accounted for via a granted reserved "
-        "matters consent, leaving 626 homes as indicative residual capacity not yet linked to any identified scheme.",
+        "matters consent, a modest share of that capacity.",
 
         "This allocation totals approximately 750 homes. Identified planning activity - principally a granted "
-        "application for 124 units - covers only a modest share of that figure, so a substantial 626-home "
-        "portion remains outside any confirmed planning activity.",
+        "application for 124 units - covers only a modest share of that figure.",
 
-        "With 124 of the allocation's 750 homes already the subject of a granted permission, the remaining "
-        "626 homes have no linked planning activity identified against them at this stage.",
+        "With 124 of the allocation's 750 homes already the subject of a granted permission, the rest of the "
+        "allocation has no linked planning activity identified against it at this stage.",
     ]
     for overview_text in variants:
         output = {
             "headline": "Partial coverage, majority of capacity remains unlinked",
             "overview": overview_text,
-            "key_points": ["124 homes are covered by a granted application.", "626 homes remain indicative residual."],
+            "key_points": ["124 homes are covered by a granted application."],
             "key_uncertainties": [],
             "investigation_priorities": [],
             "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
@@ -387,7 +390,7 @@ def test_grounded_capacities_accepted(session):
     context = build_allocation_context(session, allocation)
     output = {
         "headline": "x",
-        "overview": "The allocation totals 750 homes; 124 are identified, leaving 626 as indicative residual.",
+        "overview": "The allocation totals 750 homes; 124 are identified.",
         "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
         "referenced_applications": [], "referenced_entities": [],
     }
@@ -789,7 +792,7 @@ def test_grounded_claim_with_paired_status_decision_persists_via_full_orchestrat
     good_output = {
         "headline": "Reserved matters granted for part of the allocation",
         "overview": "DC/084620 was granted on 11 Jan 2024, covering 124 of the allocation's 750 homes; "
-                    "626 homes remain indicative residual, and a further 3 applications relate to this Site.",
+                    "a further 3 applications relate to this Site.",
         "key_points": ["124 homes are covered by a granted application."],
         "key_uncertainties": [], "investigation_priorities": [],
         "referenced_applications": [{"reference": "DC/084620", "claimed_status": "Decided", "claimed_decision": "Granted"}],
@@ -1489,7 +1492,7 @@ def test_east_of_boothstown_real_v5_rejection_now_passes(session):
         "headline": "Substantial identified activity for East of Boothstown, decision pending",
         "overview": (
             "282 of the allocation's 300 homes are identified via PA/2024/0749, which remains under "
-            "consultation - no decision has yet been recorded. 18 homes remain indicative residual capacity."
+            "consultation - no decision has yet been recorded."
         ),
         "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
         "referenced_applications": [{
@@ -1553,7 +1556,7 @@ def test_britannia_mill_grounded_output_still_validates(session):
         "headline": "Partial coverage identified for Britannia Mill",
         "overview": (
             "49 of this allocation's 136 homes are identified via 26/00098/FUL, still awaiting a decision. "
-            "87 homes remain indicative residual capacity. Holmpatrick Ltd is named under a planning "
+            "Holmpatrick Ltd is named under a planning "
             "ownership declaration for the identified Site."
         ),
         "key_points": [], "key_uncertainties": [], "investigation_priorities": [],
@@ -1950,10 +1953,9 @@ def test_natural_language_variation_remains_free_after_v7_prompt_changes(session
     variants = [
         "This allocation's identified activity, via PA/2024/0749, covers the large majority of its 300-home "
         "capacity - 282 homes - though the application remains under consultation, so this should not be read "
-        "as consented. Roughly 18 homes have no identified planning activity against them.",
+        "as consented.",
 
-        "282 of 300 homes at East of Boothstown sit behind an active but undetermined application (PA/2024/0749); "
-        "a modest 18-home slice remains unaccounted for on this platform's own records.",
+        "282 of 300 homes at East of Boothstown sit behind an active but undetermined application (PA/2024/0749).",
     ]
     for overview_text in variants:
         output = {
@@ -2723,3 +2725,13 @@ def test_o_failure_preserves_last_valid_summary_after_v9(session):
     summary2 = get_allocation_summary(session, allocation.id)
     assert summary2.headline == good_output["headline"]  # last valid summary preserved
     assert summary2.status == "error"
+
+
+def test_a_model_output_citing_the_residual_number_is_rejected_v8b(session):
+    """V8-B contract: the internal Stage 3A subtraction (750 - 124 = 626) is not a grounded, citable figure; a model that states it is rejected (no manufactured residual)."""
+    allocation = _heald_green_style_fixture(session)
+    context = build_allocation_context(session, allocation)
+    output = {"headline": "x", "overview": "The allocation totals 750 homes; 124 are identified, leaving 626 as indicative residual.", "key_points": [],
+              "key_uncertainties": [], "investigation_priorities": [], "referenced_applications": [], "referenced_entities": []}
+    is_valid, problems = validate_summary_output(context, output)
+    assert is_valid is False and any("626" in p for p in problems), problems

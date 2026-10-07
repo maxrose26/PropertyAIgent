@@ -19,7 +19,7 @@ from app.policy.buyer_profiles import BUYER_PROFILES
 from app.reporting.strategic_capacity import strategic_capacity_assessment
 from verification.transition.v7_parity import differential_category
 
-APPROVED_BY_PRODUCT_OWNER = False
+APPROVED_BY_PRODUCT_OWNER = True   # approved by Product Owner REVIEW with the 24-row table (benchmark/v8_expectation_table.APPROVAL_RECORD)
 
 
 def _allocation(minimum, indicative, maximum):

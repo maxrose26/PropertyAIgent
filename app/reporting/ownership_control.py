@@ -229,7 +229,7 @@ class RelatedApplicationSummary:
 
 @dataclass(frozen=True)
 class SiteControlSection:
-    """One Site's (or the allocation's residual land's) ownership/control
+    """One Site's (or the allocation's potential residual scope's) ownership/control
     summary within an allocation's Ownership & Control view (Section 6/7) -
     `groups` is always empty for a residual section; a residual section
     never carries any relationship evidence, by construction.

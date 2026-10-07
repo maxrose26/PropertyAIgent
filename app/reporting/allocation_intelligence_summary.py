@@ -1251,8 +1251,8 @@ def _potential_residual_flag(context) -> bool:
 def _potential_residual_prompt_line(context) -> str:
     """Number-free grounding: R2 -> context only; otherwise no residual proposition (R3). The model is never given a residual quantity."""
     if _potential_residual_flag(context):
-        return ("identified - planning activity appears to account for part of the allocation, but the remaining acquisition scope cannot currently be quantified reliably "
-                "(investigation context only; no quantity, availability or ownership is established)")
+        return ("potential only - planning evidence indicates partial development coverage, but a distinct residual acquisition scope and its capacity are not yet "
+                "established (investigation context only: no quantity is supplied, and no availability, ownership, title or parcel is established)")
     return "none indicated - make no residual or remaining-capacity statement"
 
 

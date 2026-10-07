@@ -1,7 +1,6 @@
 """Stage 2.5B V8-B: PROPOSED residual-opportunity benchmark cases (offline, deterministic; no database, network or model). NEVER imported by app/.
 
-Cases 15-24 of the proposed v8 benchmark (strategic cases 1-14 are benchmark/v8_strategic_scale_shadow.py). NOTHING here is approved: ``APPROVED_BY_PRODUCT_OWNER`` is False and every
-expectation is for REVIEW to accept, change or reject. Expectations are NOT adjusted to match the implementation: a disagreement is a failing test, reported, never silently re-pinned.
+Cases 15-24 of the proposed v8 benchmark (strategic cases 1-14 are benchmark/v8_strategic_scale_shadow.py). Approved by Product Owner REVIEW (``APPROVED_BY_PRODUCT_OWNER``). Expectations are NOT adjusted to match the implementation: a disagreement is a failing test, reported, never silently re-pinned.
 
 Each row: route, evidence facts, v7 result (always "no residual concept" - v7 had no residual subject), proposed v8 level / subject / count / fit ceiling, representative expectation,
 rationale and the prohibited inferences the case checks. "Qualified" evidence here is SYNTHETIC test evidence: production supplies none (R1 is dormant by evidence).
@@ -15,7 +14,7 @@ from app.reporting.residual_opportunity import (
 )
 from app.reporting.residential_count import CountAssessment
 
-APPROVED_BY_PRODUCT_OWNER = False
+APPROVED_BY_PRODUCT_OWNER = True   # approved by Product Owner REVIEW with the 24-row table (benchmark/v8_expectation_table.APPROVAL_RECORD)
 SITE = 61
 PARENT_ID = f"site:{SITE}:whole_site:Whole site"
 CONTAINMENT = "RM_DIRECT_PARENT_CITATION: pursuant to outline permission OUT/1"

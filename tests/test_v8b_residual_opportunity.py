@@ -101,9 +101,9 @@ def test_planning_500_300_incomplete_is_r2_with_no_200_and_qualified_is_r1_with_
     assert q500_300()[2].level == ro.LEVEL_R1 and q500_300()[2].residual_value == 200
 
 
-def test_the_benchmark_cases_match_their_proposed_expectations_and_are_unapproved():
+def test_the_benchmark_cases_match_their_approved_expectations():
     result = run_residual_benchmark()
-    assert result["approved_by_product_owner"] is False and result["disagreements"] == []
+    assert result["approved_by_product_owner"] is True and result["disagreements"] == []
     levels = {r["case_id"]: (r["actual_level"], r["actual_residual"]) for r in result["rows"]}
     assert levels["R15_qualified_500_300"] == (ro.LEVEL_R1, 200) and levels["R18_500_proven_complete_200_150"] == (ro.LEVEL_R1, 150)
     assert levels["R17_500_overlap_unknown_300_250"][1] is None and levels["R17b_500_proven_distinct_300_250"][0] == ro.LEVEL_R3

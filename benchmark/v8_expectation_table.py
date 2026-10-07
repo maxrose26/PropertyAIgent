@@ -1,6 +1,6 @@
 """Stage 2.5B V8: the COMPLETE proposed v8 benchmark expectation table (strategic cases + residual cases), assembled for REVIEW. Offline and deterministic; NEVER imported by app/.
 
-``approved_by_product_owner`` is False for every row: nothing here is approved. Each row carries the route, the evidence facts, the frozen-v7 result where applicable, the proposed v8
+``approved_by_product_owner`` is True for every row: Product Owner REVIEW approved exactly these 24 expectations (see APPROVAL_RECORD). Each row carries the route, the evidence facts, the frozen-v7 result where applicable, the proposed v8
 classification / investigative flag, the residual level, the representative expectation, the rationale and the prohibited inferences the case checks. Expectations are never adjusted to
 match the implementation: ``disagreements`` lists any row where the live evaluation differs from its proposed expectation (it must be empty, else the case is reported to REVIEW).
 """
@@ -9,7 +9,9 @@ from __future__ import annotations
 from benchmark.v8_residual_cases import run_residual_benchmark
 from benchmark.v8_strategic_scale_shadow import CASES as STRATEGIC_CASES, run_shadow
 
-APPROVED_BY_PRODUCT_OWNER = False
+APPROVED_BY_PRODUCT_OWNER = True
+APPROVAL_RECORD = ("Approved by Product Owner REVIEW for exactly the 24-row expectation table reported at 8fd1c7d32c61a8fc2af8c3dfba20d5f95a8c14ce; no expectation was changed when approval was recorded. A later change to any approved expectation changes EXPECTATION_DIGEST_AT_APPROVAL and fails its test: the expectation is never edited to fit the code.")
+EXPECTATION_DIGEST_AT_APPROVAL = "73e02dc38f5e23b728f65999748dd0b11620f146d10e8caab60ca6a678ae485c"   # sha256 of the approved expectation fields (see tests/test_v8c_final_hardening.py)
 
 # PROPOSED v8 outcome per strategic case (for REVIEW to accept, change or reject): (classification+investigative label, representative expectation, rationale)
 STRATEGIC_EXPECTATIONS = {
@@ -41,7 +43,7 @@ def build_v8_expectation_table() -> dict:
         rows.append({"case_no": number, "case_id": case_id, "route": "STRATEGIC_ALLOCATION", "buyer": row["buyer"], "evidence_facts": row["stored_figures"],
                      "capacity_semantics": row["capacity_semantics"], "v7_result": row["frozen_v7_result"], "proposed_v8_result": proposed, "actual_v8_result": row["v8_result"],
                      "differential_category": row["differential_category"], "residual_level": None, "representative_expectation": representative, "rationale": rationale,
-                     "prohibited_inferences": STRATEGIC_PROHIBITED, "approved_by_product_owner": False})
+                     "prohibited_inferences": STRATEGIC_PROHIBITED, "approved_by_product_owner": True})
     residual = run_residual_benchmark()
     offset = len(rows)
     for number, row in enumerate(residual["rows"], start=offset + 1):
@@ -52,13 +54,13 @@ def build_v8_expectation_table() -> dict:
                      "evidence_facts": row["description"], "predicates": row["predicates"], "v7_result": row["v7_result"], "proposed_v8_result": fit,
                      "actual_v8_result": row["actual_level"], "differential_category": None, "residual_level": row["proposed_level"],
                      "proposed_residual_count": row["proposed_residual"], "representative_expectation": row["representative"], "rationale": row["rationale"],
-                     "prohibited_inferences": row["prohibited_inferences"], "approved_by_product_owner": False})
+                     "prohibited_inferences": row["prohibited_inferences"], "approved_by_product_owner": True})
     allocation = residual["allocation_case"]
     rows.append({"case_no": len(rows) + 1, "case_id": allocation["case_id"], "route": allocation["route"], "buyer": "nesten_homes",
                  "evidence_facts": "allocation 1,000 + linked permission 600, no comparable-scope / completeness / non-overlap proof", "v7_result": "no residual concept",
                  "proposed_v8_result": "existing strategic fit unchanged; R2 context only", "actual_v8_result": allocation["actual_level"], "differential_category": None,
                  "residual_level": allocation["proposed_level"], "proposed_residual_count": None, "representative_expectation": "the strategic allocation subject (no residual subject exists)",
-                 "rationale": "the allocation-minus-planning subtraction is only a trigger", "prohibited_inferences": allocation["prohibited_inferences"], "approved_by_product_owner": False})
+                 "rationale": "the allocation-minus-planning subtraction is only a trigger", "prohibited_inferences": allocation["prohibited_inferences"], "approved_by_product_owner": True})
     return {"approved_by_product_owner": APPROVED_BY_PRODUCT_OWNER, "rows": rows, "disagreements": disagreements,
             "unexpected_regressions": run_shadow()["unexpected_regressions"]}
 

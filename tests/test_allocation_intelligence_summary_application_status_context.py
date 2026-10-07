@@ -60,9 +60,14 @@ def _make_relationship(session, *, allocation_id, site_id, review_status="auto_a
 
 def _make_app(session, site_id, reference, *, units=None, status=None, decision=None, decision_issued_date=None,
               application_category=None, proposal=None, complete=True, council_code="testcouncil") -> Application:
+    # Since the decided-state-aware reconciliation (Gate 2B), an application with no decision and no status carries no trusted unit count. These fixtures mean 'a trusted
+    # application with this capacity', so a bare units= application is a GRANTED one (explicit status/decision arguments are never overridden).
+    if units is not None and status is None and decision is None:
+        decision, decision_issued_date = "Granted", decision_issued_date or "Mon 01 Jan 2024"
     app = Application(
         council_code=council_code, reference=reference, site_id=site_id, status=status, decision=decision,
-        decision_issued_date=decision_issued_date, application_category=application_category, proposal=proposal,
+        decision_issued_date=decision_issued_date, application_category=application_category,
+        proposal=proposal if proposal is not None else (f"Erection of {units} dwellings" if units is not None else None),
     )
     session.add(app)
     session.commit()

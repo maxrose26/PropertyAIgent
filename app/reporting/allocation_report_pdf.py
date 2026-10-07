@@ -222,8 +222,8 @@ def _shortlist_overview(styles, context: AllocationReportContext) -> list:
     potential = sum(1 for e in context.entries if potential_residual_scope_text(e) == POTENTIAL_RESIDUAL_SHORT)
     if potential:       # V8-B: R2 investigation context only - the internal coverage subtraction is never summed or stated as a quantity
         story.append(Paragraph(
-            f"Potential residual scope - investigate: {potential} allocation{'s' if potential != 1 else ''} where identified planning activity appears to account for "
-            "part of the allocation. The remaining acquisition scope cannot currently be quantified reliably.",
+            f"Potential residual scope - investigate: {potential} allocation{'s' if potential != 1 else ''} where planning evidence indicates partial development "
+            "coverage. A distinct residual acquisition scope and its capacity are not yet established.",
             styles["Body"],
         ))
 

@@ -3,7 +3,8 @@
 Answers one narrow question: can these trusted planning subjects safely take
 part in residual-capacity arithmetic (a parent count minus contained child
 counts)? It does NOT create opportunities, rank, persist, render or decide who
-could buy anything, and nothing in production calls it yet.
+could buy anything. (V8-B: app.reporting.residual_opportunity derives the R1/R2/R3 ladder
+from it; that module, not this one, decides what may be shown.)
 
 A numeric residual must never look more complete or certain than the evidence
 used to derive it. RESOLVED therefore means: given a trusted parent count, an
@@ -18,8 +19,11 @@ Child-set completeness is never inferred from "one child was supplied", "all
 supplied children have counts", "all are contained" or "all are non-overlapping".
 It requires explicit sourced child-set evidence naming every relevant child
 subject for the parent; without it the result is UNVERIFIED and no integer is
-returned. Production currently has no source for that evidence, so in production
-this primitive fails safe to UNVERIFIED until Stage 2.5/2.6 supplies it.
+returned. Production still has no source for that evidence (the V8-B feed supplies G2
+containment only), so the residual stays UNVERIFIED and R1 stays dormant until a qualified
+Stage 2.6 producer supplies it. Stage 2.6 limitation: the child set here is the operative-approved
+children the caller supplies; richer child-set evidence (refused, superseded or documentary complete
+sets) is Stage 2.6 work.
 
 `basis == "consented"` means only that a count belongs to the accepted approved
 planning position used for this arithmetic. It does not establish that the

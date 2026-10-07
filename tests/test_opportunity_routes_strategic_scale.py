@@ -105,7 +105,7 @@ def test_v8_strategic_builder_carries_count_semantics_and_keeps_the_legacy_scala
 def test_shadow_compares_frozen_v7_with_v8_and_every_difference_is_an_expected_strategic_delta():
     from benchmark.v8_strategic_scale_shadow import APPROVED_BY_PRODUCT_OWNER, run_shadow
     result = run_shadow()
-    assert APPROVED_BY_PRODUCT_OWNER is False and result["unexpected_regressions"] == []
+    assert APPROVED_BY_PRODUCT_OWNER is True and result["unexpected_regressions"] == []
     v7 = {r["case_id"]: r["frozen_v7_result"] for r in result["rows"]}
     v8 = {r["case_id"]: r["v8_result"] for r in result["rows"]}
     assert v7["S6_minimum_only"] == v7["S7_maximum_only"] == v7["S8_malformed_conflicting"] == "STRONG_FIT"          # the v7 reduction to a scalar

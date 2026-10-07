@@ -139,7 +139,7 @@ def _render_allocation_line(entry) -> str:
         bits.append(f"development coverage: {entry.development_coverage_percentage:.0%}")
     from app.reporting.residual_opportunity import POTENTIAL_RESIDUAL_SHORT
     if potential_residual_scope_text(entry) == POTENTIAL_RESIDUAL_SHORT:       # R2 investigation context only: no number, no availability
-        bits.append("potential residual scope identified - investigate (not quantified)")
+        bits.append("potential residual scope - investigate (a distinct residual scope and its capacity are not yet established)")
     if trusted_developer:
         bits.append(f"trusted Developer: {', '.join(trusted_developer)}")
     if applicants:

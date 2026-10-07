@@ -53,11 +53,11 @@ def test_shortlist_and_local_plan_pages_do_not_show_the_subtraction_as_a_quantit
 def test_cross_site_prompt_is_number_free_for_residuals_and_forbids_subtraction():
     partial = entry()
     prompt = csi.build_cross_site_prompt(_make_context([partial]), _make_web_context())
-    assert "potential residual scope identified - investigate (not quantified)" in prompt
+    assert "potential residual scope - investigate (a distinct residual scope and its capacity are not yet established)" in prompt
     assert not NUMBER.search(prompt) and "indicative residual capacity" not in prompt.lower()
     assert "NEVER subtract planning-application" in prompt and "no availability, ownership, title, geometry or further-phase inference" in prompt
     quiet = csi.build_cross_site_prompt(_make_context([entry(development_coverage_classification="FULLY_ACCOUNTED_FOR")]), _make_web_context())
-    assert "potential residual scope identified" not in quiet
+    assert "potential residual scope - investigate" not in quiet
     assert csi.PROMPT_VERSION == "cross-site-intelligence-v2"
 
 
@@ -95,12 +95,12 @@ def test_internal_coverage_arithmetic_remains_internal_and_unmodified():
     assert not re.search(r"residual|remaining|available", ro.POTENTIAL_RESIDUAL_SHORT.replace("residual scope", ""), re.I)
 
 
-def test_the_complete_v8_expectation_table_is_unapproved_complete_and_matches_the_live_evaluation():
+def test_the_complete_v8_expectation_table_is_approved_complete_and_matches_the_live_evaluation():
     from benchmark.v8_expectation_table import build_v8_expectation_table, to_markdown
     table = build_v8_expectation_table()
-    assert table["approved_by_product_owner"] is False and table["disagreements"] == [] and table["unexpected_regressions"] == []
+    assert table["approved_by_product_owner"] is True and table["disagreements"] == [] and table["unexpected_regressions"] == []
     assert len(table["rows"]) == 24 and [r["case_no"] for r in table["rows"]] == list(range(1, 25))
-    assert all(r["approved_by_product_owner"] is False and r["prohibited_inferences"] and r["rationale"] for r in table["rows"])
+    assert all(r["approved_by_product_owner"] is True and r["prohibited_inferences"] and r["rationale"] for r in table["rows"])
     routes = {r["route"] for r in table["rows"]}
     assert "STRATEGIC_ALLOCATION" in routes and "RESIDUAL_OPPORTUNITY" in routes
     assert "R15_qualified_500_300" in to_markdown(table)

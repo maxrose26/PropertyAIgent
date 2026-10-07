@@ -49,10 +49,10 @@ PREDICATES = (PARENT_SCOPE_QUALIFIED, CHILD_RELATIONSHIP_QUALIFIED, COUNT_METRIC
 
 R1_CAVEAT = ("Derived (apparent) residual planning capacity: the parent permission count less the contained subordinate count. Availability, ownership, parcel geometry "
              "and independent deliverability are unverified.")
-PLANNING_R2_TEXT = ("Potential residual scope — investigate. A wider permission and subordinate planning activity are identified, but the remaining acquisition "
-                    "scope cannot yet be quantified reliably.")
-ALLOCATION_R2_TEXT = ("Potential residual scope — investigate. Planning activity appears to account for part of the allocation, but the remaining acquisition "
-                      "scope cannot currently be quantified reliably.")
+PLANNING_R2_TEXT = ("Potential residual scope — investigate. A wider permission and subordinate planning activity are identified, but a distinct residual "
+                    "acquisition scope and its capacity are not yet established.")
+ALLOCATION_R2_TEXT = ("Potential residual scope — investigate. Planning evidence indicates partial development coverage, but a distinct residual acquisition "
+                      "scope and its capacity are not yet established.")
 
 # gate reasons (from the safety primitive) at which a residual PROPOSITION still exists but safe arithmetic does not -> R2 (containment already holds there)
 _R2_REASONS = frozenset({rc.REASON_CHILD_OVERLAP_NOT_EXCLUDED, rc.REASON_CHILD_SET_NOT_ESTABLISHED, rc.REASON_CHILD_SET_MISMATCH, rc.REASON_CHILD_SET_CONFLICT})
@@ -262,3 +262,12 @@ def allocation_residual_context(coverage) -> AllocationResidualContext | None:
 def potential_residual_label(classification, status, residual, activity_count) -> str:
     """Short, number-free label for tables / CSV: R2 context text or 'Not indicated'."""
     return POTENTIAL_RESIDUAL_SHORT if is_potential_residual_scope(classification, status, residual, activity_count) else NO_POTENTIAL_RESIDUAL_SHORT
+
+
+def r1_prompt_fact(qualification: ResidualQualification) -> str:
+    """The ONLY sanctioned way to put a qualified residual in front of a model: labelled DERIVED / APPARENT with the approved caveat, and never for R2/R3 (which have no quantity).
+    No prompt in the platform uses R1 today (R1 is dormant in production); this is the interface a future grounding step must use."""
+    if qualification.level != LEVEL_R1 or qualification.residual_value is None:
+        raise ValueError("only an R1 qualification has a residual quantity that may be supplied to a model")
+    return (f"Derived (apparent) residual planning capacity: {qualification.residual_value:,} homes, computed deterministically as the qualified parent permission count less the qualified "
+            f"contained subordinate count. {R1_CAVEAT} Do not recompute it and do not treat it as available land.")
