@@ -21,6 +21,8 @@ Request-scoped B2-context memoisation only (buyer + site_id / buyer + allocation
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from sqlalchemy import select
 
 from app.db.models import LocalPlanSite
@@ -70,12 +72,45 @@ def _complete_strategic_cards(session, *, page_size: int = STRATEGIC_PAGE_SIZE) 
     return cards
 
 
+@dataclass(frozen=True)
+class FamilyInputs:
+    """The buyer-independent subject inputs of one read window: loaded ONCE, then evaluated for any number of buyers (the one-read principle)."""
+    strategic: list
+    lapse_raw: list
+    undeveloped_raw: list
+    recent_permission_raw: list
+    long_pending_raw: list
+    delivery: list
+
+
+def load_buyer_family_inputs(session, *, strategic_page_size: int = STRATEGIC_PAGE_SIZE) -> FamilyInputs:
+    """The complete, unbounded, buyer-independent subject population (strategic cards + planning-delivery cards with their matching facts)."""
+    from app.security.access import require_admitted
+    require_admitted()
+    strategic = _complete_strategic_cards(session, page_size=strategic_page_size)
+    lapse_raw, undeveloped_raw, recent_permission_raw, long_pending_raw, delivery = _planning_delivery_cards(session, None)
+    _attach_planning_delivery_matching_facts(session, delivery)
+    return FamilyInputs(strategic, lapse_raw, undeveloped_raw, recent_permission_raw, long_pending_raw, delivery)
+
+
 def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *, memoise_context: bool = True,
                                      strategic_page_size: int = STRATEGIC_PAGE_SIZE) -> dict:
     """The complete buyer-family result: ``{"families": [OpportunityFamily...], "excluded_family_keys": (...), "counts": {...}, "buyer_key": ...}``.
 
     ``families`` are the top ``limit`` NON-excluded families, ordered by fit bucket then family key; each family's members carry their own
     feed card in ``FamilySubject.source`` (with ``buyer_fit``). Nothing is summed across subjects."""
+    from app.security.access import require_admitted
+    require_admitted()
+    inputs = load_buyer_family_inputs(session, strategic_page_size=strategic_page_size)
+    return evaluate_buyer_families(session, buyer_key, inputs, limit, memoise_context=memoise_context)
+
+
+def evaluate_buyer_families(session, buyer_key: str, inputs: FamilyInputs, limit: int = 6, *, memoise_context: bool = True,
+                            contexts: dict | None = None, include_excluded: bool = False) -> dict:
+    """Evaluate already-loaded inputs for one buyer (the body of build_buyer_opportunity_families, unchanged in behaviour).
+
+    ``contexts`` may be a caller-owned dict shared across buyers: B2 contexts are buyer-independent (keyed by subject kind + anchor id only). ``include_excluded`` adds the
+    terminally excluded families themselves under ``"excluded_families"`` (default off: the result shape is otherwise unchanged)."""
     from app.security.access import require_admitted
     require_admitted()
     from app.policy.buyer_matching_b2_context import (
@@ -89,14 +124,14 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
     if profile is None:
         raise UnknownBuyerProfile(f"buyer {buyer_key!r} does not resolve to an active profile")
 
-    strategic = _complete_strategic_cards(session, page_size=strategic_page_size)
-    lapse_raw, undeveloped_raw, recent_permission_raw, long_pending_raw, delivery = _planning_delivery_cards(session, None)
-    _attach_planning_delivery_matching_facts(session, delivery)
+    strategic, lapse_raw, undeveloped_raw = inputs.strategic, inputs.lapse_raw, inputs.undeveloped_raw
+    recent_permission_raw, long_pending_raw, delivery = inputs.recent_permission_raw, inputs.long_pending_raw, inputs.delivery
 
-    contexts: dict[tuple, object] = {}  # request-scoped; dies with this call
+    if contexts is None:
+        contexts = {}  # request-scoped; dies with this call
 
     def _context(kind: str, anchor_id: int):
-        key = (buyer_key, kind, anchor_id)
+        key = (kind, anchor_id)
         if memoise_context and key in contexts:
             return contexts[key]
         if kind == STRATEGIC_LAND:
@@ -108,7 +143,8 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
         return context
 
     evaluated: list[dict] = []
-    for card in (*strategic, *delivery):
+    for source_card in (*strategic, *delivery):
+        card = dict(source_card)   # inputs are shared across buyers: never mutate them
         facts = card.get("matching_facts")
         if facts is None:
             raise MissingFamilySubjectMatchingFacts(str(card.get("id")), str(card.get("opportunity_type")))   # never skipped
@@ -143,4 +179,7 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
         "recent_permission": len(recent_permission_raw),
         "long_pending_application": len(long_pending_raw),
     }
-    return {"families": shown, "excluded_family_keys": tuple(f.family_key for f in excluded), "counts": counts, "buyer_key": buyer_key}
+    result = {"families": shown, "excluded_family_keys": tuple(f.family_key for f in excluded), "counts": counts, "buyer_key": buyer_key}
+    if include_excluded:
+        result["excluded_families"] = excluded
+    return result
