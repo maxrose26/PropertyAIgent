@@ -29,6 +29,8 @@ def parse_args(argv=None):
     parser.add_argument("--statement-timeout-ms", type=int, default=60000)
     parser.add_argument("--max-queries", type=int, default=None, help="optional safety circuit-breaker (not a performance threshold)")
     parser.add_argument("--skip-legacy", action="store_true", help="omit the legacy-feed comparator (its pool is re-read per card, the largest query cost)")
+    parser.add_argument("--nesten-index", action="store_true", help="include the full Nesten family/subject index and the exact-scale cohorts (additive output)")
+    parser.add_argument("--counterfactual-old-nesten", action="store_true", help="also evaluate the same universe under the pre-correction Nesten rules, labelled counterfactual (additive output)")
     parser.add_argument("--code-sha", default=None)
     return parser.parse_args(argv)
 
@@ -43,7 +45,8 @@ def main(argv=None) -> int:
     from verification.gate_b.runner import artifact_json, resolve_code_sha, run_validation, shortlist_csv
     session = get_session()
     try:
-        artifact = run_validation(session, real=real, code_sha=args.code_sha, shortlist_size=args.shortlist, statement_timeout_ms=args.statement_timeout_ms, max_queries=args.max_queries, include_legacy=not args.skip_legacy)
+        artifact = run_validation(session, real=real, code_sha=args.code_sha, shortlist_size=args.shortlist, statement_timeout_ms=args.statement_timeout_ms, max_queries=args.max_queries, include_legacy=not args.skip_legacy,
+                                  nesten_index=args.nesten_index, counterfactual_old_nesten=args.counterfactual_old_nesten)
     finally:
         session.close()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
