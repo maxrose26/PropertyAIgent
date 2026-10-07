@@ -1093,7 +1093,7 @@ RELATED SITES (each independently evidenced - a Site relates to THIS allocation,
 APPLICANT EVIDENCE (who has submitted planning applications relating to a Site, aggregated across ALL of that Site's trusted linked Applications - not only the representative one; being named as applicant, on one Application or many, does NOT by itself mean this party is the developer, promoter, landowner, or "behind" the wider scheme; see Rule 2):
 {applicant_lines}
 
-OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact Site or residual-capacity context named, NEVER the allocation as a whole - never say an entity "owns the allocation", only that ownership/control evidence for a NAMED Site or the potential residual scope names that entity in that role):
+OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact Site or potential-residual-scope context named, NEVER the allocation as a whole - never say an entity "owns the allocation", only that ownership/control evidence for a NAMED Site or the potential residual scope names that entity in that role):
 {ownership_lines}
 {f"- {context.ownership_review_pending_count} additional ownership/control relationship(s) exist but remain subject to review - do not name the entity or role, only note that review is pending." if context.ownership_review_pending_count else ""}
 {"- No ownership/control evidence currently identified for the allocation's potential residual scope - you may state this plainly, it is commercially useful information." if not context.residual_ownership_known and _potential_residual_flag(context) else ""}
@@ -1133,7 +1133,7 @@ Write like a concise land/planning intelligence analyst, not a summariser restat
 - referenced_entities: one entry for every APPLICANT/OWNERSHIP/CONTROL party you named anywhere above (never the council or Local Plan name) - [] if you named none (Rule 17), each with:
   - name: the entity name, exactly as given.
   - role: its role label, exactly as given (e.g. "Applicant", "S106 Developer", "Planning ownership declaration").
-  - site_scope: exactly the scope text given above for that entity (e.g. Site "Land At Wilmslow Road Heald Green Stockport", or "the allocation's residual (unaccounted-for) capacity") - never "the allocation" as a whole.
+  - site_scope: exactly the scope text given above for that entity (e.g. Site "Land At Wilmslow Road Heald Green Stockport", or "the allocation's potential residual scope") - never "the allocation" as a whole.
   - application_reference: if you named ONE SPECIFIC Application reference in connection with this party (e.g. "named as applicant on DC/078180"), that exact reference; if you only described the party generally (e.g. "named as applicant on several linked applications", with no single reference singled out), "".
 """
 

@@ -855,7 +855,7 @@ A strategic allocation stores up to three plan-stated figures. Representation th
 
 Wording is always qualified: *"Plan-stated capacity: 150 homes — unverified"*, *"Plan-stated range: 60–300 homes — unverified"*, *"Plan-stated minimum: 100 homes — unverified"*, and so on. It never says a bare number, and implies no permission, deliverability, ownership, availability, promoter interest or commencement. A strategic STRONG_FIT is **not** removed because the opportunity is strategic: it states a plan-stated capacity fits and nothing blocks it; it is not buyer-ready or independently verified.
 
-### Residual-capacity contract (SUPERSEDES the earlier "residual-inference prohibition"; DESIGN — not yet implemented)
+### Residual-capacity contract (SUPERSEDES the earlier "residual-inference prohibition"; DESIGN — implemented in V8-B and the final hardening; where this section differs, the V8-B and final-hardening sections govern)
 
 The earlier ruling to neutralise residual capacity product-wide is **WITHDRAWN**. Residual capacity is commercially valuable acquisition intelligence (e.g. an outline permission for 500 homes with an evidenced subordinate reserved-matters scope of 300 may leave an apparent ~200 residual that is not visible as a standalone application). The governing principle is:
 
