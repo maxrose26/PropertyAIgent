@@ -16,9 +16,9 @@ import json
 from app.db.session import get_session
 from app.policy.mandate_reonboarding import CONFIRM_PHRASE, apply_stale_mandate_reonboarding, plan_stale_mandate_reonboarding
 from app.security.cli import authorised_cli
-from verification.transition.v6_parity import v6_parity_oracle
+from verification.transition.v7_parity import v7_parity_oracle
 
-PARITY_ORACLE = v6_parity_oracle   # TEMPORARY transition-only frozen v6 oracle (verification/transition); the application itself never imports it
+PARITY_ORACLE = v7_parity_oracle   # TEMPORARY transition-only frozen v7 oracle (approved strategic deltas allowed) (verification/transition); the application itself never imports it
 
 
 @authorised_cli('reonboard_stale_mandates')

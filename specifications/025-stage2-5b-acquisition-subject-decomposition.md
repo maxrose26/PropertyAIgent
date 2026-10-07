@@ -904,3 +904,12 @@ Representing strategic capacity with proper count semantics changes buyer-fit ou
 ### Performance record (not optimised here)
 
 ~2,829 Nesten queries over 429 families at the corrected Gate B run (about 6.6 per family; planning contexts ~12–13 queries each; ~one constant-result control lookup per allocation). Future: request-scoped context reuse, batching by site ids, removing constant-result per-allocation lookups.
+
+## V8-A checkpoint: strategic scale matching, frozen v7 oracle, differential gate
+
+- `BUYER_MATCHING_POLICY_VERSION` 7 -> 8. Strategic allocation facts carry `count_assessment` (plan-stated, unverified) instead of the legacy `maximum or minimum` scalar; `unit_count` is retained for display/fingerprint continuity only.
+- Semantics: exact -> unchanged; open floor / open ceiling / malformed -> INSUFFICIENT_EVIDENCE (never a fabricated count). An open floor wholly above the discovery maximum proves the scale is outside discovery (no ceiling needed). The Strategic Land Buyer large-allocation route is preserved only where the plan-stated LOWER bound is itself above the discovery maximum.
+- Frozen v7 oracle: `verification/transition/frozen_v7_matcher.py` (verbatim `assess_buyer_fit` at 60dcbd99, function sha256 `a2bf0d22...`, 19 definition pins + 5 whole-file pins); `v7_parity.py` feeds it strategic facts with `count_assessment=None`.
+- Differential categories: EQUAL; EXPECTED_STRATEGIC_DELTA (strategic, non-EXACT capacity, not the preserved route); UNEXPECTED_REGRESSION (any planning-delivery difference, any EXACT-strategic difference, any preserved-route difference). Residual-subject additions are classified in V8-B.
+- Finding for REVIEW: ranges now evaluate through the existing uncertain-scale block, so S3/S4 (range inside / crossing preferred) keep their classification but gain the investigative flag. Recorded, not changed.
+- Remaining (V8-B/C): R1/R2/R3 residual ladder (R1 capped at POSSIBLE_FIT), derived residual subject, residual evidence fingerprint, per-surface table, AI-summary grounding, fingerprint assessment (opportunity fingerprints use only `unit_count`: a capacity-kind change with an unchanged scalar is not detected by monitoring - to be reported/fixed).

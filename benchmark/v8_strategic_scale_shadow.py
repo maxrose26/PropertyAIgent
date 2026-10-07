@@ -1,7 +1,7 @@
 """Stage 2.5B final slice: PROPOSED strategic-scale benchmark cases + SHADOW evaluation (offline, deterministic; no database, network or model). NEVER imported by app/.
 
-This does NOT change matching. For each proposed strategic capacity case it shows, side by side, what the CURRENT production path says (the legacy scalar: maximum_capacity or minimum_dwellings,
-indicative ignored) and what the UNCHANGED matcher would say if the allocation's capacity were represented through proper count semantics (app.reporting.strategic_capacity). The
+For each proposed strategic capacity case it shows, side by side, what the FROZEN v7 oracle says (the legacy scalar: maximum_capacity or minimum_dwellings, indicative ignored) and what the
+v8 matcher says (the allocation's capacity through proper count semantics, app.reporting.strategic_capacity). The
 difference is the evidence REVIEW needs to decide on a BUYER_MATCHING_POLICY_VERSION 7 -> 8 transition. Nothing here is approved: ``approved_by_product_owner`` is False and the proposed
 intended outcomes are for REVIEW to accept, change or reject.
 
@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from app.policy.buyer_matching import assess_buyer_fit, build_strategic_land_matching_facts
 from app.policy.buyer_profiles import BUYER_PROFILES
 from app.reporting.strategic_capacity import strategic_capacity_assessment
+from verification.transition.v7_parity import differential_category
 
 APPROVED_BY_PRODUCT_OWNER = False
 
@@ -51,16 +52,17 @@ def _label(assessment) -> str:
 def evaluate_case(case) -> dict:
     case_id, buyer, (minimum, indicative, maximum), description, proposed = case
     allocation, policy = _allocation(minimum, indicative, maximum), BUYER_PROFILES[buyer]
-    legacy_facts = dataclasses.replace(build_strategic_land_matching_facts(allocation, None, None), has_identified_planning_activity=False)   # as a real allocation with a coverage result of 'no identified activity'
+    v8_facts = dataclasses.replace(build_strategic_land_matching_facts(allocation, None, None), has_identified_planning_activity=False)   # an allocation with a coverage result of 'no identified activity'
     capacity = strategic_capacity_assessment(allocation)
-    shadow_facts = dataclasses.replace(legacy_facts, count_assessment=capacity)
+    v8 = assess_buyer_fit(policy, v8_facts)
+    category, v7 = differential_category(policy, v8_facts, None, v8)
     return {"case_id": case_id, "buyer": buyer, "description": description, "stored_figures": {"minimum": minimum, "indicative": indicative, "maximum": maximum},
             "capacity_semantics": {"precision": capacity.precision, "value": capacity.value, "lower": capacity.lower, "upper": capacity.upper, "resolution": capacity.resolution},
-            "legacy_unit_count": legacy_facts.unit_count, "current_production_result": _label(assess_buyer_fit(policy, legacy_facts)),
-            "shadow_result_with_count_semantics": _label(assess_buyer_fit(policy, shadow_facts)), "proposed_intended_outcome_for_review": proposed}
+            "legacy_unit_count": v8_facts.unit_count, "frozen_v7_result": _label(v7), "v8_result": _label(v8), "differential_category": category, "proposed_intended_outcome_for_review": proposed}
 
 
 def run_shadow() -> dict:
+    """Frozen v7 oracle (legacy scalar, no count semantics) vs the live v8 matcher on the SAME strategic facts."""
     rows = [evaluate_case(case) for case in CASES]
-    return {"approved_by_product_owner": APPROVED_BY_PRODUCT_OWNER, "matching_changed": False, "rows": rows,
-            "differences": [r["case_id"] for r in rows if r["current_production_result"] != r["shadow_result_with_count_semantics"]]}
+    return {"approved_by_product_owner": APPROVED_BY_PRODUCT_OWNER, "rows": rows, "differences": [r["case_id"] for r in rows if r["frozen_v7_result"] != r["v8_result"]],
+            "unexpected_regressions": [r["case_id"] for r in rows if r["differential_category"] == "UNEXPECTED_REGRESSION"]}

@@ -92,31 +92,30 @@ def test_the_conversion_is_pure_arithmetic_free_and_never_invents_a_unit():
 
 # --- matching is UNCHANGED (W, X, Y, Z-compatible) ----------------------------------------------------------------------------------------------------
 
-def test_matching_semantics_and_policy_version_are_unchanged_in_this_slice():
-    assert BUYER_MATCHING_POLICY_VERSION == 7
+def test_v8_strategic_builder_carries_count_semantics_and_keeps_the_legacy_scalar():
+    assert BUYER_MATCHING_POLICY_VERSION == 8
     facts = build_strategic_land_matching_facts(SimpleNamespace(minimum_dwellings=60, indicative_capacity=120, maximum_capacity=300, intended_use="residential",
                                                                  local_plan=SimpleNamespace(status="adopted"), plan_status="adopted", matched_site_id=None), None, None)
-    assert facts.unit_count == 300 and facts.count_assessment is None                            # the legacy scalar is still what matching uses (the shadow module shows the alternative)
-    for module in ("app/reporting/opportunity_universe.py", "app/reporting/opportunity_change.py", "app/policy/agent_evaluation_persistence.py", "app/policy/buyer_matching.py"):
+    assert facts.unit_count == 300 and facts.count_assessment is not None and facts.count_assessment.precision == "RANGE"   # v8: matching reads the assessment; the legacy scalar is display/fingerprint continuity only
+    for module in ("app/reporting/opportunity_universe.py", "app/reporting/opportunity_change.py", "app/policy/agent_evaluation_persistence.py"):
         text = (ROOT / module).read_text(encoding="utf-8")
-        assert "opportunity_route" not in text and "strategic_scale" not in text and "strategic_capacity" not in text, module     # not part of fingerprints, monitoring or matching
+        assert "opportunity_route" not in text and "strategic_scale" not in text and "strategic_capacity" not in text, module     # not part of fingerprints or monitoring
 
 
-def test_shadow_evaluation_pins_current_behaviour_and_exposes_the_required_matcher_decision():
+def test_shadow_compares_frozen_v7_with_v8_and_every_difference_is_an_expected_strategic_delta():
     from benchmark.v8_strategic_scale_shadow import APPROVED_BY_PRODUCT_OWNER, run_shadow
     result = run_shadow()
-    assert APPROVED_BY_PRODUCT_OWNER is False and result["matching_changed"] is False
-    current = {r["case_id"]: r["current_production_result"] for r in result["rows"]}
-    assert current == {"S1_exact_inside_preferred": "STRONG_FIT", "S2_indicative_only_inside_preferred": "INSUFFICIENT_EVIDENCE", "S3_range_inside_preferred": "STRONG_FIT",
-                       "S4_range_crossing_preferred_discovery": "POSSIBLE_FIT", "S5_range_spanning_outside_discovery": "INSUFFICIENT_EVIDENCE+investigative", "S6_minimum_only": "STRONG_FIT",
-                       "S7_maximum_only": "STRONG_FIT", "S8_malformed_conflicting": "STRONG_FIT", "S9a_self_qualifying_exact": "STRONG_FIT+investigative",
-                       "S9b_self_qualifying_range": "STRONG_FIT+investigative", "S9c_self_qualifying_minimum_only": "STRONG_FIT+investigative",
-                       "S10_nesten_very_large_allocation": "INSUFFICIENT_EVIDENCE+investigative"}
-    shadow = {r["case_id"]: r["shadow_result_with_count_semantics"] for r in result["rows"]}
-    assert shadow["S6_minimum_only"] == shadow["S7_maximum_only"] == shadow["S8_malformed_conflicting"].replace("+investigative", "") + "+investigative" or shadow["S8_malformed_conflicting"] == "INSUFFICIENT_EVIDENCE"
-    assert shadow["S6_minimum_only"].startswith("INSUFFICIENT") and shadow["S8_malformed_conflicting"].startswith("INSUFFICIENT")
-    assert shadow["S9b_self_qualifying_range"].startswith("INSUFFICIENT") and shadow["S9c_self_qualifying_minimum_only"].startswith("INSUFFICIENT")     # the self-qualifying regression a naive switch would cause
-    assert shadow["S9a_self_qualifying_exact"] == "STRONG_FIT+investigative" and shadow["S1_exact_inside_preferred"] == "STRONG_FIT"
+    assert APPROVED_BY_PRODUCT_OWNER is False and result["unexpected_regressions"] == []
+    v7 = {r["case_id"]: r["frozen_v7_result"] for r in result["rows"]}
+    v8 = {r["case_id"]: r["v8_result"] for r in result["rows"]}
+    assert v7["S6_minimum_only"] == v7["S7_maximum_only"] == v7["S8_malformed_conflicting"] == "STRONG_FIT"          # the v7 reduction to a scalar
+    assert all(v8[c].startswith("INSUFFICIENT") for c in ("S6_minimum_only", "S7_maximum_only", "S8_malformed_conflicting"))
+    for c in ("S9a_self_qualifying_exact", "S9b_self_qualifying_range", "S9c_self_qualifying_minimum_only"):
+        assert v7[c] == v8[c] == "STRONG_FIT+investigative"                                                          # preserved large-allocation route
+    assert v8["S1_exact_inside_preferred"] == "STRONG_FIT" and v8["S10_nesten_very_large_allocation"] == "INSUFFICIENT_EVIDENCE+investigative"
+    # S3/S4 differ only by the investigative flag (existing uncertain-scale semantics now apply to a range); recorded for REVIEW as a v8 finding, classification unchanged.
+    assert set(result["differences"]) == {"S2_indicative_only_inside_preferred", "S3_range_inside_preferred", "S4_range_crossing_preferred_discovery", "S6_minimum_only", "S7_maximum_only", "S8_malformed_conflicting"}
+    assert v7["S3_range_inside_preferred"] == "STRONG_FIT" and v8["S3_range_inside_preferred"] == "STRONG_FIT+investigative"
     assert len(result["rows"]) == 12 and all(r["proposed_intended_outcome_for_review"] for r in result["rows"])
 
 

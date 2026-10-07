@@ -156,10 +156,10 @@ def test_the_deployed_repository_layout_lets_the_transition_cli_import_the_oracl
     import subprocess
     import sys
     assert (ROOT / "scripts/reonboard_stale_mandates.py").is_file()
-    for relative in ("verification/transition/v6_parity.py", "verification/transition/frozen_v6_matcher.py"):
+    for relative in ("verification/transition/v7_parity.py", "verification/transition/frozen_v7_matcher.py"):
         assert (ROOT / relative).is_file(), relative
-    code = ("import scripts.reonboard_stale_mandates as s, verification.transition.frozen_v6_matcher as f, verification.transition.v6_parity as p;"
-            "assert s.PARITY_ORACLE is p.v6_parity_oracle and callable(f.assess_buyer_fit); print('layout-import-ok')")
+    code = ("import scripts.reonboard_stale_mandates as s, verification.transition.frozen_v7_matcher as f, verification.transition.v7_parity as p;"
+            "assert s.PARITY_ORACLE is p.v7_parity_oracle and callable(f.assess_buyer_fit); print('layout-import-ok')")
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTEST_CURRENT_TEST")}
     env["DATABASE_URL"] = "sqlite:///:memory:"
     done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
