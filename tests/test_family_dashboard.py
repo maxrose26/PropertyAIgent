@@ -17,14 +17,33 @@ import app.reporting.family_presentation as fp
 from app.db.models import Application
 from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, NOT_SUITABLE
 from app.reporting.opportunity_families import OVERLAP_WARNING
-from tests.test_buyer_family_feed import BUYER, LAPSE_AGE, World, portal
+from tests.test_buyer_family_feed import LAPSE_AGE, World, portal
+
+BUYER = "nesten_homes"   # a TOTAL-units mandate: the buyer-facing phasing label is relevant only to scale above the discovery maximum (45-220 homes), never to affordable-unit buyers
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
 def world(session, monkeypatch):
+    treat_portal_estimates_as_exact(monkeypatch)
     return World(session, monkeypatch)
+
+
+def treat_portal_estimates_as_exact(monkeypatch):
+    """The World fixtures only carry unverified portal estimates (APPROXIMATE with no supported bounds), for which the matcher - and therefore the relevance rule - correctly establishes no
+    scale position. To exercise the REAL relevance rule on realistic facts, the estimate's value is read as an exact count (everything else is untouched)."""
+    import dataclasses
+
+    import app.policy.buyer_matching as bm
+    real = bm.phasing_is_acquisition_relevant
+
+    def with_exact_counts(profile, facts, context):
+        assessment = facts.count_assessment
+        if assessment is not None and assessment.precision == "APPROXIMATE" and assessment.value is not None and assessment.lower is None:
+            facts = dataclasses.replace(facts, count_assessment=dataclasses.replace(assessment, precision="EXACT", lower=assessment.value, upper=assessment.value))
+        return real(profile, facts, context)
+    monkeypatch.setattr(bm, "phasing_is_acquisition_relevant", with_exact_counts)
 
 
 def view_of(world, limit=6):
@@ -60,7 +79,7 @@ def test_c_parent_strong_and_phase_strong_one_family_one_headline_other_shown_as
     assert len(view.families) == 1
     family = view.families[0]
     assert family.best.fit_label == "Strong fit" and any(r.fit_label == "Strong fit" for r in family.related)
-    assert family.phasing_context == fp.PHASING_CONTEXT
+    assert family.phasing_context is None                                    # an IN-RANGE wider subject: the phasing evidence exists but is not acquisition-relevant, so no redundant label
 
 
 # --- D. phase-only family ------------------------------------------------------------------------------------------------------------
@@ -76,7 +95,7 @@ def test_d_phase_only_family_with_two_phases_has_no_fabricated_whole_site_subjec
     family = view.families[0]
     labels = [family.best.label] + [r.label for r in family.related]
     assert len(labels) == 2 and all(label.startswith("Phase") for label in labels)
-    assert family.phasing_context == fp.PHASING_CONTEXT
+    assert family.phasing_context is None                                    # only self-phase subjects: the badge would merely restate "Phase N"
     assert not any("whole" in label.lower() or "unphased" in label.lower() for label in labels)
 
 
@@ -90,10 +109,10 @@ def test_large_site_with_no_phasing_evidence_is_a_compact_single_subject_family_
     assert family.best.fit_label == "Insufficient evidence"                      # the existing v6 result, unchanged
 
 
-def test_one_genuine_phase_subject_alone_shows_the_phasing_label_without_fabricating_a_parent(world):
+def test_one_genuine_phase_subject_alone_shows_no_restating_label_and_no_fabricated_parent(world):
     world.site(rm_age=300, rm_phase="Phase 1", phase="S", units_rm=80)
     family = view_of(world).families[0]
-    assert family.phasing_context == fp.PHASING_CONTEXT                      # one genuine phase is sufficient on its own
+    assert family.phasing_context is None                                    # a self-phase subject is already labelled "Phase 1": no acquisition-relevance badge
     assert len(family.related) == 0 and family.overlap_warning is None       # no synthetic parent / second subject, no overlap note
     assert family.best.label.startswith("Phase") and "wider" not in family.best.label.lower()
 
@@ -117,14 +136,16 @@ def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
     )
     from app.reporting.opportunity_families import FamilySubject, OpportunityFamily, RelatedSubject, SLOT_LIFECYCLE, SLOT_PHASE, ID_SYSTEM_FEED
 
-    def subject(key, slot, state):
+    def subject(key, slot, state, relevant=None):
         card = {"phase_code": "2" if slot == SLOT_PHASE else None}
+        if relevant is not None:
+            card["acquisition_phasing_relevant"] = relevant
         if state is not None:
             card["acquisition_phasing"] = AcquisitionPhasingEvidence(state)
         return FamilySubject(domain="planning_delivery", anchor_id=1, subject_key=key, slot=slot, fit="INSUFFICIENT_EVIDENCE", source=card, id_system=ID_SYSTEM_FEED)
 
     def family(state):
-        phase, lifecycle = subject("opp-phase-1-2", SLOT_PHASE, state), subject("opp-lapse-1", SLOT_LIFECYCLE, state)
+        phase, lifecycle = subject("opp-phase-1-2", SLOT_PHASE, state), subject("opp-lapse-1", SLOT_LIFECYCLE, state, relevant=True)   # the wider subject is relevant (oversized, total-units buyer)
         return OpportunityFamily(("planning_delivery", 1), phase, (RelatedSubject(lifecycle, "INSUFFICIENT"),))
     assert fp.phasing_evidenced(family(PHASING_CURRENT_EVIDENCED_PHASE)) is True
     assert fp.phasing_context(family(PHASING_CURRENT_EVIDENCED_PHASE)) == "Phased delivery evidenced."
@@ -134,7 +155,11 @@ def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
         assert fp.phasing_evidenced(family(not_current)) is False, not_current       # historical / none / reserved documented / fact missing: no current label
         assert fp.phasing_context(family(not_current)) is None, not_current
     single = OpportunityFamily(("planning_delivery", 1), subject("opp-phase-1-2", SLOT_PHASE, PHASING_CURRENT_EVIDENCED_PHASE), ())
-    assert fp.phasing_evidenced(single) is True                                          # one genuine phase subject is sufficient on its own
+    assert fp.phasing_evidenced(single) is True                                          # the EVIDENCE fact is unchanged: one genuine phase subject is sufficient on its own
+    assert fp.phasing_context(single) is None                                            # ...but a lone self-phase subject carries no acquisition-relevance label
+    irrelevant = OpportunityFamily(("planning_delivery", 1), subject("opp-phase-1-2", SLOT_PHASE, PHASING_CURRENT_EVIDENCED_PHASE),
+                                   (RelatedSubject(subject("opp-lapse-1", SLOT_LIFECYCLE, PHASING_CURRENT_EVIDENCED_PHASE, relevant=False), "INSUFFICIENT"),))
+    assert fp.phasing_evidenced(irrelevant) is True and fp.phasing_context(irrelevant) is None   # relevance is separate from evidence existence
     lifecycle_only = OpportunityFamily(("planning_delivery", 1), subject("opp-lapse-1", SLOT_LIFECYCLE, PHASING_NONE_IDENTIFIED), ())
     assert fp.phasing_evidenced(lifecycle_only) is False
     strategic = FamilySubject(domain="strategic_land", anchor_id=1, subject_key="opp-feed-alloc-1", slot="ALLOCATION", fit="INSUFFICIENT_EVIDENCE",
@@ -144,9 +169,9 @@ def test_the_label_follows_the_shared_phasing_fact_and_nothing_else():
 
 def test_end_to_end_an_undated_phase_shows_the_weak_label_and_an_address_only_phase_shows_none(world):
     from app.db.models import Application
-    undated = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    undated = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S", units_out=500)
     world.session.query(Application).filter(Application.site_id == undated.id, Application.reference.like("RM/%")).update({"decision_issued_date": None})
-    address_only = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
+    address_only = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S", units_out=500)
     rm = world.session.query(Application).filter(Application.site_id == address_only.id, Application.reference.like("RM/%")).one()
     rm.proposal = "Reserved matters for 30 dwellings"
     rm.address = "Phase 2, Mill Lane, Anytown"

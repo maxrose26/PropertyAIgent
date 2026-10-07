@@ -117,9 +117,14 @@ def _subject_view(subject) -> SubjectView:
 
 
 def phasing_context(family: OpportunityFamily) -> str | None:
-    """The phasing label for a family, from the SHARED fact only: CURRENT -> "Phased delivery evidenced."; PHASE_EVIDENCE_CURRENTNESS_UNKNOWN -> the weaker
-    "Phase evidence identified — current status unverified."; historical-only, none, reserved documented, a missing fact and every strategic family -> no label."""
+    """The BUYER-FACING phasing label. Two separate questions: (1) the EVIDENCE fact (shared, unchanged): CURRENT -> "Phased delivery evidenced."; PHASE_EVIDENCE_CURRENTNESS_UNKNOWN ->
+    the weaker "Phase evidence identified — current status unverified."; historical-only, none, reserved documented, a missing fact and every strategic family -> no label; and (2) its
+    acquisition RELEVANCE to this buyer (app.policy.buyer_matching.phasing_is_acquisition_relevant, carried on the card as ``acquisition_phasing_relevant``): the label shows only when
+    some WIDER (non-self-phase) planning-delivery subject is above the buyer's discovery maximum on a total-units mandate. Below-minimum, in-range, affordable-unit-metric and
+    self-phase-only families show no label; the underlying fact is untouched (phasing_evidenced still reports it)."""
     if family.family_key[0] == STRATEGIC_LAND:
+        return None
+    if not any((member.source or {}).get("acquisition_phasing_relevant") is True for member in family.members):
         return None
     from app.reporting.acquisition_phasing import phasing_state_of
     for member in family.members:

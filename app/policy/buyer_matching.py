@@ -880,6 +880,29 @@ def subject_is_self_scope(facts: MatchingFacts, context: B2MatchingContext | Non
     return bool(context.subject_application_anchored and evidence is not None and evidence.state == PHASING_CURRENT_EVIDENCED_PHASE)
 
 
+def phasing_is_acquisition_relevant(profile: BuyerMandatePolicy, facts: MatchingFacts, context: B2MatchingContext | None) -> bool:
+    """BUYER-FACING relevance of the shared phasing fact (a presentation input; it never feeds classification, the investigative flag or any fingerprint, and the evidence fact itself is untouched).
+
+    True only for a planning-delivery WIDER (non-self-phase) subject, judged on a TOTAL-units mandate, whose scale is ABOVE the buyer's discovery maximum - the one situation where
+    smaller physical delivery scope can explain a route into the buyer's range. Below-minimum, in-range, affordable-unit-metric buyers, strategic subjects and self-phase subjects
+    are never relevant. Uses the same range semantics (discovery_bounds, exact/uncertain assessment handling) as the matcher's above-maximum wording; a test pins the two together."""
+    if facts.opportunity_type != PLANNING_DELIVERY or profile.scale_metric == AFFORDABLE_UNITS or subject_is_self_scope(facts, context):
+        return False
+    _, discovery_max = discovery_bounds(profile.target_unit_min, profile.target_unit_max)
+    if discovery_max is None:
+        return False
+    assessment = facts.count_assessment
+    if assessment is None:
+        scale = known_unit_count(facts.unit_count)
+        return scale is not None and scale > discovery_max
+    if assessment.exact_value is not None:
+        return assessment.exact_value > discovery_max
+    if assessment.precision not in ("APPROXIMATE", "RANGE"):
+        return False
+    discovery_min = profile.target_unit_min if profile.below_minimum_scale_is_exclusion else discovery_bounds(profile.target_unit_min, profile.target_unit_max)[0]
+    return assessment.within_hard_bounds(minimum=discovery_min, maximum=discovery_max) is False and assessment.lower is not None and assessment.lower > discovery_max
+
+
 def _phasing_tail(facts: MatchingFacts, context: B2MatchingContext | None) -> str:
     if subject_is_self_scope(facts, context):
         return _SELF_SCOPE_TAIL

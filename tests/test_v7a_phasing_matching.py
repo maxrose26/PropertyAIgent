@@ -294,11 +294,13 @@ def test_the_feed_and_the_presentation_consume_the_same_fact_including_the_lapse
     import app.reporting.buyer_family_feed as bff
     import app.reporting.family_presentation as fp
     from tests.test_buyer_family_feed import LAPSE_AGE, World
+    from tests.test_family_dashboard import treat_portal_estimates_as_exact
+    treat_portal_estimates_as_exact(monkeypatch)
     world = World(session, monkeypatch)
-    current = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S")
-    lapsed = world.site(outline_age=365 * 3 + 300, rm_age=365 * 3 + 200, rm_phase="Phase 2", parent="I", phase="S")
-    view = fp.build_buyer_family_dashboard_view(session, "housing_association", 10)
-    result = bff.build_buyer_opportunity_families(session, "housing_association", 10)
+    current = world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S", units_out=500)
+    lapsed = world.site(outline_age=365 * 3 + 300, rm_age=365 * 3 + 200, rm_phase="Phase 2", parent="I", phase="S", units_out=500)
+    view = fp.build_buyer_family_dashboard_view(session, "nesten_homes", 10)
+    result = bff.build_buyer_opportunity_families(session, "nesten_homes", 10)
     states = {f.family_key[1]: {m.source["acquisition_phasing"].state for m in f.members} for f in result["families"]}
     assert states[current.id] == {PHASING_CURRENT_EVIDENCED_PHASE} and states[lapsed.id] == {PHASING_HISTORICAL_ONLY}     # identical for every member of a family
     labelled = {f.title: f.phasing_context for f in view.families}
