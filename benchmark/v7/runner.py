@@ -10,7 +10,7 @@ import re
 
 from app.policy.agent_evaluation_persistence import AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION
 from app.policy.agent_evaluation_result import AGENT_EVALUATION_POLICY_VERSION
-from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, AcquisitionPhasingEvidence, B2MatchingContext, MatchingFacts, assess_buyer_fit
+from app.policy.buyer_matching import BUYER_MATCHING_POLICY_VERSION, AcquisitionPhasingEvidence, B2MatchingContext, MatchingFacts, assess_buyer_fit, phasing_is_acquisition_relevant
 from app.policy.buyer_profiles import BUYER_PROFILES
 from app.reporting.family_presentation import phasing_context
 from app.reporting.opportunity_families import group_into_families, subject_from_opportunity_id
@@ -56,8 +56,9 @@ def run_case(case) -> dict:
         failures += [f"{subject.opportunity_id}: forbidden inference [{name}] in {m.group(0)!r}" for name, pattern in FORBIDDEN_INFERENCES.items()
                      for m in [re.search(pattern, text, re.I)] if m]
         evidence = AcquisitionPhasingEvidence(subject.phasing) if subject.phasing else None
+        relevant = phasing_is_acquisition_relevant(policy, MatchingFacts(**subject.facts), _context(subject))
         family_subjects.append(subject_from_opportunity_id(subject.opportunity_id, fit=assessment.classification, investigative=bool(assessment.is_investigative_exception),
-                                                           source={"acquisition_phasing": evidence}))
+                                                           source={"acquisition_phasing": evidence, "acquisition_phasing_relevant": relevant}))
     families = group_into_families(family_subjects)
     if len(families) != 1:
         failures.append(f"expected exactly one family, got {len(families)}")

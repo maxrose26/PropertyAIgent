@@ -121,6 +121,8 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
             context = replace(_context(PLANNING_DELIVERY, int(card["params"]["site_id"])),
                               subject_phase_scope_key=phase_scope_key, subject_application_anchored=application_anchored)
             card["acquisition_phasing"] = context.acquisition_phasing   # the single shared fact the Slice 2 presentation label consumes
+            from app.policy.buyer_matching import phasing_is_acquisition_relevant
+            card["acquisition_phasing_relevant"] = phasing_is_acquisition_relevant(profile, facts, context)   # evidence vs relevance: whether the label is shown
         card["buyer_fit"] = evaluate_buyer_fit(session, profile, facts, context=context)
         evaluated.append(card)
 

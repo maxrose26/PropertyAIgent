@@ -146,6 +146,6 @@ CASES = (
          "Subject = Phase 1 itself, 520 homes; phasing CURRENT_EVIDENCED_PHASE (self-scope guard)",
          (Subject(phase_id(111, 1), pd(unit_count=520), INSUFFICIENT, True, phasing=CURRENT, phase_scope_key="1",
                   must_say=("own scope is a named phase",), must_not_say=("assess the evidenced phase scope(s) separately", "Phased delivery is evidenced")),),
-         INSUFFICIENT, True, phase_id(111, 1), LABEL_CURRENT,
-         "A phase must not be told to look for phases inside itself.", optional=True),
+         INSUFFICIENT, True, phase_id(111, 1), None,
+         "A phase must not be told to look for phases inside itself, and the badge must not merely restate that the subject is a phase (Product Owner ruling on self-phase subjects).", optional=True),
 )
