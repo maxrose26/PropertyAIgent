@@ -1,6 +1,6 @@
 """V7 benchmark cases: FACTS first, then the Product Owner's INTENDED outcome (written before and independently of any implementation result).
 
-Every expectation below is a PROPOSAL awaiting Product Owner review (APPROVED_BY_PRODUCT_OWNER stays False). If the implementation disagrees with an expectation the benchmark FAILS and
+Every expectation below was APPROVED by the Product Owner via REVIEW on 2026-10-07 (see APPROVAL_RECORD). If the implementation disagrees with an expectation the benchmark FAILS and
 the expectation must NOT be edited to fit the code - the disagreement is reported for decision.
 """
 from __future__ import annotations
@@ -13,7 +13,14 @@ from app.policy.buyer_matching import (
 )
 from app.policy.buyer_profiles import ADOPTED_ALLOCATION, PERMISSION_GRANTED
 
-APPROVED_BY_PRODUCT_OWNER = False
+APPROVED_BY_PRODUCT_OWNER = True
+APPROVAL_RECORD = {
+    "decision": "Gate A Product Owner expectations approved via REVIEW",
+    "date": "2026-10-07",
+    "approved_cases": ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "M"),
+    "notes": ("Case M approved as: self-phase subject -> no acquisition-relevance phasing badge. Unbounded/unsupported portal estimates retain the conservative behaviour "
+              "(no scale position is manufactured to show the badge; no policy change authorised)."),
+}
 
 STRONG, POSSIBLE, INSUFFICIENT, NOT_SUITABLE = "STRONG_FIT", "POSSIBLE_FIT", "INSUFFICIENT_EVIDENCE", "NOT_SUITABLE"
 LABEL_CURRENT = "Phased delivery evidenced."

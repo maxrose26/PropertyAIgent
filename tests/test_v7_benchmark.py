@@ -26,11 +26,14 @@ def test_all_twelve_cases_match_the_product_owner_expectations():
     assert sorted(c.case_id[0] for c in CASES if c.optional) == ["K", "M"]
 
 
-def test_versions_are_recorded_and_expectations_are_not_self_approved():
+def test_versions_are_recorded_and_the_expectations_carry_the_review_approval_record():
     report = run_benchmark()
     assert (report["benchmark_version"], report["buyer_matching_policy_version"], report["agent_evaluation_input_fingerprint_version"], report["agent_evaluation_policy_version"]) == (
         V7_BENCHMARK_VERSION, 7, 3, 2)
-    assert report["approved_by_product_owner"] is False and cases_module.APPROVED_BY_PRODUCT_OWNER is False
+    assert report["approved_by_product_owner"] is True and cases_module.APPROVED_BY_PRODUCT_OWNER is True
+    record = report["approval_record"]
+    assert record["date"] == "2026-10-07" and record["approved_cases"] == tuple("ABCDEFGHIJKM") and "Case M" in record["notes"]
+    assert {c.case_id[0] for c in CASES} == set(record["approved_cases"])               # every case in the set is covered by the approval; none is added silently
     assert report["offline"] == {"database_calls": 0, "network_calls": 0, "model_calls": 0}
 
 

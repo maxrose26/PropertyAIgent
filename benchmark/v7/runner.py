@@ -15,7 +15,7 @@ from app.policy.buyer_profiles import BUYER_PROFILES
 from app.reporting.family_presentation import phasing_context
 from app.reporting.opportunity_families import group_into_families, subject_from_opportunity_id
 from benchmark.v7 import V7_BENCHMARK_VERSION
-from benchmark.v7.cases import APPROVED_BY_PRODUCT_OWNER, CASES
+from benchmark.v7.cases import APPROVAL_RECORD, APPROVED_BY_PRODUCT_OWNER, CASES
 
 # Forbidden inferences: nothing a subject (or the family label) says may claim any of these. (The approved phrase "Availability is unverified." is a DISCLAIMER and is not matched.)
 FORBIDDEN_INFERENCES = {
@@ -87,6 +87,7 @@ def run_benchmark() -> dict:
         "agent_evaluation_input_fingerprint_version": AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION,
         "agent_evaluation_policy_version": AGENT_EVALUATION_POLICY_VERSION,
         "approved_by_product_owner": APPROVED_BY_PRODUCT_OWNER,
+        "approval_record": APPROVAL_RECORD,
         "offline": {"database_calls": 0, "network_calls": 0, "model_calls": 0},
         "cases": results,
         "passed": all(r["passed"] for r in results),

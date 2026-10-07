@@ -1,4 +1,4 @@
-# V7 benchmark - PROPOSED Product Owner expectations (approved_by_product_owner = false)
+# V7 benchmark - Product Owner expectations (APPROVED via REVIEW, 2026-10-07; approved_by_product_owner = true)
 
 Generated from benchmark/v7/cases.py expectations only (never from an implementation result). Cases A-J are the required set; K and M are optional. Phasing label = the buyer-facing family badge (shown only where phasing is acquisition-relevant: oversized wider planning-delivery subject on a total-units mandate).
 
