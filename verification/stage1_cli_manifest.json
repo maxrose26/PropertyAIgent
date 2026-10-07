@@ -106,5 +106,13 @@
   "scripts/sync_nesten_mandate.py": {
     "command": "sync_nesten_mandate",
     "required_scope": "launch:sync_nesten_mandate"
+  },
+  "scripts/v8_monitoring_rebaseline.py": {
+    "command": "v8_monitoring_rebaseline",
+    "required_scope": "launch:v8_monitoring_rebaseline"
+  },
+  "scripts/preview_ai_summary_staleness.py": {
+    "command": "preview_ai_summary_staleness",
+    "required_scope": "launch:preview_ai_summary_staleness"
   }
 }

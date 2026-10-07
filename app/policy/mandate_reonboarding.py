@@ -37,6 +37,7 @@ CONFIRM_PHRASE = "REONBOARD STALE MANDATES UNDER CURRENT POLICY"
 PARITY_NOT_AVAILABLE, PARITY_PASSED, PARITY_FAILED = "NOT_AVAILABLE", "PASSED", "FAILED"
 DIGEST_VERSION = 2
 _MAX_LISTED_MISMATCHES = 20
+_MAX_LISTED_EXPECTED_DELTAS = 500
 
 
 class ReonboardingRefused(RuntimeError):
@@ -79,6 +80,10 @@ class _Entry:
     investigative_mismatches: int = 0
     parity_mismatches: list = field(default_factory=list)
     outcomes_digest: str = ""
+    # v8: the parity oracle's per-opportunity CATEGORY (v7_parity: EQUAL / EXPECTED_STRATEGIC_DELTA) so REVIEW sees exactly how many differences were approved strategic deltas,
+    # and the (bounded) list of those deltas. Oracles that do not categorise are counted under UNSPECIFIED.
+    parity_categories: dict = field(default_factory=dict)
+    expected_deltas: list = field(default_factory=list)
 
 
 @dataclass
@@ -103,7 +108,7 @@ class ReonboardingPlan:
             "digest_version": DIGEST_VERSION, "policy_version": BUYER_MATCHING_POLICY_VERSION, "universe_size": self.universe_size, "universe_identity": self.universe_identity,
             "parity": self.parity_status,
             "entries": [[e.buyer_key, e.mandate.id, e.old_fingerprint, e.proposed_fingerprint, e.proposed_summary, e.outcomes_digest, e.parity_status, e.parity_compared,
-                         e.classification_mismatches, e.investigative_mismatches] for e in self.entries],
+                         e.classification_mismatches, e.investigative_mismatches, sorted(e.parity_categories.items())] for e in self.entries],
         }
         return hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
 
@@ -116,6 +121,7 @@ class ReonboardingPlan:
                 "opportunities_compared": sum(e.parity_compared for e in self.entries),
                 "classification_mismatches": sum(e.classification_mismatches for e in self.entries),
                 "investigative_mismatches": sum(e.investigative_mismatches for e in self.entries),
+                "category_counts": _sum_categories(self.entries),
             },
             "can_apply": self.can_apply, "blocking_reasons": list(self.blocking_reasons), "plan_digest": self.digest(),
             "secondary_note": "stored-summary differences are SECONDARY evidence (possible universe drift); same-universe parity is the primary check",
@@ -133,6 +139,14 @@ def parse_summary(text: str | None) -> dict:
     return {key: int(value) for key, value in _SUMMARY_FIELD.findall(text or "")}
 
 
+def _sum_categories(entries) -> dict:
+    total: dict = {}
+    for entry in entries:
+        for category, count in entry.parity_categories.items():
+            total[category] = total.get(category, 0) + count
+    return {key: total[key] for key in sorted(total)}
+
+
 def _entry_report(entry: _Entry) -> dict:
     old, new = parse_summary(entry.old_summary), parse_summary(entry.proposed_summary)
     delta = {key: {"old": old.get(key), "new": new.get(key)} for key in sorted(set(old) | set(new)) if old.get(key) != new.get(key)}
@@ -146,7 +160,9 @@ def _entry_report(entry: _Entry) -> dict:
                        if delta else None),
         "parity": {"status": entry.parity_status, "opportunities_compared": entry.parity_compared, "classification_mismatches": entry.classification_mismatches,
                    "investigative_mismatches": entry.investigative_mismatches,
-                   "mismatches_listed": list(entry.parity_mismatches)},   # at most _MAX_LISTED_MISMATCHES; a passing run lists none (no per-opportunity PASS lines)
+                   "mismatches_listed": list(entry.parity_mismatches),   # at most _MAX_LISTED_MISMATCHES; a passing run lists none (no per-opportunity PASS lines)
+                   "category_counts": {key: entry.parity_categories[key] for key in sorted(entry.parity_categories)},
+                   "expected_strategic_deltas_listed": list(entry.expected_deltas)},   # bounded; only the approved v7->v8 strategic semantic deltas
     }
 
 
@@ -195,6 +211,12 @@ def compute_reonboarding_plan(session, *, page_size=DEFAULT_STRATEGIC_LAND_PAGE_
             for opportunity_id, assessment in assessments:
                 verdict = parity_oracle(policy, by_id[opportunity_id], contexts.get(opportunity_id), assessment)
                 entry.parity_compared += 1
+                category = verdict.detail if (verdict.classification_equal and verdict.investigative_equal and verdict.detail) else "UNSPECIFIED"
+                entry.parity_categories[category] = entry.parity_categories.get(category, 0) + 1
+                if category == "EXPECTED_STRATEGIC_DELTA" and len(entry.expected_deltas) < _MAX_LISTED_EXPECTED_DELTAS:
+                    entry.expected_deltas.append({"buyer_key": buyer.buyer_key, "opportunity_id": opportunity_id, "frozen_oracle_classification": verdict.v6_classification,
+                                                  "frozen_oracle_investigative": verdict.v6_investigative, "current_classification": verdict.v7_classification,
+                                                  "current_investigative": verdict.v7_investigative})
                 if not verdict.classification_equal:
                     entry.classification_mismatches += 1
                 if not verdict.investigative_equal:
