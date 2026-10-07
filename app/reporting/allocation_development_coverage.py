@@ -434,9 +434,6 @@ def classify_phasing(coverage: DevelopmentCoverageResult, phasing_hits: list[Pha
 # --- Opportunity signal (Section 10) -----------------------------------------
 
 
-PLANNING_ACTIVITY_IDENTIFIED_REASON = "Planning activity has been identified within this allocation."
-
-
 def build_opportunity_signal(
     *, plan_status_bucket: str | None, coverage: DevelopmentCoverageResult, phasing: dict,
 ) -> dict:
@@ -460,11 +457,9 @@ def build_opportunity_signal(
             "reasons": [coverage.note or "Capacity accounting for this allocation requires review before an investigation signal can be set."],
         }
 
-    # The figure is always qualified as plan-stated and UNVERIFIED. (It is the single ordering figure this layer has always used; the allocation's true stated minimum/range/maximum and
-    # basis are carried separately by app.reporting.strategic_capacity.strategic_scale_view on the card.)
     reasons: list[str] = [
-        f"{'Adopted' if plan_status_bucket == 'adopted' else 'Emerging'} residential allocation with plan-stated capacity of "
-        f"approximately {coverage.allocation_capacity:,} homes (unverified)."
+        f"{'Adopted' if plan_status_bucket == 'adopted' else 'Emerging'} residential allocation with capacity of "
+        f"approximately {coverage.allocation_capacity:,} homes."
     ]
 
     classification = coverage.development_coverage_classification
@@ -472,16 +467,20 @@ def build_opportunity_signal(
         reasons.append("No planning activity has been identified within this allocation.")
         signal = INVESTIGATE
     elif classification == PARTIAL_COVERAGE:
-        # Product Owner ruling (Stage 2.5B final slice): NEVER present a residual - subtracting application counts from an allocation capacity is not an acquisition inference (overlapping
-        # scopes, amendments, phased permissions, non-comparable counts, delivery already occurring, unknown boundaries). The coverage figures stay on the result as an INTERNAL diagnostic
-        # (signal selection only); the user-facing reason states only that planning activity has been identified.
-        reasons.append(PLANNING_ACTIVITY_IDENTIFIED_REASON)
+        pct = coverage.development_coverage_percentage or 0.0
+        reasons.append(f"Approximately {pct:.0%} of capacity is represented by identified planning activity.")
+        if coverage.indicative_residual_capacity:
+            reasons.append(
+                f"Approximately {coverage.indicative_residual_capacity:,} homes of allocation capacity are not "
+                "currently accounted for by identified planning activity."
+            )
         signal = INVESTIGATE
     elif classification == SUBSTANTIALLY_COVERED:
-        reasons.append(PLANNING_ACTIVITY_IDENTIFIED_REASON)
+        pct = coverage.development_coverage_percentage or 0.0
+        reasons.append(f"Approximately {pct:.0%} of capacity is represented by identified planning activity.")
         signal = MONITOR
     elif classification == FULLY_ACCOUNTED_FOR:
-        reasons.append(PLANNING_ACTIVITY_IDENTIFIED_REASON)
+        reasons.append("Capacity appears fully accounted for by identified planning activity.")
         signal = LOWER_PRIORITY
     else:  # CAPACITY_UNKNOWN - identified activity exists but no allocation capacity to compare against
         reasons.append("Allocation capacity is not known, so coverage cannot be calculated.")

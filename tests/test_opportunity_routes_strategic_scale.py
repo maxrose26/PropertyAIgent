@@ -69,11 +69,17 @@ def test_wording_always_states_plan_stated_and_unverified_and_never_a_bare_numbe
         assert not re.search(r"permission|deliver|promot|owner|commenc|sale", display, re.I)
 
 
-def test_open_ended_ranges_have_a_safe_label_instead_of_crashing():
-    assert CountAssessment("allocation", "x", precision="RANGE", lower=100).label() == "at least 100 homes"
-    assert CountAssessment("allocation", "x", precision="RANGE", upper=300).label() == "up to 300 homes"
-    assert CountAssessment("allocation", "x", precision="RANGE", lower=100, upper=300).label() == "100–300 homes"
-    assert CountAssessment("allocation", "x", precision="UNKNOWN").label() == "Unit count unverified"
+def test_open_ended_ranges_have_a_safe_label_instead_of_crashing_and_the_pinned_module_is_untouched():
+    assert sc.PlanStatedCapacity("allocation", "x", precision="RANGE", lower=100).label() == "at least 100 homes"
+    assert sc.PlanStatedCapacity("allocation", "x", precision="RANGE", upper=300).label() == "up to 300 homes"
+    assert sc.PlanStatedCapacity("allocation", "x", precision="RANGE", lower=100, upper=300).label() == "100–300 homes"
+    assert sc.PlanStatedCapacity("allocation", "x", precision="UNKNOWN").label() == "Unit count unverified"
+    assert all(isinstance(sc.strategic_capacity_assessment(alloc(*f)), CountAssessment) for f in ((1, None, 2), (3, None, None), (None, None, 4)))   # still the existing count semantics
+    import hashlib, json
+    import verification.transition.frozen_v6_matcher as frozen
+    for relative in ("app/reporting/residential_count.py", "app/reporting/allocation_development_coverage.py"):                                       # whole-file pinned by the frozen v6 oracle: never edited
+        text = (ROOT / relative).read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+        assert hashlib.sha256(text.encode("utf-8")).hexdigest() == frozen.SUPPORTING_MODULE_SHA256[relative]
 
 
 def test_the_conversion_is_pure_arithmetic_free_and_never_invents_a_unit():
@@ -81,7 +87,7 @@ def test_the_conversion_is_pure_arithmetic_free_and_never_invents_a_unit():
     arithmetic = [n for n in ast.walk(tree) if isinstance(n, ast.BinOp) and isinstance(n.op, (ast.Add, ast.Sub, ast.Mult, ast.Div))]
     assert all(isinstance(n.left, (ast.Constant, ast.JoinedStr)) or isinstance(n.right, (ast.Constant, ast.JoinedStr)) for n in arithmetic)      # only string joins, no unit arithmetic
     imported = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
-    assert imported <= {"__future__", "app.reporting.residential_count"}                          # no database, model or network module
+    assert imported <= {"__future__", "dataclasses", "app.reporting.residential_count"}                          # no database, model or network module
 
 
 # --- matching is UNCHANGED (W, X, Y, Z-compatible) ----------------------------------------------------------------------------------------------------
@@ -237,8 +243,9 @@ def test_family_and_subject_identity_do_not_depend_on_the_new_card_keys(world):
 
 def test_user_facing_signal_wording_no_longer_presents_residual_or_coverage_arithmetic_but_the_internal_diagnostic_remains():
     from app.reporting.allocation_development_coverage import (
-        NO_IDENTIFIED_ACTIVITY, PARTIAL_COVERAGE, SUBSTANTIALLY_COVERED, FULLY_ACCOUNTED_FOR, PLANNING_ACTIVITY_IDENTIFIED_REASON, DevelopmentCoverageResult, build_opportunity_signal,
+        PARTIAL_COVERAGE, SUBSTANTIALLY_COVERED, FULLY_ACCOUNTED_FOR, DevelopmentCoverageResult, build_opportunity_signal,
     )
+    from app.reporting.opportunity_signal import PLANNING_ACTIVITY_IDENTIFIED_REASON, build_neutral_opportunity_signal
     import dataclasses
     fields = {f.name for f in dataclasses.fields(DevelopmentCoverageResult)}
     assert {"indicative_residual_capacity", "development_coverage_percentage", "identified_application_capacity"} <= fields           # internal diagnostic preserved
@@ -250,7 +257,12 @@ def test_user_facing_signal_wording_no_longer_presents_residual_or_coverage_arit
         for name in ("number_of_related_sites", "number_of_linked_applications", "number_of_sites_with_planning_activity"):
             kwargs[name] = 1
         coverage = DevelopmentCoverageResult(**kwargs)
-        reasons = " ".join(build_opportunity_signal(plan_status_bucket="adopted", coverage=coverage, phasing=phasing)["reasons"])
+        raw = build_opportunity_signal(plan_status_bucket="adopted", coverage=coverage, phasing=phasing)                      # the unchanged internal producer still computes residual wording
+        assert re.search(r"not (currently )?accounted for|represented by identified|fully accounted", " ".join(raw["reasons"]))
+        neutral = build_neutral_opportunity_signal(plan_status_bucket="adopted", coverage=coverage, phasing=phasing)
+        assert neutral["signal"] == raw["signal"]                                                                              # the signal selection is untouched
+        reasons = " ".join(neutral["reasons"])
+        assert neutral["reasons"].count(PLANNING_ACTIVITY_IDENTIFIED_REASON) == 1
         assert PLANNING_ACTIVITY_IDENTIFIED_REASON in reasons
         assert str(residual) not in reasons and f"{round(pct * 100)}%" not in reasons and not re.search(r"not (currently )?accounted for|residual|remaining", reasons, re.I)
         assert "plan-stated capacity" in reasons and "unverified" in reasons

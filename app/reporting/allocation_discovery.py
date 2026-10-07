@@ -993,7 +993,8 @@ def build_allocation_card(
         phasing = development_coverage["phasing"]
         card["development_coverage"] = coverage
         card["phasing"] = phasing
-        card["opportunity"] = build_opportunity_signal(
+        from app.reporting.opportunity_signal import build_neutral_opportunity_signal
+        card["opportunity"] = build_neutral_opportunity_signal(
             plan_status_bucket=plan_meta["bucket"], coverage=coverage, phasing=phasing,
         )
     else:

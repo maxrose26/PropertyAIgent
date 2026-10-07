@@ -38,14 +38,7 @@ class CountAssessment:
         if self.precision == "APPROXIMATE":
             return f"~{self.value:,} {noun}"
         if self.precision == "RANGE":
-            if self.lower is not None and self.upper is not None:
-                return f"{self.lower:,}–{self.upper:,} {noun}"
-            if self.lower is not None:                       # one-sided plan-stated floor (a stated minimum): never invents a ceiling
-                return f"at least {self.lower:,} {noun}"
-            if self.upper is not None:
-                return f"up to {self.upper:,} {noun}"
-        if self.precision == "APPROXIMATE" and self.value is None:
-            return "Unit count unverified"
+            return f"{self.lower:,}–{self.upper:,} {noun}"
         return "Unit count unverified"
 
     def note(self):

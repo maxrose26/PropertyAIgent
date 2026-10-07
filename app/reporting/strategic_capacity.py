@@ -20,6 +20,8 @@ This module changes NO matching behaviour (see specification 025, final slice: m
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.reporting.residential_count import CountAssessment
 
 SCALE_BASIS_PLAN_STATED_UNVERIFIED = "PLAN_STATED_UNVERIFIED"
@@ -27,6 +29,20 @@ QUALIFIER = "unverified"
 SCOPE_TYPE = "allocation"
 SCOPE_LABEL = "Plan-stated capacity"
 BASIS = "plan_stated_unverified"
+
+
+
+@dataclass(frozen=True)
+class PlanStatedCapacity(CountAssessment):
+    """A CountAssessment whose open-ended RANGE (a plan-stated floor or ceiling) has a safe label. (residential_count.py is whole-file pinned by the frozen v6 parity oracle, so the
+    label for one-sided bounds lives here, not there.)"""
+
+    def label(self):
+        noun = "homes" if self.metric == "total_residential" else self.metric.replace("_", " ")
+        if self.precision == "RANGE" and (self.lower is None) != (self.upper is None):
+            return f"at least {self.lower:,} {noun}" if self.lower is not None else f"up to {self.upper:,} {noun}"
+        return super().label()
+
 
 KIND_UNKNOWN, KIND_MALFORMED, KIND_EXACT, KIND_RANGE, KIND_MINIMUM, KIND_MAXIMUM, KIND_INDICATIVE = (
     "unknown", "malformed", "exact", "range", "minimum", "maximum", "indicative")
@@ -62,16 +78,16 @@ def strategic_capacity_assessment(allocation) -> CountAssessment:
     kind = classify_capacity_kind(minimum, indicative, maximum)
     base = dict(scope_type=SCOPE_TYPE, scope_label=SCOPE_LABEL, basis=BASIS, confidence="plan_stated")
     if kind in (KIND_UNKNOWN, KIND_MALFORMED):
-        return CountAssessment(**base, precision="UNKNOWN", resolution="capacity_not_identified" if kind == KIND_UNKNOWN else "conflicting_or_malformed_plan_figures")
+        return PlanStatedCapacity(**base, precision="UNKNOWN", resolution="capacity_not_identified" if kind == KIND_UNKNOWN else "conflicting_or_malformed_plan_figures")
     if kind == KIND_EXACT:
-        return CountAssessment(**base, precision="EXACT", value=minimum, lower=minimum, upper=maximum, resolution="plan_stated_single_figure")
+        return PlanStatedCapacity(**base, precision="EXACT", value=minimum, lower=minimum, upper=maximum, resolution="plan_stated_single_figure")
     if kind == KIND_RANGE:
-        return CountAssessment(**base, precision="RANGE", lower=minimum, upper=maximum, resolution="plan_stated_range")
+        return PlanStatedCapacity(**base, precision="RANGE", lower=minimum, upper=maximum, resolution="plan_stated_range")
     if kind == KIND_MINIMUM:
-        return CountAssessment(**base, precision="RANGE", lower=minimum, upper=None, resolution="plan_stated_minimum_only")
+        return PlanStatedCapacity(**base, precision="RANGE", lower=minimum, upper=None, resolution="plan_stated_minimum_only")
     if kind == KIND_MAXIMUM:
-        return CountAssessment(**base, precision="RANGE", lower=None, upper=maximum, resolution="plan_stated_maximum_only")
-    return CountAssessment(**base, precision="APPROXIMATE", value=indicative, resolution="plan_stated_indicative_only")
+        return PlanStatedCapacity(**base, precision="RANGE", lower=None, upper=maximum, resolution="plan_stated_maximum_only")
+    return PlanStatedCapacity(**base, precision="APPROXIMATE", value=indicative, resolution="plan_stated_indicative_only")
 
 
 def strategic_scale_view(allocation) -> dict:

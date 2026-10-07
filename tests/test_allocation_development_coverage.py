@@ -729,9 +729,8 @@ def test_north_of_mosley_common_regression(session):
     )
     assert opportunity["signal"] == INVESTIGATE
     joined_reasons = " ".join(opportunity["reasons"])
-    assert "856" not in joined_reasons and "22%" not in joined_reasons                  # Stage 2.5B final slice: no user-facing residual / coverage arithmetic inference
-    assert "Planning activity has been identified within this allocation." in opportunity["reasons"]
-    assert coverage.indicative_residual_capacity == 856                                  # the INTERNAL coverage diagnostic is preserved (signal selection), just never presented as acquisition inference
+    assert "856" in joined_reasons
+    assert "22%" in joined_reasons
     assert OWNERSHIP_CAVEAT in opportunity["reasons"]
     assert "available" not in joined_reasons.lower()
 

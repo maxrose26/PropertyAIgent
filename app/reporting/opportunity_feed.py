@@ -125,7 +125,8 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             continue
         plan = plans_by_id.get(a.local_plan_id)
         plan_meta = PLAN_STATUS_META.get(plan.status if plan else None, PLAN_STATUS_META[None])
-        opportunity = build_opportunity_signal(
+        from app.reporting.opportunity_signal import build_neutral_opportunity_signal
+        opportunity = build_neutral_opportunity_signal(
             plan_status_bucket=plan_meta["bucket"], coverage=result["coverage"], phasing=result["phasing"],
         )
         if opportunity["signal"] not in _FEED_ELIGIBLE_SIGNALS:
