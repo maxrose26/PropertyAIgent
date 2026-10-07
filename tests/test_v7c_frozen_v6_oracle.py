@@ -103,7 +103,8 @@ def test_only_the_transition_script_and_tests_import_the_oracle_and_the_applicat
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "verification.transition" in text or "frozen_v6_matcher" in text:
             offenders.append(relative)
-    assert offenders == ["scripts/reonboard_stale_mandates.py"], offenders
+    offenders = sorted(offenders)
+    assert offenders == ["benchmark/v8_strategic_scale_shadow.py", "scripts/reonboard_stale_mandates.py"], offenders   # the V8 shadow benchmark is the only other (offline, proposed-case) transition consumer
     for path in (ROOT / "app").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         imported = {n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)} | {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
