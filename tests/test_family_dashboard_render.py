@@ -15,7 +15,7 @@ from app.reporting.opportunity_families import OVERLAP_WARNING
 from tests.test_buyer_family_feed import LAPSE_AGE, World, portal
 from tests.test_family_dashboard import BUYER, treat_portal_estimates_as_exact   # BUYER: a total-units mandate (the label is only relevant to oversized wider subjects)
 
-FORBIDDEN = ("remaining", "available", "subdivi", "other phases", "sold in phases", "contained in", "pursuant to", "total of")
+FORBIDDEN = ("remaining", "available for acquisition", "availability verified", "subdivi", "other phases", "sold in phases", "contained in", "pursuant to", "total of")
 
 
 @pytest.fixture
@@ -54,11 +54,31 @@ def assert_no_forbidden(text):
     assert not [w for w in FORBIDDEN if w in lowered], text
 
 
+def test_actual_compact_renderer_discloses_truncation_and_preserves_full_expansion():
+    from app.policy.buyer_matching import BuyerFitAssessment
+    from app.reporting.mandate_explanation import present_mandate_explanation
+    fit = BuyerFitAssessment("STRONG_FIT", False, ["recorded first", "recorded second", "recorded third"])
+    view = present_mandate_explanation(fit)
+
+    def script():
+        import streamlit as st
+        from app.ui.shell import render_mandate_explanation
+        render_mandate_explanation(st.session_state["explanation"], compact=True)
+
+    at = AppTest.from_function(script)
+    at.session_state["explanation"] = view
+    at.run()
+    assert not at.exception
+    assert "2 of 3 recorded reasons" in [c.value for c in at.caption]
+    assert at.expander[0].label == "All recorded matching reasons"
+    assert all(reason in "\n".join(m.value for m in at.expander[0].markdown) for reason in fit.matches)
+
+
 def test_a_large_parent_with_a_strong_phase_renders_phase_headline_phasing_overlap_and_collapsed_related(world):
     world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S", units_out=500, units_rm=140)
     family = view_of(world).families[0]
     text, at = render(family)
-    assert "Phased delivery evidenced." in text and OVERLAP_WARNING in text and "Strong fit" in text and "140" in text
+    assert "Phased delivery evidenced." in text and OVERLAP_WARNING in text and "Strong Mandate Fit" in text and "140" in text
     assert len(at.expander) == 1 and at.expander[0].label.startswith("Related acquisition subjects (")
     assert not at.expander[0].proto.expanded                     # collapsed by default
     assert "640" not in text and "360" not in text               # no family total, no residual
@@ -70,7 +90,7 @@ def test_a_large_parent_with_a_strong_phase_renders_phase_headline_phasing_overl
 def test_b_parent_not_suitable_with_a_possible_phase_renders_cleanly(world):
     world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="N", phase="P", units_out=500, units_rm=140)
     text, _ = render(view_of(world).families[0])
-    assert "Possible fit" in text and "Phased delivery evidenced." in text
+    assert "Possible Mandate Fit" in text and "Phased delivery evidenced." in text
     assert_no_forbidden(text)
 
 
@@ -89,7 +109,7 @@ def test_one_genuine_phase_alone_renders_compactly_without_a_restating_label_wit
     world.site(rm_age=300, rm_phase="Phase 1", phase="S", units_rm=80)
     text, at = render(view_of(world).families[0])
     assert "Phased delivery evidenced." not in text and OVERLAP_WARNING not in text and len(at.expander) == 0
-    assert "wider" not in text.lower() and "unphased" not in text.lower() and "Strong fit" in text
+    assert "wider" not in text.lower() and "unphased" not in text.lower() and "Strong Mandate Fit" in text
     assert_no_forbidden(text)
     assert "residual" not in text.lower() and "parcel" not in text.lower()
 

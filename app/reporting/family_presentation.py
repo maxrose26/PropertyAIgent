@@ -11,7 +11,8 @@ claimed. Level 2 (documented phasing without a child subject) is NOT presented: 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from app.reporting.mandate_explanation import MandateExplanation, mandate_fit_label, present_mandate_explanation
 
 from app.pipeline.phase_tracking import UNPHASED_LABEL
 from app.reporting.opportunity_families import OVERLAP_WARNING, SLOT_PHASE, STRATEGIC_LAND, FamilyInputError, OpportunityFamily
@@ -25,7 +26,7 @@ POLICY_CAVEAT = "This existing-policy result does not verify AH count source or 
 FAMILY_ERROR_MESSAGE = ("Acquisition-family results are temporarily unavailable for this buyer. "
                         "The issue has been logged for the operator; no other pages are affected.")
 
-FIT_LABELS = {"STRONG_FIT": "Strong fit", "POSSIBLE_FIT": "Possible fit", "NOT_SUITABLE": "Not suitable"}
+FIT_LABELS = {"STRONG_FIT": "Strong Mandate Fit", "POSSIBLE_FIT": "Possible Mandate Fit", "NOT_SUITABLE": "Not suitable"}
 
 _LIFECYCLE_LABELS = (
     ("opp-lapse-", "Permission approaching its assumed review date"),
@@ -53,6 +54,7 @@ class SubjectView:
     route_label: str | None = None
     route_caveat: str | None = None
     scale_basis: str | None = None         # strategic allocations only: the plan-stated, UNVERIFIED capacity wording
+    explanation: MandateExplanation | None = None
 
 
 @dataclass(frozen=True)
@@ -81,9 +83,7 @@ class FamilyFeedView:
 
 
 def fit_label(fit: str, investigative: bool) -> str:
-    if fit == "INSUFFICIENT_EVIDENCE":
-        return "Investigate" if investigative else "Insufficient evidence"
-    return FIT_LABELS.get(fit, fit.replace("_", " ").capitalize())
+    return mandate_fit_label(fit, investigative)
 
 
 def _scale(card: dict) -> str | None:
@@ -126,9 +126,10 @@ def _subject_view(subject) -> SubjectView:
         signal_key=card.get("signal") if subject.domain == STRATEGIC_LAND else None,
         signal_label=card.get("signal_label") if subject.domain == STRATEGIC_LAND else None,
         metrics=tuple(tuple(m) for m in (card.get("metrics") or ())) if subject.domain == STRATEGIC_LAND else (),
-        tags=tuple(card.get("tags") or ()), page=card.get("page"), params=dict(card.get("params") or {}),
+        tags=tuple(card.get("tags") or ()), page=card.get("page"), params={**dict(card.get("params") or {}), "subject_key": subject.subject_key},
         route=route.route, route_label=route.label, route_caveat=route.caveat,
-        scale_basis=(card.get("strategic_scale") or {}).get("display") if subject.domain == STRATEGIC_LAND else None)
+        scale_basis=(card.get("strategic_scale") or {}).get("display") if subject.domain == STRATEGIC_LAND else None,
+        explanation=present_mandate_explanation(fit, card))
 
 
 def phasing_context(family: OpportunityFamily) -> str | None:
@@ -213,6 +214,10 @@ def route_counts_caption(counts: dict) -> str:
 
 def present_family_result(result: dict, sites_by_id: dict) -> FamilyFeedView:
     views = tuple(present_family(f, sites_by_id.get(f.family_key[1]) if f.family_key[0] != STRATEGIC_LAND else None) for f in result["families"])
+    if result.get("buyer_key"):
+        def origin(subject):
+            return replace(subject, params={**subject.params, "buyer_key": result["buyer_key"]})
+        views = tuple(replace(view, best=origin(view.best), related=tuple(origin(s) for s in view.related)) for view in views)
     caption, subject_caption = counts_captions(result["counts"])
     counts = result.get("route_counts") or {}
     return FamilyFeedView(families=views, caption=caption, subject_caption=subject_caption, route_counts=tuple(counts.items()), route_caption=route_counts_caption(counts))

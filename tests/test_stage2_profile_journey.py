@@ -56,6 +56,11 @@ def test_dashboard_to_same_profile_source_and_return_preserves_buyer(tmp_path,mo
     links=[e.proto for e in at.get("page_link") if "SYN%2FJOURNEY" in str(e.proto) or "SYN/JOURNEY" in str(e.proto)]
     # The emitted destination carries stable subject and source identity.
     assert links
+    from app.reporting.buyer_family_feed import build_buyer_opportunity_families
+    from app.reporting.family_presentation import present_family_result
+    with Session(engine) as session:
+        family_view = present_family_result(build_buyer_opportunity_families(session, "nesten_homes", limit=10), {}).families[0]
+        subject_params = family_view.best.params
     from app.reporting.opportunity_feed import build_opportunity_feed
     with Session(engine) as session:
         card=next(c for c in build_opportunity_feed(session,limit=10)["cards"] if c["params"].get("site_id")==str(sid))
@@ -71,6 +76,44 @@ def test_dashboard_to_same_profile_source_and_return_preserves_buyer(tmp_path,mo
     assert "https://example.invalid/planning/SYN-JOURNEY" in " ".join(str(e.proto) for e in at.get("link_button"))
     assert at.session_state["active_buyer_key"]=="nesten_homes"
     assert any("Back to opportunities" in str(e.proto) for e in at.get("page_link"))
+    at.query_params.clear()
+    at.query_params.update(subject_params)
+    at.run(timeout=30)
+    assert not at.exception, [(e.message,e.stack_trace) for e in at.exception]
+    def explanation_text():
+        return "\n".join(str(e.value) for kind in ("markdown","caption","info","subheader") for e in at.get(kind))
+    assert "Originating acquisition subject" in explanation_text()
+    assert subject_params["subject_key"] in explanation_text()
+    assert "Active buyer: nesten_homes" in explanation_text()
+    assert family_view.best.fit_label in explanation_text()
+    assert "Why it fits" in explanation_text()
+    at.query_params["buyer_key"] = "housing_association"
+    at.run(timeout=30)
+    assert not at.exception
+    assert "Subject-specific mandate explanation unavailable" in explanation_text()
+    assert "Originating acquisition subject" not in explanation_text()
+    at.query_params["buyer_key"] = "nesten_homes"
+    at.query_params["subject_key"] = "tampered-phase"
+    at.run(timeout=30)
+    assert not at.exception
+    assert "Subject-specific mandate explanation unavailable" in explanation_text()
+    assert "Originating acquisition subject" not in explanation_text()
+    at.query_params["subject_key"] = subject_params["subject_key"]
+    selector = next(s for s in at.selectbox if s.label == "Viewing opportunities for")
+    different = next(o for o in selector.options if "Housing" in o)
+    selector.select(different).run(timeout=30)
+    assert not at.exception
+    assert at.session_state["active_buyer_key"] == "housing_association"
+    assert "Originating acquisition subject" not in explanation_text()
+    # Existing buyer-switch security clears navigation; replaying the old
+    # buyer's link must still withhold its subject assessment.
+    at.query_params.update(subject_params)
+    at.run(timeout=30)
+    assert "Subject-specific mandate explanation unavailable" in explanation_text()
+    assert "Originating acquisition subject" not in explanation_text()
+    selector = next(s for s in at.selectbox if s.label == "Viewing opportunities for")
+    selector.select(next(o for o in selector.options if "Nesten" in o)).run(timeout=30)
+    assert at.session_state["active_buyer_key"] == "nesten_homes"
     at.switch_page("pages/00_Dashboard.py");at.query_params.clear();at.run(timeout=30)
     assert not at.exception
     assert at.session_state["active_buyer_key"]=="nesten_homes"

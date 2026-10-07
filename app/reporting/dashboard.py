@@ -1105,12 +1105,12 @@ _OPPORTUNITY_SECTION_META = {
 }
 
 
-def _approaching_lapse_cards(session: Session, limit: int) -> list[dict]:
+def _approaching_lapse_cards(session: Session, limit: int, *, site_id: int | None = None) -> list[dict]:
     granted_filter = or_(*(Application.decision.ilike(f"%{kw}%") for kw in GRANTED_KEYWORDS))
     granted_site_ids = list(session.execute(
         select(Application.site_id).where(
             Application.site_id.is_not(None), Application.decision_issued_date.is_not(None), granted_filter,
-        ).distinct()
+        ).where(Application.site_id == site_id if site_id is not None else True).distinct()
     ).scalars())
     if not granted_site_ids:
         return []
@@ -1157,7 +1157,7 @@ def _low_supply_cards(session: Session, limit: int) -> list[dict]:
     } for p in rows]
 
 
-def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
+def _undeveloped_phase_cards(session: Session, limit: int, *, site_id: int | None = None) -> list[dict]:
     """Sites with multiple filings or an explicit named phase/parcel.
     A sole named phase must not be lost merely for lacking a parent filing.
     One batched query for every Application/Site involved;
@@ -1174,6 +1174,7 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
     unaffected and still produces a card exactly as before."""
     apps = session.execute(
         select(Application).where(Application.site_id.is_not(None))
+        .where(Application.site_id == site_id if site_id is not None else True)
         .join(Site, Application.site_id == Site.id).where(Site.excluded.is_not(True))
         .options(selectinload(Application.scheme_intelligence))
     ).scalars().all()
@@ -1226,7 +1227,7 @@ def _undeveloped_phase_cards(session: Session, limit: int) -> list[dict]:
     return cards[:limit]
 
 
-def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: frozenset[int] = frozenset()) -> list[dict]:
+def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: frozenset[int] = frozenset(), site_id: int | None = None) -> list[dict]:
     """Gate 1C ("Recent Permission Opportunity Candidate Detection") - the
     fourth planning/delivery signal, filling the structural gap Gate 1B
     measured between a fresh grant and the two signals above: approaching
@@ -1283,9 +1284,9 @@ def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: 
     granted_site_ids = list(session.execute(
         select(Application.site_id).where(
             Application.site_id.is_not(None), Application.decision_issued_date.is_not(None), granted_filter,
-        ).distinct()
+        ).where(Application.site_id == site_id if site_id is not None else True).distinct()
     ).scalars())
-    candidate_site_ids = [sid for sid in granted_site_ids if sid not in exclude_site_ids]
+    candidate_site_ids = [sid for sid in granted_site_ids if sid not in exclude_site_ids and (site_id is None or sid == site_id)]
     if not candidate_site_ids:
         return []
     sites = session.execute(
@@ -1334,7 +1335,7 @@ def _recent_permission_cards(session: Session, limit: int, *, exclude_site_ids: 
 
 
 def _long_pending_application_cards(
-    session: Session, limit: int | None, *, exclude_site_ids: frozenset[int] = frozenset()
+    session: Session, limit: int | None, *, exclude_site_ids: frozenset[int] = frozenset(), site_id: int | None = None
 ) -> list[dict]:
     """Gate 1C amendment's new detector: "a qualifying residential
     application has been awaiting determination for at least
@@ -1441,6 +1442,7 @@ def _long_pending_application_cards(
             Application.site_id.is_not(None),
             Application.application_received.is_not(None),
         )
+        .where(Application.site_id == site_id if site_id is not None else True)
     ).scalars().all()
 
     by_site: dict[int, list[Application]] = {}

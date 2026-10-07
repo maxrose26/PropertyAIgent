@@ -2,6 +2,34 @@
 from app.pipeline.lapse_tracking import compute_lapse_status
 
 
+def resolve_subject_explanation(session, *, site_id, buyer_key, subject_key, origin_buyer_key=None):
+    """Resolve an untrusted navigation key only against the active buyer's site subjects.
+
+    No private assessment is retained in session/cache and no wider-site or
+    representative assessment substitutes for a missing exact subject.
+    """
+    from app.security.access import require_admitted
+    require_admitted()
+    if not buyer_key or not isinstance(subject_key, str) or not subject_key:
+        return None
+    if origin_buyer_key is not None and origin_buyer_key != buyer_key:
+        return None
+    from app.policy.buyer_profile_store import get_buyer_profile_dataclass
+    profile = get_buyer_profile_dataclass(session, buyer_key)
+    if profile is None:
+        return None
+    from app.reporting.buyer_family_feed import load_site_subject_inputs, evaluate_buyer_families
+    inputs = load_site_subject_inputs(session, site_id)
+    result = evaluate_buyer_families(session, buyer_key, inputs,
+                                    limit=len(inputs.delivery) + len(inputs.residuals),
+                                    include_excluded=True, profile=profile)
+    for family in (*result["families"], *result.get("excluded_families", ())):
+        for subject in family.members:
+            if subject.subject_key == subject_key and subject.anchor_id == site_id:
+                return subject
+    return None
+
+
 def site_destination(site_id, *, phase_code=None, application_reference=None):
     params = {"site_id": str(site_id), "origin": "opportunities"}
     if phase_code:

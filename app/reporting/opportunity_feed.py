@@ -217,6 +217,10 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
         "phase_code": card.get("phase_code"),
         "phase_unit_count": card.get("phase_unit_count"),
         "count_assessment": card.get("count_assessment"),
+        **{key: card[key] for key in (
+            "source_url", "summary_url", "source_document_url", "plan_page_url",
+            "evidence_date", "source_date", "evidence_version", "source_version",
+        ) if key in card},
     }
 
 
@@ -405,7 +409,7 @@ def _buyer_selection(session, strategic: list[dict], delivery: list[dict], limit
     return ordered, {"excluded_not_suitable": excluded_not_suitable}
 
 
-def _planning_delivery_cards(session, pool_limit: int | None):
+def _planning_delivery_cards(session, pool_limit: int | None, *, site_id: int | None = None):
     """The four planning/delivery detectors, their canonical precedence exclusions and the unified card reshaping (code motion out of
     build_opportunity_feed; behaviour unchanged). ``pool_limit=None`` (family mode) takes each detector's COMPLETE population - the
     detectors already read their whole population and only slice at the end - so the exclusion sets are complete too."""
@@ -415,15 +419,16 @@ def _planning_delivery_cards(session, pool_limit: int | None):
         _recent_permission_cards,
         _undeveloped_phase_cards,
     )
-    lapse_raw = _approaching_lapse_cards(session, pool_limit)
-    undeveloped_raw = _undeveloped_phase_cards(session, pool_limit)
+    scope = {"site_id": site_id} if site_id is not None else {}
+    lapse_raw = _approaching_lapse_cards(session, pool_limit, **scope)
+    undeveloped_raw = _undeveloped_phase_cards(session, pool_limit, **scope)
     # Gate 1C - recent_permission never duplicates a site the two
     # established signals above already cover (same precedence rule as
     # app.reporting.opportunity_universe's own canonical read model).
     already_covered_site_ids = frozenset(
         int(c["params"]["site_id"]) for c in (*lapse_raw, *undeveloped_raw)
     )
-    recent_permission_raw = _recent_permission_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids)
+    recent_permission_raw = _recent_permission_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids, **scope)
     # Gate 1C amendment - long_pending_application is the lowest-precedence,
     # earliest-lifecycle-stage route of all four (see app.reporting.
     # dashboard._long_pending_application_cards's own "IDENTITY" docstring
@@ -432,7 +437,7 @@ def _planning_delivery_cards(session, pool_limit: int | None):
     already_covered_site_ids = already_covered_site_ids | frozenset(
         int(c["params"]["site_id"]) for c in recent_permission_raw
     )
-    long_pending_raw = _long_pending_application_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids)
+    long_pending_raw = _long_pending_application_cards(session, pool_limit, exclude_site_ids=already_covered_site_ids, **scope)
 
     lapse = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Assumed permission review date"]) for c in lapse_raw]
     undeveloped = [_reshape_signal_card(c, opportunity_type=PLANNING_DELIVERY, extra_tags=["Permission — commencement unverified"]) for c in undeveloped_raw]

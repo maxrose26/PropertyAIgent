@@ -139,8 +139,8 @@ _BADGE_KIND_STYLE = {
     # different colour family from the opportunity-signal badges above (a
     # buyer-fit result is relative to ONE buyer's stated requirements, an
     # opportunity signal is not) so the two are never visually confused.
-    "buyer_strong_fit": {"color": "green", "icon": "✅", "label": "Strong fit"},
-    "buyer_possible_fit": {"color": "blue", "icon": "🔷", "label": "Possible fit"},
+    "buyer_strong_fit": {"color": "green", "icon": "✅", "label": "Strong Mandate Fit"},
+    "buyer_possible_fit": {"color": "blue", "icon": "🔷", "label": "Possible Mandate Fit"},
     "buyer_insufficient_evidence": {"color": "gray", "icon": "❔", "label": "Insufficient evidence"},
     "buyer_not_suitable": {"color": "red", "icon": "🚫", "label": "Not suitable"},
 }
@@ -883,12 +883,14 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(card["signal"], "info"), card.get("signal_label") or card["signal"])
         buyer_fit = card.get("buyer_fit")
         if buyer_fit is not None:
-            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), "Existing-policy fit: " + buyer_fit.classification.replace("_", " ").title())
+            from app.reporting.mandate_explanation import mandate_fit_label
+            status_badge(BUYER_FIT_BADGE_KIND.get(buyer_fit.classification, "info"), mandate_fit_label(buyer_fit.classification, getattr(buyer_fit, "is_investigative_exception", False)))
             st.caption("This existing-policy result does not verify AH count source or scope, final tenure terms or acquisition availability.")
         if card.get("headline_reason"):
             st.write(card["headline_reason"])
-        if buyer_fit is not None and buyer_fit.matches:
-            st.caption("Existing-policy reasons (AH qualification unverified): " + " · ".join(buyer_fit.matches[:2]))
+        if buyer_fit is not None:
+            from app.reporting.mandate_explanation import present_mandate_explanation
+            render_mandate_explanation(present_mandate_explanation(buyer_fit, card), compact=True)
 
         if card.get("metrics"):
             cols = st.columns(len(card["metrics"]))
@@ -908,6 +910,34 @@ def opportunity_feed_card(card: dict, *, key: str) -> None:
 
 def _family_subject_badge(subject) -> None:
     status_badge(BUYER_FIT_BADGE_KIND.get(subject.fit_key, "info"), subject.fit_label)
+
+
+def render_mandate_explanation(view, *, compact=False):
+    """Render recorded reasons only; the presenter owns provenance and coverage."""
+    from app.reporting.mandate_explanation import MANDATE_QUALIFICATION
+    st.caption(MANDATE_QUALIFICATION)
+    st.caption(view.coverage_notice)
+    if view.positives:
+        st.markdown("**Why it fits**")
+        visible = view.positives[:2] if compact else view.positives
+        for reason in visible:
+            st.write(reason)
+        if len(visible) < len(view.positives):
+            st.caption(f"{len(visible)} of {len(view.positives)} recorded reasons")
+            with st.expander("All recorded matching reasons"):
+                for reason in view.positives:
+                    st.write(reason)
+    for heading, reasons in (("What affects this classification", view.classification_causes),
+                             ("Other evidence limitations", view.contextual_limitations),
+                             ("Investigation evidence / checks", view.investigation)):
+        if reasons:
+            st.markdown(f"**{heading}**")
+            for reason in reasons:
+                st.caption(reason)
+    for evidence in view.evidence_context:
+        st.caption(evidence)
+    if view.source_link:
+        st.link_button("View supporting source", view.source_link)
 
 
 def opportunity_family_card(view, *, key: str) -> None:
@@ -930,8 +960,8 @@ def opportunity_family_card(view, *, key: str) -> None:
         _family_subject_badge(best)
         if best.headline_reason:
             st.write(best.headline_reason)
-        if best.reasons:
-            st.caption("Existing-policy reasons: " + " · ".join(best.reasons))
+        if best.explanation is not None:
+            render_mandate_explanation(best.explanation, compact=True)
         st.caption(view.caveat)
         if best.metrics:
             cols = st.columns(len(best.metrics))
@@ -950,6 +980,8 @@ def opportunity_family_card(view, *, key: str) -> None:
                     st.caption(view.relationship_note)
                 for subject in view.related:
                     st.markdown(f"**{_escape(subject.label)}**" + (f" — {_escape(subject.scale)}" if subject.scale else "") + f" · {_escape(subject.fit_label)}")
+                    if subject.explanation is not None:
+                        render_mandate_explanation(subject.explanation)
         if best.page:
             st.page_link(best.page, label="View opportunity →", query_params=best.params or {})
 

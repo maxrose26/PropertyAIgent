@@ -347,25 +347,12 @@ with page_scope():
                 # see app.policy.buyer_matching_b2_context's own docstring.
                 assessment = evaluate_buyer_fit(session, profile, matching_facts, allocation_id=allocation_row.id)
                 section_header(f"Fit for {profile.display_name}", icon="🧭")
-                status_badge(BUYER_FIT_BADGE_KIND.get(assessment.classification, "info"), assessment.classification.replace("_", " ").title())
+                from app.reporting.mandate_explanation import mandate_fit_label, present_mandate_explanation
+                from app.ui.shell import render_mandate_explanation
+                status_badge(BUYER_FIT_BADGE_KIND.get(assessment.classification, "info"), mandate_fit_label(assessment.classification, assessment.is_investigative_exception))
                 if assessment.is_investigative_exception:
                     st.caption("Outside this buyer's normal range, but flagged as worth investigating - see below.")
-                if assessment.matches:
-                    st.markdown("**Why it matches**")
-                    for reason in assessment.matches:
-                        st.write(f"• {reason}")
-                if assessment.does_not_match:
-                    st.markdown("**Why it may not match**")
-                    for reason in assessment.does_not_match:
-                        st.write(f"• {reason}")
-                if assessment.unknown:
-                    st.markdown("**What we don't know**")
-                    for reason in assessment.unknown:
-                        st.write(f"• {reason}")
-                if assessment.investigate:
-                    st.markdown("**Investigate next**")
-                    for reason in assessment.investigate:
-                        st.write(f"• {reason}")
+                render_mandate_explanation(present_mandate_explanation(assessment, card))
 
             # Evidence (Step 15) - moved up from the bottom of the page; the real
             # excerpt Gate 4A captured, shown verbatim alongside the existing
