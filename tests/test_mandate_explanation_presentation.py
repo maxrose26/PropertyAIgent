@@ -71,5 +71,3 @@ def test_existing_subject_count_and_provenance_are_qualified_not_invented():
     assert view.source_link == "https://example.org/planning/phase-1"
     assert view.classification_causes == ()
     assert present_mandate_explanation(fit, {"source_url": "https://user:secret@example.org"}).source_link is None
-
-
