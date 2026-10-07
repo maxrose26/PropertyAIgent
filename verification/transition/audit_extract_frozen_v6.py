@@ -61,9 +61,11 @@ for name in used:
         local_defs.append(name)
         if name != "B2MatchingContext":
             pins[name] = sha256(entry)
+for extra in ("AFFORDABLE_STATE_UNKNOWN", "ControlAppetiteFacts", "DEFAULT_DISCOVERY_TOLERANCE_PERCENT"):   # reached indirectly (via MatchingFacts / discovery_bounds)
+    pins[extra] = sha256(defs[extra])
 
 supporting = {}
-for path in ("app/policy/buyer_profiles.py", "app/reporting/commercial_evidence.py"):
+for path in ("app/policy/buyer_profiles.py", "app/reporting/commercial_evidence.py", "app/reporting/residential_count.py", "app/reporting/scheme_reconciliation.py", "app/reporting/allocation_development_coverage.py"):
     text = git("show", f"{COMMIT}:{path}").decode("utf-8")
     assert "\r" not in text
     supporting[path] = sha256(text)

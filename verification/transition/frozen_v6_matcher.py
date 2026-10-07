@@ -19,7 +19,9 @@ PROVENANCE (immutable; recorded in PROVENANCE below and re-verified by tests/tes
 INDEPENDENCE: classification-affecting logic is the verbatim v6 function body. The module-level names the function references were compared with v7: all are byte-identical
 definitions except B2MatchingContext (v7 only ADDED optional fields the v6 body never reads). Those identical definitions are imported from app.policy.buyer_matching rather than copied;
 DEPENDENCY_PINS records the sha256 of each v6 definition and the test recomputes the CURRENT definition and fails if any drifts, so the oracle can never silently delegate to changed logic.
-The imported-name modules (buyer_profiles, commercial_evidence) are pinned by whole-file sha256 (LF-normalised).
+The imported-name modules (buyer_profiles, commercial_evidence) and the modules reached indirectly through the helpers it calls (residential_count, scheme_reconciliation,
+allocation_development_coverage) are pinned by whole-file sha256 (LF-normalised); indirectly reached buyer_matching definitions (ControlAppetiteFacts, AFFORDABLE_STATE_UNKNOWN,
+DEFAULT_DISCOVERY_TOLERANCE_PERCENT) are pinned by definition hash.
 """
 from __future__ import annotations
 
@@ -74,9 +76,11 @@ PROVENANCE = {
 FUNCTION_SHA256 = PROVENANCE["function_sha256"]
 
 # sha256 of each v6 module-level definition the function references (B2MatchingContext excluded: v7 only added optional fields the v6 body never reads).
-DEPENDENCY_PINS = {
+DEPENDENCY_PINS = {    "AFFORDABLE_STATE_UNKNOWN": "005c04b8d491d59f89ec1f0976c7f5d95b21e39ad67ba8a17914fd696266bb7c",
     "AFFORDABLE_STATE_WHOLLY": "6e3ceaaa16d7b7504b44f4c50b6fa1702b0ee02e715d3a22fdc17567ac9fa879",
     "BuyerFitAssessment": "99048b668eed62f7f2b8e656fee5238526740dcdb1aa255fe113a7d24169dea3",
+    "ControlAppetiteFacts": "61e7e697521838604ce93dd2b395a2e1a7cd2637ad79a6bf42a5b1363cce2744",
+    "DEFAULT_DISCOVERY_TOLERANCE_PERCENT": "391c22485818115aba852802a664117bd5e74d6e178b2e401c3e3ad433ad174f",
     "DEVELOPMENT_STATE_UNKNOWN": "92ddb49b7b0c9f9a43b3f7463d95058ae68a6ca60c2fd16f2698adbecc07291c",
     "INSUFFICIENT_EVIDENCE": "9a141f6b50fd56d0a0dc49cb7d2306f96c994bfeb2f74be38d42ffd0c6f53e75",
     "MatchingFacts": "1a7a51339af42eae8ba7847f7104a6a36ca6146fe73b29819dbca1ba760f2be6",
@@ -90,9 +94,11 @@ DEPENDENCY_PINS = {
 }
 
 # sha256 (LF-normalised) of the supporting modules whose names the function imports indirectly, as at the source commit.
-SUPPORTING_MODULE_SHA256 = {
-    "app/policy/buyer_profiles.py": "c85ff74791a21a042a50a5599b59c9f1c46bbdd4ab490b599c1eddaf46f6a03c",
+SUPPORTING_MODULE_SHA256 = {    "app/policy/buyer_profiles.py": "c85ff74791a21a042a50a5599b59c9f1c46bbdd4ab490b599c1eddaf46f6a03c",
+    "app/reporting/allocation_development_coverage.py": "442c71bf20922cbf4b5b3a80c9314fd89ae939e62bdba0fcc97757651d059112",
     "app/reporting/commercial_evidence.py": "4f9f343e345ef2399516860a1d493888817be06ce2f4b8e13d77ce060e58725b",
+    "app/reporting/residential_count.py": "ce2a778b1f13038180c27642c4955ccd39c61ff869474853290f4d480aa7c073",
+    "app/reporting/scheme_reconciliation.py": "9eaafa1d502acc12be56a19a4b0d701c9ada132f778a842df547905eb5af62d1",
 }
 
 
