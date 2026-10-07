@@ -37,7 +37,7 @@ PostgreSQL backend required in real mode; the application's own engine route (`a
 * **Comparable legacy window** — the legacy flat feed (`build_opportunity_feed`, buyer mode) called with the *same* limit N as the family shortlist, so the two result windows are the same size.
 * **NEWLY_SURFACED** — a family shown in the new top-N for which the legacy window contains **no card for that site/allocation at all**. Mere regrouping never counts.
 * **BETTER_REPRESENTED** — the legacy window contains card(s) for the site but the new representative subject is a different, strictly better-fit subject (fit rank), or several legacy cards for the site collapse into one family.
-* **UNCHANGED** — the legacy window already presented the same representative subject.
+* **COMPARABLE** — the legacy window already presents the same representative, or a different one of equal fit (no improvement is claimed). **OUTSIDE_NEW_WINDOW** — the family is not within the new top-N (reported with its legacy presence).
 * Absence from the legacy *window* is all that can be established; the legacy candidate pool is not re-derived, and the artifact says so.
 
 ## Ordering and shortlist
@@ -47,6 +47,10 @@ The shortlist is the first N (default 20) non-excluded families in the existing 
 ## Negative / missed-evidence cohort (for a later, separately authorised Stage 2.6 audit)
 
 Recorded from already-loaded facts only: oversized wider families with no qualified phasing; phase subjects without qualified phasing; currentness-unknown phasing; phase subjects without an exact count; families with no buyer-relevant scope. No document is read.
+
+## Scale-position caveat
+
+The matcher establishes a scale position only from accepted deterministic count evidence (exact counts, or estimates with supported bounds). An unbounded portal estimate establishes none, so such a subject is neither "oversized" nor badge-eligible. The artifact reports how many wider subjects are in that state (`planning_families_whose_wider_subject_scale_is_unestablished`) so the yield limit is visible. No policy change is made for it.
 
 ## Artifact
 
