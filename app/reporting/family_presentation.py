@@ -67,6 +67,7 @@ class FamilyView:
     relationship_note: str | None
     overlap_warning: str | None
     caveat: str = POLICY_CAVEAT
+    potential_residual: str | None = None  # V8-B R2 investigation CONTEXT (no number, no subject, no fit); None unless an R2 signal exists for this family
 
 
 @dataclass(frozen=True)
@@ -87,13 +88,17 @@ def fit_label(fit: str, investigative: bool) -> str:
 
 def _scale(card: dict) -> str | None:
     assessment = card.get("count_assessment")
-    return assessment.label() if assessment is not None else None
+    if assessment is None:
+        return None
+    return assessment.label() + (" (derived, apparent)" if card.get("residual_subject_id") else "")
 
 
 def _subject_label(subject, card: dict) -> str:
     key = subject.subject_key
     if subject.domain == STRATEGIC_LAND:
         return card.get("title") or "Strategic land allocation"
+    if card.get("residual_subject_id"):
+        return "Derived residual capacity"
     for prefix, label in _LIFECYCLE_LABELS:
         if key.startswith(prefix):
             return label
@@ -174,7 +179,8 @@ def present_family(family: OpportunityFamily, site) -> FamilyView:
         family_id=f"{family.family_key[0]}-{family.family_key[1]}", title=title, subtitle=subtitle, is_strategic=strategic, best=best, related=related,
         phasing_context=phasing_context(family),
         relationship_note=RELATIONSHIP_NOTE if multi and not strategic else None,
-        overlap_warning=OVERLAP_WARNING if multi else None)
+        overlap_warning=OVERLAP_WARNING if multi else None,
+        potential_residual=next((m.source.get("potential_residual") for m in family.members if (m.source or {}).get("potential_residual")), None))
 
 
 def counts_captions(counts: dict) -> tuple[str, str]:
@@ -192,9 +198,13 @@ def route_counts_caption(counts: dict) -> str:
     """"of which: X consented · Y outline-consented · Z phase/plot · W strategic allocations" - counts by opportunity route; descriptive only (a route is not a rank)."""
     if not counts:
         return ""
-    from app.reporting.opportunity_route import CONSENTED_SITE, OUTLINE_CONSENTED_SITE, PHASE_OR_PLOT, STRATEGIC_ALLOCATION, UNCLASSIFIED_PLANNING_ROUTE
+    from app.reporting.opportunity_route import (
+        CONSENTED_SITE, OUTLINE_CONSENTED_SITE, PHASE_OR_PLOT, RESIDUAL_OPPORTUNITY, STRATEGIC_ALLOCATION, UNCLASSIFIED_PLANNING_ROUTE,
+    )
     parts = [f"{counts.get(CONSENTED_SITE, 0)} consented", f"{counts.get(OUTLINE_CONSENTED_SITE, 0)} outline-consented", f"{counts.get(PHASE_OR_PLOT, 0)} phase/plot",
              f"{counts.get(STRATEGIC_ALLOCATION, 0)} strategic allocation(s)"]
+    if counts.get(RESIDUAL_OPPORTUNITY, 0):
+        parts.append(f"{counts[RESIDUAL_OPPORTUNITY]} derived residual")
     if counts.get(UNCLASSIFIED_PLANNING_ROUTE, 0):
         parts.append(f"{counts[UNCLASSIFIED_PLANNING_ROUTE]} planning (consent not established)")
     joined = " · ".join(parts)

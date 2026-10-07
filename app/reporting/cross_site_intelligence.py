@@ -58,11 +58,11 @@ import json
 import re
 from dataclasses import dataclass
 
-from app.reporting.allocation_report import AllocationReportContext
+from app.reporting.allocation_report import AllocationReportContext, potential_residual_scope_text
 from app.reporting.allocation_web_research import AllocationWebResearchContext
 
 MODEL = "gpt-4o-mini"  # matches every other OpenAI call already made across this codebase - no new model introduced
-PROMPT_VERSION = "cross-site-intelligence-v1"
+PROMPT_VERSION = "cross-site-intelligence-v2"   # v2 (V8-B): residual figures removed; potential residual scope is context only
 
 # --- Structured output schema (Section 16) ------------------------------------
 # Deliberately NO numeric field anywhere - a numerical opportunity/probability
@@ -137,8 +137,9 @@ def _render_allocation_line(entry) -> str:
     ]
     if entry.development_coverage_percentage is not None:
         bits.append(f"development coverage: {entry.development_coverage_percentage:.0%}")
-    if entry.indicative_residual_capacity is not None:
-        bits.append(f"indicative residual capacity: {entry.indicative_residual_capacity:,}")
+    from app.reporting.residual_opportunity import POTENTIAL_RESIDUAL_SHORT
+    if potential_residual_scope_text(entry) == POTENTIAL_RESIDUAL_SHORT:       # R2 investigation context only: no number, no availability
+        bits.append("potential residual scope identified - investigate (not quantified)")
     if trusted_developer:
         bits.append(f"trusted Developer: {', '.join(trusted_developer)}")
     if applicants:
@@ -203,7 +204,7 @@ You are given two kinds of evidence:
 
 CRITICAL RULES:
 1. Prioritise, in this order: overall shortlist position; genuinely differentiated opportunities; development/
-   planning activity; residual/unaccounted capacity; known Developer/Applicant involvement; recent external
+   planning activity; potential residual scope (context only); known Developer/Applicant involvement; recent external
    developments; uncertainty; investigation priorities.
 2. NEVER produce a numerical score, percentage rating, or probability of any kind (no "82/100", no "78% probability
    of consent", no housing-delivery score, no ranking by number). Use plain comparative language instead, e.g.
@@ -221,7 +222,8 @@ CRITICAL RULES:
 6. Do not build or imply a housing-delivery/HDT/five-year-housing-land-supply score or ranking, and do not build or
    imply an NPPF policy score or probability-of-consent assessment - these are separate, not-yet-built platform
    capabilities.
-7. Avoid generic boilerplate, restating every row mechanically, unsupported causal claims, and unsupported
+7. NEVER subtract planning-application or linked-site counts from the allocation capacity, and NEVER state, estimate or imply a residual, remaining, unaccounted-for or available number of homes or area of land. Potential residual scope is investigation context only: it carries no quantity and no availability, ownership, title, geometry or further-phase inference.
+8. Avoid generic boilerplate, restating every row mechanically, unsupported causal claims, and unsupported
    financial conclusions.
 
 PROPERTYAIGENT TRUSTED EVIDENCE
@@ -278,8 +280,7 @@ def _allowed_numbers(report_context: AllocationReportContext, web_context: Alloc
     for value in (
         agg.allocation_count, agg.exact_capacity_total, agg.exact_capacity_count, agg.ranged_capacity_count,
         agg.unknown_capacity_count, agg.identified_application_capacity_known_total,
-        agg.identified_application_capacity_unknown_count, agg.indicative_residual_capacity_known_total,
-        agg.indicative_residual_capacity_unknown_count, agg.adopted_count, agg.emerging_count,
+        agg.identified_application_capacity_unknown_count, agg.adopted_count, agg.emerging_count,
         agg.other_plan_status_count, agg.allocations_with_linked_activity, agg.allocations_with_no_identified_activity,
     ):
         _add(value)
@@ -289,7 +290,6 @@ def _allowed_numbers(report_context: AllocationReportContext, web_context: Alloc
         _add(entry.capacity_value)
         _add(entry.capacity_display)
         _add(entry.identified_application_capacity)
-        _add(entry.indicative_residual_capacity)
         _add(entry.development_coverage_percentage)
         _add(entry.linked_application_count)
         for a in entry.applicant_evidence:

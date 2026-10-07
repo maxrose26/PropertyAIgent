@@ -112,3 +112,56 @@ def test_exact_strategic_difference_is_unexpected_and_preserved_route_difference
     v8 = bm.assess_buyer_fit(slb, facts)
     forged = dataclasses.replace(v8, classification=bm.INSUFFICIENT_EVIDENCE)
     assert differential_category(slb, facts, None, forged)[0] == UNEXPECTED_REGRESSION
+
+
+# --- V8-B hardening: live-dependency pins and the narrowed allow-list ------------------------------------------------------------------------------------------------
+
+def test_live_dependencies_of_the_frozen_oracle_are_pinned():
+    from verification.transition.v7_parity import LIVE_DEPENDENCY_PINS
+    current = definition_texts(lf(ROOT / "app/policy/buyer_matching.py"))
+    for name, pinned in LIVE_DEPENDENCY_PINS.items():
+        assert sha256(current[name]) == pinned, f"{name} changed: re-verify the frozen v7 oracle against it, then re-pin deliberately"
+
+
+def test_the_residual_work_did_not_touch_the_pinned_supporting_modules():
+    for path, pinned in frozen.SUPPORTING_MODULE_SHA256.items():
+        assert sha256(lf(ROOT / path)) == pinned, path
+
+
+@pytest.mark.parametrize("v7,v8,expected", [
+    ((bm.STRONG_FIT, False), (bm.INSUFFICIENT_EVIDENCE, True), EXPECTED_STRATEGIC_DELTA),
+    ((bm.POSSIBLE_FIT, False), (bm.INSUFFICIENT_EVIDENCE, False), EXPECTED_STRATEGIC_DELTA),
+    ((bm.STRONG_FIT, False), (bm.STRONG_FIT, True), EXPECTED_STRATEGIC_DELTA),
+    ((bm.INSUFFICIENT_EVIDENCE, False), (bm.INSUFFICIENT_EVIDENCE, True), EXPECTED_STRATEGIC_DELTA),
+    ((bm.STRONG_FIT, False), (bm.NOT_SUITABLE, False), UNEXPECTED_REGRESSION),             # a new NOT_SUITABLE is never an approved delta
+    ((bm.INSUFFICIENT_EVIDENCE, True), (bm.NOT_SUITABLE, False), UNEXPECTED_REGRESSION),
+    ((bm.INSUFFICIENT_EVIDENCE, False), (bm.POSSIBLE_FIT, False), UNEXPECTED_REGRESSION),  # no upgrade
+    ((bm.POSSIBLE_FIT, False), (bm.STRONG_FIT, False), UNEXPECTED_REGRESSION),
+    ((bm.STRONG_FIT, True), (bm.STRONG_FIT, False), UNEXPECTED_REGRESSION),                # an investigative flag may be added, never removed
+    ((bm.STRONG_FIT, False), (bm.POSSIBLE_FIT, False), UNEXPECTED_REGRESSION),             # no other downgrade
+])
+def test_expected_strategic_delta_is_narrowed_to_the_two_approved_transitions(monkeypatch, v7, v8, expected):
+    import verification.transition.v7_parity as parity
+    policy, facts = BUYER_PROFILES["nesten_homes"], _strategic_facts(150, None, None)       # an open floor: non-EXACT, not the preserved route
+    real = bm.assess_buyer_fit(policy, facts)
+    monkeypatch.setattr(parity, "frozen_v7_assess_buyer_fit", lambda p, f, context=None: dataclasses.replace(real, classification=v7[0], is_investigative_exception=v7[1]))
+    forged = dataclasses.replace(real, classification=v8[0], is_investigative_exception=v8[1])
+    assert differential_category(policy, facts, None, forged)[0] == (EQUAL if v7 == v8 else expected)
+
+
+def test_exhaustive_strategic_grid_has_no_unexpected_regression_and_no_new_not_suitable():
+    values = (None, 0, 1, 45, 50, 150, 200, 220, 300, 2000)
+    seen = {EQUAL: 0, EXPECTED_STRATEGIC_DELTA: 0, UNEXPECTED_REGRESSION: 0}
+    for buyer in ("nesten_homes", "strategic_land_buyer", "national_housebuilder", "housing_association"):
+        policy = BUYER_PROFILES[buyer]
+        for minimum in values:
+            for indicative in values:
+                for maximum in values:
+                    facts = _strategic_facts(minimum, indicative, maximum)
+                    v8 = bm.assess_buyer_fit(policy, facts)
+                    category, v7 = differential_category(policy, facts, None, v8)
+                    seen[category] += 1
+                    assert category != UNEXPECTED_REGRESSION, (buyer, minimum, indicative, maximum, v7.classification, v8.classification)
+                    if v8.classification == bm.NOT_SUITABLE:
+                        assert v7.classification == bm.NOT_SUITABLE
+    assert seen[EQUAL] and seen[EXPECTED_STRATEGIC_DELTA]

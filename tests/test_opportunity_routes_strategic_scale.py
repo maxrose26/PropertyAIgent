@@ -98,8 +98,8 @@ def test_v8_strategic_builder_carries_count_semantics_and_keeps_the_legacy_scala
                                                                  local_plan=SimpleNamespace(status="adopted"), plan_status="adopted", matched_site_id=None), None, None)
     assert facts.unit_count == 300 and facts.count_assessment is not None and facts.count_assessment.precision == "RANGE"   # v8: matching reads the assessment; the legacy scalar is display/fingerprint continuity only
     for module in ("app/reporting/opportunity_universe.py", "app/reporting/opportunity_change.py", "app/policy/agent_evaluation_persistence.py"):
-        text = (ROOT / module).read_text(encoding="utf-8")
-        assert "opportunity_route" not in text and "strategic_scale" not in text and "strategic_capacity" not in text, module     # not part of fingerprints or monitoring
+        text = (ROOT / module).read_text(encoding="utf-8").replace("strategic_capacity_fingerprint_fields", "")      # V8: the one sanctioned fingerprint helper (non-exact kinds only)
+        assert "opportunity_route" not in text and "strategic_scale" not in text and "strategic_capacity" not in text, module     # routes / presentation are not part of fingerprints or monitoring
 
 
 def test_shadow_compares_frozen_v7_with_v8_and_every_difference_is_an_expected_strategic_delta():
@@ -175,10 +175,12 @@ def test_strategic_allocation_route_and_caveats_make_no_unsupported_claim():
     assert strategic.route == orr.STRATEGIC_ALLOCATION and "unverified" in strategic.caveat
     for route in orr.ALL_ROUTE_KEYS:
         text = f"{orr.ROUTE_LABELS[route]} {orr.ROUTE_CAVEATS[route]}"
-        assert not re.search(r"\bavailable\b|willing|for sale\b|residual|remaining|will sell|owns\b", text, re.I), (route, text)
+        forbidden = r"\bavailable\b|willing|for sale\b|remaining|will sell|owns\b" + ("" if route == orr.RESIDUAL_OPPORTUNITY else "|residual")   # only R1 may say residual
+        assert not re.search(forbidden, text, re.I), (route, text)
+    assert "unverified" in orr.ROUTE_CAVEATS[orr.RESIDUAL_OPPORTUNITY] and "derived" in orr.ROUTE_LABELS[orr.RESIDUAL_OPPORTUNITY].lower()
     assert "has not started" not in " ".join(orr.ROUTE_CAVEATS.values()).lower() or "not verified" in orr.ROUTE_CAVEATS[orr.CONSENTED_SITE]    # never claims "development not started"
     counts = orr.route_counts([orr.CONSENTED_SITE, orr.CONSENTED_SITE, orr.STRATEGIC_ALLOCATION])
-    assert counts == {orr.CONSENTED_SITE: 2, orr.OUTLINE_CONSENTED_SITE: 0, orr.PHASE_OR_PLOT: 0, orr.STRATEGIC_ALLOCATION: 1, orr.UNCLASSIFIED_PLANNING_ROUTE: 0}
+    assert counts == {orr.CONSENTED_SITE: 2, orr.OUTLINE_CONSENTED_SITE: 0, orr.PHASE_OR_PLOT: 0, orr.RESIDUAL_OPPORTUNITY: 0, orr.STRATEGIC_ALLOCATION: 1, orr.UNCLASSIFIED_PLANNING_ROUTE: 0}
 
 
 # --- the feed, family presentation and the unchanged family architecture ----------------------------------------------------------------------------
@@ -263,7 +265,14 @@ def test_user_facing_signal_wording_no_longer_presents_residual_or_coverage_arit
         reasons = " ".join(neutral["reasons"])
         assert neutral["reasons"].count(PLANNING_ACTIVITY_IDENTIFIED_REASON) == 1
         assert PLANNING_ACTIVITY_IDENTIFIED_REASON in reasons
-        assert str(residual) not in reasons and f"{round(pct * 100)}%" not in reasons and not re.search(r"not (currently )?accounted for|residual|remaining", reasons, re.I)
+        from app.reporting.residual_opportunity import ALLOCATION_R2_TEXT
+        if classification != PARTIAL_COVERAGE:
+            assert ALLOCATION_R2_TEXT not in reasons                                                              # nothing is left unaccounted: no R2 context
+        else:
+            assert neutral["reasons"].count(ALLOCATION_R2_TEXT) == 1                                              # V8-B: partial coverage -> R2 investigation context (no number)
+        bare = reasons.replace(ALLOCATION_R2_TEXT, "")
+        assert str(residual) not in reasons and f"{round(pct * 100)}%" not in reasons and not re.search(r"not (currently )?accounted for|residual|remaining|available", bare, re.I)
+        assert not re.search(r"[0-9,]+ homes (available|remaining|residual)|available|remaining parcel", ALLOCATION_R2_TEXT, re.I)
         assert "plan-stated capacity" in reasons and "unverified" in reasons
 
 

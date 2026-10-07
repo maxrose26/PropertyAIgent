@@ -940,6 +940,8 @@ def opportunity_family_card(view, *, key: str) -> None:
                     stat_tile(label, value)
         if view.phasing_context:
             st.info(view.phasing_context, icon="🧩")
+        if view.potential_residual:
+            st.info(view.potential_residual, icon="🔎")
         if view.overlap_warning:
             st.caption(view.overlap_warning)
         if view.related:

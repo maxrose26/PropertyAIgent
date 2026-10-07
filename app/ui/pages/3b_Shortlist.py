@@ -45,7 +45,7 @@ from openai import OpenAI
 
 from app.config import load_councils
 from app.reporting.allocation_discovery import ALLOCATION_REVIEW_STATUS_META, PLAN_STATUS_META
-from app.reporting.allocation_report import build_allocation_report_context, to_csv_bytes
+from app.reporting.allocation_report import build_allocation_report_context, potential_residual_scope_text, to_csv_bytes
 from app.reporting.allocation_report_pdf import allocation_report_pdf_filename, render_allocation_report_pdf
 from app.reporting.allocation_web_research import build_allocation_web_research_context
 from app.reporting.cross_site_intelligence import generate_cross_site_intelligence
@@ -282,8 +282,8 @@ with page_scope():
                     )
                 with info_cols[3]:
                     stat_tile(
-                        "Indicative residual",
-                        f"~{entry.indicative_residual_capacity:,}" if entry.indicative_residual_capacity else "Not determined",
+                        "Potential residual scope",       # V8-B: R2 investigation context only; the internal coverage subtraction is never shown as a quantity
+                        potential_residual_scope_text(entry),
                     )
 
                 # Evidence-bounded wording (Gate 1 Section 14, unchanged) - no

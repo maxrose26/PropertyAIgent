@@ -37,8 +37,8 @@ KIND_ALLOCATION = "allocation"
 # One planning lifecycle slot per site (opportunity_universe's own design): these share one WHOLE_SITE subject.
 LIFECYCLE_KINDS = frozenset({"site", "recent_permission", "long_pending_application"})
 # New kind segment -> acquisition-subject taxonomy name (spec 025). Recognised, NOT emit-capable.
-NEW_KINDS = {"component": "MIXED_COMPONENT", "affordable_package": "AFFORDABLE_PACKAGE"}
-NEW_KIND_ANCHOR_PREFIX = {"component": "component~", "affordable_package": "affordable~"}
+NEW_KINDS = {"component": "MIXED_COMPONENT", "affordable_package": "AFFORDABLE_PACKAGE", "residual": "RESIDUAL_OPPORTUNITY"}   # residual: V8-B derived, NEVER persisted/emitted
+NEW_KIND_ANCHOR_PREFIX = {"component": "component~", "affordable_package": "affordable~", "residual": "residual~"}
 # The spec 025 emission gate: no new kind may be emitted until every id consumer is migrated and G1A has
 # landed. Deliberately empty in G1.
 EMIT_CAPABLE_NEW_KINDS: frozenset = frozenset()

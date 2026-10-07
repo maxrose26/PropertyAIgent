@@ -278,7 +278,7 @@ MODEL = "gpt-4o-mini"
 # produce different output): roughly 80-88 of the 102 previously-rejected
 # allocations, moving eligible-summary coverage from 61.2% (161/263)
 # toward an estimated 90%+.
-PROMPT_VERSION = "allocation-intelligence-summary-v8"
+PROMPT_VERSION = "allocation-intelligence-summary-v9"   # v9 (V8-B): the residual figure is no longer given to the model; potential residual scope is context only
 
 
 # --- Context object (Section 4) ---------------------------------------------
@@ -954,7 +954,7 @@ def _ownership_scope_label(o: OwnershipContextEntry) -> str:
     is asked to self-report this exact string back for each entity it
     names, so a claim naming the wrong scope (or the allocation as a
     whole) simply cannot match any allowed (entity, role, scope) tuple."""
-    return "the allocation's residual (unaccounted-for) capacity" if o.is_residual else f'Site "{o.site_label}"'
+    return "the allocation's potential residual scope" if o.is_residual else f'Site "{o.site_label}"'
 
 
 def _render_ownership_line(o: OwnershipContextEntry) -> str:
@@ -1080,7 +1080,7 @@ ALLOCATION CAPACITY (the allocation's own TOTAL stated capacity - never linked-a
 
 DEVELOPMENT COVERAGE (deterministic, already computed - do NOT recalculate any of these numbers yourself):
 - Identified planning application capacity: {context.identified_application_capacity if context.identified_application_capacity is not None else 'not determined'}
-- Indicative residual allocation capacity: {context.indicative_residual_capacity if context.indicative_residual_capacity is not None else 'not determined'} (this term is the ONLY acceptable way to describe this figure - NEVER call it "available land", "developable land", "opportunity capacity", "deliverable capacity", or "consentable capacity")
+- Potential residual scope: {_potential_residual_prompt_line(context)}
 - Development coverage percentage: {f'{context.development_coverage_percentage:.0%}' if context.development_coverage_percentage is not None else 'not determined'}
 - Coverage classification: {context.development_coverage_classification}
 - Capacity accounting status: {_CAPACITY_ACCOUNTING_LABELS.get(context.capacity_accounting_status, context.capacity_accounting_status)}
@@ -1093,21 +1093,22 @@ RELATED SITES (each independently evidenced - a Site relates to THIS allocation,
 APPLICANT EVIDENCE (who has submitted planning applications relating to a Site, aggregated across ALL of that Site's trusted linked Applications - not only the representative one; being named as applicant, on one Application or many, does NOT by itself mean this party is the developer, promoter, landowner, or "behind" the wider scheme; see Rule 2):
 {applicant_lines}
 
-OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact Site or residual-capacity context named, NEVER the allocation as a whole - never say an entity "owns the allocation", only that ownership/control evidence for a NAMED Site or the residual capacity names that entity in that role):
+OWNERSHIP/CONTROL EVIDENCE (Section 13 - each fact below is scoped to the exact Site or residual-capacity context named, NEVER the allocation as a whole - never say an entity "owns the allocation", only that ownership/control evidence for a NAMED Site or the potential residual scope names that entity in that role):
 {ownership_lines}
 {f"- {context.ownership_review_pending_count} additional ownership/control relationship(s) exist but remain subject to review - do not name the entity or role, only note that review is pending." if context.ownership_review_pending_count else ""}
-{"- No ownership/control evidence currently identified for the allocation's residual (unaccounted-for) capacity - you may state this plainly, it is commercially useful information." if not context.residual_ownership_known and context.indicative_residual_capacity else ""}
+{"- No ownership/control evidence currently identified for the allocation's potential residual scope - you may state this plainly, it is commercially useful information." if not context.residual_ownership_known and _potential_residual_flag(context) else ""}
 
 RULES - follow every one of these exactly:
+0. NEVER subtract planning-application or linked-site counts from the allocation capacity, and NEVER state, estimate or imply a residual, remaining, unaccounted-for or available number of homes or area of land. Potential residual scope is investigation context only: it carries no quantity and no availability, ownership, title, geometry or further-phase inference.
 1. Never invent a number, Application reference, organisation name, planning status, decision, or role not given above, and never recompute a capacity/coverage figure - every one you might want is already given above.
 2. Use role labels EXACTLY as given (e.g. "S106 Owner", "S106 Developer", "S106 Mortgagee", "Planning ownership declaration", "Applicant") - never upgrade, downgrade, or relabel a role (an applicant is never a developer, promoter, or owner - you may note commercially that a company is "named as applicant", never that it "is developing" or "owns" anything unless a stronger role label is separately given for it; a mortgagee is never an owner; a planning ownership declaration is never "the current owner"; a planning agent is never a promoter; never use the word "promoter" unless a role label above literally contains it). The SAME entity may legitimately hold more than one role above (e.g. named as Applicant AND, separately, as S106 Developer) - only ever narrate the roles it is actually given, never merge them into a single stronger claim. An applicant named on many linked Applications for a Site is still only Applicant evidence, however many - frequency is a fact you may mention (e.g. "named as applicant on 4 linked applications"), never a reason to imply a stronger role. Concretely: a "Planning ownership declaration" role means ONLY that - never write that this party "submitted", "applied for", "has an application for", or is otherwise the applicant/developer of any Application, even one their ownership evidence happens to have been found within, unless that SAME entity separately also carries an "Applicant" or "Developer" fact above. A specific example of what NOT to do: an entity whose only fact above is "Planning ownership declaration" must never be described as having "submitted a planning application" - it has not been shown to have done so.
 2a. When naming a SPECIFIC Application reference for a party (applicant, owner, developer, etc.), it must be one of the reference(s) given for THAT party's OWN evidence above - never assume it is the same Application discussed elsewhere in this brief (e.g. the representative Application), even if that seems like the natural one. If a party's evidence line above explicitly says its reference is NOT the representative Application, do not attribute it to the representative Application. When you are not citing one specific Application, describe the party as associated with planning activity on the Site generally instead (e.g. "is named as applicant in connection with planning activity on the Site") and leave application_reference "" in your self-report - this general form is always safe and still commercially useful.
 3. A Site relationship or ownership/control relationship marked as pending confirmation/review must be described as uncertain, never as a settled or confirmed fact - do not name any entity or role that was excluded above as "still under review".
 4. Do NOT mention any other Local Plan allocation, policy reference, or nearby/adjoining site by name or code under any circumstances, even if you think one might be nearby - this platform does not currently hold trusted adjacency evidence.
 5. Never describe this allocation as adopted unless the PLANNING STATUS line above literally says ADOPTED.
-6. Ownership/control evidence is always scoped to the specific Site or residual-capacity context it is given for above - never generalise it to "the allocation" as a whole; when you name an entity, the SCOPE you describe it in (which Site, or the residual capacity) must match exactly what is given above for that entity.
+6. Ownership/control evidence is always scoped to the specific Site or potential-residual-scope context it is given for above - never generalise it to "the allocation" as a whole; when you name an entity, the SCOPE you describe it in (which Site, or the potential residual scope) must match exactly what is given above for that entity.
 7. key_uncertainties should name the specific pending-review counts, unknown capacity, or missing ownership evidence above that limit confidence - be specific, not generic. A vague item that would be equally true of almost any allocation (e.g. "planning outcomes are uncertain") is not useful - name the actual gap.
-8. investigation_priorities must each be directly traceable to a fact given above AND specific enough to act on - not a generic instruction that could apply to any allocation. Prefer, e.g., "verify who controls the allocation's residual capacity" over "investigate the site"; "monitor the outcome of the pending Application" over "monitor progress"; "establish whether the party named as applicant also controls the wider allocation" over "review planning". Never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
+8. investigation_priorities must each be directly traceable to a fact given above AND specific enough to act on - not a generic instruction that could apply to any allocation. Prefer, e.g., "verify who controls any potential residual scope" over "investigate the site"; "monitor the outcome of the pending Application" over "monitor progress"; "establish whether the party named as applicant also controls the wider allocation" over "review planning". Never a generic planning-consultant opinion, never a legal conclusion, never marketing language.
 9. PLANNING ACTIVITY is never the same thing as PLANNING OUTCOME. A Site having a linked Application (live, registered, or under consultation) demonstrates planning activity - it does NOT by itself mean planning permission exists, and it never means the development is consented, under construction, delivered, implemented, or completed. State the Application's actual status/decision (given above) rather than assuming one from the fact that an Application merely exists.
 10. Only describe an Application as having planning permission/consent if its stated decision above literally says so (e.g. "Granted"). A refused or withdrawn Application remains real, relevant planning history - describe it accurately as refused/withdrawn, never as ongoing or successful.
 11. Never describe an Application, or the allocation, as under construction, built, delivered, or completed - PropertyAIgent does not hold construction/delivery evidence; a granted planning permission is still only a planning permission.
@@ -1240,6 +1241,21 @@ _NUMBER_PATTERN = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _DIGIT_BEARING_ROLE_LABELS = {"S106 Owner", "S106 Developer", "S106 Mortgagee"}
 
 
+def _potential_residual_flag(context) -> bool:
+    """V8-B R2 trigger from the deterministic coverage fields already in the context (the subtraction is read ONLY as a trigger)."""
+    from app.reporting.residual_opportunity import is_potential_residual_scope
+    return is_potential_residual_scope(context.development_coverage_classification, context.capacity_accounting_status, context.indicative_residual_capacity,
+                                       1 if context.number_of_linked_applications else 0)
+
+
+def _potential_residual_prompt_line(context) -> str:
+    """Number-free grounding: R2 -> context only; otherwise no residual proposition (R3). The model is never given a residual quantity."""
+    if _potential_residual_flag(context):
+        return ("identified - planning activity appears to account for part of the allocation, but the remaining acquisition scope cannot currently be quantified reliably "
+                "(investigation context only; no quantity, availability or ownership is established)")
+    return "none indicated - make no residual or remaining-capacity statement"
+
+
 def _numbers_in(text: str) -> set[str]:
     return {m.replace(",", "") for m in _NUMBER_PATTERN.findall(text)}
 
@@ -1269,7 +1285,6 @@ def _allowed_numbers(context: AllocationIntelligenceContext) -> set[str]:
     # ("2,050-3,200 homes", capacity_value=3200, rejected "2050").
     _add(context.allocation_capacity_display)
     _add(context.identified_application_capacity)
-    _add(context.indicative_residual_capacity)
     _add(context.development_coverage_percentage)
     _add(context.number_of_related_sites)
     _add(context.number_of_linked_applications)

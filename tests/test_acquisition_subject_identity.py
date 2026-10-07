@@ -119,7 +119,7 @@ def test_spaces_slash_and_hyphen_in_legacy_phase_codes_are_preserved_verbatim():
 # --- unknown kinds and malformed ids fail closed -----------------------------------------------------------------------
 
 @pytest.mark.parametrize("bad", [
-    "planning_delivery:subject:61", "planning_delivery:residual:61:x", "planning_delivery:unknown:61",
+    "planning_delivery:subject:61", "planning_delivery:bogus_kind:61:x", "planning_delivery:unknown:61",
     "planning_delivery:Site:61", "strategic_land:site:61", "strategic_land:subject:5", "other_domain:site:1",
 ])
 def test_unknown_kinds_fail_closed(bad):
@@ -189,7 +189,7 @@ def test_non_canonical_or_unsafe_scope_keys_are_rejected(key):
 
 
 def test_new_kinds_have_explicit_mappings_and_namespaced_anchor_keys():
-    assert subjects.NEW_KINDS == {"component": "MIXED_COMPONENT", "affordable_package": "AFFORDABLE_PACKAGE"}
+    assert subjects.NEW_KINDS == {"component": "MIXED_COMPONENT", "affordable_package": "AFFORDABLE_PACKAGE", "residual": "RESIDUAL_OPPORTUNITY"}
     assert new_kind_anchor_scope_key("component", "abc") == "component~abc"
     assert new_kind_anchor_scope_key("affordable_package", "abc") == "affordable~abc"
 
@@ -228,7 +228,7 @@ def test_the_whole_id_cap_is_enforced():
 
 
 def test_unrecognised_future_kinds_cannot_be_built():
-    for kind in ("residual", "subject", "phase", "site"):
+    for kind in ("bogus_kind", "subject", "phase", "site"):
         with pytest.raises(UnknownOpportunityKind):
             build_new_kind_opportunity_id(kind, 61, "x")
     with pytest.raises(MalformedOpportunityId):
@@ -258,12 +258,14 @@ def test_nothing_outside_the_identity_module_emits_or_builds_new_kinds():
     root = pathlib.Path(__file__).resolve().parents[1] / "app"
     offenders = []
     for path in root.rglob("*.py"):
-        if path.name == "acquisition_subjects.py":
+        if path.name in ("acquisition_subjects.py", "residual_opportunity.py"):   # residual_opportunity: the ONE sanctioned DERIVED (never persisted) builder, KIND_RESIDUAL only
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         if "build_new_kind_opportunity_id" in text or ":component:" in text or ":affordable_package:" in text:
             offenders.append(str(path.relative_to(root)))
     assert offenders == []
+    derived = (root / "reporting" / "residual_opportunity.py").read_text(encoding="utf-8")
+    assert "build_new_kind_opportunity_id(KIND_RESIDUAL" in derived and ":component:" not in derived and ":affordable_package:" not in derived
 
 
 # --- strategic identity -------------------------------------------------------------------------------------------------

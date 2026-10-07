@@ -100,6 +100,12 @@ def _strategic_land_cards(session, limit: int) -> list[dict]:
     return _strategic_cards_for_candidates(session, candidates, limit)
 
 
+def _allocation_residual_text(coverage):
+    from app.reporting.residual_opportunity import allocation_residual_context
+    context = allocation_residual_context(coverage)
+    return context.text if context else None
+
+
 def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], limit: int | None) -> list[dict]:
     """Eligibility + card shaping for an already-selected candidate list (code motion out of `_strategic_land_cards`, behaviour
     unchanged). ``limit=None`` (family mode only) disables the card-count cut; the signal eligibility filter always applies."""
@@ -169,6 +175,7 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             "page": "pages/3_Local_Plan_Sites.py",
             "params": {"allocation_id": str(a.id)},
             "strategic_scale": scale_view,
+            "potential_residual": _allocation_residual_text(result["coverage"]),   # V8-B R2 investigation context (no number); the coverage subtraction is only the trigger
             "when": a.updated_at,
             # Buyer Profiles V1 - computed here, once, from the exact same
             # allocation/coverage/phasing objects already in scope in this
@@ -213,7 +220,7 @@ def _reshape_signal_card(card: dict, *, opportunity_type: str, extra_tags: list[
     }
 
 
-def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None:
+def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> dict:
     """Buyer Profiles V1 - batched, additive enrichment of already-built
     planning/delivery cards with a MatchingFacts reader, mutating each
     card's own "matching_facts" key in place. Never touches app.reporting.
@@ -242,7 +249,7 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
 
     site_ids = {int(c["params"]["site_id"]) for c in cards if c.get("params", {}).get("site_id")}
     if not site_ids:
-        return
+        return {}
 
     apps = session.execute(
         select(Application)
@@ -295,6 +302,7 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
         if assessment is not None:
             card["metrics"] = [(k, v) for k, v in card.get("metrics", []) if k not in ("Scale", "Count evidence")] + [("Scale", assessment.label()), ("Count evidence", assessment.note())]
             card["count_note"] = assessment.note()
+    return operative_by_site      # V8-B: the per-site operative facts, so the residual ladder reuses this one read (no second query)
 
 
 def _generic_selection(strategic: list[dict], delivery: list[dict], limit: int) -> list[dict]:

@@ -902,19 +902,16 @@ def test_build_table_row_development_coverage_percentage_formatted_and_none_safe
     assert build_table_row(no_coverage_at_all, shortlisted=False)["Development Coverage %"] == "Not determined"
 
 
-def test_build_table_row_indicative_residual_capacity_formatted_and_none_safe():
-    with_residual = _card(development_coverage=_coverage(indicative_residual_capacity=1234))
-    assert build_table_row(with_residual, shortlisted=False)["Indicative Residual Capacity"] == "1,234"
-
-    zero_residual = _card(development_coverage=_coverage(indicative_residual_capacity=0))
-    # 0 is a real, meaningful value (fully accounted-for capacity) - must
-    # not be treated as falsy/missing the way `if coverage.indicative_...`
-    # alone would (confirmed against the exact same pitfall the platform's
-    # allocation summary validators already guard against elsewhere).
-    assert build_table_row(zero_residual, shortlisted=False)["Indicative Residual Capacity"] == "0"
-
-    no_residual = _card(development_coverage=_coverage(indicative_residual_capacity=None))
-    assert build_table_row(no_residual, shortlisted=False)["Indicative Residual Capacity"] == "Not determined"
+def test_build_table_row_potential_residual_scope_is_r2_context_never_the_subtraction():
+    partial = dict(development_coverage_classification="PARTIAL_COVERAGE", capacity_accounting_status="ok", number_of_sites_with_planning_activity=1)
+    row = build_table_row(_card(development_coverage=_coverage(indicative_residual_capacity=1234, **partial)), shortlisted=False)
+    assert row["Potential Residual Scope"] == "Potential residual scope — investigate" and "Indicative Residual Capacity" not in row
+    assert "1,234" not in " ".join(str(v) for v in row.values())                                      # V8-B: the internal subtraction is never shown as a quantity
+    for change in ({"indicative_residual_capacity": 0}, {"indicative_residual_capacity": None}, {"development_coverage_classification": "FULLY_ACCOUNTED_FOR"},
+                   {"capacity_accounting_status": "review_required"}):
+        card = _card(development_coverage=_coverage(**{**dict(indicative_residual_capacity=1234, **partial), **change}))
+        assert build_table_row(card, shortlisted=False)["Potential Residual Scope"] == "Not indicated"
+    assert build_table_row(_card(), shortlisted=False)["Potential Residual Scope"] == "Not determined"
 
 
 def test_build_table_row_shortlisted_column_reflects_the_passed_in_flag():

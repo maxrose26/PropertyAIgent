@@ -11,9 +11,11 @@ from __future__ import annotations
 import re
 
 from app.reporting.allocation_development_coverage import build_opportunity_signal
+from app.reporting.residual_opportunity import ALLOCATION_R2_TEXT
 
 PLANNING_ACTIVITY_IDENTIFIED_REASON = "Planning activity has been identified within this allocation."
 _CAPACITY_REASON = re.compile(r"^((?:Adopted|Emerging) residential allocation) with capacity of approximately ([\d,]+) homes\.$")
+_PARTIAL_COVERAGE = re.compile(r"of allocation capacity are not currently accounted for")
 _COVERAGE_ARITHMETIC = (
     re.compile(r"of capacity is represented by identified planning activity"),
     re.compile(r"of allocation capacity are not currently accounted for"),
@@ -30,6 +32,9 @@ def build_neutral_opportunity_signal(*, plan_status_bucket, coverage, phasing) -
         match = _CAPACITY_REASON.match(reason)
         if match:
             reasons.append(f"{match.group(1)} with plan-stated capacity of approximately {match.group(2)} homes (unverified).")
+        elif _PARTIAL_COVERAGE.search(reason):      # V8-B: R2 investigation context (no number); the figure in the raw reason is only the trigger
+            if ALLOCATION_R2_TEXT not in reasons:
+                reasons.append(ALLOCATION_R2_TEXT)
         elif any(pattern.search(reason) for pattern in _COVERAGE_ARITHMETIC):
             if PLANNING_ACTIVITY_IDENTIFIED_REASON not in reasons:
                 reasons.append(PLANNING_ACTIVITY_IDENTIFIED_REASON)

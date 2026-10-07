@@ -69,6 +69,7 @@ from app.reporting.allocation_report import (
     AllocationReportEntry,
     LinkedApplicationEntry,
     _planning_activity_label,
+    potential_residual_scope_text,
 )
 from app.reporting.allocation_web_research import AllocationWebResearchContext
 from app.reporting.cross_site_intelligence import CrossSiteIntelligence
@@ -217,13 +218,12 @@ def _shortlist_overview(styles, context: AllocationReportContext) -> list:
             f"({agg.identified_application_capacity_unknown_count} unknown or review-required).",
             styles["Body"],
         ))
-    residual_known_allocations = agg.allocation_count - agg.indicative_residual_capacity_unknown_count
-    if residual_known_allocations:
+    from app.reporting.residual_opportunity import POTENTIAL_RESIDUAL_SHORT
+    potential = sum(1 for e in context.entries if potential_residual_scope_text(e) == POTENTIAL_RESIDUAL_SHORT)
+    if potential:       # V8-B: R2 investigation context only - the internal coverage subtraction is never summed or stated as a quantity
         story.append(Paragraph(
-            f"Indicative residual capacity across {residual_known_allocations} allocation"
-            f"{'s' if residual_known_allocations != 1 else ''} with a known figure: "
-            f"{agg.indicative_residual_capacity_known_total:,} homes "
-            f"({agg.indicative_residual_capacity_unknown_count} unknown or review-required).",
+            f"Potential residual scope - investigate: {potential} allocation{'s' if potential != 1 else ''} where identified planning activity appears to account for "
+            "part of the allocation. The remaining acquisition scope cannot currently be quantified reliably.",
             styles["Body"],
         ))
 
@@ -242,10 +242,10 @@ def _development_coverage_cell_text(entry: AllocationReportEntry) -> str:
 def _summary_table(styles, context: AllocationReportContext) -> list:
     story = [Paragraph("2. Shortlist Summary", styles["SectionHeading"])]
 
-    header = ["Allocation", "Authority", "Plan Status", "Capacity", "Planning Activity", "Dev. Coverage", "Residual Capacity"]
+    header = ["Allocation", "Authority", "Plan Status", "Capacity", "Planning Activity", "Dev. Coverage", "Potential Residual Scope"]
     rows = [[Paragraph(f"<b>{h}</b>", styles["TableCell"]) for h in header]]
     for entry in context.entries:
-        residual_text = f"{entry.indicative_residual_capacity:,}" if entry.indicative_residual_capacity is not None else "Not determined"
+        residual_text = potential_residual_scope_text(entry)
         rows.append([
             Paragraph(_e(entry.allocation_name), styles["TableCell"]),
             Paragraph(_e(entry.council_name), styles["TableCell"]),
@@ -407,12 +407,12 @@ def _allocation_section(styles, entry: AllocationReportEntry) -> list:
     # carries the honest range/exact/unknown wording, unchanged from
     # format_capacity - never reinterpreted here).
     identified_text = f"{entry.identified_application_capacity:,}" if entry.identified_application_capacity is not None else "Not determined"
-    residual_text = f"{entry.indicative_residual_capacity:,}" if entry.indicative_residual_capacity is not None else "Not determined"
+    residual_text = potential_residual_scope_text(entry)
     block.append(Paragraph(
         f"<b>Capacity:</b> {_e(entry.capacity_display)} &nbsp;&nbsp; "
         f"<b>Identified application capacity:</b> {identified_text} &nbsp;&nbsp; "
         f"<b>Development coverage:</b> {_e(_development_coverage_cell_text(entry))} &nbsp;&nbsp; "
-        f"<b>Indicative residual:</b> {residual_text}",
+        f"<b>Potential residual scope:</b> {_e(residual_text)}",
         styles["AllocationBody"],
     ))
 

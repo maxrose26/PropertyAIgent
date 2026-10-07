@@ -30,7 +30,8 @@ PHASE_OR_PLOT = "PHASE_OR_PLOT"
 OUTLINE_CONSENTED_SITE = "OUTLINE_CONSENTED_SITE"
 CONSENTED_SITE = "CONSENTED_SITE"
 UNCLASSIFIED_PLANNING_ROUTE = "UNCLASSIFIED_PLANNING_ROUTE"
-ROUTES = (CONSENTED_SITE, OUTLINE_CONSENTED_SITE, PHASE_OR_PLOT, STRATEGIC_ALLOCATION)
+RESIDUAL_OPPORTUNITY = "RESIDUAL_OPPORTUNITY"      # V8-B: an R1 derived residual subject ONLY (R2 is investigation context, never a route)
+ROUTES = (CONSENTED_SITE, OUTLINE_CONSENTED_SITE, PHASE_OR_PLOT, RESIDUAL_OPPORTUNITY, STRATEGIC_ALLOCATION)
 ALL_ROUTE_KEYS = (*ROUTES, UNCLASSIFIED_PLANNING_ROUTE)
 SUBTYPE_PHASE, SUBTYPE_PLOT = "PHASE", "PLOT"
 
@@ -38,6 +39,7 @@ ROUTE_LABELS = {
     CONSENTED_SITE: "Consented site",
     OUTLINE_CONSENTED_SITE: "Outline-consented site",
     PHASE_OR_PLOT: "Phase / plot opportunity",
+    RESIDUAL_OPPORTUNITY: "Residual opportunity (derived)",
     STRATEGIC_ALLOCATION: "Strategic allocation",
     UNCLASSIFIED_PLANNING_ROUTE: "Planning opportunity (consent not established)",
 }
@@ -47,6 +49,7 @@ ROUTE_CAVEATS = {
     PHASE_OR_PLOT: "A specific phase or plot within a wider development; a plot alone does not establish formal phasing, and ownership and sale position are not established.",
     STRATEGIC_ALLOCATION: "Plan-stated capacity, unverified; planning permission, deliverability, ownership and sale position are not established.",
     UNCLASSIFIED_PLANNING_ROUTE: "A consented position has not been established for this opportunity.",
+    RESIDUAL_OPPORTUNITY: "Derived (apparent) residual planning capacity; availability, ownership, parcel geometry and independent deliverability are unverified.",
 }
 _FULL_CONSENT_ROLES = frozenset({"full", "hybrid", "reserved_matters", "other_substantive"})
 _OUTLINE_ROLE = "outline"
@@ -65,6 +68,8 @@ def derive_opportunity_route(card: dict) -> OpportunityRoute:
     feed's existing batched fact pass. Anything not positively established falls to the neutral UNCLASSIFIED_PLANNING_ROUTE."""
     if card.get("opportunity_type") == "strategic_land":
         return _make(STRATEGIC_ALLOCATION)
+    if card.get("residual_subject_id"):
+        return _make(RESIDUAL_OPPORTUNITY)
     phase_code = card.get("phase_code")
     if phase_code and phase_code != UNPHASED_LABEL:
         return _make(PHASE_OR_PLOT, SUBTYPE_PLOT if str(phase_code).startswith("plot_") else SUBTYPE_PHASE)

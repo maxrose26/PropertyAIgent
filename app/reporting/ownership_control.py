@@ -435,7 +435,7 @@ def get_allocation_control_intelligence(
     ]
     if indicative_residual_capacity:
         sections.append(SiteControlSection(
-            label="Residual allocation capacity", site_id=None, is_residual=True, groups=[],
+            label="Potential residual scope", site_id=None, is_residual=True, groups=[],
             residual_capacity=indicative_residual_capacity, show_ownership_intelligence_gap_cue=True,
         ))
     return sections
