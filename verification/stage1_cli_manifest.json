@@ -90,5 +90,9 @@
   "app/visuals/extract_site_plans.py": {
     "command": "extract_site_plans",
     "required_scope": "launch:extract_site_plans"
+  },
+  "scripts/preview_opportunity_monitoring_sync.py": {
+    "command": "preview_opportunity_monitoring_sync",
+    "required_scope": "launch:preview_opportunity_monitoring_sync"
   }
 }

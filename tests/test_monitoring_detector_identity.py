@@ -112,7 +112,11 @@ def test_plan_is_pure_and_needs_no_session():
 
 
 def test_sync_uses_the_shared_helpers_not_string_truncation():
-    source = inspect.getsource(sync_opportunity_monitoring_state)
+    # V7C-1: the read-only half of the sync moved verbatim into _build_sync_plan, shared with the preview; the sync must call it, and together they use the shared helpers.
+    import app.reporting.opportunity_change as oc
+    sync_source = inspect.getsource(sync_opportunity_monitoring_state)
+    assert "_build_sync_plan(" in sync_source
+    source = sync_source + inspect.getsource(oc._build_sync_plan)
     assert "tracked_detector_identities(" in source and "plan_opportunity_changes(" in source
     assert "rsplit" not in source and "_opportunity_kind_prefix" not in source
 

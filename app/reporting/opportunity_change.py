@@ -262,6 +262,28 @@ def plan_opportunity_changes(universe, existing_by_id, tracked_detectors):
     return plan
 
 
+def _build_sync_plan(session, *, page_size: int | None = None):
+    """The READ-ONLY half of the ordinary sync, shared verbatim by the real sync and the V7C-1 preview so they cannot drift: builds the complete current universe, loads the
+    tracked monitoring ids/rows (selects only) and classifies everything through the one pure planner. Returns (universe, tracked_ids, tracked_detectors, plan). Raises
+    (before anything is returned) on a malformed CURRENT opportunity id, exactly as the sync does."""
+    kwargs = {} if page_size is None else {"page_size": page_size}
+    universe = build_current_opportunity_universe(session, **kwargs)
+    # Every opportunity_id ever tracked (lightweight - id strings only, not full rows): the pre-sync state this run's baseline detection is scoped against.
+    tracked_ids = list(session.execute(select(OpportunityMonitoringState.opportunity_id)).scalars())
+    tracked_detectors = tracked_detector_identities(tracked_ids)
+    existing_by_id = {
+        s.opportunity_id: s
+        for s in session.execute(
+            select(OpportunityMonitoringState).where(
+                OpportunityMonitoringState.opportunity_id.in_([r.opportunity_id for r in universe])
+            )
+        ).scalars()
+    } if universe else {}
+    # Classify EVERYTHING first (pure; raises on a malformed current id before any row is written), then the caller applies (sync) or reports (preview).
+    plan = plan_opportunity_changes(universe, existing_by_id, tracked_detectors)
+    return universe, tracked_ids, tracked_detectors, plan
+
+
 def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) -> dict[str, int]:
     """Rebuilds the COMPLETE current opportunity universe (see app.
     reporting.opportunity_universe's own "COMPLETENESS" docstring section -
@@ -302,30 +324,7 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
     Returns a plain counts dict (never a numeric score) - one line an
     operator or a future cron log can print, mirroring app.pipeline.
     material_change.MaterialChangeStats.summary_line's own convention."""
-    kwargs = {} if page_size is None else {"page_size": page_size}
-
-    universe = build_current_opportunity_universe(session, **kwargs)
-
-    # Every opportunity_id ever tracked (lightweight - id strings only,
-    # not full rows) - the pre-sync state this run's baseline detection is
-    # scoped against. At current/near-term scale (hundreds of rows) this
-    # is a trivial single query; a future high-volume gate could narrow
-    # this to distinct kind-prefixes directly if it ever needs to.
-    tracked_detectors = tracked_detector_identities(
-        session.execute(select(OpportunityMonitoringState.opportunity_id)).scalars()
-    )
-
-    existing_by_id = {
-        s.opportunity_id: s
-        for s in session.execute(
-            select(OpportunityMonitoringState).where(
-                OpportunityMonitoringState.opportunity_id.in_([r.opportunity_id for r in universe])
-            )
-        ).scalars()
-    } if universe else {}
-
-    # Classify EVERYTHING first (pure; raises on a malformed current id before any row is written), then apply.
-    plan = plan_opportunity_changes(universe, existing_by_id, tracked_detectors)
+    universe, _tracked_ids, _tracked_detectors, plan = _build_sync_plan(session, page_size=page_size)
 
     counts = {BASELINE_EXISTING: 0, NEW: 0, MATERIALLY_CHANGED: 0, UNCHANGED: 0}
     for record, previous, result in plan:
@@ -362,4 +361,73 @@ def sync_opportunity_monitoring_state(session, *, page_size: int | None = None) 
         "new": counts[NEW],
         "materially_changed": counts[MATERIALLY_CHANGED],
         "unchanged": counts[UNCHANGED],
+    }
+
+
+# --- V7C-1: ordinary-sync PREVIEW (read-only) -----------------------------------------------------------------------------------------------
+
+PREVIEW_REPORT_VERSION = 1
+
+
+def _changed_fields(previous_state, record) -> dict:
+    old = json.loads(previous_state.fingerprint_fields) if previous_state is not None and previous_state.fingerprint_fields else {}
+    new = json.loads(json.dumps(record.fingerprint_fields, sort_keys=True, default=str))
+    return {key: {"old": old.get(key), "new": new.get(key)} for key in sorted(set(old) | set(new)) if old.get(key) != new.get(key)}
+
+
+def preview_ordinary_sync(session, *, page_size: int | None = None) -> dict:
+    """"If the ordinary monitoring sync ran against exactly this universe and monitoring state, what would it do?" - READ-ONLY (selects only: no insert, update,
+    delete, flush, commit, event, alert or model call). It reuses `_build_sync_plan`, i.e. the same universe build, tracked-detector derivation and the ONE pure
+    `plan_opportunity_changes` classifier the real sync executes, so preview and execution cannot disagree about detector identity, first-detector baselining, NEW,
+    or the historical malformed-row fallback. Deterministic (every list sorted; no timestamps, no secrets); machine-readable support for a reviewed Category A/B/C
+    transition manifest - it NEVER builds or applies a manifest and never rebaselines anything.
+
+    Category support: ``retired_ids`` (tracked rows absent from the current universe: Category A candidates - ordinary sync leaves such rows untouched, it never
+    deletes or 'retires' them), ``untracked_ids`` / ``partial_detector_untracked`` (Category B candidates; a tracked detector with untracked ids classifies them NEW),
+    and ``changes`` (every non-UNCHANGED opportunity with previous/new fingerprint and per-key old/new values: Category C candidates)."""
+    universe, tracked_ids, tracked_detectors, plan = _build_sync_plan(session, page_size=page_size)
+    classifications = (BASELINE_EXISTING, NEW, UNCHANGED, MATERIALLY_CHANGED)
+    predicted = {name: 0 for name in classifications}
+    by_detector: dict[str, dict] = {}
+    reasons: dict[str, int] = {}
+    changes = []
+    untracked_ids = []
+    for record, previous, result in plan:
+        detector = opportunity_detector_identity(record.opportunity_id)
+        predicted[result.classification] += 1
+        bucket = by_detector.setdefault(detector, {"current": 0, "tracked_detector": detector in tracked_detectors, **{name: 0 for name in classifications}})
+        bucket["current"] += 1
+        bucket[result.classification] += 1
+        if previous is None:
+            untracked_ids.append(record.opportunity_id)
+        for reason in result.reasons:
+            reasons[reason] = reasons.get(reason, 0) + 1
+        if result.classification != UNCHANGED:
+            changes.append({
+                "opportunity_id": record.opportunity_id, "detector": detector, "classification": result.classification,
+                "reasons": list(result.reasons), "previous_fingerprint": previous.fingerprint if previous is not None else None,
+                "new_fingerprint": result.fingerprint, "changed_fields": _changed_fields(previous, record) if previous is not None else {},
+            })
+    current_ids = {record.opportunity_id for record, _previous, _result in plan}
+    retired_ids = sorted((i for i in set(tracked_ids) if i not in current_ids), key=str)
+    partial = {}
+    for opportunity_id in untracked_ids:
+        detector = opportunity_detector_identity(opportunity_id)
+        if detector in tracked_detectors:
+            partial.setdefault(detector, []).append(opportunity_id)
+    return {
+        "report_version": PREVIEW_REPORT_VERSION, "read_only": True,
+        "totals": {
+            "current_opportunity_ids": len(plan), "tracked_monitoring_ids": len(tracked_ids), "untracked_current_ids": len(untracked_ids),
+            "tracked_ids_not_in_current_universe": len(retired_ids),
+        },
+        "tracked_detector_identities": sorted(tracked_detectors),
+        "predicted": {**predicted, "RETIRED": 0},
+        "retired_note": "Ordinary sync never retires, deletes or refreshes a tracked row absent from the universe (RETIRED is always 0 here); retired_ids are Category A candidates only.",
+        "by_detector": {detector: by_detector[detector] for detector in sorted(by_detector)},
+        "baseline_detectors": sorted(d for d, b in by_detector.items() if not b["tracked_detector"]),
+        "partial_detector_untracked": {detector: sorted(ids) for detector, ids in sorted(partial.items())},
+        "reasons": {reason: reasons[reason] for reason in sorted(reasons)},
+        "untracked_ids": sorted(untracked_ids), "retired_ids": retired_ids,
+        "changes": sorted(changes, key=lambda change: change["opportunity_id"]),
     }
