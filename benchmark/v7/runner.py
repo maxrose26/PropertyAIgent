@@ -19,7 +19,7 @@ from benchmark.v7.cases import APPROVED_BY_PRODUCT_OWNER, CASES
 
 # Forbidden inferences: nothing a subject (or the family label) says may claim any of these. (The approved phrase "Availability is unverified." is a DISCLAIMER and is not matched.)
 FORBIDDEN_INFERENCES = {
-    "availability": r"\b(is|are|will be|now|currently|already) available\b|available (for|to) (sale|acquisition|purchase|buy)|for sale\b|on the market",
+    "availability": r"\b(site|land|phase|scheme|parcel|opportunity|development|homes) (is|are|will be|may be|could be|now) available\b|available (for|to) (sale|acquisition|purchase|buy)|for sale\b|on the market",
     "willingness_to_sell": r"willing|keen to sell|looking to sell|seeking (a )?(buyer|purchaser)|motivated seller",
     "ownership_or_control": r"\b(owns|owned by|is owned|under (the )?control of|controlled by)\b",
     "residual_or_remaining": r"residual|remaining (parcel|land|phase|homes|units|capacity)|unbuilt|balance of the",
