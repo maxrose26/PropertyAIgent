@@ -109,9 +109,11 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
 
 
 def evaluate_buyer_families(session, buyer_key: str, inputs: FamilyInputs, limit: int = 6, *, memoise_context: bool = True,
-                            contexts: dict | None = None, include_excluded: bool = False) -> dict:
+                            contexts: dict | None = None, include_excluded: bool = False, profile=None) -> dict:
     """Evaluate already-loaded inputs for one buyer (the body of build_buyer_opportunity_families, unchanged in behaviour).
 
+    ``profile`` (default None = the buyer's stored mandate, resolved exactly as before) lets a read-only analysis tool evaluate an EXPLICIT policy object (used only for labelled counterfactual
+    analysis; production behaviour never passes it).
     ``contexts`` may be a caller-owned dict shared across buyers: B2 contexts are buyer-independent (keyed by subject kind + anchor id only). ``include_excluded`` adds the
     terminally excluded families themselves under ``"excluded_families"`` (default off: the result shape is otherwise unchanged)."""
     from app.security.access import require_admitted
@@ -123,7 +125,8 @@ def evaluate_buyer_families(session, buyer_key: str, inputs: FamilyInputs, limit
     )
     from app.policy.buyer_profile_store import get_buyer_profile_dataclass
 
-    profile = get_buyer_profile_dataclass(session, buyer_key)
+    if profile is None:
+        profile = get_buyer_profile_dataclass(session, buyer_key)
     if profile is None:
         raise UnknownBuyerProfile(f"buyer {buyer_key!r} does not resolve to an active profile")
 
