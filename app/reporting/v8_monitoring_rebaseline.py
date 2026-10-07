@@ -20,6 +20,10 @@ from __future__ import annotations
 import hashlib
 import json
 
+from sqlalchemy import select
+
+from app.db.models import OpportunityMonitoringState
+
 from app.reporting.opportunity_change import MATERIALLY_CHANGED, opportunity_detector_identity, preview_ordinary_sync
 from app.reporting.opportunity_monitoring_transition import MonitoringTransitionManifest, apply_monitoring_transition
 
@@ -42,6 +46,31 @@ def _is_expected_semantic_change(change: dict) -> bool:
     return old is None and isinstance(new, dict) and new.get("precision") not in (None, "EXACT")
 
 
+def _attach_exact_field_strings(session, eligible: list) -> None:
+    """READ-ONLY. Adds the EXACT stored ``fingerprint_fields`` string of each eligible row (``previous_fingerprint_fields``, verbatim - the rollback restores exactly this) and the string the
+    transition engine will write (``proposed_fingerprint_fields``: the same dict plus the added ``capacity_semantics``, canonical JSON exactly as the engine serialises it)."""
+    if session is None or not eligible:
+        for entry in eligible:
+            entry["previous_fingerprint_fields"] = entry["proposed_fingerprint_fields"] = entry["previous_last_seen_at"] = None
+        return
+    rows = {r.opportunity_id: r for r in session.execute(select(OpportunityMonitoringState).where(OpportunityMonitoringState.opportunity_id.in_([e["opportunity_id"] for e in eligible]))).scalars()}
+    for entry in eligible:
+        row = rows.get(entry["opportunity_id"])
+        previous = row.fingerprint_fields if row is not None else None
+        entry["previous_fingerprint_fields"] = previous
+        # `last_seen_at` has an ORM onupdate, so the (unchanged) transition engine advances it as a side effect of rewriting the fingerprint; recording the exact previous value makes the rollback byte-exact.
+        entry["previous_last_seen_at"] = row.last_seen_at.isoformat() if row is not None and row.last_seen_at is not None else None
+        try:
+            fields = json.loads(previous) if previous else None
+            if isinstance(fields, dict):
+                fields[SEMANTICS_FIELD] = entry["changed_fields"][SEMANTICS_FIELD]["new"]
+                entry["proposed_fingerprint_fields"] = json.dumps(fields, sort_keys=True, default=str)
+            else:
+                entry["proposed_fingerprint_fields"] = None
+        except ValueError:
+            entry["proposed_fingerprint_fields"] = None
+
+
 def build_rebaseline_plan(session, *, preview: dict | None = None) -> dict:
     """READ-ONLY. ``preview`` (tests) defaults to ``preview_ordinary_sync(session)`` - the same planner the real sync uses."""
     preview = preview if preview is not None else preview_ordinary_sync(session)
@@ -58,7 +87,9 @@ def build_rebaseline_plan(session, *, preview: dict | None = None) -> dict:
         else:
             not_included.append({**base, "why_not_included": "not a v8 strategic capacity-semantics change; ordinary monitoring will report it as it would regardless of v8"})
     eligible.sort(key=lambda e: e["opportunity_id"])
-    digest_payload = [{k: e[k] for k in ("opportunity_id", "previous_fingerprint", "proposed_fingerprint", "changed_fields")} for e in eligible]
+    _attach_exact_field_strings(session, eligible)
+    digest_payload = [{k: e[k] for k in ("opportunity_id", "previous_fingerprint", "proposed_fingerprint", "changed_fields", "previous_fingerprint_fields",
+                                          "proposed_fingerprint_fields", "previous_last_seen_at")} for e in eligible]
     digest = hashlib.sha256(json.dumps({"v": PLAN_VERSION, "eligible": digest_payload}, sort_keys=True, default=str).encode("utf-8")).hexdigest()
     return {
         "plan_version": PLAN_VERSION, "read_only": True, "plan_digest": digest, "can_apply": not blockers and bool(eligible),

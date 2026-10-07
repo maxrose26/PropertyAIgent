@@ -114,5 +114,13 @@
   "scripts/preview_ai_summary_staleness.py": {
     "command": "preview_ai_summary_staleness",
     "required_scope": "launch:preview_ai_summary_staleness"
+  },
+  "scripts/v8_monitoring_rollback.py": {
+    "command": "v8_monitoring_rollback",
+    "required_scope": "launch:v8_monitoring_rollback"
+  },
+  "scripts/v8_reonboarding_rollback.py": {
+    "command": "v8_reonboarding_rollback",
+    "required_scope": "launch:v8_reonboarding_rollback"
   }
 }

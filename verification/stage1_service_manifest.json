@@ -132,5 +132,9 @@
   "app/policy/mandate_sync.py": {
     "plan_mandate_sync": "buyer.write",
     "apply_mandate_sync": "buyer.write"
+  },
+  "app/policy/mandate_reonboarding_rollback.py": {
+    "plan_mandate_reonboarding_rollback": "buyer.write",
+    "apply_mandate_reonboarding_rollback": "buyer.write"
   }
 }
