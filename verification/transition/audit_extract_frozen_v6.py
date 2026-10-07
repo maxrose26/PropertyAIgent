@@ -61,7 +61,7 @@ for name in used:
         local_defs.append(name)
         if name != "B2MatchingContext":
             pins[name] = sha256(entry)
-for extra in ("AFFORDABLE_STATE_UNKNOWN", "ControlAppetiteFacts", "DEFAULT_DISCOVERY_TOLERANCE_PERCENT"):   # reached indirectly (via MatchingFacts / discovery_bounds)
+for extra in ("AFFORDABLE_STATE_UNKNOWN", "ControlAppetiteFacts", "DEFAULT_DISCOVERY_TOLERANCE_PERCENT", "DEVELOPMENT_STATE_COMPLETE", "DEVELOPMENT_STATE_PARTIALLY_COMPLETE", "DEVELOPMENT_STATE_UNDERWAY"):   # reached indirectly (via MatchingFacts / discovery_bounds)
     pins[extra] = sha256(defs[extra])
 
 supporting = {}

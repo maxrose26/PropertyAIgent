@@ -141,3 +141,26 @@ def test_the_recorded_v6_checkpoint_file_is_unchanged():
 
 
 CHECKPOINT_SHA256 = "01f797d1c9991896e9ab5740192f0c878654f4cb27f3863735a368a372dd354e"   # sha256 (LF-normalised) of the checkpoint exactly as recorded in commit 2604590 under v6
+
+
+def test_the_development_state_constants_behind_the_pinned_started_states_are_pinned_too():
+    for name in ("DEVELOPMENT_STATE_UNDERWAY", "DEVELOPMENT_STATE_PARTIALLY_COMPLETE", "DEVELOPMENT_STATE_COMPLETE"):
+        assert name in frozen.DEPENDENCY_PINS, name
+    assert (bm.DEVELOPMENT_STATE_UNDERWAY, bm.DEVELOPMENT_STATE_PARTIALLY_COMPLETE, bm.DEVELOPMENT_STATE_COMPLETE) == ("underway", "partially_complete", "complete")
+
+
+def test_the_deployed_repository_layout_lets_the_transition_cli_import_the_oracle():
+    """Render runs a native Python service from the repository checkout (pip install -r requirements.txt): the layout is the runtime. From the repository root, in a FRESH interpreter with
+    no test-only path help, scripts/reonboard_stale_mandates.py must import verification.transition.v6_parity and the frozen oracle."""
+    import os
+    import subprocess
+    import sys
+    assert (ROOT / "scripts/reonboard_stale_mandates.py").is_file()
+    for relative in ("verification/transition/v6_parity.py", "verification/transition/frozen_v6_matcher.py"):
+        assert (ROOT / relative).is_file(), relative
+    code = ("import scripts.reonboard_stale_mandates as s, verification.transition.frozen_v6_matcher as f, verification.transition.v6_parity as p;"
+            "assert s.PARITY_ORACLE is p.v6_parity_oracle and callable(f.assess_buyer_fit); print('layout-import-ok')")
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTEST_CURRENT_TEST")}
+    env["DATABASE_URL"] = "sqlite:///:memory:"
+    done = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+    assert done.returncode == 0 and "layout-import-ok" in done.stdout, done.stderr[-800:]
