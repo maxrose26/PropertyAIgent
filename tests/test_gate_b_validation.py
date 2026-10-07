@@ -380,7 +380,7 @@ def test_the_feed_refactor_keeps_the_original_result_shape(world):
     seed(world)
     import app.reporting.buyer_family_feed as bff
     result = bff.build_buyer_opportunity_families(world.session, "nesten_homes", 6)
-    assert set(result) == {"families", "excluded_family_keys", "counts", "buyer_key"}
+    assert set(result) == {"families", "excluded_family_keys", "counts", "buyer_key", "route_counts"}      # route_counts is additive and presentation-only
     inputs = bff.load_buyer_family_inputs(world.session)
     first = bff.evaluate_buyer_families(world.session, "nesten_homes", inputs, 6)
     second = bff.evaluate_buyer_families(world.session, "housing_association", inputs, 6)

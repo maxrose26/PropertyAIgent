@@ -163,17 +163,13 @@ def classify_planning_activity_coverage(coverage: DevelopmentCoverageResult) -> 
 
     if classification == FULL:
         reason = (
-            f"Known planning activity ({coverage.number_of_linked_applications} application(s) across "
-            f"{coverage.number_of_sites_with_planning_activity} matched site(s)) accounts for approximately "
-            f"{coverage.development_coverage_percentage:.0%} of the allocation's trusted capacity "
-            f"({coverage.allocation_capacity:,} homes)."
+            f"Planning activity has been identified within this allocation ({coverage.number_of_linked_applications} application(s) across "
+            f"{coverage.number_of_sites_with_planning_activity} matched site(s)). No residual or available land is inferred from it."
         )
     elif classification == PARTIAL:
         reason = (
-            f"Known planning activity accounts for approximately {coverage.development_coverage_percentage:.0%} "
-            f"of the allocation's trusted capacity ({coverage.allocation_capacity:,} homes); approximately "
-            f"{coverage.indicative_residual_capacity:,} homes of capacity are not currently accounted for by "
-            f"identified planning activity in Property AIgent's current evidence."
+            f"Planning activity has been identified within this allocation ({coverage.number_of_linked_applications} application(s) across "
+            f"{coverage.number_of_sites_with_planning_activity} matched site(s)). It is not an inference that any part of the allocation is available or unplanned."
         )
     elif classification == NONE_FOUND:
         reason = (

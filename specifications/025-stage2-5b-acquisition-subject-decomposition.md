@@ -816,3 +816,61 @@ bounded to execute independently.
 5. Evaluation-fingerprint version impact (verified at implementation).
 6. Whether a second RM application sharing a phase code is a scope collision requiring its own
    evidence rule (G2).
+
+
+## Final slice — opportunity routes and strategic scale integrity
+
+Status: **IMPLEMENTED (presentation/representation) — matching integration is a SEPARATE decision (see "Policy version").** Accepted by REVIEW after the strategic-allocation architecture investigation.
+
+### Opportunity-route taxonomy (a derived label; never a rank)
+
+Three dimensions are kept separate and are never collapsed into one score: **A. opportunity route** (what kind of acquisition opportunity), **B. buyer fit** (STRONG_FIT / POSSIBLE_FIT / INSUFFICIENT_EVIDENCE / NOT_SUITABLE plus the investigative flag), **C. evidence / readiness** (how strong the underlying evidence is; this slice only states the basis honestly and adds no score).
+
+> **OPPORTUNITY ROUTE IS NOT A RANK. A STRATEGIC ALLOCATION IS NOT AUTOMATICALLY WEAKER OR STRONGER THAN A CONSENTED SITE. BUYER FIT AND EVIDENCE MATURITY ARE SEPARATE CONCEPTS.**
+
+| Route | Deterministic source (existing architecture) |
+|---|---|
+| `STRATEGIC_ALLOCATION` | a strategic-land card (a Local Plan allocation) |
+| `PHASE_OR_PLOT` (subtype PHASE or PLOT) | a planning subject scoped to a **named** phase or a **material plot** (any phase code other than the unphased bucket); a plot code is `plot_`-prefixed by the existing scope resolution. A plot is a valid subject but **not** phasing evidence |
+| `OUTLINE_CONSENTED_SITE` | a wider planning subject whose operative **consented** position (`scheme_reconciliation.build_operative_planning_facts`) is an outline permission (`planning_role == "outline"`, from the portal Application Type first) |
+| `CONSENTED_SITE` | the same, where the consented position is full / hybrid / reserved matters / other substantive |
+| `UNCLASSIFIED_PLANNING_ROUTE` | fail-closed neutral value: no resolved consented position (e.g. a pending application) or no role evidence — never guessed |
+| (promotable land) | **Stage 2.5C — not represented** |
+
+"Consented site" deliberately carries the caveat *"whether development has started is not verified"*: the architecture holds no positive "development not started" fact (absence of commencement evidence is an evidence gap, never confirmed non-commencement), so the Product Owner wording "development not started" is **not** claimed. No route is derived by a model or heuristic over free text beyond the existing deterministic role classifier. The route is computed in `app.reporting.opportunity_route`, carried only in presentation, and is never an input to fit, ordering, family or subject identity, opportunity fingerprints, monitoring or phasing evidence (tested).
+
+### Strategic scale semantics (plan-stated, unverified)
+
+A strategic allocation stores up to three plan-stated figures. Representation through the existing count semantics (`app.reporting.strategic_capacity`; source semantics from `format_capacity` / `kpi_capacity_contribution`):
+
+| Stored figures | Representation |
+|---|---|
+| minimum = maximum | `EXACT` (the plan states one figure as floor and ceiling) — still plan-stated and unverified |
+| minimum < maximum | `RANGE lower=min upper=max` (an indicative figure inside it is recorded, never averaged) |
+| minimum only | open-ended `RANGE lower=min upper=None` — a **floor**; never exact |
+| maximum only | open-ended `RANGE upper=max` — a ceiling only |
+| indicative only | `APPROXIMATE value=indicative` (unbounded estimate) |
+| nothing | `UNKNOWN` |
+| non-positive / non-integer figure, minimum > maximum, an indicative figure outside the stated floor/ceiling or different from an equal min/max | `UNKNOWN` (fail closed) |
+
+Wording is always qualified: *"Plan-stated capacity: 150 homes — unverified"*, *"Plan-stated range: 60–300 homes — unverified"*, *"Plan-stated minimum: 100 homes — unverified"*, and so on. It never says a bare number, and implies no permission, deliverability, ownership, availability, promoter interest or commencement. A strategic STRONG_FIT is **not** removed because the opportunity is strategic: it states a plan-stated capacity fits and nothing blocks it; it is not buyer-ready or independently verified.
+
+### Residual-inference prohibition (Product Owner ruling)
+
+No acquisition inference may be drawn by subtracting planning/application counts from an allocation capacity (overlapping scopes, amendments, phased permissions, non-comparable counts, unknown boundaries, delivery already occurring, no proof the difference is available land). The Stage 3A coverage figures (`identified_application_capacity`, `indicative_residual_capacity`, `development_coverage_percentage`) remain as an **internal coverage diagnostic** used for signal selection; the user-facing opportunity reasons now say only *"Planning activity has been identified within this allocation."* Neutralised in this slice: the feed signal reasons, the Gate 4B planning-activity reason strings, the Local Plan Sites residual tile/caption and the allocation-discovery residual line. **Traced but not yet changed** (separate surfaces, report schemas and model-facing prompts that need their own approval): allocation reports and PDFs (aggregate "indicative residual capacity"), cross-site intelligence, the shortlist page, the allocation AI-summary prompt grounding and the ownership-control residual cue.
+
+### Strategic / planning separation and cross-reference
+
+Strategic allocations remain separate opportunity families; they are **not** consolidated into planning families (investigation finding; this restates the existing decision above). Accepted allocation↔planning relationships may later be shown as a neutral cross-reference (`ALLOCATION_CONTEXT` / related planning development): informational only, never affecting fit, ranking, counts or the family representative; no containment, ownership or availability implied. **Deferred.**
+
+### Policy version
+
+This slice changes **no matching output**: route, wording and the scale view are presentation; `BUYER_MATCHING_POLICY_VERSION` stays 7 and no fingerprint changes. Feeding the normalised strategic capacity into the matcher **will** change classifications for the same stored evidence (minimum-only, maximum-only and conflicting figures stop being STRONG; ranges are evaluated as ranges) and requires a matcher change for the explicit large-allocation route (it exists only on the scalar path), hence a **7 → 8 bump**. The V7C re-onboarding machinery cannot be reused as-is: its parity oracle is the frozen v6 matcher and would FAIL on the intended strategic differences; a v7→v8 transition needs a frozen v7 oracle with the intended deltas allow-listed to strategic subjects. That is a new transition architecture and is **not implemented here**. Evidence for the decision: `benchmark/v8_strategic_scale_shadow.py` (proposed, **unapproved** cases S1–S10).
+
+### Roadmap boundaries
+
+2.5B — relationships between already-known subjects and honest deterministic representation (this slice). 2.5C — promotable-land intelligence (allocation/promotable land as an acquisition opportunity itself; promotion, constraints, ownership/promoter context). 2.6 — qualified documentary evidence (verified capacity provenance, documentary phasing, affordable evidence).
+
+### Performance record (not optimised here)
+
+~2,829 Nesten queries over 429 families at the corrected Gate B run (about 6.6 per family; planning contexts ~12–13 queries each; ~one constant-result control lookup per allocation). Future: request-scoped context reuse, batching by site ids, removing constant-result per-allocation lookups.

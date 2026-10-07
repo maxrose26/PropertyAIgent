@@ -49,6 +49,10 @@ class SubjectView:
     tags: tuple[str, ...]
     page: str | None
     params: dict
+    route: str | None = None               # opportunity ROUTE (what kind of opportunity) - separate from fit and evidence; never a rank
+    route_label: str | None = None
+    route_caveat: str | None = None
+    scale_basis: str | None = None         # strategic allocations only: the plan-stated, UNVERIFIED capacity wording
 
 
 @dataclass(frozen=True)
@@ -71,6 +75,8 @@ class FamilyFeedView:
     caption: str = ""
     subject_caption: str = ""
     error: str | None = None
+    route_counts: tuple = ()               # ((route_key, count), ...) over the shown families' representatives
+    route_caption: str = ""
 
 
 def fit_label(fit: str, investigative: bool) -> str:
@@ -101,7 +107,9 @@ def _subject_label(subject, card: dict) -> str:
 
 
 def _subject_view(subject) -> SubjectView:
+    from app.reporting.opportunity_route import derive_opportunity_route
     card = subject.source or {}
+    route = derive_opportunity_route(card)
     fit = card["buyer_fit"]
     reasons = tuple(fit.matches[:2])
     if fit.classification == "INSUFFICIENT_EVIDENCE" and fit.is_investigative_exception and getattr(fit, "investigate", None):
@@ -113,7 +121,9 @@ def _subject_view(subject) -> SubjectView:
         signal_key=card.get("signal") if subject.domain == STRATEGIC_LAND else None,
         signal_label=card.get("signal_label") if subject.domain == STRATEGIC_LAND else None,
         metrics=tuple(tuple(m) for m in (card.get("metrics") or ())) if subject.domain == STRATEGIC_LAND else (),
-        tags=tuple(card.get("tags") or ()), page=card.get("page"), params=dict(card.get("params") or {}))
+        tags=tuple(card.get("tags") or ()), page=card.get("page"), params=dict(card.get("params") or {}),
+        route=route.route, route_label=route.label, route_caveat=route.caveat,
+        scale_basis=(card.get("strategic_scale") or {}).get("display") if subject.domain == STRATEGIC_LAND else None)
 
 
 def phasing_context(family: OpportunityFamily) -> str | None:
@@ -178,10 +188,24 @@ def counts_captions(counts: dict) -> tuple[str, str]:
     return caption, subjects
 
 
+def route_counts_caption(counts: dict) -> str:
+    """"of which: X consented · Y outline-consented · Z phase/plot · W strategic allocations" - counts by opportunity route; descriptive only (a route is not a rank)."""
+    if not counts:
+        return ""
+    from app.reporting.opportunity_route import CONSENTED_SITE, OUTLINE_CONSENTED_SITE, PHASE_OR_PLOT, STRATEGIC_ALLOCATION, UNCLASSIFIED_PLANNING_ROUTE
+    parts = [f"{counts.get(CONSENTED_SITE, 0)} consented", f"{counts.get(OUTLINE_CONSENTED_SITE, 0)} outline-consented", f"{counts.get(PHASE_OR_PLOT, 0)} phase/plot",
+             f"{counts.get(STRATEGIC_ALLOCATION, 0)} strategic allocation(s)"]
+    if counts.get(UNCLASSIFIED_PLANNING_ROUTE, 0):
+        parts.append(f"{counts[UNCLASSIFIED_PLANNING_ROUTE]} planning (consent not established)")
+    joined = " · ".join(parts)
+    return f"Opportunity routes among the families shown: {joined}."
+
+
 def present_family_result(result: dict, sites_by_id: dict) -> FamilyFeedView:
     views = tuple(present_family(f, sites_by_id.get(f.family_key[1]) if f.family_key[0] != STRATEGIC_LAND else None) for f in result["families"])
     caption, subject_caption = counts_captions(result["counts"])
-    return FamilyFeedView(families=views, caption=caption, subject_caption=subject_caption)
+    counts = result.get("route_counts") or {}
+    return FamilyFeedView(families=views, caption=caption, subject_caption=subject_caption, route_counts=tuple(counts.items()), route_caption=route_counts_caption(counts))
 
 
 def build_buyer_family_dashboard_view(session, buyer_key: str, limit: int = 6) -> FamilyFeedView:

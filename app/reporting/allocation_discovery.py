@@ -124,8 +124,6 @@ def format_development_coverage_summary(card: dict) -> dict | None:
         lines.append(f"{coverage.identified_application_capacity:,} / ~{coverage.allocation_capacity:,} homes identified")
     if coverage.development_coverage_percentage is not None:
         lines.append(f"~{coverage.development_coverage_percentage:.0%} accounted for")
-    if coverage.indicative_residual_capacity:
-        lines.append(f"Indicative residual: ~{coverage.indicative_residual_capacity:,} homes")
 
     phasing = card.get("phasing")
     if phasing:

@@ -919,8 +919,12 @@ def opportunity_family_card(view, *, key: str) -> None:
         st.markdown(f"##### {_escape(view.title)}")
         if view.subtitle:
             st.caption(view.subtitle)
+        if best.route_label:
+            st.caption(f"Opportunity type: {best.route_label}")
         st.caption("Best acquisition subject for this buyer")
         st.markdown(f"**{_escape(best.label)}**" + (f" — {_escape(best.scale)}" if best.scale else ""))
+        if best.scale_basis:
+            st.caption(best.scale_basis)
         if best.signal_label:
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(best.signal_key, "info"), best.signal_label)
         _family_subject_badge(best)

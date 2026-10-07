@@ -135,6 +135,8 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
         activity_coverage = classify_planning_activity_coverage(result["coverage"])
         capacity = format_capacity(a)
         range_labels = capacity_range_labels(capacity, a.source_excerpt)
+        from app.reporting.strategic_capacity import strategic_scale_view
+        scale_view = strategic_scale_view(a)          # the figure(s) AND their basis: plan-stated and unverified (presentation only; matching is unchanged)
 
         # Site area always shown - "Not yet verified" rather than omitted
         # when absent, never a bare 0 ha (matches the Opportunity Profile's
@@ -148,8 +150,7 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             # single figure - the same rule the Opportunity Profile detail
             # page uses (never a different label for the same fact shown
             # in two places).
-            capacity_label = "Capacity (range)" if capacity["kind"] == "range" else "Capacity"
-            metrics.append((capacity_label, capacity["display"]))
+            metrics.append(("Plan-stated capacity (unverified)", scale_view["figure"]))
 
         tags = [OPPORTUNITY_TYPE_LABELS[STRATEGIC_LAND], plan_meta["label"], PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification]]
 
@@ -166,6 +167,7 @@ def _strategic_cards_for_candidates(session, candidates: list[LocalPlanSite], li
             "tags": tags,
             "page": "pages/3_Local_Plan_Sites.py",
             "params": {"allocation_id": str(a.id)},
+            "strategic_scale": scale_view,
             "when": a.updated_at,
             # Buyer Profiles V1 - computed here, once, from the exact same
             # allocation/coverage/phasing objects already in scope in this
@@ -251,12 +253,17 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> None
         apps_by_site.setdefault(app.site_id, []).append(app)
 
     operative_by_site = {sid: build_operative_planning_facts(rows) for sid, rows in apps_by_site.items()}
+    consent_role_by_site = {}
+    for sid, operative in operative_by_site.items():              # the planning ROLE of the operative consented application (route derivation input; presentation only)
+        position = operative.consented_position
+        consent_role_by_site[sid] = position.reference.source.planning_role if position.exists and position.reference.source is not None else None
     facts_by_context = {}
     for card in cards:
         site_id_raw = card.get("params", {}).get("site_id")
         if site_id_raw is None:
             continue
         site_id = int(site_id_raw)
+        card["consent_role"] = consent_role_by_site.get(site_id)
         if site_id not in operative_by_site:
             card["matching_facts"] = None
             continue

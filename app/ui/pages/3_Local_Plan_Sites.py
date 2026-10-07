@@ -567,17 +567,11 @@ with page_scope():
                 with cov_cols[1]:
                     if coverage.development_coverage_percentage is not None:
                         stat_tile("Development coverage", f"{coverage.development_coverage_percentage:.0%}")
-                    if coverage.indicative_residual_capacity is not None:
-                        stat_tile("Indicative residual capacity", f"~{coverage.indicative_residual_capacity:,} homes")
                 st.markdown(f"**{PLANNING_ACTIVITY_COVERAGE_LABELS[activity_coverage.classification]}**")
                 st.caption(activity_coverage.reason)
                 if coverage.note:
                     st.caption(coverage.note)
-                if coverage.indicative_residual_capacity:
-                    st.caption(
-                        f"Approximately {coverage.indicative_residual_capacity:,} homes of allocation capacity are not "
-                        "currently accounted for by identified planning activity."
-                    )
+                st.caption("Planning activity figures are shown as evidence only; no residual or available land is inferred from them.")
 
                 section_header("Planning activity detail", icon="🏗️")
                 st.caption(

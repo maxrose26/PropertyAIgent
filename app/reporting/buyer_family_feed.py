@@ -185,7 +185,10 @@ def evaluate_buyer_families(session, buyer_key: str, inputs: FamilyInputs, limit
         "recent_permission": len(recent_permission_raw),
         "long_pending_application": len(long_pending_raw),
     }
-    result = {"families": shown, "excluded_family_keys": tuple(f.family_key for f in excluded), "counts": counts, "buyer_key": buyer_key}
+    from app.reporting.opportunity_route import derive_opportunity_route, route_counts
+    result = {"families": shown, "excluded_family_keys": tuple(f.family_key for f in excluded), "counts": counts, "buyer_key": buyer_key,
+              # additive, presentation-only: the opportunity ROUTE of each shown family's representative (never a rank, never an input to fit or ordering)
+              "route_counts": route_counts(derive_opportunity_route(f.representative.source or {}).route for f in shown)}
     if include_excluded:
         result["excluded_families"] = excluded
     return result
