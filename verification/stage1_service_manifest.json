@@ -128,5 +128,9 @@
   "app/policy/mandate_reonboarding.py": {
     "plan_stale_mandate_reonboarding": "buyer.write",
     "apply_stale_mandate_reonboarding": "buyer.write"
+  },
+  "app/policy/mandate_sync.py": {
+    "plan_mandate_sync": "buyer.write",
+    "apply_mandate_sync": "buyer.write"
   }
 }
