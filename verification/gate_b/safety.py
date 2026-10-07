@@ -19,8 +19,8 @@ from contextlib import contextmanager
 from sqlalchemy import event, text
 
 MODEL_MODULES = ("openai", "anthropic")
-ALLOWED_PREFIXES = ("SELECT", "WITH", "SHOW", "SET TRANSACTION READ ONLY", "SET LOCAL STATEMENT_TIMEOUT")
-_LEADING_NOISE = re.compile(r"^(\s|--[^\n]*\n|/\*.*?\*/)*", re.S)
+ALLOWED_PATTERN = re.compile(r"^(SELECT|WITH|SHOW|SET TRANSACTION READ ONLY|SET LOCAL STATEMENT_TIMEOUT)\b")
+_LEADING_NOISE = re.compile(r"^(\s|--[^\n]*(\n|$))*")
 
 
 class ReadOnlyViolation(RuntimeError):
@@ -40,7 +40,11 @@ def normalise_statement(statement: str) -> str:
 
 
 def is_allowed_statement(statement: str) -> bool:
-    return normalise_statement(statement).startswith(ALLOWED_PREFIXES)
+    """Defence in depth only (the verified READ ONLY transaction is the barrier). Conservative: a statement must START with an allowed keyword (word boundary), contain no ';' except a
+    single trailing one (no multi-statement text), and no block comment at all (PostgreSQL nests them, so they cannot be reasoned about by a simple scanner)."""
+    text_ = normalise_statement(statement)
+    body = text_[:-1].rstrip() if text_.endswith(";") else text_
+    return bool(ALLOWED_PATTERN.match(body)) and ";" not in body and "/*" not in body
 
 
 class Instrument:
@@ -104,6 +108,12 @@ def network_guard(allowed_hosts=()):
         socket.socket.connect, socket.socket.connect_ex, socket.create_connection, builtins.__import__ = originals
 
 
+def assert_read_only(connection, statement_timeout_ms: int) -> None:
+    """The first statements of every transaction on a PostgreSQL connection (SET TRANSACTION must precede any query)."""
+    connection.execute(text("SET TRANSACTION READ ONLY"))
+    connection.execute(text(f"SET LOCAL statement_timeout = {int(statement_timeout_ms)}"))
+
+
 def _database_host() -> str | None:
     from urllib.parse import urlsplit
     url = os.getenv("DATABASE_URL") or ""
@@ -150,6 +160,11 @@ def read_only_window(session, *, real: bool, statement_timeout_ms: int = 60000, 
         if sess.new or sess.dirty or sess.deleted:
             raise ReadOnlyViolation("ORM changes were staged inside the read-only window")
 
+    def after_begin(sess, transaction, connection):
+        # Every NEW transaction in this session (e.g. after a rollback swallowed somewhere) is made READ ONLY before anything else runs.
+        if dialect == "postgresql":
+            assert_read_only(connection, statement_timeout_ms)
+
     def before_commit(sess):
         raise ReadOnlyViolation("commit attempted inside the read-only window")
 
@@ -160,15 +175,15 @@ def read_only_window(session, *, real: bool, statement_timeout_ms: int = 60000, 
     event.listen(session, "before_flush", before_flush)
     event.listen(session, "before_commit", before_commit)
     event.listen(session, "loaded_as_persistent", loaded)
+    event.listen(session, "after_begin", after_begin)
     guard = network_guard(allowed_hosts=(_database_host(),) if real else ())
     try:
         with guard:
             if dialect == "postgresql":
-                session.execute(text("SET TRANSACTION READ ONLY"))
-                session.execute(text(f"SET LOCAL statement_timeout = {int(statement_timeout_ms)}"))
+                session.connection()                                  # begins the transaction: after_begin issues SET TRANSACTION READ ONLY first
                 if session.execute(text("SHOW transaction_read_only")).scalar() != "on":
                     raise ReadOnlyViolation("the transaction could not be verified READ ONLY")
-                status["read_only_transaction"] = "verified_on"
+                status["read_only_transaction"] = "verified_on_and_reasserted_on_every_new_transaction"
                 status["statement_timeout_ms"] = int(statement_timeout_ms)
             yield instrument, status
     finally:
@@ -177,5 +192,6 @@ def read_only_window(session, *, real: bool, statement_timeout_ms: int = 60000, 
             event.remove(session, "before_flush", before_flush)
             event.remove(session, "before_commit", before_commit)
             event.remove(session, "loaded_as_persistent", loaded)
+            event.remove(session, "after_begin", after_begin)
         finally:
             session.rollback()

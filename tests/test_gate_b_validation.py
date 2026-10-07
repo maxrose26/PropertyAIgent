@@ -98,10 +98,33 @@ def test_the_statement_allow_list_is_exact():
                "-- c\nSELECT 1", "/* c */ SELECT 1"):
         assert safety.is_allowed_statement(ok), ok
     for bad in ("INSERT INTO t VALUES (1)", "UPDATE t SET a=1", "DELETE FROM t", "COMMIT", "SET ROLE x", "SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE", "SET LOCAL lock_timeout = 1",
-                "CREATE TABLE t (a int)", "DROP TABLE t", "TRUNCATE t", "GRANT ALL ON t TO x", "ALTER TABLE t ADD c int", "COPY t FROM STDIN", "CALL p()", "SELECT 1; DELETE FROM t"[:0] + "DELETE FROM t"):
+                "CREATE TABLE t (a int)", "DROP TABLE t", "TRUNCATE t", "GRANT ALL ON t TO x", "ALTER TABLE t ADD c int", "COPY t FROM STDIN", "CALL p()",
+                "SELECT 1; DELETE FROM t", "SELECT 1; COMMIT; BEGIN; DELETE FROM t", "SHOW x; COMMIT", "SET LOCAL statement_timeout=1; SET SESSION AUTHORIZATION x",
+                "/* /* */ SELECT 1 */ DELETE FROM t", "SELECT 1 /* x */", "SELECTX 1", "WITHDRAW 5", "SHOWDOWN", "-- c\nDELETE FROM t", ""):
         assert not safety.is_allowed_statement(bad), bad
+    assert safety.is_allowed_statement("SELECT 1;") and safety.is_allowed_statement("SELECT 1 ;")          # one trailing semicolon is harmless
+
+
+def test_every_new_postgres_transaction_is_made_read_only_first():
+    executed = []
+    connection = SimpleNamespace(execute=lambda statement: executed.append(str(statement)))
+    safety.assert_read_only(connection, 45000)
+    assert executed == ["SET TRANSACTION READ ONLY", "SET LOCAL statement_timeout = 45000"]
+    assert all(safety.is_allowed_statement(s) for s in executed)
     source = open(safety.__file__, encoding="utf-8").read()
-    assert "SET TRANSACTION READ ONLY" in source and "SHOW transaction_read_only" in source and "statement_timeout" in source
+    assert 'event.listen(session, "after_begin", after_begin)' in source and "assert_read_only(connection, statement_timeout_ms)" in source   # re-asserted after any rollback
+
+
+def test_the_guards_are_restored_even_when_the_window_raises(world):
+    seed(world)
+    originals = (socket.socket.connect, socket.create_connection, __import__("builtins").__import__)
+    with pytest.raises(RuntimeError, match="boom"):
+        with safety.read_only_window(world.session, real=False):
+            raise RuntimeError("boom")
+    assert (socket.socket.connect, socket.create_connection, __import__("builtins").__import__) == originals
+    world.session.add(Site(council_code="x", canonical_address="after", display_address="after"))
+    world.session.commit()                                                                  # outside the window normal behaviour is back (the window left no listener behind)
+    assert world.session.query(Site).filter(Site.canonical_address == "after").count() == 1
 
 
 def test_no_network_and_no_model_client_can_be_used_inside_the_window(world, monkeypatch):
@@ -153,7 +176,8 @@ def test_scale_bounds_come_from_the_mandate_never_from_the_runner(world):
     assert (mandate["discovery_min"], mandate["discovery_max"]) == discovery_bounds(50, 200) == (45, 220)
     assert artifact["buyers"]["housing_association"]["mandate"]["scale_metric"] == "affordable_units"
     code = re.sub(r'""".*?"""', "", open(runner.__file__, encoding="utf-8").read(), flags=re.S)
-    assert not re.search(r"\b(45|220|50|200|nesten_homes\s*==)\b", code.replace("PRIMARY_BUYER = \"nesten_homes\"", ""))     # no hard-coded Nesten numbers
+    assert not re.search(r"\b(45|220|50|200|nesten_homes\s*==|housing_association\s*==)\b", code.replace("PRIMARY_BUYER = \"nesten_homes\"", ""))     # no hard-coded Nesten numbers or buyer-name branches
+    assert 'buyer == "' not in code and "AFFORDABLE_UNITS" in code                                                              # the affordable-unit distinction follows the mandate's scale metric
     assert len(mandate["digest"]) == 16
 
 
@@ -212,7 +236,8 @@ def test_comparison_categories_follow_the_written_definitions():
     legacy = lambda subjects, rank: {"index": {("planning_delivery", 1): {"subjects": subjects, "best_rank": rank}} if subjects else {}}   # noqa: E731
     assert runner.compare_with_legacy(family, True, legacy([], None))["comparison"] == runner.NEWLY_SURFACED
     assert runner.compare_with_legacy(family, True, legacy(["opp-lapse-1"], 2))["comparison"] == runner.BETTER_REPRESENTED        # strictly better representative
-    assert runner.compare_with_legacy(family, True, legacy(["opp-lapse-1", "opp-phase-1-2"], 0))["comparison"] == runner.BETTER_REPRESENTED   # several cards collapse
+    assert runner.compare_with_legacy(family, True, legacy(["opp-lapse-1", "opp-phase-1-2"], 0))["comparison"] == runner.DEDUPLICATED      # several cards collapse: no better discovery claimed
+    assert runner.compare_with_legacy(family, True, legacy(["opp-lapse-1", "opp-lapse-9"], 2))["comparison"] == runner.BETTER_REPRESENTED   # collapse AND a strictly better representative
     assert runner.compare_with_legacy(family, True, legacy(["opp-phase-1-2"], 0))["comparison"] == runner.COMPARABLE              # same representative: regrouping alone is never "new"
     assert runner.compare_with_legacy(family, False, legacy([], None))["comparison"] == runner.OUTSIDE_NEW_WINDOW
     assert runner.compare_with_legacy(family, True, None)["comparison"] is None                                                   # no comparator: no claim
@@ -226,10 +251,10 @@ def test_end_to_end_comparison_never_calls_a_regrouped_site_newly_surfaced(world
     assert legacy["window"] == 20 and sum(counts.values()) == len(artifact["nesten"]["shortlist"])
     for row in artifact["nesten"]["shortlist"]:
         if row["legacy_cards_for_family"]:
-            assert row["comparison"] in (runner.BETTER_REPRESENTED, runner.COMPARABLE)         # the legacy window already held the site
+            assert row["comparison"] in (runner.BETTER_REPRESENTED, runner.DEDUPLICATED, runner.COMPARABLE)         # the legacy window already held the site
         else:
             assert row["comparison"] == runner.NEWLY_SURFACED
-    assert "legacy candidate pool is not re-derived" in artifact["definitions"]["legacy_limits"] or "not re-derived" in artifact["definitions"]["legacy_limits"]
+    assert "not re-derived" in artifact["definitions"]["legacy_limits"] and "not re-derived" in artifact["aggregates"]["comparison_caveat"] and "non-commercial" in artifact["aggregates"]["comparison_caveat"]
 
 
 # --- 8-10. no summation / residual / availability ----------------------------------------------------------------------------------------
@@ -254,6 +279,7 @@ def test_housing_association_does_not_inherit_total_site_phasing(world):
     seed(world)
     artifact = run(world.session)
     ha = artifact["buyers"]["housing_association"]
+    assert "total_site_phasing_is_not_affordable_package_evidence" in ha and "total_site_phasing_is_not_affordable_package_evidence" not in artifact["buyers"]["nesten_homes"]
     assert ha["total_site_phasing_is_not_affordable_package_evidence"] == {"families_with_current_qualified_phasing": 1, "families_showing_phasing_badge": 0, "required_badge_count": 0, "holds": True}
     assert ha["population"]["oversized_wider_families"] == 0 and ha["population"]["oversized_wider_with_buyer_sized_current_phase"] == 0
     assert artifact["buyers"]["nesten_homes"]["population"]["families_showing_phasing_badge"] == 1      # the same evidence IS relevant for the total-units buyer
@@ -328,14 +354,18 @@ def test_query_and_entity_instrumentation_reports_costs(world):
     assert efficiency["statement_kinds"].get("SELECT", 0) > 0
 
 
-def test_the_one_read_principle_inputs_and_site_contexts_are_loaded_once_for_all_buyers(world):
+def test_the_one_read_principle_extra_buyers_cost_a_constant_not_a_per_site_read(world):
+    """With the legacy comparator off, three more buyers must add a number of queries that does NOT grow with the number of sites (inputs and B2 site contexts are read once)."""
+    def extra_for_three_buyers():
+        one = run(world.session, buyers=("nesten_homes",), include_legacy=False)["efficiency"]["query_count"]
+        four = run(world.session, include_legacy=False)["efficiency"]["query_count"]
+        return four - one
     seed(world)
-    one = run(world.session, buyers=("nesten_homes",))["efficiency"]
-    four = run(world.session)["efficiency"]
-    load = next(s for s in four["stages"] if s["stage"] == "load_subject_inputs")
-    assert sum(1 for s in four["stages"] if s["stage"] == "load_subject_inputs") == 1 and load["queries"] > 0
-    extra_per_buyer = (four["query_count"] - one["query_count"]) / 3
-    assert extra_per_buyer < one["query_count"] / 2           # three more buyers cost far less than three more full reads (inputs + B2 contexts are shared)
+    small = extra_for_three_buyers()
+    for _ in range(6):
+        world.site(outline_age=LAPSE_AGE, rm_age=LAPSE_AGE, parent="I", phase="S", units_out=500, units_rm=140)
+    large = extra_for_three_buyers()
+    assert small == large and small <= 30, (small, large)
 
 
 def test_the_circuit_breaker_aborts_a_runaway_read(world):

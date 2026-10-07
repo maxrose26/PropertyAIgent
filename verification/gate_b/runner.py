@@ -18,8 +18,9 @@ from datetime import datetime, timezone
 from app.policy.agent_evaluation_persistence import AGENT_EVALUATION_INPUT_FINGERPRINT_VERSION
 from app.policy.agent_evaluation_result import AGENT_EVALUATION_POLICY_VERSION
 from app.policy.buyer_matching import (
-    BUYER_MATCHING_POLICY_VERSION, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, discovery_bounds,
+    AFFORDABLE_UNITS, BUYER_MATCHING_POLICY_VERSION, PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED, discovery_bounds,
 )
+from app.security.access import AccessDenied
 from app.reporting.buyer_family_feed import UnknownBuyerProfile, evaluate_buyer_families, load_buyer_family_inputs
 from app.reporting.family_presentation import _subject_label, phasing_context
 from app.pipeline.phase_tracking import UNPHASED_LABEL
@@ -31,7 +32,9 @@ PRIMARY_BUYER = "nesten_homes"
 OTHER_BUYERS = ("national_housebuilder", "strategic_land_buyer", "housing_association")
 STATES = (PHASING_CURRENT_EVIDENCED_PHASE, PHASING_CURRENTNESS_UNKNOWN, PHASING_HISTORICAL_ONLY, PHASING_NONE_IDENTIFIED)
 COHORT_SAMPLE = 25
-NEWLY_SURFACED, BETTER_REPRESENTED, COMPARABLE, OUTSIDE_NEW_WINDOW = "NEWLY_SURFACED", "BETTER_REPRESENTED", "COMPARABLE", "OUTSIDE_NEW_WINDOW"
+NEWLY_SURFACED, BETTER_REPRESENTED, DEDUPLICATED, COMPARABLE, OUTSIDE_NEW_WINDOW = "NEWLY_SURFACED", "BETTER_REPRESENTED", "DEDUPLICATED", "COMPARABLE", "OUTSIDE_NEW_WINDOW"
+COMPARISON_CAVEAT = ("Relative to the legacy flat feed WINDOW of the same size only. NEWLY_SURFACED means absent from that window, not 'undiscoverable' (the legacy candidate pool is not re-derived). "
+                     "Order within a fit bucket is lexical and non-commercial; no position is a market ranking.")
 
 DEFINITIONS = {
     "phase_subject": "a family member whose slot is a named phase (an opportunity subject)",
@@ -40,7 +43,8 @@ DEFINITIONS = {
     "oversized_wider_family": "a family with a wider (non-self-phase) planning-delivery subject for which phasing_is_acquisition_relevant holds for the buyer (above the mandate's discovery maximum, total-units mandate)",
     "comparable_legacy_window": "build_opportunity_feed in buyer mode called with the same limit N as the family shortlist (the legacy candidate pool is not re-derived)",
     NEWLY_SURFACED: "in the new top-N, and the legacy window of the same size holds NO card for that site/allocation",
-    BETTER_REPRESENTED: "the legacy window holds card(s) for the site/allocation, but the new representative is a different, strictly better-fit subject, or several legacy cards collapse into one family",
+    BETTER_REPRESENTED: "the legacy window holds card(s) for the site/allocation, but the new representative is a different, strictly better-fit subject",
+    DEDUPLICATED: "the legacy window held SEVERAL cards for the site/allocation which now collapse into one family, without a better representative (less duplication; no better discovery is claimed)",
     COMPARABLE: "the legacy window already presents the same representative, or a different one of equal fit (no improvement is claimed)",
     OUTSIDE_NEW_WINDOW: "the family is not within the new top-N window (reported with its legacy presence)",
     "ordering": "the existing v7 family order (fit bucket, then lexical family key). Ties are NON-COMMERCIAL; this is not a market ranking and no new ranking is introduced",
@@ -158,8 +162,9 @@ def compare_with_legacy(family, in_new_window: bool, legacy: dict | None) -> dic
     if not present:
         return {"comparison": NEWLY_SURFACED, "legacy_cards_for_family": 0}
     rep = family.representative
-    better = len(present) > 1 or (rep.subject_key not in present and entry["best_rank"] is not None and fit_rank(rep.fit, rep.investigative) < entry["best_rank"])
-    return {"comparison": BETTER_REPRESENTED if better else COMPARABLE, "legacy_cards_for_family": len(present)}
+    better = rep.subject_key not in present and entry["best_rank"] is not None and fit_rank(rep.fit, rep.investigative) < entry["best_rank"]
+    label = BETTER_REPRESENTED if better else (DEDUPLICATED if len(present) > 1 else COMPARABLE)
+    return {"comparison": label, "legacy_cards_for_family": len(present)}
 
 
 def _site_context(sites: dict, family) -> dict:
@@ -237,7 +242,7 @@ def _legacy_window(session, buyer_key: str, window: int):
     return build_opportunity_feed(session, limit=window, buyer_key=buyer_key)
 
 
-def run_validation(session, *, real: bool, code_sha: str | None = None, shortlist_size: int = 20, statement_timeout_ms: int = 60000, max_queries: int | None = None,
+def run_validation(session, *, real: bool, code_sha: str | None = None, shortlist_size: int = 20, statement_timeout_ms: int = 60000, max_queries: int | None = None, include_legacy: bool = True,
                    clock=lambda: datetime.now(timezone.utc), buyers: tuple = (PRIMARY_BUYER, *OTHER_BUYERS)) -> dict:
     """The whole validation inside one read-only window. Returns the artifact dict (call write_artifact to persist it)."""
     from sqlalchemy import select
@@ -254,12 +259,12 @@ def run_validation(session, *, real: bool, code_sha: str | None = None, shortlis
             try:
                 profiles[buyer] = get_buyer_profile_dataclass(session, buyer)
                 results[buyer] = evaluate_buyer_families(session, buyer, inputs, 10 ** 9, contexts=contexts, include_excluded=True)
-            except UnknownBuyerProfile as error:
-                results[buyer] = {"error": str(error)}
+            except (UnknownBuyerProfile, AccessDenied) as error:           # a missing / out-of-scope buyer is recorded, never fatal to the one read window
+                results[buyer] = {"error": f"{type(error).__name__}: buyer {buyer!r} could not be evaluated"}
             instrument.snapshot(f"evaluate:{buyer}")
         legacy = None
         primary = results.get(PRIMARY_BUYER)
-        if primary is not None and "error" not in primary:
+        if include_legacy and primary is not None and "error" not in primary:
             legacy_feed = _legacy_window(session, PRIMARY_BUYER, shortlist_size)
             legacy = {"window": shortlist_size, **_legacy_index(legacy_feed["cards"]), "cards_returned": len(legacy_feed["cards"])}
             instrument.snapshot("legacy_feed_window")
@@ -278,7 +283,7 @@ def run_validation(session, *, real: bool, code_sha: str | None = None, shortlis
             dmin, dmax = discovery_bounds(lo, hi)
             section = {"mandate": {"digest": mandate_digest(policy), "scale_metric": policy.scale_metric, "preferred_min": lo, "preferred_max": hi, "discovery_min": dmin, "discovery_max": dmax},
                        "population": population(analyses), "subject_counts": result["counts"]}
-            if buyer == "housing_association":
+            if policy.scale_metric == AFFORDABLE_UNITS:
                 section["total_site_phasing_is_not_affordable_package_evidence"] = {
                     "families_with_current_qualified_phasing": sum(a["state"] == PHASING_CURRENT_EVIDENCED_PHASE for a in analyses),
                     "families_showing_phasing_badge": section["population"]["families_showing_phasing_badge"], "required_badge_count": 0,
@@ -305,7 +310,7 @@ def run_validation(session, *, real: bool, code_sha: str | None = None, shortlis
             counts = Counter(r["comparison"] for r in shortlist)
             nesten = {"population": buyer_sections[PRIMARY_BUYER]["population"], "oversized_wider_with_buyer_sized_current_phase": review_records, "shortlist": shortlist,
                       "shortlist_size": shortlist_size, "shortlist_ordering": DEFINITIONS["ordering"],
-                      "comparison_counts_in_new_window": {k: counts.get(k, 0) for k in (NEWLY_SURFACED, BETTER_REPRESENTED, COMPARABLE)},
+                      "comparison_counts_in_new_window": {k: counts.get(k, 0) for k in (NEWLY_SURFACED, BETTER_REPRESENTED, DEDUPLICATED, COMPARABLE)}, "comparison_caveat": COMPARISON_CAVEAT,
                       "legacy_window": None if legacy is None else {"window": legacy["window"], "cards_returned": legacy["cards_returned"], "malformed_legacy_cards": legacy["malformed_legacy_cards"]}}
             cohort = negative_cohort(groups, sites)
             phasing = phasing_population(analyses)
@@ -322,13 +327,13 @@ def run_validation(session, *, real: bool, code_sha: str | None = None, shortlis
                          "timestamp_utc": clock().astimezone(timezone.utc).isoformat(), "primary_buyer": PRIMARY_BUYER, "production_read_safety": safety,
                          "mandate_digests": {b: s.get("mandate", {}).get("digest") for b, s in buyer_sections.items()}},
         "aggregates": {"phasing_population": phasing, "family_fit_population": {b: s.get("population") for b, s in buyer_sections.items()},
-                       "comparison_counts_in_new_window": (nesten or {}).get("comparison_counts_in_new_window")},
+                       "comparison_counts_in_new_window": (nesten or {}).get("comparison_counts_in_new_window"), "comparison_caveat": COMPARISON_CAVEAT},
         "buyers": buyer_sections, "nesten": nesten, "negative_cohort": cohort, "efficiency": efficiency, "definitions": DEFINITIONS,
     }
     return artifact
 
 
-CSV_COLUMNS = ("position", "family_id", "council_code", "title", "representative", "family_fit", "investigative", "qualified_phasing_state", "phasing_badge", "comparison",
+CSV_COLUMNS = ("order_position_non_commercial", "family_id", "council_code", "title", "representative", "family_fit", "investigative", "qualified_phasing_state", "phasing_badge", "comparison",
                "representative_scale", "buyer_sized_phase_scale")
 
 

@@ -101,6 +101,9 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
     feed card in ``FamilySubject.source`` (with ``buyer_fit``). Nothing is summed across subjects."""
     from app.security.access import require_admitted
     require_admitted()
+    from app.policy.buyer_profile_store import get_buyer_profile_dataclass
+    if get_buyer_profile_dataclass(session, buyer_key) is None:      # resolve the buyer BEFORE the full read: an unknown buyer fails cheaply, as it always did
+        raise UnknownBuyerProfile(f"buyer {buyer_key!r} does not resolve to an active profile")
     inputs = load_buyer_family_inputs(session, strategic_page_size=strategic_page_size)
     return evaluate_buyer_families(session, buyer_key, inputs, limit, memoise_context=memoise_context)
 

@@ -36,7 +36,8 @@ PostgreSQL backend required in real mode; the application's own engine route (`a
 * **Oversized wider family** — a family with a wider (non-self-phase) planning-delivery subject for which `phasing_is_acquisition_relevant` holds for the buyer (above the mandate's discovery maximum, total-units mandate).
 * **Comparable legacy window** — the legacy flat feed (`build_opportunity_feed`, buyer mode) called with the *same* limit N as the family shortlist, so the two result windows are the same size.
 * **NEWLY_SURFACED** — a family shown in the new top-N for which the legacy window contains **no card for that site/allocation at all**. Mere regrouping never counts.
-* **BETTER_REPRESENTED** — the legacy window contains card(s) for the site but the new representative subject is a different, strictly better-fit subject (fit rank), or several legacy cards for the site collapse into one family.
+* **BETTER_REPRESENTED** — the legacy window contains card(s) for the site but the new representative subject is a different, strictly better-fit subject (fit rank).
+* **DEDUPLICATED** — several legacy cards for the site collapse into one family without a better representative (less duplication; no better discovery is claimed).
 * **COMPARABLE** — the legacy window already presents the same representative, or a different one of equal fit (no improvement is claimed). **OUTSIDE_NEW_WINDOW** — the family is not within the new top-N (reported with its legacy presence).
 * Absence from the legacy *window* is all that can be established; the legacy candidate pool is not re-derived, and the artifact says so.
 
