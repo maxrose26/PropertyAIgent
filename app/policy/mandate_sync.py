@@ -105,6 +105,10 @@ class MandateSyncPlan:
     baseline_present: bool = False
     stale_before: bool | None = None
     stale_after_correction: bool | None = None
+    stored_baseline_fingerprint_id: str | None = None      # first 12 hex chars of the stored matching_fingerprint (None = never stamped)
+    onboarding_completed_at: str | None = None
+    current_rules_fingerprint_id: str | None = None        # fingerprint of the STORED rules under the current policy version
+    proposed_rules_fingerprint_id: str | None = None       # fingerprint of the rules AFTER the correction (what a later re-onboarding would stamp)
 
     @property
     def applicable(self) -> bool:
@@ -113,7 +117,8 @@ class MandateSyncPlan:
     def digest(self) -> str:
         material = {"digest_version": DIGEST_VERSION, "matching_policy_version": BUYER_MATCHING_POLICY_VERSION, "buyer_key": self.buyer_key, "buyer_id": self.buyer_id,
                     "mandate_id": self.mandate_id, "workspace_id": self.workspace_id, "expected_old_sha256": self.expected_old_sha256, "stored_sha256": self.stored_sha256,
-                    "proposed_sha256": self.proposed_sha256, "diff": self.diff, "status": self.status}
+                    "proposed_sha256": self.proposed_sha256, "diff": self.diff, "status": self.status,
+                    "stored_baseline_fingerprint_id": self.stored_baseline_fingerprint_id}
         return hashlib.sha256(json.dumps(material, sort_keys=True, default=str).encode()).hexdigest()
 
     def report(self, mode: str) -> dict:
@@ -123,6 +128,8 @@ class MandateSyncPlan:
                 "expected_new_policy_sha256": self.expected_new_sha256, "field_diff": list(self.diff),
                 "derived": {"discovery_before": self.discovery_before, "discovery_after": self.discovery_after},
                 "baseline": {"stored_baseline_present": self.baseline_present, "stale_before": self.stale_before, "stale_after_correction": self.stale_after_correction,
+                             "stored_baseline_fingerprint_id": self.stored_baseline_fingerprint_id, "onboarding_completed_at": self.onboarding_completed_at,
+                             "current_rules_fingerprint_id": self.current_rules_fingerprint_id, "proposed_rules_fingerprint_id": self.proposed_rules_fingerprint_id,
                              "note": "the onboarding baseline columns are never written by this command; the old baseline is left in place and is stale by computation"},
                 "preserved_fields": list(PRESERVED_FIELDS), "syncable_rule_fields": list(SYNCABLE_RULE_FIELDS)}
 
@@ -168,12 +175,16 @@ def compute_mandate_sync_plan(session, buyer_key: str) -> MandateSyncPlan:
         if stored_sha != change.expected_old_policy_sha256:
             reasons.append("stored mandate is not the expected pre-correction state (whole-policy digest differs): refusing; investigate drift")
     baseline_present = mandate.matching_fingerprint is not None and mandate.onboarding_completed_at is not None
-    stale_after = (not baseline_present) or compute_buyer_mandate_fingerprint(proposed_policy) != mandate.matching_fingerprint
+    proposed_fingerprint = compute_buyer_mandate_fingerprint(proposed_policy)
+    stale_after = (not baseline_present) or proposed_fingerprint != mandate.matching_fingerprint
     return MandateSyncPlan(
         buyer_key=buyer_key, status=status, blocking_reasons=reasons, mandate=mandate, buyer_id=mandate.buyer_id, mandate_id=mandate.id, workspace_id=buyer.workspace_id, stored_sha256=stored_sha,
         proposed_sha256=proposed_sha, expected_old_sha256=change.expected_old_policy_sha256, expected_new_sha256=change.expected_new_policy_sha256, diff=diff,
         discovery_before=discovery_bounds(stored_policy.target_unit_min, stored_policy.target_unit_max), discovery_after=discovery_bounds(proposed_policy.target_unit_min, proposed_policy.target_unit_max),
-        baseline_present=baseline_present, stale_before=is_buyer_mandate_baseline_stale(mandate), stale_after_correction=stale_after)
+        baseline_present=baseline_present, stale_before=is_buyer_mandate_baseline_stale(mandate), stale_after_correction=stale_after,
+        stored_baseline_fingerprint_id=(mandate.matching_fingerprint or "")[:12] or None,
+        onboarding_completed_at=mandate.onboarding_completed_at.isoformat() if mandate.onboarding_completed_at else None,
+        current_rules_fingerprint_id=compute_buyer_mandate_fingerprint(stored_policy)[:12], proposed_rules_fingerprint_id=proposed_fingerprint[:12])
 
 
 @command('buyer.write')
