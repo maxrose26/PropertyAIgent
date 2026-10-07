@@ -133,7 +133,7 @@ def test_no_network_and_no_model_client_can_be_used_inside_the_window(world, mon
         with pytest.raises(safety.ReadOnlyViolation):
             socket.create_connection(("203.0.113.9", 443), timeout=1)
         with pytest.raises(safety.ReadOnlyViolation):
-            socket.socket().connect(("203.0.113.9", 443))
+            socket.socket.connect(None, ("203.0.113.9", 443))        # the guard refuses before any socket is used (the offline sandbox forbids creating one)
         monkeypatch.delitem(sys.modules, "openai", raising=False)
         with pytest.raises(safety.ReadOnlyViolation):
             __import__("openai")
