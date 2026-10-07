@@ -12,13 +12,15 @@ from streamlit.testing.v1 import AppTest
 import app.reporting.family_presentation as fp
 from app.db.models import Application
 from app.reporting.opportunity_families import OVERLAP_WARNING
-from tests.test_buyer_family_feed import BUYER, LAPSE_AGE, World, portal
+from tests.test_buyer_family_feed import LAPSE_AGE, World, portal
+from tests.test_family_dashboard import BUYER, treat_portal_estimates_as_exact   # BUYER: a total-units mandate (the label is only relevant to oversized wider subjects)
 
 FORBIDDEN = ("remaining", "available", "subdivi", "other phases", "sold in phases", "contained in", "pursuant to", "total of")
 
 
 @pytest.fixture
 def world(session, monkeypatch):
+    treat_portal_estimates_as_exact(monkeypatch)
     return World(session, monkeypatch)
 
 
@@ -79,14 +81,14 @@ def test_d_phase_only_family_renders_no_whole_site_subject(world):
                                   proposal=f"Reserved matters for Phase 2 of 70 dwellings pursuant to outline permission OUT/{s.id}"))
     world.session.commit()
     text, _ = render(view_of(world).families[0])
-    assert "whole site" not in text.lower() and "unphased" not in text.lower() and "Phased delivery evidenced." in text
+    assert "whole site" not in text.lower() and "unphased" not in text.lower() and "Phased delivery evidenced." not in text   # only self-phase subjects: no restating badge
     assert_no_forbidden(text)
 
 
-def test_one_genuine_phase_alone_renders_the_label_compactly_with_no_parent_residual_or_availability_claim(world):
+def test_one_genuine_phase_alone_renders_compactly_without_a_restating_label_with_no_parent_residual_or_availability_claim(world):
     world.site(rm_age=300, rm_phase="Phase 1", phase="S", units_rm=80)
     text, at = render(view_of(world).families[0])
-    assert "Phased delivery evidenced." in text and OVERLAP_WARNING not in text and len(at.expander) == 0
+    assert "Phased delivery evidenced." not in text and OVERLAP_WARNING not in text and len(at.expander) == 0
     assert "wider" not in text.lower() and "unphased" not in text.lower() and "Strong fit" in text
     assert_no_forbidden(text)
     assert "residual" not in text.lower() and "parcel" not in text.lower()
