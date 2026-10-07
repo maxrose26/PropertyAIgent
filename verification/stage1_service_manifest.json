@@ -124,5 +124,9 @@
   },
   "app/visuals/classification.py": {
     "classify_page": "paid:visual.classify"
+  },
+  "app/policy/mandate_reonboarding.py": {
+    "plan_stale_mandate_reonboarding": "buyer.write",
+    "apply_stale_mandate_reonboarding": "buyer.write"
   }
 }

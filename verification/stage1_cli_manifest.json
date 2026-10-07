@@ -94,5 +94,9 @@
   "scripts/preview_opportunity_monitoring_sync.py": {
     "command": "preview_opportunity_monitoring_sync",
     "required_scope": "launch:preview_opportunity_monitoring_sync"
+  },
+  "scripts/reonboard_stale_mandates.py": {
+    "command": "reonboard_stale_mandates",
+    "required_scope": "launch:reonboard_stale_mandates"
   }
 }

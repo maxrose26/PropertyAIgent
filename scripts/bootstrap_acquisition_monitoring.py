@@ -1,5 +1,8 @@
 """Gate 1 (Acquisition Monitoring Substrate) - explicit bootstrap command.
 
+NOT the approved v7 transition path (Stage 2.5B V7C): this command runs the ORDINARY global monitoring sync first, reseeds default profiles, has no dry-run and commits
+per mandate. It is kept unchanged for backwards compatibility. The approved mandate re-onboarding path is scripts.reonboard_stale_mandates (dry-run by default).
+
 THE canonical, safe first-deployment sequence (Gate 1 amendment, Product
 Owner review - this command now performs all of it, in the correct order,
 as one call):
