@@ -1,3 +1,5 @@
+> Historical checkpoint at3607b245. See B1-INTEGRITY-CONTRACT.md and FINAL-OFFLINE-ACCEPTANCE.md for the separately authorised successor review.
+
 # TO REVIEW — STAGE 2.6B B0+B1 OFFLINE IMPLEMENTATION COMPLETION
 
 **Outcome: OFFLINE CANDIDATE PRESERVED; ACCEPTANCE BLOCKED. Not implementation completion or release approval.**

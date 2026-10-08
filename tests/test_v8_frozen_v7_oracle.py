@@ -55,7 +55,13 @@ def test_pinned_definitions_unchanged_and_function_reads_only_existing_facts_fie
     facts_read = {n.attr for n in ast.walk(function) if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "facts"}
     assert facts_read <= {f.name for f in dataclasses.fields(bm.MatchingFacts)}
     for path, pinned in frozen.SUPPORTING_MODULE_SHA256.items():
-        assert sha256(lf(ROOT / path)) == pinned, path
+        if path == "app/reporting/scheme_reconciliation.py":
+            # B1: immutable historical source AND explicit current successor.
+            # Matcher/golden definitions above remain on their original pins.
+            from tests.stage26b_integrity import assert_historical_and_successor
+            assert_historical_and_successor(ROOT, pinned)
+        else:
+            assert sha256(lf(ROOT / path)) == pinned, path
     assert frozen.assess_buyer_fit is not bm.assess_buyer_fit
 
 
@@ -125,7 +131,13 @@ def test_live_dependencies_of_the_frozen_oracle_are_pinned():
 
 def test_the_residual_work_did_not_touch_the_pinned_supporting_modules():
     for path, pinned in frozen.SUPPORTING_MODULE_SHA256.items():
-        assert sha256(lf(ROOT / path)) == pinned, path
+        if path == "app/reporting/scheme_reconciliation.py":
+            # B1: immutable historical source AND explicit current successor.
+            # Matcher/golden definitions above remain on their original pins.
+            from tests.stage26b_integrity import assert_historical_and_successor
+            assert_historical_and_successor(ROOT, pinned)
+        else:
+            assert sha256(lf(ROOT / path)) == pinned, path
 
 
 @pytest.mark.parametrize("v7,v8,expected", [

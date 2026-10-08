@@ -1,3 +1,5 @@
+> Historical checkpoint at3607b245. See B1-INTEGRITY-CONTRACT.md and FINAL-OFFLINE-ACCEPTANCE.md for the separately authorised successor review.
+
 # Independent B0+B1 review — NO-GO pending contract resolution
 
 Reviewer: separate read-only agent `/root/b01_security_review`; 8 October 2026. Reviewed the source changes, fixture design, counterexamples and differential approach; parent agent supplied final test outputs. This is not an independent rerun of every suite.

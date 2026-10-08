@@ -1,5 +1,8 @@
 {
-  "tests/fixtures/stage26b/sample-context.json": "cc560e0a491461ae821c9a815835a2d26d97719e980debc4b76f980f4097a04b",
+  "tests/fixtures/stage26b/case-index.json": "74909f390da89ec5112dcf0b83c8c600040d929528af925823c36e11f379a814",
+  "tests/fixtures/stage26b/expected-b1-consequences.json": "d05ed775502ebac6c52c14dbb083f2d4960045638f09f29cd3507b76cdfec67d",
+  "tests/fixtures/stage26b/integrity/b1-successor.json": "2ee0824f3e606bd28a73e18ea80cdcc1ee7a86b694010e2b95327a9eed293156",
+  "tests/fixtures/stage26b/integrity/scheme_reconciliation.v6-v7.py.txt": "9eaafa1d502acc12be56a19a4b0d701c9ada132f778a842df547905eb5af62d1",
   "tests/fixtures/stage26b/retained-cases.json": "f1b1b32fcc0277bef6edbb1ea694ecc5739009a736af6808d9e7c50a04999afe",
-  "tests/fixtures/stage26b/case-index.json": "74909f390da89ec5112dcf0b83c8c600040d929528af925823c36e11f379a814"
+  "tests/fixtures/stage26b/sample-context.json": "cc560e0a491461ae821c9a815835a2d26d97719e980debc4b76f980f4097a04b"
 }

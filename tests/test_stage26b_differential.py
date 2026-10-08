@@ -67,7 +67,7 @@ def test_actual_universe_family_and_fingerprint_differential(tmp_path):
     assert after['universe'][next(iter(added))]['unit_count'] is None
     assert before['query_counts']==after['query_counts'], 'Request-local guard must not add database work'
     changed={k for k in before['universe'].keys() & after['universe'].keys() if before['universe'][k]!=after['universe'][k]}
-    assert changed
+    assert changed == {'planning_delivery:phase:900:2','planning_delivery:recent_permission:16','planning_delivery:recent_permission:248','planning_delivery:recent_permission:336','planning_delivery:recent_permission:508','planning_delivery:recent_permission:62'}
     for key in changed:
         assert after['universe'][key]['unit_count'] is None
         assert before['universe'][key]['fingerprint']!=after['universe'][key]['fingerprint']
@@ -76,5 +76,12 @@ def test_actual_universe_family_and_fingerprint_differential(tmp_path):
         new={m['subject'] for f in after['buyers'][buyer] for m in f['members']}
         assert old-new=={'opp-phase-371-plot_A6'}
         assert new-old=={'opp-phase-371-Whole site / unphased'}
+    def consequence_summary(data):
+        return {buyer:[{'family':f['family'],'representative':f['representative'],'excluded':f['excluded'],
+            'subjects':[{'key':m['subject'],'classification':m['fit']['classification'],'investigative':m['fit']['is_investigative_exception']} for m in f['members']]} for f in families]
+            for buyer,families in data['buyers'].items()}
+    expected=json.loads((ROOT/'tests/fixtures/stage26b/expected-b1-consequences.json').read_text())
+    assert consequence_summary(before)==expected['before']
+    assert consequence_summary(after)==expected['after']
     output=os.environ.get('STAGE26B_UNIVERSE_OUTPUT')
     if output:Path(output).write_text(json.dumps({'baseline':BASE,'before':before,'after':after,'changed_subjects':sorted(changed),'removed_subjects':sorted(removed),'added_subjects':sorted(added),'classification':'EXPECTED eligibility consequence; REVIEW approval required before release'},indent=2))

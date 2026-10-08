@@ -29,7 +29,12 @@ for case in cases:
         'is_specialist_development':facts.is_specialist_development,'count_assessment':count.fingerprint()}
     key=f'planning_delivery:site:{a.site_id}'
     ah=compute_affordable_headline(a.scheme_intelligence)
-    record={'ah_headline':ah,'ah_tenure':build_affordable_tenure(a.scheme_intelligence,ah),'subject':key,'reference':a.reference,'raw_scale':case['stored_total'],'qualified_scale':count.fingerprint(),
+    eligibility={'eligible':True,'reason':None}
+    if (Path(sys.argv[1])/'app/reporting/residential_count_eligibility.py').exists():
+        from app.reporting.residential_count_eligibility import residential_count_eligibility
+        verdict=residential_count_eligibility(a,case['stored_total'])
+        eligibility={'eligible':verdict.eligible,'reason':verdict.reason}
+    record={'raw_evidence':case,'eligibility':eligibility,'qualified_input':dataclasses.asdict(facts),'ah_headline':ah,'ah_tenure':build_affordable_tenure(a.scheme_intelligence,ah),'subject':key,'reference':a.reference,'raw_scale':case['stored_total'],'qualified_scale':count.fingerprint(),
         'fingerprint_fields_subset':fp,'fingerprint_subset_hash':compute_opportunity_fingerprint(fp),'buyers':{}}
     for bk,buyer in BUYER_PROFILES.items():
         result=assess_buyer_fit(buyer,facts,B2MatchingContext(council_code='stockport'))
@@ -39,4 +44,4 @@ for case in cases:
 for bk,sub in subjects.items():
     out['families'][bk]=[{'family':f.family_key,'representative':f.representative.subject_key,'members':[m.subject_key for m in f.members],
                          'excluded':f.is_terminally_excluded} for f in group_into_families(sub)]
-print(json.dumps(out,sort_keys=True))
+print(json.dumps(out,sort_keys=True,default=str))
