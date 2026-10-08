@@ -568,23 +568,18 @@ def _scheme_total_units(rs: ResolvedApplication) -> int | None:
     si = rs.scheme
     if si is not None and si.total_units_final is not None:
         from app.reporting.commercial_evidence import known_unit_count
-        from app.reporting.residential_count_eligibility import eligible_residential_scalar
-        return known_unit_count(eligible_residential_scalar(rs.application, si.total_units_final))
+        return known_unit_count(si.total_units_final)
     return None
 
 
 def _portal_estimated_units(rs: ResolvedApplication) -> int | None:
-    from app.reporting.residential_count_eligibility import residential_count_eligibility
-    if not residential_count_eligibility(rs.application, rs.scheme.total_units_final if rs.scheme is not None else None).eligible:
-        return None
     v = rs.application.estimated_unit_count
     from app.reporting.commercial_evidence import known_unit_count
-    from app.reporting.residential_count_eligibility import eligible_residential_scalar
     if v is not None:
-        return known_unit_count(eligible_residential_scalar(rs.application, v))
+        return known_unit_count(v)
     from app.scrapers.unit_filter import extract_unit_counts
     counts = {known_unit_count(n) for n in extract_unit_counts(rs.application.proposal)}
-    return eligible_residential_scalar(rs.application, next(iter(counts))) if len(counts) == 1 and None not in counts else None
+    return next(iter(counts)) if len(counts) == 1 and None not in counts else None
 
 
 def _s73_addresses_units(rs: ResolvedApplication) -> bool:
@@ -769,29 +764,10 @@ def _count_fact(assessment, *, name="approved_residential_units"):
     )
 
 
-def _contain_count_assessment(assessment, rows):
-    from dataclasses import replace
-    from app.reporting.residential_count_eligibility import residential_count_eligibility
-    rejected = []
-    for row in rows:
-        raw = row.scheme.total_units_final if row.scheme is not None else None
-        reason = residential_count_eligibility(row.application, raw).reason
-        if reason:
-            rejected.append(reason)
-    if rejected and not assessment.sources:
-        # Preserve rejected raw evidence on its ORM source; no fabricated
-        # corrected total, bounds, or confidence. Other scopes remain independent.
-        return replace(assessment, precision="UNKNOWN", value=None, lower=None,
-                       upper=None, resolution="material_conflict",
-                       confidence="none")
-    return assessment
-
-
 def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[OperativeFact, tuple[FactPosition, ...]]:
     """Approved, scope-local evidence. Dates never establish supersession alone."""
     import re
     from app.reporting.residential_count import assess_positions
-    from app.reporting.residential_count_eligibility import residential_count_eligibility
     scopes = {(r.scope_type, r.scope_label) for r in resolved}
     scope_type, scope_label = next(iter(scopes)) if len(scopes) == 1 else (SCOPE_UNCLEAR, "Whole site")
     eligible = [r for r in resolved if r.decided_state == DECIDED_GRANTED
@@ -814,8 +790,7 @@ def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[Operat
     current = [r for r in eligible if r.id not in superseded_ids]
     # Preserve malformed extracted evidence rather than hiding it with a valid peer.
     positions = [_position(r, r.scheme.total_units_final) for r in current
-                 if r.scheme is not None and r.scheme.total_units_final is not None
-                 and residential_count_eligibility(r.application, r.scheme.total_units_final).eligible]
+                 if r.scheme is not None and r.scheme.total_units_final is not None]
     estimated = not positions
     if estimated:
         positions = [_position(r, _portal_estimated_units(r)) for r in current if r.is_substantive and _portal_estimated_units(r) is not None]
@@ -827,7 +802,6 @@ def _resolve_approved_units(resolved: list[ResolvedApplication]) -> tuple[Operat
         from dataclasses import replace
         assessment = replace(assessment, precision="APPROXIMATE", lower=None, upper=None,
                              resolution="portal_estimate", confidence="low")
-    assessment = _contain_count_assessment(assessment, current)
     return _count_fact(assessment), superseded
 
 
@@ -1009,9 +983,7 @@ def _build_active_position(group: list[ResolvedApplication], scope_type: str, sc
 
     from dataclasses import replace
     from app.reporting.residential_count import assess_positions
-    from app.reporting.residential_count_eligibility import residential_count_eligibility
-    extracted_rows = [r for r in group if r.scheme is not None and r.scheme.total_units_final is not None
-                      and residential_count_eligibility(r.application, r.scheme.total_units_final).eligible]
+    extracted_rows = [r for r in group if r.scheme is not None and r.scheme.total_units_final is not None]
     positions = [_position(r, r.scheme.total_units_final) for r in extracted_rows]
     if not positions:
         positions = [_position(r, _portal_estimated_units(r)) for r in group if _portal_estimated_units(r) is not None]
@@ -1021,7 +993,6 @@ def _build_active_position(group: list[ResolvedApplication], scope_type: str, sc
                                   metric="all_use_units" if _has_specialist_component(group, None) else "total_residential")
     if not extracted_rows and assessment.precision == "EXACT":
         assessment = replace(assessment, precision="APPROXIMATE", lower=None, upper=None, resolution="portal_estimate")
-    assessment = _contain_count_assessment(assessment, group)
     proposed = _count_fact(assessment, name="proposed_residential_units")
 
     all_use = _resolve_all_use_total(proposed, "proposed")

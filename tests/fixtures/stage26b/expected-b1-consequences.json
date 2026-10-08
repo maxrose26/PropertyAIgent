@@ -1,0 +1,1303 @@
+{
+  "provenance": "Explicit synthetic B1 consequences observed in 3607b245; not production truth or frozen matching-policy benchmark",
+  "before": {
+    "housing_association": [
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-plot_A6",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-plot_A6",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-1",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-1",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      }
+    ],
+    "national_housebuilder": [
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-2",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-2",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-1",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-plot_A6",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-plot_A6",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "NOT_SUITABLE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "NOT_SUITABLE",
+            "investigative": true
+          }
+        ]
+      }
+    ],
+    "nesten_homes": [
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-plot_A6",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-plot_A6",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-1",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-1",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "POSSIBLE_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "NOT_SUITABLE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "NOT_SUITABLE",
+            "investigative": false
+          }
+        ]
+      }
+    ],
+    "strategic_land_buyer": [
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-plot_A6",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-plot_A6",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-1",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-1",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "NOT_SUITABLE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "NOT_SUITABLE",
+            "investigative": true
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "housing_association": [
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-Whole site / unphased",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-1",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-1",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      }
+    ],
+    "national_housebuilder": [
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-Whole site / unphased",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-1",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-Whole site / unphased",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "NOT_SUITABLE",
+            "investigative": true
+          }
+        ]
+      }
+    ],
+    "nesten_homes": [
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-1",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-1",
+            "classification": "STRONG_FIT",
+            "investigative": false
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-Whole site / unphased",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "NOT_SUITABLE",
+            "investigative": false
+          }
+        ]
+      }
+    ],
+    "strategic_land_buyer": [
+      {
+        "family": [
+          "planning_delivery",
+          28
+        ],
+        "representative": "opp-recent-permission-28",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-28",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          900
+        ],
+        "representative": "opp-phase-900-1",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-900-1",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": true
+          },
+          {
+            "key": "opp-phase-900-2",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          16
+        ],
+        "representative": "opp-recent-permission-16",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-16",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          25
+        ],
+        "representative": "opp-recent-permission-25",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-25",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          62
+        ],
+        "representative": "opp-recent-permission-62",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-62",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          248
+        ],
+        "representative": "opp-recent-permission-248",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-248",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          336
+        ],
+        "representative": "opp-recent-permission-336",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-336",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          371
+        ],
+        "representative": "opp-phase-371-Whole site / unphased",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-phase-371-Whole site / unphased",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          508
+        ],
+        "representative": "opp-recent-permission-508",
+        "excluded": false,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-508",
+            "classification": "INSUFFICIENT_EVIDENCE",
+            "investigative": false
+          }
+        ]
+      },
+      {
+        "family": [
+          "planning_delivery",
+          215
+        ],
+        "representative": "opp-recent-permission-215",
+        "excluded": true,
+        "subjects": [
+          {
+            "key": "opp-recent-permission-215",
+            "classification": "NOT_SUITABLE",
+            "investigative": true
+          }
+        ]
+      }
+    ]
+  }
+}

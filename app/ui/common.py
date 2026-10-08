@@ -316,6 +316,7 @@ def aggregate_scheme_fields(
         ),
         reverse=True,
     )
+    from app.reporting.residential_count_eligibility import eligible_residential_scalar, residential_count_eligibility
     merged = {field: None for field in MERGED_SCHEME_FIELDS}
     for field in MERGED_SCHEME_FIELDS:
         for app in ordered:
@@ -326,6 +327,8 @@ def aggregate_scheme_fields(
                 value = getattr(app.scheme_intelligence, field)
             else:
                 value = None
+            if field == "total_units_final":
+                value = eligible_residential_scalar(app, value)
             if value not in (None, ""):
                 merged[field] = value
                 break
@@ -347,7 +350,9 @@ def aggregate_scheme_fields(
     merged["total_units_is_estimated"] = False
     if merged["total_units_final"] is None:
         by_estimate = sorted(
-            [a for a in applications if a.estimated_unit_count is not None],
+            [a for a in applications if a.estimated_unit_count is not None
+             and eligible_residential_scalar(a, a.estimated_unit_count) is not None
+             and residential_count_eligibility(a, a.scheme_intelligence.total_units_final if a.scheme_intelligence else None).eligible],
             key=lambda a: parse_portal_date(a.application_received), reverse=True,
         )
         if by_estimate:

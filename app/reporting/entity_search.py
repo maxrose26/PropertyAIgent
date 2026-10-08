@@ -279,6 +279,8 @@ def search_planning_site_entities(
 def _units_display(app: Application) -> str | None:
     si = getattr(app, "scheme_intelligence", None)
     units = si.total_units_final if si is not None and si.total_units_final else app.estimated_unit_count
+    from app.reporting.residential_count_eligibility import eligible_residential_scalar
+    units = eligible_residential_scalar(app, units)
     return f"{units:,} units" if units else None
 
 

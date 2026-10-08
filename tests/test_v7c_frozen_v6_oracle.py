@@ -80,7 +80,13 @@ def test_every_definition_the_v6_function_references_is_byte_identical_in_the_cu
 
 def test_the_supporting_modules_behind_the_imported_names_are_unchanged_since_v6():
     for path, pinned in frozen.SUPPORTING_MODULE_SHA256.items():
-        assert sha256(lf(ROOT / path)) == pinned, path
+        if path == "app/reporting/scheme_reconciliation.py":
+            # B1: immutable historical source AND explicit current successor.
+            # Matcher/golden definitions above remain on their original pins.
+            from tests.stage26b_integrity import assert_historical_and_successor
+            assert_historical_and_successor(ROOT, pinned)
+        else:
+            assert sha256(lf(ROOT / path)) == pinned, path
 
 
 def test_the_oracle_does_not_call_the_v7_matcher_or_its_changed_helpers():

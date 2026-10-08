@@ -1,0 +1,80 @@
+{
+  "contract": "stage26b-b1-reconciliation-v1",
+  "scope": "Selected offline suites; overlapping coverage, not all repository tests",
+  "suites": [
+    {
+      "name": "B0/B1 focused and integrity",
+      "tests": 63,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 63
+    },
+    {
+      "name": "Stage2/Spec028/v8",
+      "tests": 1768,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 1768
+    },
+    {
+      "name": "Stage1 security",
+      "tests": 211,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 211
+    },
+    {
+      "name": "Rendered journeys",
+      "tests": 24,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 24
+    },
+    {
+      "name": "Relevant extraction/reconciliation/AH",
+      "tests": 211,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 211
+    },
+    {
+      "name": "Mock refresh compatibility",
+      "tests": 163,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 163
+    },
+    {
+      "name": "AH web-only",
+      "tests": 267,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 267,
+      "pytest_counts": "257 passed plus 10 passing subtests; JUnit represents 267",
+      "walkthrough": "PASS"
+    },
+    {
+      "name": "Three formerly failing integrity gates",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 3
+    }
+  ]
+}

@@ -897,7 +897,8 @@ def _scheme_card(
             else OPERATIVE_DECISION_STATUS_LABELS.get(filter_facts.decision_status)
         )
     else:
-        total_units = si.total_units_final if si else None
+        from app.reporting.residential_count_eligibility import eligible_residential_scalar
+        total_units = eligible_residential_scalar(app, si.total_units_final) if si else None
         affordable_units = si.affordable_units_final if si else None
         affordable_percentage = si.affordable_percentage_final if si else None
         decision_status = classify_decision_status(app.decision, app.status)

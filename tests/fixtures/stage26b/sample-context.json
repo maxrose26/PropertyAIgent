@@ -1,0 +1,847 @@
+{
+  "status": "Retained dated presentation observations, not verified planning facts or current buyer truth",
+  "observed_at": "2026-10-08",
+  "source_sha256": "885fda2034abe3857bb62fe71f900d7c6b601c99c3f5ffc30da448267e2b9324",
+  "families": [
+    {
+      "site_id": 25,
+      "council_code": "oldham",
+      "family_id": "planning_delivery:25",
+      "representative": "opp-long-pending-25",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "147 homes",
+            "lower": 147,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 147,
+            "value": 147
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-25"
+        }
+      ]
+    },
+    {
+      "site_id": 28,
+      "council_code": "oldham",
+      "family_id": "planning_delivery:28",
+      "representative": "opp-long-pending-28",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "68 homes",
+            "lower": 68,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 68,
+            "value": 68
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-28"
+        }
+      ]
+    },
+    {
+      "site_id": 87,
+      "council_code": "stockport",
+      "family_id": "planning_delivery:87",
+      "representative": "opp-long-pending-87",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "109 homes",
+            "lower": 109,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 109,
+            "value": 109
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-87"
+        }
+      ]
+    },
+    {
+      "site_id": 248,
+      "council_code": "trafford",
+      "family_id": "planning_delivery:248",
+      "representative": "opp-phase-248-Whole site / unphased",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "116 homes",
+            "lower": 116,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 116,
+            "value": 116
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Wider permission",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "PHASE",
+          "subject_key": "opp-phase-248-Whole site / unphased"
+        }
+      ]
+    },
+    {
+      "site_id": 281,
+      "council_code": "oldham",
+      "family_id": "planning_delivery:281",
+      "representative": "opp-phase-281-1",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "140 homes",
+            "lower": 140,
+            "precision": "EXACT",
+            "scope": "phase",
+            "upper": 140,
+            "value": 140
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Phase 1",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-281-1"
+        },
+        {
+          "classification": "NOT_SUITABLE",
+          "count": {
+            "display": "26 all use units",
+            "lower": 26,
+            "precision": "EXACT",
+            "scope": "whole_site",
+            "upper": 26,
+            "value": 26
+          },
+          "fit": "NOT_SUITABLE+investigative",
+          "investigative": true,
+          "is_family_representative": false,
+          "label": "Permission approaching its assumed review date",
+          "named_phase": false,
+          "route": "OUTLINE_CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-lapse-281"
+        },
+        {
+          "classification": "NOT_SUITABLE",
+          "count": {
+            "display": "26 all use units",
+            "lower": 26,
+            "precision": "EXACT",
+            "scope": "whole_site",
+            "upper": 26,
+            "value": 26
+          },
+          "fit": "NOT_SUITABLE+investigative",
+          "investigative": true,
+          "is_family_representative": false,
+          "label": "Wider permission",
+          "named_phase": false,
+          "route": "OUTLINE_CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "PHASE",
+          "subject_key": "opp-phase-281-Whole site / unphased"
+        }
+      ]
+    },
+    {
+      "site_id": 371,
+      "council_code": "salford",
+      "family_id": "planning_delivery:371",
+      "representative": "opp-phase-371-plot_A6",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "79 homes",
+            "lower": 79,
+            "precision": "EXACT",
+            "scope": "plot",
+            "upper": 79,
+            "value": 79
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Phase plot_A6",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PLOT",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-371-plot_A6"
+        },
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "933 homes",
+            "lower": 933,
+            "precision": "EXACT",
+            "scope": "whole_site",
+            "upper": 933,
+            "value": 933
+          },
+          "fit": "INSUFFICIENT_EVIDENCE+investigative",
+          "investigative": true,
+          "is_family_representative": false,
+          "label": "Wider permission",
+          "named_phase": false,
+          "route": "OUTLINE_CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "PHASE",
+          "subject_key": "opp-phase-371-Whole site / unphased"
+        }
+      ]
+    },
+    {
+      "site_id": 336,
+      "council_code": "wigan",
+      "family_id": "planning_delivery:336",
+      "representative": "opp-phase-336-plot_1",
+      "subjects": [
+        {
+          "classification": "POSSIBLE_FIT",
+          "count": {
+            "display": "47 homes",
+            "lower": 47,
+            "precision": "EXACT",
+            "scope": "plot",
+            "upper": 47,
+            "value": 47
+          },
+          "fit": "POSSIBLE_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Phase plot_1",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PLOT",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-336-plot_1"
+        }
+      ]
+    },
+    {
+      "site_id": 62,
+      "council_code": "stockport",
+      "family_id": "planning_delivery:62",
+      "representative": "opp-phase-62-H4",
+      "subjects": [
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "372 homes",
+            "lower": 372,
+            "precision": "EXACT",
+            "scope": "phase",
+            "upper": 372,
+            "value": 372
+          },
+          "fit": "INSUFFICIENT_EVIDENCE+investigative",
+          "investigative": true,
+          "is_family_representative": true,
+          "label": "Phase H4",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-62-H4"
+        },
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "372 homes",
+            "lower": 372,
+            "precision": "EXACT",
+            "scope": "whole_site",
+            "upper": 372,
+            "value": 372
+          },
+          "fit": "INSUFFICIENT_EVIDENCE+investigative",
+          "investigative": true,
+          "is_family_representative": false,
+          "label": "Wider permission",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "PHASE",
+          "subject_key": "opp-phase-62-Whole site / unphased"
+        }
+      ]
+    },
+    {
+      "site_id": 67,
+      "council_code": "stockport",
+      "family_id": "planning_delivery:67",
+      "representative": "opp-phase-67-3B",
+      "subjects": [
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "295 all use units",
+            "lower": 295,
+            "precision": "EXACT",
+            "scope": "phase",
+            "upper": 295,
+            "value": 295
+          },
+          "fit": "INSUFFICIENT_EVIDENCE+investigative",
+          "investigative": true,
+          "is_family_representative": true,
+          "label": "Phase 3B",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-67-3B"
+        }
+      ]
+    },
+    {
+      "site_id": 96,
+      "council_code": "stockport",
+      "family_id": "planning_delivery:96",
+      "representative": "opp-phase-96-5",
+      "subjects": [
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": null,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": null,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Phase 5",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-96-5"
+        },
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": null,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": null,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": false,
+          "label": "Phase 6",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-96-6"
+        },
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": null,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": null,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": false,
+          "label": "Phase 7",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-96-7"
+        },
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": null,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": null,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": false,
+          "label": "Phase 8",
+          "named_phase": true,
+          "route": "PHASE_OR_PLOT",
+          "route_subtype": "PHASE",
+          "slot": "PHASE",
+          "subject_key": "opp-phase-96-8"
+        }
+      ]
+    },
+    {
+      "site_id": 16,
+      "council_code": "bury",
+      "family_id": "planning_delivery:16",
+      "representative": "opp-long-pending-16",
+      "subjects": [
+        {
+          "classification": "NOT_SUITABLE",
+          "count": {
+            "display": "60 homes",
+            "lower": 60,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 60,
+            "value": 60
+          },
+          "fit": "NOT_SUITABLE",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-16"
+        }
+      ]
+    },
+    {
+      "site_id": 51,
+      "council_code": "tameside",
+      "family_id": "planning_delivery:51",
+      "representative": "opp-long-pending-51",
+      "subjects": [
+        {
+          "classification": "POSSIBLE_FIT",
+          "count": {
+            "display": "49 homes",
+            "lower": 49,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 49,
+            "value": 49
+          },
+          "fit": "POSSIBLE_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-51"
+        }
+      ]
+    },
+    {
+      "site_id": 140,
+      "council_code": "bolton",
+      "family_id": "planning_delivery:140",
+      "representative": "opp-recent-permission-140",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "117 homes",
+            "lower": 117,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 117,
+            "value": 117
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Recently granted permission",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-recent-permission-140"
+        }
+      ]
+    },
+    {
+      "site_id": 161,
+      "council_code": "wigan",
+      "family_id": "planning_delivery:161",
+      "representative": "opp-phase-161-Whole site / unphased",
+      "subjects": [
+        {
+          "classification": "POSSIBLE_FIT",
+          "count": {
+            "display": "219 homes",
+            "lower": 219,
+            "precision": "EXACT",
+            "scope": "whole_site",
+            "upper": 219,
+            "value": 219
+          },
+          "fit": "POSSIBLE_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Wider permission",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "PHASE",
+          "subject_key": "opp-phase-161-Whole site / unphased"
+        }
+      ]
+    },
+    {
+      "site_id": 508,
+      "council_code": "rochdale",
+      "family_id": "planning_delivery:508",
+      "representative": "opp-lapse-508",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "56 homes",
+            "lower": 56,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 56,
+            "value": 56
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Permission approaching its assumed review date",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-lapse-508"
+        }
+      ]
+    },
+    {
+      "site_id": 222,
+      "council_code": "manchester",
+      "family_id": "planning_delivery:222",
+      "representative": "opp-long-pending-222",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "51 homes",
+            "lower": 51,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 51,
+            "value": 51
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-222"
+        }
+      ]
+    },
+    {
+      "site_id": 94,
+      "council_code": "stockport",
+      "family_id": "planning_delivery:94",
+      "representative": "opp-long-pending-94",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "106 homes",
+            "lower": 106,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 106,
+            "value": 106
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-94"
+        }
+      ]
+    },
+    {
+      "site_id": 129,
+      "council_code": "bolton",
+      "family_id": "planning_delivery:129",
+      "representative": "opp-long-pending-129",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "178 homes",
+            "lower": 178,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 178,
+            "value": 178
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-129"
+        }
+      ]
+    },
+    {
+      "site_id": 179,
+      "council_code": "salford",
+      "family_id": "planning_delivery:179",
+      "representative": "opp-phase-179-Whole site / unphased",
+      "subjects": [
+        {
+          "classification": "NOT_SUITABLE",
+          "count": {
+            "display": "400 all use units",
+            "lower": 400,
+            "precision": "EXACT",
+            "scope": "whole_site",
+            "upper": 400,
+            "value": 400
+          },
+          "fit": "NOT_SUITABLE+investigative",
+          "investigative": true,
+          "is_family_representative": true,
+          "label": "Wider permission",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "PHASE",
+          "subject_key": "opp-phase-179-Whole site / unphased"
+        }
+      ]
+    },
+    {
+      "site_id": 215,
+      "council_code": "rochdale",
+      "family_id": "planning_delivery:215",
+      "representative": "opp-long-pending-215",
+      "subjects": [
+        {
+          "classification": "NOT_SUITABLE",
+          "count": {
+            "display": "67 all use units",
+            "lower": 67,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 67,
+            "value": 67
+          },
+          "fit": "NOT_SUITABLE",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-215"
+        }
+      ]
+    },
+    {
+      "site_id": 58,
+      "council_code": "stockport",
+      "family_id": "planning_delivery:58",
+      "representative": "opp-lapse-58",
+      "subjects": [
+        {
+          "classification": "NOT_SUITABLE",
+          "count": {
+            "display": "372 all use units",
+            "lower": 372,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 372,
+            "value": 372
+          },
+          "fit": "NOT_SUITABLE+investigative",
+          "investigative": true,
+          "is_family_representative": true,
+          "label": "Permission approaching its assumed review date",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-lapse-58"
+        }
+      ]
+    },
+    {
+      "site_id": 128,
+      "council_code": "bolton",
+      "family_id": "planning_delivery:128",
+      "representative": "opp-recent-permission-128",
+      "subjects": [
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": null,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": null,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Recently granted permission",
+          "named_phase": false,
+          "route": "OUTLINE_CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-recent-permission-128"
+        }
+      ]
+    },
+    {
+      "site_id": 261,
+      "council_code": "trafford",
+      "family_id": "planning_delivery:261",
+      "representative": "opp-recent-permission-261",
+      "subjects": [
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": 251,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": 800,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Recently granted permission",
+          "named_phase": false,
+          "route": "CONSENTED_SITE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-recent-permission-261"
+        }
+      ]
+    },
+    {
+      "site_id": 470,
+      "council_code": "manchester",
+      "family_id": "planning_delivery:470",
+      "representative": "opp-long-pending-470",
+      "subjects": [
+        {
+          "classification": "INSUFFICIENT_EVIDENCE",
+          "count": {
+            "display": "Unit count unverified",
+            "lower": null,
+            "precision": "UNKNOWN",
+            "scope": "unclear",
+            "upper": null,
+            "value": null
+          },
+          "fit": "INSUFFICIENT_EVIDENCE",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-470"
+        }
+      ]
+    },
+    {
+      "site_id": 347,
+      "council_code": "wigan",
+      "family_id": "planning_delivery:347",
+      "representative": "opp-long-pending-347",
+      "subjects": [
+        {
+          "classification": "STRONG_FIT",
+          "count": {
+            "display": "179 homes",
+            "lower": 179,
+            "precision": "EXACT",
+            "scope": "unclear",
+            "upper": 179,
+            "value": 179
+          },
+          "fit": "STRONG_FIT",
+          "investigative": false,
+          "is_family_representative": true,
+          "label": "Long-pending application",
+          "named_phase": false,
+          "route": "UNCLASSIFIED_PLANNING_ROUTE",
+          "route_subtype": null,
+          "slot": "LIFECYCLE",
+          "subject_key": "opp-long-pending-347"
+        }
+      ]
+    }
+  ]
+}

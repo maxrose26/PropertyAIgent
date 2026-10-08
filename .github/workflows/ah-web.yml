@@ -42,6 +42,8 @@ jobs:
           fetch-depth: 3
       - name: Fetch frozen v8 differential baseline
         run: git fetch --no-tags --depth=1 origin 22636ddab7e0af9b6220c6466d400bc1ec98aafc
+      - name: Fetch B0/B1 qualified-evidence baseline
+        run: git fetch --no-tags --depth=1 origin 8ec17e22e476209a88a1c162fb4b41a896a1af9e
       - name: Install pinned dependencies
         run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/stage2-venv"
       - name: Offline Stage 2, Stage 1 security and journeys

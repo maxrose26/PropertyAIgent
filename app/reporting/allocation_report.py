@@ -340,6 +340,8 @@ def _linked_applications_for_site(site_summary) -> list[LinkedApplicationEntry]:
         elif application.estimated_unit_count is not None:
             unit_count = application.estimated_unit_count
             unit_count_is_estimate = True
+        from app.reporting.residential_count_eligibility import eligible_residential_scalar
+        unit_count = eligible_residential_scalar(application, unit_count)
         entries.append(LinkedApplicationEntry(
             reference=application.reference,
             proposal=application.proposal,
