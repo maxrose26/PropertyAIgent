@@ -26,7 +26,7 @@ import streamlit as st
 
 from sqlalchemy import select
 from app.db.models import Application, Site
-from app.reporting.profile_destination import limited_profile, origin_evidence
+from app.reporting.profile_destination import limited_profile, origin_evidence, resolve_subject_explanation
 from app.ui.buyer_selector import buyer_selector
 from app.ui.common import bootstrap, credits_sidebar, get_db, load_site_applications
 from app.ui.map_selection import parse_site_id_param
@@ -50,7 +50,7 @@ with page_scope():
 
         if st.query_params.get("origin") == "opportunities":
             st.page_link(Path(__file__).resolve().parents[1] / "pages" / "00_Dashboard.py", label="← Back to opportunities")
-        buyer_selector(key="site-profile", session=session)
+        selected_buyer = buyer_selector(key="site-profile", session=session)
 
         raw_site_id = st.query_params.get("site_id")
         site_id = parse_site_id_param(raw_site_id)
@@ -81,6 +81,29 @@ with page_scope():
             st.stop()
 
         credits_sidebar(session, settings)
+
+        subject_key = st.query_params.get("subject_key")
+        if st.query_params.get("origin") == "opportunities" or subject_key:
+            subject = resolve_subject_explanation(
+                session, site_id=site_id, buyer_key=selected_buyer,
+                subject_key=subject_key, origin_buyer_key=st.query_params.get("buyer_key"),
+            )
+            if subject is None:
+                st.info("Subject-specific mandate explanation unavailable")
+            else:
+                from app.reporting.mandate_explanation import present_mandate_explanation, mandate_fit_label
+                from app.ui.shell import render_mandate_explanation
+                st.subheader("Originating acquisition subject")
+                source = subject.source or {}
+                fit = source["buyer_fit"]
+                st.write(mandate_fit_label(fit.classification, fit.is_investigative_exception))
+                st.caption("Active buyer: " + selected_buyer)
+                st.caption("Subject: " + subject.subject_key)
+                count = source.get("count_assessment")
+                if count is not None:
+                    st.write(count.label())
+                render_mandate_explanation(present_mandate_explanation(fit, source), compact=False)
+            st.caption("The evidence profile below covers the wider site; its evidence is not automatically attributable to the originating subject.")
 
         reference = st.query_params.get("application_reference")
         phase_code = st.query_params.get("phase_code")

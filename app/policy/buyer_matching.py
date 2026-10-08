@@ -839,6 +839,34 @@ class B2MatchingContext:
 
 
 @dataclass(frozen=True)
+class BuyerFitReasonTrace:
+    rule_id: str
+    reason: str
+    role: str
+    contributed: bool
+
+
+class _ReasonList(list):
+    """Record presentation provenance at the existing reason-emission sites."""
+
+    def __init__(self, role, trace):
+        super().__init__()
+        self.role = role
+        self.trace = trace
+
+    def append(self, reason, *, rule_id, driver=None):
+        super().append(reason)
+        role = "classification_affecting" if driver and self.role == "contextual" else self.role
+        self.trace.append((rule_id, reason, role, driver if role == "classification_affecting" else None))
+        if driver is not None and role != "classification_affecting":
+            self.trace.append((rule_id, reason, "classification_affecting", driver))
+
+    def extend_recorded(self, reasons, *, rule_id, driver):
+        for reason in reasons:
+            self.append(reason, rule_id=rule_id, driver=driver)
+
+
+@dataclass(frozen=True)
 class BuyerFitAssessment:
     classification: str  # STRONG_FIT | NOT_SUITABLE | INSUFFICIENT_EVIDENCE
     is_investigative_exception: bool
@@ -948,10 +976,11 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     Phase B2 narrow remediation (Issue A): not every `unknown` reason
     drives classification - see `blocking_unknown` below and the module-
     level classification-driving-vs-contextual distinction it encodes."""
-    matches: list[str] = []
-    does_not_match: list[str] = []
-    unknown: list[str] = []
-    investigate: list[str] = []
+    trace = []
+    matches = _ReasonList("positive", trace)
+    does_not_match = _ReasonList("classification_affecting", trace)
+    unknown = _ReasonList("contextual", trace)
+    investigate = _ReasonList("investigation", trace)
     is_investigative_exception = False
     # Phase B2 narrow remediation (Issue A), extended by the B2 narrow
     # semantic cleanup (post Buyer Fit Classification Audit): not every
@@ -1005,14 +1034,14 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 f"Trusted evidence identifies this as a specialist development "
                 f"({facts.development_type_raw or 'non-residential use'}), not the general-needs residential "
                 f"development this buyer requires."
-            )
+            , rule_id="specialist.exclusion", driver="hard")
         else:
             unknown.append(
                 f"Trusted evidence identifies this as a specialist development "
                 f"({facts.development_type_raw or 'a specialist residential product'}); this buyer's own "
                 f"appetite for specialist/retirement housing has not been specified, so this is not treated "
                 f"as confirmed positive or negative evidence."
-            )
+            , rule_id="specialist.appetite_unknown", driver="blocking")
             blocking_unknown = True
     elif facts.is_specialist_development is None:
         if facts.opportunity_type == STRATEGIC_LAND:
@@ -1033,9 +1062,9 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             # alone must not classification-block Buyer Fit for this
             # opportunity type - that is a genuine structural-null
             # question, not a temporary evidence gap.
-            unknown.append("Specialist-development status cannot be established from a strategic land allocation's own intended-use classification alone - not treated as a disqualifying fact for this opportunity type.")
+            unknown.append("Specialist-development status cannot be established from a strategic land allocation's own intended-use classification alone - not treated as a disqualifying fact for this opportunity type.", rule_id="specialist.allocation_context")
         else:
-            unknown.append("Development type has not been established with enough confidence to confirm this is general-needs housing.")
+            unknown.append("Development type has not been established with enough confidence to confirm this is general-needs housing.", rule_id="specialist.type_unknown", driver="blocking")
             blocking_unknown = True
 
     # --- Hard exclusion 2: wholly (100%) affordable-led ---------------------
@@ -1054,14 +1083,14 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             does_not_match.append(
                 f"Trusted evidence shows this is a {descriptor} affordable-led "
                 f"scheme, not open-market residential development."
-            )
+            , rule_id="affordable.wholly_exclusion", driver="hard")
         elif profile.scale_metric == AFFORDABLE_UNITS:
             # Only a buyer whose OWN scale is measured in affordable homes (Housing Association) reads
             # wholly-affordable evidence as on-strategy.
             matches.append(
                 f"Trusted evidence shows this is a {descriptor} affordable-led "
                 f"scheme, directly relevant to this buyer's affordable-housing focus."
-            )
+            , rule_id="affordable.wholly_match")
         else:
             # No stated exclusion AND no stated affordable-housing focus (e.g. Nesten, whose real brief is
             # silent on affordable composition): visible context only - never a match, never an exclusion.
@@ -1069,8 +1098,8 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                 f"Trusted evidence shows this is a {descriptor} affordable-led "
                 f"scheme; this buyer has not stated an exclusion for it, so it is context to investigate, "
                 f"not a fit signal."
-            )
-            investigate.append("Confirm the affordable composition and whether the scheme suits this buyer's requirement.")
+            , rule_id="affordable.wholly_context")
+            investigate.append("Confirm the affordable composition and whether the scheme suits this buyer's requirement.", rule_id="affordable.composition_check")
     elif not facts.affordable_percentage_trusted:
         if facts.opportunity_type == STRATEGIC_LAND:
             # B2 semantic cleanup (Buyer Fit Classification Audit, Section
@@ -1082,15 +1111,15 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             # data gap future extraction could close, so it must not
             # classification-block Buyer Fit for this opportunity type.
             # Still surfaced for transparency; never assumed 0% or 100%.
-            unknown.append("Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.")
+            unknown.append("Scheme-specific affordable housing proportion is not established for a strategic land allocation - not assumed to be 0%, and not treated as a disqualifying fact for this opportunity type.", rule_id="affordable.allocation_context")
         else:
             # Stage 2.5A (v6, N1-B): a missing/unqualified percentage is a visible
             # evidence gap, not proof of a problem. It no longer blocks fit on its
             # own: the wholly-affordable exclusion above still needs positive
             # evidence, and mandates that need affordable QUANTUM (affordable-unit
             # scale, AFFORDABLE_HOUSING_PACKAGE) keep those requirements below.
-            unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.")
-            investigate.append("Confirm the affordable housing proportion and whether the scheme is affordable-led.")
+            unknown.append("Affordable housing proportion has not been confirmed - not assumed to be 0%.", rule_id="affordable.percentage_unknown")
+            investigate.append("Confirm the affordable housing proportion and whether the scheme is affordable-led.", rule_id="affordable.percentage_check")
     # A trusted, non-100% figure (the normal policy-compliant case) is
     # deliberately NOT added as a "matches"/"does_not_match" reason for any
     # profile - per the brief, the mere presence of policy-compliant
@@ -1101,12 +1130,12 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
 
     # --- Planning appetite - never a hard exclusion (see module docstring) -
     if facts.planning_state in profile.accepted_planning_states:
-        matches.append(f"Planning position ({_planning_state_label(facts.planning_state)}) matches this buyer's stated planning appetite.")
+        matches.append(f"Planning position ({_planning_state_label(facts.planning_state)}) matches this buyer's stated planning appetite.", rule_id="planning.accepted")
     elif facts.planning_state == OTHER_OR_UNKNOWN:
         # Genuinely unclassifiable - a real evidence gap (planning position
         # itself could not be established), not a known-but-non-preferred
         # fact - remains classification-driving.
-        unknown.append("Planning position could not be classified with confidence against this buyer's stated appetite.")
+        unknown.append("Planning position could not be classified with confidence against this buyer's stated appetite.", rule_id="planning.unknown", driver="blocking")
         blocking_unknown = True
     else:
         # B2 semantic cleanup (Buyer Fit Classification Audit, Section 5):
@@ -1117,7 +1146,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         # for development-state appetite). Text unchanged - it already
         # said "not treated as a disqualifying fact"; only the
         # classification consequence was wrong.
-        unknown.append(f"This opportunity is {_planning_state_label(facts.planning_state)}, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.")
+        unknown.append(f"This opportunity is {_planning_state_label(facts.planning_state)}, which is outside this buyer's stated planning appetite but not treated as a disqualifying fact.", rule_id="planning.nonpreferred")
 
     # --- Consent + active proposal coexistence (Gate 2B-2B.1, Section 9) -
     #
@@ -1133,14 +1162,14 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         investigate.append(
             f"An operative planning permission exists for this opportunity, and {proposal_noun} also live and "
             f"not yet decided - review whether this represents an additional phase or a proposed variation."
-        )
+        , rule_id="planning.active_proposal")
 
     # --- Strategic Land Buyer's own risk-appetite framing -------------------
     if profile.treats_no_activity_as_positive and facts.opportunity_type == STRATEGIC_LAND:
         if facts.has_identified_planning_activity is False:
-            matches.append("No planning activity has yet been identified against this allocation - an early-stage position consistent with this buyer's strategic land appetite.")
+            matches.append("No planning activity has yet been identified against this allocation - an early-stage position consistent with this buyer's strategic land appetite.", rule_id="planning.early_allocation")
         elif facts.has_identified_planning_activity is None:
-            unknown.append("Planning activity position could not be established for this allocation.")
+            unknown.append("Planning activity position could not be established for this allocation.", rule_id="planning.activity_unknown", driver="blocking")
             blocking_unknown = True
 
     # --- Unit-range assessment -----------------------------------------------
@@ -1203,8 +1232,8 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         matches.append(
             f"This allocation's plan-stated scale ({assessment.label()}) is wholly above this buyer's discovery range, representing a meaningful "
             f"strategic-land position in its own right, independent of whether a specific parcel size is confirmed."
-        )
-        investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
+        , rule_id="scale.strategic_range")
+        investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.", rule_id="scale.strategic_range_parcel")
         is_investigative_exception = True
     elif scale_value is None and uncertain_scale:
         preferred_fit = assessment.within_hard_bounds(minimum=profile.target_unit_min, maximum=profile.target_unit_max)
@@ -1215,35 +1244,36 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         hard_minimum_fit = (assessment.within_hard_bounds(minimum=profile.target_unit_min)
                             if profile.below_minimum_scale_is_exclusion else True)
         if hard_minimum_fit is False:
-            does_not_match.append("Supported scale is below this buyer's hard minimum.")
+            does_not_match.append("Supported scale is below this buyer's hard minimum.", rule_id="scale.hard_minimum_uncertain", driver="hard")
         elif preferred_fit is True:
-            unknown.append(f"{assessment.label()}: uncertain discovery scale; exact mandate compliance unverified. " + assessment.note())
+            unknown.append(f"{assessment.label()}: uncertain discovery scale; exact mandate compliance unverified. " + assessment.note(), rule_id="scale.uncertain_preferred")
         elif discovery_fit is True:
             scale_possible = True
             matches.append(
                 f"{assessment.label()} - not fully within this buyer's preferred range ({preferred_text}), but wholly "
                 f"within its discovery range ({discovery_text}). " + assessment.note()
-            )
+            , rule_id="scale.uncertain_discovery", driver="possible")
         elif discovery_fit is False:
             scale_outside_discovery = True
             above = discovery_max is not None and assessment.lower is not None and assessment.lower > discovery_max
             investigate.append(_outside_reason(f"The supported scale ({assessment.label()})", above,
-                                               legacy_prefix=f"The supported scale ({assessment.label()})"))
+                                               legacy_prefix=f"The supported scale ({assessment.label()})"), rule_id="scale.uncertain_outside", driver="outside")
         else:
             blocking_unknown = True
             unknown.append(
                 f"{assessment.label()}: the supported evidence does not establish whether scale is within this "
                 f"buyer's discovery range ({discovery_text}). " + assessment.note()
-            )
+            , rule_id="scale.uncertain_bounds", driver="blocking")
         if hard_minimum_fit is None:
             blocking_unknown = True
-        investigate.append("Verify current subject scale before treating this lead as numerically qualified.")
+            trace.append(("scale.hard_minimum_unverified", "Verify current subject scale before treating this lead as numerically qualified.", "classification_affecting", "blocking"))
+        investigate.append("Verify current subject scale before treating this lead as numerically qualified.", rule_id="scale.verify")
         is_investigative_exception = True
     elif scale_value is None:
-        unknown.append(no_count_message)
+        unknown.append(no_count_message, rule_id="scale.unknown", driver="blocking")
         blocking_unknown = True
     elif profile.target_unit_min <= scale_value <= profile.target_unit_max:
-        matches.append(f"Approximately {scale_value:,} {unit_noun} sits within this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}).")
+        matches.append(f"Approximately {scale_value:,} {unit_noun} sits within this buyer's target range ({profile.target_unit_min}-{profile.target_unit_max} {unit_noun}).", rule_id="scale.preferred")
     elif scale_value < profile.target_unit_min and profile.below_minimum_scale_is_exclusion:
         # Housing Association amendment: an explicit hard minimum (e.g. "fewer
         # than 50 affordable homes is NOT SUITABLE") - never moved to the
@@ -1251,14 +1281,14 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         does_not_match.append(
             f"Trusted evidence shows only {scale_value:,} {unit_noun}, below this buyer's minimum "
             f"requirement of {profile.target_unit_min} {unit_noun}."
-        )
+        , rule_id="scale.hard_minimum", driver="hard")
     elif discovery_min <= scale_value <= discovery_max:
         scale_possible = True
         side = "below" if scale_value < profile.target_unit_min else "above"
         matches.append(
             f"{scale_value:,} {unit_noun} is slightly {side} this buyer's preferred range ({preferred_text}), "
             f"but within its discovery range ({discovery_text})."
-        )
+        , rule_id="scale.discovery", driver="possible")
     elif (scale_value > profile.target_unit_max and profile.large_allocation_is_self_qualifying
           and facts.opportunity_type == STRATEGIC_LAND):
         # An explicit mandate rule (unchanged): a large strategic allocation
@@ -1267,8 +1297,8 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             f"This allocation's own scale (~{scale_value:,} {unit_noun}) represents a meaningful "
             f"strategic-land position in its own right, independent of whether a specific parcel size "
             f"is confirmed."
-        )
-        investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.")
+        , rule_id="scale.strategic_large")
+        investigate.append("Establish whether a suitable development parcel/phase could become available within this buyer's target range.", rule_id="scale.strategic_parcel")
         is_investigative_exception = True
     else:
         # Stage 2.5A: a KNOWN count outside the soft discovery envelope. The
@@ -1278,9 +1308,9 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         # NOT_SUITABLE and never STRONG/POSSIBLE.
         scale_outside_discovery = True
         above = discovery_max is not None and scale_value > discovery_max
-        investigate.append(_outside_reason(f"Scale ({scale_value:,} {unit_noun})", above, legacy_prefix=f"{scale_value:,} {unit_noun}"))
+        investigate.append(_outside_reason(f"Scale ({scale_value:,} {unit_noun})", above, legacy_prefix=f"{scale_value:,} {unit_noun}"), rule_id="scale.outside", driver="outside")
         if scale_value > profile.target_unit_max and facts.has_phasing_evidence and not planning_total_units:
-            investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.")
+            investigate.append("Evidence of phased delivery exists for this opportunity - review whether a phase within this buyer's target range could be available.", rule_id="scale.phasing")
         is_investigative_exception = True
 
     # --- Ownership/control - allocation-specific, structural gap -----------
@@ -1296,7 +1326,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # ownership, control, availability or seller intention; never a match;
     # never a hard mismatch.
     if facts.opportunity_type == STRATEGIC_LAND and not facts.matched_to_site:
-        investigate.append("Ownership/control has not been established for this allocation - a genuine investigation question, not a Buyer Fit blocker.")
+        investigate.append("Ownership/control has not been established for this allocation - a genuine investigation question, not a Buyer Fit blocker.", rule_id="allocation.control_unknown")
 
     # ==========================================================================
     # Buyer Mandate V2, Phase B2 - the four newly-activated mandate dimensions.
@@ -1323,12 +1353,12 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # rejection.
     if b2_active and profile.geography_scope == GEOGRAPHY_COUNCILS:
         if context.council_code is None:
-            unknown.append("This opportunity's council is not available to assess against this buyer's stated geographic boundary.")
+            unknown.append("This opportunity's council is not available to assess against this buyer's stated geographic boundary.", rule_id="geography.unknown", driver="blocking")
             blocking_unknown = True
         elif context.council_code in profile.geography_councils:
-            matches.append(f"This opportunity's council ({context.council_code}) is within this buyer's stated geographic boundary.")
+            matches.append(f"This opportunity's council ({context.council_code}) is within this buyer's stated geographic boundary.", rule_id="geography.match")
         else:
-            does_not_match.append(f"This opportunity's council ({context.council_code}) is outside this buyer's explicit geographic boundary ({', '.join(sorted(profile.geography_councils))}).")
+            does_not_match.append(f"This opportunity's council ({context.council_code}) is outside this buyer's explicit geographic boundary ({', '.join(sorted(profile.geography_councils))}).", rule_id="geography.exclusion", driver="hard")
 
     # --- B2.2 Acquisition Type — mostly SOFT, one narrow HARD constraint ----
     #
@@ -1382,10 +1412,10 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
                     "Trusted evidence shows development is underway or further, but this is not confirmed to "
                     "cover this opportunity's full relevant scope - review whether the wider strategic-land "
                     "opportunity has genuinely been overtaken by delivery, or only a part of it."
-                )
+                , rule_id="acquisition.scope_check")
                 acquisition_type_unknowns.append("This opportunity's planning position does not clearly establish whether it remains an early-stage strategic-land-control opportunity, pending review of the underway evidence's own scope.")
             elif is_strategic_situation:
-                matches.append("This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy.")
+                matches.append("This opportunity's own planning position is consistent with this buyer's strategic-land-control acquisition strategy.", rule_id="acquisition.strategic_match")
                 acquisition_type_matched = True
             else:
                 # A PLANNING_DELIVERY signal that is NOT confirmed
@@ -1398,7 +1428,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             if facts.affordable_percentage_trusted and facts.affordable_percentage == 0.0:
                 acquisition_type_hard_mismatches.append("Trusted evidence shows this scheme has no affordable housing content at all, incompatible with this buyer's affordable-housing-package acquisition strategy.")
             elif (facts.affordable_unit_count or 0) > 0 or (facts.affordable_percentage_trusted and facts.affordable_percentage and facts.affordable_percentage > 0):
-                matches.append("Trusted evidence shows this scheme includes an affordable housing component, structurally relevant to this buyer's affordable-housing-package acquisition strategy - this does not establish that the package is known to be available for acquisition.")
+                matches.append("Trusted evidence shows this scheme includes an affordable housing component, structurally relevant to this buyer's affordable-housing-package acquisition strategy - this does not establish that the package is known to be available for acquisition.", rule_id="acquisition.affordable_match")
                 acquisition_type_matched = True
             else:
                 acquisition_type_unknowns.append("Affordable housing content has not been established with enough confidence to assess against this buyer's affordable-housing-package acquisition strategy.")
@@ -1417,7 +1447,7 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
             # so this dimension contributes nothing (neutral) rather than
             # matching merely because the mandate states this type.
             if context.development_state in _DEVELOPMENT_STARTED_STATES:
-                matches.append("Trusted evidence shows development is underway or further, structurally compatible with this buyer's development/homes acquisition strategy - this does not establish that a forward purchase, forward funding or completed-homes opportunity actually exists.")
+                matches.append("Trusted evidence shows development is underway or further, structurally compatible with this buyer's development/homes acquisition strategy - this does not establish that a forward purchase, forward funding or completed-homes opportunity actually exists.", rule_id="acquisition.development_match")
                 acquisition_type_matched = True
 
         # Multi-select OR semantics: only reject if NOTHING in the set
@@ -1427,9 +1457,9 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         # strategic-land leg alone would have been (the other type still
         # applies to the same shared facts).
         if not acquisition_type_matched and acquisition_type_hard_mismatches:
-            does_not_match.extend(acquisition_type_hard_mismatches)
+            does_not_match.extend_recorded(acquisition_type_hard_mismatches, rule_id="acquisition.hard", driver="hard")
         elif not acquisition_type_matched:
-            unknown.extend(acquisition_type_unknowns)
+            unknown.extend_recorded(acquisition_type_unknowns, rule_id="acquisition.blocking", driver="blocking")
             if acquisition_type_unknowns:
                 # Acquisition type is a stated mandate REQUIREMENT (the
                 # buyer selected specific types it will acquire), not a
@@ -1450,26 +1480,26 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
         if profile.development_state_appetite == UNCOMMENCED_PREFERRED:
             if confirmed_started:
                 # SOFT mismatch - never does_not_match (Section 21/24).
-                unknown.append("This buyer prefers uncommenced sites; trusted evidence shows development is already underway or further - this preference is not met, but it is not treated as a disqualifying fact on its own.")
+                unknown.append("This buyer prefers uncommenced sites; trusted evidence shows development is already underway or further - this preference is not met, but it is not treated as a disqualifying fact on its own.", rule_id="development.nonpreferred")
             elif state is None or state == DEVELOPMENT_STATE_UNKNOWN:
                 # EVIDENCE GAP - absence of commencement evidence is NEVER
                 # treated as confirmed uncommenced (Section 19/21, the
                 # mandatory evidence safeguard).
-                unknown.append("No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference.")
+                unknown.append("No commencement evidence has been identified for this opportunity - this is not treated as confirmed non-commencement against this buyer's stated preference.", rule_id="development.no_commencement")
             # else: a positively-evidenced non-commencement fact would be
             # a match here, but the current factual vocabulary has no
             # such state to read (see this module's own DEVELOPMENT_
             # STATE_* constants) - never fabricated.
         elif profile.development_state_appetite == UNDERWAY_ACCEPTABLE:
             if confirmed_started:
-                matches.append("Trusted evidence shows development is underway or further - this does not count against this buyer's stated appetite.")
+                matches.append("Trusted evidence shows development is underway or further - this does not count against this buyer's stated appetite.", rule_id="development.acceptable")
             elif state is None or state == DEVELOPMENT_STATE_UNKNOWN:
-                unknown.append("Development progress has not been established for this opportunity.")
+                unknown.append("Development progress has not been established for this opportunity.", rule_id="development.progress_unknown")
         elif profile.development_state_appetite == UNDERWAY_PREFERRED:
             if confirmed_started:
-                matches.append("Trusted evidence shows development is underway or further, a positive signal for this buyer's stated preference.")
+                matches.append("Trusted evidence shows development is underway or further, a positive signal for this buyer's stated preference.", rule_id="development.preferred")
             elif state is None or state == DEVELOPMENT_STATE_UNKNOWN:
-                unknown.append("Development progress has not been established for this opportunity - this buyer's stated preference for development progress cannot be confirmed as met.")
+                unknown.append("Development progress has not been established for this opportunity - this buyer's stated preference for development progress cannot be confirmed as met.", rule_id="development.preference_unknown")
 
     # --- B2.4 Control / Ownership Appetite — SOFT, never hard ---------------
     #
@@ -1482,17 +1512,17 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     control_facts = context.control_facts
     if b2_active and profile.control_appetite and control_facts is not None:
         if DEVELOPER_LED_ACCEPTABLE in profile.control_appetite and control_facts.developer_or_applicant_led is True:
-            matches.append("Trusted evidence shows a developer/applicant-led situation, which this buyer's mandate accepts.")
+            matches.append("Trusted evidence shows a developer/applicant-led situation, which this buyer's mandate accepts.", rule_id="control.developer")
         if THIRD_PARTY_INTEREST_ACCEPTABLE in profile.control_appetite and control_facts.third_party_interest_declared is True:
-            matches.append("Trusted evidence shows a declared third-party ownership interest, which this buyer's mandate accepts.")
+            matches.append("Trusted evidence shows a declared third-party ownership interest, which this buyer's mandate accepts.", rule_id="control.third_party")
         if UNRESOLVED_OWNERSHIP_INVESTIGATABLE in profile.control_appetite and control_facts.ownership_unresolved is True:
             # investigate, not matches - the mandate accepts investigating
             # this, but the evidence itself remains genuinely unresolved
             # (Section 29 - never transformed into positive control
             # evidence).
-            investigate.append("Ownership/control evidence for this opportunity remains unresolved; this buyer's mandate treats unresolved ownership as worth investigating rather than a disqualifying fact.")
+            investigate.append("Ownership/control evidence for this opportunity remains unresolved; this buyer's mandate treats unresolved ownership as worth investigating rather than a disqualifying fact.", rule_id="control.unresolved")
         if PARTIAL_SITE_CONTROL_ACCEPTABLE in profile.control_appetite and control_facts.partial_control_evidence is True:
-            matches.append("Trusted evidence indicates a partial/shared ownership position, which this buyer's mandate does not require to be whole-site control.")
+            matches.append("Trusted evidence indicates a partial/shared ownership position, which this buyer's mandate does not require to be whole-site control.", rule_id="control.partial")
 
     # Phase B2 narrow remediation (Issue A): classification is driven by
     # `blocking_unknown`, not by the mere presence of ANY reason in
@@ -1506,14 +1536,26 @@ def assess_buyer_fit(profile: BuyerMandatePolicy, facts: MatchingFacts, context:
     # > within discovery but outside preferred (POSSIBLE_FIT) > STRONG_FIT.
     if does_not_match:
         classification = NOT_SUITABLE
+        contributing_drivers = {"hard"}
     elif blocking_unknown or scale_outside_discovery:
         classification = INSUFFICIENT_EVIDENCE
+        contributing_drivers = {"blocking", "outside"}
     elif scale_possible:
         classification = POSSIBLE_FIT
+        contributing_drivers = {"possible"}
     else:
         classification = STRONG_FIT
+        contributing_drivers = set()
 
-    return BuyerFitAssessment(
+    result = BuyerFitAssessment(
         classification=classification, is_investigative_exception=is_investigative_exception,
-        matches=matches, does_not_match=does_not_match, unknown=unknown, investigate=investigate,
+        matches=list(matches), does_not_match=list(does_not_match), unknown=list(unknown), investigate=list(investigate),
     )
+    # Request-local attributes deliberately preserve the original dataclass,
+    # including frozen behavioural oracles and six-field asdict fingerprints.
+    object.__setattr__(result, "explanation_trace", tuple(
+        BuyerFitReasonTrace(rule_id, reason, role, driver in contributing_drivers if driver else False)
+        for rule_id, reason, role, driver in trace
+    ))
+    object.__setattr__(result, "explanation_coverage", "complete")
+    return result

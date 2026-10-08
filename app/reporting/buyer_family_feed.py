@@ -111,6 +111,20 @@ def build_buyer_opportunity_families(session, buyer_key: str, limit: int = 6, *,
     return evaluate_buyer_families(session, buyer_key, inputs, limit, memoise_context=memoise_context)
 
 
+def load_site_subject_inputs(session, site_id: int) -> FamilyInputs:
+    """Reuse canonical delivery detectors bounded to one admitted site's records.
+
+    Detail navigation never loads strategic allocations or the full opportunity
+    universe. Default dashboard/family loading remains unchanged.
+    """
+    from app.security.access import require_admitted
+    require_admitted()
+    lapse, phases, recent, pending, delivery = _planning_delivery_cards(session, None, site_id=site_id)
+    operative = _attach_planning_delivery_matching_facts(session, delivery)
+    from app.reporting.residual_feed import build_site_residuals
+    return FamilyInputs([], lapse, phases, recent, pending, delivery, build_site_residuals(operative or {}, None))
+
+
 def _residual_subject_cards(evaluated: list, residuals: dict, profile, context_for) -> list:
     """One derived feed card per R1 qualification (never persisted). Parent facts = the site's lifecycle card facts; with none, the residual cannot be assessed and is skipped
     (fail closed: a residual without trusted parent facts is not a subject)."""

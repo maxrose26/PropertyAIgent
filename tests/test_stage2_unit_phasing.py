@@ -1358,7 +1358,7 @@ def test_s25a_possible_badge_and_label_render():
     literals = {t.id: ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
                 for t in n.targets if isinstance(t, ast.Name) and t.id in ("BUYER_FIT_BADGE_KIND", "_BADGE_KIND_STYLE")}
     kind = literals["BUYER_FIT_BADGE_KIND"][POSSIBLE_FIT]
-    assert literals["_BADGE_KIND_STYLE"][kind]["label"] == "Possible fit"
+    assert literals["_BADGE_KIND_STYLE"][kind]["label"] == "Possible Mandate Fit"
     assert POSSIBLE_FIT.replace("_", " ").title() == "Possible Fit"
 
 

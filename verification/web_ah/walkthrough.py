@@ -291,7 +291,7 @@ opportunity_feed_card(dict(id='fixture', title='Fixture', subtitle='Existing pol
 card_text=json.dumps(values(cards));(OUT/'cards.json').write_text(card_text)
 assert '100% affordable' not in card_text
 assert 'Reported AH percentage: 100% (scope unverified)' in card_text
-assert 'Existing-policy fit: Strong Fit' in card_text
+assert 'Strong Mandate Fit' in card_text
 assert 'does not verify AH count source or scope' in card_text
 # Shared evidence renderer exercised with qualified/source-bounded and conflicting inputs.
 qualified = run(AppTest.from_string("""

@@ -57,7 +57,7 @@ def test_a_large_parent_insufficient_with_a_strong_phase_is_one_family_headed_by
     view = view_of(world)
     assert view.error is None and len(view.families) == 1
     family = view.families[0]
-    assert family.title == f"Site {s.id}" and family.best.fit_label == "Strong fit" and "140" in (family.best.scale or "")
+    assert family.title == f"Site {s.id}" and family.best.fit_label == "Strong Mandate Fit" and "140" in (family.best.scale or "")
     assert family.best.label.startswith("Phase") or "2" in family.best.label
     assert "Permission approaching its assumed review date" in [r.label for r in family.related]
     assert family.phasing_context == fp.PHASING_CONTEXT and family.overlap_warning == OVERLAP_WARNING
@@ -69,7 +69,7 @@ def test_b_parent_not_suitable_with_a_possible_phase_remains_visible_headed_by_t
     view = view_of(world)
     assert len(view.families) == 1
     family = view.families[0]
-    assert family.best.fit_label == "Possible fit" and family.phasing_context == fp.PHASING_CONTEXT
+    assert family.best.fit_label == "Possible Mandate Fit" and family.phasing_context == fp.PHASING_CONTEXT
     assert "Not suitable" in [r.fit_label for r in family.related]
 
 
@@ -78,7 +78,7 @@ def test_c_parent_strong_and_phase_strong_one_family_one_headline_other_shown_as
     view = view_of(world)
     assert len(view.families) == 1
     family = view.families[0]
-    assert family.best.fit_label == "Strong fit" and any(r.fit_label == "Strong fit" for r in family.related)
+    assert family.best.fit_label == "Strong Mandate Fit" and any(r.fit_label == "Strong Mandate Fit" for r in family.related)
     assert family.phasing_context is None                                    # an IN-RANGE wider subject: the phasing evidence exists but is not acquisition-relevant, so no redundant label
 
 
@@ -213,7 +213,7 @@ def test_more_families_not_shown_is_reported(world):
 # --- fit language / no policy change ------------------------------------------------------------------------------------------------------
 
 def test_fit_labels_use_the_existing_language_and_no_policy_is_changed():
-    assert fp.fit_label("STRONG_FIT", False) == "Strong fit" and fp.fit_label("POSSIBLE_FIT", False) == "Possible fit"
+    assert fp.fit_label("STRONG_FIT", False) == "Strong Mandate Fit" and fp.fit_label("POSSIBLE_FIT", False) == "Possible Mandate Fit"
     assert fp.fit_label("INSUFFICIENT_EVIDENCE", True) == "Investigate" and fp.fit_label("INSUFFICIENT_EVIDENCE", False) == "Insufficient evidence"
     assert fp.fit_label("NOT_SUITABLE", False) == "Not suitable"
     assert BUYER_MATCHING_POLICY_VERSION == 8

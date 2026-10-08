@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 3
       - name: Install pinned dependencies
         run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/ah-web-venv"
       - name: Focused tests and actual rendered CSV
@@ -38,6 +39,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 3
+      - name: Fetch frozen v8 differential baseline
+        run: git fetch --no-tags --depth=1 origin 22636ddab7e0af9b6220c6466d400bc1ec98aafc
       - name: Install pinned dependencies
         run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/stage2-venv"
       - name: Offline Stage 2, Stage 1 security and journeys
