@@ -1,0 +1,83 @@
+{
+  "scope": "Selected offline suites, not all repository tests",
+  "deselected": 0,
+  "network": "Existing syscall offline test wrappers; synthetic SQLite; no live production/model calls",
+  "suites": [
+    {
+      "name": "B0/B1 focused",
+      "tests": 50,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 50,
+      "failed_tests": []
+    },
+    {
+      "name": "Stage2/Spec028/v8",
+      "tests": 1755,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 1752,
+      "failed_tests": [
+        "tests.test_v7c_frozen_v6_oracle::test_the_supporting_modules_behind_the_imported_names_are_unchanged_since_v6",
+        "tests.test_v8_frozen_v7_oracle::test_pinned_definitions_unchanged_and_function_reads_only_existing_facts_fields",
+        "tests.test_v8_frozen_v7_oracle::test_the_residual_work_did_not_touch_the_pinned_supporting_modules"
+      ]
+    },
+    {
+      "name": "Stage1 security",
+      "tests": 211,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 211,
+      "failed_tests": []
+    },
+    {
+      "name": "Rendered journeys",
+      "tests": 24,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 24,
+      "failed_tests": []
+    },
+    {
+      "name": "Relevant extraction/reconciliation/AH",
+      "tests": 211,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 211,
+      "failed_tests": []
+    },
+    {
+      "name": "Mock refresh compatibility",
+      "tests": 163,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 163,
+      "failed_tests": []
+    },
+    {
+      "name": "AH web-only",
+      "tests": 267,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "deselected": 0,
+      "passed": 267,
+      "failed_tests": [],
+      "pytest_counts": "257 passed plus 10 passing subtests; JUnit represents 267 cases",
+      "walkthrough": "PASS; actual rendered selected CSV"
+    }
+  ]
+}

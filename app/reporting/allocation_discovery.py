@@ -749,6 +749,8 @@ def build_linked_application_summaries(linked_applications: list, matched_site: 
             units = si.total_units_final
         elif app.estimated_unit_count:
             units = app.estimated_unit_count
+        from app.reporting.residential_count_eligibility import eligible_residential_scalar
+        units = eligible_residential_scalar(app, units)
         summaries.append({
             "id": app.id,
             "reference": app.reference,
@@ -875,8 +877,10 @@ def build_allocation_card(
         for app in linked_applications:
             si = getattr(app, "scheme_intelligence", None)
             if si and si.total_units_final:
-                matched_total_units = si.total_units_final
-                break
+                from app.reporting.residential_count_eligibility import eligible_residential_scalar
+                matched_total_units = eligible_residential_scalar(app, si.total_units_final)
+                if matched_total_units is not None:
+                    break
         scope = assess_delivery_scope(allocation.minimum_dwellings, matched_total_units)
         delivery_note = scope["note"] if scope["status"] != "unknown" else None
 
