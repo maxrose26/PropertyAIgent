@@ -34,6 +34,11 @@ def present_planning_freshness(application, *, now, cadence_days=None,
     """
     verified = application.status_verified_at
     state = _classify_planning_state(application.decision, application.status)
+    raw = f"{application.status or ''} {application.decision or ''}".lower()
+    if not raw.strip():
+        state = "unknown_unverified"
+    elif ("committee" in raw or "resolution" in raw) and state not in {"granted", "refused", "withdrawn"}:
+        state = "committee_resolution_unissued"
     freshness = "verification_unavailable"
     qualification = "Successful status verification unavailable"
     visibility = "unavailable"
@@ -62,5 +67,9 @@ def present_planning_freshness(application, *, now, cadence_days=None,
     fact_date = parsed_date.isoformat() if parsed_date != dt.date.min else None
     from urllib.parse import urlsplit
     url = application.summary_url
-    safe_url = url if url and urlsplit(url).scheme in {"http", "https"} and urlsplit(url).hostname and not urlsplit(url).username and not urlsplit(url).password else None
+    try:
+        parsed_url = urlsplit(url or "")
+        safe_url = url if parsed_url.scheme in {"http", "https"} and parsed_url.hostname and not parsed_url.username and not parsed_url.password else None
+    except ValueError:
+        safe_url = None
     return PlanningFreshness(state, fact_date, safe_url, verified, freshness, qualification, visibility)

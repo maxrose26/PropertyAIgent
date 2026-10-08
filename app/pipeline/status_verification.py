@@ -421,6 +421,7 @@ def verify_application_status(
 
     reference = application.reference
     def outcome(value):
+        session.rollback()  # all failed pre-write paths release the owned read transaction
         return VerificationOutcome(outcome=value, application_reference=reference)
 
     # This stage owns its transaction, never commits another caller's pending work.
@@ -449,6 +450,9 @@ def verify_application_status(
         if breaker is not None:
             breaker.record_failure(error, stage="status-verification")
         return outcome(OUTCOME_PORTAL_UNAVAILABLE if is_portal_host_failure(error) else OUTCOME_FETCH_FAILED)
+    except BaseException:
+        session.rollback()
+        raise
     finally:
         if requests_session is not None:
             requests_session.close()
@@ -457,6 +461,15 @@ def verify_application_status(
         return outcome(OUTCOME_APPLICATION_NOT_FOUND)
     fields = getattr(result, "fields", None)
     if not isinstance(fields, dict) or getattr(result, "reference", None) != reference:
+        return outcome(OUTCOME_FETCH_FAILED)
+    from urllib.parse import urlsplit
+    try:
+        source_url = urlsplit(getattr(result, "summary_url", "") or "")
+        expected_url = urlsplit(council.base_url)
+        if (source_url.scheme not in {"http", "https"} or source_url.hostname != expected_url.hostname
+                or source_url.username or source_url.password):
+            return outcome(OUTCOME_FETCH_FAILED)
+    except ValueError:
         return outcome(OUTCOME_FETCH_FAILED)
     if fields.get("Reference", reference) != reference:
         return outcome(OUTCOME_FETCH_FAILED)
@@ -470,11 +483,15 @@ def verify_application_status(
                                ("await", "pending", "recommend", "committee", "resolution", "decided", "decision made", "withdraw", "appeal")):
         return outcome(OUTCOME_FETCH_FAILED)
     combined = f"{status or ''} {decision or ''}".lower()
+    import re
+    if re.search(r"\b(?:not|never)\s+(?:been\s+)?(?:granted|approved|refused|withdrawn)\b|\bminded to\b|\bsubject to\s+(?:s106|section 106|legal agreement)\b", combined):
+        return outcome(OUTCOME_CONFLICTING)
     # Committee/recommendation is not an issued decision. Reject contradictory
     # structured decision evidence rather than silently upgrading it to a grant.
     committee = "committee" in combined or "resolution" in combined or "recommend" in combined
     terminal = {"granted", "refused", "withdrawn"}
     new_state = _classify_planning_state(decision, status)
+    old_planning = _classify_planning_state(prior[1], prior[0])
     if committee and decision and any(word in decision.lower() for word in ("grant", "approv", "refus")):
         return outcome(OUTCOME_CONFLICTING)
     if decision and new_state in {"not_yet_decided", "decision_outcome_unknown"} and decision.strip().lower() not in {"determined", "decision made"}:
@@ -493,9 +510,13 @@ def verify_application_status(
         decision = "Withdrawn"
     from app.pipeline.lapse_tracking import parse_portal_date
     raw_date = fields.get("Decision Issued Date")
+    old_date = parse_portal_date(prior[2])
+    source_date = parse_portal_date(raw_date)
+    if old_planning in terminal and new_state in terminal and old_planning != new_state and old_date != dt.date.min:
+        if source_date == dt.date.min or source_date < old_date:
+            return outcome(OUTCOME_CONFLICTING)
     if raw_date and parse_portal_date(raw_date) == dt.date.min:
         return outcome(OUTCOME_FETCH_FAILED)
-    old_planning = _classify_planning_state(prior[1], prior[0])
     if old_planning in terminal and new_state not in terminal:
         return outcome(OUTCOME_CONFLICTING)
     if decision and status:

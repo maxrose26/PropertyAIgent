@@ -131,8 +131,8 @@ def test_old_response_rejected_after_newer_success(session):
 
 def test_changed_decision_does_not_borrow_old_date(session):
     a=app(session,status='Decided',decision='Granted',decision_issued_date='2025-01-01')
-    execute(session,a,_scraped('A/1',status='Decided',decision='Refused'))
-    assert a.decision_issued_date is None
+    assert execute(session,a,_scraped('A/1',status='Decided',decision='Refused')).outcome=='conflicting_source'
+    assert a.decision=='Granted' and a.decision_issued_date=='2025-01-01'
 
 
 def test_presentation_distinguishes_dates_scope_failures_and_policy(session):
@@ -168,8 +168,8 @@ def test_unsupported_or_conflicting_status_combinations_do_not_stamp(session,sta
 
 def test_status_only_withdrawal_cannot_retain_previous_grant_date(session):
     a=app(session,status='Decided',decision='Granted',decision_issued_date='2025-01-01')
-    assert execute(session,a,_scraped('A/1',status='Withdrawn')).outcome=='verified_changed'
-    assert a.decision=='Withdrawn' and a.decision_issued_date is None
+    assert execute(session,a,_scraped('A/1',status='Withdrawn')).outcome=='conflicting_source'
+    assert a.decision=='Granted' and a.decision_issued_date=='2025-01-01'
 
 
 def test_date_only_correction_has_one_atomic_lifecycle_signal(session):
@@ -182,3 +182,81 @@ def test_date_only_correction_has_one_atomic_lifecycle_signal(session):
     assert a.evidence_refresh_required
     assert execute(session,a,r).outcome=='verified_unchanged'
     assert len(session.scalars(select(ApplicationLifecycleEvent)).all())==1
+
+
+
+def test_stale_result_is_rejected_across_independent_sessions(session):
+    from sqlalchemy.orm import Session
+    a=app(session)
+    def old_fetch(*_):
+        with Session(session.get_bind(),expire_on_commit=False) as newer:
+            other=newer.get(Application,a.id)
+            with patch('app.scrapers.idox_portal.fetch_application_by_reference',return_value=_scraped('A/1',status='Decided',decision='Refused')):
+                assert verify_application_status(newer,MagicMock(),_council_config(),other).outcome=='verified_changed'
+        return _scraped('A/1',status='Decided',decision='Granted')
+    with patch('app.scrapers.idox_portal.fetch_application_by_reference',side_effect=old_fetch):
+        assert verify_application_status(session,MagicMock(),_council_config(),a).outcome=='stale_response'
+    session.refresh(a)
+    assert a.decision=='Refused'
+    assert len(session.scalars(select(ApplicationLifecycleEvent)).all())==1
+
+
+@pytest.mark.parametrize('raw', ['http://[broken','https://user:password@example.invalid','javascript:alert(1)'])
+def test_presentation_rejects_unsafe_or_malformed_source_links(session,raw):
+    a=app(session);a.summary_url=raw
+    assert present_planning_freshness(a,now=NOW).source_url is None
+
+
+def test_presentation_unknown_and_committee_are_not_permission(session):
+    a=app(session);a.status=None
+    assert present_planning_freshness(a,now=NOW).planning_state=='unknown_unverified'
+    a.status='Committee resolution to approve'
+    assert present_planning_freshness(a,now=NOW).planning_state=='committee_resolution_unissued'
+
+
+def test_future_verification_and_unparseable_date_are_qualified(session):
+    a=app(session);a.status_verified_at=NOW+dt.timedelta(days=1)
+    assert present_planning_freshness(a,now=NOW).freshness=='verification_unavailable'
+
+
+def test_malformed_source_date_preserves_previous_fact(session):
+    a=app(session);before=snapshot(a);r=_scraped('A/1',status='Decided',decision='Refused')
+    r.fields['Decision Issued Date']='not a date'
+    assert execute(session,a,r).outcome=='fetch_failed'
+    assert snapshot(a)==before
+
+
+@pytest.mark.parametrize('decision',['Not granted','Application not approved','Minded to grant','Approved subject to S106'])
+def test_negated_or_unissued_decision_preserves_accepted_fact(session,decision):
+    a=app(session);before=snapshot(a)
+    assert execute(session,a,_scraped('A/1',status='Decided',decision=decision)).outcome=='conflicting_source'
+    assert snapshot(a)==before
+
+
+def test_cross_terminal_older_source_cannot_overwrite_newer_refusal(session):
+    a=app(session,status='Decided',decision='Refused',decision_issued_date='2026-09-25');before=snapshot(a)
+    r=_scraped('A/1',status='Decided',decision='Granted');r.fields['Decision Issued Date']='2026-09-01'
+    assert execute(session,a,r).outcome=='conflicting_source'
+    assert snapshot(a)==before
+
+
+def test_fetch_interruption_rolls_back_and_closes_http_session(session):
+    a=app(session);before=snapshot(a)
+    with patch('app.pipeline.status_verification.requests.Session') as factory:
+        with pytest.raises(KeyboardInterrupt):execute(session,a,error=KeyboardInterrupt())
+        factory.return_value.close.assert_called_once()
+    assert not session.in_transaction()
+    assert snapshot(a)==before
+
+
+def test_successful_status_only_withdrawal_from_pending_is_not_old_grant(session):
+    a=app(session)
+    assert execute(session,a,_scraped('A/1',status='Withdrawn')).outcome=='verified_changed'
+    assert a.decision=='Withdrawn' and a.decision_issued_date is None
+
+
+@pytest.mark.parametrize('url',['https://other-council.invalid/A/1','https://user:secret@example.invalid/A/1','http://[broken'])
+def test_source_must_belong_to_requested_council_origin(session,url):
+    a=app(session);before=snapshot(a);r=_scraped('A/1',status='Decided',decision='Granted');r.summary_url=url
+    assert execute(session,a,r).outcome=='fetch_failed'
+    assert snapshot(a)==before
