@@ -54,7 +54,7 @@ import os
 from dataclasses import dataclass, field
 
 import requests
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import CouncilConfig
@@ -144,6 +144,10 @@ OUTCOME_PORTAL_UNAVAILABLE = "portal_unavailable"
 # says to stop and report rather than build silently. See the
 # implementation report's own "Failure Semantics" section.
 OUTCOME_FETCH_FAILED = "fetch_failed"
+# B2.0 request-local outcomes; no new persisted attempt state or schema.
+OUTCOME_CONFLICTING = "conflicting_source"
+OUTCOME_STALE_RESPONSE = "stale_response"
+OUTCOME_PERSISTENCE_FAILED = "persistence_failed"
 
 # Outcomes that count as a genuinely COMPLETED direct verification -
 # status_verified_at advances for these two, and only these two (Section 8
@@ -404,70 +408,160 @@ def verify_application_status(
     breaker: CouncilPortalCircuitBreaker | None = None,
     lifecycle_event_stats: LifecycleEventStats | None = None,
 ) -> VerificationOutcome:
-    """Directly re-fetches ONE already-known Application by its exact
-    reference (never a date-range search) and, only on a successfully
-    parsed result, passes it through the existing, UNMODIFIED
-    _upsert_scraped_application (imported locally to avoid a circular
-    import with app.pipeline.run_weekly, which itself will import this
-    module) - reusing its already-proven update-in-place and material-
-    change-detection behaviour verbatim. No new scraper, no parallel
-    change-detection logic, no reconciliation of any kind."""
-    from app.pipeline.run_weekly import _upsert_scraped_application  # local import: avoids a circular import
+    """Exact-reference register verification, atomically guarded against stale results.
 
-    old_state = ApplicationState(
-        status=application.status, decision=application.decision, estimated_unit_count=application.estimated_unit_count,
-    )
+    The existing upsert/detector/lifecycle writer remains the sole fact writer.
+    An optimistic conditional UPDATE reserves the successful watermark in the
+    SAME transaction as facts/events. PostgreSQL rechecks its WHERE after a
+    concurrent writer releases the row; no new version column or lock service.
+    A failed transaction rolls back both the reservation and fact/event writes.
+    """
+    from app.pipeline.run_weekly import _upsert_scraped_application
+    from app.pipeline.material_change import _classify_planning_state
 
+    reference = application.reference
+    def outcome(value):
+        return VerificationOutcome(outcome=value, application_reference=reference)
+
+    # This stage owns its transaction, never commits another caller's pending work.
+    if session.new or session.dirty or session.deleted:
+        raise ValueError("Status verification requires a clean session")
+    columns = (Application.status, Application.decision, Application.decision_issued_date,
+               Application.status_verified_at, Application.last_seen_at)
+    prior = session.execute(select(*columns).where(
+        Application.id == application.id, Application.reference == reference,
+        Application.council_code == council.code)).one_or_none()
+    if prior is None:
+        return outcome(OUTCOME_FETCH_FAILED)
+    old_state = ApplicationState(status=prior[0], decision=prior[1],
+                                 estimated_unit_count=application.estimated_unit_count)
+    requests_session = None
     try:
         if council.doc_system == "arcus":
-            from app.scrapers.arcus_portal import fetch_application_by_reference as fetch_by_reference_arcus
-            result = fetch_by_reference_arcus(page, council, application.reference)
+            from app.scrapers.arcus_portal import fetch_application_by_reference
+            result = fetch_application_by_reference(page, council, reference)
         else:
-            from app.scrapers.idox_portal import HEADERS
-            from app.scrapers.idox_portal import fetch_application_by_reference as fetch_by_reference_idox
+            from app.scrapers.idox_portal import HEADERS, fetch_application_by_reference
             requests_session = requests.Session()
             requests_session.headers.update(HEADERS)
-            result = fetch_by_reference_idox(page, requests_session, council, application.reference)
-    except Exception as e:
-        if is_portal_host_failure(e):
-            if breaker is not None:
-                breaker.record_failure(e, stage="status-verification")
-            return VerificationOutcome(outcome=OUTCOME_PORTAL_UNAVAILABLE, application_reference=application.reference)
+            result = fetch_application_by_reference(page, requests_session, council, reference)
+    except Exception as error:
         if breaker is not None:
-            breaker.record_failure(e, stage="status-verification")
-        return VerificationOutcome(outcome=OUTCOME_FETCH_FAILED, application_reference=application.reference)
+            breaker.record_failure(error, stage="status-verification")
+        return outcome(OUTCOME_PORTAL_UNAVAILABLE if is_portal_host_failure(error) else OUTCOME_FETCH_FAILED)
+    finally:
+        if requests_session is not None:
+            requests_session.close()
 
+    if result is None:
+        return outcome(OUTCOME_APPLICATION_NOT_FOUND)
+    fields = getattr(result, "fields", None)
+    if not isinstance(fields, dict) or getattr(result, "reference", None) != reference:
+        return outcome(OUTCOME_FETCH_FAILED)
+    if fields.get("Reference", reference) != reference:
+        return outcome(OUTCOME_FETCH_FAILED)
+    status, decision = fields.get("Status"), fields.get("Decision")
+    if any(value is not None and not isinstance(value, str) for value in
+           (status, decision, fields.get("Decision Issued Date"))):
+        return outcome(OUTCOME_FETCH_FAILED)
+    if not ((status or "").strip() or (decision or "").strip()):
+        return outcome(OUTCOME_FETCH_FAILED)
+    if not decision and not any(word in (status or "").lower() for word in
+                               ("await", "pending", "recommend", "committee", "resolution", "decided", "decision made", "withdraw", "appeal")):
+        return outcome(OUTCOME_FETCH_FAILED)
+    combined = f"{status or ''} {decision or ''}".lower()
+    # Committee/recommendation is not an issued decision. Reject contradictory
+    # structured decision evidence rather than silently upgrading it to a grant.
+    committee = "committee" in combined or "resolution" in combined or "recommend" in combined
+    terminal = {"granted", "refused", "withdrawn"}
+    new_state = _classify_planning_state(decision, status)
+    if committee and decision and any(word in decision.lower() for word in ("grant", "approv", "refus")):
+        return outcome(OUTCOME_CONFLICTING)
+    if decision and new_state in {"not_yet_decided", "decision_outcome_unknown"} and decision.strip().lower() not in {"determined", "decision made"}:
+        return outcome(OUTCOME_FETCH_FAILED)
+    if "appeal" in combined:
+        return outcome(OUTCOME_CONFLICTING)  # appeal identity/outcome support is separately gated
+    if decision and (("await" in (status or "").lower() or "pending" in (status or "").lower()) and new_state in terminal):
+        return outcome(OUTCOME_CONFLICTING)
+    if "withdraw" in (status or "").lower() and decision and "withdraw" not in decision.lower():
+        return outcome(OUTCOME_CONFLICTING)
+    if "withdraw" in (status or "").lower() and not decision:
+        from copy import copy
+        result = copy(result)
+        fields = dict(fields, Decision="Withdrawn")
+        result.fields = fields
+        decision = "Withdrawn"
+    from app.pipeline.lapse_tracking import parse_portal_date
+    raw_date = fields.get("Decision Issued Date")
+    if raw_date and parse_portal_date(raw_date) == dt.date.min:
+        return outcome(OUTCOME_FETCH_FAILED)
+    old_planning = _classify_planning_state(prior[1], prior[0])
+    if old_planning in terminal and new_state not in terminal:
+        return outcome(OUTCOME_CONFLICTING)
+    if decision and status:
+        status_lower = status.lower()
+        if (("refus" in status_lower and new_state == "granted") or
+            (("grant" in status_lower or "approv" in status_lower) and new_state == "refused")):
+            return outcome(OUTCOME_CONFLICTING)
     if breaker is not None:
         breaker.record_success()
 
-    # Same "not found" contract app.pipeline.run_weekly.
-    # stage_fetch_missing_parents already relies on for this exact return
-    # shape - a genuinely completed lookup that found nothing is not a
-    # fetch failure (Section 9: "It should be observable/logged and remain
-    # eligible for appropriate retry" - never a status/decision mutation,
-    # never a fabricated withdrawn/excluded state).
-    if not result or not result.reference:
-        return VerificationOutcome(outcome=OUTCOME_APPLICATION_NOT_FOUND, application_reference=application.reference)
-
-    updated = _upsert_scraped_application(
-        session, council, result, batch_id=None, material_change_stats=material_change_stats,
-        authoritative_source=SOURCE_STATUS_VERIFICATION, lifecycle_event_stats=lifecycle_event_stats,
-    )
-    session.commit()
-
-    new_state = ApplicationState(
-        status=updated.status, decision=updated.decision, estimated_unit_count=updated.estimated_unit_count,
-    )
-    change_result = detect_material_application_change(old_state, new_state)
-
-    # Section 8: status_verified_at advances ONLY here - a completed
-    # direct retrieval and parse, whether or not anything changed.
-    updated.status_verified_at = dt.datetime.now(dt.timezone.utc)
-    session.commit()
-
+    local_events = LifecycleEventStats()
+    try:
+        stamp = dt.datetime.now(dt.timezone.utc)
+        prior_stamp = prior[3]
+        if prior_stamp is not None and stamp <= (prior_stamp.replace(tzinfo=dt.timezone.utc) if prior_stamp.tzinfo is None else prior_stamp):
+            session.rollback()
+            return outcome(OUTCOME_PERSISTENCE_FAILED)
+        conditions = [column.is_(None) if value is None else column == value
+                      for column, value in zip(columns, prior)]
+        reservation = session.execute(update(Application).where(
+            Application.id == application.id, Application.reference == reference,
+            Application.council_code == council.code, *conditions,
+        ).values(status_verified_at=stamp).execution_options(synchronize_session=False))
+        if reservation.rowcount != 1:
+            session.rollback()
+            return outcome(OUTCOME_STALE_RESPONSE)
+        session.refresh(application)
+        updated = _upsert_scraped_application(
+            session, council, result, batch_id=None, material_change_stats=None,
+            authoritative_source=SOURCE_STATUS_VERIFICATION, lifecycle_event_stats=local_events,
+        )
+        changed = detect_material_application_change(old_state, ApplicationState(
+            status=updated.status, decision=updated.decision,
+            estimated_unit_count=updated.estimated_unit_count))
+        # A changed terminal outcome cannot borrow the prior decision's date.
+        if prior[1] != updated.decision and not fields.get("Decision Issued Date"):
+            updated.decision_issued_date = None
+        old_date = parse_portal_date(prior[2])
+        new_date = parse_portal_date(updated.decision_issued_date)
+        if new_date != dt.date.min and new_date != old_date and prior[1] == updated.decision:
+            from app.pipeline.lifecycle_events import record_decision_date_correction
+            from app.pipeline.material_change import TRIGGER_MATERIAL_CHANGE
+            from dataclasses import replace
+            record_decision_date_correction(session, application_id=updated.id,
+                old_date=prior[2], new_date=updated.decision_issued_date,
+                authoritative_source=SOURCE_STATUS_VERIFICATION, stats=local_events)
+            changed = replace(changed, changed=True, reasons=(*changed.reasons, "decision_date_corrected"))
+            updated.evidence_refresh_required = True
+            updated.evidence_refresh_reason = ",".join(changed.reasons)
+            updated.evidence_refresh_trigger = TRIGGER_MATERIAL_CHANGE
+            updated.evidence_refresh_requested_at = stamp
+        updated.status_verified_at = stamp
+        session.commit()  # sole commit: watermark + facts + lifecycle + refresh signal
+    except BaseException as error:
+        session.rollback()
+        if not isinstance(error, Exception):
+            raise  # interruption/cancellation cleans up but never reports success
+        return outcome(OUTCOME_PERSISTENCE_FAILED)
+    # Operational counters are updated only for committed evidence.
+    if material_change_stats is not None:
+        material_change_stats.record(changed)
+    if lifecycle_event_stats is not None:
+        lifecycle_event_stats.record(local_events.written)
     return VerificationOutcome(
-        outcome=OUTCOME_VERIFIED_CHANGED if change_result.changed else OUTCOME_VERIFIED_UNCHANGED,
-        application_reference=updated.reference, material_change_reasons=change_result.reasons,
+        outcome=OUTCOME_VERIFIED_CHANGED if changed.changed else OUTCOME_VERIFIED_UNCHANGED,
+        application_reference=reference, material_change_reasons=changed.reasons,
     )
 
 
