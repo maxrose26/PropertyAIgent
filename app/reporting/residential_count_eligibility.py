@@ -39,8 +39,17 @@ def residential_count_eligibility(application, value=None):
               r"(?:up to\s+|approximately\s+|approx\.?\s+)?")
     # Trim a trailing parent citation only after current-scope evidence. Some
     # portals put the citation BEFORE the actual description; keep that text.
+    ancillary_action = re.search(
+        r"\b(?:reserved matters(?: application)?(?: approval)?(?: for)?|"
+        r"application for reserved matters approval for|"
+        r"(?:approval|provision|construction|erection) of)\s+"
+        r"(?:associated\s+)?(?:landscaping(?: works)?|infrastructure(?: works)?)\b",
+        text,
+    ) or re.match(r"\s*landscaping(?: works)?\b", text)
     before_parent = re.split(r"\bpursuant to\b|\bof hybrid application\b", text, maxsplit=1)[0]
-    if re.search(prefix + quantum, before_parent) or re.search(
+    if ancillary_action:
+        before_parent = re.split(r"\b(?:adjoining|adjacent to|associated with|in connection with)\s+(?:(?:the|a)\s+)?(?:erection|construction|development|infrastructure|phase)\b|\bfor parent scheme\b", before_parent, maxsplit=1)[0]
+    if ancillary_action or re.search(prefix + quantum, before_parent) or re.search(
         r"\b(?:bridges|footbridges|porches|commercial building|acoustics building)\b", before_parent):
         text = before_parent
     creation_matches = list(re.finditer(prefix + quantum, text))
@@ -49,8 +58,24 @@ def residential_count_eligibility(application, value=None):
             r"\b(?:conversion|change of use)\s+[^.;]{0,100}?\b(?:to|into)\s+" + quantum, text))
     if not creation_matches:
         creation_matches = list(re.finditer(r"\bdevelopment of land for\s+" + quantum, text))
+    if not creation_matches:
+        # A building-creation clause can place its residential quantum after
+        # height/use details. Require an explicit new development/building and
+        # a containing connective; incidental demolition/works are not creation.
+        building_creation = (
+            r"\b(?:erection|construction|provision|development)\s+(?:of\s+)?"
+            r"(?:a\s+|an\s+)?(?:new\s+)?(?:(?:[0-9]+|[a-z]+)[ -](?:storey|story)\s+)?"
+            r"(?:(?:mixed-use|residential|apartment|new)\s+)?"
+            r"(?:development|building|block)\b[^.;]{0,160}?"
+            r"\b(?:with|containing|comprising|providing)\s+" + quantum
+        )
+        creation_matches = list(re.finditer(building_creation, text))
     creation = bool(creation_matches)
     if not creation:
+        # The application action, not the mere word 'landscaping', establishes
+        # an ancillary scope. Parent citations cannot supply its own homes.
+        if ancillary_action:
+            return CountEligibility("ancillary_works_scope")
         if re.search(r"\b(?:porches|roofs?|windows?|cladding|repairs|refurbishment)\b", text) and re.search(
             r"\b(?:existing\b|to\s+\d+\s+(?:dwellings|homes|houses))", text):
             return CountEligibility("existing_stock_works")

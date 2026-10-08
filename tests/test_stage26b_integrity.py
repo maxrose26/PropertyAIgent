@@ -14,15 +14,18 @@ def test_historical_and_current_successor_integrity():
     assert_historical_and_successor(ROOT,HISTORICAL)
 
 
-@pytest.mark.parametrize('surface',['historical','manifest','eligibility','approved','proposed','portal','legacy','constant','binding','position','decorator'])
+@pytest.mark.parametrize('surface',['historical','manifest','eligibility','approved','proposed','portal','legacy','constant','binding','position','decorator','predecessor','creation','ancillary'])
 def test_corrupted_contract_or_runtime_dependency_fails(tmp_path,surface):
     contract=json.loads((ROOT/MANIFEST).read_text())
-    files={MANIFEST,contract['historical']['fixture'],*contract['definition_pins'],*contract['module_pins']}
+    files={MANIFEST,contract['predecessor']['fixture'],contract['historical']['fixture'],*contract['definition_pins'],*contract['module_pins']}
     for name in files:
         target=tmp_path/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,target)
     choices={
+      'predecessor':(contract['predecessor']['fixture'],'stage26b-b1-reconciliation-v1','stage26b-b1-reconciliation-v2'),
+      'creation':('app/reporting/residential_count_eligibility.py','creation_matches = list(re.finditer(building_creation, text))','creation_matches = []'),
+      'ancillary':('app/reporting/residential_count_eligibility.py','if ancillary_action:', 'if False:'),
       'historical':(contract['historical']['fixture'],'FACT_RESOLVED = "resolved"','FACT_RESOLVED = "changed"'),
-      'manifest':(MANIFEST,'stage26b-b1-reconciliation-v1','stage26b-b1-reconciliation-v2'),
+      'manifest':(MANIFEST,'stage26b-b11-reconciliation-v1','stage26b-b11-reconciliation-v2'),
       'eligibility':('app/reporting/residential_count_eligibility.py','return CountEligibility("existing_stock_works")','return CountEligibility()'),
       'approved':('app/reporting/scheme_reconciliation.py','def _resolve_approved_units','def _changed_approved_units'),
       'proposed':('app/reporting/scheme_reconciliation.py','def _build_active_position','def _changed_active_position'),
