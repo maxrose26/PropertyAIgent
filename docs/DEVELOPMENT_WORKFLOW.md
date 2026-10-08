@@ -15,9 +15,11 @@ Before substantial implementation begins:
 1. Confirm the exact REVIEW-approved integration-base commit.
 2. Refresh the remote repository state.
 3. Create/use a dedicated feature branch for the authorised workstream.
-4. Confirm authenticated native Git publication to that remote branch is available.
+4. Establish the dedicated feature branch remotely and confirm a supported authenticated GitHub write route before substantial implementation.
 
-If genuine Git publication is unavailable, resolve or report that capability **before substantial implementation proceeds**. Do not defer publication capability until final acceptance.
+GitHub remote durability is mandatory. Native Git publication is preferred where available. A supported authenticated GitHub connector/API write route is acceptable when established before substantial implementation and used to persist coherent checkpoints remotely.
+
+If no supported authenticated remote write route is available, resolve or report that capability **before substantial implementation proceeds**. Do not defer publication capability until final acceptance.
 
 Never implement directly on `master`.
 
@@ -25,7 +27,9 @@ Never implement directly on `master`.
 
 Local investigation, experiments and intermediate edits are allowed.
 
-Once a coherent implementation checkpoint exists, publish the **genuine Git history** to the dedicated remote feature branch. For substantial work, continue pushing coherent checkpoints so accepted engineering history is not stranded in an ephemeral environment.
+Persist each coherent implementation checkpoint on the dedicated remote feature branch through the established native Git or authenticated connector/API route. For substantial work, continue persisting coherent checkpoints so accepted engineering history is not stranded in an ephemeral environment.
+
+With a connector/API workflow, the remotely created commit is the authoritative candidate: retrieve and test/review that exact candidate, and record its commit, tree, parentage and diff identities. Do not report a separately tested local candidate as equivalent without verifying the remote identity and contents.
 
 Before DEVELOPMENT reports a candidate as implementation-complete or REVIEW-ready, verify:
 
@@ -40,7 +44,7 @@ A local-only commit is not a completed REVIEW candidate.
 
 ## 3. Preserve genuine history
 
-Do not reconstruct replacement commits through an API merely to recover from late publication failure unless REVIEW explicitly authorises replacement history.
+Do not reconstruct an accepted local candidate after the fact through an API merely to work around late publication failure unless REVIEW explicitly authorises replacement history. Prospective connector/API checkpoint creation under the established remote workflow does not waive this prohibition or permit silently replacing accepted Git history.
 
 Do not silently squash, rebase, amend or cherry-pick an accepted candidate into a different identity.
 
