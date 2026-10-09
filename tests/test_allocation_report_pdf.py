@@ -98,6 +98,8 @@ def _make_summary(session, allocation_id, *, headline="Test headline.", overview
     # v8 release safety: a narrative is shown as current intelligence only if it was generated under the CURRENT prompt version, so a fixture standing for a current summary records it.
     from app.reporting.allocation_intelligence_summary import PROMPT_VERSION
     kwargs.setdefault("prompt_version", PROMPT_VERSION)
+    from app.reporting.allocation_intelligence_summary import build_allocation_context, compute_context_fingerprint
+    kwargs.setdefault("context_fingerprint", compute_context_fingerprint(build_allocation_context(session, session.get(LocalPlanSite, allocation_id))))
     row = AllocationIntelligenceSummary(
         allocation_id=allocation_id, headline=headline, overview=overview, status=status, **kwargs,
     )

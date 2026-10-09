@@ -207,3 +207,16 @@ def test_timestamp_only_actual_buyer_family_subject_explanation_and_fingerprint_
         fingerprints=[(r.opportunity_id,compute_opportunity_fingerprint(r.fingerprint_fields)) for r in build_current_opportunity_universe(session)]
         return family_view,fingerprints
     before=snapshot();app.status_verified_at=NOW;session.commit();assert snapshot()==before
+
+
+def test_named_phase_valid_type_wrong_label_cannot_borrow_verification(session):
+    from app.reporting.opportunity_feed import _attach_planning_delivery_matching_facts
+    from app.reporting.scheme_reconciliation import scoped_count_assessment
+    site=_make_site(session)
+    app=_make_app(session,site.id,reference='PHASE/2',proposal='Reserved matters for Phase 2 erection of 68 dwellings',decision='Granted',decision_issued_date='2026-01-01',status_verified_at=NOW)
+    assessment=scoped_count_assessment([app], 'phase', 'Phase 2')
+    card={"params":{"site_id":site.id},"phase_code":"1","count_assessment":assessment}
+    _attach_planning_delivery_matching_facts(session,[card])
+    position=card['planning_freshness'][0]
+    assert position[1] is None and position[2].last_successful_verification is None
+    assert position[2].freshness=='verification_unavailable'

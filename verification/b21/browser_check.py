@@ -41,8 +41,11 @@ try:
             long=page.get_by_text('Source conflict requires review.',exact=False)
             box=long.bounding_box();assert box and box['x']>=0 and box['x']+box['width']<=width+1
             assert box['height']>20
-            buttons=page.get_by_role('button');names=buttons.all_text_contents()
-            assert any('Related acquisition subjects' in label for label in names)
+            # Streamlit expander uses the native disclosure (summary), not a button.
+            disclosure=page.locator('summary').filter(has_text='Related acquisition subjects')
+            assert disclosure.count()==1
+            assert 'Related acquisition subjects' in disclosure.inner_text()
+            assert disclosure.evaluate("el => el.parentElement.tagName === 'DETAILS' && el.parentElement.open")
             page.screenshot(path=str(out/f'{name}.png'),full_page=True)
             results.append({'viewport':name,'width':width,'height':height,'overflow':False,'status_fact_date_verification_qualification':True,'long_qualification_wrap':True,'expander_accessible_name':True})
             context.close()

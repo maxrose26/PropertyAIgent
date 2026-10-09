@@ -62,7 +62,6 @@ from app.reporting.allocation_discovery import (
 )
 from app.reporting.allocation_intelligence_summary import (
     AI_SUMMARY_REQUIRES_REFRESH_TEXT, _clean_portal_value, get_allocation_summaries, summary_requires_refresh,
-    build_allocation_context, allocation_narrative_eligibility,
 )
 from app.reporting.ownership_control import get_allocations_control_intelligence
 
@@ -385,6 +384,8 @@ def build_allocation_report_context(session: Session, allocation_ids: list[int])
     lands in `excluded` with a reason, while every other id's entry is
     still built normally (Section 21A: "one broken allocation must not
     prevent export of the others")."""
+    from app.reporting.allocation_intelligence_summary import build_allocation_context, allocation_narrative_eligibility
+
     unique_ids = sorted(set(allocation_ids))
     generated_at = dt.datetime.now(dt.timezone.utc)
 
