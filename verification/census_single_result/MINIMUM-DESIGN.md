@@ -71,9 +71,9 @@ Five-second SQL timeout differs from <=60-second observed client/request ceiling
 
 ## Historical sizing and feasibility
 
-`sizing.json` reports historical rows/bytes per section. Known Oct8 ten-section subtotal:2101 DATA rows/1,031,835 compact UTF8 bytes including typed record wrappers. The unmeasured summary population uses an explicitly qualified249-row scenario extrapolated from the Oct9 one-canary metadata row:82,917 bytes. This is not current certified population or an upper bound on arbitrary metadata.
+`sizing.json` reports historical rows/bytes per section. Known Oct8 ten-section subtotal:2101 DATA rows/1,031,835 compact UTF8 bytes including typed record wrappers. The unmeasured summary population uses an explicitly qualified263-record scenario (249 narrative-bearing) extrapolated from the Oct9 one-canary metadata row:87,579 bytes. This is not current certified population or an upper bound on arbitrary metadata.
 
-Scenario total:2350 DATA rows/1,114,752 compact bytes. Add100,000 estimated SQL JSON-formatting reserve and10,000 section-control reserve. Sixfold encoded scenario plus4096 framing:7,352,608 bytes. Estimated headroom:2,647,392 bytes (26.47%). Exact server guard uses actual serialization, not this estimate. Current growth/long proposals can still cause fail-closed overflow.
+Scenario total:2364 DATA rows/1,119,414 compact bytes. Add100,000 estimated SQL JSON-formatting reserve and10,000 section-control reserve. Sixfold encoded scenario plus4096 framing:7,380,580 bytes. Estimated headroom:2,619,420 bytes (26.19%). Exact server guard uses actual serialization, not this estimate. Current growth/long proposals can still cause fail-closed overflow.
 
 Retained revised canary estimate:22 applications, six sites, four buyers/four mandates; documents/control/company/SI absent. Exact current sizes unknown. Original accepted small canary established transport only; no five-second full-query guarantee.
 
