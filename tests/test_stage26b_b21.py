@@ -157,3 +157,53 @@ def test_report_batch_context_fingerprint_identical_and_query_count_bounded(sess
         _make_summary(session,a.id);ids.append(a.id)
     many=count(ids)
     assert many==one and many<=10,(one,many)
+
+
+def test_named_phase_missing_scope_cannot_borrow_parent_verification(session):
+    from app.reporting.opportunity_feed import _attach_planning_delivery_matching_facts
+    site=_make_site(session)
+    _make_app(session,site.id,reference='PARENT/1',proposal='Outline erection of 500 dwellings',decision='Granted',decision_issued_date='2026-01-01',status_verified_at=NOW)
+    cards=[{"params":{"site_id":site.id},"phase_code":"1","count_assessment":None}]
+    _attach_planning_delivery_matching_facts(session,cards)
+    rows=cards[0]['planning_freshness']
+    assert rows[0][1] is None and rows[0][2].last_successful_verification is None
+
+
+def test_prefetched_context_exact_parity_with_real_disputed_control_groups(session):
+    from tests.test_allocation_report import _make_control
+    from app.reporting.allocation_development_coverage import build_allocation_development_coverage
+    from app.reporting.ownership_control import get_allocations_control_intelligence
+    allocation,app,summary=allocation_setup(session)
+    _make_control(session,site_id=app.site_id,application_id=app.id,entity_name_raw='Accepted Company',role='DEVELOPER',evidence_category='developer_indication')
+    disputed=_make_site(session,address='Disputed Site')
+    _make_relationship(session,allocation.id,disputed.id,review_status='needs_confirmation')
+    second=_make_app(session,disputed.id,reference='DISPUTED/1',status='Awaiting decision',applicant_name_raw='Untrusted Applicant')
+    _make_control(session,site_id=disputed.id,application_id=second.id,entity_name_raw='Disputed Company',role='DEVELOPER',evidence_category='developer_indication')
+    _make_app(session,app.site_id,reference='VAR/1',status='Awaiting decision',application_category='condition_discharge_or_details')
+    original=ais.build_allocation_context(session,allocation)
+    entry=build_allocation_development_coverage(session,[allocation])[allocation.id]
+    groups=get_allocations_control_intelligence(session,[app.site_id,disputed.id])
+    batch=ais.build_allocation_context(session,allocation,coverage_entry=entry,control_groups_by_site=groups)
+    assert batch==original
+    assert ais.compute_context_fingerprint(batch)==ais.compute_context_fingerprint(original)
+    assert any(o.entity_name_raw=='Accepted Company' for o in batch.ownership_entities)
+    assert all(o.entity_name_raw!='Disputed Company' for o in batch.ownership_entities)
+    assert batch.ownership_review_pending_count==1 and batch.disputed_site_count==1
+
+
+def test_timestamp_only_actual_buyer_family_subject_explanation_and_fingerprint_invariance(session):
+    from dataclasses import asdict
+    from app.db.models import SchemeIntelligence
+    from app.reporting.buyer_family_feed import build_buyer_opportunity_families
+    from app.reporting.opportunity_universe import build_current_opportunity_universe, compute_opportunity_fingerprint
+    from app.reporting.mandate_explanation import present_mandate_explanation
+    site=_make_site(session)
+    app=_make_app(session,site.id,reference='RES/1',proposal='Erection of 68 dwellings',decision='Granted',decision_issued_date='2026-09-25',status_verified_at=OLD)
+    app.scheme_intelligence=SchemeIntelligence(total_units_final=68,development_type='houses');session.commit()
+    def snapshot():
+        families=build_buyer_opportunity_families(session,'nesten_homes',limit=10)
+        assert families['families']
+        family_view=[(f.family_key,f.representative.subject_key,[(m.subject_key,asdict(m.source['buyer_fit']),asdict(present_mandate_explanation(m.source['buyer_fit'],m.source))) for m in f.members]) for f in families['families']]
+        fingerprints=[(r.opportunity_id,compute_opportunity_fingerprint(r.fingerprint_fields)) for r in build_current_opportunity_universe(session)]
+        return family_view,fingerprints
+    before=snapshot();app.status_verified_at=NOW;session.commit();assert snapshot()==before

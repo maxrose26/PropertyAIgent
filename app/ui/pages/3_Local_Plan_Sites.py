@@ -70,7 +70,7 @@ from app.reporting.ownership_control import (
     EMPTY_STATE_ALLOCATION_SITE,
     OWNERSHIP_INTELLIGENCE_GAP_CUE,
     SOURCE_NOTE,
-    get_allocation_control_intelligence,
+    get_allocation_control_intelligence, get_allocations_control_intelligence,
 )
 from app.reporting.residential_mix import build_residential_mix
 from app.reporting.residual_opportunity import ALLOCATION_R2_TEXT, allocation_residual_context
@@ -391,7 +391,15 @@ with page_scope():
             # OpenAI - Section 8's own "opening an allocation page must NOT
             # normally call OpenAI" rule.
             ai_summary_row = get_allocation_summary(session, allocation_id)
-            narrative_eligibility = allocation_narrative_eligibility(ai_summary_row, build_allocation_context(session, allocation_row)) if ai_summary_row is not None and ai_summary_row.headline else "missing"
+            # Reuse this page's existing coverage and one ownership batch, also
+            # consumed by the control section below. No per-site narrative reads.
+            summary_sites = coverage.site_summaries if coverage is not None else []
+            control_groups_by_site = get_allocations_control_intelligence(session, [s.site_id for s in summary_sites])
+            narrative_context = build_allocation_context(
+                session, allocation_row, coverage_entry={"coverage": coverage, "site_summaries": summary_sites},
+                control_groups_by_site=control_groups_by_site,
+            ) if ai_summary_row is not None and ai_summary_row.headline else None
+            narrative_eligibility = allocation_narrative_eligibility(ai_summary_row, narrative_context)
             if summary_requires_refresh(ai_summary_row):
                 # v8 release safety: a narrative generated under an older prompt version is NOT shown as current intelligence. The stored row is preserved; refresh is a separate, authorised, paid action.
                 with st.expander("AI narrative", icon="🤖", expanded=False):
@@ -653,6 +661,7 @@ with page_scope():
                 section_header("Ownership & Control", icon="🗝️")
                 control_sections = get_allocation_control_intelligence(
                     session, coverage.site_summaries, indicative_residual_capacity=coverage.indicative_residual_capacity,
+                    groups_by_site=control_groups_by_site,
                 )
                 site_sections = [s for s in control_sections if not s.is_residual]
                 residual_sections = [s for s in control_sections if s.is_residual]

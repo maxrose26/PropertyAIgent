@@ -16,5 +16,5 @@ env -i HOME=/tmp PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: PYTHONDONTWR
  --junitxml="$output/security.xml" | tee "$output/security.log"
 env -i HOME=/tmp PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
  "$interpreter" verification/stage2_ui_offline_pytest.py -q -p no:cacheprovider -p verification.stage1_preservation_plugin \
- tests/test_stage26b_rendered.py tests/test_stage2_profile_journey.py tests/test_family_dashboard_render.py tests/test_mandate_explanation_presentation.py verification/test_ui_session_lifecycle.py \
+ tests/test_stage26b_b21_rendered.py tests/test_stage26b_rendered.py tests/test_stage2_profile_journey.py tests/test_family_dashboard_render.py tests/test_mandate_explanation_presentation.py verification/test_ui_session_lifecycle.py \
  --junitxml="$output/journey.xml" | tee "$output/journey.log"

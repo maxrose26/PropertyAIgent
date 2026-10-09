@@ -291,7 +291,14 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> dict
                 operative = planning_facts_for_scope(operative, assessment.scope_type, assessment.scope_label)
             from app.reporting.planning_freshness import present_operative_planning_freshness
             import datetime as dt
-            freshness_by_context[key] = present_operative_planning_freshness(operative, apps_by_site[site_id], now=dt.datetime.now(dt.timezone.utc))
+            from app.pipeline.phase_tracking import UNPHASED_LABEL
+            if phase_code and phase_code != UNPHASED_LABEL and (assessment is None or assessment.scope_type not in {"phase", "parcel"}):
+                from app.reporting.planning_freshness import PlanningFreshness
+                freshness_by_context[key] = (("Subject planning position", None, PlanningFreshness(
+                    "unknown_unverified", None, None, None, "verification_unavailable",
+                    "Current verification unavailable: subject planning source attribution unresolved", "unavailable")),)
+            else:
+                freshness_by_context[key] = present_operative_planning_freshness(operative, apps_by_site[site_id], now=dt.datetime.now(dt.timezone.utc))
             facts = build_planning_delivery_matching_facts_from_operative(
                 operative, apps_by_site[site_id], application_reference=reference)
             if phase_code:
