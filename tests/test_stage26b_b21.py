@@ -220,3 +220,23 @@ def test_named_phase_valid_type_wrong_label_cannot_borrow_verification(session):
     position=card['planning_freshness'][0]
     assert position[1] is None and position[2].last_successful_verification is None
     assert position[2].freshness=='verification_unavailable'
+
+
+def test_supporting_application_reads_batch_dashboard_related_subjects(session):
+    from app.reporting.opportunity_feed import _attach_planning_delivery_matching_facts
+    sites=[]
+    for i in range(9):
+        site=_make_site(session,address=f'Batch supporting site {i}')
+        _make_app(session,site.id,reference=f'B21/BATCH/{i}',proposal='Erection of 68 dwellings',status_verified_at=NOW)
+        sites.append(site.id)
+    def count(ids):
+        session.expire_all();statements=[]
+        def observe(*args): statements.append(args[2])
+        event.listen(session.bind,'before_cursor_execute',observe)
+        try:
+            cards=[{'params':{'site_id':sid}} for sid in ids]
+            _attach_planning_delivery_matching_facts(session,cards)
+            assert all(c.get('planning_freshness') for c in cards)
+        finally:event.remove(session.bind,'before_cursor_execute',observe)
+        return len(statements)
+    assert count(sites[:1])==count(sites)==2

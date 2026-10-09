@@ -85,4 +85,22 @@ def test_full_dashboard_phase_profile_history_and_real_scheme_csv(tmp_path,monke
     assert rows and 'Planning Verified As Of' in rows[0]
     assert 'OUT/B21: 2026-09-18' in rows[0]['Planning Verified As Of']
     assert 'RM/B21' not in rows[0]['Planning Verified As Of'] # phase time cannot verify wider-site status
+    # Actual Local Plan detail must use the same eligibility decision as reports/CSV.
+    from tests.test_allocation_report import _make_local_plan, _make_allocation, _make_relationship, _make_summary
+    from app.reporting.allocation_report import build_allocation_report_context, to_csv_rows
+    with Session(engine) as session:
+        plan=_make_local_plan(session,council_code='stockport')
+        allocation=_make_allocation(session,plan.id,council_code='stockport')
+        _make_relationship(session,allocation.id,sid)
+        summary=_make_summary(session,allocation.id,headline='B21 stored prose must be withheld',overview='Old authoritative context')
+        aid=allocation.id
+        session.query(Application).filter_by(reference='RM/B21').one().decision='Refused'
+        session.commit()
+        report=build_allocation_report_context(session,[aid])
+        assert report.entries[0].ai_intelligence.requires_refresh
+        assert 'B21 stored prose must be withheld' not in str(to_csv_rows(report))
+    at.switch_page('pages/3_Local_Plan_Sites.py');at.query_params.clear();at.query_params['allocation_id']=str(aid);at.run(timeout=30)
+    assert not at.exception,[(e.message,e.stack_trace) for e in at.exception]
+    assert 'B21 stored prose must be withheld' not in text(at)
+    assert 'requires refresh' in text(at).lower()
     engine.dispose()
