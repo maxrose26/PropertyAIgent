@@ -248,3 +248,18 @@ def record_related_application_discovery_event(
     if stats is not None:
         stats.record(written)
     return written
+
+
+def record_decision_date_correction(session: Session, *, application_id: int,
+                                    old_date, new_date, authoritative_source: str,
+                                    stats: LifecycleEventStats | None = None) -> None:
+    """B2.0 accepted date correction, in the caller's atomic status transaction.
+
+    Existing generic lifecycle shape; no new table, detector or AI processing.
+    Caller has validated/compared parsed exact-reference dates before invoking.
+    """
+    _write_event(session, application_id=application_id, event_type=EVENT_STATUS_CHANGED,
+                 authoritative_source=authoritative_source, field_name="decision_issued_date",
+                 old_value=old_date, new_value=new_date)
+    if stats is not None:
+        stats.record(1)

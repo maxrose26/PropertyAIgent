@@ -1,0 +1,11 @@
+{
+  "contract": "stage26b-b20-freshness-v1",
+  "audit_pack_sha256": "25c765339320d71e1892c88d67aaa93f98ada92f4080174c291f6685b73f724d",
+  "limitations": "Dated purposive observations, not current production forecasts. Historical failure attribution remains unresolved. No real withdrawal/appeal/variation outcome is established here.",
+  "cases": [
+    {"name":"Failsworth", "kind":"REAL_SOURCE_QUALIFIED_FACT", "site_id":28, "application_id":42, "reference":"FUL/355686/26", "council":"oldham", "observed_at":"2026-10-08T11:03:10.160Z", "source_url":"https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TA7382MCIP700", "source_snapshot_sha256":"8a8cb01baf5f4a032f5d89005597a07f2b63e0dd359451bef179f4c4871312a1", "stored_status":"Awaiting decision", "stored_decision":null, "stored_date":null, "verified_at":"2026-09-18T05:20:51.437351+00:00", "expected_decision":"Refused", "expected_source_date":"2026-09-25", "historical_cause":"UNRESOLVED"},
+    {"name":"Southlink", "kind":"REAL_SOURCE_QUALIFIED_FACT", "site_id":25, "application_id":29, "reference":"FUL/355201/25", "council":"oldham", "observed_at":"2026-10-08T11:02:41.977Z", "source_snapshot_sha256":"45d3ddd86ba031ca730540a6d554ae01b0e05e5e17b4ded4e243163fc8a32985", "stored_status":"Awaiting decision", "stored_decision":null, "stored_date":null, "verified_at":"2026-09-10T10:51:19.561245+00:00", "expected_decision":null, "expected_source_date":null, "qualification":"Committee resolution is not issued permission"}
+  ],
+  "synthetic_contract_cases": ["unchanged", "grant", "refusal", "withdrawal", "committee_before_decision", "timeout", "rate_limit", "unavailable", "malformed", "not_found", "conflict", "wrong_reference", "atomicity_interruption", "out_of_order", "unsupported_appeal_or_variation"],
+  "unverified_categories": ["real_withdrawal", "real_appeal", "real_supersession_or_variation"]
+}
