@@ -76,40 +76,46 @@ def design(mode='full'):
     order=['local_plan_sites','sites','applications','scheme_intelligence','buyers','buyer_mandates',
       'local_plans','local_plan_councils','allocation_site_relationships','control_relationships',
       'councils','workspaces','documents','allocation_intelligence_summaries','companies','applicant_intelligences']
+    return render_query(mode,bounds,FIELDS,KEYS,where,order,VERSION,extra_flags=True)
+
+def render_query(mode,bounds,fields,keys,where,order,version,*,extra_flags=False):
     ctes=[]; manifest=[]
     for t in order:
-        columns=['x.'+f for f in FIELDS[t].split(',')]
-        if t=='applications': columns.append("(x.applicant_name_raw IS NOT NULL AND x.applicant_name_raw<>'') AS applicant_present")
-        if t=='control_relationships': columns.append("(x.title_number IS NOT NULL AND x.title_number<>'') AS title_present")
-        if t=='allocation_intelligence_summaries': columns += ["(coalesce(x.headline,'')<>'') AS headline_present","(coalesce(x.overview,'')<>'') AS overview_present"]
-        select=f"SELECT {','.join(columns)} FROM public.{t} x WHERE {where[t]} ORDER BY x.{KEYS[t]} LIMIT {bounds[t]+1}"
+        columns=['x.'+f for f in fields[t].split(',')]
+        if extra_flags and t=='applications': columns.append("(x.applicant_name_raw IS NOT NULL AND x.applicant_name_raw<>'') AS applicant_present")
+        if extra_flags and t=='control_relationships': columns.append("(x.title_number IS NOT NULL AND x.title_number<>'') AS title_present")
+        if extra_flags and t=='allocation_intelligence_summaries': columns += ["(coalesce(x.headline,'')<>'') AS headline_present","(coalesce(x.overview,'')<>'') AS overview_present"]
+        select=f"SELECT {','.join(columns)} FROM public.{t} x WHERE {where[t]} ORDER BY x.{keys[t]} LIMIT {bounds[t]+1}"
         ctes.append(f's_{t} AS MATERIALIZED ({select})')
-        manifest.append(dict(section=t,table='public.'+t,columns=columns,predicate=where[t],key=KEYS[t],limit_plus_one=bounds[t]+1,timeout_seconds=5,
-          index_evidence='ORM primary key (councils.code / other id); deployed index and FK access paths UNVERIFIED',assembly_key=[t,KEYS[t]]))
+        manifest.append(dict(section=t,table='public.'+t,columns=columns,predicate=where[t],key=keys[t],limit_plus_one=bounds[t]+1,timeout_seconds=5,
+          index_evidence='ORM primary key (councils.code / other id); deployed index and FK access paths UNVERIFIED',assembly_key=[t,keys[t]]))
     branches=[]
     for t in order:
-        branches.append(f"SELECT '{t}'::text AS record_type,'DATA'::text AS row_kind,a.{KEYS[t]}::text AS record_id,to_jsonb(a) AS payload FROM s_{t} a")
-        branches.append(f"SELECT '{t}'::text,'CONTROL'::text,NULL::text,jsonb_build_object('count',count(a.{KEYS[t]}),'limit',{bounds[t]},'overflow',count(a.{KEYS[t]})>{bounds[t]}) FROM s_{t} a")
+        branches.append(f"SELECT '{t}'::text AS record_type,'DATA'::text AS row_kind,a.{keys[t]}::text AS record_id,to_jsonb(a) AS payload FROM s_{t} a")
+        branches.append(f"SELECT '{t}'::text,'CONTROL'::text,NULL::text,jsonb_build_object('count',count(a.{keys[t]}),'limit',{bounds[t]},'overflow',count(a.{keys[t]})>{bounds[t]}) FROM s_{t} a")
     ctes.append('rows AS MATERIALIZED ('+'\nUNION ALL\n'.join(branches)+')')
     ctes.append("safety AS MATERIALIZED (SELECT current_setting('transaction_read_only') AS read_only,current_setting('transaction_isolation') AS isolation,current_setting('statement_timeout') AS statement_timeout,current_setting('lock_timeout') AS lock_timeout,pg_current_snapshot()::text AS snapshot,statement_timestamp() AS captured_at,pg_backend_pid() AS backend_pid)")
     ctes.append("budget AS MATERIALIZED (SELECT coalesce(sum(octet_length(row_to_json(r)::text)+2),0) AS logical_bytes,6*coalesce(sum(octet_length(row_to_json(r)::text)+2),0)+4096 AS encoded_upper_bound,count(record_type) AS rows FROM rows r)")
-    final="SELECT record_type,row_kind,record_id,payload FROM rows WHERE (SELECT encoded_upper_bound<=10000000 FROM budget) AND NOT EXISTS(SELECT 1 FROM rows z WHERE z.row_kind='CONTROL' AND (z.payload->>'overflow')::boolean)\nUNION ALL\nSELECT '__capture','CONTROL',NULL::text,to_jsonb(s)||jsonb_build_object('version','"+VERSION+"','mode','"+mode+"','logical_bytes',b.logical_bytes,'row_count',b.rows,'encoded_upper_bound',b.encoded_upper_bound,'byte_limit',10000000,'row_limit',"+str(sum(v+1 for v in bounds.values())+len(bounds))+",'overflow',b.encoded_upper_bound>10000000 OR EXISTS(SELECT 1 FROM rows z WHERE z.row_kind='CONTROL' AND (z.payload->>'overflow')::boolean)) FROM safety s CROSS JOIN budget b\nORDER BY record_type,row_kind,record_id"
+    final="SELECT record_type,row_kind,record_id,payload FROM rows WHERE (SELECT encoded_upper_bound<=10000000 FROM budget) AND NOT EXISTS(SELECT 1 FROM rows z WHERE z.row_kind='CONTROL' AND (z.payload->>'overflow')::boolean)\nUNION ALL\nSELECT '__capture','CONTROL',NULL::text,to_jsonb(s)||jsonb_build_object('version','"+version+"','mode','"+mode+"','logical_bytes',b.logical_bytes,'row_count',b.rows,'encoded_upper_bound',b.encoded_upper_bound,'byte_limit',10000000,'row_limit',"+str(sum(v+1 for v in bounds.values())+len(bounds))+",'overflow',b.encoded_upper_bound>10000000 OR EXISTS(SELECT 1 FROM rows z WHERE z.row_kind='CONTROL' AND (z.payload->>'overflow')::boolean)) FROM safety s CROSS JOIN budget b\nORDER BY record_type,row_kind,record_id"
     sql='WITH '+',\n'.join(ctes)+'\n'+final+';\n'
     wrapper="BEGIN;\nSET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;\nSET LOCAL statement_timeout='5s';\nSET LOCAL lock_timeout='2s';\n"+sql+'ROLLBACK;\n'
-    return sql,wrapper,dict(version=VERSION,mode=mode,sections=manifest,bounds=bounds,byte_limit=10000000,runtime_limit=60,
+    return sql,wrapper,dict(version=version,mode=mode,sections=manifest,bounds=bounds,byte_limit=10000000,runtime_limit=60,
       statements=6,qualifications=['document-derived control/phasing excluded','fuzzy identity resolution excluded','canonical narrative hash parity unresolved','capture COMPLETE is not dependency-census COMPLETE'],sql_sha256=hashlib.sha256(sql.encode()).hexdigest())
 
 def assemble(rows, *, encoded_bytes, elapsed_seconds):
+    return validate_rows(rows,encoded_bytes=encoded_bytes,elapsed_seconds=elapsed_seconds,fields=FIELDS,keys=KEYS,fk=FK,manifest_fn=design,version=VERSION,extra_flags=True)
+
+def validate_rows(rows, *, encoded_bytes, elapsed_seconds,fields,keys,fk,manifest_fn,version,extra_flags=False):
     if encoded_bytes>10000000 or elapsed_seconds>60: raise ValueError('Capture byte/runtime overflow')
     capture=[r for r in rows if r['record_type']=='__capture']
     if len(capture)!=1 or capture[0]['row_kind']!='CONTROL': raise ValueError('Missing/duplicate capture control')
     c=capture[0]['payload']
-    if c.get('version')!=VERSION or c.get('mode') not in ('canary','full'): raise ValueError('Unknown manifest')
+    if c.get('version')!=version or c.get('mode') not in ('canary','full'): raise ValueError('Unknown manifest')
     if c.get('read_only')!='on' or c.get('isolation')!='repeatable read': raise ValueError('Unsafe transaction')
     if c.get('statement_timeout')!='5s' or c.get('lock_timeout')!='2s' or not c.get('snapshot') or not c.get('captured_at') or not c.get('backend_pid'): raise ValueError('Missing safety evidence')
     if c.get('overflow') is not False or c.get('encoded_upper_bound',10000001)>10000000: raise ValueError('Overflow')
-    _,_,manifest=design(c['mode']);bounds=manifest['bounds']
-    sections={t:[] for t in FIELDS};controls={}
+    _,_,manifest=manifest_fn(c['mode']);bounds=manifest['bounds']
+    sections={t:[] for t in fields};controls={}
     for r in rows:
         t=r['record_type']
         if t=='__capture': continue
@@ -118,25 +124,25 @@ def assemble(rows, *, encoded_bytes, elapsed_seconds):
             if t in controls: raise ValueError('Duplicate control')
             controls[t]=r['payload']
         elif r['row_kind']=='DATA':
-            if str(r['payload'].get(KEYS[t]))!=r['record_id']: raise ValueError('Key mismatch')
-            allowed=set(FIELDS[t].split(','))|({'applicant_present'} if t=='applications' else {'title_present'} if t=='control_relationships' else {'headline_present','overview_present'} if t=='allocation_intelligence_summaries' else set())
+            if str(r['payload'].get(keys[t]))!=r['record_id']: raise ValueError('Key mismatch')
+            allowed=set(fields[t].split(','))|(({'applicant_present'} if t=='applications' else {'title_present'} if t=='control_relationships' else {'headline_present','overview_present'} if t=='allocation_intelligence_summaries' else set()) if extra_flags else set())
             if set(r['payload'])!=allowed: raise ValueError('Projection mismatch')
             sections[t].append(r['payload'])
         else: raise ValueError('Unknown row kind')
-    if set(controls)!=set(FIELDS): raise ValueError('Missing section')
+    if set(controls)!=set(fields): raise ValueError('Missing section')
     if c.get('row_count')!=len(rows)-1: raise ValueError('Total row mismatch')
     indexes={}
     for t,records in sections.items():
-        ctr=controls[t];keys=[r[KEYS[t]] for r in records]
-        if len(keys)!=len(set(keys)): raise ValueError('Duplicate key')
-        if ctr.get('count')!=len(keys) or ctr.get('limit')!=bounds[t] or ctr.get('overflow') is not False or len(keys)>bounds[t]: raise ValueError('Count/overflow mismatch')
-        indexes[t]=set(keys)
+        ctr=controls[t];row_keys=[r[keys[t]] for r in records]
+        if len(row_keys)!=len(set(row_keys)): raise ValueError('Duplicate key')
+        if ctr.get('count')!=len(row_keys) or ctr.get('limit')!=bounds[t] or ctr.get('overflow') is not False or len(row_keys)>bounds[t]: raise ValueError('Count/overflow mismatch')
+        indexes[t]=set(row_keys)
     unresolved=[]
-    for table,field,parent in FK:
+    for table,field,parent in fk:
         for r in sections[table]:
             if r[field] is not None and r[field] not in indexes[parent]:
                 # Cross-scope context is never silently treated as no relationship.
-                unresolved.append(dict(table=table,id=r[KEYS[table]],field=field,parent=parent,value=r[field],qualification='UNRESOLVED_OUTSIDE_CAPTURE_SCOPE'))
+                unresolved.append(dict(table=table,id=r[keys[table]],field=field,parent=parent,value=r[field],qualification='UNRESOLVED_OUTSIDE_CAPTURE_SCOPE'))
     for t in ('buyers','buyer_mandates'):
         if any(u['table']==t for u in unresolved): raise ValueError('Unresolved buyer isolation relationship')
     if any(b['workspace_id']!=1 or b['status']!='active' for b in sections['buyers']): raise ValueError('Buyer isolation mismatch')
