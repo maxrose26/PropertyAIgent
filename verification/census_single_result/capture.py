@@ -46,11 +46,13 @@ FK = [('applications','site_id','sites'),('scheme_intelligence','application_id'
 def design(mode='full'):
     if mode not in ('full','canary'): raise ValueError('Unsupported mode')
     bounds = dict(LIMITS)
-    if mode=='canary': bounds = {t:min(n,200) for t,n in bounds.items()}
+    if mode=='canary':
+        bounds = {t:min(n,20) for t,n in bounds.items()}
+        bounds.update(applications=100,scheme_intelligence=100,documents=300,control_relationships=50,allocation_site_relationships=50)
     # Retained IDs select a test cohort, never confer planning-source authority.
-    site_filter = 'x.id IN (25,28,254,58,96,62)' if mode=='canary' else 'TRUE'
-    alloc_filter = ('(x.matched_site_id IN (25,28,254,58,96,62) OR x.id IN '
-       '(SELECT r.allocation_id FROM public.allocation_site_relationships r WHERE r.site_id IN (25,28,254,58,96,62)) '
+    site_filter = 'x.id IN (25,28,254,58,96,281)' if mode=='canary' else 'TRUE'
+    alloc_filter = ('(x.matched_site_id IN (25,28,254,58,96,281) OR x.id IN '
+       '(SELECT r.allocation_id FROM public.allocation_site_relationships r WHERE r.site_id IN (25,28,254,58,96,281)) '
        'OR x.id=(SELECT min(z.allocation_id) FROM public.allocation_intelligence_summaries z '
        'JOIN public.local_plan_sites p ON p.id=z.allocation_id WHERE p.council_code IN ('+GM+')))' if mode=='canary' else 'TRUE')
     where = {
@@ -90,8 +92,8 @@ def design(mode='full'):
         branches.append(f"SELECT '{t}'::text,'CONTROL'::text,NULL::text,jsonb_build_object('count',count(a.{KEYS[t]}),'limit',{bounds[t]},'overflow',count(a.{KEYS[t]})>{bounds[t]}) FROM s_{t} a")
     ctes.append('rows AS MATERIALIZED ('+'\nUNION ALL\n'.join(branches)+')')
     ctes.append("safety AS MATERIALIZED (SELECT current_setting('transaction_read_only') AS read_only,current_setting('transaction_isolation') AS isolation,current_setting('statement_timeout') AS statement_timeout,current_setting('lock_timeout') AS lock_timeout,pg_current_snapshot()::text AS snapshot,statement_timestamp() AS captured_at,pg_backend_pid() AS backend_pid)")
-    ctes.append("budget AS MATERIALIZED (SELECT coalesce(sum(octet_length(payload::text)+octet_length(record_type)+coalesce(octet_length(record_id),0)+64),0) AS logical_bytes,count(record_type) AS rows FROM rows)")
-    final="SELECT record_type,row_kind,record_id,payload FROM rows\nUNION ALL\nSELECT '__capture','CONTROL',NULL::text,to_jsonb(s)||jsonb_build_object('version','"+VERSION+"','mode','"+mode+"','logical_bytes',b.logical_bytes,'row_count',b.rows,'byte_limit',10000000,'row_limit',"+str(sum(v+1 for v in bounds.values())+len(bounds))+",'overflow',b.logical_bytes>10000000) FROM safety s CROSS JOIN budget b\nORDER BY record_type,row_kind,record_id"
+    ctes.append("budget AS MATERIALIZED (SELECT coalesce(sum(octet_length(row_to_json(r)::text)+2),0) AS logical_bytes,6*coalesce(sum(octet_length(row_to_json(r)::text)+2),0)+4096 AS encoded_upper_bound,count(record_type) AS rows FROM rows r)")
+    final="SELECT record_type,row_kind,record_id,payload FROM rows WHERE (SELECT encoded_upper_bound<=10000000 FROM budget) AND NOT EXISTS(SELECT 1 FROM rows z WHERE z.row_kind='CONTROL' AND (z.payload->>'overflow')::boolean)\nUNION ALL\nSELECT '__capture','CONTROL',NULL::text,to_jsonb(s)||jsonb_build_object('version','"+VERSION+"','mode','"+mode+"','logical_bytes',b.logical_bytes,'row_count',b.rows,'encoded_upper_bound',b.encoded_upper_bound,'byte_limit',10000000,'row_limit',"+str(sum(v+1 for v in bounds.values())+len(bounds))+",'overflow',b.encoded_upper_bound>10000000 OR EXISTS(SELECT 1 FROM rows z WHERE z.row_kind='CONTROL' AND (z.payload->>'overflow')::boolean)) FROM safety s CROSS JOIN budget b\nORDER BY record_type,row_kind,record_id"
     sql='WITH '+',\n'.join(ctes)+'\n'+final+';\n'
     wrapper="BEGIN;\nSET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;\nSET LOCAL statement_timeout='5s';\nSET LOCAL lock_timeout='2s';\n"+sql+'ROLLBACK;\n'
     return sql,wrapper,dict(version=VERSION,mode=mode,sections=manifest,bounds=bounds,byte_limit=10000000,runtime_limit=60,
@@ -105,7 +107,7 @@ def assemble(rows, *, encoded_bytes, elapsed_seconds):
     if c.get('version')!=VERSION or c.get('mode') not in ('canary','full'): raise ValueError('Unknown manifest')
     if c.get('read_only')!='on' or c.get('isolation')!='repeatable read': raise ValueError('Unsafe transaction')
     if c.get('statement_timeout')!='5s' or c.get('lock_timeout')!='2s' or not c.get('snapshot') or not c.get('captured_at') or not c.get('backend_pid'): raise ValueError('Missing safety evidence')
-    if c.get('overflow') is not False or c.get('logical_bytes',10000001)>10000000: raise ValueError('Overflow')
+    if c.get('overflow') is not False or c.get('encoded_upper_bound',10000001)>10000000: raise ValueError('Overflow')
     _,_,manifest=design(c['mode']);bounds=manifest['bounds']
     sections={t:[] for t in FIELDS};controls={}
     for r in rows:
@@ -148,8 +150,23 @@ def preserve_dependencies(edges):
     return {kind:[e for e in edges if e['dependency_type']==kind] for kind in sorted(kinds)}
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
-    for mode in ('canary','full'):
-        sql,wrapper,manifest=design(mode)
-        (a.output/(mode+'.sql')).write_text(wrapper)
-        (a.output/(mode+'-manifest.json')).write_text(json.dumps(manifest,indent=2)+'\n')
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--assemble',type=Path);p.add_argument('--elapsed-seconds',type=float)
+    a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
+    if a.assemble:
+        import csv,io
+        raw=a.assemble.read_bytes()
+        if len(raw)>10000000:raise ValueError('File overflow; no complete artifact')
+        if a.elapsed_seconds is None or not 0<=a.elapsed_seconds<=60:raise ValueError('Measured elapsed time required')
+        if a.assemble.suffix.lower()=='.csv':
+            records=list(csv.DictReader(io.StringIO(raw.decode('utf-8-sig'))))
+            for r in records:r['payload']=json.loads(r['payload']);r['record_id']=r['record_id'] or None
+        else: records=json.loads(raw)
+        result=assemble(records,encoded_bytes=len(raw),elapsed_seconds=a.elapsed_seconds)
+        target=a.output/'qualified-capture.json';temporary=target.with_suffix('.tmp')
+        temporary.write_text(json.dumps(result,indent=2)+'\n');temporary.replace(target)
+    else:
+        for mode in ('canary','full'):
+            sql,wrapper,manifest=design(mode)
+            (a.output/(mode+'.sql')).write_text(wrapper)
+            (a.output/(mode+'-manifest.json')).write_text(json.dumps(manifest,indent=2)+'\n')
