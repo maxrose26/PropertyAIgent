@@ -1,0 +1,688 @@
+{
+  "aggregate_inventory": {
+    "utc": "2026-10-09T09:51:12.460142+00:00",
+    "ages": [
+      {
+        "n": 302,
+        "age": "7-30d"
+      },
+      {
+        "n": 968,
+        "age": "missing"
+      }
+    ],
+    "sites": 550,
+    "councils": [
+      {
+        "sites": 48,
+        "missing": 44,
+        "verified": 26,
+        "applications": 70,
+        "council_code": "bolton"
+      },
+      {
+        "sites": 22,
+        "missing": 30,
+        "verified": 7,
+        "applications": 37,
+        "council_code": "bury"
+      },
+      {
+        "sites": 98,
+        "missing": 225,
+        "verified": 68,
+        "applications": 293,
+        "council_code": "manchester"
+      },
+      {
+        "sites": 44,
+        "missing": 51,
+        "verified": 26,
+        "applications": 77,
+        "council_code": "oldham"
+      },
+      {
+        "sites": 59,
+        "missing": 70,
+        "verified": 41,
+        "applications": 111,
+        "council_code": "rochdale"
+      },
+      {
+        "sites": 74,
+        "missing": 177,
+        "verified": 70,
+        "applications": 247,
+        "council_code": "salford"
+      },
+      {
+        "sites": 70,
+        "missing": 141,
+        "verified": 11,
+        "applications": 152,
+        "council_code": "stockport"
+      },
+      {
+        "sites": 25,
+        "missing": 26,
+        "verified": 18,
+        "applications": 44,
+        "council_code": "tameside"
+      },
+      {
+        "sites": 51,
+        "missing": 109,
+        "verified": 0,
+        "applications": 109,
+        "council_code": "trafford"
+      },
+      {
+        "sites": 59,
+        "missing": 95,
+        "verified": 35,
+        "applications": 130,
+        "council_code": "wigan"
+      }
+    ],
+    "statuses": [
+      {
+        "n": 1,
+        "status": "Appeal lodged",
+        "decision": "Prior Approval Required and Refused"
+      },
+      {
+        "n": 69,
+        "status": "Awaiting decision",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 5,
+        "status": "Awaiting decision",
+        "decision": "Granted, subject to legal agreement"
+      },
+      {
+        "n": 2,
+        "status": "Closed",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 1,
+        "status": "Closed",
+        "decision": "Advice Given"
+      },
+      {
+        "n": 125,
+        "status": "Closed",
+        "decision": "Condition Request determined"
+      },
+      {
+        "n": 9,
+        "status": "Closed",
+        "decision": "Environmental Statement Not Required"
+      },
+      {
+        "n": 1,
+        "status": "Closed",
+        "decision": "Not Required"
+      },
+      {
+        "n": 1,
+        "status": "Closed",
+        "decision": "Planning Permission Required"
+      },
+      {
+        "n": 1,
+        "status": "Closed",
+        "decision": "Prior Approval Required and Approved"
+      },
+      {
+        "n": 1,
+        "status": "Closed",
+        "decision": "Scoping Opinion issued"
+      },
+      {
+        "n": 6,
+        "status": "Closed",
+        "decision": "Withdrawn"
+      },
+      {
+        "n": 4,
+        "status": "Decided",
+        "decision": "Application Noted"
+      },
+      {
+        "n": 3,
+        "status": "Decided",
+        "decision": "Application Withdrawn"
+      },
+      {
+        "n": 27,
+        "status": "Decided",
+        "decision": "Approve"
+      },
+      {
+        "n": 22,
+        "status": "Decided",
+        "decision": "Approve subject to conditions"
+      },
+      {
+        "n": 36,
+        "status": "Decided",
+        "decision": "Approve with Conditions"
+      },
+      {
+        "n": 3,
+        "status": "Decided",
+        "decision": "Approve without condition"
+      },
+      {
+        "n": 25,
+        "status": "Decided",
+        "decision": "Approved with Conditions"
+      },
+      {
+        "n": 8,
+        "status": "Decided",
+        "decision": "Condition Discharged"
+      },
+      {
+        "n": 1,
+        "status": "Decided",
+        "decision": "Condition Discharged - None"
+      },
+      {
+        "n": 6,
+        "status": "Decided",
+        "decision": "Condition Part Discharged"
+      },
+      {
+        "n": 8,
+        "status": "Decided",
+        "decision": "Determined"
+      },
+      {
+        "n": 53,
+        "status": "Decided",
+        "decision": "Discharge Of Conditions"
+      },
+      {
+        "n": 9,
+        "status": "Decided",
+        "decision": "EIA Not Required"
+      },
+      {
+        "n": 5,
+        "status": "Decided",
+        "decision": "EIA Required"
+      },
+      {
+        "n": 1,
+        "status": "Decided",
+        "decision": "Environmental Assessment Not Required"
+      },
+      {
+        "n": 2,
+        "status": "Decided",
+        "decision": "Finally Disposed Of"
+      },
+      {
+        "n": 12,
+        "status": "Decided",
+        "decision": "Full discharge of conditions"
+      },
+      {
+        "n": 54,
+        "status": "Decided",
+        "decision": "Granted"
+      },
+      {
+        "n": 13,
+        "status": "Decided",
+        "decision": "Partial discharge of conditions"
+      },
+      {
+        "n": 1,
+        "status": "Decided",
+        "decision": "Permitted Development"
+      },
+      {
+        "n": 3,
+        "status": "Decided",
+        "decision": "Prior Approval Approved"
+      },
+      {
+        "n": 1,
+        "status": "Decided",
+        "decision": "Prior Approval is Required and Refused"
+      },
+      {
+        "n": 3,
+        "status": "Decided",
+        "decision": "Prior Approval Required and Granted"
+      },
+      {
+        "n": 1,
+        "status": "Decided",
+        "decision": "Prior Approval Required and Refused"
+      },
+      {
+        "n": 3,
+        "status": "Decided",
+        "decision": "Raise No Objection"
+      },
+      {
+        "n": 4,
+        "status": "Decided",
+        "decision": "Raised No Objection"
+      },
+      {
+        "n": 8,
+        "status": "Decided",
+        "decision": "Refuse"
+      },
+      {
+        "n": 4,
+        "status": "Decided",
+        "decision": "Refuse Permission"
+      },
+      {
+        "n": 24,
+        "status": "Decided",
+        "decision": "Refused"
+      },
+      {
+        "n": 34,
+        "status": "Decided",
+        "decision": "Replied"
+      },
+      {
+        "n": 1,
+        "status": "Decided",
+        "decision": "Scoping Opinion"
+      },
+      {
+        "n": 2,
+        "status": "Decided",
+        "decision": "Split Decision"
+      },
+      {
+        "n": 3,
+        "status": "Decided",
+        "decision": "Withdrawn"
+      },
+      {
+        "n": 2,
+        "status": "Decided",
+        "decision": "Withdrawn by the applicant"
+      },
+      {
+        "n": 1,
+        "status": "Decision",
+        "decision": "Closed"
+      },
+      {
+        "n": 1,
+        "status": "Decision Made",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 27,
+        "status": "Decision Made",
+        "decision": "Approve"
+      },
+      {
+        "n": 79,
+        "status": "Decision Made",
+        "decision": "Approve with Conditions"
+      },
+      {
+        "n": 1,
+        "status": "Decision Made",
+        "decision": "Decline to Determine"
+      },
+      {
+        "n": 1,
+        "status": "Decision Made",
+        "decision": "EIA Required"
+      },
+      {
+        "n": 1,
+        "status": "Decision Made",
+        "decision": "Environmental Statement Not Required"
+      },
+      {
+        "n": 1,
+        "status": "Decision Made",
+        "decision": "Not Required"
+      },
+      {
+        "n": 8,
+        "status": "Decision Made",
+        "decision": "Refuse"
+      },
+      {
+        "n": 18,
+        "status": "Decision Made",
+        "decision": "Request Completed"
+      },
+      {
+        "n": 5,
+        "status": "Decision Made",
+        "decision": "Withdrawn"
+      },
+      {
+        "n": 19,
+        "status": "Deposited",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 182,
+        "status": "Final",
+        "decision": "Approve"
+      },
+      {
+        "n": 2,
+        "status": "Final",
+        "decision": "Issue Opinion"
+      },
+      {
+        "n": 23,
+        "status": "Final",
+        "decision": "Refuse"
+      },
+      {
+        "n": 27,
+        "status": "Final",
+        "decision": "Split"
+      },
+      {
+        "n": 13,
+        "status": "Final",
+        "decision": "Withdrawn"
+      },
+      {
+        "n": 4,
+        "status": "Recommendation Made",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 62,
+        "status": "Registered",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 1,
+        "status": "Registered",
+        "decision": "Not Available"
+      },
+      {
+        "n": 1,
+        "status": "Registered",
+        "decision": "Objection (Consult with Neighbour Auth)"
+      },
+      {
+        "n": 35,
+        "status": "Under Consideration",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 73,
+        "status": "Under Consultation",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 20,
+        "status": "Unknown",
+        "decision": "Agreed"
+      },
+      {
+        "n": 3,
+        "status": "Unknown",
+        "decision": "Closed"
+      },
+      {
+        "n": 7,
+        "status": "Unknown",
+        "decision": "Consultation Closed"
+      },
+      {
+        "n": 1,
+        "status": "Unknown",
+        "decision": "Deemed Not Proceeded With"
+      },
+      {
+        "n": 1,
+        "status": "Unknown",
+        "decision": "Details Required"
+      },
+      {
+        "n": 2,
+        "status": "Unknown",
+        "decision": "GPD Prior Approval Required and GRANTED"
+      },
+      {
+        "n": 1,
+        "status": "Unknown",
+        "decision": "GPD Prior Approval Required and REFUSED"
+      },
+      {
+        "n": 1,
+        "status": "Unknown",
+        "decision": "Granted LUC Existing Use or Development"
+      },
+      {
+        "n": 6,
+        "status": "Unknown",
+        "decision": "No Objection"
+      },
+      {
+        "n": 2,
+        "status": "Unknown",
+        "decision": "No Objection (Consult with Nghbour Auth)"
+      },
+      {
+        "n": 2,
+        "status": "Unknown",
+        "decision": "Non Material Amendment Approved"
+      },
+      {
+        "n": 7,
+        "status": "Unknown",
+        "decision": "Objection (Consult with Neighbour Auth)"
+      },
+      {
+        "n": 1,
+        "status": "Unknown",
+        "decision": "Refusal of Discharge of Conditions"
+      },
+      {
+        "n": 6,
+        "status": "Unknown",
+        "decision": "Scoping Opinion Issued"
+      },
+      {
+        "n": 10,
+        "status": "Unknown",
+        "decision": "Screening Opinion Issued"
+      },
+      {
+        "n": 2,
+        "status": "Unknown",
+        "decision": "Withdrawn by Applicant"
+      },
+      {
+        "n": 2,
+        "status": "Valid",
+        "decision": "[NULL]"
+      },
+      {
+        "n": 3,
+        "status": "Withdrawn",
+        "decision": "Application Withdrawn"
+      }
+    ],
+    "verified": 302,
+    "read_only": "on",
+    "applications": 1270,
+    "sites_all_verified": 162,
+    "sites_any_verified": 227,
+    "allocation_summaries": 263,
+    "intelligence_records": 601,
+    "allocation_narratives": 249,
+    "site_status_narrative_records": 550,
+    "allocation_missing_context_hash": 0
+  },
+  "metadata_comparison": {
+    "baseline_snapshot_date": "2026-10-08T14:48:25.927351+00:00",
+    "compared_fields": [
+      "site_id",
+      "reference",
+      "status",
+      "decision",
+      "decision_issued_date"
+    ],
+    "differences": []
+  },
+  "retained_dependency_lower_bound": {
+    "snapshot_date": "2026-10-08",
+    "universe_subjects": 442,
+    "count_supporting_applications": 176,
+    "count_source_subject_links": 182,
+    "buyers": {
+      "housing_association": {
+        "approaching_lapse": 28,
+        "derived_subjects_r1": 0,
+        "families_considered": 429,
+        "families_excluded_not_suitable": 0,
+        "families_shown": 429,
+        "investigation_contexts_r2": 0,
+        "long_pending_application": 139,
+        "recent_permission": 13,
+        "strategic_land": 226,
+        "subjects_considered": 439,
+        "undeveloped_phase": 33
+      },
+      "national_housebuilder": {
+        "approaching_lapse": 28,
+        "derived_subjects_r1": 0,
+        "families_considered": 429,
+        "families_excluded_not_suitable": 14,
+        "families_shown": 415,
+        "investigation_contexts_r2": 0,
+        "long_pending_application": 139,
+        "recent_permission": 13,
+        "strategic_land": 226,
+        "subjects_considered": 439,
+        "undeveloped_phase": 33
+      },
+      "nesten_homes": {
+        "approaching_lapse": 28,
+        "derived_subjects_r1": 0,
+        "families_considered": 429,
+        "families_excluded_not_suitable": 14,
+        "families_shown": 415,
+        "investigation_contexts_r2": 0,
+        "long_pending_application": 139,
+        "recent_permission": 13,
+        "strategic_land": 226,
+        "subjects_considered": 439,
+        "undeveloped_phase": 33
+      },
+      "strategic_land_buyer": {
+        "approaching_lapse": 28,
+        "derived_subjects_r1": 0,
+        "families_considered": 429,
+        "families_excluded_not_suitable": 14,
+        "families_shown": 415,
+        "investigation_contexts_r2": 0,
+        "long_pending_application": 139,
+        "recent_permission": 13,
+        "strategic_land": 226,
+        "subjects_considered": 439,
+        "undeveloped_phase": 33
+      }
+    },
+    "limitation": "Count-source edges are not a complete planning-status/operative/context dependency map; retained snapshot, not a current buyer-facing census."
+  },
+  "normalised_application_states": {
+    "counts": {
+      "decision_outcome_unknown": 190,
+      "withdrawn": 37,
+      "granted": 472,
+      "not_yet_decided": 496,
+      "refused": 71,
+      "recommendation_made": 4
+    },
+    "qualification": "Raw administrative normalisation only; not a count of operative residential permissions. Technical filings remain in denominator."
+  },
+  "allocation_narrative_eligibility": {
+    "total_allocations": 287,
+    "summary_rows": 263,
+    "stored_narratives": 249,
+    "eligible": 0,
+    "withheld": 249,
+    "summary_rows_without_narrative": 14,
+    "allocations_without_summary_row": 24,
+    "basis": "All 249 stored narratives have prompt v6/v7/v8; deployed eligibility requires v9. No prose exported; context comparison unnecessary for decisive version mismatch."
+  },
+  "access_audit": {
+    "transactions": 2,
+    "sql_statements": 14,
+    "evidence_selects": 2,
+    "read_only_verified": "on",
+    "statement_timeout_seconds": 5,
+    "lock_timeout_seconds": 2,
+    "metadata_rows": 1270,
+    "metadata_bytes": 300085,
+    "aggregation_bytes": 6614,
+    "overflow": false,
+    "no_document_bodies": true,
+    "no_buyer_records_exported": true
+  },
+  "metadata_observation": {
+    "utc": "2026-10-09T09:52:38.209381+00:00",
+    "nonexcluded_sites": 555,
+    "allocation_count": 287,
+    "summary_versions": [
+      {
+        "n": 14,
+        "prompt_version": "[NULL]",
+        "narrative_count": 0
+      },
+      {
+        "n": 1,
+        "prompt_version": "allocation-intelligence-summary-v6",
+        "narrative_count": 1
+      },
+      {
+        "n": 108,
+        "prompt_version": "allocation-intelligence-summary-v7",
+        "narrative_count": 108
+      },
+      {
+        "n": 140,
+        "prompt_version": "allocation-intelligence-summary-v8",
+        "narrative_count": 140
+      }
+    ],
+    "overflow": false,
+    "unlinked_nonexcluded_sites": 5
+  },
+  "query_provenance": [
+    {
+      "filename": "legacy-bootstrap-inventory.sql",
+      "sha256": "e2ce1a1e285d8af6d649e032c9512518d3c2ee601fda78ab986bffabfffdef2a"
+    },
+    {
+      "filename": "legacy-bootstrap-metadata.sql",
+      "sha256": "e6c9e49851b399339c72d87f1bedecec15aa304e4c3f5cc3429a65706430b2a0"
+    }
+  ],
+  "denominators": {
+    "applications": "1270 applications linked to 550 non-excluded sites; not an operative-permission count",
+    "sites": "555 non-excluded sites, including 5 with no linked application",
+    "verification": "302 with status_verified_at; 968 without; no threshold implies currentness",
+    "observations": "Two separately consistent READ ONLY transactions; not a single snapshot across both observations"
+  },
+  "age_bins": "At aggregate observation UTC: missing=NULL; future=timestamp>now; 0-7d=0<=age<=7 days; 7-30d=7<age<=30; 30-90d=30<age<=90; 90d+=age>90. Descriptive inventory only, not freshness policy."
+}

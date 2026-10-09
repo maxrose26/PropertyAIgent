@@ -938,3 +938,14 @@ B2.0 is merged at `7446c1218e2daca591a74918150863a89bb90d50`; no production depl
 **Mandatory future operational gate:** inventory the legacy application corpus without external requests (pending, committee resolution awaiting issued decision, current buyer-facing opportunities, missing/ageing successful verification, conflicts and settled historic decisions); prioritise by evidenced status/commercial risk without a global age threshold; deterministically reverify authoritative sources; classify unchanged/material-change/failure/conflict outcomes; invalidate only materially dependent intelligence; selectively reprocess rather than wholesale AI; establish the required baseline before treating steady-state monitoring as sufficient freshness coverage. This bootstrap is not implemented or executed by B2.1.
 
 The later operational design must compare direct-reference polling, council recent-decision/change discovery, document-delta detection, related-application discovery and time-triggered verification. Use status/risk-dependent priority; no final cadence is selected here. Unchanged verification must not automatically trigger AI processing. Operational activation remains separately gated; monitoring hash diagnosis, Stand Golf component opportunities and Stage 2.5C ranking remain separate.
+
+
+## Product Owner checkpoint — 9 October 2026: legacy freshness bootstrap
+
+B2.1 is production-complete within its accepted application scope at `a65ee9795fe58449ba826098480c75b7753d5767`, Render `dep-db4aog7lot8c738ddfug`. It displays exact-source verification qualifications and withholds incompatible allocation prose; it does not discover new decisions.
+
+Specification 031 proposes a bounded legacy inventory/dependency manifest, risk-cohort catch-up and separate steady-state transition. Current authority is specification and read-only preflight only. No bootstrap, repair, cron, monitoring or model execution is authorised. All four production crons remain suspended; Stage 2.5C remains HOLD.
+
+The future strategy must compare direct-reference polling, verified council decision/change signals, document deltas, related-application discovery and time-triggered checks. Received/validated lists are not complete change feeds. Timestamp-only verification must not change material evidence, fit, families or fingerprints, or trigger AI. Bootstrap completion requires explicitly accepted cohort coverage/exceptions before steady-state coverage is claimed.
+
+Stand Golf remains a separate acquisition-subject requirement: one planning scheme may contain commercially distinct opportunities. Wider 103 homes and retirement component 60 apartments are recorded; the potential 43-home remainder is not independently validated. Reuse/reconcile Stage 2.5B before later decomposition. Historical monitoring-hash mismatch remains separate, with no rebaseline or activation.
