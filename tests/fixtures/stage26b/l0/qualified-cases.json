@@ -1,0 +1,221 @@
+{
+  "version": "l0-qualified-v1",
+  "cases": [
+    {
+      "name": "Failsworth",
+      "truth": "RETAINED_HISTORICAL_FACT",
+      "dependency": {
+        "application_id": 42,
+        "consumer_mapping_qualification": "observed source attribution; downstream list is conservative candidate impact, not proven causality",
+        "council": "oldham",
+        "dependency_type": "DIRECT_FACTUAL_DEPENDENCY",
+        "document_ids": [],
+        "generated_intelligence_dependency": "UNRESOLVED: per-record generated provenance not captured",
+        "operative_role": "status_supporting",
+        "reason": "Actual B2.1 exact-status-source adapter position: Whole site (scope not confirmed by phase evidence)",
+        "reference": "FUL/355686/26",
+        "site_id": 28,
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TA7382MCIP700",
+        "status_verified_at": "2026-09-18T05:20:51.437351+00:00",
+        "subject_key": "opp-long-pending-28",
+        "supported_fields": [
+          "decision",
+          "decision_issued_date",
+          "planning_status"
+        ],
+        "supported_fields_verification": "UNKNOWN unless separately source-qualified",
+        "truth": "RETAINED_HISTORICAL_FACT",
+        "uncertainty": [
+          "Not a new council verification",
+          "Current production membership unverified"
+        ],
+        "verification_scope": "application_planning_status_only; does not certify other supported fields",
+        "verification_state": "STATUS_VERIFIED_AS_OF"
+      },
+      "qualification": "Missing verification does not prove incorrect or stale status",
+      "source_case": {
+        "name": "Failsworth",
+        "kind": "REAL_SOURCE_QUALIFIED_FACT",
+        "site_id": 28,
+        "application_id": 42,
+        "reference": "FUL/355686/26",
+        "council": "oldham",
+        "observed_at": "2026-10-08T11:03:10.160Z",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TA7382MCIP700",
+        "source_snapshot_sha256": "8a8cb01baf5f4a032f5d89005597a07f2b63e0dd359451bef179f4c4871312a1",
+        "stored_status": "Awaiting decision",
+        "stored_decision": null,
+        "stored_date": null,
+        "verified_at": "2026-09-18T05:20:51.437351+00:00",
+        "expected_decision": "Refused",
+        "expected_source_date": "2026-09-25",
+        "historical_cause": "UNRESOLVED"
+      }
+    },
+    {
+      "name": "Southlink",
+      "truth": "RETAINED_HISTORICAL_FACT",
+      "dependency": {
+        "application_id": 29,
+        "consumer_mapping_qualification": "observed source attribution; downstream list is conservative candidate impact, not proven causality",
+        "council": "oldham",
+        "dependency_type": "DIRECT_FACTUAL_DEPENDENCY",
+        "document_ids": [],
+        "generated_intelligence_dependency": "UNRESOLVED: per-record generated provenance not captured",
+        "operative_role": "status_supporting",
+        "reason": "Actual B2.1 exact-status-source adapter position: Whole site (scope not confirmed by phase evidence)",
+        "reference": "FUL/355201/25",
+        "site_id": 25,
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T3R6YPMCGOJ00",
+        "status_verified_at": "2026-09-10T10:51:19.561245+00:00",
+        "subject_key": "opp-long-pending-25",
+        "supported_fields": [
+          "decision",
+          "decision_issued_date",
+          "planning_status"
+        ],
+        "supported_fields_verification": "UNKNOWN unless separately source-qualified",
+        "truth": "RETAINED_HISTORICAL_FACT",
+        "uncertainty": [
+          "Not a new council verification",
+          "Current production membership unverified"
+        ],
+        "verification_scope": "application_planning_status_only; does not certify other supported fields",
+        "verification_state": "STATUS_VERIFIED_AS_OF"
+      },
+      "qualification": "Missing verification does not prove incorrect or stale status",
+      "source_case": {
+        "name": "Southlink",
+        "kind": "REAL_SOURCE_QUALIFIED_FACT",
+        "site_id": 25,
+        "application_id": 29,
+        "reference": "FUL/355201/25",
+        "council": "oldham",
+        "observed_at": "2026-10-08T11:02:41.977Z",
+        "source_snapshot_sha256": "45d3ddd86ba031ca730540a6d554ae01b0e05e5e17b4ded4e243163fc8a32985",
+        "stored_status": "Awaiting decision",
+        "stored_decision": null,
+        "stored_date": null,
+        "verified_at": "2026-09-10T10:51:19.561245+00:00",
+        "expected_decision": null,
+        "expected_source_date": null,
+        "qualification": "Committee resolution is not issued permission"
+      }
+    },
+    {
+      "name": "Trafford missing verification",
+      "truth": "RETAINED_HISTORICAL_FACT",
+      "dependency": {
+        "application_id": 305,
+        "consumer_mapping_qualification": "observed source attribution; downstream list is conservative candidate impact, not proven causality",
+        "council": "trafford",
+        "dependency_type": "DIRECT_FACTUAL_DEPENDENCY",
+        "document_ids": [],
+        "generated_intelligence_dependency": "UNRESOLVED: per-record generated provenance not captured",
+        "operative_role": "status_supporting",
+        "reason": "Actual B2.1 exact-status-source adapter position: Whole site (scope not confirmed by phase evidence)",
+        "reference": "117614/FUL/25",
+        "site_id": 254,
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T4MXDXQLFR700&activeTab=summary",
+        "status_verified_at": null,
+        "subject_key": "opp-long-pending-254",
+        "supported_fields": [
+          "decision",
+          "decision_issued_date",
+          "planning_status"
+        ],
+        "supported_fields_verification": "UNKNOWN unless separately source-qualified",
+        "truth": "RETAINED_HISTORICAL_FACT",
+        "uncertainty": [
+          "Not a new council verification",
+          "Current production membership unverified"
+        ],
+        "verification_scope": "application_planning_status_only; does not certify other supported fields",
+        "verification_state": "UNKNOWN"
+      },
+      "qualification": "Missing verification does not prove incorrect or stale status",
+      "source_case": null
+    },
+    {
+      "name": "Stockport missing verification",
+      "truth": "RETAINED_HISTORICAL_FACT",
+      "dependency": {
+        "application_id": 78,
+        "consumer_mapping_qualification": "observed source attribution; downstream list is conservative candidate impact, not proven causality",
+        "council": "stockport",
+        "dependency_type": "DIRECT_FACTUAL_DEPENDENCY",
+        "document_ids": [],
+        "generated_intelligence_dependency": "UNRESOLVED: per-record generated provenance not captured",
+        "operative_role": "status_supporting",
+        "reason": "Actual B2.1 exact-status-source adapter position: Permission",
+        "reference": "DC/078942",
+        "site_id": 58,
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=QKM8H1PJGJA00&activeTab=summary",
+        "status_verified_at": null,
+        "subject_key": "opp-lapse-58",
+        "supported_fields": [
+          "decision",
+          "decision_issued_date",
+          "planning_status"
+        ],
+        "supported_fields_verification": "UNKNOWN unless separately source-qualified",
+        "truth": "RETAINED_HISTORICAL_FACT",
+        "uncertainty": [
+          "Not a new council verification",
+          "Current production membership unverified"
+        ],
+        "verification_scope": "application_planning_status_only; does not certify other supported fields",
+        "verification_state": "UNKNOWN"
+      },
+      "qualification": "Missing verification does not prove incorrect or stale status",
+      "source_case": null
+    },
+    {
+      "name": "Related citation discovery",
+      "truth": "DISCOVERY_CANDIDATE",
+      "dependency": {
+        "application_id": 358,
+        "consumer_mapping_qualification": "observed source attribution; downstream list is conservative candidate impact, not proven causality",
+        "consumers": [
+          "future_change_discovery"
+        ],
+        "council": "oldham",
+        "dependency_type": "DISCOVERY_RELATIONSHIP",
+        "document_ids": [],
+        "generated_intelligence_dependency": "UNRESOLVED: per-record generated provenance not captured",
+        "material_change_potential": {
+          "allocation_narrative_eligibility": "only where accepted allocation-context edge exists",
+          "buyer_assessment": false,
+          "deterministic_reconciliation": false,
+          "family_presentation": false,
+          "fingerprint_value": false,
+          "future_ai_summary": "potential only, not implemented or generation authority",
+          "planning_presentation": false,
+          "scheme_intelligence": "dependency review needed; do not automatically invalidate",
+          "spec028_explanation": false
+        },
+        "operative_role": "related_candidate",
+        "reason": "Existing formatted parent-citation scan + exact same-site reference; no accepted status transfer",
+        "reference": "VAR/349651/22",
+        "site_id": 281,
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=RGNXRKMCM7200",
+        "status_verified_at": null,
+        "subject_key": "opp-lapse-281",
+        "supported_fields": [
+          "related_reference_candidate"
+        ],
+        "supported_fields_verification": "UNKNOWN unless separately source-qualified",
+        "truth": "DISCOVERY_CANDIDATE",
+        "uncertainty": [
+          "Not a new council verification",
+          "Current production membership unverified"
+        ],
+        "verification_scope": "application_planning_status_only; does not certify other supported fields",
+        "verification_state": "UNKNOWN"
+      },
+      "qualification": "Citation is not proof of operative status or parenthood"
+    }
+  ],
+  "phase_parent_case": "MOCKED_EXPECTATION in test_parent_cannot_certify_child",
+  "limitations": "Retained dated facts; no new current council or production verification"
+}

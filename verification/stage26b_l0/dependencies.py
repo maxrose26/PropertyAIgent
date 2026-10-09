@@ -42,7 +42,9 @@ def edge(*, subject_key, site_id, application, dependency_type, fields, consumer
                 supported_fields=sorted(set(fields)), consumers=sorted(set(consumers)),
                 reason=reason, truth=truth, operative_role=operative_role,
                 status_verified_at=verified,
-                verification_state='UNKNOWN' if not verified else 'VERIFIED_AS_OF',
+                verification_state='UNKNOWN' if not verified else 'STATUS_VERIFIED_AS_OF',
+                verification_scope='planning_status_and_decision_only',
+                supported_fields_verification='UNKNOWN unless separately source-qualified',
                 source_url=application.get('summary_url'), document_ids=sorted(set(documents)),
                 generated_intelligence_dependency='candidate_only_not_regeneration_authority',
                 uncertainty=['Not a new council verification', 'Current production membership unverified'])
@@ -99,7 +101,7 @@ def priority_key(item):
 
 def summarise(edges):
     return dict(total=len(edges), by_type=dict(sorted(Counter(e['dependency_type'] for e in edges).items())),
-                subjects=len({e['subject_key'] for e in edges}),
+                subjects_with_application_edges=len({e['subject_key'] for e in edges}),
                 applications=len({e['application_id'] for e in edges}),
                 direct_status_applications=len({e['application_id'] for e in edges
                     if e['dependency_type'] == DIRECT and 'planning_status' in e['supported_fields']}))

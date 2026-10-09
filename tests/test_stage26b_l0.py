@@ -81,3 +81,25 @@ def test_fresh_metadata_cannot_certify_changed_fact():
         edge(subject_key='x',site_id=28,application=app(),dependency_type=DIRECT,
              fields=['planning_status'],consumers=['profile'],reason='bad',
              verification_observation={**app(),'decision':'Refused'})
+
+
+@pytest.mark.parametrize("field", ["qualified_residential_scale", "control_context", "document_provenance"])
+def test_status_timestamp_does_not_verify_other_fields(field):
+    e=edge(subject_key="fixture",site_id=28,application=app(verified="2026-10-08T00:00:00+00:00"),
+           dependency_type=DIRECT,fields=[field],consumers=["candidate"],reason="retained attribution")
+    assert e["verification_scope"] == "planning_status_and_decision_only"
+    assert e["supported_fields_verification"].startswith("UNKNOWN")
+
+
+def test_context_only_gap_has_separate_review_cohort():
+    assert risk_cohort(context_gap=True,missing_verification=True)["cohort"]==3
+
+
+def test_retained_risk_fixture_truth_and_isolation():
+    pack=json.loads(Path("tests/fixtures/stage26b/l0/qualified-cases.json").read_text())
+    cases={c["name"]:c for c in pack["cases"]}
+    assert cases["Failsworth"]["source_case"]["historical_cause"]=="UNRESOLVED"
+    assert cases["Southlink"]["source_case"]["expected_decision"] is None
+    for name in ["Trafford missing verification","Stockport missing verification"]:
+        assert cases[name]["dependency"]["verification_state"]=="UNKNOWN"
+    assert cases["Related citation discovery"]["dependency"]["dependency_type"]==DISCOVERY
