@@ -1,0 +1,59 @@
+{
+  "version": "canary-v2-coverage-v1",
+  "truth": "RETAINED_HISTORICAL_FACT",
+  "cohort": [
+    25,
+    28,
+    254,
+    58,
+    179,
+    281
+  ],
+  "pair": {
+    "site_id": 179,
+    "child": {
+      "id": 284,
+      "site_id": 179,
+      "council_code": "salford",
+      "reference": "NOT/2026/0722",
+      "proposal": "Application for approval of reserved matters (Access; Appearance; Landscaping; Layout; and Scale) pursuant to outline planning permission ref. 23/81719/HYBEIA, relating to Phases 2 and 3, for the erection of 176 dwellings (Use Class C3) together with associated landscaping, public open space, access roads, car parking, active travel connections and associated infrastructure (including foul water pumping station and electrical substation)",
+      "application_category": "reserved_matters",
+      "site_link_method": "created",
+      "status": "Under Consultation",
+      "decision": null,
+      "decision_issued_date": null,
+      "status_verified_at": "2026-09-17T05:24:33.22393+00:00"
+    },
+    "parent": {
+      "id": 566,
+      "site_id": 179,
+      "council_code": "salford",
+      "reference": "23/81719/HYBEIA",
+      "application_category": "outline_application",
+      "site_link_method": "exact_address",
+      "status": "Decision Made",
+      "decision": "Approve with Conditions",
+      "decision_issued_date": "31/10/2025",
+      "status_verified_at": null
+    },
+    "evidence": {
+      "snapshot_sha256": "7838168f65178e0ea7e7b32d2d93e66c3ec41086b4ff5a98af36c66075eabbc4",
+      "council_retained_observation": {
+        "site": 179,
+        "app_id": 284,
+        "url": "https://salfordcitycouncil.my.site.com/pr/s/planning-application/a0kSq00000H2ikkIAB/not20260722?c__r=Arcus_BE_Public_Register",
+        "observed": "2026-10-08T11:13:53.334Z",
+        "table": "Reference\tNOT/2026/0722\nProposal\tApproval of reserved matters pursuant to 23/81719/HYBEIA for Phases 2 and 3, 176 dwellings (C3), landscaping and infrastructure.\nApplication Type\tApproval of reserved matters\nStatus\tUnder Consultation\nValid date\t26/6/2026\nDecision date\tNot displayed"
+      },
+      "source_case_hash": "7a3501d3cb7a1ed27d721f4c89858c54ace19d52541d26838129c91d8db93bc0",
+      "parent_role": "hybrid with outline elements",
+      "relationship_scope": "Direct statutory RM-to-parent planning context only; not acquisition CONTAINED_IN",
+      "inference_exclusions": [
+        "Not shared address/site inference",
+        "Not generic phase wording",
+        "Not verified acquisition subject containment",
+        "No residual/control/availability inference"
+      ]
+    }
+  }
+}
