@@ -55,6 +55,7 @@ class SubjectView:
     route_caveat: str | None = None
     scale_basis: str | None = None         # strategic allocations only: the plan-stated, UNVERIFIED capacity wording
     explanation: MandateExplanation | None = None
+    planning_freshness: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -129,7 +130,8 @@ def _subject_view(subject) -> SubjectView:
         tags=tuple(card.get("tags") or ()), page=card.get("page"), params={**dict(card.get("params") or {}), "subject_key": subject.subject_key},
         route=route.route, route_label=route.label, route_caveat=route.caveat,
         scale_basis=(card.get("strategic_scale") or {}).get("display") if subject.domain == STRATEGIC_LAND else None,
-        explanation=present_mandate_explanation(fit, card))
+        explanation=present_mandate_explanation(fit, card),
+        planning_freshness=card.get("planning_freshness", ()))
 
 
 def phasing_context(family: OpportunityFamily) -> str | None:

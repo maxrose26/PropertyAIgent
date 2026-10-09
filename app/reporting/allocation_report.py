@@ -62,6 +62,7 @@ from app.reporting.allocation_discovery import (
 )
 from app.reporting.allocation_intelligence_summary import (
     AI_SUMMARY_REQUIRES_REFRESH_TEXT, _clean_portal_value, get_allocation_summaries, summary_requires_refresh,
+    build_allocation_context, allocation_narrative_eligibility,
 )
 from app.reporting.ownership_control import get_allocations_control_intelligence
 
@@ -450,7 +451,8 @@ def build_allocation_report_context(session: Session, allocation_ids: list[int])
         linked_application_count = sum(len(s.applications) for s in site_summaries)
 
         summary_row = summaries_by_allocation.get(allocation.id)
-        if summary_requires_refresh(summary_row):
+        narrative_context = build_allocation_context(session, allocation, coverage_entry=coverage_result, control_groups_by_site=control_groups_by_site) if summary_row is not None and summary_row.headline else None
+        if summary_requires_refresh(summary_row) or allocation_narrative_eligibility(summary_row, narrative_context) == "requires_refresh":
             # v8 release safety: never expose a narrative generated under an older prompt version as current intelligence (the stored row is untouched).
             ai_intelligence = AllocationIntelligenceSnapshot(available=False, requires_refresh=True)
         elif summary_row is not None and summary_row.headline:

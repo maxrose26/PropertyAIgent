@@ -489,6 +489,9 @@ def render_scheme_detail(session, settings, site: Site, apps: list[Application])
     # discharge/variation records this display filter would otherwise
     # drop).
     operative_facts = build_operative_planning_facts(list(site.applications))
+    from app.reporting.planning_freshness import present_operative_planning_freshness
+    from app.ui.shell import render_planning_freshness
+    render_planning_freshness(present_operative_planning_freshness(operative_facts, list(site.applications), now=dt.datetime.now(dt.timezone.utc)))
 
     st.subheader(site.display_address)
     st.caption(f"{site.council_code} — {len(apps)} linked application(s)")

@@ -630,6 +630,9 @@ with page_scope():
                 report_filter_facts = resolve_operative_filter_facts(report_facts)
                 report_decision_label = format_operative_decision_status_label(report_filter_facts)
                 report_affordable_percentage = resolve_explore_affordable_percentage_display(report_filter_facts)
+                from app.reporting.planning_freshness import present_operative_planning_freshness, planning_freshness_report_columns
+                import datetime as dt
+                freshness_columns = planning_freshness_report_columns(present_operative_planning_freshness(report_facts, all_report_apps, now=dt.datetime.now(dt.timezone.utc)))
                 rows_out.append({
                     "Council": site.council_code,
                     "Region": council_regions.get(site.council_code),
@@ -666,7 +669,8 @@ with page_scope():
                     "Decision": rep_app.decision if rep_app else None,
                     "Decision Status": report_decision_label,
                     "decision_status": report_filter_facts.decision_status,
-                    "Decision Date": lapse["granted_app"].decision_issued_date if lapse["granted_app"] else None,
+                    "Decision Date": freshness_columns["Planning Decision Date"],
+                    **freshness_columns,
                     "Build Status": BUILD_STATUS_LABELS[lapse["build_status"]],
                     "build_status": lapse["build_status"],
                     "Lapse Risk": LAPSE_STATUS_LABELS[lapse["status"]],

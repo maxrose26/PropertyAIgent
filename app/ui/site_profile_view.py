@@ -14,6 +14,8 @@ re-implementing any of them.
 from __future__ import annotations
 
 import json
+import datetime as dt
+from app.reporting.planning_freshness import present_planning_freshness, planning_freshness_report_columns
 
 import pandas as pd
 import streamlit as st
@@ -66,6 +68,7 @@ def _applications_dataframe(apps: list[Application]) -> pd.DataFrame:
     rows = [{
         "Reference": a.reference, "Type": a.application_type, "Status": a.status,
         "Decision": a.decision, "Received": a.application_received,
+        **planning_freshness_report_columns((("Application", a.reference, present_planning_freshness(a, now=dt.datetime.now(dt.timezone.utc))),)),
         "Portal URL": a.summary_url,
     } for a in sorted(apps, key=lambda a: parse_portal_date(a.application_received), reverse=True)]
     return pd.DataFrame(rows)
@@ -79,6 +82,8 @@ def _render_planning_position(site: Site, apps: list[Application], view: dict) -
     where the required decision date is missing (compute_lapse_status_public
     already returns deadline=None in that case, and this view only ever
     renders what it's given)."""
+    from app.ui.shell import render_planning_freshness
+    render_planning_freshness(view.get("planning_freshness", ()))
     header = view["header"]
     lapse_label = header["lapse_status_label"]
     if lapse_label:
