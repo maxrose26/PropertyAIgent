@@ -94,17 +94,23 @@
       "section": "allocation_intelligence_summaries",
       "historical_rows": 1,
       "observed_compact_bytes": 333,
-      "sizing_rows": 249,
-      "sizing_compact_bytes": 82917,
-      "sixfold_encoded_estimate": 497502,
+      "sizing_rows": 263,
+      "sizing_compact_bytes": 87579,
+      "sixfold_encoded_estimate": 525474,
       "basis": "Oct9 one-canary observed section only; not full population"
     }
   ],
-  "sizing_rows": 2350,
-  "compact_bytes": 1114752,
+  "sizing_rows": 2364,
+  "compact_bytes": 1119414,
   "formatting_reserve_bytes": 100000,
   "control_reserve_bytes": 10000,
-  "conservative_encoded_scenario_bytes": 7352608,
-  "headroom_bytes": 2647392,
-  "qualification": "Historical sizing scenario;249 summaries extrapolated from single observed metadata row; native serialized bytes and current population unmeasured"
+  "conservative_encoded_scenario_bytes": 7380580,
+  "headroom_bytes": 2619420,
+  "qualification": "Historical sizing scenario;263 summary records (249 narrative-bearing) extrapolated from single observed metadata row;native serialized bytes/current population unmeasured",
+  "summary_ceiling_300_scenario": {
+    "rows": 2401,
+    "compact_bytes": 1131735,
+    "encoded_bytes": 7454506,
+    "headroom_bytes": 2545494
+  }
 }
