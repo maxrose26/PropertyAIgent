@@ -153,7 +153,11 @@ def test_real_concurrent_connections(engine, block_writer):
         return result(ref, 'Granted' if local.kind == 'older' else 'Refused',
                       '2026-09-01' if local.kind == 'older' else '2026-09-25')
     def after_sql(conn, cursor, statement, *args):
-        if block_writer and local.kind == 'newer' and statement.startswith('UPDATE applications SET status_verified_at'):
+        # SQLAlchemy also emits the existing last_seen_at onupdate value;
+        # column order is not the transaction invariant under test.
+        if (block_writer and local.kind == 'newer' and not reserved.is_set()
+                and statement.startswith('UPDATE applications SET')
+                and 'status_verified_at=' in statement):
             reserved.set(); assert release.wait(8)
     def worker(kind):
         local.kind = kind
