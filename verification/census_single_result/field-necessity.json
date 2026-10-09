@@ -1,0 +1,817 @@
+{
+  "sites.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "sites.council_code": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "sites.canonical_address": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "sites.display_address": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "sites.postcode": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "sites.build_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "sites.build_status_checked_at": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "sites.epc_dwellings_found": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "sites.excluded": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "applications.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "applications.site_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "applications.council_code": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "applications.reference": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "applications.alternative_reference": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.address": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.proposal": {
+    "classification": "REQUIRED FOR FRESHNESS DEPENDENCY SELECTION",
+    "retained": true,
+    "reason": "Exact application category/link context and public statutory-citation provenance for local existing parser; no scope assertion from incidental wording"
+  },
+  "applications.application_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.application_category": {
+    "classification": "REQUIRED FOR FRESHNESS DEPENDENCY SELECTION",
+    "retained": true,
+    "reason": "Exact application category/link context and public statutory-citation provenance for local existing parser; no scope assertion from incidental wording"
+  },
+  "applications.status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "applications.decision": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "applications.decision_issued_date": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "applications.application_received": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.application_validated": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.expected_decision_date": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.estimated_unit_count": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.unit_confirmation_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.site_link_method": {
+    "classification": "REQUIRED FOR FRESHNESS DEPENDENCY SELECTION",
+    "retained": true,
+    "reason": "Exact application category/link context and public statutory-citation provenance for local existing parser; no scope assertion from incidental wording"
+  },
+  "applications.site_link_confidence": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.status_verified_at": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "applications.summary_url": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "scheme_intelligence.id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.application_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.total_units": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.total_units_final": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_units": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_units_final": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.private_units": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.private_units_final": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_percentage": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_percentage_final": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_tenure_split": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_tenure_split_final": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.development_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.housing_typology": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.specialist_housing_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.housing_confidence": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_data_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.application_context_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_classification_confidence": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.unit_total_check": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.unit_total_difference": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.unit_reconciliation_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.data_quality_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.formal_decision_outstanding": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.affordable_housing_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "scheme_intelligence.core_intelligence_complete": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyers.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "buyers.workspace_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "buyers.buyer_key": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyers.status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "buyer_mandates.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "buyer_mandates.buyer_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "buyer_mandates.mandate_key": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "buyer_mandates.target_unit_min": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.target_unit_max": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.scale_metric": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.accepted_planning_states": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.treats_no_activity_as_positive": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.large_allocation_is_self_qualifying": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.specialist_development_is_exclusion": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.wholly_affordable_is_exclusion": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.below_minimum_scale_is_exclusion": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.geography_scope": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.geography_councils": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.acquisition_types": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.development_state_appetite": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.control_appetite": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "buyer_mandates.matching_fingerprint": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_sites.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_sites.council_code": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_sites.local_plan_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_sites.site_name": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.policy_reference": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.minimum_dwellings": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.maximum_capacity": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.indicative_capacity": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.intended_use": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.matched_site_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_sites.plan_status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "local_plan_sites.allocation_status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "local_plan_sites.raw_allocation_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.category": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.green_belt_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.review_status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "local_plan_sites.duplicate_classification": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.progression_signal": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.match_confidence": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.site_area_hectares": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.latitude": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.longitude": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.plan_name": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.source_document_url": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.source_page": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_sites.updated_at": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plans.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plans.council_code": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plans.plan_name": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plans.status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "local_plans.five_year_supply_years": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plans.last_checked": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_councils.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_councils.local_plan_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_councils.council_code": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "local_plan_councils.role": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "local_plan_councils.is_lead_authority": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "allocation_site_relationships.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_site_relationships.allocation_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_site_relationships.site_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_site_relationships.review_status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "control_relationships.id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.site_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.application_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.role": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.entity_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.company_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.confidence": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.evidence_category": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.evidence_document_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "control_relationships.review_status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "councils.code": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "councils.name": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "councils.base_url": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "councils.date_field_mode": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "councils.doc_system": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "workspaces.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "workspaces.status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "documents.id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "documents.application_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "documents.doc_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "documents.text_extracted": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "documents.content_hash": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "allocation_intelligence_summaries.id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_intelligence_summaries.allocation_id": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_intelligence_summaries.prompt_version": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_intelligence_summaries.context_fingerprint": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_intelligence_summaries.generated_at": {
+    "classification": "REQUIRED FOR COMPLETENESS/PROVENANCE",
+    "retained": true,
+    "reason": "Exact identity, source, version or structured FK reconciliation; no cross-application freshness transfer"
+  },
+  "allocation_intelligence_summaries.status": {
+    "classification": "REQUIRED FOR RISK COHORT",
+    "retained": true,
+    "reason": "Accepted status/date, unknown verification, scope/admission or disputed allocation-link qualification; not acquisition ranking"
+  },
+  "companies.id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.company_id": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.identity_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.primary_type": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.primary_type_confidence": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.is_spv": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.generated_at": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.context_fingerprint": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.prompt_version": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applicant_intelligences.status": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Acquisition evaluation, display, count/AH/control, document-delta or unused narrative eligibility detail; removal qualifies exact buyer/subject replay"
+  },
+  "applications.applicant_present": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Presence does not establish exact status-source dependency; summary identity retained without prose-presence inspection"
+  },
+  "control_relationships.title_present": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Presence does not establish exact status-source dependency; summary identity retained without prose-presence inspection"
+  },
+  "allocation_intelligence_summaries.headline_present": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Presence does not establish exact status-source dependency; summary identity retained without prose-presence inspection"
+  },
+  "allocation_intelligence_summaries.overview_present": {
+    "classification": "NOT REQUIRED FOR BOOTSTRAP CENSUS",
+    "retained": false,
+    "reason": "Presence does not establish exact status-source dependency; summary identity retained without prose-presence inspection"
+  }
+}
