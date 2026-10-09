@@ -1,0 +1,110 @@
+{
+  "sections": [
+    {
+      "section": "sites",
+      "historical_rows": 555,
+      "observed_compact_bytes": 68930,
+      "sizing_rows": 555,
+      "sizing_compact_bytes": 68930,
+      "sixfold_encoded_estimate": 413580,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "applications",
+      "historical_rows": 1270,
+      "observed_compact_bytes": 891704,
+      "sizing_rows": 1270,
+      "sizing_compact_bytes": 891704,
+      "sixfold_encoded_estimate": 5350224,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "buyers",
+      "historical_rows": 4,
+      "observed_compact_bytes": 456,
+      "sizing_rows": 4,
+      "sizing_compact_bytes": 456,
+      "sixfold_encoded_estimate": 2736,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "buyer_mandates",
+      "historical_rows": 4,
+      "observed_compact_bytes": 832,
+      "sizing_rows": 4,
+      "sizing_compact_bytes": 832,
+      "sixfold_encoded_estimate": 4992,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "local_plan_sites",
+      "historical_rows": 229,
+      "observed_compact_bytes": 64792,
+      "sizing_rows": 229,
+      "sizing_compact_bytes": 64792,
+      "sixfold_encoded_estimate": 388752,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "local_plans",
+      "historical_rows": 10,
+      "observed_compact_bytes": 1361,
+      "sizing_rows": 10,
+      "sizing_compact_bytes": 1361,
+      "sixfold_encoded_estimate": 8166,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "local_plan_councils",
+      "historical_rows": 10,
+      "observed_compact_bytes": 1357,
+      "sizing_rows": 10,
+      "sizing_compact_bytes": 1357,
+      "sixfold_encoded_estimate": 8142,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "allocation_site_relationships",
+      "historical_rows": 8,
+      "observed_compact_bytes": 1330,
+      "sizing_rows": 8,
+      "sizing_compact_bytes": 1330,
+      "sixfold_encoded_estimate": 7980,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "councils",
+      "historical_rows": 10,
+      "observed_compact_bytes": 972,
+      "sizing_rows": 10,
+      "sizing_compact_bytes": 972,
+      "sixfold_encoded_estimate": 5832,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "workspaces",
+      "historical_rows": 1,
+      "observed_compact_bytes": 101,
+      "sizing_rows": 1,
+      "sizing_compact_bytes": 101,
+      "sixfold_encoded_estimate": 606,
+      "basis": "Oct8 historical projection"
+    },
+    {
+      "section": "allocation_intelligence_summaries",
+      "historical_rows": 1,
+      "observed_compact_bytes": 333,
+      "sizing_rows": 249,
+      "sizing_compact_bytes": 82917,
+      "sixfold_encoded_estimate": 497502,
+      "basis": "Oct9 one-canary observed section only; not full population"
+    }
+  ],
+  "sizing_rows": 2350,
+  "compact_bytes": 1114752,
+  "formatting_reserve_bytes": 100000,
+  "control_reserve_bytes": 10000,
+  "conservative_encoded_scenario_bytes": 7352608,
+  "headroom_bytes": 2647392,
+  "qualification": "Historical sizing scenario;249 summaries extrapolated from single observed metadata row; native serialized bytes and current population unmeasured"
+}
