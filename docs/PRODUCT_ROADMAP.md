@@ -11,6 +11,16 @@ Development Economics  →  AI Decision Support  →  Workflow
 
 ---
 
+## Product Owner decision record — 9 October 2026
+
+**APPROVED STATUS AND SPECIFICATION SEQUENCING.** Stage 2.6A is complete for its qualified audit purpose. Stage 2.6B B1.1 is accepted and closed within its production application scope at `c709bd7643161daab16db86b86509aabf289048d` (Render `dep-db3va4g473hc73c38ia0`). This supersedes earlier next-task labels without rewriting historical decisions or completing unfinished original gates.
+
+B2 planning-status freshness is the next **investigation/specification gate**, described in [Specification 030](../specifications/030-stage26b-b2-planning-status-freshness.md). Failsworth’s post-refusal successful-verification gap is verified; the exact historical invocation, selection, retrieval or parsing cause is unresolved. Correctness must distinguish accepted planning facts, source fact dates, successful checks, later failed attempts and stale/conflicting evidence. Specification preparation does not authorise implementation, schema changes, repair or source-refresh execution.
+
+**Future acquisition-subject requirement:** one planning scheme may contain multiple commercially distinct acquisition opportunities. Stand Golf currently evidences a wider103-home scheme and60-apartment retirement component; the potential43-home residual/general component is **not independently validated** and subtraction alone is not evidence. Future evidence-gated work must assess separate buyer-facing components against the existing Stage2.5B acquisition-subject/phase/family architecture before proposing new architecture. B2 does not implement decomposition.
+
+**NOT YET AUTHORISED IMPLEMENTATION OR OPERATIONS.** Stage 2.5C/commercial ranking remains ON HOLD. B2 implementation, subsequent remediation slices, summaries, migrations and releases require separate approval. All four production crons and monitoring remain suspended; Stage4 operational-safety acceptance and explicit activation approval remain mandatory. The historical monitoring-fingerprint mismatch predates B1.1 and remains a separate unresolved operational issue: no rebaseline, hash repair or saved-subject migration is authorised. Accepted v8, Spec028, Stage1 and AH/P0-A safeguards remain binding.
+
 ## Product Owner decision record — 7 October 2026
 
 **APPROVED ROADMAP SEQUENCING.** This dated record is the current authority for sequencing where earlier checkpoints below conflict. Historical decisions and their outstanding acceptance criteria are retained, not rewritten or silently completed.
