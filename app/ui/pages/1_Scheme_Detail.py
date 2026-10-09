@@ -92,7 +92,7 @@ with page_scope():
                 st.info("Subject-specific mandate explanation unavailable")
             else:
                 from app.reporting.mandate_explanation import present_mandate_explanation, mandate_fit_label
-                from app.ui.shell import render_mandate_explanation
+                from app.ui.shell import render_mandate_explanation, render_planning_freshness
                 st.subheader("Originating acquisition subject")
                 source = subject.source or {}
                 fit = source["buyer_fit"]
@@ -102,6 +102,7 @@ with page_scope():
                 count = source.get("count_assessment")
                 if count is not None:
                     st.write(count.label())
+                render_planning_freshness(source.get("planning_freshness", ()))
                 render_mandate_explanation(present_mandate_explanation(fit, source), compact=False)
             st.caption("The evidence profile below covers the wider site; its evidence is not automatically attributable to the originating subject.")
 

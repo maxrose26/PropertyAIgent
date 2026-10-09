@@ -473,7 +473,7 @@ def _clean_portal_value(raw: str | None) -> str | None:
     return cleaned
 
 
-def build_allocation_context(session: Session, allocation: LocalPlanSite) -> AllocationIntelligenceContext:
+def build_allocation_context(session: Session, allocation: LocalPlanSite, *, coverage_entry=None, control_groups_by_site=None) -> AllocationIntelligenceContext:
     """READ ONLY - issues the same batched queries app.reporting.
     allocation_development_coverage.build_allocation_development_coverage
     and app.reporting.ownership_control.get_allocation_control_intelligence
@@ -490,8 +490,10 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
     council_config = load_councils()
     council_name = council_config[allocation.council_code].name if allocation.council_code in council_config else allocation.council_code
 
-    coverage_by_allocation = build_allocation_development_coverage(session, [allocation])
-    entry = coverage_by_allocation.get(allocation.id, {})
+    entry = coverage_entry
+    if entry is None:
+        coverage_by_allocation = build_allocation_development_coverage(session, [allocation])
+        entry = coverage_by_allocation.get(allocation.id, {})
     coverage = entry.get("coverage")
     site_summaries = entry.get("site_summaries", [])
 
@@ -594,6 +596,7 @@ def build_allocation_context(session: Session, allocation: LocalPlanSite) -> All
     control_sections = get_allocation_control_intelligence(
         session, site_summaries,
         indicative_residual_capacity=coverage.indicative_residual_capacity if coverage else None,
+        groups_by_site=control_groups_by_site,
     )
     # Final Pre-Merge Amendment ("needs_confirmation Trust Boundary",
     # Section 5) - get_allocation_control_intelligence only ever checks
@@ -847,6 +850,21 @@ def should_regenerate_allocation_summary(
     if summary.prompt_version != PROMPT_VERSION:
         return True
     return False
+
+
+def allocation_narrative_eligibility(summary, context) -> str:
+    """One read-time page/report/export guard. Stored rows remain untouched.
+
+    Context provenance missing or no longer matching -> withhold, not regenerate.
+    Verification recency is NOT a dependency fingerprint or a new expiry policy.
+    """
+    if summary is None or not summary.headline:
+        return "missing"
+    if context is None or not summary.context_fingerprint:
+        return "requires_refresh"
+    if should_regenerate_allocation_summary(summary, compute_context_fingerprint(context)):
+        return "requires_refresh"
+    return "available"
 
 
 def is_allocation_summary_stale(session: Session, allocation: LocalPlanSite) -> bool:

@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import datetime as dt
 
+from app.reporting.planning_freshness import present_operative_planning_freshness
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -725,6 +727,7 @@ def build_site_profile(
         "policy_rows": policy_rows,
         "residential_mix": residential_mix,
         "scheme_reconciliation": _reconciliation_view(facts),
+        "planning_freshness": present_operative_planning_freshness(facts, all_apps, now=dt.datetime.now(dt.timezone.utc)),
     }
 
 

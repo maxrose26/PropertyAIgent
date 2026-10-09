@@ -396,6 +396,7 @@ def get_allocations_control_intelligence(session: Session, site_ids: list[int]) 
 
 def get_allocation_control_intelligence(
     session: Session, site_summaries: list, *, indicative_residual_capacity: int | None,
+    groups_by_site: dict | None = None,
 ) -> list[SiteControlSection]:
     """Section 6/7 - one SiteControlSection per related Site (each queried
     independently via get_site_control_intelligence, so evidence never
@@ -424,7 +425,7 @@ def get_allocation_control_intelligence(
     sections = [
         SiteControlSection(
             label=summary.site.display_address, site_id=summary.site_id, is_residual=False,
-            groups=get_site_control_intelligence(session, summary.site_id),
+            groups=(groups_by_site.get(summary.site_id, []) if groups_by_site is not None else get_site_control_intelligence(session, summary.site_id)),
             applications=_application_summaries(summary),
             representative_application_reference=(
                 summary.representative_application.reference if summary.representative_application else None

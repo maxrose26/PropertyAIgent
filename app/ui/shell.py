@@ -940,6 +940,22 @@ def render_mandate_explanation(view, *, compact=False):
         st.link_button("View supporting source", view.source_link)
 
 
+def render_planning_freshness(positions) -> None:
+    """Text-first accessible context, never a classification badge/cause."""
+    for label, reference, freshness in positions:
+        state = freshness.planning_state.replace("_", " ").capitalize()
+        st.markdown(f"**Planning: {_escape(state)}**")
+        st.caption(f"{label} · {reference or 'Source attribution unresolved'}")
+        if freshness.source_fact_date:
+            st.caption(f"Decision issued: {freshness.source_fact_date}")
+        if freshness.last_successful_verification:
+            from app.reporting.planning_freshness import _utc
+            st.caption(f"Verified as of: {_utc(freshness.last_successful_verification).strftime('%d %b %Y %H:%M UTC')}")
+        st.caption(freshness.qualification)
+        if freshness.source_url:
+            st.link_button("Planning source", freshness.source_url)
+
+
 def opportunity_family_card(view, *, key: str) -> None:
     """One buyer-dashboard item per OpportunityFamily (Stage 2.5B G3b Slice 2) - ``view`` is app.reporting.family_presentation.FamilyView; this only renders
     it (no ranking, no policy, no arithmetic). Hierarchy: development context -> BEST ACQUISITION SUBJECT for this buyer -> phasing context (only when the
@@ -958,6 +974,7 @@ def opportunity_family_card(view, *, key: str) -> None:
         if best.signal_label:
             status_badge(OPPORTUNITY_SIGNAL_BADGE_KIND.get(best.signal_key, "info"), best.signal_label)
         _family_subject_badge(best)
+        render_planning_freshness(best.planning_freshness)
         if best.headline_reason:
             st.write(best.headline_reason)
         if best.explanation is not None:
@@ -980,6 +997,7 @@ def opportunity_family_card(view, *, key: str) -> None:
                     st.caption(view.relationship_note)
                 for subject in view.related:
                     st.markdown(f"**{_escape(subject.label)}**" + (f" — {_escape(subject.scale)}" if subject.scale else "") + f" · {_escape(subject.fit_label)}")
+                    render_planning_freshness(subject.planning_freshness)
                     if subject.explanation is not None:
                         render_mandate_explanation(subject.explanation)
         if best.page:

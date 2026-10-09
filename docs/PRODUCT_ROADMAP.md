@@ -929,3 +929,12 @@ The former “Recommended Next Task” section named Gate 2B-0B as the next arch
 ## Historical carry-forward — buyer-specific opportunity sets (2026-10-05)
 
 This decision has now been promoted into the authoritative Current Roadmap — Post Stage 2 section above. The original carry-forward text is removed here to avoid maintaining two competing current definitions.
+
+
+### 9 October 2026 — B2.1 offline scope and future freshness bootstrap
+
+B2.0 is merged at `7446c1218e2daca591a74918150863a89bb90d50`; no production deployment follows. B2.1 is authorised for offline deterministic freshness presentation and read-time withholding of stale/unverifiable planning-dependent narrative only. No production repair, refresh or activation is authorised.
+
+**Mandatory future operational gate:** inventory the legacy application corpus without external requests (pending, committee resolution awaiting issued decision, current buyer-facing opportunities, missing/ageing successful verification, conflicts and settled historic decisions); prioritise by evidenced status/commercial risk without a global age threshold; deterministically reverify authoritative sources; classify unchanged/material-change/failure/conflict outcomes; invalidate only materially dependent intelligence; selectively reprocess rather than wholesale AI; establish the required baseline before treating steady-state monitoring as sufficient freshness coverage. This bootstrap is not implemented or executed by B2.1.
+
+The later operational design must compare direct-reference polling, council recent-decision/change discovery, document-delta detection, related-application discovery and time-triggered verification. Use status/risk-dependent priority; no final cadence is selected here. Unchanged verification must not automatically trigger AI processing. Operational activation remains separately gated; monitoring hash diagnosis, Stand Golf component opportunities and Stage 2.5C ranking remain separate.

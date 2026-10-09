@@ -1,0 +1,37 @@
+name: B2.1 rendered freshness acceptance
+on:
+  push:
+    branches: [feat/stage26b-b21-freshness-presentation]
+  pull_request:
+    paths:
+      - 'app/reporting/planning_freshness.py'
+      - 'app/ui/**'
+      - 'tests/test_stage26b_b21*'
+      - 'verification/b21/**'
+      - '.github/workflows/b21-rendered.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rendered:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install existing pinned application dependencies
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/b21-venv"
+      - name: Install pinned browser verification dependency
+        run: |
+          "$RUNNER_TEMP/b21-venv/bin/python" -m pip install playwright==1.55.0
+          "$RUNNER_TEMP/b21-venv/bin/python" -m playwright install --with-deps chromium
+      - name: Synthetic desktop/mobile shared renderer acceptance
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/b21-venv/bin/python" verification/b21/browser_check.py "$RUNNER_TEMP/b21-rendered"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b21-rendered-${{ github.sha }}
+          path: ${{ runner.temp }}/b21-rendered
+          retention-days: 7

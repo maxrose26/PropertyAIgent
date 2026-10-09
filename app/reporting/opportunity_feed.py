@@ -269,7 +269,11 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> dict
     for sid, operative in operative_by_site.items():              # the planning ROLE of the operative consented application (route derivation input; presentation only)
         position = operative.consented_position
         consent_role_by_site[sid] = position.reference.source.planning_role if position.exists and position.reference.source is not None else None
+    from app.pipeline.phase_tracking import acquisition_scope_key, build_acquisition_scope_breakdown
+    phase_site_ids = {int(c["params"]["site_id"]) for c in cards if c.get("phase_code") and c.get("params", {}).get("site_id")}
+    scopes_by_site = {sid: {acquisition_scope_key(row): row for row in build_acquisition_scope_breakdown(apps_by_site.get(sid, []))} for sid in phase_site_ids}
     facts_by_context = {}
+    freshness_by_context = {}
     for card in cards:
         site_id_raw = card.get("params", {}).get("site_id")
         if site_id_raw is None:
@@ -288,6 +292,20 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> dict
             if phase_code and assessment is not None:
                 from app.reporting.scheme_reconciliation import planning_facts_for_scope
                 operative = planning_facts_for_scope(operative, assessment.scope_type, assessment.scope_label)
+            from app.reporting.planning_freshness import present_operative_planning_freshness
+            import datetime as dt
+            from app.pipeline.phase_tracking import UNPHASED_LABEL
+            scope_row = scopes_by_site.get(site_id, {}).get(phase_code)
+            scope_attributed = (assessment is not None and scope_row is not None
+                                and assessment.scope_type == scope_row["kind"]
+                                and assessment.scope_label == scope_row["label"])
+            if phase_code and phase_code != UNPHASED_LABEL and not scope_attributed:
+                from app.reporting.planning_freshness import PlanningFreshness
+                freshness_by_context[key] = (("Subject planning position", None, PlanningFreshness(
+                    "unknown_unverified", None, None, None, "verification_unavailable",
+                    "Current verification unavailable: subject planning source attribution unresolved", "unavailable")),)
+            else:
+                freshness_by_context[key] = present_operative_planning_freshness(operative, apps_by_site[site_id], now=dt.datetime.now(dt.timezone.utc))
             facts = build_planning_delivery_matching_facts_from_operative(
                 operative, apps_by_site[site_id], application_reference=reference)
             if phase_code:
@@ -300,6 +318,7 @@ def _attach_planning_delivery_matching_facts(session, cards: list[dict]) -> dict
                                 affordable_percentage_trusted=False,
                                 whole_site_affordable_state=AFFORDABLE_STATE_UNKNOWN)  # a phase never inherits whole-site AH
             facts_by_context[key] = facts
+        card["planning_freshness"] = freshness_by_context[key]
         card["matching_facts"] = facts_by_context[key]
         card["count_assessment"] = facts_by_context[key].count_assessment
         assessment = card["count_assessment"]

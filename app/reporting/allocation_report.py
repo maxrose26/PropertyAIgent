@@ -384,6 +384,8 @@ def build_allocation_report_context(session: Session, allocation_ids: list[int])
     lands in `excluded` with a reason, while every other id's entry is
     still built normally (Section 21A: "one broken allocation must not
     prevent export of the others")."""
+    from app.reporting.allocation_intelligence_summary import build_allocation_context, allocation_narrative_eligibility
+
     unique_ids = sorted(set(allocation_ids))
     generated_at = dt.datetime.now(dt.timezone.utc)
 
@@ -450,7 +452,8 @@ def build_allocation_report_context(session: Session, allocation_ids: list[int])
         linked_application_count = sum(len(s.applications) for s in site_summaries)
 
         summary_row = summaries_by_allocation.get(allocation.id)
-        if summary_requires_refresh(summary_row):
+        narrative_context = build_allocation_context(session, allocation, coverage_entry=coverage_result, control_groups_by_site=control_groups_by_site) if summary_row is not None and summary_row.headline else None
+        if summary_requires_refresh(summary_row) or allocation_narrative_eligibility(summary_row, narrative_context) == "requires_refresh":
             # v8 release safety: never expose a narrative generated under an older prompt version as current intelligence (the stored row is untouched).
             ai_intelligence = AllocationIntelligenceSnapshot(available=False, requires_refresh=True)
         elif summary_row is not None and summary_row.headline:
