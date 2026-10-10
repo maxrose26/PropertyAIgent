@@ -202,6 +202,15 @@ def fetch_application_status_by_reference(council, reference, transport):
     url, html = transport.retrieve('POST', target, urlencode(fields).encode())
     if is_rate_limited(html): transport.reject('RATE_LIMITED', 'portal rate limit')
     soup = BeautifulSoup(html, 'html.parser')
+    # Do not certify uniqueness from a partial search page or follow pagination.
+    for control in soup.find_all(['a', 'button', 'input']):
+        label = (control.get_text(' ', strip=True) or control.get('value', '')).lower().strip(' >»')
+        rel = control.get('rel', [])
+        href = urlsplit(urljoin(url, control.get('href', '')))
+        if (label in ('next', 'last') or 'next' in rel
+            or (href.path.endswith('/advancedSearchResults.do') and href.query
+                and href.query != 'action=firstPage')):
+            transport.reject('PARTIAL_RETRIEVAL', 'search completeness unavailable')
     key = keyval_from_url(url)
     keys = [key] if key else []
     for anchor in soup.find_all('a', href=True):
