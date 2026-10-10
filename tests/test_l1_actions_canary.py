@@ -171,6 +171,22 @@ def test_artifact_overflow_rejected():
     with pytest.raises(BoundaryFailure): encode_artifact({'extra': 'x' * MAX_ARTIFACT})
 
 
+@pytest.mark.parametrize('defect', ['failure_complete', 'repository', 'workflow', 'adapter', 'council', 'counter', 'private_field', 'bytes'])
+def test_malformed_worker_artifact_rejected(defect):
+    from verification.stage26b_l1.actions_runner import validate_worker_artifact
+    result = run(sha=SHA)
+    validate_worker_artifact(result, sha=SHA, mode='offline', status=0)
+    if defect == 'failure_complete': result['results'][0]['outcome'] = 'PARSER_FAILURE'
+    elif defect == 'repository': result['repository'] = 'other/repo'
+    elif defect == 'workflow': result['workflow_version'] = 'unknown'
+    elif defect == 'adapter': result['results'][0]['adapter'] = 'arcus'
+    elif defect == 'council': result['results'][0]['council'] = 'other'
+    elif defect == 'counter': result['results'][0]['requests_attempted'] = 11
+    elif defect == 'private_field': result['results'][0]['html'] = 'private text'
+    elif defect == 'bytes': result['received_bytes'] += 1
+    with pytest.raises((ValueError, TypeError)): validate_worker_artifact(result, sha=SHA, mode='offline', status=0)
+
+
 def test_offline_socket_and_requests_denied():
     with offline_network_denial():
         for action in (lambda: socket.getaddrinfo('planningpa.oldham.gov.uk', 443),
