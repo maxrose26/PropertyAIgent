@@ -16,6 +16,9 @@ def offline(monkeypatch):
  monkeypatch.setattr(requests.sessions.Session,'request',deny)
  monkeypatch.setattr(subprocess,'Popen',deny)
  monkeypatch.setattr(idox_portal.time,'sleep',lambda *a:None)
+ import openai
+ monkeypatch.setattr(openai.OpenAI,'__init__',deny)
+ monkeypatch.setattr(openai.AsyncOpenAI,'__init__',deny)
 
 class Page:
  def __init__(self,ref,found=True):self.url='';self.ref=ref;self.found=found
@@ -78,7 +81,7 @@ def test_real_arcus_detail_parser_without_network(monkeypatch):
   def goto(self,u,**kw):self.url=u
   def wait_for_timeout(self,*a):pass
   def inner_text(self,*a):
-   if '/detail/' in self.url:return 'Status\tDecided\nDecision\tRefused\nDecision date\t25 September 2026\nApplication type\tDischarge of Conditions'
+   if '/detail/' in self.url:return 'Status\tDecided\nDecision\tRefused\nDecision date\tFri 25 Sep 2026\nApplication type\tDischarge of Conditions'
    return 'Reference\nX\nApplication type\nDischarge of Conditions\nSite address\nFixture\nDescription\nCondition\nStatus\nDecided\nDecision\nRefused\n'
   def eval_on_selector_all(self,*a):return [{'text':'X','href':'https://account.rochdale.gov.uk/pr/s/detail/X'}]
  c=get_council('rochdale');result=arcus_portal.fetch_application_by_reference(ArcusPage(),c,'X')
@@ -89,3 +92,48 @@ def test_priority_missing_then_oldest():
  base={'cohort':2,'council':'oldham','reference':'X','application_id':1}
  rows=[dict(base,status_verified_at='2026-09-18'),dict(base,status_verified_at=None),dict(base,status_verified_at='2026-09-10')]
  assert [x['status_verified_at'] for x in sorted(rows,key=priority_key)]==[None,'2026-09-10','2026-09-18']
+
+def synthetic_basis():
+ direct=[];apps={};risks=[];subjects=[]
+ for i in range(1,235):
+  fields=['planning_status','decision','decision_issued_date'] if i<=211 else ['qualified_residential_scale']
+  ref=f'SYNTHETIC/{i}';apps[i]=dict(id=i,site_id=i,council_code='oldham',reference=ref,status='Awaiting decision',decision=None,decision_issued_date=None,status_verified_at=None)
+  direct.append(dict(application_id=i,reference=ref,site_id=i,council='oldham',dependency_type='DIRECT_FACTUAL_DEPENDENCY',supported_fields=fields,consumers=['dashboard'],subject_key=f'synthetic-{i}'))
+  risks.append(dict(application_id=i,cohort=1 if i==42 else 2,reasons=['synthetic_fixture']))
+  subjects.append(dict(subject_key=f'synthetic-{i}',site_id=i,status_sources=[ref] if i<=211 else []))
+ from verification.stage26b_l1.selection import REVIEW_IDS
+ for i in REVIEW_IDS-apps.keys():apps[i]=dict(id=i,site_id=i,council_code='oldham',reference=f'SYNTHETIC/{i}')
+ return dict(dependencies=direct,risk_cohorts=risks,subjects=subjects),dict(retrieval_state='COMPLETE',dependency_census_state='QUALIFIED',capture={'captured_at':'2026-10-09T17:46:54+00:00','snapshot':'SYNTHETIC'},data={'applications':list(apps.values()),'allocation_site_relationships':[]})
+
+def test_complete_manifest_and_other_fact_separation():
+ r,c=synthetic_basis();m=build(r,c)
+ assert m['candidate_count']==234 and len(m['status_manifest'])==211
+ assert m['other_fact_dispositions']=={'B_OTHER_FACT_DEFERRED':23}
+ assert len(m['allocation_review'])==10 and all(not a['request_eligible'] for a in m['allocation_review'])
+ assert len(m['unresolved_attribution'])==23 and all(not a['request_eligible'] for a in m['unresolved_attribution'])
+ assert m['status_manifest'][0]['application_id']==42
+ assert all(row['manifest_version']==m['version'] for row in m['status_manifest'])
+ assert build(r,c)==m
+
+@pytest.mark.parametrize('change',['remove_status','reference','duplicate','incomplete'])
+def test_selection_fails_closed(change):
+ r,c=synthetic_basis()
+ if change=='remove_status':r['dependencies'][0]['supported_fields']=['qualified_residential_scale']
+ if change=='reference':c['data']['applications'][0]['reference']='DIFFERENT'
+ if change=='duplicate':c['data']['applications'].append(c['data']['applications'][0])
+ if change=='incomplete':c['retrieval_state']='PARTIAL'
+ with pytest.raises(ValueError):build(r,c)
+
+@pytest.mark.parametrize('before,fields,outcome',[
+ ({'status':'Awaiting decision'},{'Status':'garbage','Decision':'garbage'},'PARSER_FAILURE'),
+ ({'status':'Decided','decision':'Granted','decision_issued_date':'Fri 25 Sep 2026'},{'Status':'Decided'},'PARTIAL_RETRIEVAL'),
+ ({'status':'Decided','decision':'Granted','decision_issued_date':'Fri 25 Sep 2026'},{'Status':'Decided','Decision':'Refused','Decision Issued Date':'Thu 24 Sep 2026'},'AMBIGUOUS_SOURCE_RESULT'),
+ ({'status':'Awaiting decision'},{'Status':'Appeal pending'},'PARTIAL_RETRIEVAL')])
+def test_partial_unknown_older_evidence_does_not_erase(before,fields,outcome):
+ out=assess(before,candidate(**fields),reference='X',base_url='https://example.invalid')
+ assert out['outcome']==outcome and not out['advance_verification'] and out['acceptance_candidate'] is None
+
+@pytest.mark.parametrize('status,decision',[('Awaiting decision','Granted'),('Pending','Refused'),('Decided','Not granted'),('Decided','Minded to approve'),('Decided','Granted subject to S106'),('Withdrawn','Granted'),('Refused','Granted'),('Approved','Refused')])
+def test_b20_negative_authority_cases(status,decision):
+ out=assess({'status':'Awaiting decision'},candidate(Status=status,Decision=decision),reference='X',base_url='https://example.invalid')
+ assert out['outcome']=='AMBIGUOUS_SOURCE_RESULT' and not out['advance_verification']
