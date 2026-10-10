@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime, timezone
 import json
 from sqlalchemy import select
-from app.db.models import Application, BuyerMandate
+from app.db.models import Application, Buyer, BuyerMandate
 from app.services.authorised_reads import buyer_query
 from app.policy.buyer_profile_store import _resolve_default_mandate_for_buyer
 from app.reporting.buyer_family_feed import load_buyer_family_inputs, evaluate_buyer_families
@@ -17,12 +17,14 @@ def encode(artifact):
     if len(raw.encode())>LIMITS['bytes']: raise ObservationFailure('output byte overflow')
     return raw
 
-def observe(session, *, code_sha, synthetic=False, structural=None):
+def observe(session, *, code_sha, synthetic=False, structural=None, expected_buyer_ids=None):
     if len(code_sha)!=40 or any(c not in '0123456789abcdef' for c in code_sha):
         raise ObservationFailure('exact SHA required')
-    records=[]; counts=Counter(); seen=set(); contexts={}
+    records=[]; counts=Counter({k:0 for k in ["DIRECT_FACTUAL_DEPENDENCY","CONTEXT_DEPENDENCY","DISCOVERY_RELATIONSHIP","UNKNOWN"]}); seen=set(); contexts={}
     with guarded_window(session,synthetic=synthetic,max_queries=LIMITS['queries'],seconds=LIMITS['seconds']) as safety:
-        buyers=session.execute(buyer_query().order_by(__import__('app.db.models',fromlist=['Buyer']).Buyer.id)).scalars().all()
+        buyers=session.execute(buyer_query().order_by(Buyer.id)).scalars().all()
+        if not synthetic and expected_buyer_ids is None: raise ObservationFailure('buyer census expectations required')
+        if expected_buyer_ids is not None and {b.id for b in buyers}!=set(expected_buyer_ids): raise ObservationFailure('buyer scope incomplete')
         if not buyers or len(buyers)>LIMITS['buyers']: raise ObservationFailure('buyer count invalid')
         mandates={}
         for buyer in buyers:
@@ -58,14 +60,14 @@ def observe(session, *, code_sha, synthetic=False, structural=None):
                     positions=card.get('planning_freshness') or [(None,None,None)]
                     for label,ref,freshness in positions:
                         ids=by_source.get((sid,ref),[]) if ref else []
-                        exact=len(ids)==1 and freshness is not None and freshness.planning_state!='unknown_unverified'
+                        exact=len(ids)==1 and freshness is not None and freshness.planning_state!='unknown_unverified' and freshness.freshness!='conflicting'
                         dependency='DIRECT_FACTUAL_DEPENDENCY' if exact else 'UNKNOWN'
                         aid=ids[0] if exact else None
                         correlation='UNRESOLVED'
                         if structural is not None:
                             keys=[('sites',sid),('applications',aid),('local_plan_sites',allocation)]
                             missing=[(s,i) for s,i in keys if i is not None and i not in structural.get(s,set())]
-                            correlation='EXPECTED_LATER_SNAPSHOT_DIFFERENCE' if missing else 'MATCHED_STRUCTURAL_ENTITY'
+                            correlation='UNRESOLVED' if missing else 'MATCHED_STRUCTURAL_ENTITY'
                         records.append(dict(buyer_id=buyer.id,mandate_id=mandates[buyer.id].id,mandate_fingerprint=mandates[buyer.id].matching_fingerprint,subject_key=subject.subject_key,subject_type=subject.domain,subject_scope=subject.slot,site_id=sid,allocation_id=allocation,family_identity=list(family.family_key),role=role,visibility='TERMINALLY_EXCLUDED' if family.is_terminally_excluded else 'ADMITTED_CANDIDATE',status_source_application_id=aid,status_source_reference=ref if exact else None,supported_field='planning_status' if exact else None,dependency_type=dependency,attribution='EXACT_EXISTING_STATUS_SOURCE' if exact else 'UNRESOLVED',structural_correlation=correlation))
                         counts[dependency]+=1
                         if len(records)>LIMITS['rows']: raise ObservationFailure('row overflow')
