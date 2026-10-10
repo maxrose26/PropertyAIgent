@@ -1,0 +1,60 @@
+name: L1 Oldham two-reference canary (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact REVIEW-approved 40-character commit; must equal workflow revision
+        required: true
+        type: string
+      mode:
+        description: Live requires separate Product Owner authority; default is offline
+        required: true
+        type: choice
+        default: offline
+        options: [offline, live]
+      authority:
+        description: OFFLINE_ONLY or separately authorised exact two-reference acknowledgement
+        required: true
+        type: choice
+        default: OFFLINE_ONLY
+        options: [OFFLINE_ONLY, AUTHORISE_FAILSWORTH_SOUTHLINK_ONLY]
+permissions:
+  contents: read
+concurrency:
+  group: l1-oldham-two-reference-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Exact workflow and code revision admission
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          MODE: ${{ inputs.mode }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$MODE" == offline || ( "$MODE" == live && "$AUTHORITY" == AUTHORISE_FAILSWORTH_SOUTHLINK_ONLY ) ]]
+          echo "CANARY_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Install existing locked dependencies (not council traffic)
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/canary-venv"
+      - name: Bounded audit only; no service credentials inherited
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          MODE: ${{ inputs.mode }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          env -i PATH=/usr/bin:/bin GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/canary-venv/bin/python" -m verification.stage26b_l1.actions_runner --sha "$PIN" --mode "$MODE" --authority "$AUTHORITY" --deadline 120 --job-start-epoch "$CANARY_JOB_START" --output "$RUNNER_TEMP/canary-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: l1-oldham-audit-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/canary-audit.json
+          if-no-files-found: error
+          retention-days: 7
