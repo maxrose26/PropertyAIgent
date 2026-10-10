@@ -175,6 +175,7 @@ def run(*, sha, mode='offline', dispatch_factory=None):
                     kwargs.pop('deadline', None)
                     return session.request(method, url, **kwargs)
             boundary = OldhamBoundary(case['reference'], budget, dispatch)
+            reference_started = time.monotonic()
             try:
                 candidate = exact_status_lookup(boundary)
                 verdict = assess(case, candidate, reference=case['reference'], base_url=BASE)
@@ -189,14 +190,17 @@ def run(*, sha, mode='offline', dispatch_factory=None):
                         decision_date=accepted['decision_issued_date'], source_url=candidate.summary_url)
             except BoundaryFailure as exc:
                 row = boundary.audit(exc.outcome); row['failure_classification'] = exc.reason
+                row['source_qualification'] = 'not_verified'
             except Exception:
                 budget.failure = budget.failure or BoundaryFailure('PARTIAL_RETRIEVAL', 'unqualified verifier failure')
                 row = boundary.audit('PARTIAL_RETRIEVAL'); row['failure_classification'] = 'unqualified verifier failure'
+                row['source_qualification'] = 'not_verified'
             finally:
                 boundary.close()
                 if session is not None: session.close()
             rows.append(row)
             row['attempted'] = boundary.requests > 0
+            row['elapsed_seconds'] = round(time.monotonic() - reference_started, 3)
         complete = len(rows) == 2 and all(r['outcome'].startswith('VERIFIED_') for r in rows) and not budget.failure
         return dict(manifest_version=VERSION, workflow_version=VERSION, repository=REPOSITORY,
             repository_sha=sha, execution_time=dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -204,6 +208,7 @@ def run(*, sha, mode='offline', dispatch_factory=None):
             council_network_requests=0 if mode == 'offline' else sum(r['requests_attempted'] for r in rows),
             requests_attempted=sum(r['requests_attempted'] for r in rows),
             received_bytes=budget.used_bytes, budget_state='EXHAUSTED' if budget.failure and budget.failure.budget else 'WITHIN_LIMITS',
+            elapsed_seconds=round(time.monotonic() - budget.started, 3),
             results=rows)
     finally: sys.meta_path.remove(fence)
 
