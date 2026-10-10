@@ -92,6 +92,14 @@ def test_duplicate_status_label_is_ambiguous():
     assert exc.value.outcome == 'AMBIGUOUS_SOURCE_RESULT'
 
 
+def test_single_key_on_paginated_search_not_certified_unique():
+    page = '<a href="applicationDetails.do?keyVal=A">one</a><a href="advancedSearchResults.do?action=nextPage">Next</a>'
+    b = make(dispatch_pages(FORM, page))
+    with pytest.raises(BoundaryFailure) as exc: exact_status_lookup(b)
+    assert exc.value.outcome == 'PARTIAL_RETRIEVAL'
+    assert b.requests == 2
+
+
 def test_wrong_detail_reference_stops_whole_run():
     def factory(reference):
         if reference != CASES[0]['reference']:
