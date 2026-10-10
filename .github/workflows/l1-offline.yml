@@ -13,9 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Fetch immutable Spec028 behavioural baseline
         run: git fetch --no-tags --depth=1 origin 22636ddab7e0af9b6220c6466d400bc1ec98aafc
+      - name: Fetch immutable generic Idox behavioural baseline
+        run: git fetch --no-tags --depth=1 origin 27966c34d1b4dbb88c15cd59d0805d55b14af9a7
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/l1-venv"
       - name: Network-denied selection and source fixture rehearsal
         run: |
