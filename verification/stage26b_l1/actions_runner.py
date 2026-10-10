@@ -14,7 +14,81 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import parse_qs, urlsplit
 from .actions_canary import AUTHORITY, CASES, MAX_ARTIFACT, REPOSITORY, VERSION, encode_artifact
+from .actions_canary import BASE
+
+
+def validate_worker_artifact(result, *, sha, mode, status):
+    """Exact minimised schema; contradictory COMPLETE is never accepted."""
+    top = {'manifest_version', 'workflow_version', 'repository', 'repository_sha',
+        'execution_time', 'mode', 'execution_status', 'persistence',
+        'council_network_requests', 'requests_attempted', 'received_bytes',
+        'budget_state', 'elapsed_seconds', 'results'}
+    if not isinstance(result, dict) or set(result) != top: raise ValueError('Audit schema')
+    if (result['manifest_version'] != VERSION or result['workflow_version'] != VERSION
+        or result['repository'] != REPOSITORY or result['repository_sha'] != sha
+        or result['mode'] != mode or result['persistence'] is not False
+        or result['execution_status'] not in ('COMPLETE', 'FAIL')
+        or result['budget_state'] not in ('WITHIN_LIMITS', 'EXHAUSTED')):
+        raise ValueError('Audit identity/state')
+    stamp = dt.datetime.fromisoformat(result['execution_time'])
+    if stamp.utcoffset() != dt.timedelta(0): raise ValueError('UTC required')
+    def integer(value, maximum):
+        if type(value) is not int or not 0 <= value <= maximum: raise ValueError('Audit bound')
+    def elapsed(value):
+        if type(value) not in (int, float) or not 0 <= value <= 180: raise ValueError('Elapsed bound')
+    integer(result['requests_attempted'], 20); integer(result['received_bytes'], 10_000_000)
+    integer(result['council_network_requests'], 20); elapsed(result['elapsed_seconds'])
+    if result['council_network_requests'] != (0 if mode == 'offline' else result['requests_attempted']):
+        raise ValueError('Network accounting')
+    rows = result['results']
+    if not isinstance(rows, list) or len(rows) != 2: raise ValueError('Exact cohort')
+    required = {'council', 'reference', 'adapter', 'outcome', 'requests_attempted',
+        'redirects', 'retries', 'received_bytes', 'elapsed_seconds',
+        'budget_exhaustion', 'source_qualification', 'attempted'}
+    optional = {'failure_classification', 'status', 'decision', 'decision_date', 'source_url'}
+    from .contract import OUTCOMES
+    states = {'granted', 'refused', 'withdrawn', 'not_yet_decided',
+        'decision_outcome_unknown', 'recommended_for_approval',
+        'recommended_for_refusal', 'recommendation_made'}
+    for row, case in zip(rows, CASES):
+        if not isinstance(row, dict) or not required <= set(row) or set(row) - required - optional:
+            raise ValueError('Row schema/privacy')
+        if row['reference'] != case['reference'] or row['council'] != 'oldham' or row['adapter'] != 'idox' or row['outcome'] not in OUTCOMES:
+            raise ValueError('Row identity/outcome')
+        integer(row['requests_attempted'], 10); integer(row['received_bytes'], 10_000_000)
+        integer(row['redirects'], 2); integer(row['retries'], 1); elapsed(row['elapsed_seconds'])
+        if type(row['budget_exhaustion']) is not bool or row['attempted'] is not (row['requests_attempted'] > 0):
+            raise ValueError('Row accounting')
+        verified = row['outcome'].startswith('VERIFIED_')
+        if verified:
+            if not {'status', 'decision', 'decision_date', 'source_url'} <= set(row) or not row['attempted'] or row['budget_exhaustion']:
+                raise ValueError('Verified evidence incomplete')
+            if row['status'] not in states or (row['decision'] is not None and row['decision'] not in states):
+                raise ValueError('Normalized evidence only')
+            if row['decision_date'] is not None: dt.date.fromisoformat(row['decision_date'])
+            u = urlsplit(row['source_url']); query = parse_qs(u.query)
+            if (u.scheme != 'https' or u.netloc != urlsplit(BASE).netloc
+                or u.path != urlsplit(BASE).path + '/applicationDetails.do' or u.fragment
+                or set(query) != {'activeTab', 'keyVal'} or query['activeTab'] != ['summary']
+                or len(query['keyVal']) != 1 or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', query['keyVal'][0])):
+                raise ValueError('Source URL')
+            if row['source_qualification'] != ('MOCKED_EXPECTATION' if mode == 'offline' else 'exact_public_council_summary'):
+                raise ValueError('Source qualification')
+        elif set(row) & {'status', 'decision', 'decision_date', 'source_url'}:
+            raise ValueError('Failed result cannot certify a fact')
+        if 'failure_classification' in row and (not isinstance(row['failure_classification'], str)
+            or not re.fullmatch(r'[A-Za-z0-9 _/.-]{1,120}', row['failure_classification'])):
+            raise ValueError('Unsafe error text')
+    if sum(r['requests_attempted'] for r in rows) != result['requests_attempted'] or sum(r['received_bytes'] for r in rows) != result['received_bytes']:
+        raise ValueError('Accounting reconciliation')
+    complete = result['execution_status'] == 'COMPLETE'
+    if complete and (status != 0 or result['budget_state'] != 'WITHIN_LIMITS'
+        or any(not r['outcome'].startswith('VERIFIED_') for r in rows)):
+        raise ValueError('Contradictory COMPLETE')
+    if not complete and status == 0: raise ValueError('Contradictory exit status')
+    encode_artifact(result)
 
 
 def failure_artifact(sha, outcome, reason, *, mode):
@@ -87,11 +161,7 @@ def execute(*, sha, mode, authority, output, deadline=120, job_start_epoch=None)
         else:
             try:
                 result = json.loads(audit.read_bytes())
-                if (result['manifest_version'] != VERSION or result['repository_sha'] != sha
-                    or result['mode'] != mode or result['persistence'] is not False
-                    or [r['reference'] for r in result['results']] != [c['reference'] for c in CASES]
-                    or (status != 0 and result['execution_status'] == 'COMPLETE')):
-                    raise ValueError('Audit provenance mismatch')
+                validate_worker_artifact(result, sha=sha, mode=mode, status=status)
             except Exception:
                 result = failure_artifact(sha, 'PARTIAL_RETRIEVAL', 'invalid_audit', mode=mode)
         encoded = encode_artifact(result)
