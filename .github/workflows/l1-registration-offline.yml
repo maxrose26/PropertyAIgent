@@ -1,0 +1,39 @@
+name: L1 registration offline acceptance
+on:
+  push:
+    branches: [feat/l1-oldham-registration]
+  pull_request:
+    paths: ['verification/stage26b_l1/**', 'tests/test_l1_registration_request_safety.py', 'tests/test_l1_actions_canary.py', '.github/workflows/l1-registration-offline.yml', '.github/workflows/l1-oldham-canary.yml']
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Fetch immutable Spec028 behavioural baseline
+        run: git fetch --no-tags --depth=1 origin 22636ddab7e0af9b6220c6466d400bc1ec98aafc
+      - name: Fetch immutable generic Idox behavioural baseline
+        run: git fetch --no-tags --depth=1 origin 27966c34d1b4dbb88c15cd59d0805d55b14af9a7
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/l1-venv"
+      - name: Network-denied registration and source fixture rehearsal
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/l1-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_l1_registration_request_safety.py tests/test_l1_actions_canary.py tests/test_stage26b_l0.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_stage26b_b11.py tests/test_stage26b_integrity.py tests/test_planning_status_verification.py tests/test_material_planning_change_detection.py tests/test_spec028_profile.py tests/test_spec028_differential.py -q --junitxml="$RUNNER_TEMP/l1-results.xml"
+      - name: Actual canary runner OFFLINE only (zero council requests)
+        env:
+          PIN: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git checkout --detach "$PIN"
+          env -i PATH=/usr/bin:/bin GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/l1-venv/bin/python" -m verification.stage26b_l1.actions_runner --sha "$PIN" --mode offline --authority OFFLINE_ONLY --output "$RUNNER_TEMP/canary-audit.json"
+          python3 -c 'import json,sys; a=json.load(open(sys.argv[1])); assert a["mode"]=="offline" and a["council_network_requests"]==0 and a["execution_status"]=="COMPLETE"; print("OFFLINE_CANARY_COMPLETE: zero council requests; mocked refusal + unchanged pending")' "$RUNNER_TEMP/canary-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: l1-offline-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/l1-results.xml
+            ${{ runner.temp }}/canary-audit.json
