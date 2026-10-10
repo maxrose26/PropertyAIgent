@@ -11,6 +11,8 @@ import re
 import time
 from dataclasses import dataclass, field
 from urllib.parse import urljoin
+from urllib.parse import urlencode, urlsplit
+from types import SimpleNamespace
 
 import requests
 from bs4 import BeautifulSoup
@@ -174,6 +176,58 @@ def extract_table_fields(html: str) -> dict[str, str]:
             value = cells[1].get_text(strip=True)
             data[key] = value
     return data
+
+
+def fetch_application_status_by_reference(council, reference, transport):
+    """Opt-in bounded status-only verification; generic discovery is unchanged.
+
+    The caller must supply an admitted/accounted transport. No browser, assets,
+    further-information, documents or related-case traversal. Unsupported forms
+    fail closed rather than expanding discovery. Existing table parsing is reused.
+    """
+    if reference != transport.policy.reference or council.base_url != transport.policy.base_url:
+        transport.reject('PARTIAL_RETRIEVAL', 'adapter policy mismatch')
+    _, html = transport.retrieve('GET', council.search_url)
+    soup = BeautifulSoup(html, 'html.parser')
+    forms = [f for f in soup.find_all('form') if f.select('input[name="searchCriteria.reference"]')]
+    if len(forms) != 1 or forms[0].get('method', '').upper() != 'POST':
+        transport.reject('PARTIAL_RETRIEVAL', 'unique reference form unavailable')
+    form = forms[0]; fields = {}
+    for element in form.select('input[name]'):
+        name = element['name']
+        if name in fields: transport.reject('PARSER_FAILURE', 'duplicate form input')
+        fields[name] = element.get('value', '')
+    fields['searchCriteria.reference'] = reference
+    target = urljoin(council.search_url, form.get('action', ''))
+    url, html = transport.retrieve('POST', target, urlencode(fields).encode())
+    if is_rate_limited(html): transport.reject('RATE_LIMITED', 'portal rate limit')
+    soup = BeautifulSoup(html, 'html.parser')
+    key = keyval_from_url(url)
+    keys = [key] if key else []
+    for anchor in soup.find_all('a', href=True):
+        href = urljoin(url, anchor['href']); u = urlsplit(href)
+        if u.path.endswith('/applicationDetails.do'):
+            if u.hostname != urlsplit(council.base_url).hostname:
+                transport.reject('PARTIAL_RETRIEVAL', 'external detail link')
+            candidate = keyval_from_url(href)
+            if candidate: keys.append(candidate)
+    # All plausible keys participate: never silently pick the first match.
+    key = transport.unique(keys, complete=False)
+    if not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', key):
+        transport.reject('PARSER_FAILURE', 'noncanonical key')
+    summary = council.base_url + '/applicationDetails.do?' + urlencode(dict(activeTab='summary', keyVal=key))
+    if url != summary: url, html = transport.retrieve('GET', summary)
+    if is_rate_limited(html): transport.reject('RATE_LIMITED', 'portal rate limit')
+    fields = extract_table_fields(html)
+    labels = []
+    for row in BeautifulSoup(html, 'html.parser').find_all('tr'):
+        cells = row.find_all(['th', 'td'])
+        if len(cells) == 2: labels.append(cells[0].get_text(strip=True))
+    for label in ('Reference', 'Status', 'Decision', 'Decision Issued Date'):
+        if labels.count(label) > 1:
+            transport.reject('AMBIGUOUS_SOURCE_RESULT', 'duplicate status evidence')
+    return SimpleNamespace(reference=fields.get('Reference'), summary_url=url,
+        fields={k: fields.get(k) for k in ('Reference', 'Status', 'Decision', 'Decision Issued Date')})
 
 
 def collect_result_links(page: Page, council: CouncilConfig, date_from: str, date_to: str) -> list[str]:
