@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import re
 import time
+from html.parser import HTMLParser
 from types import SimpleNamespace
 from urllib.parse import urlsplit, parse_qs
 
@@ -58,6 +59,26 @@ def admit(case):
 def reject(outcome, reason):
     raise BoundaryFailure(outcome, reason)
 
+class SummaryClosure(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.depth, self.selected, self.closed = 0, None, 0
+    def handle_starttag(self, tag, attrs):
+        if tag == 'table':
+            if self.selected is not None:
+                reject('PARTIAL_RETRIEVAL', 'nested summary table')
+            self.depth += 1
+            if dict(attrs).get('id') == 'simpleDetailsTable':
+                if sum(k == 'id' for k,v in attrs) != 1:
+                    reject('PARSER_FAILURE', 'ambiguous summary identifier')
+                self.selected = self.depth
+    def handle_endtag(self, tag):
+        if tag == 'table':
+            if self.selected == self.depth:
+                self.closed += 1
+                self.selected = None
+            self.depth = max(0, self.depth-1)
+
 def parse_summary(html, case):
     """Explicit blank rows establish absence; omitted rows do not.
 
@@ -71,7 +92,9 @@ def parse_summary(html, case):
     if len(tables) != 1:
         reject('PARTIAL_RETRIEVAL', 'unique summary table unavailable')
     table = tables[0]
-    if not re.search(r'</table\s*>', html, re.I):
+    closure = SummaryClosure()
+    closure.feed(html)
+    if closure.closed != 1 or closure.selected is not None:
         reject('PARTIAL_RETRIEVAL', 'incomplete summary table')
     values = {k: [] for k in FIELDS}
     for row in table.find_all('tr'):
@@ -119,7 +142,7 @@ def semantic_state(fields):
     low = status.casefold()
     supported = bool(re.search(r'grant|approv|refus|withdraw', decision, re.I)) or low in {'pending', 'awaiting decision',
         'awaiting determination', 'decided', 'decision made', 'withdrawn'} or \
-        any(x in low for x in ('committee', 'resolution', 'recommend'))
+        'recommend' in low
     if not supported:
         return 'UNKNOWN_UNMAPPED'
     candidate = SimpleNamespace(reference=fields['Reference'], summary_url=BASE,
@@ -219,15 +242,18 @@ def run(*, sha, dispatch, qualification='MOCKED_EXPECTATION'):
                 reject('PARTIAL_RETRIEVAL', 'summary media type unavailable')
             row.update(interpret(case, parse_summary(body.decode('utf-8', errors='strict'), case)))
         except BoundaryFailure as exc:
+            budget.failure = budget.failure or exc
             row.update(outcome=exc.outcome, source_fact_verified=False,
                        qualification=exc.reason)
         except Exception:
+            budget.failure = budget.failure or BoundaryFailure('PARSER_FAILURE', 'summary decoding or parsing failed')
             row.update(outcome='PARSER_FAILURE', source_fact_verified=False,
                        qualification='summary decoding or parsing failed')
         finally:
             boundary.close()
         row.update(requests=boundary.requests, redirects=boundary.redirects,
                    retries=boundary.retries, received_bytes=boundary.received_bytes,
+                   attempted=boundary.requests > 0,
                    elapsed_seconds=round(time.monotonic()-started, 3))
         results.append(row)
     complete = all(r['source_fact_verified'] for r in results) and not budget.failure
@@ -238,6 +264,7 @@ def run(*, sha, dispatch, qualification='MOCKED_EXPECTATION'):
         requests=sum(r['requests'] for r in results),
         received_bytes=sum(r['received_bytes'] for r in results), results=results)
     encode(artifact)
+    validate(artifact)
     return artifact
 
 def encode(artifact):
@@ -245,3 +272,74 @@ def encode(artifact):
     if len(data) > MAX_ARTIFACT:
         raise ValueError('Audit artifact overflow')
     return data
+
+def validate(artifact):
+    """Closed audit contract; literal success cannot imply semantic materiality."""
+    if set(artifact) != {'manifest_version','repository_sha','execution_time',
+            'execution_status','persistence','budget_state','requests','received_bytes','results'}:
+        raise ValueError('Audit fields')
+    if artifact['manifest_version'] != VERSION or artifact['persistence'] is not False or \
+        not re.fullmatch('[0-9a-f]{40}', artifact['repository_sha']):
+        raise ValueError('Audit provenance')
+    dt.datetime.fromisoformat(artifact['execution_time'])
+    rows = artifact['results']
+    if not isinstance(rows,list) or len(rows) != 2:
+        raise ValueError('Complete fixed scope required')
+    common = {'council','application_id','reference','source_url','source_qualification',
+              'outcome','source_fact_verified','requests','redirects','retries',
+              'received_bytes','attempted','elapsed_seconds'}
+    fact = {'source_status_raw','source_decision_raw','source_decision_date',
+            'semantic_state','semantic_qualification','source_fact_change','semantic_materiality'}
+    from .contract import FAILURES
+    for case,row in zip(CASES,rows):
+        if (row.get('council'),row.get('application_id'),row.get('reference'),row.get('source_url')) != \
+            ('bolton',case.application_id,case.reference,case.url):
+            raise ValueError('Audit source identity')
+        if row.get('source_qualification') not in {'MOCKED_EXPECTATION','exact_public_council_summary'}:
+            raise ValueError('Audit source qualification')
+        for key,cap in [('requests',2),('redirects',2),('retries',1),('received_bytes',2_131_072)]:
+            if type(row.get(key)) is not int or not 0 <= row[key] <= cap:
+                raise ValueError('Audit accounting')
+        if type(row.get('attempted')) is not bool or row['attempted'] != (row['requests']>0):
+            raise ValueError('Audit attempt state')
+        if not isinstance(row.get('elapsed_seconds'),(int,float)) or not 0 <= row['elapsed_seconds'] <= 51:
+            raise ValueError('Audit elapsed time')
+        if row.get('source_fact_verified') is True:
+            if set(row) != common|fact or not row['attempted'] or row['received_bytes']>1_000_000:
+                raise ValueError('Verified source fields')
+            if row['outcome'] not in {'SOURCE_FACT_VERIFIED_CHANGED','SOURCE_FACT_VERIFIED_UNCHANGED',
+                    'VERIFIED_UNCHANGED','VERIFIED_NON_MATERIAL_CHANGE','VERIFIED_MATERIAL_CHANGE'}:
+                raise ValueError('Verified outcome')
+            fields = {'Reference':case.reference,'Status':row['source_status_raw'],
+                'Decision':row['source_decision_raw'],'Decision Issued Date':row['source_decision_date']}
+            if any(value is not None and not isinstance(value,str) for value in fields.values()):
+                raise ValueError('Audit literal types')
+            for key in ('Status','Decision'):
+                value = fields[key]
+                if value is not None and not re.fullmatch(r'[A-Za-z0-9 ()/.,:;-]{1,256}',value):
+                    raise ValueError('Audit literal privacy')
+            if not fields['Status']:
+                raise ValueError('Audit missing status')
+            date = fields['Decision Issued Date']
+            if date is not None and (not re.fullmatch(r'\d{4}-\d{2}-\d{2}',date) or
+                    dt.date.fromisoformat(date).isoformat() != date):
+                raise ValueError('Audit date')
+            expected = interpret(case,fields)
+            if any(row[k] != value for k,value in expected.items()):
+                raise ValueError('Audit source/semantic separation')
+        elif row.get('source_fact_verified') is False:
+            if set(row) != common|{'qualification'} or row['outcome'] not in FAILURES or \
+                not re.fullmatch('[A-Za-z0-9 _/.-]{1,120}',row['qualification']):
+                raise ValueError('Failure must not certify facts')
+        else:
+            raise ValueError('Audit verification flag')
+    if artifact['requests'] != sum(r['requests'] for r in rows) or \
+        artifact['received_bytes'] != sum(r['received_bytes'] for r in rows):
+        raise ValueError('Audit totals')
+    complete = all(r['source_fact_verified'] for r in rows)
+    if artifact['execution_status'] != ('COMPLETE' if complete else 'FAIL') or \
+        artifact['budget_state'] != ('WITHIN_LIMITS' if complete else 'FAILED_OR_INCOMPLETE'):
+        raise ValueError('Audit completion')
+    if complete and (artifact['requests']>4 or artifact['received_bytes']>2_000_000):
+        raise ValueError('Audit run budget')
+    encode(artifact)
