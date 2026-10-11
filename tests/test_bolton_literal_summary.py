@@ -42,6 +42,41 @@ def test_global_fallback_is_preserved_but_not_used():
     assert b.semantic_state(fields()) == 'UNKNOWN_UNMAPPED'
     assert b.semantic_state(fields(status='Unrecognised')) == 'UNKNOWN_UNMAPPED'
 
+@pytest.mark.parametrize('status',['Committee review','Resolution recorded','Council processing label'])
+def test_unmapped_labels_cannot_reach_global_fallback(status):
+    assert b.semantic_state(fields(status=status))=='UNKNOWN_UNMAPPED'
+
+def test_closed_other_table_does_not_certify_unclosed_summary():
+    html=fixture_html(C).replace('</table>','')
+    html=html.replace('<body>','<body><table><tr><td>Other</td></tr></table>')
+    with pytest.raises(b.BoundaryFailure):b.parse_summary(html,C)
+
+def test_ambiguity_latches_run_and_no_second_dispatch():
+    calls=[]
+    def conflict(*a,**k):
+        calls.append(a)
+        return FixtureResponse(fixture_html(C).replace('Deposited','').encode())
+    audit=b.run(sha=SHA,dispatch=conflict)
+    assert len(calls)==1 and audit['results'][1]['attempted'] is False
+    assert audit['results'][1]['requests']==0 and audit['execution_status']=='FAIL'
+
+@pytest.mark.parametrize('defect',['missing','scope','semantic','private','count','complete'])
+def test_closed_artifact_validation(defect):
+    a=b.run(sha=SHA,dispatch=dispatch)
+    if defect=='missing':a['results']=[]
+    if defect=='scope':a['results'][0]['reference']='OTHER'
+    if defect=='semantic':a['results'][0]['semantic_state']='not_yet_decided'
+    if defect=='private':a['results'][0]['proposal']='SECRET'
+    if defect=='count':a['requests']=0
+    if defect=='complete':a['execution_status']='FAIL'
+    with pytest.raises(ValueError):b.validate(a)
+
+@pytest.mark.parametrize('value',['private@example.com','<html>secret</html>','x'*257])
+def test_artifact_rejects_literal_privacy_leak(value):
+    a=b.run(sha=SHA,dispatch=dispatch)
+    a['results'][0]['source_status_raw']=value
+    with pytest.raises(ValueError):b.validate(a)
+
 def test_absence_requires_explicit_blank_rows():
     f = fields(); assert f['Decision'] is None and f['Decision Issued Date'] is None
     html = fixture_html(C).replace('<tr><th>Decision</th><td></td></tr>', '')
