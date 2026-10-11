@@ -133,6 +133,23 @@ def test_transient_retry_counted():
     assert audit['execution_status']=='COMPLETE' and audit['requests']==3
     assert audit['results'][0]['retries']==1
 
+def test_retry_body_accounting_is_cumulative_not_per_response():
+    calls=[]
+    def transient(method,url,**kwargs):
+        calls.append(url)
+        if len(calls)==1:
+            response=FixtureResponse(b'x'*600_000);response.status_code=503
+            return response
+        response=dispatch(method,url,**kwargs)
+        if url==C.url:
+            response=FixtureResponse((fixture_html(C).replace('</body>',' '*500_000+'</body>')).encode())
+        return response
+    audit=b.run(sha=SHA,dispatch=transient)
+    assert audit['execution_status']=='COMPLETE'
+    assert 1_000_000<audit['results'][0]['received_bytes']<2_000_000
+    assert audit['results'][0]['retries']==1 and audit['requests']==3
+    b.validate(audit)
+
 def test_timeout_no_unbounded_retry():
     def timeout(*a,**k):raise requests.Timeout()
     audit=b.run(sha=SHA,dispatch=timeout)
