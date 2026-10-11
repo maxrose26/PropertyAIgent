@@ -8,7 +8,7 @@ import sys
 import tempfile
 from .actions_runner import supervise
 from .actions_canary import ImportFence, offline_network_denial
-from .bolton_literal import CASES, run, encode, VERSION
+from .bolton_literal import CASES, run, encode, validate, VERSION
 
 class FixtureResponse:
     status_code = 200
@@ -61,6 +61,7 @@ def main():
             raise SystemExit('Offline worker failed or expired; no complete artifact')
         if target.stat().st_size > 16_384: raise SystemExit('Artifact overflow')
         artifact = json.loads(target.read_bytes())
+        validate(artifact)
         if artifact.get('repository_sha') != args.sha or artifact.get('manifest_version') != VERSION or \
             artifact.get('execution_status') != 'COMPLETE' or artifact.get('persistence') is not False or \
             any(r.get('source_qualification') != 'MOCKED_EXPECTATION' for r in artifact['results']):
