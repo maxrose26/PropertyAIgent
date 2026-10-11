@@ -47,14 +47,40 @@ wire-body position, not Content-Length. An overflow chunk is charged and fails
 closed; enforcement is chunk-granular (up to 65,536 bytes), not an OS packet cap.
 No artifact claims an overflow run succeeded. Artifact maximum 16,384 bytes.
 
-Only an offline command-line rehearsal is supplied. It uses a clean exact SHA,
+The originally accepted offline command-line rehearsal uses a clean exact SHA,
 mock transport, import/network denial, a short-lived worker and temporary-file
 cleanup. The added CI workflow is OFFLINE-only, contents:read, hosted Ubuntu,
 no production secrets/environment and no manual/live dispatch route.
-Existing application/security CI remains required. No live workflow registered.
+Existing application/security CI remains required. The separate registration
+launcher below adds a manual workflow without dispatching it.
 
 ## Review gate
 
 Live source access and persistence remain HOLD. A future live authority must
 cover only the two fixed tuples and separately approve the launcher/registration.
 No Oldham, Arcus, broader manifest or production service is involved.
+
+## Registration-only launcher
+
+`bolton-literal-canary.yml` registers workflow_dispatch ONLY. No merge, push,
+PR or schedule can start that workflow. Its inputs are SHA, offline/live mode
+and a dedicated acknowledgement; none can substitute council/reference/URL.
+Live access still requires a separately approved Product Owner decision.
+
+`bolton_runner` admits an exact clean SHA matching the executing workflow,
+GitHub-hosted runner, manual event and AUTHORISE_BOLTON_TWO_SUMMARIES_ONLY.
+Worker environment is rebuilt without service credentials, model keys, proxies
+or GitHub token. ImportFence is installed before importing the verifier.
+
+Outer job: 2 minutes, including dependency setup. Worker: at most 45 seconds;
+15 seconds are reserved for normal cancellation/upload. Slow setup shortens
+the worker allowance or rejects execution before any council request. Runner
+disposal remains the final process boundary; no shared Render execution.
+
+Complete and valid failure audits are validated against the accepted closed
+schema before export. Interrupted/missing/invalid output fails the job without
+inventing zero-request accounting or manufacturing a complete artifact.
+
+Registration CI invokes the launcher OFFLINE with mock transport/network denial.
+Its automatic triggers never supply live mode or live authority. The manual
+workflow is not dispatched during registration, including in offline mode.
