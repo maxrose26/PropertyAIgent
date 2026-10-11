@@ -1,0 +1,61 @@
+name: Bolton literal-status two-summary audit (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed SHA; must equal this workflow revision
+        required: true
+        type: string
+      mode:
+        description: Live requires separate Product Owner authority
+        required: true
+        type: choice
+        default: offline
+        options: [offline, live]
+      authority:
+        description: Dedicated fixed two-summary acknowledgement
+        required: true
+        type: choice
+        default: OFFLINE_ONLY
+        options: [OFFLINE_ONLY, AUTHORISE_BOLTON_TWO_SUMMARIES_ONLY]
+permissions:
+  contents: read
+concurrency:
+  group: bolton-literal-two-summary-canary
+  cancel-in-progress: false
+jobs:
+  canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Exact workflow revision and manual authority admission
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          MODE: ${{ inputs.mode }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ ( "$MODE" == offline && "$AUTHORITY" == OFFLINE_ONLY ) || ( "$MODE" == live && "$AUTHORITY" == AUTHORISE_BOLTON_TWO_SUMMARIES_ONLY ) ]]
+          echo "BOLTON_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Existing locked dependencies; no council traffic
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/bolton-venv"
+      - name: Bounded fixed-summary audit; no service credentials inherited
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          MODE: ${{ inputs.mode }}
+          AUTHORITY: ${{ inputs.authority }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          env -i PATH=/usr/bin:/bin GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_EVENT_NAME=workflow_dispatch BOLTON_WORKFLOW_SHA="$WORKFLOW_SHA" PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/bolton-venv/bin/python" -m verification.stage26b_l1.bolton_runner --sha "$PIN" --mode "$MODE" --authority "$AUTHORITY" --job-start-epoch "$BOLTON_JOB_START" --output "$RUNNER_TEMP/bolton-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bolton-literal-audit-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/bolton-audit.json
+          if-no-files-found: error
+          retention-days: 7
