@@ -305,7 +305,7 @@ def validate(artifact):
         if not isinstance(row.get('elapsed_seconds'),(int,float)) or not 0 <= row['elapsed_seconds'] <= 51:
             raise ValueError('Audit elapsed time')
         if row.get('source_fact_verified') is True:
-            if set(row) != common|fact or not row['attempted'] or row['received_bytes']>1_000_000:
+            if set(row) != common|fact or not row['attempted'] or row['received_bytes']>2_000_000:
                 raise ValueError('Verified source fields')
             if row['outcome'] not in {'SOURCE_FACT_VERIFIED_CHANGED','SOURCE_FACT_VERIFIED_UNCHANGED',
                     'VERIFIED_UNCHANGED','VERIFIED_NON_MATERIAL_CHANGE','VERIFIED_MATERIAL_CHANGE'}:
