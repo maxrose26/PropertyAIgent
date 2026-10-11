@@ -1,0 +1,27 @@
+name: L1 offline selection acceptance
+on:
+  push:
+    branches: [feat/stage26b-l1-selection, feat/stage26b-l1-request-boundary]
+  pull_request:
+    paths: ['verification/stage26b_l1/**', 'tests/test_stage26b_l1.py', 'tests/test_stage26b_l1_boundary.py', '.github/workflows/l1-offline.yml']
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch immutable Spec028 behavioural baseline
+        run: git fetch --no-tags --depth=1 origin 22636ddab7e0af9b6220c6466d400bc1ec98aafc
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/l1-venv"
+      - name: Network-denied selection and source fixture rehearsal
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/l1-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_stage26b_l1.py tests/test_stage26b_l1_boundary.py tests/test_stage26b_l0.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_stage26b_b11.py tests/test_stage26b_integrity.py tests/test_planning_status_verification.py tests/test_material_planning_change_detection.py tests/test_spec028_profile.py tests/test_spec028_differential.py -q --junitxml="$RUNNER_TEMP/l1-results.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: l1-offline-${{ github.sha }}
+          path: ${{ runner.temp }}/l1-results.xml
