@@ -148,7 +148,7 @@ Ratings describe expected burden or potential, not measured vendor performance. 
 
 | Dimension | Licensed feed | Public structured + targeted own | Own platform collection | Licensed + selective own |
 |---|---|---|---|---|
-| Coverage | HIGH potential; supplier exclusions untested | LOW/MEDIUM demonstrated; current gaps | HIGH potential, LOW currently qualified | HIGH potential; gaps explicitly qualified |
+| Coverage | HIGH potential; supplier exclusions untested | Limited source evidence; operational GM discovery coverage unproved | HIGH potential, LOW currently qualified | HIGH potential; gaps explicitly qualified |
 | Freshness | MEDIUM/HIGH potential; SLA/deltas needed | Uneven publication/council cadence | Controllable schedule, upstream delays remain | Feed signals plus selective verification; no universal currentness claim |
 | Reliability | Contract/observability dependent | Heterogeneous weak guarantees | Owned incidents across many hosts | Two evidence layers, but more failure states |
 | Time to market | Shorter if licensing fits | Uncertain per-source qualification | Longest under current evidence | Shorter only if supplementation stays selective |
@@ -165,7 +165,7 @@ Vendor risks include correlated upstream sources, pricing/term changes, API disc
 
 ## Q. Independent review
 
-Pending separate review of this assessment before final publication status.
+Separate independent review: GO for documentation-only publication. Reviewer supported decision D, the bounded three-supplier shortlist, explicit rights/AI distinctions, qualitative cost reasoning, competitor treatment, freshness and national-coverage qualifications, vendor risk and moat analysis. One wording correction was adopted: public structured coverage is now described as unproved operational GM coverage rather than a demonstrated LOW/MEDIUM rating. Review assessed the artifact against the instruction; it did not independently retest supplier claims, fetch supplier data or contact suppliers. No supplier selection, purchase, implementation or merge authority follows.
 
 ## S. One next action: tightly scoped commercial-enquiry round
 
