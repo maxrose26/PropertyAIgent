@@ -244,7 +244,7 @@ def refresh(session, application, council, *, retrieve_evidence):
     observation = None
     failure = None
     raw_before = (application.status, application.decision, application.decision_issued_date)
-    def loader():
+    def loader(prior):
         nonlocal observation, failure
         try:
             observation = retrieve_evidence()
@@ -260,8 +260,8 @@ def refresh(session, application, council, *, retrieve_evidence):
                 or semantic_state(observation.fields) == 'UNKNOWN_UNMAPPED'
                 or not observation.b2_eligible):
                 fail('PARTIAL_RETRIEVAL', 'Literal-only observation; B2 completeness/semantic gate not met')
-            for field_name, attr in [('Decision','decision'),('Decision Issued Date','decision_issued_date')]:
-                if not observation.fields.get(field_name) and getattr(application,attr):
+            for field_name, retained in [('Decision',prior[1]),('Decision Issued Date',prior[2])]:
+                if not observation.fields.get(field_name) and retained:
                     fail('PARTIAL_RETRIEVAL', 'Blank cannot certify retained nonblank fact')
             return ScrapedApplication(reference=row['reference'],fields=observation.fields,
                 summary_url=row['source_url'], further_info_url='', keyval=None,
