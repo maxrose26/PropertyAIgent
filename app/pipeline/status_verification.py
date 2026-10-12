@@ -442,7 +442,7 @@ def verify_application_status(
         if evidence_loader is not None:
             # Direct-route loader runs AFTER the guarded prior snapshot.
             # It must qualify identity and field completeness before handoff.
-            result = evidence_loader()
+            result = evidence_loader(prior)
         elif council.doc_system == "arcus":
             from app.scrapers.arcus_portal import fetch_application_by_reference
             result = fetch_application_by_reference(page, council, reference)
