@@ -185,6 +185,20 @@
         "config/councils.yaml",
         "app/scrapers/idox_portal.py",
         "app/scrapers/arcus_portal.py"
+      ],
+      "retained_exact_summary_sources": [
+        {
+          "application_id": 202,
+          "reference": "00307/26",
+          "url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPAO1DEGJP00",
+          "qualification": "RETAINED_APPROVED_URL_TRANSPORT_DEMONSTRATED_NOT_CURRENT_FACT_ACCEPTANCE"
+        },
+        {
+          "application_id": 74,
+          "reference": "21233/25",
+          "url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T487AODEM3700",
+          "qualification": "RETAINED_APPROVED_URL_NOT_ATTEMPTED_IN_FAILED_LIVE_CANARY"
+        }
       ]
     },
     {
@@ -1434,8 +1448,8 @@
       "structured": "STRUCTURED_FORMAT_ADVERTISED",
       "delivery": "BULK_CSV",
       "authority": "OFFICIAL_DERIVED",
-      "licence": "UNKNOWN",
-      "commercial_reuse": "UNKNOWN",
+      "licence": "CONFIRMED: OGL_V3_IN_PUBLISHED_METADATA_OR_REPOSITORY",
+      "commercial_reuse": "ATTRIBUTION_REQUIRED_QUALIFIED_SCOPE_AND_THIRD_PARTY_RIGHTS",
       "evidence_label": "PARTIALLY CONFIRMED",
       "evidence_as_of": "2026-10-12",
       "operational_status": "PROPOSED_NOT_AUTHORISED",
@@ -1476,8 +1490,8 @@
       "structured": "STRUCTURED_FORMAT_ADVERTISED",
       "delivery": "BULK_CSV",
       "authority": "OFFICIAL_DERIVED",
-      "licence": "UNKNOWN",
-      "commercial_reuse": "UNKNOWN",
+      "licence": "CONFIRMED: OGL_V3_IN_PUBLISHED_METADATA_OR_REPOSITORY",
+      "commercial_reuse": "ATTRIBUTION_REQUIRED_QUALIFIED_SCOPE_AND_THIRD_PARTY_RIGHTS",
       "evidence_label": "PARTIALLY CONFIRMED",
       "evidence_as_of": "2026-10-12",
       "operational_status": "PROPOSED_NOT_AUTHORISED",
@@ -1518,8 +1532,8 @@
       "structured": "STRUCTURED_FORMAT_ADVERTISED",
       "delivery": "BULK_CSV",
       "authority": "OFFICIAL_DERIVED",
-      "licence": "UNKNOWN",
-      "commercial_reuse": "UNKNOWN",
+      "licence": "CONFIRMED: reduced open dataset OGL; UPRN-enriched dataset subject to OS restrictions",
+      "commercial_reuse": "REDUCED_OPEN_PROJECTION_ATTRIBUTION_REQUIRED_UPRN_ENRICHED_RESTRICTED",
       "evidence_label": "PARTIALLY CONFIRMED",
       "evidence_as_of": "2026-10-12",
       "operational_status": "PROPOSED_NOT_AUTHORISED",
@@ -1560,8 +1574,8 @@
       "structured": "STRUCTURED_FORMAT_ADVERTISED",
       "delivery": "GIS_SELECTED_SITES",
       "authority": "OFFICIAL_DERIVED",
-      "licence": "UNKNOWN",
-      "commercial_reuse": "UNKNOWN",
+      "licence": "CONFIRMED: OGL_V3_IN_PUBLISHED_METADATA_OR_REPOSITORY",
+      "commercial_reuse": "ATTRIBUTION_REQUIRED_QUALIFIED_SCOPE_AND_THIRD_PARTY_RIGHTS",
       "evidence_label": "PARTIALLY CONFIRMED",
       "evidence_as_of": "2026-10-12",
       "operational_status": "PROPOSED_NOT_AUTHORISED",
@@ -1644,8 +1658,8 @@
       "structured": "MIXED",
       "delivery": "OPEN_DATA_REPOSITORY",
       "authority": "OFFICIAL_DERIVED",
-      "licence": "UNKNOWN",
-      "commercial_reuse": "UNKNOWN",
+      "licence": "CONFIRMED: OGL_V3_IN_PUBLISHED_METADATA_OR_REPOSITORY",
+      "commercial_reuse": "ATTRIBUTION_REQUIRED_QUALIFIED_SCOPE_AND_THIRD_PARTY_RIGHTS",
       "evidence_label": "PARTIALLY CONFIRMED",
       "evidence_as_of": "2026-10-12",
       "operational_status": "PROPOSED_NOT_AUTHORISED",
