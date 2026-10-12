@@ -1,0 +1,372 @@
+{
+  "assessment_version": "idox-family-preflight-v1",
+  "binding_contract_version": "da0-contract-v1",
+  "base_sha": "da06dae001cbef9af6c0f38776e1fa4adfb022b3",
+  "assessment_date": "2026-10-12",
+  "decision": "PARTIAL_CANDIDATE",
+  "decision_scope": "Engineering candidate for received/validated-window enumeration; no operational source PASS",
+  "execution_authority": null,
+  "cohort": [
+    {
+      "council": "bolton",
+      "source_id": "bolton-register",
+      "origin": "https://paplanning.bolton.gov.uk/online-applications",
+      "doc_system": "idox",
+      "date_kind": "received",
+      "date_fields": [
+        "date(applicationReceivedStart)",
+        "date(applicationReceivedEnd)"
+      ],
+      "retained_manifest_references": 16,
+      "observed_difference": "Retained literal summary/field-state work; consumed summary canary did not verify facts",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX"
+    },
+    {
+      "council": "bury",
+      "source_id": "bury-register",
+      "origin": "https://planning.bury.gov.uk/online-applications",
+      "doc_system": "idox_anite",
+      "date_kind": "received",
+      "date_fields": [
+        "date(applicationReceivedStart)",
+        "date(applicationReceivedEnd)"
+      ],
+      "retained_manifest_references": 5,
+      "observed_difference": "Idox search with separate Anite document system; documents excluded",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX_ANITE"
+    },
+    {
+      "council": "oldham",
+      "source_id": "oldham-register",
+      "origin": "https://planningpa.oldham.gov.uk/online-applications",
+      "doc_system": "idox",
+      "date_kind": "received",
+      "date_fields": [
+        "date(applicationReceivedStart)",
+        "date(applicationReceivedEnd)"
+      ],
+      "retained_manifest_references": 20,
+      "observed_difference": "Automated verification deferred/unproved; historical raw form rejection and metadata 403; no new experiment",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "DEFERRED_UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX"
+    },
+    {
+      "council": "stockport",
+      "source_id": "stockport-register",
+      "origin": "https://planning.stockport.gov.uk/PlanningData-live",
+      "doc_system": "idox",
+      "date_kind": "validated",
+      "date_fields": [
+        "date(applicationValidatedStart)",
+        "date(applicationValidatedEnd)"
+      ],
+      "retained_manifest_references": 35,
+      "observed_difference": "Validated-date mode; details tab override; 2.5s detail pacing and historical 429 evidence",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX"
+    },
+    {
+      "council": "tameside",
+      "source_id": "tameside-register",
+      "origin": "https://publicaccess.tameside.gov.uk/online-applications",
+      "doc_system": "idox",
+      "date_kind": "received",
+      "date_fields": [
+        "date(applicationReceivedStart)",
+        "date(applicationReceivedEnd)"
+      ],
+      "retained_manifest_references": 7,
+      "observed_difference": "Received-date configuration; official weekly/monthly description; live protocol unproved",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX"
+    },
+    {
+      "council": "trafford",
+      "source_id": "trafford-register",
+      "origin": "https://pa.trafford.gov.uk/online-applications",
+      "doc_system": "idox",
+      "date_kind": "received",
+      "date_fields": [
+        "date(applicationReceivedStart)",
+        "date(applicationReceivedEnd)"
+      ],
+      "retained_manifest_references": 19,
+      "observed_difference": "Historical direct-result redirect and connection/navigation timeout evidence",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX"
+    },
+    {
+      "council": "wigan",
+      "source_id": "wigan-register",
+      "origin": "https://planning.wigan.gov.uk/online-applications",
+      "doc_system": "idox",
+      "date_kind": "received",
+      "date_fields": [
+        "date(applicationReceivedStart)",
+        "date(applicationReceivedEnd)"
+      ],
+      "retained_manifest_references": 19,
+      "observed_difference": "Historical inline tab links share keyVal; official weekly/monthly description; no structured-source retry",
+      "new_discovery": "DESIGN_CANDIDATE_UNPROVED",
+      "changed_discovery": "UNKNOWN",
+      "known_verification": "UNPROVED",
+      "operational": false,
+      "gates": {
+        "AUTHORITY": "UNKNOWN",
+        "COMPLETENESS": "UNKNOWN",
+        "FRESHNESS_LATENCY": "UNKNOWN",
+        "IDENTITY": "UNKNOWN",
+        "PROVENANCE": "UNKNOWN",
+        "RESOURCE_BOUNDING": "UNKNOWN",
+        "RIGHTS": "UNKNOWN",
+        "SCHEMA_STABILITY": "UNKNOWN"
+      },
+      "platform_family": "IDOX"
+    }
+  ],
+  "retained_references": 121,
+  "retained_non_oldham_references": 101,
+  "operationally_supported_references": 0,
+  "new_discovery_scope": "Public received/validated application-date window only; not all submissions or unlimited history",
+  "changed_discovery": {
+    "family_documented_lead": "DECISION_ONLY_CHANGE_DISCOVERY",
+    "operational_classification": "UNKNOWN",
+    "general_change_cursor": "UNKNOWN",
+    "rss_or_public_feed": "UNKNOWN",
+    "account_notifications": "Documented feature; unadmitted, no account created",
+    "general_change_coverage": "NOT_ESTABLISHED"
+  },
+  "existing_code_findings": [
+    {
+      "function": "collect_result_links",
+      "finding": "Pagination exception breaks and returns collected links without completeness qualification"
+    },
+    {
+      "function": "collect_result_links",
+      "finding": "No page/count/byte/deadline bound or duplicate-page loop guard"
+    },
+    {
+      "function": "collect_result_links",
+      "finding": "Attempted results-per-page 100 is hardcoded, optional select failure swallowed; not actual page size proof"
+    },
+    {
+      "function": "collect_result_links",
+      "finding": "Links are deduplicated by full URL, not exact reference/keyVal; all applicationDetails tabs are admitted by substring"
+    },
+    {
+      "function": "fetch_application_by_reference",
+      "finding": "Fallback selects first sorted keyVal; not proof of unique exact source"
+    },
+    {
+      "function": "extract_table_fields",
+      "finding": "Later duplicate labels overwrite earlier fields; qualifier must detect conflict before reuse"
+    },
+    {
+      "function": "fetch_application_detail",
+      "finding": "Couples proposal qualification and further-information retrieval; unsuitable unchanged for cheap/status-only acquisition"
+    },
+    {
+      "function": "get_with_retry/_goto_with_retry",
+      "finding": "4 HTTP attempts/3 navigation attempts; local timeouts do not bound whole run/browser traffic"
+    }
+  ],
+  "source_code_provenance": {
+    "path": "app/scrapers/idox_portal.py",
+    "sha256": "ac746bf94aa1626ccbe66e777cf9ea50ef61f09f734cde884d8fd55b5bca18c1",
+    "excerpt_path": "verification/idox_family/retained_collect_result_links.py.txt",
+    "excerpt_sha256": "94a91716688c22a2ea274a546a90c18fb6431762ce48795eba275e30ab37decd",
+    "truth": "RETAINED_REPOSITORY_CODE_UNMODIFIED_FUNCTION",
+    "rehearsal": "SYNTHETIC_FAKE_PAGE_NOT_PORTAL_TRUTH"
+  },
+  "public_documentation": [
+    {
+      "url": "https://www.wigan.gov.uk/Resident/Planning-and-Building-Control/Planning/Search-planning-applications.aspx",
+      "evidence": "Official weekly/monthly list description; no portal link followed"
+    },
+    {
+      "url": "https://www.tameside.gov.uk/w/development-management-home-page",
+      "evidence": "Official planning database with weekly/monthly lists; no portal link followed"
+    },
+    {
+      "url": "https://www.wigan.gov.uk/Docs/PDF/Resident/Planning-and-Building-Control/Planning-guidance/User-Guide-Idox-Public-Access-system.pdf",
+      "evidence": "Historical platform guide feature metadata; not current-council protocol or licence proof",
+      "qualification": "Guide copyright restrictions noted; no manual text/screenshots/procedures reproduced"
+    },
+    {
+      "url": "https://www.wigan.gov.uk/Resident/Planning-and-Building-Control/Planning/Disclaimer.aspx",
+      "evidence": "Portal/documents/map rights qualifications; no dataset reuse blanket grant"
+    },
+    {
+      "url": "https://www.stockport.gov.uk/find-planning-applications",
+      "evidence": "Research tool 403; retained official description remains historical"
+    },
+    {
+      "url": "https://www.trafford.gov.uk/planning-and-building-control/step-by-step/search-and-comment-planning-applications/search-planning-application",
+      "evidence": "Research tool 403; retained description remains historical"
+    }
+  ],
+  "transport": {
+    "existing_date_window_path": "PLAYWRIGHT_BROWSER",
+    "http_date_window_path": "UNPROVED",
+    "browser_required_for_all_councils": false,
+    "browser_byte_accounting": "UNPROVED_UNDER_ACCEPTED_CONTRACT",
+    "new_transport_implementation": false
+  },
+  "request_model": {
+    "http_formula": "1 form GET + 1 submit + (P-1) next-page requests + S page-size/sort operations + D selective summary GETs + redirects + retries",
+    "browser_formula": "Logical operations plus actual admitted navigation/XHR/assets/redirects/retries; no measured multiplier",
+    "cost": "MEDIUM_CONDITIONAL_HTTP_LIST_ONLY_HIGH_BROWSER_OR_ALL_DETAIL",
+    "measured_throughput": null,
+    "measured_bytes": null
+  },
+  "future_acceptance_councils": [
+    "bolton",
+    "stockport",
+    "wigan"
+  ],
+  "future_acceptance": {
+    "mode": "OFFLINE_FIRST_SEPARATELY_AUTHORISED_SINGLE_COORDINATED_LIVE_GATE_LATER",
+    "common": [
+      "Exact origin/source admission",
+      "Explicit query scope/date kind",
+      "Independent source identity",
+      "All pages or explicit partial failure",
+      "Count/key/terminal reconciliation",
+      "Request/byte/deadline enforcement",
+      "No documents/further-info/related-case entry",
+      "No database/model/persistence"
+    ],
+    "configuration_specific": [
+      "Origin/base path",
+      "Received versus validated semantics",
+      "Observed selectors/labels/date format",
+      "Observed page-size/sort controls",
+      "Pacing",
+      "Optional field states"
+    ],
+    "must_not_claim": "Three councils passing does not activate all seven or certify general change discovery"
+  },
+  "checkpoint_contract": {
+    "identity_fields": [
+      "council",
+      "source_id",
+      "capability",
+      "date_kind",
+      "filters",
+      "schema_version",
+      "parser_version",
+      "config_version",
+      "accepted_predecessor"
+    ],
+    "boundary": "Overlapping inclusive local-calendar windows only after source boundary semantics proved",
+    "lateness": "Source-specific qualification; fixed overlap cannot guarantee unknown late/backdated publication",
+    "advance": "Only after entire accepted bounded window; never page-level or failed capture",
+    "schema_drift": "Controlled rebaseline"
+  },
+  "discovery_projection": [
+    "council/source_id",
+    "Exact reference when independently evidenced",
+    "keyVal/source record ID",
+    "Admitted summary URL",
+    "Window/date-kind and page provenance",
+    "Observed optional fields with DA0 states",
+    "Completeness/resource controls",
+    "Parser/config/code provenance"
+  ],
+  "key_only_result": "Unresolved source-record candidate, not accepted application or APPLICATION_DISCOVERED event",
+  "documents_allowed": false,
+  "models_allowed": false,
+  "database_allowed": false,
+  "live_application_requests": 0,
+  "search_submissions": 0,
+  "detail_requests": 0,
+  "source_exceptions": {
+    "oldham": "DEFERRED; no force-fitting or weaker admission",
+    "bolton": "Deposited UNKNOWN_UNMAPPED; optional decision/date; no canary rerun"
+  },
+  "preserved_prs": [
+    49,
+    50
+  ],
+  "next_slice": "Offline common Idox discovery-window contract/parser/completeness rehearsal with three configs; transport/live authority remains gated"
+}
