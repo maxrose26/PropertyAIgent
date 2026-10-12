@@ -149,14 +149,19 @@ hosted CI and review, minimal default-branch integration is the requested operat
 registration change. Confirm workflow active and its run collection empty before
 asking for one live execution. Do not dispatch to prove registration.
 
-At preparation, current Render deployment-impact verification was unavailable:
-Render connector returned no selected workspace and requires explicit user workspace
-selection. It lists My Workspace (tea-d9qbf8jm8hqs7385cu0g). Historical repository
-records say auto-deploy OFF; they do not establish current service settings. No
-workspace was selected, Render settings changed or deployment performed. If this
-preflight remains unresolved, do not merge and do not claim GO—CANARY REGISTERED.
-Finish and publish the tested candidate, then return the exact outstanding access
-confirmation. No broader infrastructure review or production-data access is needed.
+The initial Render-settings preflight was unavailable because the connector requires
+explicit workspace selection. No workspace was selected and current settings remain
+UNKNOWN. This does not require a new configuration-access gate: accepted registration
+merges e85952b and3371efd used [skip render] to suppress automatic deployment.
+Current official Render documentation (https://render.com/docs/deploys and
+https://render.com/docs/service-previews, checked12October2026) confirms that marker
+in the merge commit prevents auto-deploy and in the PR title prevents previews.
+Use it explicitly in BOTH the PR title and exact merge message, then verify the
+actual merge retains it. Repository workflows were checked for independent deployment
+hooks; none was found. No Render configuration modification or deployment is required.
+This suppresses the documented Render integration, not arbitrary unknown external
+hooks; current production state remains unverified. Independent review accepted this
+bounded alternative to asking for unnecessary workspace/configuration access.
 
 Stage4 stays OPEN. This canary does not establish116 live-compatible references,
 seven-council Idox coverage, full ten-council GM refresh, cadence or new discovery.
