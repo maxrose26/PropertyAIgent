@@ -1,0 +1,57 @@
+name: Stage4 Oldham42 B2 PRODUCTION ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact REVIEW-approved SHA equal to workflow revision
+        required: true
+        type: string
+      authority:
+        description: Separate REVIEW execution authority required; registration is not authority
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_STAGE4_OLDHAM42_B2_PERSISTENCE_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-oldham42-production-once
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: First dispatch only; exact workflow SHA and authority
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$AUTHORITY" == AUTHORISE_STAGE4_OLDHAM42_B2_PERSISTENCE_ONCE ]]
+          [[ "$RUN_NUMBER" == 1 && "$RUN_ATTEMPT" == 1 ]]
+          echo "OLDHAM_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Install accepted pinned dependencies without production credentials
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/oldham-production-venv"
+      - name: One fresh Oldham B2 transaction and bounded readback
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          OLDHAM_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          OLDHAM_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_EVENT_NAME=workflow_dispatch OLDHAM_WORKFLOW_SHA="$OLDHAM_WORKFLOW_SHA" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" OLDHAM_DATABASE_URL="$OLDHAM_DATABASE_URL" "$RUNNER_TEMP/oldham-production-venv/bin/python" -m verification.direct_reference.oldham_production --sha "$PIN" --authority "$AUTHORITY" --job-start "$OLDHAM_JOB_START" --output "$RUNNER_TEMP/oldham-production-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage4-oldham-production-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/oldham-production-audit.json
+          if-no-files-found: error
+          retention-days: 7
