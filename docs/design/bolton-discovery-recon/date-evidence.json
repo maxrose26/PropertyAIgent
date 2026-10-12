@@ -1,0 +1,10 @@
+{
+  "truth": "RETAINED_HISTORICAL_FIELD_PROJECTION",
+  "source_file": "stage26a-final/stage26a-current-sources.json",
+  "source_file_sha256": "5ccec2c546f44cfd0766e241d1e20c7e010511610d7b8ee1a2c6c90c3768e5c5",
+  "observed_at": "2026-10-08T11:05:27.405Z",
+  "reference": "00307/26",
+  "received_date": "2026-02-19",
+  "validated_date": "2026-04-23",
+  "qualification": "Retained summary table text, not current council truth or raw HTML. Date-selection rationale only; no assertion of current discovery count or one-page completeness. No reference/detail request is part of reconnaissance."
+}

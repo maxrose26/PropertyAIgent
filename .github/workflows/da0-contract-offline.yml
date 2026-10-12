@@ -1,10 +1,10 @@
 name: DA0 offline contracts
 on:
   push:
-    branches: [feat/da0-acquisition-contracts]
-    paths: ['verification/da0/**', 'verification/da0/test_contracts.py', 'verification/da0/registry_fixtures.json', '.github/workflows/da0-contract-offline.yml', 'docs/design/da0-acquisition-contract/**']
+    branches: [feat/da0-acquisition-contracts, feat/bolton-discovery-recon-preflight]
+    paths: ['verification/bolton_recon/**', 'docs/design/bolton-discovery-recon/**', '.github/workflows/bolton-discovery-recon.yml', 'verification/da0/**', 'verification/da0/test_contracts.py', 'verification/da0/registry_fixtures.json', '.github/workflows/da0-contract-offline.yml', 'docs/design/da0-acquisition-contract/**']
   pull_request:
-    paths: ['verification/da0/**', 'verification/da0/test_contracts.py', 'verification/da0/registry_fixtures.json', '.github/workflows/da0-contract-offline.yml', 'docs/design/da0-acquisition-contract/**']
+    paths: ['verification/bolton_recon/**', 'docs/design/bolton-discovery-recon/**', '.github/workflows/bolton-discovery-recon.yml', 'verification/da0/**', 'verification/da0/test_contracts.py', 'verification/da0/registry_fixtures.json', '.github/workflows/da0-contract-offline.yml', 'docs/design/da0-acquisition-contract/**']
 permissions:
   contents: read
 jobs:
@@ -18,5 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pytest==8.3.5
-      - run: python -m pytest verification/da0/test_contracts.py -q
+      - run: python -m pip install pytest==8.3.5 PyYAML==6.0.2 -r verification/bolton_recon/requirements.txt
+      - run: python -m pytest verification/da0/test_contracts.py verification/bolton_recon/test_recon.py -q
+      - name: Fixed reconnaissance launcher offline only
+        run: python -m verification.bolton_recon.runner --sha "$(git rev-parse HEAD)" --mode offline --authority OFFLINE_ONLY --output "$RUNNER_TEMP/bolton-recon-offline.json"
