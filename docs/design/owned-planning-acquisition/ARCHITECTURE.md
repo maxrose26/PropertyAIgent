@@ -14,7 +14,7 @@ The historical 1,270 linked applications and accepted 211 direct status referenc
 
 ## 2. Evidence and source map
 
-`SOURCE_MATRIX.json` is the detailed, minimised research inventory. Every row records all requested capabilities; UNKNOWN is explicit. CONFIRMED means the particular documented observation is established, not that a collector is live-ready. Repository configurations are retained technical evidence, not new live portal tests. This bounded map is not an exhaustive census of all official resources.
+`SOURCE_MATRIX.json` is the detailed, minimised research inventory. Every row records all requested capabilities; UNKNOWN is explicit. `evidence_as_of` is the assessment date, NOT an underlying source observation/record refresh date. CONFIRMED means the particular documented observation is established, not that a collector is live-ready. Repository configurations are retained technical evidence, not new live portal tests. This bounded map is not an exhaustive census of all official resources.
 
 | Council | Platform in accepted repository | Structured source evidence | Publication/change lead | Near-term disposition |
 |---|---|---|---|---|
@@ -155,7 +155,7 @@ Require no-network fixtures, malformed/schema drift, redirect/SSRF, time/row/byt
 
 ## 13. Roadmap and first implementation recommendation
 
-Do not implement a snapshot engine before obtaining a complete, suitable source. Do not make national rollout block useful bounded freshness.
+Do not implement a snapshot engine before obtaining a complete, suitable source. Do not make national rollout block useful bounded freshness. DA4 known-reference freshness can proceed independently of DA2/DA3 discovery/snapshot work once its OWN source, evidence, resource and separately authorised acceptance gates pass; the stage numbers do not mandate unnecessary infrastructure dependencies.
 
 | Stage | Product outcome / scope | Dependencies and tests | GO / NO-GO | Explicit deferrals |
 |---|---|---|---|---|
@@ -193,6 +193,8 @@ Own a trustworthy, selective foundation and explainable intelligence, not necess
 ## 15. Publication, review and decision
 
 Two documentation paths only; no application/config/workflow change. Remote feature branch established from exact master before writing. Independent review and exact remote identities must be recorded in the completion report. Hosted doc-only acceptance is useful publication evidence, not source validation. No automatic or manual live workflow is changed/dispatched.
+
+Independent documentation review: GO after correcting recurring-transition event identity; the correction is incorporated. The reviewer also confirmed 40 source rows, all ten councils and the 211-reference counts, and requested the assessment-date and independent known-freshness qualifications incorporated above. No live/source acceptance follows from that review.
 
 Requested REVIEW decision: accept/revise owned architecture and narrowed DA0/DA1 sequence; choose whether first source may be direct-summary (recommended) or must be structured/bulk (currently blocked). Authorise only a later bounded offline DA1 slice if accepted. Live source access, acceptance persistence and activation remain separate decisions.
 
