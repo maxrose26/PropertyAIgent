@@ -80,7 +80,11 @@ def test_artifact_rejects_literal_privacy_leak(value):
 def test_absence_requires_explicit_blank_rows():
     f = fields(); assert f['Decision'] is None and f['Decision Issued Date'] is None
     html = fixture_html(C).replace('<tr><th>Decision</th><td></td></tr>', '')
-    with pytest.raises(b.BoundaryFailure): b.parse_summary(html,C)
+    parsed=b.parse_summary(html,C)
+    assert parsed.evidence['decision']=='NOT_PRESENT'
+    result=b.interpret(C,parsed)
+    assert result['source_retrieval']=='COMPLETE_FOR_STATUS_ONLY'
+    assert result['semantic_materiality']=='UNKNOWN_REQUIRES_REVIEW'
 
 def test_control_unchanged():
     r = b.interpret(CONTROL, fields(CONTROL))

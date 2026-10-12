@@ -19,10 +19,18 @@ from app.pipeline.material_change import _classify_planning_state
 from .contract import assess
 from .request_boundary import Boundary, BoundaryFailure, Budget, Policy
 
-VERSION = 'bolton-literal-summary-v1'
+VERSION = 'bolton-literal-summary-v2'
 BASE = 'https://paplanning.bolton.gov.uk/online-applications'
 MAX_ARTIFACT = 16_384
 FIELDS = ('Reference', 'Status', 'Decision', 'Decision Issued Date')
+FIELD_IDS = dict(zip(FIELDS, ('reference','status','decision','decision_date')))
+STATES = {'PRESENT_VALUE','PRESENT_BLANK','NOT_PRESENT','CONFLICTING','UNPARSEABLE'}
+
+class SummaryFacts(dict):
+    """Missing optional evidence is NOT an authoritative NULL observation."""
+    def __init__(self, fields, evidence, diagnostics):
+        super().__init__(fields)
+        self.evidence, self.diagnostics = evidence, diagnostics
 
 @dataclass(frozen=True)
 class Case:
@@ -56,8 +64,10 @@ def admit(case):
         parse_qs(u.query) != {'activeTab': ['summary'], 'keyVal': [case.key]}):
         raise ValueError('Unapproved source')
 
-def reject(outcome, reason):
-    raise BoundaryFailure(outcome, reason)
+def reject(outcome, reason, diagnostics=None):
+    error = BoundaryFailure(outcome, reason)
+    error.diagnostics = diagnostics
+    raise error
 
 class SummaryClosure(HTMLParser):
     def __init__(self):
@@ -82,8 +92,8 @@ class SummaryClosure(HTMLParser):
 def parse_summary(html, case):
     """Explicit blank rows establish absence; omitted rows do not.
 
-    Require the summary table, all four factual labels, a closed document and
-    no conflicting duplicate fields. Never project the rest of the page.
+    Require the summary table, reference/status labels, a closed document and
+    no conflicting factual fields. Optional labels retain explicit evidence states.
     """
     if not isinstance(html, str) or not re.search(r'</html\s*>\s*$', html, re.I):
         reject('PARTIAL_RETRIEVAL', 'incomplete summary document')
@@ -104,33 +114,45 @@ def parse_summary(html, case):
         name, value = (c.get_text(strip=True) for c in cells)
         if name in values:
             values[name].append(value)
-    if any(not v for v in values.values()):
-        reject('PARTIAL_RETRIEVAL', 'required source field omitted')
-    if any(len(set(v)) != 1 for v in values.values()):
-        reject('AMBIGUOUS_SOURCE_RESULT', 'conflicting factual fields')
+    evidence = {FIELD_IDS[k]: ('NOT_PRESENT' if not v else
+        'CONFLICTING' if len(set(v)) != 1 else 'PRESENT_VALUE' if v[0] else 'PRESENT_BLANK')
+        for k,v in values.items()}
+    diagnostics = dict(parser_manifest=VERSION, table_id='simpleDetailsTable',
+        table_ordinal=soup.find_all('table').index(table)+1,
+        fields={FIELD_IDS[k]:dict(state=evidence[FIELD_IDS[k]], occurrences=len(v))
+                for k,v in values.items()})
+    if 'CONFLICTING' in evidence.values():
+        reject('AMBIGUOUS_SOURCE_RESULT', 'conflicting factual fields',diagnostics)
+    for name in ('Reference','Status'):
+        if evidence[FIELD_IDS[name]] != 'PRESENT_VALUE':
+            reject('PARTIAL_RETRIEVAL', 'mandatory '+FIELD_IDS[name]+' field not evidenced',diagnostics)
     parsed = extract_table_fields(str(table))  # existing deterministic Idox parser
-    fields = {k: parsed[k] or None for k in FIELDS}
+    fields = {k: parsed.get(k) or None for k in FIELDS}
     ref = fields['Reference']
     if ref is None:
         reject('PARTIAL_RETRIEVAL', 'displayed reference missing')
     if ref.strip().upper() != case.reference:
-        reject('AMBIGUOUS_SOURCE_RESULT', 'displayed reference mismatch')
+        reject('AMBIGUOUS_SOURCE_RESULT', 'displayed reference mismatch',diagnostics)
     fields['Reference'] = case.reference
     if fields['Status'] is None:
         reject('PARTIAL_RETRIEVAL', 'literal status missing')
     for k in ('Status', 'Decision'):
         v = fields[k]
         if v is not None and not re.fullmatch(r'[A-Za-z0-9 ()/.,:;-]{1,256}', v):
-            reject('PARSER_FAILURE', 'unsafe or excessive factual field')
+            evidence[FIELD_IDS[k]]='UNPARSEABLE'
+            diagnostics['fields'][FIELD_IDS[k]]['state']='UNPARSEABLE'
+            reject('PARSER_FAILURE', 'unsafe or excessive factual field',diagnostics)
     raw_date = fields['Decision Issued Date']
     if raw_date:
         if len(raw_date) > 64:
-            reject('PARSER_FAILURE', 'date field exceeds bound')
+            diagnostics['fields']['decision_date']['state']='UNPARSEABLE'
+            reject('PARSER_FAILURE', 'date field exceeds bound',diagnostics)
         date = parse_portal_date(raw_date)
         if date == dt.date.min:
-            reject('PARSER_FAILURE', 'decision date unparseable')
+            diagnostics['fields']['decision_date']['state']='UNPARSEABLE'
+            reject('PARSER_FAILURE', 'decision date unparseable',diagnostics)
         fields['Decision Issued Date'] = date.isoformat()
-    return fields
+    return SummaryFacts(fields,evidence,diagnostics)
 
 def semantic_state(fields):
     """Evidence-gated entry to the unchanged canonical classifier.
@@ -160,16 +182,19 @@ def interpret(case, fields):
     before = {'Reference': case.reference, 'Status': case.status,
               'Decision': case.decision, 'Decision Issued Date': case.date}
     keys = ('Status', 'Decision', 'Decision Issued Date')
-    changed = any(before[k] != fields[k] for k in keys)
+    evidence = getattr(fields,'evidence', {FIELD_IDS[k]: 'PRESENT_VALUE' if fields[k] else 'PRESENT_BLANK' for k in FIELDS})
+    scope = [FIELD_IDS[k] for k in keys if evidence[FIELD_IDS[k]] != 'NOT_PRESENT']
+    changed = any(before[k] != fields[k] for k in keys if FIELD_IDS[k] in scope)
+    optional_missing = any(evidence[k]=='NOT_PRESENT' for k in ('decision','decision_date'))
     # Loss of previously evidenced terminal facts is incomplete retrieval, not
     # a successful observation that silently clears the accepted facts.
-    if (case.decision and not fields['Decision']) or (case.date and not fields['Decision Issued Date']):
+    if (case.decision and not fields['Decision'] and evidence['decision']!='NOT_PRESENT') or (case.date and not fields['Decision Issued Date'] and evidence['decision_date']!='NOT_PRESENT'):
         reject('PARTIAL_RETRIEVAL', 'previously evidenced decision fact absent')
-    state = semantic_state(fields)
+    state = 'UNKNOWN_UNMAPPED' if evidence['decision']=='NOT_PRESENT' else semantic_state(fields)
     prior = semantic_state(before)
     outcome = 'SOURCE_FACT_VERIFIED_CHANGED' if changed else 'SOURCE_FACT_VERIFIED_UNCHANGED'
-    materiality = 'UNKNOWN_REQUIRES_REVIEW' if changed else 'NO_SOURCE_FACT_CHANGE'
-    if prior != 'UNKNOWN_UNMAPPED' and state != 'UNKNOWN_UNMAPPED':
+    materiality = 'UNKNOWN_REQUIRES_REVIEW' if changed or optional_missing else 'NO_SOURCE_FACT_CHANGE'
+    if not optional_missing and prior != 'UNKNOWN_UNMAPPED' and state != 'UNKNOWN_UNMAPPED':
         candidate = SimpleNamespace(reference=case.reference, summary_url=case.url, fields=fields)
         comparison = assess(dict(status=case.status, decision=case.decision,
                                  decision_issued_date=case.date), candidate,
@@ -182,12 +207,16 @@ def interpret(case, fields):
                      if state == 'UNKNOWN_UNMAPPED' else
                      'Current semantic state established; prior unmapped state prevents transition materiality determination.'
                      if prior == 'UNKNOWN_UNMAPPED' and changed else 'Accepted semantic evidence rules applied.')
+    if optional_missing:
+        qualification += ' Optional decision/date evidence not retrieved; change comparison covers evidenced fields only.'
     return dict(outcome=outcome, source_fact_verified=True,
         source_status_raw=fields['Status'], source_decision_raw=fields['Decision'],
         source_decision_date=fields['Decision Issued Date'], semantic_state=state,
         semantic_qualification=qualification,
         source_fact_change='CHANGED' if changed else 'UNCHANGED',
-        semantic_materiality=materiality)
+        semantic_materiality=materiality, field_evidence=evidence,
+        source_fact_change_scope=scope,
+        source_retrieval='COMPLETE_FOR_STATUS_ONLY' if optional_missing else 'COMPLETE_FOR_STATUS_DECISION_DATE')
 
 def http_dispatch(method, url, **kwargs):
     """Existing Requests streaming transport; never called by offline entrypoint.
@@ -240,11 +269,14 @@ def run(*, sha, dispatch, qualification='MOCKED_EXPECTATION'):
                 reject('PARTIAL_RETRIEVAL', 'redirect not admitted')
             if 'html' not in headers.get('Content-Type', '').lower():
                 reject('PARTIAL_RETRIEVAL', 'summary media type unavailable')
-            row.update(interpret(case, parse_summary(body.decode('utf-8', errors='strict'), case)))
+            facts = parse_summary(body.decode('utf-8', errors='strict'), case)
+            row['field_diagnostics'] = facts.diagnostics
+            row.update(interpret(case, facts))
         except BoundaryFailure as exc:
             budget.failure = budget.failure or exc
             row.update(outcome=exc.outcome, source_fact_verified=False,
                        qualification=exc.reason)
+            row['field_diagnostics'] = (row.get('field_diagnostics') or getattr(exc,'diagnostics',None)) if boundary.requests > 0 else None
         except Exception:
             budget.failure = budget.failure or BoundaryFailure('PARSER_FAILURE', 'summary decoding or parsing failed')
             row.update(outcome='PARSER_FAILURE', source_fact_verified=False,
@@ -255,6 +287,7 @@ def run(*, sha, dispatch, qualification='MOCKED_EXPECTATION'):
                    retries=boundary.retries, received_bytes=boundary.received_bytes,
                    attempted=boundary.requests > 0,
                    elapsed_seconds=round(time.monotonic()-started, 3))
+        row.setdefault('field_diagnostics',None)
         results.append(row)
     complete = all(r['source_fact_verified'] for r in results) and not budget.failure
     artifact = dict(manifest_version=VERSION, repository_sha=sha,
@@ -287,11 +320,15 @@ def validate(artifact):
         raise ValueError('Complete fixed scope required')
     common = {'council','application_id','reference','source_url','source_qualification',
               'outcome','source_fact_verified','requests','redirects','retries',
-              'received_bytes','attempted','elapsed_seconds'}
+              'received_bytes','attempted','elapsed_seconds','field_diagnostics'}
     fact = {'source_status_raw','source_decision_raw','source_decision_date',
-            'semantic_state','semantic_qualification','source_fact_change','semantic_materiality'}
+            'semantic_state','semantic_qualification','source_fact_change','semantic_materiality',
+            'field_evidence','source_fact_change_scope','source_retrieval'}
     from .contract import FAILURES
     for case,row in zip(CASES,rows):
+        diagnostic=row.get('field_diagnostics')
+        if diagnostic is not None:
+            validate_diagnostics(diagnostic)
         if (row.get('council'),row.get('application_id'),row.get('reference'),row.get('source_url')) != \
             ('bolton',case.application_id,case.reference,case.url):
             raise ValueError('Audit source identity')
@@ -302,6 +339,8 @@ def validate(artifact):
                 raise ValueError('Audit accounting')
         if type(row.get('attempted')) is not bool or row['attempted'] != (row['requests']>0):
             raise ValueError('Audit attempt state')
+        if not row['attempted'] and diagnostic is not None:
+            raise ValueError('Unattempted source cannot borrow diagnostics')
         if not isinstance(row.get('elapsed_seconds'),(int,float)) or not 0 <= row['elapsed_seconds'] <= 51:
             raise ValueError('Audit elapsed time')
         if row.get('source_fact_verified') is True:
@@ -324,7 +363,15 @@ def validate(artifact):
             if date is not None and (not re.fullmatch(r'\d{4}-\d{2}-\d{2}',date) or
                     dt.date.fromisoformat(date).isoformat() != date):
                 raise ValueError('Audit date')
-            expected = interpret(case,fields)
+            if diagnostic is None or row['field_evidence'] != {k:v['state'] for k,v in diagnostic['fields'].items()}:
+                raise ValueError('Audit evidence states')
+            for key,name in FIELD_IDS.items():
+                state=row['field_evidence'][name]
+                if state not in {'PRESENT_VALUE','PRESENT_BLANK','NOT_PRESENT'} or (fields[key] is not None)!=(state=='PRESENT_VALUE'):
+                    raise ValueError('Audit value/state consistency')
+            if row['field_evidence']['reference']!='PRESENT_VALUE' or row['field_evidence']['status']!='PRESENT_VALUE':
+                raise ValueError('Mandatory source evidence')
+            expected = interpret(case,SummaryFacts(fields,row['field_evidence'],diagnostic))
             if any(row[k] != value for k,value in expected.items()):
                 raise ValueError('Audit source/semantic separation')
         elif row.get('source_fact_verified') is False:
@@ -343,3 +390,10 @@ def validate(artifact):
     if complete and (artifact['requests']>4 or artifact['received_bytes']>2_000_000):
         raise ValueError('Audit run budget')
     encode(artifact)
+
+def validate_diagnostics(d):
+    if set(d)!={'parser_manifest','table_id','table_ordinal','fields'} or d['parser_manifest']!=VERSION or d['table_id']!='simpleDetailsTable' or type(d['table_ordinal']) is not int or not 1<=d['table_ordinal']<=1000 or set(d['fields'])!=set(FIELD_IDS.values()):
+        raise ValueError('Diagnostic schema')
+    for row in d['fields'].values():
+        if set(row)!={'state','occurrences'} or row['state'] not in STATES or type(row['occurrences']) is not int or not 0<=row['occurrences']<=1000 or (row['state']=='NOT_PRESENT')!=(row['occurrences']==0) or (row['state']=='CONFLICTING' and row['occurrences']<2):
+            raise ValueError('Diagnostic evidence')

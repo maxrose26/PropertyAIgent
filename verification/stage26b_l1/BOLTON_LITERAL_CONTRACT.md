@@ -9,8 +9,8 @@ No fixture is presented as current council truth.
 ## Two independent layers
 
 Source verification requires independently displayed exact reference, a complete
-summary document/table, all four source labels (explicit blanks establish
-absence), unambiguous values and successful safety checks. It returns literal
+summary document/table, mandatory reference/status labels, unambiguous values
+and successful safety checks. It returns literal
 status, literal decision and separately parsed decision date.
 
 Deposited is UNKNOWN_UNMAPPED. Neither date absence nor the global classifier's
@@ -59,6 +59,34 @@ launcher below adds a manual workflow without dispatching it.
 Live source access and persistence remain HOLD. A future live authority must
 cover only the two fixed tuples and separately approve the launcher/registration.
 No Oldham, Arcus, broader manifest or production service is involved.
+
+## V2 field-granular evidence correction — offline, not registered
+
+Retained 8 October browser-table text for app202 contains Reference/Status but
+omits Decision/date labels; app74 contains all four. The privacy-minimised
+fixture is a historical table-text projection rendered into synthetic HTML,
+not original HTML or current council truth. Its table-text hashes differ from
+case-index snapshot hashes; that cryptographic linkage is unresolved.
+This justifies historical field optionality, not the latest run's missing label.
+
+Reference and status remain mandatory nonblank exact evidence. Decision/date
+use PRESENT_VALUE, PRESENT_BLANK, NOT_PRESENT, CONFLICTING or UNPARSEABLE.
+NOT_PRESENT means the recognised label was not found, never verified absence.
+Successful artifacts carry field_evidence and source_fact_change_scope so None
+cannot imply authoritative absence without PRESENT_BLANK qualification.
+Optional omission gives COMPLETE_FOR_STATUS_ONLY, not complete decision facts.
+Unchanged applies only to the explicitly listed evidenced fields.
+
+Missing decision prevents semantic interpretation; missing either optional field
+prevents semantic materiality assessment. Explicit blanking of an earlier
+decision/date still fails; conflicting fields and malformed dates still fail.
+Deposited remains UNKNOWN_UNMAPPED. No persistence or freshness write follows.
+
+V2 diagnostics contain only parser version, fixed summary-table identifier,
+bounded ordinal, four approved field identifiers, states and occurrence counts.
+No values, arbitrary labels, HTML or personal information are included.
+The registered workflow/verifier on master remains V1 until separate review
+and integration; the consumed canary remains FAIL and is not rerun.
 
 ## Registration-only launcher
 
