@@ -58,3 +58,38 @@ def test_wrapper_transaction_local(session):
     assert result['transaction']=='COMMITTED',result
     assert result['materiality']=='MATERIAL'
     assert len(result['after']['events'])==1
+
+@pytest.mark.parametrize('kind',['missing','malformed','oversized','valid_failure','wrong_sha'])
+def test_parent_rejects_bad_artifact_even_zero_worker(monkeypatch,tmp_path,kind):
+    import json,time
+    from verification.stage26b_l1 import actions_runner
+    out=tmp_path/'result.json'
+    monkeypatch.setattr(p,'admit',lambda *a:None)
+    monkeypatch.setenv('GITHUB_RUN_ID','123')
+    monkeypatch.setattr(p.sys,'argv',['canary','--sha',SHA,'--authority',p.AUTHORITY,'--job-start',str(time.time()),'--output',str(out)])
+    def fake(command,**kw):
+        path=Path(command[command.index('--output')+1])
+        if kind=='malformed':path.write_text('{')
+        elif kind=='oversized':path.write_text(' '*20000)
+        elif kind in ('valid_failure','wrong_sha'):path.write_text(json.dumps(p.empty('b'*40 if kind=='wrong_sha' else SHA,'123')))
+        return 0,False
+    monkeypatch.setattr(actions_runner,'supervise',fake)
+    assert p.main()==1
+    assert json.loads(out.read_text())['transaction']=='UNKNOWN'
+
+def test_unqualified_production_route_cannot_connect(monkeypatch):
+    monkeypatch.setenv('OLDHAM_DATABASE_URL','postgresql://postgres:throwaway@db.aaaaaaaaaaaaaaaaaaaa.supabase.co/postgres')
+    assert p.PRODUCTION_ROUTE is None
+    with pytest.raises(ValueError,match='UNQUALIFIED_PRODUCTION_ROUTE'):p.production_engine()
+
+def test_qualified_engine_configuration_without_connecting(monkeypatch):
+    import sqlalchemy
+    host='db.aaaaaaaaaaaaaaaaaaaa.supabase.co'
+    monkeypatch.setattr(p,'PRODUCTION_ROUTE',(host,5432,'postgres','postgres'))
+    monkeypatch.setenv('OLDHAM_DATABASE_URL','postgresql://postgres:throwaway@'+host+'/postgres')
+    seen={}
+    def fake(url,**kwargs):seen.update(kwargs);return 'NO_CONNECTION'
+    monkeypatch.setattr(sqlalchemy,'create_engine',fake)
+    assert p.production_engine()=='NO_CONNECTION'
+    assert seen['pool_size']==1 and seen['max_overflow']==0 and seen['hide_parameters']
+    assert seen['connect_args']['connect_timeout']==5 and seen['connect_args']['sslmode']=='require'

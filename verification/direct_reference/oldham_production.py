@@ -24,6 +24,8 @@ REFERENCE='FUL/355686/26'
 URL='https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TA7382MCIP700'
 AUTHORITY='AUTHORISE_STAGE4_OLDHAM42_B2_PERSISTENCE_ONCE'
 WORKFLOW='.github/workflows/stage4-oldham-production-once.yml'
+# Non-secret (host,port,database,username) must be REVIEW-qualified before registration.
+PRODUCTION_ROUTE=None
 MAX_AUDIT=16384
 UNKNOWN='UNKNOWN'
 COUPLED=('status','decision','decision_issued_date','status_verified_at','evidence_refresh_required',
@@ -86,7 +88,9 @@ def validate(a):
     if a['b2_outcome'] not in {UNKNOWN,'VERIFIED_MATERIAL_CHANGE','VERIFIED_NON_MATERIAL_CHANGE','VERIFIED_UNCHANGED','PARTIAL_RETRIEVAL','STALE_RESPONSE','PERSISTENCE_FAILED','PARSER_FAILURE','AMBIGUOUS_SOURCE_RESULT','SOURCE_UNAVAILABLE','TIMEOUT','RATE_LIMITED'}:raise ValueError('OUTCOME')
     if a['error'] not in {None,'ADMISSION','SOURCE_REJECTED','AUDIT_REJECTED','DB_REJECTED','READBACK_MISMATCH','COMMIT_ACK_UNKNOWN','INTERRUPTED','CLEANUP_FAILED'}:raise ValueError('ERROR')
     if a['cleanup'] not in {'CLOSED',UNKNOWN,'FAILED'}:raise ValueError('CLEANUP')
-    if a['transaction']=='COMMITTED' and (a['expected'] is None or a['after']!=a['expected']):raise ValueError('UNPROVED_COMMIT')
+    if a['transaction']=='COMMITTED':
+        if (a['before'] is None or a['expected'] is None or a['after']!=a['expected'] or a['source'] is None
+            or a['source']['outcome']!='LITERAL_VERIFIED' or a['after']['facts']['status_verified_at'] is None):raise ValueError('UNPROVED_COMMIT')
     encode(a)
 
 
@@ -226,7 +230,7 @@ def run_transaction(engine,sha,run_id,source_factory):
         if audit['transaction']=='COMMITTED':
             b=audit['before'];a=audit['after']
             audit['materiality']='MATERIAL' if a['events']!=b['events'] else ('UNCHANGED' if all(a['facts'][k]==b['facts'][k] for k in ('status','decision','decision_issued_date')) else 'NON_MATERIAL')
-        if result['accepted'] and audit['transaction']!='COMMITTED':audit['error']='READBACK_MISMATCH'
+        if result['accepted'] and audit['transaction']!='COMMITTED' and audit['error'] is None:audit['error']='READBACK_MISMATCH'
         if not result['accepted'] and audit['transaction']=='NOT_COMMITTED':audit['error']='SOURCE_REJECTED' if audit['expected'] is None else 'DB_REJECTED'
     except Exception:
         audit['error']='DB_REJECTED'
@@ -245,6 +249,7 @@ def production_engine():
     u=make_url(_normalize_database_url(raw))
     if u.drivername!='postgresql+psycopg' or not u.host or not u.password or u.database!='postgres' or u.query:raise ValueError('DB_ROUTE')
     # Only the existing Supabase app route; no SQLite/local/alternate service fallback.
+    if (u.host,u.port or 5432,u.database,u.username)!=PRODUCTION_ROUTE:raise ValueError('UNQUALIFIED_PRODUCTION_ROUTE')
     if not (re.fullmatch(r'db\.[a-z0-9]{20}\.supabase\.co',u.host) or re.fullmatch(r'aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com',u.host)):raise ValueError('DB_ROUTE')
     return create_engine(u,pool_size=1,max_overflow=0,pool_pre_ping=False,hide_parameters=True,
       connect_args={'connect_timeout':5,'sslmode':'require','options':'-c statement_timeout=10000 -c lock_timeout=8000 -c idle_in_transaction_session_timeout=40000', 'application_name':'stage4_oldham42_once'})
@@ -291,10 +296,12 @@ def main():
             if timeout or not out.exists() or out.stat().st_size>MAX_AUDIT:
                 a=empty(args.sha,os.environ['GITHUB_RUN_ID']);a['error']='INTERRUPTED'
             else:
-                try:a=json.loads(out.read_bytes());validate(a)
+                try:
+                    a=json.loads(out.read_bytes());validate(a)
+                    if a['repository_sha']!=args.sha or a['run_id']!=os.environ['GITHUB_RUN_ID']:raise ValueError('AUDIT_RUN_MISMATCH')
                 except Exception:a=empty(args.sha,os.environ['GITHUB_RUN_ID']);a['error']='AUDIT_REJECTED'
             Path(args.output).write_bytes(encode(a))
-        return 0 if status==0 and not timeout else 1
+        return 0 if status==0 and not timeout and a['transaction']=='COMMITTED' and a['error'] is None and a['cleanup']=='CLOSED' else 1
     except Exception:
         print('Oldham canary admission failed; no diagnostic details exported',file=sys.stderr);return 2
 
