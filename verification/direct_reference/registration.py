@@ -128,6 +128,7 @@ def observe(application_id, session_factory):
     budget=Budget(request_limit=2,byte_limit=2_000_000,seconds=40)
     meter=MeteredSession(row,session_factory())
     started=time.monotonic()
+    bound_exhausted=False
     try:
         observation=retrieve(application_id,session_factory=lambda:meter,budget=budget)
         audit.update(outcome='LITERAL_VERIFIED',identity_qualification='EXACT_DISPLAYED_REFERENCE',
@@ -135,6 +136,7 @@ def observe(application_id, session_factory):
           normalized_facts=observation.fields,semantic_qualification=observation.semantic_state)
     except BoundaryFailure as error:
         audit['outcome']=error.outcome if error.outcome in FAILURES else 'PARSER_FAILURE'
+        bound_exhausted=any(word in error.reason.lower() for word in ('ceiling','bound','deadline'))
         diagnostics=getattr(error,'diagnostics',None)
         if diagnostics:
             audit['field_states']={k:v['state'] for k,v in diagnostics['fields'].items()}
@@ -144,7 +146,7 @@ def observe(application_id, session_factory):
         audit.update(attempted=meter.requests>0,requests=meter.requests,redirects=meter.redirects,
           retries=max(0,meter.requests-1),received_body_bytes=meter.bytes,
           elapsed_seconds=round(time.monotonic()-started,6),
-          budget_state='WITHIN_LIMITS' if not budget.failed and meter.bytes<=2_000_000 else 'EXHAUSTED',
+          budget_state='WITHIN_LIMITS' if not budget.failed and not bound_exhausted and meter.bytes<=2_000_000 and time.monotonic()-started<40 else 'EXHAUSTED',
           cleanup_state='CLOSED' if meter.closed and all(x[1] for x in meter.responses) else 'FAILED')
     if meter.violation:audit['outcome']=meter.violation
     if meter.requests!=budget.requests or meter.bytes!=budget.bytes:
