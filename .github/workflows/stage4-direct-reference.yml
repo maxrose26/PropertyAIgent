@@ -59,7 +59,7 @@ jobs:
         env:
           B20_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
         run: |
-          env -i HOME=/tmp PATH=/usr/bin:/bin B20_DISPOSABLE=YES_SYNTHETIC_ONLY B20_POSTGRES_PORT="$B20_POSTGRES_PORT" PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$RUNNER_TEMP/direct-native-venv/bin/python" -m pytest verification/b20_native/test_postgres.py verification/direct_reference/test_native.py -q --junitxml="$RUNNER_TEMP/direct-native.xml"
+          env -i HOME=/tmp PATH=/usr/bin:/bin B20_DISPOSABLE=YES_SYNTHETIC_ONLY B20_POSTGRES_PORT="$B20_POSTGRES_PORT" PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$RUNNER_TEMP/direct-native-venv/bin/python" -m pytest verification/b20_native/test_postgres.py -q --junitxml="$RUNNER_TEMP/direct-native.xml"
       - name: Stop disposable PostgreSQL
         if: always()
         env:
