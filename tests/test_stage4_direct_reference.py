@@ -276,3 +276,25 @@ def test_failure_diagnostics_retain_field_state_only():
     assert e.value.diagnostics['fields']['decision']['state']=='CONFLICTING'
     with pytest.raises(BoundaryFailure) as e:observe(summary(ROW['reference'],date='invalid'))
     assert e.value.diagnostics['fields']['decision_date']['state']=='UNPARSEABLE'
+
+
+def test_nonmaterial_literal_wording_change(session):
+    a=add(session)
+    out=call(session,a,summary(ROW['reference'],'Awaiting Decision'))
+    assert out['accepted'] and out['outcome']=='VERIFIED_NON_MATERIAL_CHANGE'
+    assert not a.evidence_refresh_required
+    assert not session.scalars(select(ApplicationLifecycleEvent)).all()
+
+
+def test_stale_orm_date_cannot_bypass_blank_guard(session):
+    from sqlalchemy.orm import Session as DBSession
+    from sqlalchemy import text
+    a=add(session)
+    with DBSession(session.get_bind()) as other:
+        other.execute(text("UPDATE applications SET decision_issued_date='2026-09-25' WHERE id=42"));other.commit()
+    assert a.decision_issued_date is None  # stale in-memory object is intentional
+    out=call(session,a)
+    assert not out['accepted']
+    session.refresh(a)
+    assert a.decision_issued_date=='2026-09-25'
+    assert a.status_verified_at.replace(tzinfo=dt.timezone.utc)==OLD
