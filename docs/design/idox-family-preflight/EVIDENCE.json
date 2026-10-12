@@ -3,8 +3,8 @@
   "binding_contract_version": "da0-contract-v1",
   "base_sha": "da06dae001cbef9af6c0f38776e1fa4adfb022b3",
   "assessment_date": "2026-10-12",
-  "decision": "PARTIAL_CANDIDATE",
-  "decision_scope": "Engineering candidate for received/validated-window enumeration; no operational source PASS",
+  "decision": "BLOCKED",
+  "decision_scope": "Genuine family reuse potential; no evidenced reusable bounded acquisition route without further platform/live evidence",
   "execution_authority": null,
   "cohort": [
     {
@@ -368,5 +368,5 @@
     49,
     50
   ],
-  "next_slice": "Offline common Idox discovery-window contract/parser/completeness rehearsal with three configs; transport/live authority remains gated"
+  "next_slice": "One coordinated platform-family evidence gate: offline fixed-scope safety package before any separately authorised three-council live window observation; no operational adapter"
 }

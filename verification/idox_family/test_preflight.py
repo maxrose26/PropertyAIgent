@@ -138,8 +138,8 @@ def test_rate_limit_still_fails_in_legacy_function():
         collector()(Page(['too many requests']),council(),'01/10/2026','07/10/2026')
 
 
-def test_partial_candidate_is_not_source_or_live_authority():
-    e=ledger();assert e['binding_contract_version']==VERSION and e['decision']=='PARTIAL_CANDIDATE'
+def test_shared_reuse_potential_is_blocked_not_source_or_live_authority():
+    e=ledger();assert e['binding_contract_version']==VERSION and e['decision']=='BLOCKED'
     assert e['execution_authority'] is None and e['transport']['new_transport_implementation'] is False
     assert e['transport']['http_date_window_path']=='UNPROVED'
     assert e['transport']['browser_byte_accounting'].startswith('UNPROVED')
