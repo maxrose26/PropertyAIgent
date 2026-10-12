@@ -276,3 +276,9 @@ def test_native_query_cancellation_cleanup(engine):
             finally: tx.rollback(); thread.join(timeout=12)
     assert not thread.is_alive() and failures == [] and outcomes == ['persistence_failed']
     assert read(engine, identity) == before and engine.pool.checkedout() == 0
+
+
+@pytest.mark.parametrize('scenario', __import__('verification.direct_reference.persistence_native', fromlist=['SCENARIOS']).SCENARIOS)
+def test_frozen_live_direct_b2_acceptance(engine, monkeypatch, scenario):
+    from verification.direct_reference.persistence_native import run_scenario
+    run_scenario(engine, monkeypatch, scenario)
