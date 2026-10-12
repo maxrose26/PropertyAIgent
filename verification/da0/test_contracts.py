@@ -1,9 +1,11 @@
 """Synthetic/retained design fixtures, not source truth or operational admission."""
 import copy
+import ast
 from dataclasses import replace
 import json
 from pathlib import Path
 import pytest
+import socket
 
 from verification.da0.contracts import (
     VERSION, Capability, FieldState, FieldEvidence, RawEnvelope, Snapshot,
@@ -12,6 +14,35 @@ from verification.da0.contracts import (
 )
 
 FIXTURES = Path(__file__).parent / 'registry_fixtures.json'
+
+
+@pytest.fixture(autouse=True)
+def no_source_network(monkeypatch):
+    def denied(*args, **kwargs):
+        raise AssertionError('DA0 offline tests cannot access network')
+    monkeypatch.setattr(socket.socket, 'connect', denied)
+    monkeypatch.setattr(socket, 'create_connection', denied)
+    monkeypatch.setattr(socket, 'getaddrinfo', denied)
+
+
+def test_contract_imports_are_stdlib_only_no_transport_db_model():
+    tree=ast.parse(Path(__file__).with_name('contracts.py').read_text())
+    allowed={'__future__','dataclasses','enum','hashlib','ipaddress','json','math','urllib.parse'}
+    for node in ast.walk(tree):
+        if isinstance(node,ast.Import):
+            assert all(x.name in allowed for x in node.names)
+        if isinstance(node,ast.ImportFrom):
+            assert node.module in allowed
+
+
+@pytest.mark.parametrize('meaning',['SOURCE_LITERAL','DERIVED_QUALIFIED'])
+def test_same_meaning_agreement_and_cross_meaning_review(meaning):
+    a=FieldEvidence(FieldState.VALUE,'Pending','a',meaning)
+    b=FieldEvidence(FieldState.VALUE,'Pending','b',meaning)
+    assert compare_fact(('c','a','status'),a,('c','a','status'),b)=='AGREEMENT'
+    other='DERIVED_QUALIFIED' if meaning=='SOURCE_LITERAL' else 'SOURCE_LITERAL'
+    b=FieldEvidence(FieldState.VALUE,'Pending','b',other)
+    assert compare_fact(('c','a','status'),a,('c','a','status'),b)=='REVIEW_REQUIRED'
 
 
 def records():

@@ -195,6 +195,8 @@ def compare_fact(left_identity, left, right_identity, right):
     """Conservative comparison only; no automatic production acceptance."""
     if left_identity != right_identity:
         return "IDENTITY_MISMATCH"
+    if left.meaning != right.meaning:
+        return "REVIEW_REQUIRED"
     if any(f.state in {FieldState.MISSING, FieldState.CONFLICT, FieldState.UNPARSEABLE} for f in (left, right)):
         return "REVIEW_REQUIRED"
     return "AGREEMENT" if (left.state, left.value) == (right.state, right.value) else "SOURCE_CONFLICT_DETECTED"
