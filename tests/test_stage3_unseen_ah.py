@@ -108,7 +108,8 @@ def test_holdout_existing_consumers(session, case):
         assert 'HISTORICAL / REFUSED' in explanations
         assert not facts.affordable_housing.active_whole_site
     print(json.dumps({'case':case['reference'], 'explore_export':columns,
-        'profile':mix['structured_summary'], 'buyer_count':buyer.affordable_unit_count,
+        'profile':mix['structured_summary'], 'profile_totals':mix['overview_totals'],
+        'selected_residential_units':selected.units, 'buyer_count':buyer.affordable_unit_count,
         'feed_count':cards[0]['matching_facts'].affordable_unit_count,
         'packet_count_state':packet.affordable_units.state,
         'dashboard_reported_count':dashboard['affordable_units'], 'explanation':explanations}, default=str))
