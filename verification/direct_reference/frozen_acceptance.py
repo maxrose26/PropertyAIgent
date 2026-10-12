@@ -55,6 +55,8 @@ def validate_persistence_audit(a):
     if type(a['application_id']) is not int or a['application_id'] not in (42,78,202):raise ValueError('Identity')
     live=next(r for r in load_live()['results'] if r['application_id']==a['application_id'])
     if a['reference']!=live['reference']:raise ValueError('Reference')
+    expected={k:live['normalized_facts'][f] for k,f in [('status','Status'),('decision','Decision'),('decision_date','Decision Issued Date')]}
+    if a['qualified_incoming']!=expected:raise ValueError('Incoming frozen facts')
     if a['field_states']!=live['field_states'] or a['semantic_qualification']!=live['semantic_qualification']:raise ValueError('Evidence qualification')
     for k in ('before','qualified_incoming','after'):
         if set(a[k])!=FACT_KEYS:raise ValueError('Only coupled planning facts')

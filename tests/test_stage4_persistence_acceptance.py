@@ -38,7 +38,7 @@ def sample():
     f={'status':'Awaiting decision','decision':None,'decision_date':None}
     return dict(application_id=42,reference='FUL/355686/26',source_provenance=PROVENANCE,
       retrieval_started_at=None,retrieval_completed_at=None,outcome='PARTIAL_RETRIEVAL',
-      before=f,qualified_incoming=f,after=f,verification_watermark_before=None,
+      before=f,qualified_incoming={'status':'Decided','decision':'Refuse Permission','decision_date':'2026-09-25'},after=f,verification_watermark_before=None,
       verification_watermark_after=None,material_change='UNKNOWN',transaction_result='REJECTED_NO_WRITE',
       field_states=next(r['field_states'] for r in load_live()['results'] if r['application_id']==42),semantic_qualification='refused',
       lifecycle_before=[],lifecycle_after=[],refresh_signal_before={'required':False,'reason':None,'trigger':None,'requested_at':None},
@@ -67,6 +67,6 @@ def test_fixture_tampering_rejected(monkeypatch):
 
 def test_audit_carries_exact_field_states_and_semantics():
     a=sample();validate_persistence_audit(a)
-    for field,value in [('semantic_qualification','pending'),('field_states',{}),('reference','unapproved reference')]:
+    for field,value in [('semantic_qualification','pending'),('field_states',{}),('reference','unapproved reference'),('qualified_incoming',{'status':'Awaiting decision','decision':None,'decision_date':None})]:
         bad=copy.deepcopy(a);bad[field]=value
         with pytest.raises(ValueError):validate_persistence_audit(bad)
