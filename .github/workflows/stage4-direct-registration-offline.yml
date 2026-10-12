@@ -1,0 +1,39 @@
+name: Stage4 direct-reference registration OFFLINE
+on:
+  pull_request:
+    paths:
+      - 'verification/direct_reference/**'
+      - 'tests/test_stage4_direct_registration.py'
+      - '.github/workflows/stage4-direct-live-once.yml'
+      - '.github/workflows/stage4-direct-registration-offline.yml'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: git fetch --no-tags --depth=1 origin 27966c34d1b4dbb88c15cd59d0805d55b14af9a7
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/direct-test-venv"
+      - name: Network-denied registration and accepted regressions
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_stage4_direct_registration.py tests/test_bolton_literal_summary.py tests/test_bolton_field_evidence.py tests/test_bolton_registration.py tests/test_l1_actions_canary.py tests/test_l1_registration_request_safety.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
+      - name: Minimum dependency closure and actual supervised synthetic cohort
+        env:
+          PIN: ${{ github.event.pull_request.head.sha }}
+        run: |
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin /usr/bin/python3 -m venv "$RUNNER_TEMP/direct-minimal"
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin "$RUNNER_TEMP/direct-minimal/bin/python" -m pip --isolated install --only-binary=:all: --no-deps --index-url https://pypi.org/simple -r verification/direct_reference/requirements.lock
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin "$RUNNER_TEMP/direct-minimal/bin/python" -m pip check
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/direct-minimal/bin/python" -m verification.direct_reference.registration --sha "$PIN" --output "$RUNNER_TEMP/direct-synthetic.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-registration-offline-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/direct-registration.xml
+            ${{ runner.temp }}/direct-synthetic.json
