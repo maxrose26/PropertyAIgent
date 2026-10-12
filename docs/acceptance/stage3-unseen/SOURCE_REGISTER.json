@@ -1,0 +1,90 @@
+{
+  "review_date": "2026-10-12",
+  "captures": [
+    {
+      "id": "71",
+      "url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=T3152ODELN700&activeTab=summary",
+      "status": 200,
+      "content_type": "text/html;charset=ISO-8859-1",
+      "bytes": 36921,
+      "sha256": "4dc31ce56c2d58e9b6e8555611b953b28ac71c5f66ebcf416632a1bbb5d96348"
+    },
+    {
+      "id": "294",
+      "url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000egglSIAQ?c__r=Arcus_BE_Public_Register",
+      "status": 200,
+      "content_type": "text/html;charset=UTF-8",
+      "bytes": 17328,
+      "sha256": "5de63c09d9edcdc396e3c88f569f02979ac2b70b5e3490e490802163f0d8aef9"
+    },
+    {
+      "id": "24",
+      "url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SZ39VFMCN4W00",
+      "status": 200,
+      "content_type": "text/html;charset=ISO-8859-1",
+      "bytes": 39096,
+      "sha256": "1752434bc30204d19512fd03b9a6563fb76340032e33343a807aa3559a1a3876"
+    },
+    {
+      "id": "49",
+      "url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=T03VE9PUII600&activeTab=summary",
+      "status": 200,
+      "content_type": "text/html;charset=ISO-8859-1",
+      "bytes": 45232,
+      "sha256": "9c22f3a149425ff2baa368dfb7b82bb58bc59bfad78afdb8125bf51183fbcaea"
+    },
+    {
+      "id": "208",
+      "url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=SZ6TT5RRGUB00&activeTab=summary",
+      "status": 200,
+      "content_type": "text/html;charset=ISO-8859-1",
+      "bytes": 39964,
+      "sha256": "6625eda637b1099e641d9caf9874dbae727b7e89bd089e9683c5f6924670d9a3"
+    },
+    {
+      "id": "16",
+      "url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_63745&activeTab=summary",
+      "status": 200,
+      "content_type": "text/html;charset=ISO-8859-1",
+      "bytes": 31696,
+      "sha256": "9c9087289e1eee0148a80eed7c5e224c0feb2a9195b8b800acc2fb6607912b94"
+    },
+    {
+      "id": "bolton-report",
+      "url": "https://bolton.moderngov.co.uk/documents/s13300/Land%20north%20of%20Arthur%20Lane.pdf",
+      "file": "bolton-report.pdf",
+      "status": 200,
+      "route": "Ordinary curl succeeded; web/urllib GET403",
+      "sha256": "c825cd5d8b5ad12e0c5cb4b10bff83951e2f511d8b67fd2adefb6a2106e93211"
+    },
+    {
+      "id": "rochdale-report",
+      "url": "https://rochdale.moderngov.co.uk/documents/s119316/Application%202400581HYBR%20-%20Land%20to%20the%20West%20of%20Hollingworth%20Road.pdf",
+      "file": "rochdale-report.pdf",
+      "status": 200,
+      "route": "Ordinary curl; link from official agenda",
+      "sha256": "2cf86b5498d93fd686121715c080bbecf5c00fd85516b25d6305ac3cc414e1e9"
+    },
+    {
+      "id": "rochdale-agenda",
+      "url": "https://rochdale.moderngov.co.uk/mgAi.aspx?ID=50212",
+      "file": "rochdale-agenda.html",
+      "status": 200,
+      "route": "Ordinary curl; web403",
+      "sha256": "8a58b9a82a02dfe625d3912dc818d73bed04951c17c5c8071dcc15616084a69e"
+    }
+  ],
+  "document_attempts": {
+    "oldham-form": "https://planningpa.oldham.gov.uk/online-applications/files/1E13B540E2C7FB26D1297D16D0FC4068/pdf/OUT_354782_25-APPLICATIONFORMREDACTED-1974933.pdf",
+    "tameside-report": "https://publicaccess.tameside.gov.uk/online-applications/files/2B7C0BD7527BC05BF0837A033EEEF881/pdf/25_00625_REM-DELEGATED_REPORT-1749800.pdf",
+    "wigan-report": "https://planning.wigan.gov.uk/online-applications/files/6B27C967B4AB1A4480F1F2FB3F166CDE/pdf/A_25_099319_OUT-OFFICER_REPORT-1138171.pdf"
+  },
+  "document_attempt_result": "Three selected linked PDFs (Oldham form, Tameside report, Wigan report) returned404. No bypass/access engineering. Bury external-document link observed but not followed; summary sufficient only for narrow unknown case.",
+  "replacement": "Rochdale294 returned application shell/CSS error, not substantive evidence; preselected621 used. Other replacements not needed. Wigan209 has existing allocation fixtures but was not used.",
+  "retention": "Full transient responses/PDFs are not republished because they contain unrelated planning content/personal details. Durable record retains exact URLs, full-capture hashes, independently reviewed field interpretations, source paragraph/page anchors and comparison outputs. Does not claim retained complete document bytes in Git.",
+  "source_quotes": {
+    "bolton_report": "up to 40 affordable houses",
+    "rochdale_report": "25 shared ownership homes comprising 20no two-beds and 15no two-beds"
+  },
+  "copyright": "Only minimal pertinent excerpts are republished; remaining evidence is paraphrased in frozen expectations."
+}
