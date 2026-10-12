@@ -1,0 +1,72 @@
+name: Stage4 direct-reference OFFLINE acceptance
+on:
+  pull_request:
+    paths:
+      - 'verification/direct_reference/**'
+      - 'tests/test_stage4_direct_reference.py'
+      - 'app/pipeline/status_verification.py'
+      - 'app/pipeline/run_weekly.py'
+      - '.github/workflows/stage4-direct-reference.yml'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - run: git fetch --no-tags --depth=1 origin 27966c34d1b4dbb88c15cd59d0805d55b14af9a7
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/direct-venv"
+      - name: Network-denied direct path and accepted regressions
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_stage4_direct_reference.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_l1_actions_canary.py tests/test_l1_registration_request_safety.py tests/test_bolton_literal_summary.py tests/test_bolton_field_evidence.py tests/test_planning_status_verification.py verification/test_stage1_outbound.py verification/test_stage1_access.py -q --junitxml="$RUNNER_TEMP/direct-tests.xml"
+      - name: Disposable supervisor and synthetic worker only
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/direct-venv/bin/python" -m verification.direct_reference.worker > "$RUNNER_TEMP/direct-worker.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-offline-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/direct-tests.xml
+            ${{ runner.temp }}/direct-worker.json
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: b20_disposable
+          POSTGRES_DB: b20_disposable
+          POSTGRES_PASSWORD: b20-disposable-only
+        ports:
+          - '127.0.0.1::5432'
+        options: >-
+          --health-cmd "pg_isready -U b20_disposable -d b20_disposable"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/direct-native-venv"
+      - name: Disposable native transactions only
+        env:
+          B20_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          env -i HOME=/tmp PATH=/usr/bin:/bin B20_DISPOSABLE=YES_SYNTHETIC_ONLY B20_POSTGRES_PORT="$B20_POSTGRES_PORT" PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$RUNNER_TEMP/direct-native-venv/bin/python" -m pytest verification/b20_native/test_postgres.py verification/direct_reference/test_native.py -q --junitxml="$RUNNER_TEMP/direct-native.xml"
+      - name: Stop disposable PostgreSQL
+        if: always()
+        env:
+          SERVICE_ID: ${{ job.services.postgres.id }}
+        run: docker stop "$SERVICE_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-native-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/direct-native.xml
