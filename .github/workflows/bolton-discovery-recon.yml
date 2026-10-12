@@ -1,0 +1,67 @@
+name: Bolton fixed-date discovery reconnaissance (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed workflow SHA
+        required: true
+        type: string
+      mode:
+        description: Live requires separate single-use authority
+        required: true
+        type: choice
+        default: offline
+        options: [offline, live]
+      authority:
+        description: Fixed Bolton received-date acknowledgement
+        required: true
+        type: choice
+        default: OFFLINE_ONLY
+        options: [OFFLINE_ONLY, AUTHORISE_BOLTON_RECEIVED_2026_02_19_ONLY]
+permissions:
+  contents: read
+concurrency:
+  group: bolton-fixed-date-discovery-recon
+  cancel-in-progress: false
+jobs:
+  recon:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Admit exact manual revision and first attempt
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          MODE: ${{ inputs.mode }}
+          AUTHORITY: ${{ inputs.authority }}
+          ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" && "$ATTEMPT" == 1 ]]
+          [[ ( "$MODE" == offline && "$AUTHORITY" == OFFLINE_ONLY ) || ( "$MODE" == live && "$AUTHORITY" == AUTHORISE_BOLTON_RECEIVED_2026_02_19_ONLY ) ]]
+          echo "BOLTON_RECON_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install minimal locked dependencies; no council access
+        run: |
+          python -m venv "$RUNNER_TEMP/bolton-recon-venv"
+          "$RUNNER_TEMP/bolton-recon-venv/bin/python" -m pip install -r verification/bolton_recon/requirements.txt
+      - name: Independently bounded fixed-date worker
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          MODE: ${{ inputs.mode }}
+          AUTHORITY: ${{ inputs.authority }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          env -i PATH=/usr/bin:/bin GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_EVENT_NAME=workflow_dispatch GITHUB_REPOSITORY=maxrose26/PropertyAIgent GITHUB_RUN_ATTEMPT=1 BOLTON_RECON_SHA="$WORKFLOW_SHA" PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/bolton-recon-venv/bin/python" -m verification.bolton_recon.runner --sha "$PIN" --mode "$MODE" --authority "$AUTHORITY" --job-start "$BOLTON_RECON_START" --output "$RUNNER_TEMP/bolton-discovery-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bolton-discovery-audit-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/bolton-discovery-audit.json
+          if-no-files-found: error
+          retention-days: 7
