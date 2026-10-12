@@ -306,3 +306,27 @@ def test_requirements_exact_existing_lock_subset():
 def test_offline_ci_cannot_dispatch_live():
     text=Path('.github/workflows/da0-contract-offline.yml').read_text()
     assert '--mode offline --authority OFFLINE_ONLY' in text and '--mode live' not in text
+
+
+@pytest.mark.parametrize('field,value',[('method',None),('action_path',None),('controls',[])])
+def test_success_requires_complete_form_qualification(field,value):
+    r,_,_=observe();r['form'][field]=value
+    with pytest.raises(Failure):encode(r)
+
+
+def test_success_cannot_hide_prohibited_control():
+    r,_,_=observe()
+    r['form']['controls'][0]['classification']='UNKNOWN'
+    with pytest.raises(Failure):encode(r)
+
+
+@pytest.mark.parametrize('count',[0,2])
+def test_success_count_and_pagination_reconcile(count):
+    r,_,_=observe();r['result']['source_count']=count
+    with pytest.raises(Failure):encode(r)
+
+
+def test_duplicate_result_rows_fail_instead_of_count_ambiguity():
+    row=RESULT[RESULT.index(b'<li '):RESULT.index(b'</li>')+5]
+    r,_,_=observe(result=b'<html><ul id="searchresults">'+row+row+b'</ul></html>')
+    assert r['outcome']=='PARTIAL_RETRIEVAL' and r['failure_reason']=='IDENTITY_CONFLICT'

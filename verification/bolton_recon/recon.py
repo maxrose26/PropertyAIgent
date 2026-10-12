@@ -246,7 +246,7 @@ def parse_results(body):
         ref=ref_values[0] if ref_values else None
         if ref: require(bool(re.search(r'\d',ref)),'LAYOUT_UNRECOGNISED','RESULT_STRUCTURE')
         candidate={'reference':ref,'source_key':key,'source_path':path}
-        require(key not in candidates or candidates[key]==candidate,'PARTIAL_RETRIEVAL','IDENTITY_CONFLICT')
+        require(key not in candidates,'PARTIAL_RETRIEVAL','IDENTITY_CONFLICT')
         require(ref is None or ref not in refs or refs[ref]==key,'PARTIAL_RETRIEVAL','IDENTITY_CONFLICT')
         candidates[key]=candidate
         if ref: refs[ref]=key
@@ -337,10 +337,23 @@ def validate(out):
     require(out['accounting_complete'] and out['requests']==2 and out['redirects']==0 and out['http_statuses']==[200,200]
             and out['received_bytes']<=MAX_TOTAL and out['failure_reason'] is None and form['selected'] and out['budget_state']=='WITHIN_LIMITS'
             and out['elapsed_seconds']<=30,'PARTIAL_RETRIEVAL','OUTPUT_INVALID')
+    require(form['method']=='POST' and form['action_path'] in ('/online-applications/search.do','/online-applications/advancedSearchResults.do'),
+            'PARTIAL_RETRIEVAL','OUTPUT_INVALID')
+    active=[c for c in form['controls'] if not c['disabled']]
+    dates=[c for c in active if c['classification']=='APPROVED_DATE_INPUT']
+    submits=[c for c in active if c['classification']=='APPROVED_FIXED_SUBMIT_CONTROL']
+    require(len(dates)==2 and {c['field'] for c in dates}==set(DATE_FIELDS) and not any(c['populated'] for c in dates)
+            and len(submits)==1 and submits[0]['field'] in (None,'action') and submits[0]['populated']
+            and not any(c['classification'] in ('UNKNOWN','PROHIBITED_SEARCH_EXPANSION') for c in active),
+            'PARTIAL_RETRIEVAL','OUTPUT_INVALID')
+    require(all(c['field'] in STATE_FIELDS and c['populated'] for c in active if c['classification']=='REQUIRED_SERVER_STATE'),
+            'PARTIAL_RETRIEVAL','OUTPUT_INVALID')
     r=out['result']
     require(set(r)=={'source_count','pagination_present','page_ordinal','candidates','qualification'} and type(r['pagination_present']) is bool
             and r['page_ordinal']==1 and (r['source_count'] is None or type(r['source_count']) is int and 0<=r['source_count']<=100000)
             and len(r['candidates'])<=MAX_ROWS,'PARTIAL_RETRIEVAL','OUTPUT_INVALID')
+    require(r['source_count'] is None or r['source_count']>=len(r['candidates']) and (r['source_count']==len(r['candidates']) or r['pagination_present']),
+            'PARTIAL_RETRIEVAL','OUTPUT_INVALID')
     zero=out['outcome']=='RECOGNISED_ZERO_RESULTS'
     require((len(r['candidates'])==0)==zero and (not zero or r['source_count']==0 and not r['pagination_present']),
             'PARTIAL_RETRIEVAL','OUTPUT_INVALID')

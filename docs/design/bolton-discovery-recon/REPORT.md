@@ -83,7 +83,7 @@ Conservative proposed parser expectations:
 - nonempty `li.searchresult` rows, maximum20;
 - admitted application summary links, inspected but never fetched;
 - exact `Ref. No:` values from `.metaInfo` when available; missing reference stays null;
-- same-key duplicate links reconcile only if their displayed references agree;
+- same-key duplicate links within one row reconcile only if their displayed references agree; duplicate keys across result rows fail closed;
 - optional structurally parsed `.searchinfo` source count;
 - pagination observed from next/pagination links or an explicit remaining count.
 
@@ -179,3 +179,12 @@ bounded first response, return the actual failure to REVIEW. Do not automaticall
 patch/retry or restart platform-family engineering. Review should reassess the
 commercial case for further Idox acquisition investment against provider/official
 feed alternatives, rather than treating more safety tooling as freshness value.
+
+## Independent-review correction
+
+Review of the first published checkpoint identified two audit-validation gaps.
+Success now requires the admitted POST action, both fixed date controls and the
+single approved Search control. Source counts must reconcile with returned rows
+and pagination qualification. Duplicate result rows fail closed. No request scope
+or resource limit changed. Local focused validation: 151 passed (57 DA0 and 94
+reconnaissance tests); hosted exact-candidate results remain recorded in PR #53.
