@@ -45,7 +45,7 @@ Before any intelligence tuning, split by whole family/site into a visible develo
 | Buyer matching | Acquisition packet plus actual retained stored mandate provenance and enough qualified evidence for each criterion claimed decisive | Missing AH, size, delivery or control remains insufficient/unknown under existing matcher; do not exclude from uncertainty testing | Missing mandate or no eligible supported evidence for a claimed fit: no substantive buyer-fit conclusion |
 | Economic scenario reasoning | Identity/location; supported scope/units and product/tenure, or an explicit user scenario; development-stage qualification; dated cost/value/obligation assumptions with units and sources | A labelled hypothetical scenario can test reasoning and sensitivity, not real viability | No coherent quantity/tenure scope or no approved assumptions: exclude from numeric scenario; still test a missing-information checklist |
 
-Structural capture alone cannot satisfy these requirements: it deliberately excluded proposal/document bodies and much buyer context. Reuse minimised retained audit/evaluation packets and lawful existing evidence; do not expand production exports or recreate matching in SQL. If the necessary material is not retained, mark the affected packet ineligible for the relevant experiment. Four buyer IDs existing is not proof the full matching context is available.
+Structural capture alone cannot satisfy these requirements: it retained application proposal text and structured identity/status, but excluded document bodies, full mandate criteria and the full evidence needed to reconstruct qualified count/control/document-derived phasing inputs. Reuse minimised retained audit/evaluation packets and lawful existing evidence; do not expand production exports or recreate matching in SQL. If the necessary material is not retained, mark the affected packet ineligible for the relevant experiment. Four buyer IDs existing is not proof the full matching context is available.
 
 ## G–H. Bounded gap register and dispositions
 
@@ -165,7 +165,7 @@ Move buyer differentiation earlier than the proposed sequential ordering: it def
 
 ## U. Independent review and limitations
 
-Independent review pending final draft. Reviewed source/fixture sufficiency, not live data, current buyer membership or financial feasibility. Final review disposition will be recorded before publication is declared ready.
+Independent reviewer disposition: **GO for docs-only publication**, after correcting the description of the structural capture to acknowledge retained proposal text. The reviewer independently checked accepted capture field names without exposing values. No other blocking defect identified. Review confirmed the proposed cap is not a certified cohort; scale positives are not availability truth; dated/ambiguous controls, early buyer comparison, scenario-only economics and family-isolated holdouts remain qualified. This was source/fixture and reasoning review, not live data validation, current buyer membership certification or financial feasibility testing. No reviewer network, production access or model call occurred.
 
 ## V–X. Conclusion and actions not taken
 
