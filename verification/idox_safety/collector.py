@@ -313,6 +313,9 @@ def collect(council, start, end, basis, tape, *, limits=Limits(),
     return result
 
 
+FAILURE_REASONS = frozenset("configuration_not_admitted invalid_window window_exceeds_two_calendar_days date_basis_mismatch malformed_url origin_denied duplicate_query_key search_expansion_denied route_denied detail_tab_or_query_denied missing_exchange unexpected_operation offline_transport_only worker_deadline request_budget invalid_chunk body_budget redirect_denied attachment_denied compressed_body_not_admitted transport_failure http_failure declarations_denied result_marker_missing invalid_markers declared_count_budget unknown_fixture_element malformed_fixture_page code_identity observation_timestamp fixture_form_marker page_budget repeated_page page_progression count_drift candidate_budget zero_not_proved reference_shape key_reference_conflict reference_key_conflict overlapping_page_membership empty_nonzero_page terminal_count_mismatch continuation_not_proved unconsumed_fixture_exchange artifact_budget".split())
+
+
 RESULT_KEYS = frozenset("manifest_version council date_basis window_start window_end config_version adapter_version source_mode code_sha observed_at completion_state failure_reason pages_attempted pages_accepted terminal_proof requests redirects retries received_bytes elapsed_seconds candidate_count unique_application_identities candidates raw_evidence cleanup_verified checkpoint_eligible consistency live_ready".split())
 
 
@@ -324,6 +327,15 @@ def validate_result(r):
     check(r["council"] in CONFIGS and r["adapter_version"] == VERSION and r["config_version"] == CONFIG_VERSION
           and r["consistency"] == "SYNTHETIC_TAPE_ONLY" and r["cleanup_verified"] is True,
           "PARTIAL_RETRIEVAL", "audit_provenance")
+    check(isinstance(r["observed_at"], str) and len(r["observed_at"]) <= 32,
+          "PARTIAL_RETRIEVAL", "audit_timestamp")
+    try:
+        stamp = datetime.fromisoformat(r["observed_at"].replace("Z", "+00:00"))
+        check(stamp.utcoffset() is not None, "PARTIAL_RETRIEVAL", "audit_timestamp")
+    except ValueError:
+        raise Failure("PARTIAL_RETRIEVAL", "audit_timestamp") from None
+    check(type(r["candidates"]) is list and type(r["raw_evidence"]) is list
+          and type(r["terminal_proof"]) is bool, "PARTIAL_RETRIEVAL", "audit_types")
     window(r["window_start"], r["window_end"], r["date_basis"], CONFIGS[r["council"]])
     check(isinstance(r["code_sha"], str) and bool(re.fullmatch(r"[0-9a-f]{40}", r["code_sha"])),
           "PARTIAL_RETRIEVAL", "audit_code_identity")
@@ -336,6 +348,15 @@ def validate_result(r):
           and r["elapsed_seconds"] >= 0, "PARTIAL_RETRIEVAL", "audit_counter")
     check(r["completion_state"] in STATES, "PARTIAL_RETRIEVAL", "outcome_schema")
     complete = r["completion_state"] in {"COMPLETE", "COMPLETE_ZERO_RESULTS"}
+    if complete:
+        check(1 <= r["pages_accepted"] == r["pages_attempted"] <= 2
+              and r["requests"] == r["pages_attempted"] + 1 and r["redirects"] == 0
+              and 0 < r["received_bytes"] <= 2_000_000 and r["elapsed_seconds"] <= 30
+              and r["candidate_count"] <= 100, "PARTIAL_RETRIEVAL", "success_accounting")
+        check((r["completion_state"] == "COMPLETE_ZERO_RESULTS") == (r["candidate_count"] == 0),
+              "PARTIAL_RETRIEVAL", "zero_count_invariant")
+    else:
+        check(r["failure_reason"] in FAILURE_REASONS, "PARTIAL_RETRIEVAL", "failure_reason_schema")
     check(r["candidate_count"] == len(r["candidates"])
           and r["unique_application_identities"] == len(r["raw_evidence"]), "PARTIAL_RETRIEVAL", "audit_count")
     check((complete and r["terminal_proof"] and r["failure_reason"] is None)
@@ -359,13 +380,30 @@ def validate_result(r):
             check(c["identity"] is None and c["qualification"] == "SELECTIVE_DETAIL_REQUIRED",
                   "PARTIAL_RETRIEVAL", "unknown_identity")
     check(len(identities) == r["unique_application_identities"], "PARTIAL_RETRIEVAL", "identity_count")
+    by_reference = {c["reference"]: c for c in r["candidates"] if c["reference"]}
     envelope_refs = set()
     for e in r["raw_evidence"]:
         check(e["council"] == r["council"] and e["application_reference_raw"] not in envelope_refs
               and e["council"] + ":" + e["application_reference_raw"] in identities
               and e["capability"] == Capability.NEW.value and e["authority_class"] == "FIXTURE_EXPECTATION"
               and e["source_type"] == "SYNTHETIC_RESULT_LIST", "PARTIAL_RETRIEVAL", "envelope_identity")
+        candidate = by_reference[e["application_reference_raw"]]
+        check(e["source_url"] == candidate["source_url"] and e["source_record_id"] == candidate["source_key"]
+              and e["source_id"] == r["council"] + "-idox" and e["retrieved_at"] == r["observed_at"]
+              and e["versions"] == {"adapter": VERSION, "parser": "synthetic-protocol-v1", "config": CONFIG_VERSION,
+                                    "source_schema": "UNPROVED_LIVE", "code": r["code_sha"]}
+              and e["discovery_window"] == {"basis": r["date_basis"], "start": r["window_start"], "end": r["window_end"]}
+              and e["requests"] == r["requests"] and e["received_bytes"] == r["received_bytes"],
+              "PARTIAL_RETRIEVAL", "envelope_provenance")
         envelope_refs.add(e["application_reference_raw"])
+        check(e["provider"] == "council" and e["run_id"] == "offline-fixture" and e["complete_for_claim"] is True
+              and e["budget_outcome"] == "WITHIN_BOUND", "PARTIAL_RETRIEVAL", "envelope_claim")
+        check(e["fields"] == {"reference": {"state": FieldState.VALUE, "value": candidate["reference"],
+              "locator": "synthetic-result-list", "meaning": "SOURCE_LITERAL"}}, "PARTIAL_RETRIEVAL", "field_projection")
+        check(e["source_timestamps"] == {k: {"state": FieldState.MISSING, "value": None,
+              "locator": "not_requested", "meaning": "SOURCE_LITERAL"}
+              for k in ("record_created_at", "record_updated_at", "dataset_updated_at")},
+              "PARTIAL_RETRIEVAL", "timestamp_projection")
         e = dict(e)
         e["fields"] = {k: FieldEvidence(FieldState(v["state"]), v["value"], v["locator"], v["meaning"]) for k, v in e["fields"].items()}
         e["source_timestamps"] = {k: FieldEvidence(FieldState(v["state"]), v["value"], v["locator"], v["meaning"]) for k, v in e["source_timestamps"].items()}

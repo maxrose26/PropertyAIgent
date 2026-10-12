@@ -268,3 +268,40 @@ def test_foreign_transport_rejected():
         def take(self, op): raise AssertionError("must not execute")
     with pytest.raises(Failure):
         collect("bolton", "2026-10-01", "2026-10-01", "RECEIVED", Sneaky())
+
+
+@pytest.mark.parametrize("field,value", [("source_url", "https://evil.invalid/x"), ("source_record_id", "DIFFERENT"),
+                                         ("source_id", "other-council"), ("requests", 0), ("received_bytes", 0),
+                                         ("retrieved_at", "wrong-date")])
+def test_envelope_provenance_cannot_be_substituted(field, value):
+    r = run()
+    r["raw_evidence"][0][field] = value
+    with pytest.raises(Failure):
+        encode_result(r)
+
+
+def test_zero_state_requires_zero_candidates():
+    r = run()
+    r['completion_state'] = 'COMPLETE_ZERO_RESULTS'
+    with pytest.raises(Failure): encode_result(r)
+
+
+def test_success_requires_real_accounting():
+    r = run()
+    for k in ('requests','pages_attempted','pages_accepted'): r[k] = 0
+    with pytest.raises(Failure): encode_result(r)
+
+
+def test_free_text_failure_reason_not_admitted():
+    r = run(b'<unknown/>')
+    r['failure_reason'] = 'private arbitrary body text'
+    with pytest.raises(Failure): encode_result(r)
+
+
+def test_timestamp_and_field_locators_not_free_text():
+    r = run()
+    r['observed_at'] = 'private text'
+    with pytest.raises(Failure): encode_result(r)
+    r = run()
+    r['raw_evidence'][0]['fields']['reference']['locator'] = 'private text'
+    with pytest.raises(Failure): encode_result(r)

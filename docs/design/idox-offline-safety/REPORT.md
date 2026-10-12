@@ -132,7 +132,7 @@ install the same denial. Application/database/model/client modules are absent.
 Dependency installation by Actions may contact the package registry; test code
 has no council network route. No workflow_dispatch trigger is introduced.
 
-Initial local combined result: **136 tests passed** (57 DA0 plus79 safety cases).
+Local combined result after audit review: **146 tests passed** (57 DA0 plus89 safety cases).
 Native fixture measurement (not council throughput): Bolton/Stockport/Wigan each
 2 logical operations, 1 page, 1 candidate, 231 fixture body bytes; artifacts about
 2.4KB; process wall time 0.072/0.079/0.087 seconds. Hung fixture: TIMEOUT at0.502s
@@ -193,3 +193,13 @@ must not authorise a live canary on it. No speculative protocol implementation,
 second browser scraper, source experiment or further architecture research began.
 Any next decision must explicitly address these narrow protocol/evidence gaps;
 this package does not expand authority to obtain that evidence.
+
+## Independent review correction
+
+The first remote checkpoint was independently fetched and reproduced at136 passes.
+Adversarial review found insufficient audit reconciliation: a zero-result label
+could carry a candidate, successful counters could be zero, and envelope source
+URLs/keys could differ from their candidate. A genuine follow-up commit adds
+completion/counter invariants, envelope source/key/URL/window/code/accounting
+linkage, fixed failure reasons and timestamp/field-locator validation with ten
+new rejection tests. These changes do not bind or enable live transport.
