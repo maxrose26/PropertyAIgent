@@ -349,6 +349,7 @@ def _upsert_scraped_application(
     material_change_stats: MaterialChangeStats | None = None,
     authoritative_source: str = SOURCE_SCRAPE,
     lifecycle_event_stats: LifecycleEventStats | None = None,
+    status_only: bool = False,
 ) -> Application:
     """Shared by stage_scrape and stage_fetch_missing_parents - both end up
     writing the same shape of scraper result (idox_portal/arcus_portal's
@@ -386,32 +387,37 @@ def _upsert_scraped_application(
         status=existing.status, decision=existing.decision, estimated_unit_count=existing.estimated_unit_count,
     )
 
+    if existing is None and status_only:
+        raise ValueError("Direct status verification cannot create applications")
     if existing is None:
         existing = Application(council_code=council.code, reference=app.reference)
         session.add(existing)
 
     for model_field, portal_field in FIELD_MAP.items():
+        if status_only and model_field not in {"status", "decision", "decision_issued_date"}:
+            continue
         value = app.fields.get(portal_field)
         if value:
             setattr(existing, model_field, value)
 
-    existing.summary_url = app.summary_url
-    existing.further_info_url = app.further_info_url
-    existing.keyval = app.keyval
-    existing.estimated_unit_count = app.estimated_unit_count
-    existing.application_category = app.application_category
-    existing.opportunity_classification = app.opportunity_classification
-    existing.scrape_batch_id = batch_id
-    if unit_confirmation_status:
-        # Excluded from UNIT_GATE_PASSED on purpose - this row exists purely
-        # as a phase-progress signal or parent-context backfill, not to go
-        # through document download/AI extraction as its own scheme in its
-        # own right.
-        existing.unit_confirmation_status = unit_confirmation_status
-    elif existing.estimated_unit_count is not None:
-        # Portal proposal text already gave a confident unit count - no need
-        # for the confirm-units gate below.
-        existing.unit_confirmation_status = "confirmed_qualifying"
+    if not status_only:
+        existing.summary_url = app.summary_url
+        existing.further_info_url = app.further_info_url
+        existing.keyval = app.keyval
+        existing.estimated_unit_count = app.estimated_unit_count
+        existing.application_category = app.application_category
+        existing.opportunity_classification = app.opportunity_classification
+        existing.scrape_batch_id = batch_id
+        if unit_confirmation_status:
+            # Excluded from UNIT_GATE_PASSED on purpose - this row exists purely
+            # as a phase-progress signal or parent-context backfill, not to go
+            # through document download/AI extraction as its own scheme in its
+            # own right.
+            existing.unit_confirmation_status = unit_confirmation_status
+        elif existing.estimated_unit_count is not None:
+            # Portal proposal text already gave a confident unit count - no need
+            # for the confirm-units gate below.
+            existing.unit_confirmation_status = "confirmed_qualifying"
 
     if old_state is not None:
         new_state = ApplicationState(
