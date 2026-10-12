@@ -276,7 +276,7 @@ def run(*, sha, dispatch, qualification='MOCKED_EXPECTATION'):
             budget.failure = budget.failure or exc
             row.update(outcome=exc.outcome, source_fact_verified=False,
                        qualification=exc.reason)
-            row['field_diagnostics'] = row.get('field_diagnostics') or getattr(exc,'diagnostics',None)
+            row['field_diagnostics'] = (row.get('field_diagnostics') or getattr(exc,'diagnostics',None)) if boundary.requests > 0 else None
         except Exception:
             budget.failure = budget.failure or BoundaryFailure('PARSER_FAILURE', 'summary decoding or parsing failed')
             row.update(outcome='PARSER_FAILURE', source_fact_verified=False,
@@ -339,6 +339,8 @@ def validate(artifact):
                 raise ValueError('Audit accounting')
         if type(row.get('attempted')) is not bool or row['attempted'] != (row['requests']>0):
             raise ValueError('Audit attempt state')
+        if not row['attempted'] and diagnostic is not None:
+            raise ValueError('Unattempted source cannot borrow diagnostics')
         if not isinstance(row.get('elapsed_seconds'),(int,float)) or not 0 <= row['elapsed_seconds'] <= 51:
             raise ValueError('Audit elapsed time')
         if row.get('source_fact_verified') is True:
