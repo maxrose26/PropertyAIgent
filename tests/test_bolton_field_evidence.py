@@ -90,3 +90,12 @@ def test_diagnostic_schema_rejects_arbitrary_value():
     f=b.parse_summary(fixture_html(b.CASES[0]),b.CASES[0])
     f.diagnostics['fields']['status']['value']='SECRET'
     with pytest.raises(ValueError):b.validate_diagnostics(f.diagnostics)
+
+def test_unattempted_control_cannot_borrow_first_response_diagnostics():
+    def missing(*a,**k):return FixtureResponse(omitted(b.CASES[0],'Reference').encode())
+    audit=b.run(sha='a'*40,dispatch=missing)
+    assert audit['results'][0]['field_diagnostics']['fields']['reference']['state']=='NOT_PRESENT'
+    assert audit['results'][1]['attempted'] is False
+    assert audit['results'][1]['field_diagnostics'] is None
+    audit['results'][1]['field_diagnostics']=audit['results'][0]['field_diagnostics']
+    with pytest.raises(ValueError):b.validate(audit)
