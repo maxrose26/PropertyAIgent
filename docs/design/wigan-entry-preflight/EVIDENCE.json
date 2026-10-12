@@ -1,0 +1,452 @@
+{
+  "assessment_version": "wigan-entry-preflight-v1",
+  "binding_contract_version": "da0-contract-v1",
+  "base_sha": "da06dae001cbef9af6c0f38776e1fa4adfb022b3",
+  "assessment_date": "2026-10-12",
+  "decision": "BLOCKED",
+  "operational": false,
+  "execution_authority": null,
+  "proposed_capability": "NEW_APPLICATION_DISCOVERY",
+  "sources": [
+    {
+      "source_id": "wigan-2021-2030",
+      "catalogue_url": "https://www.data.gov.uk/dataset/2fcf1013-970c-4329-8231-fe32b25c4890/planning-applications-2021-to-20303",
+      "layer": null,
+      "catalogue_updated": "2025-10-21"
+    },
+    {
+      "source_id": "wigan-2025",
+      "catalogue_url": "https://www.data.gov.uk/dataset/3221d41e-1877-4f87-8f58-36d2e6d85d0c/planning-applications-20252",
+      "layer": 6,
+      "catalogue_updated": "2025-12-18"
+    },
+    {
+      "source_id": "wigan-2026",
+      "catalogue_url": "https://www.data.gov.uk/dataset/5d14984a-0d15-454a-932b-5b5a27db12c0/planning-applications-2026",
+      "layer": 9,
+      "catalogue_updated": "2026-10-11"
+    }
+  ],
+  "arcgis_item_id": "1a3ea7fae81b46b68aa36ed2401f1161",
+  "service_url": "https://maps.wigan.gov.uk/arcgis/rest/services/Planning_BuildingControl/Planning_Applications_2021_to_2030/MapServer",
+  "publisher": "Wigan Metropolitan Borough Council",
+  "publisher_qualification": "CONFIRMED_CATALOGUE_ONLY",
+  "gates": {
+    "AUTHORITY": "UNKNOWN",
+    "COMPLETENESS": "UNKNOWN",
+    "FRESHNESS_LATENCY": "UNKNOWN",
+    "IDENTITY": "UNKNOWN",
+    "PROVENANCE": "UNKNOWN",
+    "RESOURCE_BOUNDING": "UNKNOWN",
+    "RIGHTS": "UNKNOWN",
+    "SCHEMA_STABILITY": "UNKNOWN"
+  },
+  "complete_capture_obtained": false,
+  "counts_obtained": false,
+  "schema_obtained": false,
+  "rights_state": "RIGHTS_UNRESOLVED",
+  "change_capability": "UNKNOWN",
+  "field_semantics": {
+    "REFVAL": "PARTIALLY_CONFIRMED",
+    "KEYVAL": "UNKNOWN",
+    "DECSN": "UNKNOWN",
+    "DATEDECISN": "UNKNOWN",
+    "APPLDECTYP": "UNKNOWN",
+    "DATEAPPDEC": "UNKNOWN",
+    "status": "UNKNOWN",
+    "application_date": "UNKNOWN",
+    "validation_date": "UNKNOWN",
+    "record_created_at": "UNKNOWN",
+    "record_modified_at": "UNKNOWN"
+  },
+  "observations": [
+    {
+      "id": "R1",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://www.data.gov.uk/dataset/2fcf1013-970c-4329-8231-fe32b25c4890/planning-applications-2021-to-20303",
+      "result": "READABLE_PUBLISHER_ITEM_SERVICE_LINKS",
+      "qualification": "No application data or count"
+    },
+    {
+      "id": "R2",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://www.data.gov.uk/dataset/5d14984a-0d15-454a-932b-5b5a27db12c0/planning-applications-2026",
+      "result": "READABLE_LAYER_9_CATALOGUE",
+      "qualification": "Catalogue date is not record freshness; dataset licence Not set"
+    },
+    {
+      "id": "R3",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://www.wigan.gov.uk/Council/DataProtection-FOI-Stats/Open-Data.aspx",
+      "result": "COUNCIL_OGL_COMMERCIAL_POLICY",
+      "qualification": "No dataset-specific rights clearance"
+    },
+    {
+      "id": "R4",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://www.data.gov.uk/dataset/3221d41e-1877-4f87-8f58-36d2e6d85d0c/planning-applications-20252",
+      "result": "READABLE_LAYER_6_CATALOGUE",
+      "qualification": "Resource date 2025-10-21 is not record freshness"
+    },
+    {
+      "id": "R5",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://maps.wigan.gov.uk/arcgis/rest/services/Planning_BuildingControl/Planning_Applications_2021_to_2030/MapServer",
+      "result": "TOOL_REPORTED_403",
+      "qualification": "No readable service metadata; not proof source universally inaccessible"
+    },
+    {
+      "id": "R6",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://maps.wigan.gov.uk/arcgis/rest/services/Planning_BuildingControl/Planning_Applications_2021_to_2030/MapServer/9",
+      "result": "TOOL_REPORTED_403",
+      "qualification": "No readable layer schema"
+    },
+    {
+      "id": "R7",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://maps.wigan.gov.uk/arcgis/rest/services/Planning_BuildingControl/Planning_Applications_2021_to_2030/MapServer/6",
+      "result": "TOOL_REPORTED_403",
+      "qualification": "No readable layer schema"
+    },
+    {
+      "id": "R8",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://opendata.wigan.gov.uk/api/download/v1/items/1a3ea7fae81b46b68aa36ed2401f1161/csv?layers=9",
+      "result": "EXPORT_REDIRECT_TARGET_UNAVAILABLE",
+      "qualification": "No complete CSV retrieved"
+    },
+    {
+      "id": "R9",
+      "method": "ONE_BOUNDED_NATIVE_METADATA_GET",
+      "url": "https://maps.wigan.gov.uk/arcgis/rest/services/Planning_BuildingControl/Planning_Applications_2021_to_2030/MapServer?f=pjson",
+      "result": "URL_ERROR",
+      "qualification": "HTTP status and response bytes unknown; no body/schema accepted",
+      "observed_elapsed_seconds": 5.01,
+      "configured_timeout_seconds": 5,
+      "configured_body_ceiling": 262144,
+      "redirects_followed": 0,
+      "retries": 0
+    }
+  ],
+  "other_research_limitations": [
+    "ArcGIS item JSON unavailable via research tool",
+    "Advertised Hub service page returned no usable text",
+    "Harvest HTML metadata inaccessible through catalogue redirect",
+    "Additional Hub about-page probe yielded no evidence and is not an admitted replacement source",
+    "OGL linked licence page not readable through research tool; council policy alone retained"
+  ],
+  "manifest_sample_provenance": {
+    "code_commit": "371acef3e2a075d8fb7a8579540f87f5dc72c985",
+    "version": "stage26b-l1-selection-v1",
+    "observed_at": "2026-10-09T17:46:54.113754+00:00",
+    "qualification": "QUALIFIED_RETAINED_BASIS",
+    "sha256": "dc7ac4d94b19ddb48f09a52cab31acf91873956e8222d91a98fead3f85f64862",
+    "projection": "application_id/site_id/reference/council only; no buyer/private fields"
+  },
+  "cross_check_counts": {
+    "FOUND_EXACT": 0,
+    "NOT_FOUND": 0,
+    "AMBIGUOUS": 0,
+    "FORMAT_DIFFERENCE": 0,
+    "UNTESTED": 19
+  },
+  "cross_checks": [
+    {
+      "application_id": 721,
+      "site_id": 170,
+      "reference": "A/20/88859/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 483,
+      "site_id": 336,
+      "reference": "A/24/97573/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 484,
+      "site_id": 338,
+      "reference": "A/24/97592/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 498,
+      "site_id": 347,
+      "reference": "A/24/98324/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 499,
+      "site_id": 348,
+      "reference": "A/25/098376/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 510,
+      "site_id": 357,
+      "reference": "A/25/098963/NLA",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 514,
+      "site_id": 161,
+      "reference": "A/25/099009/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 209,
+      "site_id": 149,
+      "reference": "A/25/099409/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 215,
+      "site_id": 155,
+      "reference": "A/25/099717/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 217,
+      "site_id": 156,
+      "reference": "A/25/099747/NLA",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 219,
+      "site_id": 158,
+      "reference": "A/25/099857/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 220,
+      "site_id": 159,
+      "reference": "A/25/099883/OUT",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 225,
+      "site_id": 164,
+      "reference": "A/25/100055/OUT",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 226,
+      "site_id": 165,
+      "reference": "A/25/100145/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 227,
+      "site_id": 166,
+      "reference": "A/25/100245/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 235,
+      "site_id": 170,
+      "reference": "A/26/100520/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 236,
+      "site_id": 171,
+      "reference": "A/26/100539/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 239,
+      "site_id": 174,
+      "reference": "A/26/100631/MAJOR",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 244,
+      "site_id": 176,
+      "reference": "A/26/100798/RMMAJ",
+      "council": "wigan",
+      "result": "UNTESTED",
+      "qualification": "No complete supported structured retrieval; no not-found inference",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_record_identity": "UNTESTED"
+      }
+    }
+  ],
+  "salford_fallback": {
+    "source_id": "salford-historical-csv",
+    "recommendation": "NEXT_BOUNDED_QUALIFICATION_NOT_IMPLEMENTATION",
+    "new_live_research": false,
+    "blockers": [
+      "Current supported CSV retrieval",
+      "Current schema/exact identity/scope/completeness",
+      "Refresh cadence and timestamp meaning",
+      "Reduced open projection rights; exclude restricted UPRN enrichment"
+    ]
+  }
+}
