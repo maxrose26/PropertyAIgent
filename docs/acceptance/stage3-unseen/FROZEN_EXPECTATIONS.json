@@ -1,0 +1,437 @@
+{
+  "frozen_at_utc": "2026-10-12T18:32:35.171885+00:00",
+  "selection_commit": "b8de19053713840daeecc18f821957807c13f9f5",
+  "software_base": "d253773a09690f27b150adb701c95f9aa3ee210f",
+  "ordering": "All expectations derived and frozen before holdout-specific runtime/code comparison. No runtime behaviour changed.",
+  "cases": [
+    {
+      "id": 71,
+      "reference": "21082/25",
+      "council_code": "bolton",
+      "address": "Land To North Of Arthur Lane Arthur Lane Bolton BL2 4JG",
+      "summary_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=T3152ODELN700&activeTab=summary",
+      "expected": {
+        "reported_ah_count": {
+          "state": "REPORTED",
+          "value": {
+            "upper_bound": 40
+          },
+          "qualification": "Historical outline proposal; not exact40"
+        },
+        "qualified_ah_count": {
+          "state": "QUALIFIED",
+          "value": {
+            "upper_bound": 40
+          },
+          "qualification": "Source-qualified historical proposed ceiling ONLY; current secured exact quantity UNKNOWN"
+        },
+        "residential_denominator": {
+          "state": "REPORTED",
+          "value": {
+            "upper_bound": 80
+          }
+        },
+        "reported_percentage": {
+          "state": "REPORTED",
+          "value": 50,
+          "qualification": "Historical proposed share, explicitly stated; not currently secured"
+        },
+        "derived_percentage": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "Do not divide two maxima to derive an unconditional percentage"
+        },
+        "tenure_mix": {
+          "state": "REPORTED",
+          "value": {
+            "social_or_affordable_rent_percent": 75,
+            "intermediate_percent": 25,
+            "maximum_scenario_counts": [
+              30,
+              10
+            ]
+          },
+          "qualification": "Do not split social/affordable rent or rename intermediate; counts may reduce"
+        },
+        "scope": {
+          "state": "QUALIFIED",
+          "value": "Whole outline residential proposal; access only determined; no phase donation"
+        },
+        "status": {
+          "state": "QUALIFIED",
+          "value": "Refused13April2026; earlier officer recommendation is historical"
+        },
+        "legal_s106": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "Report requires future S106 completion; not evidence of execution"
+        },
+        "funding_viability": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "on_off_site": {
+          "state": "REPORTED",
+          "value": "on-site AH; education/public-open-space payments are not AH payments"
+        },
+        "conflicts": {
+          "state": "QUALIFIED",
+          "value": "Earlier favourable recommendation/later refusal; preserve chronology, no current approval inference"
+        }
+      },
+      "source_files": [
+        "71.html",
+        "bolton-report.pdf"
+      ],
+      "source_limit": "26 March2026 report paras1-2,46,124-125,137; later13April2026 council summary refusal takes precedence for decision status; executed legal document not reviewed.",
+      "source_hashes": {
+        "71.html": "4dc31ce56c2d58e9b6e8555611b953b28ac71c5f66ebcf416632a1bbb5d96348",
+        "bolton-report.pdf": "c825cd5d8b5ad12e0c5cb4b10bff83951e2f511d8b67fd2adefb6a2106e93211"
+      }
+    },
+    {
+      "id": 621,
+      "reference": "24/00581/HYBR",
+      "council_code": "rochdale",
+      "address": "Land To The West Of Hollingworth Road And Land Off Rakewood Road\nLittleborough",
+      "summary_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e83sRIAQ?c__r=Arcus_BE_Public_Register",
+      "expected": {
+        "reported_ah_count": {
+          "state": "REPORTED",
+          "value": 47,
+          "qualification": "Repeated total; retain breakdown conflict"
+        },
+        "qualified_ah_count": {
+          "state": "QUALIFIED",
+          "value": 47,
+          "qualification": "Proposed total only, if field-level qualification permits; conservative withholding acceptable ONLY with conflict explanation"
+        },
+        "residential_denominator": {
+          "state": "QUALIFIED",
+          "value": 309,
+          "qualification": "Revised residential component only; exclude primary school/car park and superseded312"
+        },
+        "reported_percentage": {
+          "state": "REPORTED",
+          "value": 15.2
+        },
+        "derived_percentage": {
+          "state": "DERIVED",
+          "value": 15.210355987055015,
+          "qualification": "Proposed residential share; retain conflict warning; not delivery"
+        },
+        "tenure_mix": {
+          "state": "CONFLICTING",
+          "value": {
+            "social_rent": 12,
+            "shared_ownership_alternatives": [
+              25,
+              35
+            ]
+          },
+          "qualification": "Do not silently repair stated25 to35; bedroom breakdown also inconsistent"
+        },
+        "scope": {
+          "state": "QUALIFIED",
+          "value": "Residential component of hybrid application; no AH donation to school, other applications or phases"
+        },
+        "status": {
+          "state": "QUALIFIED",
+          "value": "Committee resolution to grant subject to S106 and conditions"
+        },
+        "legal_s106": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "Subject to S106 is not executed secured obligation"
+        },
+        "funding_viability": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "on_off_site": {
+          "state": "REPORTED",
+          "value": "On-site AH; separate education/sports/highways/car-park payments not AH contributions"
+        },
+        "conflicts": {
+          "state": "CONFLICTING",
+          "value": "Shared ownership25 vs35 and inconsistent bedroom breakdown"
+        }
+      },
+      "source_files": [
+        "rochdale-report.pdf",
+        "rochdale-agenda.html"
+      ],
+      "source_limit": "Official27November2025 committee item40 and linked report paras2.6,7.29,7.248-250,13.1. Rochdale primary294 excluded as shell; replacement predetermined. No executed S106 or later decision notice inspected.",
+      "source_hashes": {
+        "rochdale-report.pdf": "2cf86b5498d93fd686121715c080bbecf5c00fd85516b25d6305ac3cc414e1e9",
+        "rochdale-agenda.html": "8a58b9a82a02dfe625d3912dc818d73bed04951c17c5c8071dcc15616084a69e"
+      }
+    },
+    {
+      "id": 24,
+      "reference": "OUT/354782/25",
+      "council_code": "oldham",
+      "address": "1 Skipton Street Oldham OL8 2JF",
+      "summary_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SZ39VFMCN4W00",
+      "expected": {
+        "reported_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "qualified_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "residential_denominator": {
+          "state": "REPORTED",
+          "value": 2,
+          "qualification": "Proposal only; AH percentage remains UNKNOWN"
+        },
+        "reported_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "derived_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "tenure_mix": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "scope": {
+          "state": "QUALIFIED",
+          "value": "Whole outline2-dwelling proposal"
+        },
+        "status": {
+          "state": "REPORTED",
+          "value": "Awaiting decision"
+        },
+        "legal_s106": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "funding_viability": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "on_off_site": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "conflicts": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "No AH evidence in inspected summary; not confirmation that none exists"
+        }
+      },
+      "source_files": [
+        "24.html"
+      ],
+      "source_limit": "Official application summary only; documents tab inspected where useful, linked substantive PDFs returned404. No silence-to-zero inference.",
+      "source_hashes": {
+        "24.html": "1752434bc30204d19512fd03b9a6563fb76340032e33343a807aa3559a1a3876"
+      }
+    },
+    {
+      "id": 49,
+      "reference": "25/00625/REM",
+      "council_code": "tameside",
+      "address": "The Railway Inn 326 Lumb Lane Droylsden Tameside M43 7LA",
+      "summary_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=T03VE9PUII600&activeTab=summary",
+      "expected": {
+        "reported_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "qualified_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "residential_denominator": {
+          "state": "REPORTED",
+          "value": 1,
+          "qualification": "Proposal only; AH percentage remains UNKNOWN"
+        },
+        "reported_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "derived_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "tenure_mix": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "scope": {
+          "state": "QUALIFIED",
+          "value": "Appearance/landscaping RM for one detached house; parent22/00846/OUT not reviewed"
+        },
+        "status": {
+          "state": "REPORTED",
+          "value": "Approved19September2025"
+        },
+        "legal_s106": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "funding_viability": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "on_off_site": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "conflicts": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "No AH evidence in inspected summary; not confirmation that none exists"
+        }
+      },
+      "source_files": [
+        "49.html"
+      ],
+      "source_limit": "Official application summary only; documents tab inspected where useful, linked substantive PDFs returned404. No silence-to-zero inference.",
+      "source_hashes": {
+        "49.html": "9c22f3a149425ff2baa368dfb7b82bb58bc59bfad78afdb8125bf51183fbcaea"
+      }
+    },
+    {
+      "id": 208,
+      "reference": "A/25/099319/OUT",
+      "council_code": "wigan",
+      "address": "Public Open Space Middlecot Close Orrell Wigan WN5 8SW",
+      "summary_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=SZ6TT5RRGUB00&activeTab=summary",
+      "expected": {
+        "reported_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "qualified_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "residential_denominator": {
+          "state": "REPORTED",
+          "value": 3,
+          "qualification": "Proposal only; AH percentage remains UNKNOWN"
+        },
+        "reported_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "derived_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "tenure_mix": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "scope": {
+          "state": "QUALIFIED",
+          "value": "Whole outline3-dwelling proposal"
+        },
+        "status": {
+          "state": "REPORTED",
+          "value": "Refused31October2025"
+        },
+        "legal_s106": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "funding_viability": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "on_off_site": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "conflicts": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "No AH evidence in inspected summary; not confirmation that none exists"
+        }
+      },
+      "source_files": [
+        "208.html"
+      ],
+      "source_limit": "Official application summary only; documents tab inspected where useful, linked substantive PDFs returned404. No silence-to-zero inference.",
+      "source_hashes": {
+        "208.html": "6625eda637b1099e641d9caf9874dbae727b7e89bd089e9683c5f6924670d9a3"
+      }
+    },
+    {
+      "id": 16,
+      "reference": "72367",
+      "council_code": "bury",
+      "address": "Site of former Wellington Pub, Stand Lane, Radcliffe, M26 1LJ",
+      "summary_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_63745&activeTab=summary",
+      "expected": {
+        "reported_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "qualified_ah_count": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "residential_denominator": {
+          "state": "REPORTED",
+          "value": 40,
+          "qualification": "Proposal only; AH percentage remains UNKNOWN"
+        },
+        "reported_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "derived_percentage": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "tenure_mix": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "scope": {
+          "state": "QUALIFIED",
+          "value": "Outline40-flat proposal"
+        },
+        "status": {
+          "state": "REPORTED",
+          "value": "Status Unknown; decision Withdrawn by Applicant20April2026"
+        },
+        "legal_s106": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "funding_viability": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "on_off_site": {
+          "state": "UNKNOWN",
+          "value": null
+        },
+        "conflicts": {
+          "state": "UNKNOWN",
+          "value": null,
+          "qualification": "No AH evidence in inspected summary; not confirmation that none exists"
+        }
+      },
+      "source_files": [
+        "16.html"
+      ],
+      "source_limit": "Official application summary only; documents tab inspected where useful, linked substantive PDFs returned404. No silence-to-zero inference.",
+      "source_hashes": {
+        "16.html": "9c9087289e1eee0148a80eed7c5e224c0feb2a9195b8b800acc2fb6607912b94"
+      }
+    }
+  ],
+  "comparison_policy": "No production or AI extraction. Existing deterministic contracts evaluated offline with source-faithful representations. Missing trusted runtime acceptance may justify SAFE_UNKNOWN, never masking supported claimed functionality. Reported facts retain source/status/conflict context. Source silence must never become zero.",
+  "review": "Independent source-only agent reviewed both complex reports before software comparison; visually checked RochdalePDFpage64 conflict. Four summary-only cases have narrow absence-of-evidence expectations."
+}
