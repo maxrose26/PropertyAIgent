@@ -1,9 +1,9 @@
 name: Bolton literal-status OFFLINE acceptance
 on:
   push:
-    branches: [feat/l1-bolton-literal-summary, feat/l1-bolton-canary-registration]
+    branches: [feat/l1-bolton-literal-summary, feat/l1-bolton-canary-registration, feat/bolton-field-evidence]
   pull_request:
-    paths: ['verification/stage26b_l1/**', 'tests/test_bolton_literal_summary.py', 'tests/test_bolton_registration.py', '.github/workflows/bolton-literal-offline.yml', '.github/workflows/bolton-literal-canary.yml']
+    paths: ['verification/stage26b_l1/**', 'tests/test_bolton*.py', 'tests/fixtures/bolton-field-evidence.json', '.github/workflows/bolton-literal-offline.yml', '.github/workflows/bolton-literal-canary.yml']
 permissions:
   contents: read
 jobs:
@@ -20,7 +20,7 @@ jobs:
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/bolton-venv"
       - name: Network-denied literal-source and existing contract regressions
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/bolton-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_bolton_literal_summary.py tests/test_bolton_registration.py tests/test_l1_actions_canary.py tests/test_l1_registration_request_safety.py tests/test_stage26b_l0.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_stage26b_b11.py tests/test_planning_status_verification.py tests/test_material_planning_change_detection.py -q --junitxml="$RUNNER_TEMP/bolton-tests.xml"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/bolton-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_bolton_literal_summary.py tests/test_bolton_field_evidence.py tests/test_bolton_registration.py tests/test_l1_actions_canary.py tests/test_l1_registration_request_safety.py tests/test_stage26b_l0.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_stage26b_b11.py tests/test_planning_status_verification.py tests/test_material_planning_change_detection.py -q --junitxml="$RUNNER_TEMP/bolton-tests.xml"
       - name: Actual supervisor and mock worker ONLY
         env:
           PIN: ${{ github.event.pull_request.head.sha || github.sha }}
