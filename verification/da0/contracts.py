@@ -163,14 +163,28 @@ class RawEnvelope:
     source_type: str = "DIRECT_SUMMARY"
     authority_class: str = "PRIMARY_CLAIM_SPECIFIC"
     run_id: str = "offline-fixture"
+    discovery_window: dict[str, str] | None = None
 
     def __post_init__(self):
         require(self.manifest_version == VERSION, "envelope version")
         require(bool(self.source_id and self.council and self.application_reference_raw), "envelope identity")
         require(self.application_reference_raw == self.application_reference_canonical, "no unapproved reference normalisation")
         validate_url(self.source_url)
-        require(self.capability == Capability.STATUS.value, "this offline projection supports status only")
-        require(set(self.fields) <= STATUS_FIELDS, "unauthorised status projection")
+        require(self.capability in {Capability.STATUS.value, Capability.NEW.value}, "unsupported offline projection")
+        if self.capability == Capability.NEW.value:
+            from datetime import date
+            w = self.discovery_window
+            require(isinstance(w, dict) and set(w) == {"basis", "start", "end"}, "discovery window provenance")
+            require(w["basis"] in {"RECEIVED", "VALIDATED"}, "discovery date basis")
+            require(date.fromisoformat(w["start"]) <= date.fromisoformat(w["end"]), "discovery window order")
+            require(set(self.fields) == {"reference"}, "identity-only discovery projection")
+            ref = self.fields["reference"]
+            require(isinstance(ref, FieldEvidence) and ref.state == FieldState.VALUE
+                    and ref.meaning == "SOURCE_LITERAL" and ref.value == self.application_reference_raw,
+                    "displayed discovery reference required")
+        else:
+            require(self.discovery_window is None, "status cannot claim discovery window")
+            require(set(self.fields) <= STATUS_FIELDS, "unauthorised status projection")
         require(all(isinstance(x, FieldEvidence) for x in self.fields.values()), "qualified fields required")
         require(set(self.versions) == {"adapter", "parser", "config", "source_schema", "code"}
                 and all(self.versions.values()), "version provenance")
@@ -183,7 +197,7 @@ class RawEnvelope:
 
 def status_claim_complete(envelope, authorised_reference):
     f = envelope.fields
-    return bool(envelope.complete_for_claim and envelope.budget_outcome == "WITHIN_BOUND"
+    return bool(envelope.capability == Capability.STATUS.value and envelope.complete_for_claim and envelope.budget_outcome == "WITHIN_BOUND"
                 and envelope.application_reference_canonical == authorised_reference
                 and all(k in f and f[k].state == FieldState.VALUE and f[k].meaning == "SOURCE_LITERAL"
                         for k in ("reference", "source_status_raw"))

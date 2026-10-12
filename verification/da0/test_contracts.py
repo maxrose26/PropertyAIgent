@@ -27,7 +27,7 @@ def no_source_network(monkeypatch):
 
 def test_contract_imports_are_stdlib_only_no_transport_db_model():
     tree=ast.parse(Path(__file__).with_name('contracts.py').read_text())
-    allowed={'__future__','dataclasses','enum','hashlib','ipaddress','json','math','urllib.parse'}
+    allowed={'__future__','dataclasses','enum','hashlib','ipaddress','json','math','urllib.parse','datetime'}
     for node in ast.walk(tree):
         if isinstance(node,ast.Import):
             assert all(x.name in allowed for x in node.names)
