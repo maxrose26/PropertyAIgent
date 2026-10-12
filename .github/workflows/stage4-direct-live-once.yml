@@ -1,0 +1,59 @@
+name: Stage4 direct-reference THREE summaries LIVE ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact REVIEW-approved SHA equal to workflow revision
+        required: true
+        type: string
+      authority:
+        description: Separate REVIEW execution authority required; registration is not authority
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_STAGE4_THREE_SUMMARIES_ONCE_NO_PERSISTENCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-direct-three-once
+  cancel-in-progress: false
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: First dispatch only; exact workflow SHA and authority
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$AUTHORITY" == AUTHORISE_STAGE4_THREE_SUMMARIES_ONCE_NO_PERSISTENCE ]]
+          [[ "$RUN_NUMBER" == 1 && "$RUN_ATTEMPT" == 1 ]]
+          echo "DIRECT_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Minimum pinned parser dependencies; no source requests
+        run: |
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin /usr/bin/python3 -m venv "$RUNNER_TEMP/direct-live-venv"
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin "$RUNNER_TEMP/direct-live-venv/bin/python" -m pip --isolated install --only-binary=:all: --no-deps --index-url https://pypi.org/simple -r verification/direct_reference/requirements.lock
+          env -i HOME="$RUNNER_TEMP" PATH=/usr/bin:/bin "$RUNNER_TEMP/direct-live-venv/bin/python" -m pip check
+      - name: Frozen three-summary audit; no persistence and no inherited credentials
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          DIRECT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_EVENT_NAME=workflow_dispatch DIRECT_WORKFLOW_SHA="$DIRECT_WORKFLOW_SHA" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" "$RUNNER_TEMP/direct-live-venv/bin/python" -m verification.direct_reference.registration --sha "$PIN" --mode live --authority "$AUTHORITY" --job-start-epoch "$DIRECT_JOB_START" --output "$RUNNER_TEMP/direct-live-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage4-direct-audit-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/direct-live-audit.json
+          if-no-files-found: error
+          retention-days: 7
