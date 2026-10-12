@@ -40,6 +40,7 @@ def sample():
       retrieval_started_at=None,retrieval_completed_at=None,outcome='PARTIAL_RETRIEVAL',
       before=f,qualified_incoming=f,after=f,verification_watermark_before=None,
       verification_watermark_after=None,material_change='UNKNOWN',transaction_result='REJECTED_NO_WRITE',
+      field_states=next(r['field_states'] for r in load_live()['results'] if r['application_id']==42),semantic_qualification='refused',
       lifecycle_before=[],lifecycle_after=[],refresh_signal_before={'required':False,'reason':None,'trigger':None,'requested_at':None},
       refresh_signal_after={'required':False,'reason':None,'trigger':None,'requested_at':None},error_qualification='WITHHELD_PARTIAL')
 
@@ -62,3 +63,10 @@ def test_fixture_tampering_rejected(monkeypatch):
         return b.replace(b'Deposited',b'Pending') if p.name=='live-observations-38310507094.json' else b
     monkeypatch.setattr(Path,'read_bytes',tamper)
     with pytest.raises(ValueError):load_live()
+
+
+def test_audit_carries_exact_field_states_and_semantics():
+    a=sample();validate_persistence_audit(a)
+    for field,value in [('semantic_qualification','pending'),('field_states',{}),('reference','unapproved reference')]:
+        bad=copy.deepcopy(a);bad[field]=value
+        with pytest.raises(ValueError):validate_persistence_audit(bad)

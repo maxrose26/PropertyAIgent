@@ -45,14 +45,17 @@ def frozen_observation(application_id):
 AUDIT_KEYS={'application_id','reference','source_provenance','retrieval_started_at',
  'retrieval_completed_at','outcome','before','qualified_incoming','after',
  'verification_watermark_before','verification_watermark_after','material_change',
- 'transaction_result','lifecycle_before','lifecycle_after','refresh_signal_before',
+ 'field_states','semantic_qualification','transaction_result','lifecycle_before','lifecycle_after','refresh_signal_before',
  'refresh_signal_after','error_qualification'}
 FACT_KEYS={'status','decision','decision_date'}
 
 
 def validate_persistence_audit(a):
     if set(a)!=AUDIT_KEYS:raise ValueError('Closed persistence audit')
-    if type(a['application_id']) is not int or not isinstance(a['reference'],str):raise ValueError('Identity')
+    if type(a['application_id']) is not int or a['application_id'] not in (42,78,202):raise ValueError('Identity')
+    live=next(r for r in load_live()['results'] if r['application_id']==a['application_id'])
+    if a['reference']!=live['reference']:raise ValueError('Reference')
+    if a['field_states']!=live['field_states'] or a['semantic_qualification']!=live['semantic_qualification']:raise ValueError('Evidence qualification')
     for k in ('before','qualified_incoming','after'):
         if set(a[k])!=FACT_KEYS:raise ValueError('Only coupled planning facts')
     # Closed nested schemas prevent arbitrary source bodies/error strings.
