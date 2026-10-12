@@ -276,3 +276,10 @@ def test_native_query_cancellation_cleanup(engine):
             finally: tx.rollback(); thread.join(timeout=12)
     assert not thread.is_alive() and failures == [] and outcomes == ['persistence_failed']
     assert read(engine, identity) == before and engine.pool.checkedout() == 0
+
+
+def test_stage4_direct_retrieval_handoff(engine, monkeypatch):
+    # Share this module's disposable database lifecycle; do not initialise the
+    # same fixed-name database a second time through an imported module fixture.
+    from verification.direct_reference.test_native import test_direct_native_atomic_retry_metadata_and_failure
+    test_direct_native_atomic_retry_metadata_and_failure(engine, monkeypatch)
