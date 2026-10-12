@@ -1,0 +1,39 @@
+def collect_result_links(page: Page, council: CouncilConfig, date_from: str, date_to: str) -> list[str]:
+    """Run one date-range search on the advanced search form and page through
+    all results, returning every applicationDetails.do summary URL found."""
+    links: set[str] = set()
+
+    _goto_with_retry(page, council.search_url)
+    page.fill(f'input[name="{council.date_start_field}"]', date_from)
+    page.fill(f'input[name="{council.date_end_field}"]', date_to)
+    page.click('input[value="Search"]')
+    page.wait_for_load_state("networkidle", timeout=30000)
+
+    try:
+        page.select_option('select[name="searchCriteria.resultsPerPage"]', "100")
+        page.wait_for_load_state("networkidle", timeout=30000)
+        time.sleep(WAIT_SECONDS)
+    except Exception:
+        pass  # not all portals expose this control
+
+    while True:
+        html = page.content()
+        if is_rate_limited(html):
+            raise RuntimeError(f"Rate limited by portal while searching {date_from}-{date_to}")
+
+        soup = BeautifulSoup(html, "html.parser")
+        for a in soup.find_all("a", href=True):
+            if "applicationDetails.do" in a["href"] and "keyVal=" in a["href"]:
+                links.add(urljoin(page.url, a["href"]))
+
+        next_links = page.locator("a", has_text="Next")
+        if next_links.count() == 0:
+            break
+        try:
+            next_links.first.click()
+            page.wait_for_load_state("networkidle", timeout=30000)
+            time.sleep(WAIT_SECONDS)
+        except Exception:
+            break
+
+    return sorted(links)
