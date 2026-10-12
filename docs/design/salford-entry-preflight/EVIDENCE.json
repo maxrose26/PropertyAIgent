@@ -1,0 +1,765 @@
+{
+  "assessment_version": "salford-entry-preflight-v1",
+  "binding_contract_version": "da0-contract-v1",
+  "base_sha": "da06dae001cbef9af6c0f38776e1fa4adfb022b3",
+  "assessment_date": "2026-10-12",
+  "decision": "BLOCKED",
+  "source_id": "salford-historical-csv",
+  "catalogue_url": "https://www.data.gov.uk/dataset/61f7eda9-b456-47ab-bba8-b27217dd15a7/scc-planning-applications",
+  "resource_url": "https://map.salford.gov.uk/maps/opendata/SCC-planning-applications.csv",
+  "publisher": "Salford City Council",
+  "title": "Salford City Council - Planning applications",
+  "publisher_qualification": "CONFIRMED_CATALOGUE",
+  "source_scope": "UNKNOWN",
+  "documented_scope": "Applications received since 1 April 2014; no stated end date",
+  "documented_scope_start": "2014-04-01",
+  "actual_earliest_record_date": null,
+  "actual_latest_record_date": null,
+  "catalogue_updated": "2016-07-18",
+  "resource_link_updated": "2014-10-30",
+  "operational": false,
+  "execution_authority": null,
+  "proposed_capability": "NEW_APPLICATION_DISCOVERY",
+  "gates": {
+    "AUTHORITY": "UNKNOWN",
+    "COMPLETENESS": "UNKNOWN",
+    "FRESHNESS_LATENCY": "UNKNOWN",
+    "IDENTITY": "UNKNOWN",
+    "PROVENANCE": "UNKNOWN",
+    "RESOURCE_BOUNDING": "UNKNOWN",
+    "RIGHTS": "UNKNOWN",
+    "SCHEMA_STABILITY": "UNKNOWN"
+  },
+  "complete_capture_obtained": false,
+  "header_obtained": false,
+  "row_count": null,
+  "file_bytes": null,
+  "upstream_system": "UNKNOWN",
+  "identity_state": "UNRESOLVED_ACTUAL_RESOURCE_UNOBSERVED",
+  "identity_classification_pending": [
+    "EXACT_REFERENCE_SUPPORTED",
+    "DETERMINISTIC_NORMALISATION_REQUIRED",
+    "IDENTITY_AMBIGUOUS",
+    "IDENTITY_UNAVAILABLE"
+  ],
+  "identity_qualification": "Schema defines exact CaseReference; current CSV identity cannot be classified without inspection",
+  "schema_guidance_url": "https://schemas.opendata.esd.org.uk/PlanningApplications/LocalOpenDataIncentiveSchemePlanningApplicationsSchemaGuidance.pdf",
+  "schema_guidance_date": "2014-07-23",
+  "schema_adoption_qualification": "Catalogue claims schema compliance; present header/content/version not verified",
+  "field_semantics": {
+    "application_reference": {
+      "candidate_column": "CaseReference",
+      "definition": "Unique application reference within planning authority",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "application_status": {
+      "candidate_column": "Status",
+      "definition": "Optional literal status at extraction date; documented list is not a PropertyAIgent mapping",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "decision": {
+      "candidate_column": "Decision",
+      "definition": "Optional authority outcome; distinct from DecisionType and appeal outcome",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "decision_date": {
+      "candidate_column": "DecisionDate",
+      "definition": "Optional date authority made decision; not necessarily issued notice date",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "application_type": {
+      "candidate_column": "ServiceTypeURI/ServiceTypeLabel",
+      "definition": "Application service category",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "proposal": {
+      "candidate_column": "CaseText",
+      "definition": "Applicant proposal text; not required for qualification output",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "application_received_date": {
+      "candidate_column": "CaseDate",
+      "definition": "Optional valid application received date even if validity check later",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "validation_date": {
+      "candidate_column": null,
+      "definition": "No separate validation-date definition established",
+      "schema_definition": "UNKNOWN",
+      "source_semantics": "UNKNOWN",
+      "current_field_availability": "UNTESTED"
+    },
+    "record_created_date": {
+      "candidate_column": null,
+      "definition": "No row-created field established",
+      "schema_definition": "UNKNOWN",
+      "source_semantics": "UNKNOWN",
+      "current_field_availability": "UNTESTED"
+    },
+    "record_modified_date": {
+      "candidate_column": null,
+      "definition": "No row-modified field established",
+      "schema_definition": "UNKNOWN",
+      "source_semantics": "UNKNOWN",
+      "current_field_availability": "UNTESTED"
+    },
+    "source_extract_date": {
+      "candidate_column": "ExtractDate",
+      "definition": "Date data extracted from source database; not record modification time",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "location_site_identifier": {
+      "candidate_column": "UPRN/GeoAreaURI",
+      "definition": "UPRN restricted and excluded; GeoArea denotes area, not proven stable site key",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    },
+    "council_identity": {
+      "candidate_column": "OrganisationURI/OrganisationLabel",
+      "definition": "Planning authority distinct from publishing organisation",
+      "schema_definition": "CONFIRMED",
+      "source_semantics": "PARTIALLY_CONFIRMED",
+      "current_field_availability": "UNTESTED"
+    }
+  },
+  "change_mechanism": "UNKNOWN",
+  "capability_qualifications": {
+    "NEW_APPLICATION_DISCOVERY": "UNPROVED",
+    "CHANGE_DISCOVERY": "UNPROVED",
+    "KNOWN_REFERENCE_STATUS": "UNPROVED"
+  },
+  "discovery_value": "UNRESOLVED",
+  "rights_state": "RIGHTS_CONFIRMED_WITH_ATTRIBUTION",
+  "rights_scope": "Advertised reduced open dataset only; UPRN enrichment and OS-derived coordinates excluded",
+  "operational_rights_qualification": "Actual resource schema and restricted-field boundary not verified; RIGHT gate remains UNKNOWN",
+  "restricted_fields_out_of_scope": [
+    "UPRN",
+    "OS_DERIVED_COORDINATES"
+  ],
+  "observations": [
+    {
+      "id": "S1",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://www.data.gov.uk/dataset/61f7eda9-b456-47ab-bba8-b27217dd15a7/scc-planning-applications",
+      "result": "READABLE_CATALOGUE",
+      "qualification": "Official publisher, received-since scope, CSV link, dataset OGL and restricted enrichment described"
+    },
+    {
+      "id": "S2",
+      "method": "PUBLIC_WEB_RESOURCE",
+      "url": "https://map.salford.gov.uk/maps/opendata/SCC-planning-applications.csv",
+      "result": "TOOL_REPORTED_FETCH_TIMEOUT",
+      "qualification": "No CSV/header/count observed; no confirmed source HTTP status"
+    },
+    {
+      "id": "S3",
+      "method": "PUBLIC_WEB_METADATA",
+      "url": "https://schemas.opendata.esd.org.uk/PlanningApplications",
+      "result": "READABLE_SCHEMA_INDEX",
+      "qualification": "Declared standard, not actual CSV validation"
+    },
+    {
+      "id": "S4",
+      "method": "PUBLIC_WEB_DOCUMENTATION",
+      "url": "https://schemas.opendata.esd.org.uk/PlanningApplications/LocalOpenDataIncentiveSchemePlanningApplicationsSchemaGuidance.pdf",
+      "result": "READABLE_SCHEMA_GUIDANCE",
+      "qualification": "Expected fields and meanings; not observed Salford rows"
+    },
+    {
+      "id": "S5",
+      "method": "ONE_BOUNDED_NATIVE_HEAD",
+      "url": "https://map.salford.gov.uk/maps/opendata/SCC-planning-applications.csv",
+      "result": "URL_ERROR",
+      "configured_timeout_seconds": 5,
+      "response_body_read": false,
+      "redirects_followed": 0,
+      "retries": 0,
+      "elapsed_seconds": 5.012,
+      "qualification": "HTTP status/size/header unknown; no raw exception or body retained"
+    }
+  ],
+  "other_research_limitations": [
+    "Harvested HTML metadata unavailable through catalogue redirect",
+    "Linked schema GitHub page inaccessible via research tool",
+    "Linked OGL text not readable via research tool; dataset-specific catalogue licence retained"
+  ],
+  "manifest_sample_provenance": {
+    "code_commit": "371acef3e2a075d8fb7a8579540f87f5dc72c985",
+    "version": "stage26b-l1-selection-v1",
+    "observed_at": "2026-10-09T17:46:54.113754+00:00",
+    "qualification": "QUALIFIED_RETAINED_BASIS",
+    "sha256": "dc7ac4d94b19ddb48f09a52cab31acf91873956e8222d91a98fead3f85f64862",
+    "projection": "application_id/site_id/reference/council only"
+  },
+  "cross_check_counts": {
+    "FOUND_EXACT": 0,
+    "NOT_FOUND_WITHIN_PROVED_COMPLETE_SCOPE": 0,
+    "AMBIGUOUS": 0,
+    "FORMAT_DIFFERENCE": 0,
+    "OUTSIDE_DATASET_SCOPE": 0,
+    "UNTESTED": 32
+  },
+  "cross_checks": [
+    {
+      "application_id": 1145,
+      "site_id": 517,
+      "reference": "23/81450/OUT",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 566,
+      "site_id": 179,
+      "reference": "23/81719/HYBEIA",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1156,
+      "site_id": 519,
+      "reference": "23/81788/FUL",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1155,
+      "site_id": 526,
+      "reference": "23/82436/FUL",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1168,
+      "site_id": 515,
+      "reference": "NOT/2023/0395",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 552,
+      "site_id": 371,
+      "reference": "NOT/2024/1885",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 284,
+      "site_id": 179,
+      "reference": "NOT/2026/0722",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1159,
+      "site_id": 528,
+      "reference": "PA/2023/0425",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1167,
+      "site_id": 529,
+      "reference": "PA/2023/0532",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1165,
+      "site_id": 530,
+      "reference": "PA/2023/0550",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1177,
+      "site_id": 531,
+      "reference": "PA/2023/0556",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1178,
+      "site_id": 518,
+      "reference": "PA/2024/0749",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 553,
+      "site_id": 382,
+      "reference": "PA/2024/0784",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 531,
+      "site_id": 383,
+      "reference": "PA/2024/0917",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 529,
+      "site_id": 384,
+      "reference": "PA/2024/0962",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 536,
+      "site_id": 388,
+      "reference": "PA/2024/1195",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 534,
+      "site_id": 389,
+      "reference": "PA/2024/1313",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 540,
+      "site_id": 391,
+      "reference": "PA/2024/1538",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 545,
+      "site_id": 393,
+      "reference": "PA/2024/1621",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 547,
+      "site_id": 394,
+      "reference": "PA/2024/1622",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 554,
+      "site_id": 395,
+      "reference": "PA/2025/0043",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 558,
+      "site_id": 396,
+      "reference": "PA/2025/0239",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 1031,
+      "site_id": 389,
+      "reference": "PA/2025/0662",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 248,
+      "site_id": 192,
+      "reference": "PA/2025/0746",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 253,
+      "site_id": 195,
+      "reference": "PA/2025/1028",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 252,
+      "site_id": 196,
+      "reference": "PA/2025/1084",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 249,
+      "site_id": 198,
+      "reference": "PA/2025/1132",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 269,
+      "site_id": 199,
+      "reference": "PA/2025/1256",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 561,
+      "site_id": 395,
+      "reference": "PA/2025/1349",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 268,
+      "site_id": 201,
+      "reference": "PA/2025/1422",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 995,
+      "site_id": 179,
+      "reference": "PA/2026/0239",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    },
+    {
+      "application_id": 275,
+      "site_id": 204,
+      "reference": "PA/2026/0262",
+      "council": "salford",
+      "result": "UNTESTED",
+      "qualification": "Current complete relevant CSV scope not proved; no absence or scope exclusion inferred",
+      "field_availability": {
+        "literal_status": "UNTESTED",
+        "decision": "UNTESTED",
+        "decision_date": "UNTESTED",
+        "application_type": "UNTESTED",
+        "source_identity": "UNTESTED",
+        "record_timestamps": "UNTESTED"
+      }
+    }
+  ],
+  "resource_envelope_state": "NOT_QUALIFIED_NO_SIZE_OR_COUNT_EVIDENCE",
+  "future_resource_plan": {
+    "format": "advertised CSV; actual encoding/compression unknown",
+    "requests": "one exact resource GET if complete uncompressed bulk route proved",
+    "pagination": "not advertised; no mechanism proved",
+    "redirects_followed": 0,
+    "automatic_retries": 0,
+    "required_before_numeric_limits": [
+      "Actual file and expanded size",
+      "Actual row count and schema limits",
+      "Measured supported completion profile",
+      "Approved independent deadline"
+    ],
+    "projection": "approved minimal non-personal fields only; no restricted enrichment"
+  },
+  "wigan_comparison_provenance": {
+    "commit": "ef584df315d26ee60d4a1bab0982647a44fc2a0f",
+    "tree": "b84c3f84b38ac2ce5bc6cec3e09ae3e2f4beb168",
+    "decision": "BLOCKED",
+    "new_requests": false
+  },
+  "next_candidate": {
+    "source_id": "manchester-shlaa",
+    "recommendation": "CURRENTNESS_SCOPE_METADATA_CHECK_ONLY_BEFORE_FULL_QUALIFICATION",
+    "new_research": false,
+    "limitations": [
+      "Selected permitted housing sites, not full application register",
+      "Historical metadata 2019; current publication/cadence unproved",
+      "Exact application identity and full specialist scope unproved"
+    ],
+    "product_qualification": "Possible specialist housing context/discovery; not automatically suitable DA1 planning-discovery source"
+  }
+}
