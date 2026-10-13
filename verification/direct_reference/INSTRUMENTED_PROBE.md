@@ -58,3 +58,10 @@ Guest framework context may contain up to 20 primitive public globals from the
 fresh credential-free page. Values remain transient and unchanged; nested,
 oversized or credential-named entries are rejected. This tolerance does not
 change the exact action/record/register/null-token boundary.
+
+After an identity-matched guest header response, the original intercepted
+browser request may be fulfilled locally from those transient bytes. Its POST
+is not dispatched. No response headers except JSON content type are copied.
+The audit records supplied_to_original_page separately; blocked_posts counts
+intercepted unadmitted POSTs, including this locally fulfilled request. Newly
+revealed actions remain blocked pending review.

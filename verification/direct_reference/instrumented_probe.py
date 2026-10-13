@@ -1,6 +1,7 @@
 """Credential-free, frozen-reference transport reconnaissance. Never writes B2."""
 import argparse
 import asyncio
+import base64
 import json
 import os
 from pathlib import Path
@@ -80,6 +81,7 @@ def post_metadata(body, destination):
                 value=params.get(key)
                 if isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9_.$]{0,160}',value):
                     record[key] = value
+            record['parameter_keys'] = sorted(k for k in params if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20]
             inner=params.get('params', {})
             record['argument_keys'] = sorted(k for k in inner if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20] if isinstance(inner,dict) else []
             record_id=urlsplit(destination).path.rsplit('/',1)[-1]
@@ -121,8 +123,8 @@ def permitted_navigation(url, expected):
     # Observed Salford client route retains the exact frozen Salesforce identity.
     if b.netloc == 'salfordcitycouncil.my.site.com':
         record = b.path.rsplit('/', 1)[-1]
-        return (origin(url) == origin(expected) and a.path ==
-                '/pr/s/planning-application/' + record + '/pa20251084'
+        return (origin(url) == origin(expected) and a.path in ('/pr/s/planning-application/' + record + '/pa20251084',
+                           '/pr/s/planning-application/' + record + '/detail')
                 and a.query in (b.query, "") and not a.fragment)
     return False
 
@@ -202,11 +204,16 @@ async def probe(case):
                         fail('HTTP_BUDGET_UNAVAILABLE')
                         await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
                         return
-                    audit['http_probe'] = observed_guest_read(url, request.get('postData'), destination, reference)
+                    response_body=[]
+                    audit['http_probe'] = observed_guest_read(url, request.get('postData'), destination, reference, response_body.append)
                     audit['requests'] += int(audit['http_probe']['attempted'])
                     audit['decoded_bytes'] += audit['http_probe']['received_bytes']
                     if audit['requests'] > MAX_REQUESTS or audit['decoded_bytes'] > MAX_BYTES:
                         fail('HTTP_AGGREGATE_BOUND')
+                    if response_body and not stopped.is_set():
+                        await client.send('Fetch.fulfillRequest', {'requestId':event['requestId'], 'responseCode':200, 'responseHeaders':[{'name':'Content-Type','value':'application/json'}], 'body':base64.b64encode(response_body[0]).decode('ascii')})
+                        audit['http_probe']['supplied_to_original_page']=True
+                        return
                 await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
                 return  # collect other blocked public-page actions; never dispatch them
             if reason:

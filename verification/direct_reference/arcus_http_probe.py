@@ -67,6 +67,8 @@ def guest_envelope(body, destination):
     if url.netloc=='salfordcitycouncil.my.site.com':
         route='/pr/s/planning-application/'+url.path.rsplit('/',1)[-1]+'/pa20251084'
         pages.extend([route,route+'?'+url.query])
+        detail=route.rsplit('/',1)[0]+'/detail'
+        pages.extend([detail,detail+'?'+url.query])
     if form.get('aura.pageURI',[None])[0] not in pages:
         raise ValueError('PAGE_IDENTITY')
     # Preserve observed body exactly; no constructed context, token or new action.
@@ -104,7 +106,7 @@ def response_summary(data, reference):
             'planning_label_values':pairs[:20]}
 
 
-def observed_guest_read(url, body, destination, reference):
+def observed_guest_read(url, body, destination, reference, consumer=None):
     result={'attempted':False,'b2_eligible':False,'received_bytes':0,'outcome':'UNQUALIFIED'}
     started=time.monotonic()
     try:
@@ -148,6 +150,8 @@ def observed_guest_read(url, body, destination, reference):
                     raise ValueError('AURA_NOT_SUCCESS')
                 result.update(response_summary(data,reference))
                 result['outcome']='GUEST_JSON_OBSERVED' if result['exact_reference_value_present'] else 'IDENTITY_NOT_ESTABLISHED'
+                if consumer is not None and result['outcome']=='GUEST_JSON_OBSERVED':
+                    consumer(bytes(content))
     except Exception as exc:
         result['outcome']=str(exc) if type(exc) is ValueError and str(exc).isupper() else type(exc).__name__
     result['elapsed_seconds']=round(time.monotonic()-started,3)
