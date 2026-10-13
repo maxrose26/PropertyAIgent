@@ -65,3 +65,17 @@ is not dispatched. No response headers except JSON content type are copied.
 The audit records supplied_to_original_page separately; blocked_posts counts
 intercepted unadmitted POSTs, including this locally fulfilled request. Newly
 revealed actions remain blocked pending review.
+
+## Continued factual-reader qualification — 13 October 2026
+
+The Product Owner authorises qualification of the already observed public
+RecordGvp getRecord read, then minimum implementation only if exact reference
+and factual field contracts qualify. One diagnostic may replay the unchanged
+page-generated request when a closed descriptor grammar binds its entire value
+to the frozen record. A shape mismatch prevents dispatch. Null/default control
+tokens do not establish semantics by themselves. Response identity, independent
+reference, field locations and extra record scope must be assessed separately.
+No response from this diagnostic is B2-eligible. No new source admission yet.
+Retain only planning values and bounded schema metadata; no response bodies.
+At most two guest HTTP attempts per case (header and record), within unchanged
+aggregate request/byte/deadline bounds. No unrelated action is admitted.

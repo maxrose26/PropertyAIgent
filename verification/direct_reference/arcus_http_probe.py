@@ -6,6 +6,14 @@ import time
 from urllib.parse import parse_qs, urlsplit
 
 MAX_BODY = 1024 * 1024
+RECORD_GETTER = 'serviceComponent://ui.force.components.controllers.recordGlobalValueProvider.RecordGvpController/ACTION$getRecord'
+
+
+def record_descriptor_matches(value, record_id):
+    if not isinstance(value, str) or len(value)>256:
+        return False
+    # Structural hypotheses only, not claims about null/default semantics.
+    return value in (record_id + '-null' * 11, record_id + '.null' * 11)
 
 
 def unique_object(pairs):
@@ -17,7 +25,7 @@ def unique_object(pairs):
     return result
 
 
-def guest_envelope(body, destination):
+def guest_envelope(body, destination, kind='header'):
     if not body or len(body) > 65536:
         raise ValueError('BODY_BOUND')
     form = parse_qs(body, keep_blank_values=True)
@@ -33,12 +41,21 @@ def guest_envelope(body, destination):
     action = message['actions'][0]
     if set(action) - {'id','descriptor','callingDescriptor','params'}:
         raise ValueError('UNREVIEWED_ACTION_KEYS')
-    if action.get('descriptor') != 'aura://ApexActionController/ACTION$execute':
+    if kind == 'record':
+        if action.get('descriptor') != RECORD_GETTER:
+            raise ValueError('RECORD_ACTION_DESCRIPTOR')
+        params = action.get('params', {})
+        if set(params) != {'recordDescriptor'} or not record_descriptor_matches(
+                params['recordDescriptor'], urlsplit(destination).path.rsplit('/',1)[-1]):
+            raise ValueError('RECORD_DESCRIPTOR_SCOPE')
+    elif kind != 'header':
+        raise ValueError('READ_KIND')
+    if kind == 'header' and action.get('descriptor') != 'aura://ApexActionController/ACTION$execute':
         raise ValueError('ACTION_DESCRIPTOR')
     params = action.get('params', {})
-    if set(params) - {'namespace','classname','method','params','cacheable','isContinuation'}:
+    if kind == 'header' and set(params) - {'namespace','classname','method','params','cacheable','isContinuation'}:
         raise ValueError('UNREVIEWED_PARAMS')
-    if (params.get('namespace'), params.get('classname'), params.get('method')) != (
+    if kind == 'header' and (params.get('namespace'), params.get('classname'), params.get('method')) != (
             'arcuscommunity', 'PublicRegisterViewService', 'getRecordHeaderDetails'):
         raise ValueError('ACTION_IDENTITY')
     if 'cacheable' in params and type(params['cacheable']) is not bool:
@@ -46,7 +63,7 @@ def guest_envelope(body, destination):
     if params.get('isContinuation', False) is not False:
         raise ValueError('CONTINUATION_FLAG')
     url = urlsplit(destination)
-    if params.get('params') != {'recordId': url.path.rsplit('/',1)[-1], 'registerName':'Arcus_BE_Public_Register'}:
+    if kind == 'header' and params.get('params') != {'recordId': url.path.rsplit('/',1)[-1], 'registerName':'Arcus_BE_Public_Register'}:
         raise ValueError('EXACT_RECORD_REGISTER')
     context = json.loads(form['aura.context'][0], object_pairs_hook=unique_object)
     if not isinstance(context,dict) or set(context) - {'mode','fwuid','app','loaded','dn','globals','uad'}:
@@ -106,7 +123,7 @@ def response_summary(data, reference):
             'planning_label_values':pairs[:20]}
 
 
-def observed_guest_read(url, body, destination, reference, consumer=None):
+def observed_guest_read(url, body, destination, reference, consumer=None, kind='header'):
     result={'attempted':False,'b2_eligible':False,'received_bytes':0,'outcome':'UNQUALIFIED'}
     started=time.monotonic()
     try:
@@ -117,7 +134,7 @@ def observed_guest_read(url, body, destination, reference, consumer=None):
         query = parse_qs(target.query, keep_blank_values=True)
         if any(not re.fullmatch(r'(r|aura\.[A-Za-z.]+)', key) or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
             raise ValueError('UNREVIEWED_QUERY')
-        payload=guest_envelope(body,destination)
+        payload=guest_envelope(body,destination,kind)
         import requests
         with requests.Session() as session:
             session.trust_env=False
@@ -149,6 +166,24 @@ def observed_guest_read(url, body, destination, reference, consumer=None):
                 if any(action.get('state')!='SUCCESS' for action in data.get('actions',[])) or not data.get('actions'):
                     raise ValueError('AURA_NOT_SUCCESS')
                 result.update(response_summary(data,reference))
+                if kind == 'record':
+                    target_id=source.path.rsplit('/',1)[-1]
+                    values=[]
+                    def collect(value, depth=0):
+                        if depth>15 or len(values)>10000:
+                            raise ValueError('RECORD_COMPLEXITY')
+                        if isinstance(value,dict):
+                            for key,child in value.items():
+                                if key in ('id','Id','recordId') and isinstance(child,str) and re.fullmatch(r'[A-Za-z0-9]{18}',child):
+                                    values.append(child)
+                                collect(child,depth+1)
+                        elif isinstance(value,list):
+                            for child in value: collect(child,depth+1)
+                    collect(actions[0].get('returnValue'))
+                    result['exact_record_id_present']=target_id in values
+                    result['other_record_identity_count']=len(set(values)-{target_id})
+                    if target_id not in values or set(values)-{target_id}:
+                        raise ValueError('RESPONSE_RECORD_SCOPE')
                 result['outcome']='GUEST_JSON_OBSERVED' if result['exact_reference_value_present'] else 'IDENTITY_NOT_ESTABLISHED'
                 if consumer is not None and result['outcome']=='GUEST_JSON_OBSERVED':
                     consumer(bytes(content))

@@ -90,7 +90,11 @@ def post_metadata(body, destination):
                 value=params['recordDescriptor']
                 record['record_descriptor_encoding']=type(value).__name__
                 if isinstance(value,str):
-                    record['record_descriptor_raw']={'length':len(value),'exact_frozen_id':value==record_id,'contains_frozen_id':record_id in value,'delimiter_counts':{c:value.count(c) for c in ':;,|/{}[]'}}
+                    record['record_descriptor_raw']={'length':len(value),'exact_frozen_id':value==record_id,'contains_frozen_id':record_id in value,'delimiter_counts':{c:value.count(c) for c in '.-:;,|/{}[]'}}
+                    from verification.direct_reference.arcus_http_probe import record_descriptor_matches
+                    record['record_descriptor_closed_shape']=record_descriptor_matches(value,record_id)
+                    public_controls={'undefined','null','true','false','Id','Name','VIEW','FULL','COMPACT','RecordTypeId'}
+                    record['record_descriptor_slots']=[('FROZEN_RECORD' if part==record_id else part if part in public_controls else 'UNRETAINED_LENGTH_'+str(len(part))) for part in value.split('.')[:15]]
                 if isinstance(value,str) and len(value)<8192:
                     try:
                         value=json.loads(value)
@@ -183,7 +187,7 @@ async def probe(case):
                  persistence=False, requests=0, responses=0, redirects=0,
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
-                 http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
+                 http_probe=None, record_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN')
     started = time.monotonic()
     browser = context = None
@@ -225,24 +229,31 @@ async def probe(case):
             if reason == 'UNREVIEWED_METHOD':
                 audit['blocked_posts'] += 1
                 metadata = post_metadata(request.get('postData'), destination)
-                if audit['http_probe'] is None and any(
+                from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, RECORD_GETTER
+                slot = None
+                kind = 'header'
+                if audit['record_http_probe'] is None and any(m.get('descriptor')==RECORD_GETTER for m in metadata):
+                    slot = 'record_http_probe'
+                    kind = 'record'
+                elif audit['http_probe'] is None and any(
                         m.get('namespace') == 'arcuscommunity' and
                         m.get('classname') == 'PublicRegisterViewService' and
                         m.get('method') == 'getRecordHeaderDetails' for m in metadata):
-                    from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY
+                    slot = 'http_probe'
+                if slot:
                     if audit['requests'] >= MAX_REQUESTS or audit['decoded_bytes'] + MAX_BODY > MAX_BYTES:
                         fail('HTTP_BUDGET_UNAVAILABLE')
                         await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
                         return
                     response_body=[]
-                    audit['http_probe'] = observed_guest_read(url, request.get('postData'), destination, reference, response_body.append)
-                    audit['requests'] += int(audit['http_probe']['attempted'])
-                    audit['decoded_bytes'] += audit['http_probe']['received_bytes']
+                    audit[slot] = observed_guest_read(url, request.get('postData'), destination, reference, response_body.append,kind=kind)
+                    audit['requests'] += int(audit[slot]['attempted'])
+                    audit['decoded_bytes'] += audit[slot]['received_bytes']
                     if audit['requests'] > MAX_REQUESTS or audit['decoded_bytes'] > MAX_BYTES:
                         fail('HTTP_AGGREGATE_BOUND')
                     if response_body and not stopped.is_set():
                         await client.send('Fetch.fulfillRequest', {'requestId':event['requestId'], 'responseCode':200, 'responseHeaders':[{'name':'Content-Type','value':'application/json'}], 'body':base64.b64encode(response_body[0]).decode('ascii')})
-                        audit['http_probe']['supplied_to_original_page']=True
+                        audit[slot]['supplied_to_original_page']=True
                         return
                 await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
                 return  # collect other blocked public-page actions; never dispatch them

@@ -98,6 +98,16 @@ class ProbeContract(unittest.TestCase):
         self.assertNotIn('Applicant',json.dumps(result))
         self.assertEqual(result['planning_label_values'],[['Reference','R'],['Status','Final']])
 
+    def test_record_descriptor_closed_shape(self):
+        from verification.direct_reference.arcus_http_probe import record_descriptor_matches
+        record='a1DSl000007GOmFMAW'
+        self.assertTrue(record_descriptor_matches(record+'-null'*11,record))
+        self.assertTrue(record_descriptor_matches(record+'.null'*11,record))
+        for value in [record, 'OTHER'+'-null'*11, record+'.Contact.Email', record+'-null'*12,
+                      record+'.undefined.null.null.null.Id.VIEW.false.null.Name,Email.null',
+                      record+'.undefined.null.null.null.Id.VIEW.false.null.Name.null']:
+            self.assertFalse(record_descriptor_matches(value,record))
+
 
 if __name__ == '__main__':
     unittest.main()
