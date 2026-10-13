@@ -116,6 +116,8 @@ def permitted_navigation(url, expected):
     if url == expected:
         return True
     a, b = urlsplit(url), urlsplit(expected)
+    if b.netloc == 'pa.trafford.gov.uk' and url == 'https://pa.trafford.gov.uk/online-applications/':
+        return True
     # Observed Salford client route retains the exact frozen Salesforce identity.
     if b.netloc == 'salfordcitycouncil.my.site.com':
         record = b.path.rsplit('/', 1)[-1]
@@ -149,7 +151,7 @@ async def probe(case):
                  persistence=False, requests=0, responses=0, redirects=0,
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
-                 blocked_actions=[], blocked_action_metadata=[], failure=None, exact_reference=False, fields=None,
+                 blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', network_classification='UNKNOWN')
     started = time.monotonic()
     browser = context = None
@@ -181,9 +183,17 @@ async def probe(case):
             if event.get('redirectedRequestId'):
                 audit['redirects'] += 1
             if request['method'] not in ('GET', 'HEAD'):
-                audit['blocked_actions'] = post_descriptors(request.get('postData'))
-                audit['blocked_action_metadata'] = post_metadata(request.get('postData'), destination)
+                for descriptor in post_descriptors(request.get('postData')):
+                    if descriptor not in audit['blocked_actions'] and len(audit['blocked_actions']) < 20:
+                        audit['blocked_actions'].append(descriptor)
+                for metadata in post_metadata(request.get('postData'), destination):
+                    if metadata not in audit['blocked_action_metadata'] and len(audit['blocked_action_metadata']) < 20:
+                        audit['blocked_action_metadata'].append(metadata)
             reason = request_failure(url, request['method'], event.get('resourceType'), destination, audit['requests'])
+            if reason == 'UNREVIEWED_METHOD':
+                audit['blocked_posts'] += 1
+                await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+                return  # collect other blocked public-page actions; never dispatch them
             if reason:
                 fail(reason)
             if audit['failure']:
@@ -255,7 +265,13 @@ async def probe(case):
                 client.on('Network.dataReceived', charge)
                 client.on('Fetch.requestPaused', route_handler)
                 await client.send('Fetch.enable', {'patterns':[{'urlPattern':'*','requestStage':'Request'}]})
-                nav = asyncio.create_task(page.goto(destination, wait_until='domcontentloaded', timeout=25000))
+                async def navigate():
+                    if case == 'trafford':
+                        await page.goto('https://pa.trafford.gov.uk/online-applications/', wait_until='domcontentloaded', timeout=12000)
+                        if stopped.is_set():
+                            return
+                    await page.goto(destination, wait_until='domcontentloaded', timeout=25000)
+                nav = asyncio.create_task(navigate())
                 stop = asyncio.create_task(stopped.wait())
                 done, _ = await asyncio.wait((nav, stop), return_when=asyncio.FIRST_COMPLETED)
                 if stop in done:
@@ -288,7 +304,9 @@ async def probe(case):
                         if exact and fields['status']['state'] == 'PRESENT_VALUE':
                             break
                         await asyncio.sleep(.2)
-                    if not audit['exact_reference']:
+                    if audit['blocked_posts']:
+                        fail('UNREVIEWED_METHOD')
+                    elif not audit['exact_reference']:
                         fail('IDENTITY_NOT_ESTABLISHED')
                     elif not audit['fields'] or audit['fields']['status']['state'] != 'PRESENT_VALUE':
                         fail('STATUS_NOT_ESTABLISHED')

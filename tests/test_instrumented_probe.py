@@ -19,6 +19,11 @@ class ProbeContract(unittest.TestCase):
         self.assertTrue(permitted_navigation(new, old))
         self.assertFalse(permitted_navigation(new.replace('a0kSq000008OfVFIA0', 'wrong'), old))
 
+    def test_trafford_bootstrap_only(self):
+        frozen=CASES['trafford'][2]
+        self.assertTrue(permitted_navigation('https://pa.trafford.gov.uk/online-applications/', frozen))
+        self.assertFalse(permitted_navigation('https://pa.trafford.gov.uk/online-applications/search.do', frozen))
+
     def test_missing_is_not_blank(self):
         exact, fields = qualify([('Reference', 'R'), ('Status', 'Recommendation Made')], 'R')
         self.assertTrue(exact)
