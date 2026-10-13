@@ -32,6 +32,15 @@ def test_exact_cohort_and_shared_bytes():
     for path,digest in expected.items():
         assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
     assert len(load_manifest())==202
+    # The authorised status-scope evolution never replaces historical evidence.
+    historical=json.loads((root/'accepted-dependencies-v1.json').read_text())
+    assert set(historical)==set(expected)
+    for path,digest in historical.items():
+        source=root/'history/refresh-v1.py.txt' if path=='verification/direct_reference/refresh.py' else Path(path)
+        assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
+    provenance=json.loads((root/'history/provenance.json').read_text())
+    assert provenance['original_live_sha']=='a0feeb7c1cd39c979e2a9018b82d764d1edcd76b'
+    assert provenance['immutable_refresh_sha256']==historical['verification/direct_reference/refresh.py']
 
 
 @pytest.mark.parametrize('application_id',r.IDS)

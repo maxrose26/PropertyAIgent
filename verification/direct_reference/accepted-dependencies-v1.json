@@ -1,0 +1,18 @@
+{
+  "verification/direct_reference/refresh.py": "42077ab4e204e427ea29286bbe2dcfc7a96a337193bc167949c25861fa204265",
+  "verification/direct_reference/manifest.json": "ce143eafd498e89129965d098b2f820295fa1d1e1b4d9458f5d9209543071dde",
+  "verification/direct_reference/fixtures.py": "8a04d275e3ce27a5a9eaabd95a8497e098f2c12ad0a3e23338597ca973534ed2",
+  "verification/direct_reference/__init__.py": "6486c129e806cce680e3119d50f764245f3ed320375e63fa83330b3e2d5c9dea",
+  "verification/stage26b_l1/bolton_literal.py": "24b3b0bee557fec57892a5e5cca602707cd59b75fe988e81fab70a9daece1aa0",
+  "verification/stage26b_l1/actions_runner.py": "2d25c8b170bc8ba35d760386d375a27c5a3202734c3979a9248f47d226669319",
+  "verification/stage26b_l1/actions_canary.py": "72fa017d642391f6c0898e3f4725ee2868953415c27d1e1381c513776ccd32c8",
+  "verification/stage26b_l1/request_boundary.py": "ad243bd5148a90147fa5f04047e316355909cabf263d53d0f1827a6ba0660c76",
+  "verification/stage26b_l1/contract.py": "977e2b0834066508e4361c04bb56cbcd4735e16582b4beab066bf9c2c38556b2",
+  "verification/stage26b_l0/dependencies.py": "fb762c892ebc504df1647c0864b78190e81700cd7e1bf1ae5d2a11d55bd1b79a",
+  "app/scrapers/idox_portal.py": "ac746bf94aa1626ccbe66e777cf9ea50ef61f09f734cde884d8fd55b5bca18c1",
+  "app/scrapers/unit_filter.py": "57227e0f3ef6c3d333e8f7a56570626b4065b1f2bde4de231454f0c9bab9102e",
+  "app/config.py": "559a65bed3d1eca33a72f99b48e707d8c14bc030ec65756efee16289de10bc89",
+  "app/db/models.py": "53fcc621bb89194108f1f3a5c3bc7e150b63b1eb27bf5077b9f0ceb33865452a",
+  "app/pipeline/lapse_tracking.py": "529cf4af0beb8e788f4c98902a5610c8aa40a33b1b9d2bad492f8b623112bb66",
+  "app/pipeline/material_change.py": "25efd128f31beeee58130c04cf0d5ff1d63e329c4dcc82795f99470a17375568"
+}
