@@ -126,6 +126,23 @@ class ProbeContract(unittest.TestCase):
         self.assertEqual(fields['decision']['state'],'PRESENT_BLANK')
         self.assertEqual(fields['decision_date']['state'],'PRESENT_BLANK')
 
+    def test_display_projection_is_diagnostic_and_private(self):
+        import json
+        from verification.direct_reference.arcus_http_probe import record_observation, PLANNING_OBJECT
+        rid='a0kSq000008OfVFIA0'
+        fields={'Name':{'value':'PA/2025/1084'},
+                'StatusLookup__c':{'value':'PRIVATE_ID','displayValue':'Decision Made','label':'Status'},
+                'Contact__c':{'value':'PRIVATE_PERSON','displayValue':'PRIVATE_EMAIL'}}
+        data={'context':{'globalValueProviders':[{'values':{'records':{
+            rid:{PLANNING_OBJECT:{'record':{'id':rid,'fields':fields}}}}}}]}}
+        result=record_observation(data,rid,'PA/2025/1084')
+        self.assertEqual(result['known_public_ui_display_candidates']['Status'],[
+            {'api_field':'StatusLookup__c','raw_type':'str','label_matches':True}])
+        self.assertEqual(result['record_field_states']['status']['state'],'NOT_PRESENT')
+        self.assertNotIn('PRIVATE_',json.dumps(result))
+        fields['Name']['value']='WRONG'
+        with self.assertRaises(ValueError): record_observation(data,rid,'PA/2025/1084')
+
     def test_record_field_states_same_exact_subtree(self):
         from verification.direct_reference.arcus_http_probe import record_observation, PLANNING_OBJECT
         rid='a1DSl000007GOmFMAW'

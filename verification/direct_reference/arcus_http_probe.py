@@ -75,14 +75,24 @@ def record_observation(data, record_id, reference):
     # Qualification metadata only: compare exact known public UI literals, never
     # export arbitrary source values or assign semantics from text matching.
     ui_matches={}
+    display_matches={}
     if reference=='PA/2025/1084':
         for label,literal in (('Status','Decision Made'),('Decision','Approve with Conditions')):
             ui_matches[label]=sorted(api for api,node in fields.items()
                 if isinstance(api,str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,100}',api)
                 and isinstance(node,dict) and node.get('value')==literal)[:10]
+            # Diagnostic only. A display-value coincidence is not a qualified
+            # source mapping. Export neither arbitrary values nor labels.
+            display_matches[label]=[
+                {'api_field':api, 'raw_type':type(node.get('value')).__name__,
+                 'label_matches':node.get('label') == label}
+                for api,node in sorted(fields.items())
+                if isinstance(api,str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,100}',api)
+                and isinstance(node,dict) and node.get('displayValue')==literal][:10]
     return {'exact_record_id_present':True,'exact_reference_value_present':True,
             'other_record_identity_count':0,'record_identity_sources':len(ids),
-            'record_field_states':result,'known_public_ui_literal_candidate_keys':ui_matches}
+            'record_field_states':result,'known_public_ui_literal_candidate_keys':ui_matches,
+            'known_public_ui_display_candidates':display_matches}
 
 
 def record_descriptor_matches(value, record_id):
