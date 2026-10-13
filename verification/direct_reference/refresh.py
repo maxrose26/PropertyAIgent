@@ -60,9 +60,38 @@ def validate_destination(row):
 def admitted_row(application_id):
     row = next((r for r in load_manifest() if r['application_id'] == application_id), None)
     if row is None:
+        row = next((r for r in extended_admission() if r['application_id'] == application_id), None)
+    if row is None:
         fail('UNSUPPORTED_ROUTE', 'Unknown manifest identity')
     validate_destination(row)
     return row
+
+EXTENDED_SHA256 = 'e7ac8017fc0a18c810afb6ba23e09de16fa2c8ebd888f847bb2da4c62c01c5c7'
+
+def extended_admission():
+    """Closed six-council offline admission. Individual live availability unproved."""
+    raw = Path(__file__).with_name('extended-admission.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest() != EXTENDED_SHA256:
+        raise ValueError('Extended admission digest mismatch')
+    data = json.loads(raw)
+    if set(data) != {'schema','census_at','rows'} or data['schema'] != 1:
+        raise ValueError('Extended admission schema')
+    rows=data['rows']; old=load_manifest(); ids={r['application_id'] for r in old}
+    if len(rows)!=512 or len({r['application_id'] for r in rows})!=512:
+        raise ValueError('Extended admission count')
+    keys={'application_id','council','reference','source_url','source_identifier','platform_family','admission','admission_reason'}
+    combined=[r for r in old if r['admission']=='ADMITTED_DIRECT_ROUTE']+rows
+    for r in rows:
+        if (set(r)!=keys or type(r['application_id']) is not int or r['application_id']<=0
+                or r['application_id'] in ids or r['council']=='trafford'
+                or not isinstance(r['reference'],str) or not r['reference']
+                or r['admission_reason']!='OFFLINE_EXACT_IDOX_CONTRACT_ONLY'):
+            raise ValueError('Extended admission identity')
+        validate_destination(r)
+    for key in ('reference','source_identifier','source_url'):
+        if len({(r['council'],r[key]) for r in combined})!=len(combined):
+            raise ValueError('Extended admission collision')
+    return rows
 
 @dataclass
 class Budget:

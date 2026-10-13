@@ -1,0 +1,858 @@
+{
+  "census_at": "2026-10-13 12:24:33.08279+00",
+  "description": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY",
+  "rows": [
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 24,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "OUT/354782/25",
+        "site_id": 29,
+        "source_identifier": "SZ39VFMCN4W00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SZ39VFMCN4W00",
+        "status_verified_at": "2026-09-10T10:50:44.177646+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:50:44.177646+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 28,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "FUL/355091/25",
+        "site_id": 24,
+        "source_identifier": "T2ODCZMCGDQ00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T2ODCZMCGDQ00",
+        "status_verified_at": "2026-09-10T10:51:07.768779+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:51:07.768779+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 29,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "FUL/355201/25",
+        "site_id": 25,
+        "source_identifier": "T3R6YPMCGOJ00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T3R6YPMCGOJ00",
+        "status_verified_at": "2026-09-10T10:51:19.561245+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:51:19.561245+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 31,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "FUL/355282/25",
+        "site_id": 26,
+        "source_identifier": "T4VRLYMCGY100",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T4VRLYMCGY100",
+        "status_verified_at": "2026-09-10T10:51:31.089926+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:51:31.089926+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 32,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "CEA/355283/25",
+        "site_id": 20,
+        "source_identifier": "T4VRMBMCGY300",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T4VRMBMCGY300",
+        "status_verified_at": "2026-09-10T10:51:42.289122+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:51:42.289122+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 39,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "OUT/355454/25",
+        "site_id": 32,
+        "source_identifier": "T7BAU8MCHQP00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T7BAU8MCHQP00",
+        "status_verified_at": "2026-09-10T10:52:05.738382+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:52:05.738382+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 40,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "OUT/355495/25",
+        "site_id": 33,
+        "source_identifier": "T7O6Q7MCHVP00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T7O6Q7MCHVP00",
+        "status_verified_at": "2026-09-10T10:52:17.621578+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:52:17.621578+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 41,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "FUL/355603/26",
+        "site_id": 27,
+        "source_identifier": "T9BRLLMCIEP00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T9BRLLMCIEP00",
+        "status_verified_at": "2026-09-10T10:52:30.927242+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-10 10:52:30.927242+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 390,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "FUL/353940/25",
+        "site_id": 293,
+        "source_identifier": "SPS0LUMCKP500",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SPS0LUMCKP500",
+        "status_verified_at": "2026-09-13T10:58:21.125188+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 10:58:21.125188+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 392,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "OUT/353970/25",
+        "site_id": 301,
+        "source_identifier": "SQ4Z32MCKSL00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SQ4Z32MCKSL00",
+        "status_verified_at": "2026-09-13T10:58:30.325742+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 10:58:30.325742+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 393,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "OUT/353978/25",
+        "site_id": 302,
+        "source_identifier": "SQ8OFOMCKTN00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SQ8OFOMCKTN00",
+        "status_verified_at": "2026-09-13T10:58:39.595214+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 10:58:39.595214+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 403,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "LBC/354193/25",
+        "site_id": 296,
+        "source_identifier": "SSYTWNMCLGM00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SSYTWNMCLGM00",
+        "status_verified_at": "2026-09-13T10:58:58.008254+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 10:58:58.008254+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 53,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "25/00973/OUT",
+        "site_id": 48,
+        "source_identifier": "T6MTRTPUKPP00",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T6MTRTPUKPP00",
+        "status_verified_at": "2026-09-13T12:12:09.619867+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 12:12:09.619867+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 56,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "26/00098/FUL",
+        "site_id": 51,
+        "source_identifier": "T9VQKTPULXN00",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T9VQKTPULXN00",
+        "status_verified_at": "2026-09-13T12:12:21.871628+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 12:12:21.871628+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 59,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "26/00152/FUL",
+        "site_id": 147,
+        "source_identifier": "TANQX3PUMAX00",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TANQX3PUMAX00",
+        "status_verified_at": "2026-09-13T12:12:46.510253+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 12:12:46.510253+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 60,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "26/00191/OUT",
+        "site_id": 53,
+        "source_identifier": "TBF7YJPUML300",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TBF7YJPUML300",
+        "status_verified_at": "2026-09-13T12:12:58.77424+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 12:12:58.77424+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 446,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "25/00173/OUT",
+        "site_id": 313,
+        "source_identifier": "SSE8YWPUFO800",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SSE8YWPUFO800",
+        "status_verified_at": "2026-09-13T12:13:11.281565+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 12:13:11.281565+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "PREVIOUSLY_WITHHELD_STRICT_PENDING_STATUS_ONLY"
+    }
+  ],
+  "schema": 1,
+  "selection_seed": "CURRENT_GATE_AUTONOMOUS_KNOWN_REFERENCE_CLOSURE"
+}
