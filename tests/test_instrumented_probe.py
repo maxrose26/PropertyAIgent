@@ -134,6 +134,15 @@ class ProbeContract(unittest.TestCase):
         form={'message':json.dumps({'actions':[action]}),'aura.token':'null',
               'aura.context':json.dumps({'mode':'PROD'}),'aura.pageURI':u.path+'?'+u.query}
         self.assertEqual(guest_envelope(urlencode(form),destination,'host_config'),urlencode(form))
+        for value in (True, False):
+            action['storable']=value
+            encoded=urlencode(dict(form,message=json.dumps({'actions':[action]})))
+            self.assertEqual(guest_envelope(encoded,destination,'host_config'),encoded)
+        for value in ('true', {}, [], 1, None):
+            action['storable']=value
+            with self.assertRaisesRegex(ValueError,'STORABLE_FLAG'):
+                guest_envelope(urlencode(dict(form,message=json.dumps({'actions':[action]}))),destination,'host_config')
+        action.pop('storable')
         with self.assertRaises(ValueError):
             guest_envelope(urlencode(form),CASES['manchester'][2],'host_config')
         for params in ({'recordId':'OTHER'}, {'secret':'PRIVATE'}, None, []):
@@ -144,6 +153,19 @@ class ProbeContract(unittest.TestCase):
         action['descriptor']=HOST_CONFIG_GETTER.replace('getConfigData','saveConfigData')
         with self.assertRaises(ValueError):
             guest_envelope(urlencode(dict(form,message=json.dumps({'actions':[action]}))),destination,'host_config')
+
+    def test_storable_not_admitted_for_record_reads(self):
+        import json
+        from urllib.parse import urlencode, urlsplit
+        from verification.direct_reference.arcus_http_probe import guest_envelope, RECORD_GETTER
+        destination=CASES['salford'][2]
+        u=urlsplit(destination)
+        action={'id':'1;a','descriptor':RECORD_GETTER,'storable':True,
+                'params':{'recordDescriptor':u.path.rsplit('/',1)[-1]+'.undefined.FULL.null.null.null.VIEW.true.null.null.null'}}
+        form={'message':json.dumps({'actions':[action]}),'aura.token':'null',
+              'aura.context':'{"mode":"PROD"}','aura.pageURI':u.path+'?'+u.query}
+        with self.assertRaisesRegex(ValueError,'UNREVIEWED_ACTION_KEYS'):
+            guest_envelope(urlencode(form),destination,'record')
 
     def test_record_descriptor_closed_shape(self):
         from verification.direct_reference.arcus_http_probe import record_descriptor_matches

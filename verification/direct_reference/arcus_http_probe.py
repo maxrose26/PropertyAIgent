@@ -160,7 +160,16 @@ def guest_envelope(body, destination, kind='header'):
     if set(message) != {'actions'} or len(message['actions']) != 1:
         raise ValueError('SINGLE_ACTION_REQUIRED')
     action = message['actions'][0]
-    if set(action) - {'id','descriptor','callingDescriptor','params'}:
+    allowed_action_keys = {'id','descriptor','callingDescriptor','params'}
+    if kind == 'host_config':
+        # Observed as a boolean in frozen Salford run 38469427347. Salesforce
+        # documents storable as the action-response caching flag, not authority
+        # to call additional methods. Preserve its observed value unchanged.
+        # https://developer.salesforce.com/docs/platform/aura-platform/guide/controllers-server-storable-actions.html
+        allowed_action_keys.add('storable')
+        if 'storable' in action and type(action['storable']) is not bool:
+            raise ValueError('STORABLE_FLAG')
+    if set(action) - allowed_action_keys:
         raise ValueError('UNREVIEWED_ACTION_KEYS')
     if kind in ('record', 'record_name'):
         if action.get('descriptor') != RECORD_GETTER:
