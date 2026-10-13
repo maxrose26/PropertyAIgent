@@ -72,9 +72,17 @@ def record_observation(data, record_id, reference):
                 except (ValueError,TypeError):
                     item['state']='UNPARSEABLE'
         result[field]=item
+    # Qualification metadata only: compare exact known public UI literals, never
+    # export arbitrary source values or assign semantics from text matching.
+    ui_matches={}
+    if reference=='PA/2025/1084':
+        for label,literal in (('Status','Decision Made'),('Decision','Approve with Conditions')):
+            ui_matches[label]=sorted(api for api,node in fields.items()
+                if isinstance(api,str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,100}',api)
+                and isinstance(node,dict) and node.get('value')==literal)[:10]
     return {'exact_record_id_present':True,'exact_reference_value_present':True,
             'other_record_identity_count':0,'record_identity_sources':len(ids),
-            'record_field_states':result}
+            'record_field_states':result,'known_public_ui_literal_candidate_keys':ui_matches}
 
 
 def record_descriptor_matches(value, record_id):

@@ -115,6 +115,17 @@ class ProbeContract(unittest.TestCase):
         self.assertFalse(fact_read_candidate([{'descriptor':'OTHER','record_descriptor_closed_shape':True}]))
         self.assertTrue(fact_read_candidate([{'descriptor':RECORD_GETTER,'record_descriptor_closed_shape':True}]))
 
+    def test_salford_public_field_semantics(self):
+        exact, fields=qualify([('Reference','PA/2025/1084'),('Status','Decision Made'),
+            ('Decision','Approve with Conditions'),('Decision date','20/8/2026')],'PA/2025/1084')
+        self.assertTrue(exact)
+        self.assertTrue(all(f['state']=='PRESENT_VALUE' for f in fields.values()))
+        exact, fields=qualify([('Reference','PA/2025/1028'),('Status','Under Consultation'),
+            ('Decision',''),('Decision date','')],'PA/2025/1028')
+        self.assertTrue(exact)
+        self.assertEqual(fields['decision']['state'],'PRESENT_BLANK')
+        self.assertEqual(fields['decision_date']['state'],'PRESENT_BLANK')
+
     def test_record_field_states_same_exact_subtree(self):
         from verification.direct_reference.arcus_http_probe import record_observation, PLANNING_OBJECT
         rid='a1DSl000007GOmFMAW'
