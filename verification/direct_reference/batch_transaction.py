@@ -86,7 +86,7 @@ def session_type(row):
     return BoundedSession
 
 
-def run_transaction(engine,row,source_factory,limits):
+def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REHEARSAL'):
     """Fresh retrieval inside B2 snapshot; independent readback reconciles ack."""
     from sqlalchemy import event,select
     from app.db.models import Application
@@ -97,14 +97,22 @@ def run_transaction(engine,row,source_factory,limits):
     from verification.stage26b_l1.request_boundary import BoundaryFailure
     if row!=admitted_row(row['application_id']):raise ValueError('UNADMITTED')
     a=blank(row);a.update(transaction='UNKNOWN',b2_outcome='UNKNOWN',cleanup='UNKNOWN',disposition='UNCERTAIN')
+    if provenance not in {'SYNTHETIC_REHEARSAL','FRESH_OFFICIAL_SUMMARY'}:raise ValueError('PROVENANCE')
     S=session_type(row);meter=Meter(engine);guard=install_guards(engine,row)
     try:
         with S(engine,expire_on_commit=False) as s:
             app=s.execute(select(Application).where(Application.id==row['application_id'],Application.reference==row['reference'],Application.council_code==row['council']).limit(1)).scalar_one()
             a['before']=snapshot(s,row)
             def loader():
-                source=observe(row['application_id'],source_factory,identity=row,
-                    limits={k:limits[k] for k in ('requests','bytes','seconds')})
+                a['source_provenance']=provenance
+                a['retrieval_started_at']=dt.datetime.now(dt.timezone.utc).isoformat()
+                try:
+                    source=observe(row['application_id'],source_factory,identity=row,
+                        limits={k:limits[k] for k in ('requests','bytes','seconds')})
+                except Exception:
+                    a['error']='AUDIT_REJECTED'
+                    raise BoundaryFailure('PRIVACY_FAILURE','Source audit rejected')
+                a['retrieval_completed_at']=dt.datetime.now(dt.timezone.utc).isoformat()
                 a['source']=source
                 validate_record(a,row) # privacy and accounting before watermark reservation
                 if source['outcome']!='LITERAL_VERIFIED':raise BoundaryFailure(source['outcome'],'Qualified source failure')
@@ -131,7 +139,9 @@ def run_transaction(engine,row,source_factory,limits):
             if not source or source['outcome']!='LITERAL_VERIFIED':a['error']='AUDIT_REJECTED'
             else:a['disposition']='COMPLETED'
         elif a['transaction']=='NOT_COMMITTED':
-            if a['expected'] is not None or a['b2_outcome']=='PERSISTENCE_FAILED':
+            if a['error'] is not None:
+                a['disposition']='SAFETY_STOP'
+            elif a['expected'] is not None or a['b2_outcome']=='PERSISTENCE_FAILED':
                 a['error']='DB_REJECTED';a['disposition']='SAFETY_STOP'
             elif a['b2_outcome'] in LOCAL:
                 a['error']='SOURCE_REJECTED';a['disposition']='SAFELY_REJECTED'

@@ -39,6 +39,7 @@ def manifest():
 def blank(row):
     return dict(application_id=row['application_id'],reference=row['reference'],council=row['council'],
         source_url=row['source_url'],source=None,before=None,expected=None,after=None,
+        source_provenance=None,retrieval_started_at=None,retrieval_completed_at=None,
         b2_outcome='NOT_ATTEMPTED',transaction='NOT_ATTEMPTED',error=None,cleanup='NOT_STARTED',
         disposition='NOT_ATTEMPTED',statements=None)
 
@@ -55,6 +56,16 @@ def validate_record(a,row):
     if a['error'] not in {None,'SOURCE_REJECTED','DB_REJECTED','READBACK_MISMATCH','COMMIT_ACK_UNKNOWN','INTERRUPTED','AUDIT_REJECTED','CLEANUP_FAILED','SCOPE_REJECTED'}:raise ValueError('ERROR')
     if a['cleanup'] not in {'CLOSED','FAILED','UNKNOWN'}:raise ValueError('CLEANUP')
     if a['b2_outcome'] not in COMPLETE|LOCAL|SAFETY|{'PERSISTENCE_FAILED','UNKNOWN'}:raise ValueError('B2_OUTCOME')
+    if a['source_provenance'] not in {None,'SYNTHETIC_REHEARSAL','FRESH_OFFICIAL_SUMMARY'}:raise ValueError('SOURCE_PROVENANCE')
+    import datetime as dt
+    times=[]
+    for key in ('retrieval_started_at','retrieval_completed_at'):
+        if a[key] is not None:
+            value=dt.datetime.fromisoformat(a[key])
+            if value.tzinfo is None:raise ValueError('NAIVE_SOURCE_TIME')
+            times.append(value)
+    if len(times)==2 and times[1]<times[0]:raise ValueError('SOURCE_TIME_ORDER')
+    if a['source'] is not None and (len(times)!=2 or a['source_provenance'] is None):raise ValueError('SOURCE_TIMING_REQUIRED')
     for k in ('before','expected','after'):
         if a[k] is not None:validate_snapshot(a[k])
     if a['source'] is not None:validate_row(a['source'],row['application_id'],identity=row)
@@ -97,7 +108,11 @@ def validate(a):
 def totals(records,carried):
     source=[r['source'] for r in records if r['source'] is not None and r['application_id'] not in carried]
     out={k:sum(r[k] for r in source) for k in ('requests','redirects','retries','received_body_bytes','elapsed_seconds')}
-    if out['requests']>40 or out['redirects'] or out['received_body_bytes']>20_000_000 or out['elapsed_seconds']>150:raise ValueError('GLOBAL_SOURCE_BOUND')
+    if out['requests']>40 or out['received_body_bytes']>20_000_000 or out['elapsed_seconds']>150:raise ValueError('GLOBAL_SOURCE_BOUND')
+    # Observed redirects are never followed; retain their truthful count as a
+    # safety failure rather than erasing the record to force a zero counter.
+    if any(r['source'] is None and r['disposition'] in {'UNCERTAIN','SAFETY_STOP'} and r['application_id'] not in carried for r in records):
+        return {k:'UNKNOWN' for k in out}
     return out
 
 def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,clock=time.monotonic):
