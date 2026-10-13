@@ -20,6 +20,8 @@ CASES = {
     'rochdale': (295, '25/01149/FUL', 'https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000eZEmGIAW?c__r=Arcus_BE_Public_Register'),
     'trafford': (290, '117039/FUL/25', 'https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T0TL4VQL01T00&activeTab=summary'),
 }
+from verification.direct_reference.arcus_manifest import case_definitions
+CASES.update(case_definitions())
 MAX_BYTES = 20 * 1024 * 1024
 MAX_REQUESTS = 80
 MAX_SECONDS = 45
@@ -157,7 +159,11 @@ def permitted_navigation(url, expected):
     # Observed Salford client route retains the exact frozen Salesforce identity.
     if b.netloc == 'salfordcitycouncil.my.site.com':
         record = b.path.rsplit('/', 1)[-1]
-        return (origin(url) == origin(expected) and a.path in ('/pr/s/planning-application/' + record + '/pa20251084',
+        references = {reference for _, reference, destination in CASES.values() if destination == expected}
+        if len(references) != 1:
+            return False
+        slug = re.sub('[^a-z0-9]', '', references.pop().lower())
+        return (origin(url) == origin(expected) and a.path in ('/pr/s/planning-application/' + record + '/' + slug,
                            '/pr/s/planning-application/' + record + '/detail')
                 and a.query in (b.query, "") and not a.fragment)
     return False
@@ -188,6 +194,21 @@ def record_failure(audit, reason):
         events = audit.setdefault('safety_events', [])
         if reason not in events and len(events) < 8:
             events.append(reason)
+
+
+def exact_guest_record(audit, reference):
+    """HTTP application identity is independent of optional rendered fields."""
+    source = audit.get('record_http_probe')
+    if not isinstance(source, dict):
+        return False
+    fields = source.get('record_field_states')
+    return (source.get('outcome') == 'GUEST_JSON_OBSERVED' and source.get('http_status') == 200
+            and source.get('exact_record_id_present') is True
+            and source.get('exact_reference_value_present') is True
+            and source.get('other_record_identity_count') == 0
+            and isinstance(fields, dict) and isinstance(fields.get('reference'), dict)
+            and fields['reference'].get('state') == 'PRESENT_VALUE'
+            and fields['reference'].get('value') == reference)
 
 
 async def probe(case):
@@ -243,7 +264,7 @@ async def probe(case):
                 from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, fact_read_candidate, HOST_CONFIG_GETTER
                 slot = None
                 kind = 'header'
-                if (case == 'salford' and audit['host_config_http_probe'] is None and
+                if (allowed == 'https://salfordcitycouncil.my.site.com' and audit['host_config_http_probe'] is None and
                         any(m.get('descriptor') == HOST_CONFIG_GETTER and
                             m.get('parameter_keys') == [] for m in metadata)):
                     slot = 'host_config_http_probe'
@@ -390,11 +411,14 @@ async def probe(case):
                         }""")
                         exact, fields = qualify(pairs, reference)
                         audit.update(exact_reference=exact, fields=fields)
-                        if exact and fields['status']['state'] == 'PRESENT_VALUE':
+                        if (exact and fields['status']['state'] == 'PRESENT_VALUE'
+                                or case != 'trafford' and exact_guest_record(audit, reference)):
                             break
                         await asyncio.sleep(.2)
                     if audit['blocked_posts']:
                         fail('UNREVIEWED_METHOD')
+                    elif case != 'trafford' and exact_guest_record(audit, reference):
+                        pass  # Partial exact-record evidence does not require DOM status.
                     elif not audit['exact_reference']:
                         fail('IDENTITY_NOT_ESTABLISHED')
                     elif not audit['fields'] or audit['fields']['status']['state'] != 'PRESENT_VALUE':

@@ -144,6 +144,7 @@ class Observation:
     literal_verified: bool = True
     b2_eligible: bool = False
     verification_scope: str = 'COUPLED'
+    field_evidence: dict | None = None
 
 def pending_status_evidence(observation):
     """Positive literal status proof; omission never proves absent decisions."""
@@ -301,6 +302,20 @@ def _refresh_row(session, application, council, row, *, retrieve_evidence):
             if (observation.application_id != row['application_id'] or
                 observation.reference != row['reference'] or observation.source_url != row['source_url']):
                 fail('AMBIGUOUS_SOURCE_RESULT', 'Handoff identity mismatch')
+            if observation.verification_scope == 'FIELD_LEVEL_DATE_ONLY':
+                if (not observation.literal_verified or not observation.b2_eligible
+                        or observation.field_states.get('reference') != 'PRESENT_VALUE'
+                        or observation.field_states.get('decision_date') != 'PRESENT_VALUE'
+                        or observation.fields.get('Reference') != row['reference']):
+                    fail('PARTIAL_RETRIEVAL', 'Field-level identity/date not qualified')
+                result=ScrapedApplication(reference=row['reference'],
+                    fields={'Reference':row['reference'],'Decision Issued Date':observation.fields['Decision Issued Date']},
+                    summary_url=row['source_url'],further_info_url='',keyval=None,estimated_unit_count=None,
+                    application_category='',opportunity_classification='',qualifies=False)
+                result.verification_scope='FIELD_LEVEL_DATE_ONLY'
+                result.field_evidence=observation.field_evidence
+                result.body_sha256=observation.body_sha256
+                return result
             if observation.verification_scope == 'UNCHANGED_PENDING_STATUS_ONLY':
                 if (not pending_status_evidence(observation) or prior[0] != 'Awaiting decision'
                         or prior[1] is not None or prior[2] is not None):
@@ -330,10 +345,10 @@ def _refresh_row(session, application, council, row, *, retrieve_evidence):
             failure = error.outcome
             raise
     result = verify_application_status(session, None, council, application, evidence_loader=loader)
-    outcome = failure or {'verified_unchanged':'VERIFIED_UNCHANGED','verified_changed':'VERIFIED_MATERIAL_CHANGE','verified_status_only':'VERIFIED_STATUS_ONLY',
+    outcome = failure or {'verified_unchanged':'VERIFIED_UNCHANGED','verified_changed':'VERIFIED_MATERIAL_CHANGE','verified_status_only':'VERIFIED_STATUS_ONLY','field_level_verified':'FIELD_LEVEL_VERIFIED',
         'conflicting_source':'PARTIAL_RETRIEVAL','stale_response':'STALE_RESPONSE',
         'persistence_failed':'PERSISTENCE_FAILED','fetch_failed':'PARSER_FAILURE'}.get(result.outcome,'SOURCE_UNAVAILABLE')
     if outcome == 'VERIFIED_UNCHANGED' and raw_before != (application.status,application.decision,application.decision_issued_date):
         outcome = 'VERIFIED_NON_MATERIAL_CHANGE'
     return {'outcome':outcome,'observation':observation,'b2_outcome':result.outcome,
-            'accepted':result.outcome in ('verified_unchanged','verified_changed','verified_status_only')}
+            'accepted':result.outcome in ('verified_unchanged','verified_changed','verified_status_only','field_level_verified')}

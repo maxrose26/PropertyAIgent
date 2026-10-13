@@ -16,7 +16,8 @@ class ProbeContract(unittest.TestCase):
         self.assertEqual(audit['safety_events'],['BROWSER_Error'])
 
     def test_frozen_routes(self):
-        self.assertEqual(len(CASES), 5)
+        from verification.direct_reference.arcus_manifest import case_definitions
+        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford'} | set(case_definitions()))
         for _, _, url in CASES.values():
             self.assertTrue(permitted_navigation(url, url))
             self.assertFalse(permitted_navigation(url + '&other=1', url))
@@ -28,6 +29,22 @@ class ProbeContract(unittest.TestCase):
         new = 'https://salfordcitycouncil.my.site.com/pr/s/planning-application/a0kSq000008OfVFIA0/pa20251084?c__r=Arcus_BE_Public_Register'
         self.assertTrue(permitted_navigation(new, old))
         self.assertFalse(permitted_navigation(new.replace('a0kSq000008OfVFIA0', 'wrong'), old))
+
+    def test_salford_closed_cohort_slug(self):
+        old = CASES['arcus_266'][2]
+        new = 'https://salfordcitycouncil.my.site.com/pr/s/planning-application/a0kSq000009JA3JIAW/pa20251295?c__r=Arcus_BE_Public_Register'
+        self.assertTrue(permitted_navigation(new, old))
+        self.assertFalse(permitted_navigation(new.replace('pa20251295', 'pa20251084'), old))
+
+    def test_guest_identity_does_not_require_status(self):
+        from verification.direct_reference.instrumented_probe import exact_guest_record
+        source = dict(outcome='GUEST_JSON_OBSERVED', http_status=200,
+            exact_record_id_present=True, exact_reference_value_present=True,
+            other_record_identity_count=0,
+            record_field_states={'reference': {'state':'PRESENT_VALUE','value':'PA/2025/1084'},
+                                 'status': {'state':'NOT_PRESENT','value':None}})
+        self.assertTrue(exact_guest_record({'record_http_probe':source}, 'PA/2025/1084'))
+        self.assertFalse(exact_guest_record({'record_http_probe':source}, 'OTHER'))
 
     def test_trafford_bootstrap_only(self):
         frozen=CASES['trafford'][2]

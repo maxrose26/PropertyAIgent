@@ -240,7 +240,9 @@ def run_transaction(engine,sha,run_id,source_factory):
     validate(audit);return audit
 
 
-def production_engine(*,secret_name='OLDHAM_DATABASE_URL',application_name='stage4_oldham42_once'):
+def production_engine(*,secret_name='OLDHAM_DATABASE_URL',application_name='stage4_oldham42_once', idle_transaction_ms=40000):
+    if idle_transaction_ms not in (40000,60000):raise ValueError('DB_IDLE_BOUND')
+    if idle_transaction_ms==60000 and application_name!='stage4_arcus_b2_once':raise ValueError('DB_IDLE_SCOPE')
     from sqlalchemy import create_engine
     from sqlalchemy.engine import make_url
     from app.db.session import _normalize_database_url
@@ -252,7 +254,7 @@ def production_engine(*,secret_name='OLDHAM_DATABASE_URL',application_name='stag
     if (u.host,u.port or 5432,u.database,u.username)!=PRODUCTION_ROUTE:raise ValueError('UNQUALIFIED_PRODUCTION_ROUTE')
     if not (re.fullmatch(r'db\.[a-z0-9]{20}\.supabase\.co',u.host) or re.fullmatch(r'aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com',u.host)):raise ValueError('DB_ROUTE')
     return create_engine(u,pool_size=1,max_overflow=0,pool_pre_ping=False,hide_parameters=True,
-      connect_args={'connect_timeout':5,'sslmode':'require','options':'-c statement_timeout=10000 -c lock_timeout=8000 -c idle_in_transaction_session_timeout=40000', 'application_name':application_name})
+      connect_args={'connect_timeout':5,'sslmode':'require','options':f'-c statement_timeout=10000 -c lock_timeout=8000 -c idle_in_transaction_session_timeout={idle_transaction_ms}', 'application_name':application_name})
 
 
 def worker(sha,run_id,path):

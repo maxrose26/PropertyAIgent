@@ -151,6 +151,7 @@ OUTCOME_PERSISTENCE_FAILED = "persistence_failed"
 # Narrow direct-evidence opt-in: unchanged explicit pending status only.
 # Omitted decision/date remain unobserved, never verified absence/NULL.
 OUTCOME_VERIFIED_STATUS_ONLY = "verified_status_only"
+OUTCOME_FIELD_LEVEL_VERIFIED = "field_level_verified"
 
 # Outcomes that count as a genuinely COMPLETED direct verification -
 # status_verified_at advances for these two, and only these two (Section 8
@@ -405,6 +406,173 @@ class VerificationRunStats:
         )
 
 
+def current_verified_planning_field(application, field):
+    """Return provenance only while its accepted normalized fact still matches."""
+    import json
+    import re
+    from urllib.parse import urlsplit
+    from app.pipeline.lapse_tracking import parse_portal_date
+    if field != "decision_date":
+        return None  # initial independent scope is date only
+    try:
+        raw = application.planning_field_verification
+        if not isinstance(raw, str) or len(raw) > 8192:
+            return None
+        def unique(pairs):
+            values = {}
+            for key, value in pairs:
+                if key in values:
+                    raise ValueError("DUPLICATE_METADATA_KEY")
+                values[key] = value
+            return values
+        metadata = json.loads(raw, object_pairs_hook=unique)
+        if not isinstance(metadata, dict) or set(metadata) != {"status", "decision", "decision_date"}:
+            return None
+        keys = {"state", "literal", "normalized", "source_url", "body_sha256", "verified_at", "scope"}
+        if any(not isinstance(value, dict) or set(value) != keys for value in metadata.values()):
+            return None
+        item = metadata[field]
+        stamp = dt.datetime.fromisoformat(item.get("verified_at", ""))
+        source = item.get("source_url")
+        if not isinstance(source, str) or len(source) > 2048:
+            return None
+        url = urlsplit(source)
+        if (stamp.tzinfo is None or stamp > dt.datetime.now(dt.timezone.utc)
+                or item.get("scope") != "FIELD_LEVEL_DATE_ONLY"
+                or not isinstance(item.get("body_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", item["body_sha256"])
+                or url.scheme != "https" or not url.hostname or url.username or url.password
+                or url.port not in (None, 443)
+                or url.fragment or "\\" in source):
+            return None
+        current = parse_portal_date(application.decision_issued_date)
+        if (item.get("state") == "PRESENT_VALUE" and item.get("verified_at")
+                and current != dt.date.min and item.get("normalized") == current.isoformat()
+                and isinstance(item.get("literal"), str)
+                and len(item["literal"]) <= 160
+                and parse_portal_date(item["literal"]) == current):
+            return item
+    except (ValueError, TypeError, KeyError, AttributeError):
+        pass
+    return None
+
+
+def _verify_date_field(session, council, application, result, columns, prior,
+                       material_change_stats, lifecycle_event_stats):
+    """Initial independent field scope inside the existing B2 sole writer."""
+    import json
+    import re
+    from app.pipeline.lapse_tracking import parse_portal_date
+    from app.pipeline.lifecycle_events import record_decision_date_correction
+    from app.pipeline.material_change import TRIGGER_MATERIAL_CHANGE
+    reference = application.reference
+    def fail(value):
+        session.rollback()
+        return VerificationOutcome(outcome=value, application_reference=reference)
+    evidence = getattr(result, "field_evidence", None)
+    fields = result.fields
+    digest = getattr(result, "body_sha256", None)
+    if (set(fields) != {"Reference", "Decision Issued Date"}
+            or fields.get("Reference") != reference
+            or not isinstance(evidence, dict)
+            or set(evidence) != {"reference", "status", "decision", "decision_date"}
+            or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)):
+        return fail(OUTCOME_FETCH_FAILED)
+    unsupported = {"NOT_PRESENT", "UNKNOWN", "CONFLICTING", "UNPARSEABLE"}
+    for key, item in evidence.items():
+        if not isinstance(item, dict):
+            return fail(OUTCOME_FETCH_FAILED)
+        value, state = item.get("value"), item.get("state")
+        if key in {"status", "decision"}:
+            # Observed companion fields are retained as evidence, not accepted
+            # or verified by the independent date-only scope.
+            if state in unsupported:
+                valid = value is None
+            elif state == "PRESENT_VALUE":
+                valid = isinstance(value, str) and bool(value.strip()) and len(value) <= 160
+            elif state == "PRESENT_BLANK":
+                valid = isinstance(value, str) and not value.strip() and len(value) <= 160
+            else:
+                valid = False
+            if not valid:
+                return fail(OUTCOME_FETCH_FAILED)
+        elif state != "PRESENT_VALUE" or not isinstance(value, str) or not value.strip() or len(value) > 160:
+            return fail(OUTCOME_FETCH_FAILED)
+    if evidence["reference"]["value"] != reference:
+        return fail(OUTCOME_FETCH_FAILED)
+    literal = evidence["decision_date"]["value"]
+    parsed = parse_portal_date(literal)
+    if parsed == dt.date.min or parse_portal_date(fields["Decision Issued Date"]) != parsed:
+        return fail(OUTCOME_FETCH_FAILED)
+    stamp = dt.datetime.now(dt.timezone.utc)
+    try:
+        previous = json.loads(prior[5] or "{}")
+        if not isinstance(previous, dict):
+            return fail(OUTCOME_FETCH_FAILED)
+        previous_stamp = previous.get("decision_date", {}).get("verified_at")
+        if previous_stamp:
+            verified = dt.datetime.fromisoformat(previous_stamp)
+            if verified.tzinfo is None:
+                return fail(OUTCOME_FETCH_FAILED)
+            if stamp <= verified:
+                return fail(OUTCOME_STALE_RESPONSE)
+    except (ValueError, TypeError, AttributeError):
+        return fail(OUTCOME_FETCH_FAILED)
+    metadata = {}
+    for key in ("status", "decision", "decision_date"):
+        supported = key == "decision_date"
+        metadata[key] = dict(state=evidence[key]["state"], literal=evidence[key]["value"],
+            normalized=parsed.isoformat() if supported else None,
+            source_url=result.summary_url, body_sha256=digest,
+            verified_at=stamp.isoformat() if supported else None,
+            scope="FIELD_LEVEL_DATE_ONLY")
+    encoded = json.dumps(metadata, sort_keys=True, separators=(",", ":"))
+    if len(encoded) > 8192:
+        return fail(OUTCOME_FETCH_FAILED)
+    local_events = LifecycleEventStats()
+    old_state = ApplicationState(status=prior[0], decision=prior[1],
+                                 estimated_unit_count=application.estimated_unit_count)
+    changed = detect_material_application_change(old_state, old_state)
+    try:
+        conditions = [column.is_(None) if value is None else column == value
+                      for column, value in zip(columns, prior)]
+        reservation = session.execute(update(Application).where(
+            Application.id == application.id, Application.reference == reference,
+            Application.council_code == council.code, *conditions,
+        ).values(planning_field_verification=encoded, last_seen_at=prior[4]).execution_options(synchronize_session=False))
+        if reservation.rowcount != 1:
+            return fail(OUTCOME_STALE_RESPONSE)
+        session.refresh(application)
+        if parsed != parse_portal_date(prior[2]):
+            from dataclasses import replace
+            application.decision_issued_date = parsed.isoformat()
+            record_decision_date_correction(session, application_id=application.id,
+                old_date=prior[2], new_date=application.decision_issued_date,
+                authoritative_source=SOURCE_STATUS_VERIFICATION, stats=local_events)
+            changed = replace(changed, changed=True, reasons=("decision_date_corrected",))
+            application.evidence_refresh_required = True
+            application.evidence_refresh_reason = "decision_date_corrected"
+            application.evidence_refresh_trigger = TRIGGER_MATERIAL_CHANGE
+            application.evidence_refresh_requested_at = stamp
+            # Explicitly retain the observation watermark despite the model's
+            # onupdate default when factual date/refresh flags are flushed.
+            from sqlalchemy.orm.attributes import flag_modified
+            application.last_seen_at = prior[4]
+            flag_modified(application, "last_seen_at")
+        session.commit()
+    except BaseException as error:
+        session.rollback()
+        if not isinstance(error, Exception):
+            raise
+        return fail(OUTCOME_PERSISTENCE_FAILED)
+    if material_change_stats is not None:
+        material_change_stats.record(changed)
+    if lifecycle_event_stats is not None:
+        lifecycle_event_stats.record(local_events.written)
+    return VerificationOutcome(outcome=OUTCOME_FIELD_LEVEL_VERIFIED,
+        application_reference=reference, material_change_reasons=changed.reasons)
+
+
 def verify_application_status(
     session: Session, page, council: CouncilConfig, application: Application, *,
     material_change_stats: MaterialChangeStats | None = None,
@@ -432,7 +600,8 @@ def verify_application_status(
     if session.new or session.dirty or session.deleted:
         raise ValueError("Status verification requires a clean session")
     columns = (Application.status, Application.decision, Application.decision_issued_date,
-               Application.status_verified_at, Application.last_seen_at)
+               Application.status_verified_at, Application.last_seen_at,
+               Application.planning_field_verification)
     prior = session.execute(select(*columns).where(
         Application.id == application.id, Application.reference == reference,
         Application.council_code == council.code)).one_or_none()
@@ -471,7 +640,7 @@ def verify_application_status(
     if not isinstance(fields, dict) or getattr(result, "reference", None) != reference:
         return outcome(OUTCOME_FETCH_FAILED)
     status_scope = getattr(result, "verification_scope", "COUPLED")
-    if status_scope not in {"COUPLED", "UNCHANGED_PENDING_STATUS_ONLY"}:
+    if status_scope not in {"COUPLED", "UNCHANGED_PENDING_STATUS_ONLY", "FIELD_LEVEL_DATE_ONLY"}:
         return outcome(OUTCOME_FETCH_FAILED)
     pending_only = status_scope == "UNCHANGED_PENDING_STATUS_ONLY"
     if pending_only and (evidence_loader is None
@@ -491,6 +660,11 @@ def verify_application_status(
         return outcome(OUTCOME_FETCH_FAILED)
     if fields.get("Reference", reference) != reference:
         return outcome(OUTCOME_FETCH_FAILED)
+    if status_scope == "FIELD_LEVEL_DATE_ONLY":
+        if evidence_loader is None:
+            return outcome(OUTCOME_FETCH_FAILED)
+        return _verify_date_field(session, council, application, result, columns, prior,
+                                  material_change_stats, lifecycle_event_stats)
     status, decision = fields.get("Status"), fields.get("Decision")
     if any(value is not None and not isinstance(value, str) for value in
            (status, decision, fields.get("Decision Issued Date"))):

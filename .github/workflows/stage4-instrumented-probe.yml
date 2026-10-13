@@ -1,8 +1,12 @@
-name: Stage4 instrumented public-source probe
+name: Stage4 Arcus and instrumented offline contracts
 on:
   pull_request:
     paths:
-      - verification/direct_reference/instrumented_probe.py
+      - verification/direct_reference/**
+      - app/pipeline/status_verification.py
+      - app/db/models.py
+      - tests/test_arcus*
+      - tests/test_field_level_verification.py
       - verification/direct_reference/arcus_http_probe.py
       - verification/direct_reference/INSTRUMENTED_PROBE.md
       - tests/test_instrumented_probe.py
@@ -27,23 +31,7 @@ jobs:
           python-version: '3.12'
       - name: Install existing browser dependencies
         run: |
-          python -m pip install playwright==1.63.0 psutil==7.2.2 requests==2.34.2
-          python -m playwright install --with-deps chromium --only-shell
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/arcus-offline-venv"
       - name: Focused offline contracts
-        run: python -m unittest tests.test_instrumented_probe tests.test_render_disposable_job -v
-      - name: Frozen Arcus guest-route observations
         run: |
-          mkdir -p "$RUNNER_TEMP/stage4-probe-audit"
-          probe_result=0
-          for probe_case in salford; do
-            python -m verification.direct_reference.instrumented_probe --case "$probe_case" --output "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json" || probe_result=1
-            python -c 'import json,sys; a=json.load(open(sys.argv[1])); sys.exit(0 if a.get("process_cleanup")=="CLOSED" and not a.get("supervisor_limit_hit",True) else 1)' "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json"
-          done
-          exit "$probe_result"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: stage4-instrumented-probe-${{ github.run_id }}-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/stage4-probe-audit/*.json
-          if-no-files-found: warn
-          retention-days: 14
+          "$RUNNER_TEMP/arcus-offline-venv/bin/python" -m pytest tests/test_instrumented_probe.py tests/test_render_disposable_job.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py tests/test_arcus_batch.py tests/test_field_level_verification.py tests/test_arcus_production.py -q

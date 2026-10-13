@@ -1,0 +1,530 @@
+{
+  "schema": 1,
+  "census_at": "2026-10-13 12:24:33.08279+00",
+  "rows": [
+    {
+      "application_id": 668,
+      "council": "manchester",
+      "reference": "140580/FO/2024",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOyxMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GOyxMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 682,
+      "council": "manchester",
+      "reference": "141788/FO/2024",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GNgIMAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GNgIMAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 688,
+      "council": "manchester",
+      "reference": "142419/FO/2025",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOmFMAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GOmFMAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 693,
+      "council": "manchester",
+      "reference": "142609/FO/2025",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007G1oQMAS?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007G1oQMAS",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1257,
+      "council": "manchester",
+      "reference": "137485/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GL9rMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GL9rMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1260,
+      "council": "manchester",
+      "reference": "137764/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GPdpMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GPdpMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1261,
+      "council": "manchester",
+      "reference": "137841/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GPBSMA4?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GPBSMA4",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1262,
+      "council": "manchester",
+      "reference": "137941/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOiSMAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GOiSMAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1263,
+      "council": "manchester",
+      "reference": "137912/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GNA0MAO?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GNA0MAO",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1264,
+      "council": "manchester",
+      "reference": "137919/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOO3MAO?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GOO3MAO",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1265,
+      "council": "manchester",
+      "reference": "138185/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GPoMMAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GPoMMAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1268,
+      "council": "manchester",
+      "reference": "138128/OO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GNfCMAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GNfCMAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1270,
+      "council": "manchester",
+      "reference": "138348/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GPcOMAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GPcOMAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1272,
+      "council": "manchester",
+      "reference": "138316/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GNotMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GNotMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1274,
+      "council": "manchester",
+      "reference": "138589/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GNcsMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GNcsMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1277,
+      "council": "manchester",
+      "reference": "138482/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GPYGMA4?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GPYGMA4",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1282,
+      "council": "manchester",
+      "reference": "138767/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOj7MAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GOj7MAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1283,
+      "council": "manchester",
+      "reference": "138788/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GQVwMAO?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GQVwMAO",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1288,
+      "council": "manchester",
+      "reference": "139261/FO/2024",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GO8aMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GO8aMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1292,
+      "council": "manchester",
+      "reference": "137660/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GQZTMA4?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GQZTMA4",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1293,
+      "council": "manchester",
+      "reference": "139715/FO/2024",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GQymMAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GQymMAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1299,
+      "council": "manchester",
+      "reference": "138696/FO/2023",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GO89MAG?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a1DSl000007GO89MAG",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 295,
+      "council": "rochdale",
+      "reference": "25/01149/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000eZEmGIAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000eZEmGIAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 297,
+      "council": "rochdale",
+      "reference": "PL/2026/0141",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000htbJAIAY?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000htbJAIAY",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 621,
+      "council": "rochdale",
+      "reference": "24/00581/HYBR",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e83sRIAQ?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e83sRIAQ",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 623,
+      "council": "rochdale",
+      "reference": "24/00143/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e85yBIAQ?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e85yBIAQ",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 628,
+      "council": "rochdale",
+      "reference": "24/01007/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8GU5IAM?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8GU5IAM",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 631,
+      "council": "rochdale",
+      "reference": "24/01091/PRA56",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8GSzIAM?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8GSzIAM",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 633,
+      "council": "rochdale",
+      "reference": "24/01159/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8FucIAE?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8FucIAE",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 634,
+      "council": "rochdale",
+      "reference": "24/01160/LBC",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8FudIAE?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8FudIAE",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 646,
+      "council": "rochdale",
+      "reference": "25/00405/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8HbTIAU?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8HbTIAU",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 652,
+      "council": "rochdale",
+      "reference": "PL/2026/0352",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000kouvlIAA?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000kouvlIAA",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 937,
+      "council": "rochdale",
+      "reference": "25/01109/DOC",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8E7WIAU?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8E7WIAU",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1087,
+      "council": "rochdale",
+      "reference": "20/01170/OUT",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e832NIAQ?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e832NIAQ",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1088,
+      "council": "rochdale",
+      "reference": "22/00466/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8B10IAE?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8B10IAE",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1094,
+      "council": "rochdale",
+      "reference": "23/01007/OUT",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8G40IAE?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8G40IAE",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1099,
+      "council": "rochdale",
+      "reference": "23/01162/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8FeoIAE?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8FeoIAE",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1101,
+      "council": "rochdale",
+      "reference": "23/01232/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e89QfIAI?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e89QfIAI",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1103,
+      "council": "rochdale",
+      "reference": "23/01310/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8F0MIAU?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8F0MIAU",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1104,
+      "council": "rochdale",
+      "reference": "23/01382/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8FdcIAE?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8FdcIAE",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 252,
+      "council": "salford",
+      "reference": "PA/2025/1084",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000008OfVFIA0?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000008OfVFIA0",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 266,
+      "council": "salford",
+      "reference": "PA/2025/1295",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000009JA3JIAW?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000009JA3JIAW",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 534,
+      "council": "salford",
+      "reference": "PA/2024/1313",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000002tuejIAA?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000002tuejIAA",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 540,
+      "council": "salford",
+      "reference": "PA/2024/1538",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000003cb01IAA?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000003cb01IAA",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 545,
+      "council": "salford",
+      "reference": "PA/2024/1621",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000003trBdIAI?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000003trBdIAI",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 547,
+      "council": "salford",
+      "reference": "PA/2024/1622",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000003tpOcIAI?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000003tpOcIAI",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 554,
+      "council": "salford",
+      "reference": "PA/2025/0043",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000054eNNIAY?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000054eNNIAY",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 566,
+      "council": "salford",
+      "reference": "23/81719/HYBEIA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000nxcIAA?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000000nxcIAA",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1146,
+      "council": "salford",
+      "reference": "23/81238/OUTEIA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000mCcIAI?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000000mCcIAI",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1149,
+      "council": "salford",
+      "reference": "23/81742/HYBEIA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000nvlIAA?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000000nvlIAA",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1155,
+      "council": "salford",
+      "reference": "23/82436/FUL",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000ojWIAQ?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000000ojWIAQ",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1156,
+      "council": "salford",
+      "reference": "23/81788/FUL",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000qXjIAI?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000000qXjIAI",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1159,
+      "council": "salford",
+      "reference": "PA/2023/0425",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000DhVNIA0?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000000DhVNIA0",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1165,
+      "council": "salford",
+      "reference": "PA/2023/0550",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000LqWfIAK?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000000LqWfIAK",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1167,
+      "council": "salford",
+      "reference": "PA/2023/0532",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000L0TFIA0?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000000L0TFIA0",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1177,
+      "council": "salford",
+      "reference": "PA/2023/0556",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000M66nIAC?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq000000M66nIAC",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    },
+    {
+      "application_id": 1181,
+      "council": "salford",
+      "reference": "20/76664/OUT",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000oQSIAY?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0kSq0000000oQSIAY",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    }
+  ],
+  "manual_candidates": [
+    {
+      "application_id": 1100,
+      "council": "rochdale",
+      "reference": "23/01215/FUL",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8G4LIAU?c__r=Arcus_BE_Public_Register",
+      "source_identifier": "a0rSl00000e8G4LIAU",
+      "platform_family": "ARCUS",
+      "admission": "ADMITTED_ARCUS_ROUTE"
+    }
+  ]
+}

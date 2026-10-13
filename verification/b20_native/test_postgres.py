@@ -297,3 +297,65 @@ def test_oldham_native_worker_limits(engine):
     result=subprocess.run([sys.executable,'-m','verification.direct_reference.oldham_registration_native'],env=env,capture_output=True,text=True,timeout=45)
     assert result.returncode==0,result.stdout+result.stderr
     print(result.stdout)
+
+
+def independent_date_evidence(reference,date):
+    from tests.test_field_level_verification import evidence
+    r=evidence();r.reference=reference;r.fields['Reference']=reference
+    r.fields['Decision Issued Date']=date
+    r.field_evidence['reference']['value']=reference
+    r.field_evidence['decision_date']['value']=date
+    return r
+
+
+def test_native_field_level_lost_ack(engine,monkeypatch):
+    import json
+    identity=seed(engine,'field-lost-ack',decision_issued_date='2026-08-19')
+    with Session(engine) as s:
+        app=s.get(Application,identity);seen=app.last_seen_at
+        original=s.commit
+        def lost():original();raise RuntimeError('Synthetic lost acknowledgement')
+        monkeypatch.setattr(s,'commit',lost)
+        out=verify_application_status(s,None,_council_config(),app,
+            evidence_loader=lambda prior:independent_date_evidence('field-lost-ack','2026-08-20'))
+        assert out.outcome=='persistence_failed'
+        assert not s.in_transaction()
+    with Session(engine) as reader:
+        app=reader.get(Application,identity)
+        assert app.status_verified_at==OLD and app.last_seen_at==seen
+        assert app.decision_issued_date=='2026-08-20'
+        assert json.loads(app.planning_field_verification)['decision_date']['normalized']=='2026-08-20'
+        events=list(reader.scalars(select(ApplicationLifecycleEvent).where(ApplicationLifecycleEvent.application_id==identity)))
+        assert len(events)==1 and events[0].field_name=='decision_issued_date'
+    assert engine.pool.checkedout()==0
+
+
+def test_native_field_level_concurrent_metadata_cas(engine):
+    import json
+    identity=seed(engine,'field-concurrent',decision_issued_date='2026-08-19')
+    barrier=threading.Barrier(2);finished=threading.Event()
+    outcomes={};failures=[];pids={}
+    def worker(kind):
+        try:
+            with Session(engine) as s:
+                pids[kind]=s.connection().connection.driver_connection.info.backend_pid
+                def loader(prior):
+                    barrier.wait(timeout=8)
+                    if kind=='older':assert finished.wait(8)
+                    return independent_date_evidence('field-concurrent','2026-08-20' if kind=='newer' else '2026-08-18')
+                outcomes[kind]=verify_application_status(s,None,_council_config(),s.get(Application,identity),evidence_loader=loader).outcome
+                assert not s.in_transaction()
+        except BaseException as exc:failures.append(exc)
+        finally:
+            if kind=='newer':finished.set()
+    threads=[threading.Thread(target=worker,args=(kind,)) for kind in ('newer','older')]
+    for thread in threads:thread.start()
+    for thread in threads:thread.join(timeout=12)
+    assert not any(thread.is_alive() for thread in threads)
+    assert failures==[] and len(set(pids.values()))==2
+    assert outcomes=={'newer':'field_level_verified','older':'stale_response'}
+    with Session(engine) as reader:
+        app=reader.get(Application,identity)
+        assert app.decision_issued_date=='2026-08-20' and app.status_verified_at==OLD
+        assert json.loads(app.planning_field_verification)['decision_date']['normalized']=='2026-08-20'
+    assert engine.pool.checkedout()==0

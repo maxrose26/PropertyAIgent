@@ -1,5 +1,24 @@
 # Stage 2.6B B2 Planning-Status Freshness
 
+## Stage 4 field-level amendment — 13 October 2026
+
+The Product Owner permits independently supported field subsets, with Trafford
+deferred. Initial `FIELD_LEVEL_DATE_ONLY` support verifies a nonblank decision
+date without claiming status/decision verification or a permission outcome.
+Reuse the existing B2 transaction and source/identity boundary. Add one nullable
+Application Text column `planning_field_verification` containing bounded JSON
+for fixed status/decision/decision_date keys: source state, literal, normalized
+value, source URL, response SHA-256, per-field verified timestamp and scope.
+No backfill and no new writer/table. Unsupported observations have no verification
+timestamp and never clear retained facts. Metadata is value-bound; a reader must
+compare its normalized value to the current fact before considering it verified.
+Date and provenance persist atomically under the existing prior-state CAS,
+extended to include this column; a newer prior field timestamp fails stale.
+Date-only refresh leaves status, decision, status_verified_at and last_seen_at
+unchanged. A changed date reuses decision-date lifecycle/evidence-refresh logic.
+The production schema addition remains an explicit bounded migration operation,
+never an implicit production page-load mutation.
+
 Status: PREPARED FOR REVIEW — SPECIFICATION ONLY. Implementation, migration, production repair, source-refresh execution and operational activation require separate approval.
 Date: 9 October 2026 (Europe/London).
 

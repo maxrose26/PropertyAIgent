@@ -31,11 +31,17 @@ class Meter:
 def snapshot(session,row):
     from sqlalchemy import select
     from app.db.models import Application,ApplicationLifecycleEvent as E
-    values=session.execute(select(*(getattr(Application,k) for k in COUPLED)).where(
+    arcus=row.get('platform_family')=='ARCUS'
+    columns=COUPLED+('planning_field_verification','last_seen_at') if arcus else COUPLED
+    values=session.execute(select(*(getattr(Application,k) for k in columns)).where(
       Application.id==row['application_id'],Application.reference==row['reference'],Application.council_code==row['council']).limit(1)).one()
-    facts={k:(v.isoformat() if isinstance(v,dt.datetime) else v) for k,v in zip(COUPLED,values)}
+    facts={k:(v.isoformat() if isinstance(v,dt.datetime) else v) for k,v in zip(columns,values)}
     events=[dict(zip(EVENT_FIELDS,r)) for r in session.execute(select(*(getattr(E,k) for k in EVENT_FIELDS)).where(E.application_id==row['application_id']).order_by(E.id).limit(17))]
-    out=dict(facts=facts,events=events);validate_snapshot(out);return out
+    out=dict(facts=facts,events=events)
+    if arcus:
+        from .arcus_batch import validate_snapshot as validator
+    else:validator=validate_snapshot
+    validator(out);return out
 
 
 def install_guards(engine,row):
@@ -43,6 +49,7 @@ def install_guards(engine,row):
     from sqlalchemy import event
     from sqlalchemy.sql.dml import Insert,Update
     from sqlalchemy.sql.selectable import Select
+    allowed=WRITE_FIELDS|({'planning_field_verification','last_seen_at'} if row.get('platform_family')=='ARCUS' else set())
     def guard(conn,clause,multi,params,options):
         if isinstance(clause,Select):return
         if not isinstance(clause,(Insert,Update)):raise ValueError('SQL_DENIED')
@@ -52,7 +59,7 @@ def install_guards(engine,row):
         if isinstance(clause,Update):
             if clause.table.name!='applications':raise ValueError('TABLE_DENIED')
             assignments={getattr(k,'key',str(k)) for k in (clause._values or {})} or (set(params or (multi[0] if multi else {}))-{'applications_id'})
-            if not assignments<=WRITE_FIELDS:raise ValueError('COLUMN_DENIED')
+            if not assignments<=allowed:raise ValueError('COLUMN_DENIED')
             # B2 CAS binds id_1; ORM flush binds applications_id. Neither is caller input.
             if bound.get('id_1',bound.get('applications_id'))!=row['application_id']:raise ValueError('ROW_DENIED')
         else:
@@ -65,6 +72,7 @@ def session_type(row):
     from sqlalchemy import event
     from sqlalchemy.orm import Session
     from app.db.models import Application,ApplicationLifecycleEvent as E
+    allowed=WRITE_FIELDS|({'planning_field_verification','last_seen_at'} if row.get('platform_family')=='ARCUS' else set())
     class BoundedSession(Session):pass
     @event.listens_for(BoundedSession,'do_orm_execute')
     def scope(state):
@@ -82,11 +90,11 @@ def session_type(row):
             if not isinstance(obj,E) or obj.application_id!=row['application_id'] or obj.authoritative_source!='status_verification':raise ValueError('INSERT_DENIED')
         for obj in s.dirty:
             if not isinstance(obj,Application) or obj.id!=row['application_id']:raise ValueError('UPDATE_DENIED')
-            if {a.key for a in sa_inspect(obj).attrs if a.history.has_changes()}-WRITE_FIELDS:raise ValueError('COLUMN_DENIED')
+            if {a.key for a in sa_inspect(obj).attrs if a.history.has_changes()}-allowed:raise ValueError('COLUMN_DENIED')
     return BoundedSession
 
 
-def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REHEARSAL',allow_status_only=False):
+def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REHEARSAL',allow_status_only=False,family='IDOX'):
     """Fresh retrieval inside B2 snapshot; independent readback reconciles ack."""
     from sqlalchemy import event,select
     from app.db.models import Application
@@ -95,6 +103,9 @@ def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REH
     from .registration import observe
     from app.config import CouncilConfig
     from verification.stage26b_l1.request_boundary import BoundaryFailure
+    if family=='ARCUS':
+        from .arcus_manifest import admitted_row
+    elif family!='IDOX':raise ValueError('FAMILY')
     if row!=admitted_row(row['application_id']):raise ValueError('UNADMITTED')
     a=blank(row);a.update(transaction='UNKNOWN',b2_outcome='UNKNOWN',cleanup='UNKNOWN',disposition='UNCERTAIN')
     if provenance not in {'SYNTHETIC_REHEARSAL','FRESH_OFFICIAL_SUMMARY'}:raise ValueError('PROVENANCE')
@@ -107,8 +118,13 @@ def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REH
                 a['source_provenance']=provenance
                 a['retrieval_started_at']=dt.datetime.now(dt.timezone.utc).isoformat()
                 try:
-                    source=observe(row['application_id'],source_factory,identity=row,
-                        limits={k:limits[k] for k in ('requests','bytes','seconds')})
+                    if family=='ARCUS':
+                        from .arcus_batch import source_record
+                        retrieved=source_factory()
+                        source=source_record(retrieved,row,limits)
+                    else:
+                        source=observe(row['application_id'],source_factory,identity=row,
+                            limits={k:limits[k] for k in ('requests','bytes','seconds')})
                 except Exception:
                     a['error']='AUDIT_REJECTED'
                     raise BoundaryFailure('PRIVACY_FAILURE','Source audit rejected')
@@ -116,6 +132,7 @@ def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REH
                 a['source']=source
                 validate_record(a,row) # privacy and accounting before watermark reservation
                 if source['outcome']!='LITERAL_VERIFIED':raise BoundaryFailure(source['outcome'],'Qualified source failure')
+                if family=='ARCUS':return retrieved['observation']
                 eligible=all(v in {'PRESENT_VALUE','PRESENT_BLANK'} for v in source['field_states'].values()) and source['semantic_qualification']!='UNKNOWN_UNMAPPED'
                 observation=Observation(row['application_id'],row['reference'],row['source_url'],source['normalized_facts'],source['field_states'],source['semantic_qualification'],None,source['literal_facts'],b2_eligible=eligible)
                 from .refresh import pending_status_evidence
@@ -128,8 +145,11 @@ def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REH
                 if len(new)>2 or any(e['event_type'] not in EVENT_TYPES or e['authoritative_source']!='status_verification' for e in new):raise ValueError('EVENT_BOUND')
                 check_consequences(a['before'],a['expected']);validate_record(a,row)
             event.listen(s,'before_commit',before_commit)
-            cfg=CouncilConfig(code=row['council'],name=row['council'],base_url=row['source_url'].split('/applicationDetails.do')[0],date_field_mode='received',doc_system='idox',anite_base_url=None,unit_threshold=10,region='GM',country='England')
-            result=refresh(s,app,cfg,retrieve_evidence=loader)
+            cfg=CouncilConfig(code=row['council'],name=row['council'],base_url=row['source_url'].split('/applicationDetails.do')[0],date_field_mode='received',doc_system='arcus' if family=='ARCUS' else 'idox',anite_base_url=None,unit_threshold=10,region='GM',country='England')
+            if family=='ARCUS':
+                from .refresh import _refresh_row
+                result=_refresh_row(s,app,cfg,row,retrieve_evidence=loader)
+            else:result=refresh(s,app,cfg,retrieve_evidence=loader)
             a['b2_outcome']=result['outcome']
         try:
             with S(engine) as reader:a['after']=snapshot(reader,row)

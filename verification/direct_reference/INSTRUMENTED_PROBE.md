@@ -1,4 +1,10 @@
-# Stage 4 instrumented source probe
+# Stage 4 instrumented source probe — retained history
+
+Current authority and operational acceptance are in ARCUS_COMPLETION.md.
+The historical qualification notes below describe their original stages.
+Trafford is now deferred; no further execution is authorised. Optional field
+absence does not invalidate independently qualified field-level evidence.
+PR checks now run offline contracts; no repeated automatic live Salford probe.
 
 Authority: Product Owner instruction 13 October 2026, instrumented transport
 validation and minimum ten-council completion. Extends specification 030's
