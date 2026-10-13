@@ -17,6 +17,7 @@ to safe action descriptors for review. No direct API replay without an evidenced
 ordinary public read-only contract. Off-origin requests fail closed.
 
 Bounds per invocation: one case, one context/page, two main-frame navigations,
+at most two direct-child about:blank/about:srcdoc frame navigations,
 80 requests, 20 MiB observed encoded and decoded response bytes, 45-second worker
 deadline, 1 GiB aggregate owned-process RSS. No retries. Observed network byte
 events have reporting latency; this is an observed-byte threshold, not a claim

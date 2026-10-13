@@ -116,7 +116,7 @@ async def probe(case):
     allowed = origin(destination)
     audit = dict(case=case, application_id=app_id, reference=reference, destination=destination,
                  persistence=False, requests=0, responses=0, redirects=0,
-                 decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0,
+                 decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
                  blocked_actions=[], failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', network_classification='UNKNOWN')
@@ -181,7 +181,17 @@ async def probe(case):
 
     def navigation(frame):
         if frame.parent_frame is not None:
-            fail('FRAME_DENIED')
+            kind = 'BLANK' if frame.url == 'about:blank' else 'SRCDOC' if frame.url == 'about:srcdoc' else 'NETWORK' if frame.url.startswith('https://') else 'OTHER'
+            if len(audit['frame_kinds']) < 4:
+                audit['frame_kinds'].append({'kind':kind,'direct_child':frame.parent_frame.parent_frame is None})
+            # Permit only bounded local blank/srcdoc frame navigations.
+            # This admits no additional network destination; scripts are not presumed inert.
+            if frame.url in ('about:blank', 'about:srcdoc') and frame.parent_frame.parent_frame is None:
+                audit['local_frames'] += 1
+                if audit['local_frames'] > 2:
+                    fail('FRAME_LIMIT')
+            else:
+                fail('FRAME_DENIED')
             return
         audit['navigations'] += 1
         try:
