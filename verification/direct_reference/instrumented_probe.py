@@ -86,6 +86,34 @@ def post_metadata(body, destination):
             record['argument_keys'] = sorted(k for k in inner if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20] if isinstance(inner,dict) else []
             record_id=urlsplit(destination).path.rsplit('/',1)[-1]
             record['contains_frozen_record_id'] = record_id in json.dumps(inner)
+            if 'recordDescriptor' in params:
+                value=params['recordDescriptor']
+                record['record_descriptor_encoding']=type(value).__name__
+                if isinstance(value,str) and len(value)<8192:
+                    try:
+                        value=json.loads(value)
+                        record['record_descriptor_encoding']='JSON_STRING'
+                    except ValueError:
+                        value=None
+                shape=[]
+                def describe(item,path='',depth=0):
+                    if depth>4 or len(shape)>=40:
+                        return
+                    if isinstance(item,dict):
+                        for key,child in item.items():
+                            if isinstance(key,str) and re.fullmatch(r'[A-Za-z_$][A-Za-z0-9_.$]{0,79}',key):
+                                describe(child,path+'.'+key,depth+1)
+                    elif isinstance(item,list):
+                        shape.append({'path':path,'type':'list','count':len(item)})
+                        if path.rsplit('.',1)[-1] in ('fields','optionalFields') and all(isinstance(x,str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]{0,100}',x) for x in item) and len(item)<=40:
+                            shape.append({'path':path,'api_names':item})
+                        else:
+                            for child in item[:3]: describe(child,path+'[]',depth+1)
+                    else:
+                        shape.append({'path':path,'type':type(item).__name__,'equals_frozen_id':item==record_id})
+                describe(value)
+                record['record_descriptor_shape']=shape
+
             record['token_state'] = 'ABSENT' if 'aura.token' not in form else 'NULL' if form['aura.token'] == ['null'] else 'EMPTY' if form['aura.token'] == [''] else 'PRESENT_NOT_RETAINED'
             records.append(record)
         return records

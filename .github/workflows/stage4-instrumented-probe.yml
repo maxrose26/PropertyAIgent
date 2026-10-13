@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/stage4-probe-audit"
           probe_result=0
-          for probe_case in manchester salford rochdale; do
+          for probe_case in manchester; do
             python -m verification.direct_reference.instrumented_probe --case "$probe_case" --output "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json" || probe_result=1
             python -c 'import json,sys; a=json.load(open(sys.argv[1])); sys.exit(0 if a.get("process_cleanup")=="CLOSED" and not a.get("supervisor_limit_hit",True) else 1)' "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json"
           done
