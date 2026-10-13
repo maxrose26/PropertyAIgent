@@ -179,6 +179,17 @@ def request_failure(url, method, resource_type, destination, count):
     return None
 
 
+def record_failure(audit, reason):
+    """Keep fatal controls visible even after an optional action was denied."""
+    if audit.get('failure') is None:
+        audit['failure'] = reason
+    if reason != 'UNREVIEWED_METHOD':
+        audit['safety_failure'] = True
+        events = audit.setdefault('safety_events', [])
+        if reason not in events and len(events) < 8:
+            events.append(reason)
+
+
 async def probe(case):
     from playwright.async_api import async_playwright
     app_id, reference, destination = CASES[case]
@@ -187,15 +198,15 @@ async def probe(case):
                  persistence=False, requests=0, responses=0, redirects=0,
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
-                 http_probe=None, record_http_probe=None, name_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
-                 cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN')
+                 http_probe=None, record_http_probe=None, name_http_probe=None, host_config_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
+                 cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN',
+                 safety_failure=False, safety_events=[])
     started = time.monotonic()
     browser = context = None
     stopped = asyncio.Event()
 
     def fail(reason):
-        if audit['failure'] is None:
-            audit['failure'] = reason
+        record_failure(audit, reason)
         stopped.set()
 
     def charge(event):
@@ -229,10 +240,15 @@ async def probe(case):
             if reason == 'UNREVIEWED_METHOD':
                 audit['blocked_posts'] += 1
                 metadata = post_metadata(request.get('postData'), destination)
-                from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, fact_read_candidate
+                from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, fact_read_candidate, HOST_CONFIG_GETTER
                 slot = None
                 kind = 'header'
-                if audit['record_http_probe'] is None and fact_read_candidate(metadata):
+                if (case == 'salford' and audit['host_config_http_probe'] is None and
+                        any(m.get('descriptor') == HOST_CONFIG_GETTER and
+                            m.get('parameter_keys') == [] for m in metadata)):
+                    slot = 'host_config_http_probe'
+                    kind = 'host_config'
+                elif audit['record_http_probe'] is None and fact_read_candidate(metadata):
                     slot = 'record_http_probe'
                     kind = 'record'
                 elif audit['name_http_probe'] is None and any(m.get('record_descriptor_slots') ==

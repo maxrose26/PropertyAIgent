@@ -277,9 +277,17 @@ def refresh(session, application, council, *, retrieve_evidence):
 
     Literal-only evidence is returned separately, never certified by B2's watermark.
     """
+    row = admitted_row(application.id)
+    return _refresh_row(session, application, council, row, retrieve_evidence=retrieve_evidence)
+
+
+def _refresh_row(session, application, council, row, *, retrieve_evidence):
+    """Shared B2 handoff; callers must establish their closed source admission.
+
+    This extraction does not admit any additional route in the production batch.
+    """
     from app.pipeline.status_verification import verify_application_status
     from app.scrapers.idox_portal import ScrapedApplication
-    row = admitted_row(application.id)
     if (application.reference != row['reference'] or application.council_code != row['council']
             or council.code != row['council'] or urlsplit(council.base_url).hostname != urlsplit(row['source_url']).hostname):
         fail('AMBIGUOUS_SOURCE_RESULT', 'Stored identity differs from admitted manifest')

@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 
 MAX_BODY = 1024 * 1024
 RECORD_GETTER = 'serviceComponent://ui.force.components.controllers.recordGlobalValueProvider.RecordGvpController/ACTION$getRecord'
+HOST_CONFIG_GETTER = 'serviceComponent://ui.force.components.controllers.hostConfig.HostConfigController/ACTION$getConfigData'
 PLANNING_OBJECT = 'arcusbuiltenv__Planning_Application__c'
 FACT_FIELDS = {'reference':'Name', 'status':'arcusbuiltenv__Status__c',
                'decision':'arcusbuiltenv__Current_Decision__c',
@@ -143,6 +144,13 @@ def guest_envelope(body, destination, kind='header'):
                     record_id + '.undefined.null.null.null.Name.VIEW.false.null.null.null')
         if set(params) != {'recordDescriptor'} or not expected:
             raise ValueError('RECORD_DESCRIPTOR_SCOPE')
+    elif kind == 'host_config':
+        # Parameterless public framework read observed in the frozen Salford
+        # page. Bootstrap only: it cannot establish application identity/facts.
+        if (urlsplit(destination).netloc != 'salfordcitycouncil.my.site.com' or
+                action.get('descriptor') != HOST_CONFIG_GETTER or
+                action.get('params', {}) != {}):
+            raise ValueError('HOST_CONFIG_SCOPE')
     elif kind != 'header':
         raise ValueError('READ_KIND')
     if kind == 'header' and action.get('descriptor') != 'aura://ApexActionController/ACTION$execute':
@@ -235,7 +243,9 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
             raise ValueError('EXACT_ENDPOINT')
         query = parse_qs(target.query, keep_blank_values=True)
         result['query_shape']=[{'key':key if re.fullmatch(r'[A-Za-z0-9_.-]{1,120}',key) else 'UNRETAINED', 'numeric_single':len(values)==1 and bool(re.fullmatch(r'[0-9]{1,10}',values[0]))} for key,values in list(query.items())[:8]]
-        allowed_query={'r', 'aura.ApexAction.execute'} if kind=='header' else {'r','ui-force-components-controllers-recordGlobalValueProvider.RecordGvp.getRecord'}
+        allowed_query={'r', 'aura.ApexAction.execute'} if kind=='header' else (
+            {'r','ui-force-components-controllers-hostConfig.HostConfig.getConfigData'} if kind=='host_config'
+            else {'r','ui-force-components-controllers-recordGlobalValueProvider.RecordGvp.getRecord'})
         if any(key not in allowed_query or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
             raise ValueError('UNREVIEWED_QUERY')
         payload=guest_envelope(body,destination,kind)
@@ -269,6 +279,15 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
                     raise ValueError('RESPONSE_ACTION_IDENTITY')
                 if any(action.get('state')!='SUCCESS' for action in data.get('actions',[])) or not data.get('actions'):
                     raise ValueError('AURA_NOT_SUCCESS')
+                if kind == 'host_config':
+                    # Do not retain configuration values or recursively extract
+                    # facts from a framework response unrelated to one record.
+                    result.update(exact_reference_value_present=False,
+                                  outcome='GUEST_BOOTSTRAP_OBSERVED')
+                    if consumer is not None:
+                        consumer(bytes(content))
+                    result['elapsed_seconds']=round(time.monotonic()-started,3)
+                    return result
                 if kind in ('record', 'record_name'):
                     result.update(record_observation(data,source.path.rsplit('/',1)[-1],reference))
                 else:

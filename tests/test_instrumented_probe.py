@@ -5,6 +5,16 @@ from verification.direct_reference.instrumented_probe import (
 
 
 class ProbeContract(unittest.TestCase):
+    def test_optional_denial_cannot_hide_later_safety_failure(self):
+        from verification.direct_reference.instrumented_probe import record_failure
+        audit={'failure':None,'safety_failure':False,'safety_events':[]}
+        record_failure(audit,'UNREVIEWED_METHOD')
+        self.assertFalse(audit['safety_failure'])
+        record_failure(audit,'BROWSER_Error')
+        self.assertEqual(audit['failure'],'UNREVIEWED_METHOD')
+        self.assertTrue(audit['safety_failure'])
+        self.assertEqual(audit['safety_events'],['BROWSER_Error'])
+
     def test_frozen_routes(self):
         self.assertEqual(len(CASES), 5)
         for _, _, url in CASES.values():
@@ -114,6 +124,27 @@ class ProbeContract(unittest.TestCase):
             form['message']=json.dumps({'actions':[action]})
             with self.assertRaises(ValueError): guest_envelope(urlencode(form),destination,'record_name')
 
+    def test_host_config_bootstrap_scope(self):
+        import json
+        from urllib.parse import urlencode, urlsplit
+        from verification.direct_reference.arcus_http_probe import guest_envelope, HOST_CONFIG_GETTER
+        destination=CASES['salford'][2]
+        u=urlsplit(destination)
+        action={'id':'1;a','descriptor':HOST_CONFIG_GETTER,'params':{}}
+        form={'message':json.dumps({'actions':[action]}),'aura.token':'null',
+              'aura.context':json.dumps({'mode':'PROD'}),'aura.pageURI':u.path+'?'+u.query}
+        self.assertEqual(guest_envelope(urlencode(form),destination,'host_config'),urlencode(form))
+        with self.assertRaises(ValueError):
+            guest_envelope(urlencode(form),CASES['manchester'][2],'host_config')
+        for params in ({'recordId':'OTHER'}, {'secret':'PRIVATE'}, None, []):
+            action['params']=params
+            with self.assertRaises(ValueError):
+                guest_envelope(urlencode(dict(form,message=json.dumps({'actions':[action]}))),destination,'host_config')
+        action['params']={}
+        action['descriptor']=HOST_CONFIG_GETTER.replace('getConfigData','saveConfigData')
+        with self.assertRaises(ValueError):
+            guest_envelope(urlencode(dict(form,message=json.dumps({'actions':[action]}))),destination,'host_config')
+
     def test_record_descriptor_closed_shape(self):
         from verification.direct_reference.arcus_http_probe import record_descriptor_matches
         record='a1DSl000007GOmFMAW'
@@ -124,6 +155,35 @@ class ProbeContract(unittest.TestCase):
                       record+'.undefined.null.null.null.Id.VIEW.false.null.Name,Email.null',
                       record+'.undefined.null.null.null.Id.VIEW.false.null.Name.null']:
             self.assertFalse(record_descriptor_matches(value,record))
+
+    def test_host_config_response_is_not_application_evidence(self):
+        import json
+        from unittest.mock import MagicMock, patch
+        from urllib.parse import urlencode, urlsplit
+        from verification.direct_reference.arcus_http_probe import observed_guest_read, HOST_CONFIG_GETTER
+        destination=CASES['salford'][2]
+        u=urlsplit(destination)
+        body=urlencode({'message':json.dumps({'actions':[{'id':'1;a',
+            'descriptor':HOST_CONFIG_GETTER,'params':{}}]}),'aura.token':'null',
+            'aura.context':'{"mode":"PROD"}','aura.pageURI':u.path+'?'+u.query})
+        content=json.dumps({'actions':[{'id':'1;a','state':'SUCCESS',
+            'returnValue':{'private':'PRIVATE_CONFIG','reference':'PA/2025/1084'}}]}).encode()
+        session=MagicMock()
+        response=session.__enter__.return_value.post.return_value.__enter__.return_value
+        response.status_code=200
+        response.headers={'Content-Type':'application/json'}
+        response.iter_content.return_value=[content]
+        delivered=[]
+        with patch('requests.Session',return_value=session):
+            result=observed_guest_read(origin(destination)+'/pr/s/sfsites/aura?r=1',body,
+                destination,'PA/2025/1084',delivered.append,kind='host_config')
+        self.assertEqual(result['outcome'],'GUEST_BOOTSTRAP_OBSERVED')
+        self.assertFalse(result['exact_reference_value_present'])
+        self.assertFalse(result['b2_eligible'])
+        self.assertNotIn('PRIVATE_CONFIG',json.dumps(result))
+        self.assertNotIn('record_field_states',result)
+        self.assertEqual(delivered,[content])
+        self.assertIn('elapsed_seconds',result)
 
     def test_partial_read_does_not_consume_fact_slot(self):
         from verification.direct_reference.arcus_http_probe import fact_read_candidate, RECORD_GETTER
