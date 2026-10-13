@@ -54,6 +54,7 @@ class ProbeContract(unittest.TestCase):
         url = CASES['manchester'][2]
         for path in ['/sfc/servlet.shepherd/version/download/X', '/servlet/servlet.FileDownload?file=X', '/file.pdf']:
             self.assertEqual(request_failure(origin(url)+path, 'GET', 'Fetch', url, 2), 'DOCUMENT_DENIED')
+        self.assertIsNone(request_failure(origin(url)+'/pr/s/sfsites/l/framework.js?label=download', 'GET', 'Script', url, 2))
 
 
 if __name__ == '__main__':

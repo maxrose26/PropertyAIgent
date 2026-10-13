@@ -103,8 +103,9 @@ def request_failure(url, method, resource_type, destination, count):
         return 'UNREVIEWED_METHOD'
     if resource_type == 'Document' and not permitted_navigation(url, destination):
         return 'UNADMITTED_NAVIGATION'
-    if (re.search(r'\.(pdf|docx?|xlsx?|zip)(?:$|[?#])', url, re.I)
-            or any(x in url.lower() for x in ('/sfc/', '/servlet/', 'filedownload', 'download'))):
+    path = urlsplit(url).path.lower()
+    if (re.search(r'\.(pdf|docx?|xlsx?|zip)$', path)
+            or any(x in path for x in ('/sfc/', '/servlet/', '/filedownload', '/download/'))):
         return 'DOCUMENT_DENIED'
     return None
 
@@ -333,6 +334,7 @@ def supervised(case, output):
         if expired or survivors:
             result['failure'] = 'SUPERVISOR_BOUND_OR_CLEANUP'
         output.write_text(json.dumps(result, indent=2) + '\n')
+        print(json.dumps(result, sort_keys=True))
         return 0 if result.get('failure') is None else 1
 
 
