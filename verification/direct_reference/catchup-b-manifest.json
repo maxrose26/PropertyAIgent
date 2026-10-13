@@ -1,0 +1,517 @@
+{
+  "census_at": "2026-10-13T08:49:12.508887Z",
+  "description": "Catch-up B: retained census reconciled with accepted live outcomes; prior facts are comparison context, never production input",
+  "rows": [
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 309,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "117693/OUT/25",
+        "site_id": 255,
+        "source_identifier": "T59I1EQLFZW00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T59I1EQLFZW00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 310,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "117786/FUL/25",
+        "site_id": 256,
+        "source_identifier": "T5VRSYQLG9A00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T5VRSYQLG9A00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 317,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "117953/OUT/25",
+        "site_id": 258,
+        "source_identifier": "T72A6KQLGRG00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T72A6KQLGRG00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 318,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "118020/FUL/25",
+        "site_id": 259,
+        "source_identifier": "T7IIOMQLGYH00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T7IIOMQLGYH00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 342,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "118719/FUL/26",
+        "site_id": 262,
+        "source_identifier": "TCI1T0QLJ4V00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=TCI1T0QLJ4V00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 345,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "118032/FUL/25",
+        "site_id": 260,
+        "source_identifier": "T7O1LWQLGZR00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T7O1LWQLGZR00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 572,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "114228/FUL/24",
+        "site_id": 405,
+        "source_identifier": "SI41OCQLLM200",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=SI41OCQLLM200&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 589,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "115154/FUL/24",
+        "site_id": 415,
+        "source_identifier": "SOAENJQLGGQ00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=SOAENJQLGGQ00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 597,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "115688/FUL/25",
+        "site_id": 417,
+        "source_identifier": "SS6R7CQL01T00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=SS6R7CQL01T00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 775,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "112477/FUL/23",
+        "site_id": 265,
+        "source_identifier": "S57E8HQLG9S00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=S57E8HQLG9S00",
+        "status_verified_at": null,
+        "stored_decision": "Approve with Conditions",
+        "stored_decision_date": "Fri 10 May 2024",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approve with Conditions",
+        "decision_issued_date": "Fri 10 May 2024",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "ADMITTED_POLICY_DUE_NOT_PREVIOUSLY_ATTEMPTED"
+    }
+  ],
+  "schema": 1,
+  "selection_seed": "COUNCIL_THEN_NUMERIC_APPLICATION_ID"
+}

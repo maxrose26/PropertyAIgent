@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 MANIFEST_SHA256='33882abdafca290400e43a18359d1654fa8a9b80f985ea1aabe54c10003fc1c1'
@@ -23,16 +24,28 @@ def encode(value,limit=MAX_BATCH):
     if len(b)>limit:raise ValueError('AUDIT_BOUND')
     return b
 
-def manifest():
+@dataclass(frozen=True)
+class ManifestSpec:
+    filename: str
+    digest: str
+    count: int
+    catchup: bool = False
+
+REPRESENTATIVE=ManifestSpec('batch-manifest.json',MANIFEST_SHA256,20)
+
+def manifest(spec=None):
+    spec=REPRESENTATIVE if spec is None else spec
+    if Path(spec.filename).name!=spec.filename or not re.fullmatch('[0-9a-f]{64}',spec.digest):raise ValueError('MANIFEST_SPEC')
     from .refresh import admitted_row
-    raw=Path(__file__).with_name('batch-manifest.json').read_bytes()
-    if hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA256:raise ValueError('MANIFEST_DIGEST')
+    raw=Path(__file__).with_name(spec.filename).read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=spec.digest:raise ValueError('MANIFEST_DIGEST')
     m=json.loads(raw)
     if set(m)!={'schema','selection_seed','census_at','description','rows'} or m['schema']!=1:raise ValueError('MANIFEST_SCHEMA')
     rows=m['rows']
-    if not 1<=len(rows)<=20 or len({r['identity']['application_id'] for r in rows})!=len(rows):raise ValueError('MANIFEST_SIZE')
+    if not 1<=len(rows)<=20 or len(rows)!=spec.count or len({r['identity']['application_id'] for r in rows})!=len(rows):raise ValueError('MANIFEST_SIZE')
     for r in rows:
-        if set(r)!={'identity','policy','selection_stratum'} or r['policy'] not in 'ABCDEF':raise ValueError('MANIFEST_ROW')
+        keys={'identity','policy','selection_stratum'}|({'prior_facts','selection_reason'} if spec.catchup else set())
+        if set(r)!=keys or r['policy'] not in 'ABCDEF':raise ValueError('MANIFEST_ROW')
         if r['identity']!=admitted_row(r['identity']['application_id']):raise ValueError('MANIFEST_ADMISSION')
     return rows
 
@@ -82,10 +95,11 @@ def validate_record(a,row):
     if a['transaction']=='UNKNOWN' and a['disposition'] not in {'UNCERTAIN','SAFETY_STOP'}:raise ValueError('FALSE_CERTAINTY')
     encode(a,MAX_RECORD)
 
-def validate(a):
-    rows=manifest()
+def validate(a,*,spec=None):
+    rows=manifest(spec)
+    digest=MANIFEST_SHA256 if spec is None else spec.digest
     if set(a)!={'schema','manifest_sha256','repository_sha','invocation','parent_audit_sha256','records','carried_ids','assessment','totals'}:raise ValueError('BATCH_SCHEMA')
-    if a['schema']!=1 or a['manifest_sha256']!=MANIFEST_SHA256 or not re.fullmatch('[0-9a-f]{40}',a['repository_sha']):raise ValueError('BATCH_IDENTITY')
+    if a['schema']!=1 or a['manifest_sha256']!=digest or not re.fullmatch('[0-9a-f]{40}',a['repository_sha']):raise ValueError('BATCH_IDENTITY')
     if not re.fullmatch('[A-Za-z0-9_-]{1,64}',a['invocation']):raise ValueError('INVOCATION')
     if a['parent_audit_sha256'] is not None and not re.fullmatch('[0-9a-f]{64}',a['parent_audit_sha256']):raise ValueError('PARENT_AUDIT')
     if len(a['records'])!=len(rows):raise ValueError('ALL_RECORDS_REQUIRED')
@@ -115,7 +129,7 @@ def totals(records,carried):
         return {k:'UNKNOWN' for k in out}
     return out
 
-def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,clock=time.monotonic):
+def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,clock=time.monotonic,spec=None):
     """Explicit capability injection; no activation from import or arbitrary IDs.
 
     Resume carries completed/safely rejected records only. Any uncertainty or
@@ -123,9 +137,9 @@ def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,
     Local rejections are terminal for this refresh epoch; future refresh requires
     a separately reviewed invocation, never automatic retries.
     """
-    rows=manifest();records=[blank(r['identity']) for r in rows];carried=[]
+    rows=manifest(spec);records=[blank(r['identity']) for r in rows];carried=[]
     if prior is not None:
-        validate(prior)
+        validate(prior,spec=spec)
         if hashlib.sha256(encode(prior)).hexdigest()!=prior_sha256:raise ValueError('RESUME_DIGEST')
         if prior['repository_sha']!=repository_sha or prior['invocation']==invocation:raise ValueError('RESUME_IDENTITY')
         if any(r['disposition'] in {'UNCERTAIN','SAFETY_STOP'} for r in prior['records']):raise ValueError('RESUME_REQUIRES_REVIEW')
@@ -151,7 +165,7 @@ def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,
             records[n]=blank(row);records[n].update(b2_outcome='UNKNOWN',transaction='UNKNOWN',error='AUDIT_REJECTED',cleanup='UNKNOWN',disposition='UNCERTAIN')
             break
         if result['disposition'] in {'UNCERTAIN','SAFETY_STOP'}:break
-    out=dict(schema=1,manifest_sha256=MANIFEST_SHA256,repository_sha=repository_sha,invocation=invocation,
+    out=dict(schema=1,manifest_sha256=MANIFEST_SHA256 if spec is None else spec.digest,repository_sha=repository_sha,invocation=invocation,
         parent_audit_sha256=prior_sha256,records=records,carried_ids=carried,assessment='ACCOUNTED',totals=totals(records,carried))
     if any(r['disposition'] in {'UNCERTAIN','SAFETY_STOP','NOT_ATTEMPTED'} for r in records):out['assessment']='STOPPED_REVIEW_REQUIRED'
-    validate(out);return out
+    validate(out,spec=spec);return out
