@@ -1,0 +1,66 @@
+name: Stage4 frozen Arcus B2 production once
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed integrated workflow revision
+        required: true
+        type: string
+      authority:
+        description: Authorised nine-council completion; Trafford excluded
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_STAGE4_ARCUS_NINE_COUNCIL_COMPLETION_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  live:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Exact integrated revision and first invocation only
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$AUTHORITY" == AUTHORISE_STAGE4_ARCUS_NINE_COUNCIL_COMPLETION_ONCE ]]
+          [[ "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Dependencies and browser installation without production credentials
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/arcus-production-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/arcus-browsers" "$RUNNER_TEMP/arcus-production-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Additive field provenance, validation, then six bounded catch-up batches
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          ARCUS_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          BATCH_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir "$RUNNER_TEMP/arcus-audit"
+          run_arcus() {
+            env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_EVENT_NAME=workflow_dispatch ARCUS_WORKFLOW_SHA="$ARCUS_WORKFLOW_SHA" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_REF="$GITHUB_REF" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/arcus-browsers" BATCH_DATABASE_URL="$BATCH_DATABASE_URL" "$RUNNER_TEMP/arcus-production-venv/bin/python" -m verification.direct_reference.arcus_production --sha "$PIN" --authority "$AUTHORITY" "$@"
+          }
+          run_arcus --migrate --output "$RUNNER_TEMP/arcus-audit/schema.json"
+          run_arcus --phase validation --output "$RUNNER_TEMP/arcus-audit/validation.json"
+          for phase in catchup_a catchup_b catchup_c catchup_d catchup_e catchup_f; do
+            run_arcus --phase "$phase" --validation "$RUNNER_TEMP/arcus-audit/validation.json" --output "$RUNNER_TEMP/arcus-audit/$phase.json"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage4-arcus-production-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/arcus-audit/*.json
+          if-no-files-found: error
+          retention-days: 14

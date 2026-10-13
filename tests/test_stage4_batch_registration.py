@@ -43,7 +43,7 @@ def test_workflow_scope():
     assert 'GITHUB_RUN_NUMBER' in steps[0]['run'] and 'GITHUB_RUN_ATTEMPT' in steps[0]['run']
     assert w['concurrency']['cancel-in-progress']=='false'
     for path in Path('.github/workflows').glob('*.yml'):
-        if path.name in ('stage4-batch-production-once.yml','stage4-oldham-production-once.yml','stage4-catchup-a-production-once.yml','stage4-catchup-b-production-once.yml','stage4-closure-pending-production-once.yml','stage4-closure-expanded-production-once.yml'):continue
+        if path.name in ('stage4-batch-production-once.yml','stage4-oldham-production-once.yml','stage4-catchup-a-production-once.yml','stage4-catchup-b-production-once.yml','stage4-closure-pending-production-once.yml','stage4-closure-expanded-production-once.yml','stage4-arcus-production-once.yml'):continue
         other=yaml.load(path.read_text(),Loader=yaml.BaseLoader)
         assert 'stage4-production-canary' not in str(other)
         assert 'secrets.DATABASE_URL' not in str(other)

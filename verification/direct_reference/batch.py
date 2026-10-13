@@ -30,11 +30,15 @@ class ManifestSpec:
     digest: str
     count: int
     catchup: bool = False
+    family: str = 'IDOX'
 
 REPRESENTATIVE=ManifestSpec('batch-manifest.json',MANIFEST_SHA256,20)
 
 def manifest(spec=None):
     spec=REPRESENTATIVE if spec is None else spec
+    if spec.family == 'ARCUS':
+        from .arcus_batch import manifest as arcus_manifest
+        return arcus_manifest(spec)
     if Path(spec.filename).name!=spec.filename or not re.fullmatch('[0-9a-f]{64}',spec.digest):raise ValueError('MANIFEST_SPEC')
     from .refresh import admitted_row
     raw=Path(__file__).with_name(spec.filename).read_bytes()
@@ -57,6 +61,9 @@ def blank(row):
         disposition='NOT_ATTEMPTED',statements=None)
 
 def validate_record(a,row):
+    if row.get('platform_family') == 'ARCUS':
+        from .arcus_batch import validate_record as arcus_validate
+        return arcus_validate(a,row)
     from .registration import validate_row
     from .oldham_production import validate_snapshot,check_consequences
     if set(a)!=set(blank(row)):raise ValueError('RECORD_SCHEMA')
@@ -135,7 +142,8 @@ def validate(a,*,spec=None):
 def totals(records,carried):
     source=[r['source'] for r in records if r['source'] is not None and r['application_id'] not in carried]
     out={k:sum(r[k] for r in source) for k in ('requests','redirects','retries','received_body_bytes','elapsed_seconds')}
-    if out['requests']>40 or out['received_body_bytes']>20_000_000 or out['elapsed_seconds']>150:raise ValueError('GLOBAL_SOURCE_BOUND')
+    arcus=any(r.get('source',{}).get('family')=='ARCUS' for r in records if r.get('source'))
+    if out['requests']>(1440 if arcus else 40) or out['received_body_bytes']>(360*1024*1024 if arcus else 20_000_000) or out['elapsed_seconds']>(270 if arcus else 150):raise ValueError('GLOBAL_SOURCE_BOUND')
     # Observed redirects are never followed; retain their truthful count as a
     # safety failure rather than erasing the record to force a zero counter.
     if any(r['source'] is None and r['disposition'] in {'UNCERTAIN','SAFETY_STOP'} and r['application_id'] not in carried for r in records):
@@ -160,13 +168,16 @@ def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,
             if r['disposition'] in {'COMPLETED','SAFELY_REJECTED'}:records[n]=copy.deepcopy(r);carried.append(r['application_id'])
     elif prior_sha256 is not None:raise ValueError('RESUME_MISSING')
     started=clock()
+    arcus=spec is not None and spec.family=='ARCUS'
     for n,entry in enumerate(rows):
         row=entry['identity']
         if row['application_id'] in carried:continue
         if clock()-started>=300:break
         used=totals(records,carried)
-        if used['requests']>=40 or used['received_body_bytes']>=20_000_000 or used['elapsed_seconds']>=150:break
-        limits=dict(requests=min(2,40-used['requests']),bytes=min(2_000_000,20_000_000-used['received_body_bytes']),seconds=min(40,150-used['elapsed_seconds']),worker_seconds=min(45,300-(clock()-started)))
+        max_requests,max_bytes,max_seconds=(1440,360*1024*1024,270) if arcus else (40,20_000_000,150)
+        if used['requests']>=max_requests or used['received_body_bytes']>=max_bytes or used['elapsed_seconds']>=max_seconds:break
+        limits=dict(requests=min(80 if arcus else 2,max_requests-used['requests']),bytes=min(20*1024*1024 if arcus else 2_000_000,max_bytes-used['received_body_bytes']),seconds=min(45 if arcus else 40,max_seconds-used['elapsed_seconds']),worker_seconds=min(75 if arcus else 45,300-(clock()-started)))
+        if arcus and (limits['requests']<80 or limits['bytes']<20*1024*1024 or limits['seconds']<45 or limits['worker_seconds']<75):break
         try:
             result=execute_record(copy.deepcopy(row),limits)
             validate_record(result,row)

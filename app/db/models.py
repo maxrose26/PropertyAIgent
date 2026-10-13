@@ -1751,6 +1751,9 @@ class Application(Base):
     # CHANGE, and must never make an unchanged re-check look like
     # MATERIALLY_CHANGED to Gate 1/1C's monitoring).
     status_verified_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # B2 field-specific provenance; no backfill or implied coupled verification.
+    # A verification is valid only while its normalized value matches the fact.
+    planning_field_verification: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     council: Mapped["Council"] = relationship(back_populates="applications")
     site: Mapped["Site | None"] = relationship(back_populates="applications", foreign_keys=[site_id])

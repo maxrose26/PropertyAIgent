@@ -1,0 +1,37 @@
+name: Stage4 Arcus and instrumented offline contracts
+on:
+  pull_request:
+    paths:
+      - verification/direct_reference/**
+      - app/pipeline/status_verification.py
+      - app/db/models.py
+      - tests/test_arcus*
+      - tests/test_field_level_verification.py
+      - verification/direct_reference/arcus_http_probe.py
+      - verification/direct_reference/INSTRUMENTED_PROBE.md
+      - tests/test_instrumented_probe.py
+      - .github/workflows/stage4-instrumented-probe.yml
+permissions:
+  contents: read
+concurrency:
+  group: stage4-instrumented-public-source-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.repository == 'maxrose26/PropertyAIgent' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'stage4/instrumented-source-probe'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing browser dependencies
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/arcus-offline-venv"
+      - name: Focused offline contracts
+        run: |
+          "$RUNNER_TEMP/arcus-offline-venv/bin/python" -m pytest tests/test_instrumented_probe.py tests/test_render_disposable_job.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py tests/test_arcus_batch.py tests/test_field_level_verification.py tests/test_arcus_production.py -q
