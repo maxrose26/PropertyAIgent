@@ -74,8 +74,12 @@ def encode(value, limit=MAX_AUDIT):
     return data
 
 
-def empty_row(application_id, outcome='NOT_ATTEMPTED'):
-    n=IDS.index(application_id);council,reference,url=IDENTITIES[n]
+def empty_row(application_id, outcome='NOT_ATTEMPTED', *, identity=None):
+    if identity is None:
+        n=IDS.index(application_id);council,reference,url=IDENTITIES[n]
+    else:
+        if identity['application_id'] != application_id:raise ValueError('Identity')
+        council,reference,url=(identity[k] for k in ('council','reference','source_url'))
     return dict(application_id=application_id,council=council,reference=reference,source_url=url,
       outcome=outcome,attempted=False if outcome=='NOT_ATTEMPTED' else UNKNOWN,
       requests=0 if outcome=='NOT_ATTEMPTED' else UNKNOWN,
@@ -120,12 +124,16 @@ class MeteredSession:
         except BaseException:self.violation='CLEANUP_FAILURE';raise
 
 
-def observe(application_id, session_factory):
+def observe(application_id, session_factory, *, identity=None, limits=None):
     from .refresh import retrieve, Budget
     from verification.stage26b_l1.request_boundary import BoundaryFailure
-    row=cohort()[IDS.index(application_id)]
-    audit=empty_row(application_id)
-    budget=Budget(request_limit=2,byte_limit=2_000_000,seconds=40)
+    row=cohort()[IDS.index(application_id)] if identity is None else identity
+    from .refresh import admitted_row
+    if row != admitted_row(application_id):raise ValueError('Unadmitted identity')
+    audit=empty_row(application_id,identity=row)
+    limits=limits or dict(requests=2,bytes=2_000_000,seconds=40)
+    if set(limits)!={'requests','bytes','seconds'} or not 0<limits['requests']<=2 or not 0<limits['bytes']<=2_000_000 or not 0<limits['seconds']<=40:raise ValueError('Record limits')
+    budget=Budget(request_limit=limits['requests'],byte_limit=limits['bytes'],seconds=limits['seconds'])
     meter=MeteredSession(row,session_factory())
     started=time.monotonic()
     bound_exhausted=False
@@ -136,6 +144,8 @@ def observe(application_id, session_factory):
           normalized_facts=observation.fields,semantic_qualification=observation.semantic_state)
     except BoundaryFailure as error:
         audit['outcome']=error.outcome if error.outcome in FAILURES else 'PARSER_FAILURE'
+        if identity is not None and error.reason in {'unsafe or excessive factual field','date field exceeds bound'}:
+            audit['outcome']='PRIVACY_FAILURE'
         bound_exhausted=any(word in error.reason.lower() for word in ('ceiling','bound','deadline'))
         diagnostics=getattr(error,'diagnostics',None)
         if diagnostics:
@@ -154,7 +164,7 @@ def observe(application_id, session_factory):
     if audit['cleanup_state']!='CLOSED':audit['outcome']='CLEANUP_FAILURE'
     if audit['outcome']!='LITERAL_VERIFIED':
         audit.update(literal_facts=None,normalized_facts=None,semantic_qualification=UNKNOWN,identity_qualification=UNKNOWN)
-    validate_row(audit,application_id)
+    validate_row(audit,application_id,identity=row)
     return audit
 
 
@@ -162,15 +172,15 @@ def integer(value, maximum):
     if type(value) is not int or not 0<=value<=maximum:raise ValueError('Audit integer bound')
 
 
-def validate_row(row, application_id):
-    expected=empty_row(application_id)
+def validate_row(row, application_id, *, identity=None):
+    expected=empty_row(application_id,identity=identity)
     if not isinstance(row,dict) or set(row)!=set(expected):raise ValueError('Closed audit schema')
     for k in ('application_id','council','reference','source_url'):
         if row[k]!=expected[k]:raise ValueError('Audit identity')
     if row['outcome'] not in FAILURES|{'LITERAL_VERIFIED','NOT_ATTEMPTED','INTERRUPTED'}:
         raise ValueError('Audit outcome')
     if row['outcome'] in ('NOT_ATTEMPTED','INTERRUPTED'):
-        if row!=empty_row(application_id,row['outcome']):raise ValueError('Unknown/unattempted accounting')
+        if row!=empty_row(application_id,row['outcome'],identity=identity):raise ValueError('Unknown/unattempted accounting')
         return
     for k,cap in [('requests',2),('redirects',2),('retries',1),('received_body_bytes',2_016_384)]:integer(row[k],cap)
     if row['attempted'] is not (row['requests']>0) or row['retries']!=max(0,row['requests']-1):raise ValueError('Request accounting')

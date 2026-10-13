@@ -240,11 +240,11 @@ def run_transaction(engine,sha,run_id,source_factory):
     validate(audit);return audit
 
 
-def production_engine():
+def production_engine(*,secret_name='OLDHAM_DATABASE_URL',application_name='stage4_oldham42_once'):
     from sqlalchemy import create_engine
     from sqlalchemy.engine import make_url
     from app.db.session import _normalize_database_url
-    raw=os.environ.pop('OLDHAM_DATABASE_URL','')
+    raw=os.environ.pop(secret_name,'')
     if not raw:raise ValueError('CREDENTIAL_MISSING')
     u=make_url(_normalize_database_url(raw))
     if u.drivername!='postgresql+psycopg' or not u.host or not u.password or u.database!='postgres' or u.query:raise ValueError('DB_ROUTE')
@@ -252,7 +252,7 @@ def production_engine():
     if (u.host,u.port or 5432,u.database,u.username)!=PRODUCTION_ROUTE:raise ValueError('UNQUALIFIED_PRODUCTION_ROUTE')
     if not (re.fullmatch(r'db\.[a-z0-9]{20}\.supabase\.co',u.host) or re.fullmatch(r'aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com',u.host)):raise ValueError('DB_ROUTE')
     return create_engine(u,pool_size=1,max_overflow=0,pool_pre_ping=False,hide_parameters=True,
-      connect_args={'connect_timeout':5,'sslmode':'require','options':'-c statement_timeout=10000 -c lock_timeout=8000 -c idle_in_transaction_session_timeout=40000', 'application_name':'stage4_oldham42_once'})
+      connect_args={'connect_timeout':5,'sslmode':'require','options':'-c statement_timeout=10000 -c lock_timeout=8000 -c idle_in_transaction_session_timeout=40000', 'application_name':application_name})
 
 
 def worker(sha,run_id,path):

@@ -1,0 +1,811 @@
+{
+  "census_at": "2026-10-13T08:49:12.508887Z",
+  "description": "Reviewed representative acceptance manifest; synthetic rehearsal is not live evidence",
+  "rows": [
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 72,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "bolton",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "21154/25",
+        "site_id": 128,
+        "source_identifier": "T3PFWWDELUR00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T3PFWWDELUR00",
+        "status_verified_at": "2026-09-13T11:27:19.863912+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Deposited",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "F",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 468,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "bolton",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "19281/24",
+        "site_id": 329,
+        "source_identifier": "SMSR3BDEG7D00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=SMSR3BDEG7D00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Approve subject to conditions",
+        "stored_decision_date": "Thu 02 Oct 2025",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 197,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "bolton",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "21583/25",
+        "site_id": 145,
+        "source_identifier": "T7GUYQDEFI400",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T7GUYQDEFI400",
+        "status_verified_at": "2026-09-28T05:08:30.533397+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Deposited",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "relationship_dependent"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 18,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "bury",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "72578",
+        "site_id": 16,
+        "source_identifier": "_BURY_DCAPR_63981",
+        "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=_BURY_DCAPR_63981",
+        "status_verified_at": "2026-09-28T05:13:29.392459+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Registered",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "F",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 381,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "bury",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "68815",
+        "site_id": 15,
+        "source_identifier": "_BURY_DCAPR_59840",
+        "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=_BURY_DCAPR_59840",
+        "status_verified_at": null,
+        "stored_decision": "Approve with Conditions",
+        "stored_decision_date": "Thu 03 Aug 2023",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 41,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "FUL/355603/26",
+        "site_id": 27,
+        "source_identifier": "T9BRLLMCIEP00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T9BRLLMCIEP00",
+        "status_verified_at": "2026-09-10T10:52:30.927242+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 409,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "FUL/354326/25",
+        "site_id": 297,
+        "source_identifier": "STZVBQMCLS100",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=STZVBQMCLS100&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Granted",
+        "stored_decision_date": "Thu 03 Jul 2025",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 37,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "oldham",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "RES/355397/25",
+        "site_id": 36,
+        "source_identifier": "T6LGA2MCHI100",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T6LGA2MCHI100",
+        "status_verified_at": "2026-09-10T10:51:54.297692+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "relationship_dependent"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 126,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "stockport",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "DC/098199",
+        "site_id": 118,
+        "source_identifier": "T9TWS9PJ0H600",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?activeTab=summary&keyVal=T9TWS9PJ0H600",
+        "status_verified_at": "2026-09-13T11:03:08.211073+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Registered",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "F",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 187,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "stockport",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "DC/082118",
+        "site_id": 67,
+        "source_identifier": "QX0C5MPJHHT00",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=QX0C5MPJHHT00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Granted",
+        "stored_decision_date": "Thu 18 Nov 2021",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 45,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "stockport",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "DC/096393",
+        "site_id": 41,
+        "source_identifier": "SZDX32PJ0DB00",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=SZDX32PJ0DB00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Objection (Consult with Neighbour Auth)",
+        "stored_decision_date": "Thu 02 Jul 2026",
+        "stored_status": "Registered",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "relationship_dependent"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 53,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "25/00973/OUT",
+        "site_id": 48,
+        "source_identifier": "T6MTRTPUKPP00",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T6MTRTPUKPP00",
+        "status_verified_at": "2026-09-13T12:12:09.619867+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 54,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "26/00004/REM",
+        "site_id": 49,
+        "source_identifier": "T8E9KVPULD000",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=T8E9KVPULD000&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Approve",
+        "stored_decision_date": "Fri 24 Jul 2026",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 56,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "tameside",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "26/00098/FUL",
+        "site_id": 51,
+        "source_identifier": "T9VQKTPULXN00",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T9VQKTPULXN00",
+        "status_verified_at": "2026-09-13T12:12:21.871628+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "quota_fill"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 305,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "117614/FUL/25",
+        "site_id": 254,
+        "source_identifier": "T4MXDXQLFR700",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T4MXDXQLFR700&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 783,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "117427/CPE/25",
+        "site_id": 251,
+        "source_identifier": "T3JRNZQLMY800",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T3JRNZQLMY800",
+        "status_verified_at": null,
+        "stored_decision": "Approve with Conditions",
+        "stored_decision_date": "Thu 15 Jan 2026",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 289,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "trafford",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact",
+          "missing_successful_verification"
+        ],
+        "reference": "117022/VLA/25",
+        "site_id": 248,
+        "source_identifier": "T0KN7LQL06E00",
+        "source_url": "https://pa.trafford.gov.uk/online-applications/applicationDetails.do?keyVal=T0KN7LQL06E00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Awaiting decision",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "relationship_dependent"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 220,
+        "cohort": 2,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "wigan",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "decision_sensitive_buyer_facing_fact"
+        ],
+        "reference": "A/25/099883/OUT",
+        "site_id": 159,
+        "source_identifier": "T4HRGYRRJOP00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T4HRGYRRJOP00",
+        "status_verified_at": "2026-09-13T12:21:30.917773+00:00",
+        "stored_decision": null,
+        "stored_decision_date": null,
+        "stored_status": "Registered",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "F",
+      "selection_stratum": "missing_decision"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 209,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "wigan",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "A/25/099409/RMMAJ",
+        "site_id": 149,
+        "source_identifier": "SZX7F4RRH9800",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=SZX7F4RRH9800&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Approved with Conditions",
+        "stored_decision_date": "Thu 26 Feb 2026",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "stored_terminal"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 499,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "wigan",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": false,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "A/25/098376/RMMAJ",
+        "site_id": 348,
+        "source_identifier": "SP5S49RRK0U00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=SP5S49RRK0U00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Approved with Conditions",
+        "stored_decision_date": "Fri 28 Mar 2025",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "E",
+      "selection_stratum": "relationship_dependent"
+    }
+  ],
+  "schema": 1,
+  "selection_seed": "stage4-census-2026-10-13"
+}
