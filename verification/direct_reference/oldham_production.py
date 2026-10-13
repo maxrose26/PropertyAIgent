@@ -24,8 +24,8 @@ REFERENCE='FUL/355686/26'
 URL='https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TA7382MCIP700'
 AUTHORITY='AUTHORISE_STAGE4_OLDHAM42_B2_PERSISTENCE_ONCE'
 WORKFLOW='.github/workflows/stage4-oldham-production-once.yml'
-# Non-secret (host,port,database,username) must be REVIEW-qualified before registration.
-PRODUCTION_ROUTE=None
+# Existing Render route, configuration-qualified only; no production connection proved.
+PRODUCTION_ROUTE=('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres','postgres.zcikcfgpblzuzpanpdqd')
 MAX_AUDIT=16384
 UNKNOWN='UNKNOWN'
 COUPLED=('status','decision','decision_issued_date','status_verified_at','evidence_refresh_required',

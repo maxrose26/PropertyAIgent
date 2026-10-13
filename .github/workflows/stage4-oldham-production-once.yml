@@ -19,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   audit:
+    environment: stage4-production-canary
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
