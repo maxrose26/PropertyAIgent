@@ -12,8 +12,8 @@ RECORD_GETTER = 'serviceComponent://ui.force.components.controllers.recordGlobal
 def record_descriptor_matches(value, record_id):
     if not isinstance(value, str) or len(value)>256:
         return False
-    # Structural hypotheses only, not claims about null/default semantics.
-    return value in (record_id + '-null' * 11, record_id + '.null' * 11)
+    # Exact control sequence observed from the ordinary public page in run 11.
+    return value == record_id + '.undefined.FULL.null.null.null.VIEW.true.null.null.null'
 
 
 def unique_object(pairs):
@@ -95,11 +95,12 @@ def guest_envelope(body, destination, kind='header'):
 def response_summary(data, reference):
     schema = set()
     pairs = []
+    field_slices = []
     found = False
     labels = {'reference','application reference','status','decision','decision date',
               'decision notice sent date','decision issued date'}
     nodes = 0
-    def visit(value, depth=0):
+    def visit(value, depth=0, path='$'):
         nonlocal nodes, found
         nodes += 1
         if depth > 15 or nodes > 10000:
@@ -111,16 +112,22 @@ def response_summary(data, reference):
             if isinstance(label,str) and label.strip().lower() in labels and isinstance(literal,(str,type(None))):
                 if literal is None or len(literal)<160:
                     pairs.append([label,literal])
-            for child in value.values():
-                visit(child,depth+1)
+            for key,child in value.items():
+                key_path=key if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}',key) else '[key]'
+                child_path=path+'.'+key_path
+                if key in {'Name','arcusbuiltenv__Status__c','arcusbuiltenv__Decision__c','arcusbuiltenv__Decision_Notice_Sent_Date_Manual__c'} and isinstance(child,dict):
+                    selected={k:v for k,v in child.items() if k in ('label','value','displayValue') and (v is None or isinstance(v,str) and len(v)<=160)}
+                    if key!='Name' or child.get('value')==reference:
+                        field_slices.append({'path':child_path,'field':key,'selected':selected})
+                visit(child,depth+1,child_path)
         elif isinstance(value,list):
-            for child in value:
-                visit(child,depth+1)
+            for index,child in enumerate(value):
+                visit(child,depth+1,path+'['+str(index)+']')
         elif value == reference:
             found=True
     visit(data)
     return {'response_keys':sorted(schema)[:80], 'exact_reference_value_present':found,
-            'planning_label_values':pairs[:20]}
+            'planning_label_values':pairs[:20], 'planning_field_slices':field_slices[:20]}
 
 
 def observed_guest_read(url, body, destination, reference, consumer=None, kind='header'):
@@ -132,7 +139,8 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
                 target.path!='/pr/s/sfsites/aura' or target.fragment or target.username):
             raise ValueError('EXACT_ENDPOINT')
         query = parse_qs(target.query, keep_blank_values=True)
-        if any(not re.fullmatch(r'(r|aura\.[A-Za-z.]+)', key) or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
+        result['query_shape']=[{'key':key if re.fullmatch(r'[A-Za-z0-9_.-]{1,120}',key) else 'UNRETAINED', 'numeric_single':len(values)==1 and bool(re.fullmatch(r'[0-9]{1,10}',values[0]))} for key,values in list(query.items())[:8]]
+        if any(not (re.fullmatch(r'(r|aura\.[A-Za-z0-9_.-]+)', key) or (kind=='record' and key=='ui-force-recordGlobalValueProvider.RecordGvp.getRecord')) or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
             raise ValueError('UNREVIEWED_QUERY')
         payload=guest_envelope(body,destination,kind)
         import requests

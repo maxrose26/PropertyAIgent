@@ -101,8 +101,9 @@ class ProbeContract(unittest.TestCase):
     def test_record_descriptor_closed_shape(self):
         from verification.direct_reference.arcus_http_probe import record_descriptor_matches
         record='a1DSl000007GOmFMAW'
-        self.assertTrue(record_descriptor_matches(record+'-null'*11,record))
-        self.assertTrue(record_descriptor_matches(record+'.null'*11,record))
+        self.assertTrue(record_descriptor_matches(record+'.undefined.FULL.null.null.null.VIEW.true.null.null.null',record))
+        self.assertFalse(record_descriptor_matches(record+'-null'*11,record))
+        self.assertFalse(record_descriptor_matches(record+'.null'*11,record))
         for value in [record, 'OTHER'+'-null'*11, record+'.Contact.Email', record+'-null'*12,
                       record+'.undefined.null.null.null.Id.VIEW.false.null.Name,Email.null',
                       record+'.undefined.null.null.null.Id.VIEW.false.null.Name.null']:
