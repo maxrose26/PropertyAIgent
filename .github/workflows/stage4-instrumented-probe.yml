@@ -30,10 +30,15 @@ jobs:
           python -m playwright install --with-deps chromium --only-shell
       - name: Focused offline contracts
         run: python -m unittest tests.test_instrumented_probe -v
-      - name: One frozen Manchester network observation
+      - name: Frozen Manchester and first Trafford network observations
         run: |
           mkdir -p "$RUNNER_TEMP/stage4-probe-audit"
-          python -m verification.direct_reference.instrumented_probe --case manchester --output "$RUNNER_TEMP/stage4-probe-audit/manchester.json"
+          probe_result=0
+          for probe_case in manchester trafford; do
+            python -m verification.direct_reference.instrumented_probe --case "$probe_case" --output "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json" || probe_result=1
+            python -c 'import json,sys; a=json.load(open(sys.argv[1])); sys.exit(0 if a.get("process_cleanup")=="CLOSED" and not a.get("supervisor_limit_hit",True) else 1)' "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json"
+          done
+          exit "$probe_result"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

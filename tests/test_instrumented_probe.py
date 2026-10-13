@@ -1,6 +1,6 @@
 import unittest
 from verification.direct_reference.instrumented_probe import (
-    CASES, origin, permitted_navigation, post_descriptors, qualify, safe_path, request_failure,
+    CASES, origin, permitted_navigation, post_descriptors, post_metadata, qualify, safe_path, request_failure,
 )
 
 
@@ -38,6 +38,9 @@ class ProbeContract(unittest.TestCase):
         self.assertEqual(post_descriptors(body), ['apex://Public/ACTION$get'])
         self.assertNotIn('SECRET', safe_path('https://example.com/pr/sfsites/a/SECRET?token=SECRET'))
         self.assertEqual(post_descriptors('message=bad'), [])
+        metadata=post_metadata(body, CASES['manchester'][2])
+        self.assertNotIn('SECRET', json.dumps(metadata))
+        self.assertEqual(metadata[0]['token_state'], 'PRESENT_NOT_RETAINED')
 
     def test_each_redirect_destination_checked(self):
         url = CASES['manchester'][2]

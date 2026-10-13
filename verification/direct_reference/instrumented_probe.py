@@ -34,11 +34,11 @@ def origin(url):
 def safe_path(url):
     """No query, fragment or credential/session-bearing arbitrary path retained."""
     path = urlsplit(url).path
+    if path.endswith('/aura'):
+        return path if re.fullmatch(r'/[A-Za-z0-9_/-]{1,100}', path) else '/[public-site]/aura'
     for prefix in ('/pr/s/sfsites/', '/pr/sfsites/', '/pr/resource/', '/pr/webruntime/'):
         if path.startswith(prefix):
             return prefix + '[resource]'
-    if path.endswith('/aura'):
-        return '/[public-site]/aura'
     if path.startswith('/pr/s/'):
         return '/pr/s/[page]'
     if path == '/online-applications/applicationDetails.do':
@@ -50,12 +50,43 @@ def post_descriptors(body):
     """Only Salesforce action identifiers; no argument values/context/tokens."""
     if not body or len(body) > 65536:
         return []
+
     try:
         message = parse_qs(body).get('message', [''])[0]
         actions = json.loads(message).get('actions', [])
         return [a['descriptor'] for a in actions[:10]
                 if isinstance(a, dict) and isinstance(a.get('descriptor'), str)
                 and re.fullmatch(r'[A-Za-z0-9_$.:/+-]{1,240}', a['descriptor'])]
+    except (ValueError, TypeError, AttributeError):
+        return []
+
+
+def post_metadata(body, destination):
+    """Describe public RPC operations without retaining params, context or tokens."""
+    if not body or len(body) > 65536:
+        return []
+    try:
+        form = parse_qs(body, keep_blank_values=True)
+        actions = json.loads(form.get('message', [''])[0]).get('actions', [])
+        records = []
+        for action in actions[:10]:
+            params = action.get('params', {})
+            record = {}
+            for key in ('descriptor',):
+                value = action.get(key)
+                if isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9_$.:/+-]{1,240}',value):
+                    record[key] = value
+            for key in ('namespace', 'classname', 'className', 'method', 'methodName'):
+                value=params.get(key)
+                if isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9_.$]{0,160}',value):
+                    record[key] = value
+            inner=params.get('params', {})
+            record['argument_keys'] = sorted(k for k in inner if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20] if isinstance(inner,dict) else []
+            record_id=urlsplit(destination).path.rsplit('/',1)[-1]
+            record['contains_frozen_record_id'] = record_id in json.dumps(inner)
+            record['token_state'] = 'ABSENT' if 'aura.token' not in form else 'NULL' if form['aura.token'] == ['null'] else 'EMPTY' if form['aura.token'] == [''] else 'PRESENT_NOT_RETAINED'
+            records.append(record)
+        return records
     except (ValueError, TypeError, AttributeError):
         return []
 
@@ -118,7 +149,7 @@ async def probe(case):
                  persistence=False, requests=0, responses=0, redirects=0,
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
-                 blocked_actions=[], failure=None, exact_reference=False, fields=None,
+                 blocked_actions=[], blocked_action_metadata=[], failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', network_classification='UNKNOWN')
     started = time.monotonic()
     browser = context = None
@@ -151,6 +182,7 @@ async def probe(case):
                 audit['redirects'] += 1
             if request['method'] not in ('GET', 'HEAD'):
                 audit['blocked_actions'] = post_descriptors(request.get('postData'))
+                audit['blocked_action_metadata'] = post_metadata(request.get('postData'), destination)
             reason = request_failure(url, request['method'], event.get('resourceType'), destination, audit['requests'])
             if reason:
                 fail(reason)
