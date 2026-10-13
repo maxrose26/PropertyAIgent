@@ -1,5 +1,6 @@
 """One observed guest read, no cookies/tokens copied and no B2 eligibility."""
 import hashlib
+import datetime as dt
 import json
 import re
 import time
@@ -7,6 +8,73 @@ from urllib.parse import parse_qs, urlsplit
 
 MAX_BODY = 1024 * 1024
 RECORD_GETTER = 'serviceComponent://ui.force.components.controllers.recordGlobalValueProvider.RecordGvpController/ACTION$getRecord'
+PLANNING_OBJECT = 'arcusbuiltenv__Planning_Application__c'
+FACT_FIELDS = {'reference':'Name', 'status':'arcusbuiltenv__Status__c',
+               'decision':'arcusbuiltenv__Current_Decision__c',
+               'decision_date':'arcusbuiltenv__Decision_Notice_Sent_Date_Manual__c'}
+
+
+def record_observation(data, record_id, reference):
+    """Only the observed exact application subtree, never surrounding text."""
+    providers=data.get('context',{}).get('globalValueProviders',[])
+    maps=[p['values']['records'] for p in providers if isinstance(p,dict)
+          and isinstance(p.get('values'),dict) and isinstance(p['values'].get('records'),dict)
+          and p['values']['records']]
+    if len(maps)!=1 or set(maps[0])!={record_id}:
+        raise ValueError('RESPONSE_RECORD_SCOPE')
+    typed=maps[0][record_id]
+    if not isinstance(typed,dict) or set(typed)!={PLANNING_OBJECT}:
+        raise ValueError('RESPONSE_OBJECT_SCOPE')
+    scoped=typed[PLANNING_OBJECT]
+    if not isinstance(scoped,dict):
+        raise ValueError('RECORD_SHAPE')
+    record=scoped.get('record')
+    if not isinstance(record,dict) or not isinstance(record.get('fields'),dict):
+        raise ValueError('RECORD_SHAPE')
+    fields=record['fields']
+    identity=fields.get('Id',{})
+    if not isinstance(identity,dict):
+        raise ValueError('RECORD_IDENTITY')
+    ids=[value for value in (record.get('id'),identity.get('value')) if value is not None]
+    if not ids or any(value!=record_id for value in ids):
+        raise ValueError('RECORD_IDENTITY')
+    name=fields.get('Name',{})
+    if not isinstance(name,dict) or name.get('value')!=reference or name.get('displayValue') not in (None,reference):
+        raise ValueError('REFERENCE_IDENTITY')
+    result={}
+    for field,api in FACT_FIELDS.items():
+        node=fields.get(api)
+        item={'api_field':api,'location':'context.globalValueProviders[].values.records.<exact-id>.'+PLANNING_OBJECT+'.record.fields.'+api}
+        if api not in fields:
+            item.update(state='NOT_PRESENT',value=None)
+        elif not isinstance(node,dict) or 'value' not in node:
+            item.update(state='UNPARSEABLE',value=None)
+        elif node['value'] is None:
+            item.update(state='UNKNOWN',value=None,raw_null=True)
+        elif not isinstance(node['value'],str) or len(node['value'])>160:
+            item.update(state='UNPARSEABLE',value=None)
+        else:
+            item.update(state='PRESENT_VALUE' if node['value'].strip() else 'PRESENT_BLANK',value=node['value'])
+        if isinstance(node,dict) and 'displayValue' in node:
+            display=node['displayValue']
+            if display is None or isinstance(display,str) and len(display)<=160:
+                item['display_value']=display
+            if field!='decision_date' and display not in (None,item['value']):
+                item['state']='CONFLICTING'
+            elif field=='decision_date' and display is not None:
+                # Compare the observed ISO/raw and UK/display encodings only.
+                # Both formats already occur in lapse_tracking's accepted parser.
+                try:
+                    raw_date=dt.datetime.strptime(item['value'],'%Y-%m-%d').date()
+                    shown_date=dt.datetime.strptime(display,'%d/%m/%Y').date()
+                    if raw_date!=shown_date:
+                        item['state']='CONFLICTING'
+                except (ValueError,TypeError):
+                    item['state']='UNPARSEABLE'
+        result[field]=item
+    return {'exact_record_id_present':True,'exact_reference_value_present':True,
+            'other_record_identity_count':0,'record_identity_sources':len(ids),
+            'record_field_states':result}
 
 
 def record_descriptor_matches(value, record_id):
@@ -109,13 +177,13 @@ def response_summary(data, reference):
             schema.update(k for k in value if isinstance(k,str) and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}',k))
             label=value.get('label',value.get('fieldLabel'))
             literal=value.get('value',value.get('displayValue'))
-            if isinstance(label,str) and label.strip().lower() in labels and isinstance(literal,(str,type(None))):
+            if ('value' in value or 'displayValue' in value) and isinstance(label,str) and label.strip().lower() in labels and isinstance(literal,(str,type(None))):
                 if literal is None or len(literal)<160:
                     pairs.append([label,literal])
             for key,child in value.items():
                 key_path=key if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,79}',key) else '[key]'
                 child_path=path+'.'+key_path
-                if key in {'Name','arcusbuiltenv__Status__c','arcusbuiltenv__Decision__c','arcusbuiltenv__Decision_Notice_Sent_Date_Manual__c'} and isinstance(child,dict):
+                if key in set(FACT_FIELDS.values()) and isinstance(child,dict):
                     selected={k:v for k,v in child.items() if k in ('label','value','displayValue') and (v is None or isinstance(v,str) and len(v)<=160)}
                     if key!='Name' or child.get('value')==reference:
                         field_slices.append({'path':child_path,'field':key,'selected':selected})
@@ -174,25 +242,10 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
                     raise ValueError('RESPONSE_ACTION_IDENTITY')
                 if any(action.get('state')!='SUCCESS' for action in data.get('actions',[])) or not data.get('actions'):
                     raise ValueError('AURA_NOT_SUCCESS')
-                result.update(response_summary(data,reference))
                 if kind == 'record':
-                    target_id=source.path.rsplit('/',1)[-1]
-                    values=[]
-                    def collect(value, depth=0):
-                        if depth>15 or len(values)>10000:
-                            raise ValueError('RECORD_COMPLEXITY')
-                        if isinstance(value,dict):
-                            for key,child in value.items():
-                                if key in ('id','Id','recordId') and isinstance(child,str) and re.fullmatch(r'[A-Za-z0-9]{18}',child):
-                                    values.append(child)
-                                collect(child,depth+1)
-                        elif isinstance(value,list):
-                            for child in value: collect(child,depth+1)
-                    collect(actions[0].get('returnValue'))
-                    result['exact_record_id_present']=target_id in values
-                    result['other_record_identity_count']=len(set(values)-{target_id})
-                    if target_id not in values or set(values)-{target_id}:
-                        raise ValueError('RESPONSE_RECORD_SCOPE')
+                    result.update(record_observation(data,source.path.rsplit('/',1)[-1],reference))
+                else:
+                    result.update(response_summary(data,reference))
                 result['outcome']='GUEST_JSON_OBSERVED' if result['exact_reference_value_present'] else 'IDENTITY_NOT_ESTABLISHED'
                 if consumer is not None and result['outcome']=='GUEST_JSON_OBSERVED':
                     consumer(bytes(content))

@@ -109,6 +109,39 @@ class ProbeContract(unittest.TestCase):
                       record+'.undefined.null.null.null.Id.VIEW.false.null.Name.null']:
             self.assertFalse(record_descriptor_matches(value,record))
 
+    def test_record_field_states_same_exact_subtree(self):
+        from verification.direct_reference.arcus_http_probe import record_observation, PLANNING_OBJECT
+        rid='a1DSl000007GOmFMAW'
+        fields={'Name':{'value':'R','displayValue':None},'Id':{'value':rid},
+                'arcusbuiltenv__Status__c':{'value':'Final','displayValue':'Final'},
+                'arcusbuiltenv__Current_Decision__c':{'value':''},
+                'arcusbuiltenv__Decision_Notice_Sent_Date_Manual__c':{'value':None}}
+        record={'id':rid,'fields':fields}
+        records={rid:{PLANNING_OBJECT:{'record':record}}}
+        data={'context':{'globalValueProviders':[{'values':{'records':records}}]}}
+        result=record_observation(data,rid,'R')['record_field_states']
+        self.assertEqual(result['status']['state'],'PRESENT_VALUE')
+        self.assertEqual(result['decision']['state'],'PRESENT_BLANK')
+        self.assertEqual(result['decision_date']['state'],'UNKNOWN')
+        date=fields['arcusbuiltenv__Decision_Notice_Sent_Date_Manual__c']
+        date.update(value='2026-07-23',displayValue='23/07/2026')
+        self.assertEqual(record_observation(data,rid,'R')['record_field_states']['decision_date']['state'],'PRESENT_VALUE')
+        date['displayValue']='24/07/2026'
+        self.assertEqual(record_observation(data,rid,'R')['record_field_states']['decision_date']['state'],'CONFLICTING')
+        date['displayValue']='not a date'
+        self.assertEqual(record_observation(data,rid,'R')['record_field_states']['decision_date']['state'],'UNPARSEABLE')
+        fields['arcusbuiltenv__Current_Decision__c']=None
+        self.assertEqual(record_observation(data,rid,'R')['record_field_states']['decision']['state'],'UNPARSEABLE')
+        del fields['arcusbuiltenv__Current_Decision__c']
+        self.assertEqual(record_observation(data,rid,'R')['record_field_states']['decision']['state'],'NOT_PRESENT')
+        fields['arcusbuiltenv__Status__c']['displayValue']='OTHER'
+        self.assertEqual(record_observation(data,rid,'R')['record_field_states']['status']['state'],'CONFLICTING')
+        fields['Name']['value']='WRONG'
+        with self.assertRaises(ValueError): record_observation(data,rid,'R')
+        fields['Name']['value']='R'
+        records['OTHER']=records[rid]
+        with self.assertRaises(ValueError): record_observation(data,rid,'R')
+
 
 if __name__ == '__main__':
     unittest.main()
