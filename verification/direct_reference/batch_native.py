@@ -28,11 +28,14 @@ def no_council():
     with patch('requests.sessions.Session.request',side_effect=AssertionError('Council forbidden')):yield
 
 def test_supervised20(engine,tmp_path):
+    import subprocess
+    candidate=os.environ['BATCH_REPOSITORY_SHA']
+    assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==candidate
     rows=b.manifest();indices={r['identity']['application_id']:n for n,r in enumerate(rows)}
     def worker(r,l):
         def command(row,limits,out):return [sys.executable,'-m','verification.direct_reference.batch_supervisor','--index',str(indices[row['application_id']]),'--limits',json.dumps(limits),'--output',str(out)]
         return supervisor.isolated(r,l,command,dict(B20_DISPOSABLE='YES_SYNTHETIC_ONLY',B20_POSTGRES_PORT=os.environ['B20_POSTGRES_PORT']))
-    result=b.run(SHA,'disposable-supervised20',worker)
+    result=b.run(candidate,'disposable-supervised20',worker)
     assert result['assessment']=='ACCOUNTED',result
     assert all(r['transaction']=='COMMITTED' and r['cleanup']=='CLOSED' for r in result['records'])
     counts={k:sum(r['statements'][k] for r in result['records']) for k in ('reads','writes','other','commits','rollbacks','connections')}
