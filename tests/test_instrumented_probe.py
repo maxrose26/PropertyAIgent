@@ -79,7 +79,7 @@ class ProbeContract(unittest.TestCase):
         body=urlencode(form)
         self.assertEqual(guest_envelope(body,destination),body)
         for change in ({'aura.token':'SECRET'}, {'message':json.dumps({'actions':[action,action]})},
-                       {'aura.pageURI':'/other'}, {'aura.context':'{"globals":{"secret":"x"}}'}):
+                       {'aura.pageURI':'/other'}, {'aura.context':'{"globals":{"secret":"x"}}'}, {'aura.context':'{"globals":{"nested":{}}}'}):
             with self.assertRaises(ValueError):
                 guest_envelope(urlencode(dict(form,**change)),destination)
         action['params']['params']['recordId']='WRONG'

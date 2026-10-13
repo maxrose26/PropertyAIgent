@@ -51,10 +51,23 @@ def guest_envelope(body, destination):
     context = json.loads(form['aura.context'][0], object_pairs_hook=unique_object)
     if not isinstance(context,dict) or set(context) - {'mode','fwuid','app','loaded','dn','globals','uad'}:
         raise ValueError('UNREVIEWED_CONTEXT_KEYS')
-    if context.get('globals') not in (None, {}):
-        raise ValueError('NONEMPTY_CONTEXT_GLOBALS')
+    globals_ = context.get('globals')
+    if globals_ is not None:
+        if not isinstance(globals_, dict) or len(globals_)>20:
+            raise ValueError('GLOBALS_SHAPE')
+        for key,value in globals_.items():
+            if not isinstance(key,str) or not re.fullmatch(r'[A-Za-z_$][A-Za-z0-9_.$]{0,79}',key):
+                raise ValueError('GLOBALS_KEY')
+            if re.search(r'token|secret|auth|session|password|cookie',key,re.I):
+                raise ValueError('GLOBALS_SENSITIVE_KEY')
+            if type(value) not in (str,bool,int,float,type(None)) or (isinstance(value,str) and len(value)>160):
+                raise ValueError('GLOBALS_VALUE_SHAPE')
     expected_page = url.path + ('?' + url.query if url.query else '')
-    if form.get('aura.pageURI') != [expected_page]:
+    pages=[expected_page]
+    if url.netloc=='salfordcitycouncil.my.site.com':
+        route='/pr/s/planning-application/'+url.path.rsplit('/',1)[-1]+'/pa20251084'
+        pages.extend([route,route+'?'+url.query])
+    if form.get('aura.pageURI',[None])[0] not in pages:
         raise ValueError('PAGE_IDENTITY')
     # Preserve observed body exactly; no constructed context, token or new action.
     return body

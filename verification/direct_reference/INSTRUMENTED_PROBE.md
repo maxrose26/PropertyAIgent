@@ -53,3 +53,8 @@ Selected planning labels and structural keys only are retained, never raw JSON.
 This diagnostic is not B2-eligible and does not establish a complete source
 contract. Its HTTP attempt and decoded body bytes join aggregate counts; CDP
 encoded-byte counts exclude this separate HTTP request. Trafford is not retried.
+
+Guest framework context may contain up to 20 primitive public globals from the
+fresh credential-free page. Values remain transient and unchanged; nested,
+oversized or credential-named entries are rejected. This tolerance does not
+change the exact action/record/register/null-token boundary.

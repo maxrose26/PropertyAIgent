@@ -123,7 +123,7 @@ def permitted_navigation(url, expected):
         record = b.path.rsplit('/', 1)[-1]
         return (origin(url) == origin(expected) and a.path ==
                 '/pr/s/planning-application/' + record + '/pa20251084'
-                and a.query == b.query and not a.fragment)
+                and a.query in (b.query, "") and not a.fragment)
     return False
 
 
@@ -152,7 +152,7 @@ async def probe(case):
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
                  http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
-                 cleanup='UNKNOWN', network_classification='UNKNOWN')
+                 cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN')
     started = time.monotonic()
     browser = context = None
     stopped = asyncio.Event()
@@ -256,6 +256,9 @@ async def probe(case):
             if seen not in audit['navigated_origins']:
                 audit['navigated_origins'].append(seen)
             if not permitted_navigation(frame.url, destination):
+                u=urlsplit(frame.url)
+                frozen_id=urlsplit(destination).path.rsplit('/',1)[-1]
+                audit['navigation_mismatch']={'same_origin':seen==allowed, 'contains_frozen_record_id':frozen_id in u.path, 'path':u.path if frozen_id in u.path and re.fullmatch(r'/[A-Za-z0-9_/-]{1,160}',u.path) else '[redacted]', 'query_keys':sorted(parse_qs(u.query))[:10], 'query_absent':not u.query, 'fragment_present':bool(u.fragment)}
                 fail('UNADMITTED_NAVIGATION')
         except ValueError:
             fail('UNADMITTED_NAVIGATION')
