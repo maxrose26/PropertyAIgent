@@ -96,6 +96,12 @@ def validate_record(a,row):
             if a['b2_outcome'] not in {'VERIFIED_STATUS_ONLY','PERSISTENCE_FAILED'}:raise ValueError('STATUS_ONLY_OUTCOME')
             if not pending_status_evidence(o) or b['status']!='Awaiting decision' or b['decision'] is not None or b['decision_issued_date'] is not None:raise ValueError('FALSE_STATUS_ONLY')
             if any(after[k]!=v for k,v in b.items() if k!='status_verified_at') or a['before']['events']!=a['after']['events']:raise ValueError('STATUS_ONLY_FACT_MUTATION')
+            def utc_stamp(value):
+                value=dt.datetime.fromisoformat(value)
+                return value.replace(tzinfo=dt.timezone.utc) if value.tzinfo is None else value.astimezone(dt.timezone.utc)
+            stamp=utc_stamp(after['status_verified_at'])
+            if b['status_verified_at'] is not None and stamp<=utc_stamp(b['status_verified_at']):raise ValueError('STATUS_ONLY_WATERMARK')
+            if stamp<utc_stamp(a['retrieval_completed_at']):raise ValueError('STATUS_ONLY_PROVENANCE_TIME')
         check_consequences(a['before'],a['after'])
     if a['disposition']=='COMPLETED' and (a['transaction']!='COMMITTED' or a['error'] is not None or a['cleanup']!='CLOSED'):raise ValueError('FALSE_COMPLETION')
     if a['disposition']=='SAFELY_REJECTED' and (a['transaction']!='NOT_COMMITTED' or a['before'] is None or a['after']!=a['before'] or a['expected'] is not None or a['b2_outcome'] not in LOCAL or a['cleanup']!='CLOSED'):raise ValueError('FALSE_SAFE_REJECTION')

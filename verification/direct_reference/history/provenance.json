@@ -1,0 +1,8 @@
+{
+  "original_live_sha": "a0feeb7c1cd39c979e2a9018b82d764d1edcd76b",
+  "retained_base": "5cc3a4914678b2fe52b106496fdd0a48a178f362",
+  "live_run": "38310507094",
+  "immutable_refresh_sha256": "42077ab4e204e427ea29286bbe2dcfc7a96a337193bc167949c25861fa204265",
+  "evolution_authority": "Product Owner autonomous Stage4 known-reference gate closure,13 October2026",
+  "changed_contract": "Opt-in unchanged explicit pending status only;original coupled/default scope preserved"
+}

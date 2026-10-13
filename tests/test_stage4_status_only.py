@@ -97,3 +97,14 @@ def test_consumer_status_scope_date_unavailable():
     assert 'decision and decision date remain unverified' in f.qualification
     columns=planning_freshness_report_columns([('Planning','TEST',f)])
     assert columns['Planning Decision Date']=='TEST: Not available' and 'status only' in columns['Planning Qualification']
+
+@pytest.mark.parametrize('outcome',['VERIFIED_STATUS_ONLY','PERSISTENCE_FAILED'])
+@pytest.mark.parametrize('kind',['equal','backward','before_source'])
+def test_status_only_audit_rejects_false_watermark(session,outcome,kind):
+    e=session.get_bind();seed(e);a=run(e,allow_status_only=True);a['b2_outcome']=outcome
+    stamp=a['after']['facts']['status_verified_at'];value=dt.datetime.fromisoformat(stamp)
+    if kind=='equal':a['before']['facts']['status_verified_at']=stamp
+    elif kind=='backward':a['before']['facts']['status_verified_at']=(value+dt.timedelta(seconds=1)).isoformat()
+    else:
+        earlier=(value-dt.timedelta(days=1)).isoformat();a['after']['facts']['status_verified_at']=earlier;a['expected']['facts']['status_verified_at']=earlier
+    with pytest.raises(ValueError,match='STATUS_ONLY_'):b.validate_record(a,b.manifest()[0]['identity'])

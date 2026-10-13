@@ -64,7 +64,7 @@ def present_planning_freshness(application, *, now, cadence_days=None,
     # Conservatively qualify even legacy pending/blank records. A status stamp
     # cannot certify missing decision/date, or independent unit/confidence facts.
     if (application.status == "Awaiting decision" and application.decision is None
-            and application.decision_issued_date is None and verified):
+            and application.decision_issued_date is None and verified and _utc(verified) <= _utc(now)):
         qualification += "; status only — decision and decision date remain unverified/unavailable"
     from app.pipeline.lapse_tracking import parse_portal_date
     raw_date = application.decision_issued_date
