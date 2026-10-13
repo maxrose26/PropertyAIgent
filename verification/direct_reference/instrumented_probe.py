@@ -89,6 +89,8 @@ def post_metadata(body, destination):
             if 'recordDescriptor' in params:
                 value=params['recordDescriptor']
                 record['record_descriptor_encoding']=type(value).__name__
+                if isinstance(value,str):
+                    record['record_descriptor_raw']={'length':len(value),'exact_frozen_id':value==record_id,'contains_frozen_id':record_id in value,'delimiter_counts':{c:value.count(c) for c in ':;,|/{}[]'}}
                 if isinstance(value,str) and len(value)<8192:
                     try:
                         value=json.loads(value)
