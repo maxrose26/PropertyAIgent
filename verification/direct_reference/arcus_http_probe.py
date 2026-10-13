@@ -140,7 +140,8 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
             raise ValueError('EXACT_ENDPOINT')
         query = parse_qs(target.query, keep_blank_values=True)
         result['query_shape']=[{'key':key if re.fullmatch(r'[A-Za-z0-9_.-]{1,120}',key) else 'UNRETAINED', 'numeric_single':len(values)==1 and bool(re.fullmatch(r'[0-9]{1,10}',values[0]))} for key,values in list(query.items())[:8]]
-        if any(not (re.fullmatch(r'(r|aura\.[A-Za-z0-9_.-]+)', key) or (kind=='record' and key=='ui-force-recordGlobalValueProvider.RecordGvp.getRecord')) or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
+        allowed_query={'r', 'aura.ApexAction.execute'} if kind=='header' else {'r','ui-force-components-controllers-recordGlobalValueProvider.RecordGvp.getRecord'}
+        if any(key not in allowed_query or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
             raise ValueError('UNREVIEWED_QUERY')
         payload=guest_envelope(body,destination,kind)
         import requests
