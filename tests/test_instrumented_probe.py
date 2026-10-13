@@ -109,6 +109,12 @@ class ProbeContract(unittest.TestCase):
                       record+'.undefined.null.null.null.Id.VIEW.false.null.Name.null']:
             self.assertFalse(record_descriptor_matches(value,record))
 
+    def test_partial_read_does_not_consume_fact_slot(self):
+        from verification.direct_reference.arcus_http_probe import fact_read_candidate, RECORD_GETTER
+        self.assertFalse(fact_read_candidate([{'descriptor':RECORD_GETTER,'record_descriptor_closed_shape':False}]))
+        self.assertFalse(fact_read_candidate([{'descriptor':'OTHER','record_descriptor_closed_shape':True}]))
+        self.assertTrue(fact_read_candidate([{'descriptor':RECORD_GETTER,'record_descriptor_closed_shape':True}]))
+
     def test_record_field_states_same_exact_subtree(self):
         from verification.direct_reference.arcus_http_probe import record_observation, PLANNING_OBJECT
         rid='a1DSl000007GOmFMAW'

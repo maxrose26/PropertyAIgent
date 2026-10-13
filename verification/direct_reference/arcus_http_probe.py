@@ -84,6 +84,12 @@ def record_descriptor_matches(value, record_id):
     return value == record_id + '.undefined.FULL.null.null.null.VIEW.true.null.null.null'
 
 
+def fact_read_candidate(metadata):
+    """Do not consume the single fact-read slot for an unrelated partial read."""
+    return any(m.get('descriptor')==RECORD_GETTER and
+               m.get('record_descriptor_closed_shape') is True for m in metadata)
+
+
 def unique_object(pairs):
     result = {}
     for key, value in pairs:

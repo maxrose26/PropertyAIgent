@@ -229,10 +229,10 @@ async def probe(case):
             if reason == 'UNREVIEWED_METHOD':
                 audit['blocked_posts'] += 1
                 metadata = post_metadata(request.get('postData'), destination)
-                from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, RECORD_GETTER
+                from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, fact_read_candidate
                 slot = None
                 kind = 'header'
-                if audit['record_http_probe'] is None and any(m.get('descriptor')==RECORD_GETTER for m in metadata):
+                if audit['record_http_probe'] is None and fact_read_candidate(metadata):
                     slot = 'record_http_probe'
                     kind = 'record'
                 elif audit['http_probe'] is None and any(
