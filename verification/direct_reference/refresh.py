@@ -84,7 +84,7 @@ def extended_admission():
     for r in rows:
         if (set(r)!=keys or type(r['application_id']) is not int or r['application_id']<=0
                 or r['application_id'] in ids or r['council']=='trafford'
-                or not isinstance(r['reference'],str) or not r['reference']
+                or not isinstance(r['reference'],str) or not re.fullmatch(r'[A-Za-z0-9 /._-]{1,100}',r['reference'])
                 or r['admission_reason']!='OFFLINE_EXACT_IDOX_CONTRACT_ONLY'):
             raise ValueError('Extended admission identity')
         validate_destination(r)

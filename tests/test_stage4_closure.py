@@ -13,11 +13,12 @@ def test_closed_expansion_and_cohorts():
  assert {x['identity']['application_id'] for x in groups[1]}-{78} <= {x['application_id'] for x in rows}
  assert all(x['identity']['council']!='trafford' for g in groups for x in g)
 
-@pytest.mark.parametrize('mutation',['digest','count','id','council','reference','source_identifier','source_url','collision','extra'])
+@pytest.mark.parametrize('mutation',['digest','count','id','council','reference','source_identifier','source_url','collision','extra','unsafe_reference'])
 def test_extension_rejects_tampering(mutation,monkeypatch):
  path=Path(r.__file__).with_name('extended-admission.json');raw=path.read_bytes();value=json.loads(raw)
  if mutation=='count':value['rows'].pop()
  elif mutation=='collision':value['rows'][1]['reference']=value['rows'][0]['reference']
+ elif mutation=='unsafe_reference':value['rows'][0]['reference']='reference\nprivate@example.invalid'
  elif mutation=='extra':value['rows'][0]['private']='forbidden'
  elif mutation!='digest':
   key={'id':'application_id'}.get(mutation,mutation)
