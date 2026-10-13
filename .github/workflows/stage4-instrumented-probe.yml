@@ -30,7 +30,7 @@ jobs:
           python -m pip install playwright==1.63.0 psutil==7.2.2 requests==2.34.2
           python -m playwright install --with-deps chromium --only-shell
       - name: Focused offline contracts
-        run: python -m unittest tests.test_instrumented_probe -v
+        run: python -m unittest tests.test_instrumented_probe tests.test_render_disposable_job -v
       - name: Frozen Arcus guest-route observations
         run: |
           mkdir -p "$RUNNER_TEMP/stage4-probe-audit"

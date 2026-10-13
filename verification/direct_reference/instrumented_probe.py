@@ -187,7 +187,7 @@ async def probe(case):
                  persistence=False, requests=0, responses=0, redirects=0,
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
-                 http_probe=None, record_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
+                 http_probe=None, record_http_probe=None, name_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN')
     started = time.monotonic()
     browser = context = None
@@ -235,6 +235,13 @@ async def probe(case):
                 if audit['record_http_probe'] is None and fact_read_candidate(metadata):
                     slot = 'record_http_probe'
                     kind = 'record'
+                elif audit['name_http_probe'] is None and any(m.get('record_descriptor_slots') ==
+                        ['FROZEN_RECORD','undefined','null','null','null','Name','VIEW','false','null','null','null']
+                        for m in metadata):
+                    # The normal page's exact Name-only read is a separate
+                    # bootstrap slot, never a substitute for factual evidence.
+                    slot = 'name_http_probe'
+                    kind = 'record_name'
                 elif audit['http_probe'] is None and any(
                         m.get('namespace') == 'arcuscommunity' and
                         m.get('classname') == 'PublicRegisterViewService' and
@@ -390,9 +397,16 @@ async def probe(case):
     return audit
 
 
-def supervised(case, output):
+def execution_environment_allowed(case, mode, environ):
+    if mode == "render-disposable":
+        return case == "trafford" and environ.get("RENDER_SERVICE_ID") == "crn-d9sv93vavr4c73f98rb0"
+    return (mode == "github-hosted" and environ.get("GITHUB_ACTIONS") == "true"
+            and environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
+
+
+def supervised(case, output, execution_mode="github-hosted"):
     import psutil
-    if os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted':
+    if not execution_environment_allowed(case, execution_mode, os.environ):
         raise ValueError('DISPOSABLE_HOSTED_RUNNER_ONLY')
     if int(Path('/proc/self/stat').read_text().split()[0]) != os.getpid():
         raise ValueError('PROCESS_NAMESPACE_MISMATCH')
@@ -469,6 +483,7 @@ def main():
     p.add_argument('--case', choices=CASES, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--worker', action='store_true')
+    p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
     a = p.parse_args()
     if any(name in os.environ for name in ('DATABASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_FREE_ONLY')
@@ -477,7 +492,7 @@ def main():
     if a.worker:
         a.output.write_text(json.dumps(asyncio.run(probe(a.case)), indent=2) + '\n')
         return 0
-    return supervised(a.case, a.output)
+    return supervised(a.case, a.output, a.execution_mode)
 
 
 if __name__ == '__main__':

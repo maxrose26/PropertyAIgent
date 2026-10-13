@@ -98,6 +98,22 @@ class ProbeContract(unittest.TestCase):
         self.assertNotIn('Applicant',json.dumps(result))
         self.assertEqual(result['planning_label_values'],[['Reference','R'],['Status','Final']])
 
+    def test_name_bootstrap_scope_is_exact(self):
+        import json
+        from urllib.parse import urlencode, urlsplit
+        from verification.direct_reference.arcus_http_probe import guest_envelope, RECORD_GETTER
+        destination=CASES['salford'][2]
+        u=urlsplit(destination)
+        descriptor=u.path.rsplit('/',1)[-1]+'.undefined.null.null.null.Name.VIEW.false.null.null.null'
+        action={'id':'1;a','descriptor':RECORD_GETTER,'params':{'recordDescriptor':descriptor}}
+        form={'message':json.dumps({'actions':[action]}),'aura.token':'null',
+              'aura.context':json.dumps({'mode':'PROD'}),'aura.pageURI':u.path+'?'+u.query}
+        self.assertEqual(guest_envelope(urlencode(form),destination,'record_name'),urlencode(form))
+        for wrong in (descriptor.replace('Name','Contact.Email'),descriptor.replace('a0kSq000008OfVFIA0','OTHER')):
+            action['params']['recordDescriptor']=wrong
+            form['message']=json.dumps({'actions':[action]})
+            with self.assertRaises(ValueError): guest_envelope(urlencode(form),destination,'record_name')
+
     def test_record_descriptor_closed_shape(self):
         from verification.direct_reference.arcus_http_probe import record_descriptor_matches
         record='a1DSl000007GOmFMAW'

@@ -133,12 +133,15 @@ def guest_envelope(body, destination, kind='header'):
     action = message['actions'][0]
     if set(action) - {'id','descriptor','callingDescriptor','params'}:
         raise ValueError('UNREVIEWED_ACTION_KEYS')
-    if kind == 'record':
+    if kind in ('record', 'record_name'):
         if action.get('descriptor') != RECORD_GETTER:
             raise ValueError('RECORD_ACTION_DESCRIPTOR')
         params = action.get('params', {})
-        if set(params) != {'recordDescriptor'} or not record_descriptor_matches(
-                params['recordDescriptor'], urlsplit(destination).path.rsplit('/',1)[-1]):
+        record_id = urlsplit(destination).path.rsplit('/',1)[-1]
+        expected = (record_descriptor_matches(params.get('recordDescriptor'), record_id)
+                    if kind == 'record' else params.get('recordDescriptor') ==
+                    record_id + '.undefined.null.null.null.Name.VIEW.false.null.null.null')
+        if set(params) != {'recordDescriptor'} or not expected:
             raise ValueError('RECORD_DESCRIPTOR_SCOPE')
     elif kind != 'header':
         raise ValueError('READ_KIND')
@@ -266,7 +269,7 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
                     raise ValueError('RESPONSE_ACTION_IDENTITY')
                 if any(action.get('state')!='SUCCESS' for action in data.get('actions',[])) or not data.get('actions'):
                     raise ValueError('AURA_NOT_SUCCESS')
-                if kind == 'record':
+                if kind in ('record', 'record_name'):
                     result.update(record_observation(data,source.path.rsplit('/',1)[-1],reference))
                 else:
                     result.update(response_summary(data,reference))

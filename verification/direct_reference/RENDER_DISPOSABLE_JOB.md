@@ -1,0 +1,9 @@
+# Disposable existing-artifact diagnostic
+
+Prepare only: `python3 -m verification.direct_reference.render_disposable_job` emits a JSON object containing the exact existing service ID, an inline `startCommand`, and payload SHA256. It does not invoke Render. Regenerate after reviewing the final worker diff; the generated payload freezes both Python source files.
+
+The one-off command is restricted to existing service `crn-d9sv93vavr4c73f98rb0` and frozen Trafford application 290. The inherited `RENDER_SERVICE_ID` must match before execution. It clears inherited environment before Python, preserves only executable search path and browser cache location plus fixed runtime settings, verifies the inline payload hash and file allowlist, and materializes it in a private disposable directory. No old repository modules are imported. Python >=3.10, installed Playwright/psutil, and an existing browser cache are required. Actual version-compatible Chromium launch occurs only inside the existing owned-process supervisor; missing capabilities fail without installation.
+
+The existing worker owns request/navigation/response/RSS/deadline limits and process cleanup. Its temporary audit is printed to stdout and removed with the payload directory. Browser child environment is separately scrubbed. No production eligibility, database access, package install, deployment, schedule change, service creation or API-token creation is authorized by this command. An operator/control-plane path capable of launching a one-off job with this command remains required. Render command-size limits and artifact compatibility are unverified. A service-ID environment check is an execution guard, not cryptographic attestation.
+
+Only reviewed one-off execution may establish whether this placement reaches the public council route. Preparation alone makes no operational or reachability claim.
