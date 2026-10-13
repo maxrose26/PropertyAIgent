@@ -407,6 +407,7 @@ def verify_application_status(
     material_change_stats: MaterialChangeStats | None = None,
     breaker: CouncilPortalCircuitBreaker | None = None,
     lifecycle_event_stats: LifecycleEventStats | None = None,
+    evidence_loader=None,
 ) -> VerificationOutcome:
     """Exact-reference register verification, atomically guarded against stale results.
 
@@ -438,7 +439,11 @@ def verify_application_status(
                                  estimated_unit_count=application.estimated_unit_count)
     requests_session = None
     try:
-        if council.doc_system == "arcus":
+        if evidence_loader is not None:
+            # Direct-route loader runs AFTER the guarded prior snapshot.
+            # It must qualify identity and field completeness before handoff.
+            result = evidence_loader(prior)
+        elif council.doc_system == "arcus":
             from app.scrapers.arcus_portal import fetch_application_by_reference
             result = fetch_application_by_reference(page, council, reference)
         else:
@@ -544,9 +549,15 @@ def verify_application_status(
             session.rollback()
             return outcome(OUTCOME_STALE_RESPONSE)
         session.refresh(application)
+        if evidence_loader is not None:
+            # Direct evidence did not observe units; do not attribute a concurrent
+            # metadata update to this status-only verification.
+            old_state = ApplicationState(status=prior[0], decision=prior[1],
+                                         estimated_unit_count=application.estimated_unit_count)
         updated = _upsert_scraped_application(
             session, council, result, batch_id=None, material_change_stats=None,
             authoritative_source=SOURCE_STATUS_VERIFICATION, lifecycle_event_stats=local_events,
+            status_only=evidence_loader is not None,
         )
         changed = detect_material_application_change(old_state, ApplicationState(
             status=updated.status, decision=updated.decision,

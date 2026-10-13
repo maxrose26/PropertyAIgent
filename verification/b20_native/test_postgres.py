@@ -276,3 +276,24 @@ def test_native_query_cancellation_cleanup(engine):
             finally: tx.rollback(); thread.join(timeout=12)
     assert not thread.is_alive() and failures == [] and outcomes == ['persistence_failed']
     assert read(engine, identity) == before and engine.pool.checkedout() == 0
+
+
+@pytest.mark.parametrize('scenario', __import__('verification.direct_reference.persistence_native', fromlist=['SCENARIOS']).SCENARIOS)
+def test_frozen_live_direct_b2_acceptance(engine, monkeypatch, scenario):
+    from verification.direct_reference.persistence_native import run_scenario
+    run_scenario(engine, monkeypatch, scenario)
+
+@pytest.mark.parametrize('case', __import__('verification.direct_reference.oldham_registration_native', fromlist=['SCENARIOS']).SCENARIOS)
+def test_oldham_production_registration(engine,monkeypatch,case):
+    from verification.direct_reference.oldham_registration_native import run_case
+    run_case(engine,monkeypatch,case)
+
+
+def test_oldham_native_worker_limits(engine):
+    import subprocess,sys
+    from verification.direct_reference.persistence_native import seed
+    seed(engine)
+    env=dict(PATH='/usr/bin:/bin',B20_DISPOSABLE='YES_SYNTHETIC_ONLY',B20_POSTGRES_PORT=os.environ['B20_POSTGRES_PORT'],OPENBLAS_NUM_THREADS='1',PYTHONDONTWRITEBYTECODE='1')
+    result=subprocess.run([sys.executable,'-m','verification.direct_reference.oldham_registration_native'],env=env,capture_output=True,text=True,timeout=45)
+    assert result.returncode==0,result.stdout+result.stderr
+    print(result.stdout)

@@ -1,0 +1,8 @@
+{
+  "application_id": 24,
+  "source_path": "stage3-holdout-source-review/24.html",
+  "source_sha256": "1752434bc30204d19512fd03b9a6563fb76340032e33343a807aa3559a1a3876",
+  "observed_at": "2026-10-12",
+  "qualification": "MINIMISED_RETAINED_SUMMARY_NOT_FULL_RESPONSE_OR_LIVE_COMPATIBILITY",
+  "html": "<html><body><table id=\"simpleDetailsTable\"><tr>\n<th scope=\"row\" width=\"40%\">\n                                        \n                                        \n                                            \n                                            \n                                                Reference\n                                            \n                                        \n                                    </th>\n<td>\n                                        \n                                            \n                                            \n                                                OUT/354782/25\n                                            \n                                        \n                                    </td>\n</tr><tr>\n<th scope=\"row\" width=\"40%\">\n                                        \n                                        \n                                            \n                                            \n                                                Status\n                                            \n                                        \n                                    </th>\n<td>\n<span class=\"caseDetailsStatus\">Awaiting decision</span>\n</td>\n</tr></table></body></html>"
+}
