@@ -4,8 +4,29 @@ Authority: Product Owner autonomous known-reference gate closure, 2026-10-13.
 No discovery, deployment, models, semantic relaxation or Trafford Batch B.
 
 The private read-only census at 2026-10-13 12:24:33.082790+00:00 returned
-1,453 applications (read_only=on, statement_timeout=10s). All identities and
-recorded dependency counts match the retained census. Raw census is not in Git.
+1,453 applications (read_only=on, statement_timeout=10s). Application identities,
+site links, current-buyer counts, monitoring counts, intelligence-presence and
+refresh-required indicators match the retained census. Raw census is not in Git.
+
+Recovery correction: the previous statement that all recorded dependency counts
+matched was incorrect. The earlier export records 28 allocation-link incidences
+across 22 applications; the 12:24 export records 114 across 107 applications.
+85 application rows differ. These are per-application counts repeated for shared
+sites, not counts of distinct allocation relationships. The current SQL counts
+all allocation_site_relationships rows for each application's site. The earlier
+SQL definition is not retained here, so a query-definition difference versus a
+real intervening relationship change is not established.
+
+Allocation counts are not used by the retained policy classifier, route admission
+or cohort generator. All inputs used for dependency prioritisation above match.
+The policy-due denominator remains 118, the extension remains 512, and the frozen
+17/19 manifests and hashes are unchanged. No pending-cohort member has a changed
+allocation count; expanded members 298, 708 and 710 do, but their selection and
+factual persistence do not use that count. Five policy-due rows differ overall.
+This corrects documentation and does not certify allocation relationships or
+reconstruct the product's parent/phase dependency graph. Both raw exports remain
+private and unchanged; no production query or factual repair was used to resolve
+the candidate-selection impact.
 Policy A/B/C due count is 118: 33 original admitted, 1 manual, 84 unsupported.
 The retained pre-live due universe was 124; six due records were refreshed.
 
