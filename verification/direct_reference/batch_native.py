@@ -27,6 +27,30 @@ def engine():
 def no_council():
     with patch('requests.sessions.Session.request',side_effect=AssertionError('Council forbidden')):yield
 
+@pytest.mark.parametrize('label',['A','B'])
+def test_catchup_context_existing_b2(engine,label):
+    """Only the manifest context is new; use the accepted transaction adapter."""
+    from . import catchup_production as catchup
+    ctx=getattr(catchup,label);rows=b.manifest(ctx.manifest)
+    with Session(engine) as s:
+        for entry in rows:
+            r=entry['identity']
+            s.add(Application(id=r['application_id'],council_code=r['council'],reference=r['reference'],status='Awaiting decision'))
+        s.commit()
+    first=rows[0]['identity']['application_id']
+    def execute(r,l):
+        factory=(lambda:Source(summary(r['reference'],status='Awaiting decision',omit=('Decision','Decision Issued Date')))) if r['application_id']==first else lambda:source(r)
+        return t.run_transaction(engine,r,factory,l)
+    out=b.run(os.environ['BATCH_REPOSITORY_SHA'],'disposable-catchup-'+label,execute,spec=ctx.manifest)
+    b.validate(out,spec=ctx.manifest)
+    assert out['assessment']=='ACCOUNTED' and len(out['records'])==ctx.manifest.count
+    assert out['records'][0]['disposition']=='SAFELY_REJECTED' and out['records'][0]['before']==out['records'][0]['after']
+    # Prior census fields are comparison context; B2 independently loads this fixture.
+    assert out['records'][0]['before']['facts']['status']=='Awaiting decision'
+    assert all(r['transaction']=='COMMITTED' and r['expected']==r['after'] and r['cleanup']=='CLOSED' for r in out['records'][1:])
+    assert all(r['statements']['peak_connections']==1 for r in out['records'])
+    assert out['carried_ids']==[] and out['parent_audit_sha256'] is None
+
 def test_supervised20(engine,tmp_path):
     import subprocess
     candidate=os.environ['BATCH_REPOSITORY_SHA']

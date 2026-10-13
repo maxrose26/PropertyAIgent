@@ -1,0 +1,93 @@
+{
+  "batch_a_ids": [
+    1068,
+    24,
+    28,
+    29,
+    31,
+    32,
+    39,
+    40,
+    354,
+    390,
+    392,
+    393,
+    403,
+    106,
+    174,
+    58,
+    59,
+    60,
+    446,
+    290
+  ],
+  "batch_b_ids": [
+    309,
+    310,
+    317,
+    318,
+    342,
+    345,
+    572,
+    589,
+    597,
+    775
+  ],
+  "census_admitted_policy_due_count": 39,
+  "census_at": "2026-10-13T08:49:12.508887Z",
+  "completeness_withheld_due_ids": [
+    41,
+    53,
+    56
+  ],
+  "expected_count_correction": "39 - 3 committed - 3 withheld - 2 timeout - 1 prior retrieval without persistence = 30",
+  "historical_retrieval_run": "38310507094",
+  "oldham42_already_fresh_at_census": true,
+  "oldham_run": "38370055696",
+  "previously_retrieved_without_persistence_due_ids": [
+    78
+  ],
+  "representative_run": "38383222682",
+  "schema": 1,
+  "successfully_refreshed_due_ids": [
+    381,
+    409,
+    468
+  ],
+  "timeout_due_ids": [
+    305,
+    783
+  ],
+  "unattempted_ids": [
+    1068,
+    24,
+    28,
+    29,
+    31,
+    32,
+    39,
+    40,
+    354,
+    390,
+    392,
+    393,
+    403,
+    106,
+    174,
+    58,
+    59,
+    60,
+    446,
+    290,
+    309,
+    310,
+    317,
+    318,
+    342,
+    345,
+    572,
+    589,
+    597,
+    775
+  ]
+}

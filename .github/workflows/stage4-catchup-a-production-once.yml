@@ -1,0 +1,64 @@
+name: Stage4 admitted catch-up A20 B2 PRODUCTION ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact REVIEW-approved SHA equal to the workflow revision
+        required: true
+        type: string
+      manifest_sha256:
+        description: Exact REVIEW-approved frozen manifest SHA256
+        required: true
+        type: string
+      authority:
+        description: Separate execution authority required; registration is not authority
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_STAGE4_ADMITTED_CATCHUP_A_B2_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-admitted-catchup-production
+  cancel-in-progress: false
+jobs:
+  live:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: First dispatch only; exact SHA, manifest and authority
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          MANIFEST: ${{ inputs.manifest_sha256 }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master ]]
+          [[ "$MANIFEST" == 96afbb6eef61cd1eee6ae24d5e21a047152f61492c25edfd5d6e86dc3f315ede ]]
+          [[ "$AUTHORITY" == AUTHORISE_STAGE4_ADMITTED_CATCHUP_A_B2_ONCE ]]
+          [[ "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          echo "BATCH_JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Install accepted pinned dependencies without production credentials
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/batch-production-venv"
+      - name: Fresh frozen-manifest batch through existing B2
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          BATCH_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          MANIFEST: ${{ inputs.manifest_sha256 }}
+          AUTHORITY: ${{ inputs.authority }}
+          BATCH_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_EVENT_NAME=workflow_dispatch BATCH_WORKFLOW_SHA="$BATCH_WORKFLOW_SHA" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_REF="$GITHUB_REF" BATCH_DATABASE_URL="$BATCH_DATABASE_URL" "$RUNNER_TEMP/batch-production-venv/bin/python" -m verification.direct_reference.catchup_production --sha "$PIN" --manifest-sha256 "$MANIFEST" --authority "$AUTHORITY" --job-start "$BATCH_JOB_START" --output "$RUNNER_TEMP/batch-production-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage4-catchup-a-production-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/batch-production-audit.json
+          if-no-files-found: error
+          retention-days: 7
