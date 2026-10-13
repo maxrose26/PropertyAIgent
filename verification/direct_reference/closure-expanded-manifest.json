@@ -1,0 +1,490 @@
+{
+  "census_at": "2026-10-13 12:24:33.08279+00",
+  "description": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY",
+  "rows": [
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 201,
+        "council": "bolton",
+        "platform_family": "IDOX",
+        "reference": "00173/26",
+        "source_identifier": "T9XFQ2DEG8C00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T9XFQ2DEG8C00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approve subject to conditions",
+        "decision_issued_date": "Tue 11 Aug 2026",
+        "evidence_refresh_reason": "decision_granted",
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": "material_change",
+        "status": "Decided",
+        "status_verified_at": "2026-09-14 05:04:01.204205+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 478,
+        "council": "bolton",
+        "platform_family": "IDOX",
+        "reference": "20462/25",
+        "source_identifier": "SXC77XDEJTC00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=SXC77XDEJTC00&activeTab=summary"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approve subject to conditions",
+        "decision_issued_date": "Wed 01 Oct 2025",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 1069,
+        "council": "bolton",
+        "platform_family": "IDOX",
+        "reference": "16449/23",
+        "source_identifier": "RYAP8PDEKV100",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=RYAP8PDEKV100&activeTab=summary"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approve subject to conditions",
+        "decision_issued_date": "Thu 18 Jan 2024",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 14,
+        "council": "bury",
+        "platform_family": "IDOX",
+        "reference": "72240",
+        "source_identifier": "_BURY_DCAPR_63603",
+        "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_63603&activeTab=summary"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approve with Conditions",
+        "decision_issued_date": "Wed 18 Mar 2026",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 356,
+        "council": "oldham",
+        "platform_family": "IDOX",
+        "reference": "OUT/351895/23",
+        "source_identifier": "S3PGUVMC00J00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=S3PGUVMC00J00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Refuse Permission",
+        "decision_issued_date": "Thu 27 Jun 2024",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 357,
+        "council": "oldham",
+        "platform_family": "IDOX",
+        "reference": "OUT/346626/21",
+        "source_identifier": "QR78F4MCJPW00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=QR78F4MCJPW00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Granted",
+        "decision_issued_date": "Wed 14 Dec 2022",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 402,
+        "council": "oldham",
+        "platform_family": "IDOX",
+        "reference": "FUL/354192/25",
+        "source_identifier": "SSYTWBMCLGL00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=SSYTWBMCLGL00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": null,
+        "decision_issued_date": null,
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Awaiting decision",
+        "status_verified_at": "2026-09-13 10:58:48.84726+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "Offline exact-origin summary GET and Idox table contract enforceable; live compatibility UNPROVED",
+        "application_id": 78,
+        "cohort": 4,
+        "consumers": [
+          "buyer_assessment",
+          "dashboard",
+          "family_presentation",
+          "opportunity_fingerprint",
+          "profile",
+          "related_subject",
+          "scheme_csv",
+          "spec028_explanation"
+        ],
+        "council": "stockport",
+        "dependency_roles": [
+          "DECISION_DATE",
+          "PLANNING_DECISION",
+          "PLANNING_STATUS"
+        ],
+        "historical_manual_summary_available": true,
+        "platform_family": "IDOX",
+        "reasons": [
+          "missing_successful_verification"
+        ],
+        "reference": "DC/078942",
+        "site_id": 58,
+        "source_identifier": "QKM8H1PJGJA00",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=QKM8H1PJGJA00&activeTab=summary",
+        "status_verified_at": null,
+        "stored_decision": "Granted",
+        "stored_decision_date": "Wed 27 Dec 2023",
+        "stored_status": "Decided",
+        "verification_qualification": "RETAINED_AS_OF_2026_10_09_NOT_CURRENT"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Granted",
+        "decision_issued_date": "Wed 27 Dec 2023",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 87,
+        "council": "stockport",
+        "platform_family": "IDOX",
+        "reference": "DC/089901",
+        "source_identifier": "S1J3VIPJ0DB00",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=S1J3VIPJ0DB00&activeTab=summary"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Prior Approval Approved",
+        "decision_issued_date": "Thu 30 Nov 2023",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 104,
+        "council": "stockport",
+        "platform_family": "IDOX",
+        "reference": "DC/082116",
+        "source_identifier": "QX0AZ9PJHHK00",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?activeTab=summary&keyVal=QX0AZ9PJHHK00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Granted",
+        "decision_issued_date": "Thu 13 Aug 2026",
+        "evidence_refresh_reason": "decision_granted",
+        "evidence_refresh_required": "true",
+        "evidence_refresh_trigger": "material_change",
+        "status": "Decided",
+        "status_verified_at": "2026-09-13 11:02:12.278286+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 111,
+        "council": "stockport",
+        "platform_family": "IDOX",
+        "reference": "DC/095548",
+        "source_identifier": "SUCR4CPJMY200",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?activeTab=summary&keyVal=SUCR4CPJMY200"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Granted",
+        "decision_issued_date": "Wed 03 Jun 2026",
+        "evidence_refresh_reason": "decision_granted",
+        "evidence_refresh_required": "true",
+        "evidence_refresh_trigger": "material_change",
+        "status": "Decided",
+        "status_verified_at": "2026-09-13 11:01:28.875291+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 708,
+        "council": "stockport",
+        "platform_family": "IDOX",
+        "reference": "DC/060928",
+        "source_identifier": "ZZZYGPPJTA212",
+        "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?activeTab=summary&keyVal=ZZZYGPPJTA212"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Refuse",
+        "decision_issued_date": "Fri 19 Jan 2018",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 50,
+        "council": "tameside",
+        "platform_family": "IDOX",
+        "reference": "25/00709/OUT",
+        "source_identifier": "T1DUYWPUIYC00",
+        "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T1DUYWPUIYC00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Refuse",
+        "decision_issued_date": "Tue 11 Aug 2026",
+        "evidence_refresh_reason": "decision_refused",
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": "material_change",
+        "status": "Decided",
+        "status_verified_at": "2026-09-13 12:11:57.463724+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 226,
+        "council": "wigan",
+        "platform_family": "IDOX",
+        "reference": "A/25/100145/MAJOR",
+        "source_identifier": "T6YNM9RRKZR00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T6YNM9RRKZR00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approved with Conditions",
+        "decision_issued_date": "Thu 03 Sep 2026",
+        "evidence_refresh_reason": "decision_granted",
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": "material_change",
+        "status": "Decided",
+        "status_verified_at": "2026-09-13 12:21:57.144461+00"
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 298,
+        "council": "wigan",
+        "platform_family": "IDOX",
+        "reference": "A/12/76665",
+        "source_identifier": "M0VP0NRR03M00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=M0VP0NRR03M00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approved with Conditions",
+        "decision_issued_date": "Thu 28 Feb 2013",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 359,
+        "council": "wigan",
+        "platform_family": "IDOX",
+        "reference": "A/21/92036/OUTMAJ",
+        "source_identifier": "QW51RERRKKN00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=QW51RERRKKN00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Refused",
+        "decision_issued_date": "Wed 27 Apr 2022",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 488,
+        "council": "wigan",
+        "platform_family": "IDOX",
+        "reference": "A/24/97732/MAJOR",
+        "source_identifier": "SI5WCERRGSD00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=SI5WCERRGSD00&activeTab=summary"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approved with Conditions",
+        "decision_issued_date": "Thu 13 Mar 2025",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 506,
+        "council": "wigan",
+        "platform_family": "IDOX",
+        "reference": "A/25/098750/MAJOR",
+        "source_identifier": "ST4FVXRRLUT00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=ST4FVXRRLUT00&activeTab=summary"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approved with Conditions",
+        "decision_issued_date": "Thu 06 Nov 2025",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    },
+    {
+      "identity": {
+        "admission": "ADMITTED_DIRECT_ROUTE",
+        "admission_reason": "OFFLINE_EXACT_IDOX_CONTRACT_ONLY",
+        "application_id": 710,
+        "council": "wigan",
+        "platform_family": "IDOX",
+        "reference": "A/16/82078/FULL",
+        "source_identifier": "O2U8KVRRJDK00",
+        "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=O2U8KVRRJDK00"
+      },
+      "policy": "A",
+      "prior_facts": {
+        "decision": "Approved with Conditions",
+        "decision_issued_date": "Thu 23 Jun 2016",
+        "evidence_refresh_reason": null,
+        "evidence_refresh_required": "false",
+        "evidence_refresh_trigger": null,
+        "status": "Decided",
+        "status_verified_at": null
+      },
+      "selection_reason": "Retained monitoring/consumer or current buyer/refresh dependency; conservative priority, current display not proved",
+      "selection_stratum": "NEWLY_ADMITTED_POLICY_DUE_OR_PRIOR_RETRIEVAL_ONLY"
+    }
+  ],
+  "schema": 1,
+  "selection_seed": "CURRENT_GATE_AUTONOMOUS_KNOWN_REFERENCE_CLOSURE"
+}
