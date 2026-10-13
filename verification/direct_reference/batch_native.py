@@ -32,8 +32,14 @@ def test_native_unchanged_pending_status_only(engine,monkeypatch,case):
     row=b.manifest()[0]['identity'];original=Session.commit
     def factory():
         if case=='concurrent':
-            with Session(engine) as other:
-                app=other.get(Application,row['application_id']);app.status='Decided';app.decision='Granted';app.decision_issued_date='2026-09-25';original(other)
+            # A competing production actor is outside this worker's one-slot
+            # pool. Simulate it through a separate disposable localhost engine.
+            assert engine.url.host=='127.0.0.1'
+            rival=create_engine(engine.url,pool_size=1,max_overflow=0)
+            try:
+                with Session(rival) as other:
+                    app=other.get(Application,row['application_id']);app.status='Decided';app.decision='Granted';app.decision_issued_date='2026-09-25';original(other)
+            finally:rival.dispose()
         return Source(summary(row['reference'],status='Awaiting decision',omit=('Decision','Decision Issued Date')))
     def fail(s):
         if case=='lost_ack':original(s)
