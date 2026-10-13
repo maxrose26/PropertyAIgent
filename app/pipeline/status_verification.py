@@ -148,12 +148,15 @@ OUTCOME_FETCH_FAILED = "fetch_failed"
 OUTCOME_CONFLICTING = "conflicting_source"
 OUTCOME_STALE_RESPONSE = "stale_response"
 OUTCOME_PERSISTENCE_FAILED = "persistence_failed"
+# Narrow direct-evidence opt-in: unchanged explicit pending status only.
+# Omitted decision/date remain unobserved, never verified absence/NULL.
+OUTCOME_VERIFIED_STATUS_ONLY = "verified_status_only"
 
 # Outcomes that count as a genuinely COMPLETED direct verification -
 # status_verified_at advances for these two, and only these two (Section 8
 # amendment: "APPLICATION_NOT_FOUND does NOT constitute status
 # verification").
-COMPLETED_OUTCOMES = frozenset({OUTCOME_VERIFIED_UNCHANGED, OUTCOME_VERIFIED_CHANGED})
+COMPLETED_OUTCOMES = frozenset({OUTCOME_VERIFIED_UNCHANGED, OUTCOME_VERIFIED_CHANGED, OUTCOME_VERIFIED_STATUS_ONLY})
 
 # --- Tiers and cadence (Section 11/12 of the approved spec, verbatim) -------
 
@@ -467,6 +470,16 @@ def verify_application_status(
     fields = getattr(result, "fields", None)
     if not isinstance(fields, dict) or getattr(result, "reference", None) != reference:
         return outcome(OUTCOME_FETCH_FAILED)
+    status_scope = getattr(result, "verification_scope", "COUPLED")
+    if status_scope not in {"COUPLED", "UNCHANGED_PENDING_STATUS_ONLY"}:
+        return outcome(OUTCOME_FETCH_FAILED)
+    pending_only = status_scope == "UNCHANGED_PENDING_STATUS_ONLY"
+    if pending_only and (evidence_loader is None
+            or set(fields) != {"Reference", "Status"}
+            or fields.get("Reference") != reference
+            or fields.get("Status") != "Awaiting decision"
+            or prior[0] != "Awaiting decision" or prior[1] is not None or prior[2] is not None):
+        return outcome(OUTCOME_FETCH_FAILED)
     from urllib.parse import urlsplit
     try:
         source_url = urlsplit(getattr(result, "summary_url", "") or "")
@@ -554,7 +567,7 @@ def verify_application_status(
             # metadata update to this status-only verification.
             old_state = ApplicationState(status=prior[0], decision=prior[1],
                                          estimated_unit_count=application.estimated_unit_count)
-        updated = _upsert_scraped_application(
+        updated = application if pending_only else _upsert_scraped_application(
             session, council, result, batch_id=None, material_change_stats=None,
             authoritative_source=SOURCE_STATUS_VERIFICATION, lifecycle_event_stats=local_events,
             status_only=evidence_loader is not None,
@@ -592,7 +605,7 @@ def verify_application_status(
     if lifecycle_event_stats is not None:
         lifecycle_event_stats.record(local_events.written)
     return VerificationOutcome(
-        outcome=OUTCOME_VERIFIED_CHANGED if changed.changed else OUTCOME_VERIFIED_UNCHANGED,
+        outcome=OUTCOME_VERIFIED_STATUS_ONLY if pending_only else OUTCOME_VERIFIED_CHANGED if changed.changed else OUTCOME_VERIFIED_UNCHANGED,
         application_reference=reference, material_change_reasons=changed.reasons,
     )
 

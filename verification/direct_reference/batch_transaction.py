@@ -86,7 +86,7 @@ def session_type(row):
     return BoundedSession
 
 
-def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REHEARSAL'):
+def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REHEARSAL',allow_status_only=False):
     """Fresh retrieval inside B2 snapshot; independent readback reconciles ack."""
     from sqlalchemy import event,select
     from app.db.models import Application
@@ -117,7 +117,10 @@ def run_transaction(engine,row,source_factory,limits,*,provenance='SYNTHETIC_REH
                 validate_record(a,row) # privacy and accounting before watermark reservation
                 if source['outcome']!='LITERAL_VERIFIED':raise BoundaryFailure(source['outcome'],'Qualified source failure')
                 eligible=all(v in {'PRESENT_VALUE','PRESENT_BLANK'} for v in source['field_states'].values()) and source['semantic_qualification']!='UNKNOWN_UNMAPPED'
-                return Observation(row['application_id'],row['reference'],row['source_url'],source['normalized_facts'],source['field_states'],source['semantic_qualification'],None,source['literal_facts'],b2_eligible=eligible)
+                observation=Observation(row['application_id'],row['reference'],row['source_url'],source['normalized_facts'],source['field_states'],source['semantic_qualification'],None,source['literal_facts'],b2_eligible=eligible)
+                from .refresh import pending_status_evidence
+                if allow_status_only and pending_status_evidence(observation):observation.verification_scope='UNCHANGED_PENDING_STATUS_ONLY'
+                return observation
             def before_commit(session):
                 session.flush();a['expected']=snapshot(session,row)
                 if a['expected']['events'][:len(a['before']['events'])]!=a['before']['events']:raise ValueError('EVENT_MUTATION')

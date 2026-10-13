@@ -31,6 +31,7 @@ class Admission:
     authority: str
     module: str
     application_name: str
+    allow_status_only: bool = False
 
 REPRESENTATIVE=Admission(batch.REPRESENTATIVE,WORKFLOW,AUTHORITY,
     'verification.direct_reference.batch_production','stage4_representative20_once')
@@ -60,6 +61,8 @@ def validate(a,sha,run_id,*,context=None):
     batch.validate(a,spec=None if context is None else context.manifest)
     if a['repository_sha']!=sha or a['invocation']!=run_id or a['parent_audit_sha256'] is not None or a['carried_ids']:raise ValueError('FIRST_INVOCATION')
     for r in a['records']:
+        pending_commit=(r['transaction']=='COMMITTED' and r['source'] is not None and r['source']['field_states']['decision']=='NOT_PRESENT')
+        if (r['b2_outcome']=='VERIFIED_STATUS_ONLY' or pending_commit) and (context is None or not context.allow_status_only):raise ValueError('STATUS_ONLY_NOT_ADMITTED')
         if r['source'] is not None and r['source_provenance']!='FRESH_OFFICIAL_SUMMARY':raise ValueError('FRESH_SOURCE_REQUIRED')
 
 def worker(row,allowance,output,*,context=None):
@@ -76,7 +79,9 @@ def worker(row,allowance,output,*,context=None):
             from .batch_transaction import run_transaction
             from .refresh import requests_session
             engine=production_engine(secret_name='BATCH_DATABASE_URL',application_name=c.application_name)
-            a=run_transaction(engine,row,requests_session,allowance,provenance='FRESH_OFFICIAL_SUMMARY')
+            if c.allow_status_only:
+                a=run_transaction(engine,row,requests_session,allowance,provenance='FRESH_OFFICIAL_SUMMARY',allow_status_only=True)
+            else:a=run_transaction(engine,row,requests_session,allowance,provenance='FRESH_OFFICIAL_SUMMARY')
         except Exception:
             # Never infer no commit from an exception, even after a failed ack.
             pass

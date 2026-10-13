@@ -27,6 +27,33 @@ def engine():
 def no_council():
     with patch('requests.sessions.Session.request',side_effect=AssertionError('Council forbidden')):yield
 
+@pytest.mark.parametrize('case',['commit','rollback','lost_ack','concurrent','later_terminal'])
+def test_native_unchanged_pending_status_only(engine,monkeypatch,case):
+    row=b.manifest()[0]['identity'];original=Session.commit
+    def factory():
+        if case=='concurrent':
+            with Session(engine) as other:
+                app=other.get(Application,row['application_id']);app.status='Decided';app.decision='Granted';app.decision_issued_date='2026-09-25';original(other)
+        return Source(summary(row['reference'],status='Awaiting decision',omit=('Decision','Decision Issued Date')))
+    def fail(s):
+        if case=='lost_ack':original(s)
+        raise RuntimeError('Synthetic transaction acknowledgement')
+    if case in {'rollback','lost_ack'}:monkeypatch.setattr(Session,'commit',fail)
+    out=t.run_transaction(engine,row,factory,LIMITS,allow_status_only=True)
+    b.validate_record(out,row)
+    if case=='rollback':assert out['transaction']=='NOT_COMMITTED' and out['before']==out['after'] and out['disposition']=='SAFETY_STOP'
+    elif case=='concurrent':assert out['b2_outcome']=='STALE_RESPONSE' and out['transaction']=='UNKNOWN' and out['disposition']=='UNCERTAIN'
+    else:
+        assert out['transaction']=='COMMITTED' and out['after']==out['expected'] and out['cleanup']=='CLOSED'
+        assert out['b2_outcome']==('PERSISTENCE_FAILED' if case=='lost_ack' else 'VERIFIED_STATUS_ONLY')
+        assert out['before']['events']==out['after']['events']==[]
+        assert out['after']['facts']['decision'] is None and out['after']['facts']['decision_issued_date'] is None
+        assert out['source']['field_states']['decision']=='NOT_PRESENT'
+        if case=='later_terminal':
+            later=t.run_transaction(engine,row,lambda:Source(summary(row['reference'],status='Decided',decision='Refuse Permission',date='Fri 25 Sep 2026')),LIMITS,allow_status_only=True)
+            assert later['transaction']=='COMMITTED' and later['b2_outcome']=='VERIFIED_MATERIAL_CHANGE'
+            assert later['after']['facts']['evidence_refresh_required'] and later['after']['events'][0]['event_type']=='decision_refused'
+
 @pytest.mark.parametrize('label',['A','B'])
 def test_catchup_context_existing_b2(engine,label):
     """Only the manifest context is new; use the accepted transaction adapter."""

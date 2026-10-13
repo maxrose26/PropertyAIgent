@@ -15,7 +15,7 @@ MANIFEST_SHA256='33882abdafca290400e43a18359d1654fa8a9b80f985ea1aabe54c10003fc1c
 MAX_RECORD=16384
 MAX_BATCH=384*1024
 LOCAL={'SOURCE_UNAVAILABLE','TIMEOUT','RATE_LIMITED','PARSER_FAILURE','PARTIAL_RETRIEVAL','STALE_RESPONSE'}
-COMPLETE={'VERIFIED_UNCHANGED','VERIFIED_MATERIAL_CHANGE','VERIFIED_NON_MATERIAL_CHANGE'}
+COMPLETE={'VERIFIED_UNCHANGED','VERIFIED_MATERIAL_CHANGE','VERIFIED_NON_MATERIAL_CHANGE','VERIFIED_STATUS_ONLY'}
 SAFETY={'AMBIGUOUS_SOURCE_RESULT','SCOPE_ESCAPE','REDIRECT_VIOLATION','PRIVACY_FAILURE',
         'ACCOUNTING_FAILURE','CLEANUP_FAILURE','INVALID_ARTIFACT','UNSUPPORTED_ROUTE'}
 
@@ -89,6 +89,13 @@ def validate_record(a,row):
     if a['transaction']=='COMMITTED':
         if a['before'] is None or a['expected'] is None or a['after']!=a['expected'] or a['source'] is None:raise ValueError('UNPROVED_COMMIT')
         if a['source']['outcome']!='LITERAL_VERIFIED' or a['after']['facts']['status_verified_at'] is None:raise ValueError('PROVENANCE')
+        if a['b2_outcome']=='VERIFIED_STATUS_ONLY' or a['source']['field_states']['decision']=='NOT_PRESENT':
+            from .refresh import Observation,pending_status_evidence
+            s=a['source'];o=Observation(row['application_id'],row['reference'],row['source_url'],s['normalized_facts'],s['field_states'],s['semantic_qualification'],None,s['literal_facts'])
+            b=a['before']['facts'];after=a['after']['facts']
+            if a['b2_outcome'] not in {'VERIFIED_STATUS_ONLY','PERSISTENCE_FAILED'}:raise ValueError('STATUS_ONLY_OUTCOME')
+            if not pending_status_evidence(o) or b['status']!='Awaiting decision' or b['decision'] is not None or b['decision_issued_date'] is not None:raise ValueError('FALSE_STATUS_ONLY')
+            if any(after[k]!=v for k,v in b.items() if k!='status_verified_at') or a['before']['events']!=a['after']['events']:raise ValueError('STATUS_ONLY_FACT_MUTATION')
         check_consequences(a['before'],a['after'])
     if a['disposition']=='COMPLETED' and (a['transaction']!='COMMITTED' or a['error'] is not None or a['cleanup']!='CLOSED'):raise ValueError('FALSE_COMPLETION')
     if a['disposition']=='SAFELY_REJECTED' and (a['transaction']!='NOT_COMMITTED' or a['before'] is None or a['after']!=a['before'] or a['expected'] is not None or a['b2_outcome'] not in LOCAL or a['cleanup']!='CLOSED'):raise ValueError('FALSE_SAFE_REJECTION')

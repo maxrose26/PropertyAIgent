@@ -114,6 +114,19 @@ class Observation:
     literal_fields: dict
     literal_verified: bool = True
     b2_eligible: bool = False
+    verification_scope: str = 'COUPLED'
+
+def pending_status_evidence(observation):
+    """Positive literal status proof; omission never proves absent decisions."""
+    return (observation.literal_verified
+        and isinstance(observation.fields,dict)
+        and set(observation.fields)=={'Reference','Status','Decision','Decision Issued Date'}
+        and observation.fields['Reference']==observation.reference
+        and observation.fields['Decision'] is None and observation.fields['Decision Issued Date'] is None
+        and observation.field_states == {'reference':'PRESENT_VALUE','status':'PRESENT_VALUE',
+            'decision':'NOT_PRESENT','decision_date':'NOT_PRESENT'}
+        and observation.literal_fields == {'Reference':observation.reference,'Status':'Awaiting decision'}
+        and observation.fields.get('Status') == 'Awaiting decision')
 
 
 def retrieve(application_id, *, session_factory, budget):
@@ -251,6 +264,16 @@ def refresh(session, application, council, *, retrieve_evidence):
             if (observation.application_id != row['application_id'] or
                 observation.reference != row['reference'] or observation.source_url != row['source_url']):
                 fail('AMBIGUOUS_SOURCE_RESULT', 'Handoff identity mismatch')
+            if observation.verification_scope == 'UNCHANGED_PENDING_STATUS_ONLY':
+                if (not pending_status_evidence(observation) or prior[0] != 'Awaiting decision'
+                        or prior[1] is not None or prior[2] is not None):
+                    fail('PARTIAL_RETRIEVAL', 'Pending-only evidence cannot verify retained decision/date or changed status')
+                result=ScrapedApplication(reference=row['reference'],fields={'Reference':row['reference'],'Status':'Awaiting decision'},
+                    summary_url=row['source_url'],further_info_url='',keyval=None,estimated_unit_count=None,
+                    application_category='',opportunity_classification='',qualifies=False)
+                result.verification_scope='UNCHANGED_PENDING_STATUS_ONLY'
+                return result
+            if observation.verification_scope != 'COUPLED':fail('PARTIAL_RETRIEVAL','Unknown verification scope')
             if (set(observation.fields) != {'Reference','Status','Decision','Decision Issued Date'}
                 or observation.fields['Reference'] != row['reference']
                 or set(observation.field_states) != {'reference','status','decision','decision_date'}
@@ -270,10 +293,10 @@ def refresh(session, application, council, *, retrieve_evidence):
             failure = error.outcome
             raise
     result = verify_application_status(session, None, council, application, evidence_loader=loader)
-    outcome = failure or {'verified_unchanged':'VERIFIED_UNCHANGED','verified_changed':'VERIFIED_MATERIAL_CHANGE',
+    outcome = failure or {'verified_unchanged':'VERIFIED_UNCHANGED','verified_changed':'VERIFIED_MATERIAL_CHANGE','verified_status_only':'VERIFIED_STATUS_ONLY',
         'conflicting_source':'PARTIAL_RETRIEVAL','stale_response':'STALE_RESPONSE',
         'persistence_failed':'PERSISTENCE_FAILED','fetch_failed':'PARSER_FAILURE'}.get(result.outcome,'SOURCE_UNAVAILABLE')
     if outcome == 'VERIFIED_UNCHANGED' and raw_before != (application.status,application.decision,application.decision_issued_date):
         outcome = 'VERIFIED_NON_MATERIAL_CHANGE'
     return {'outcome':outcome,'observation':observation,'b2_outcome':result.outcome,
-            'accepted':result.outcome in ('verified_unchanged','verified_changed')}
+            'accepted':result.outcome in ('verified_unchanged','verified_changed','verified_status_only')}

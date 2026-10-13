@@ -61,6 +61,11 @@ def present_planning_freshness(application, *, now, cadence_days=None,
             if (verified is None or _utc(attempted_at) > _utc(verified)) and current_outcome.outcome not in COMPLETED_OUTCOMES:
                 freshness = "conflicting" if current_outcome.outcome == OUTCOME_CONFLICTING else "currently_unverifiable"
                 qualification = "Source conflict requires review" if freshness == "conflicting" else "Latest available check did not verify current status; accepted fact retained"
+    # Conservatively qualify even legacy pending/blank records. A status stamp
+    # cannot certify missing decision/date, or independent unit/confidence facts.
+    if (application.status == "Awaiting decision" and application.decision is None
+            and application.decision_issued_date is None and verified):
+        qualification += "; status only — decision and decision date remain unverified/unavailable"
     from app.pipeline.lapse_tracking import parse_portal_date
     raw_date = application.decision_issued_date
     parsed_date = parse_portal_date(raw_date)
