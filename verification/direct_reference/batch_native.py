@@ -71,6 +71,7 @@ def test_transaction_failures(engine,monkeypatch,case):
         if case=='withheld' and r['application_id']==target:
             with Session(engine) as s:
                 a=s.get(Application,target);a.status='Decided';a.decision='Granted';a.decision_issued_date='2026-10-01';s.commit()
+            return t.run_transaction(engine,r,lambda:Source(summary(r['reference'],status='Decided',decision='Refuse Permission',date='Fri 25 Sep 2026')),l)
         if case=='stale' and r['application_id']==target:
             other=create_engine(engine.url,pool_size=1,max_overflow=0)
             def newer():
@@ -97,3 +98,13 @@ def test_transaction_failures(engine,monkeypatch,case):
     else:
         assert out['records'][0]['b2_outcome']=='STALE_RESPONSE'
         assert out['records'][0]['transaction']=='UNKNOWN' and out['assessment']=='STOPPED_REVIEW_REQUIRED'
+
+def test_native_partial_resume(engine):
+    calls=[]
+    def clock():return 0 if len(calls)<11 else 300
+    def execute(r,l):calls.append(r['application_id']);return t.run_transaction(engine,r,lambda:source(r),l)
+    partial=b.run(SHA,'partial',execute,clock=clock)
+    assert len(calls)==11
+    done=b.run(SHA,'resume',execute,prior=partial,prior_sha256=hashlib.sha256(b.encode(partial)).hexdigest())
+    assert len(calls)==20 and len(set(calls))==20 and done['assessment']=='ACCOUNTED'
+    assert all(len(r['after']['events'])==1 for r in done['records'])

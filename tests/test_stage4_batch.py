@@ -105,3 +105,43 @@ def test_sql_denied(session):
             with pytest.raises(ValueError):
                 with e.begin() as c:c.execute(q)
     finally:event.remove(e,'before_execute',g)
+
+def test_optional_blank(session):
+    e=session.get_bind();seed(e);r=b.manifest()[0]['identity']
+    out=t.run_transaction(e,r,lambda:Source(summary(r['reference'])),LIMITS)
+    assert out['transaction']=='COMMITTED' and out['b2_outcome']=='VERIFIED_UNCHANGED'
+    assert out['source']['field_states']['decision']=='PRESENT_BLANK'
+
+@pytest.mark.parametrize('case',['privacy','cleanup'])
+def test_privacy_cleanup_stop(session,case):
+    e=session.get_bind();seed(e)
+    class Broken(Source):
+        def close(self):raise RuntimeError('Private diagnostic must not escape')
+    def fn(r,l):
+        factory=lambda:Broken(summary(r['reference'])) if case=='cleanup' else Source(summary(r['reference'],status='private@example.com'))
+        return t.run_transaction(e,r,factory,l)
+    out=b.run(SHA,case,fn)
+    assert out['assessment']=='STOPPED_REVIEW_REQUIRED'
+    assert all(r['disposition']=='NOT_ATTEMPTED' for r in out['records'][1:])
+    assert 'private@example.com' not in b.encode(out).decode()
+    assert 'Private diagnostic' not in b.encode(out).decode()
+
+def test_worker_no_audit_is_unknown(monkeypatch,tmp_path):
+    from verification.direct_reference import batch_supervisor as sup
+    monkeypatch.setattr(sup,'supervise',lambda *a,**k:(-9,True))
+    row=b.manifest()[0]['identity']
+    out=sup.isolated(row,LIMITS,lambda *a:['never-executed'],{})
+    assert out['transaction']=='UNKNOWN' and out['cleanup']=='UNKNOWN'
+    result=b.run(SHA,'timeout',lambda *a:out)
+    assert set(result['totals'].values())=={'UNKNOWN'}
+
+def test_bad_resume_digest(session):
+    e=session.get_bind();seed(e)
+    out=b.run(SHA,'first',lambda r,l:execute(e,r,l))
+    with pytest.raises(ValueError):b.run(SHA,'second',lambda *a:None,prior=out,prior_sha256='0'*64)
+
+def test_frozen_manifest_digest(monkeypatch):
+    original=Path.read_bytes
+    def corrupt(p):return b'{}' if p.name=='batch-manifest.json' else original(p)
+    monkeypatch.setattr(Path,'read_bytes',corrupt)
+    with pytest.raises(ValueError):b.manifest()

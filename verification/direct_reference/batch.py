@@ -141,7 +141,7 @@ def run(repository_sha,invocation,execute_record,*,prior=None,prior_sha256=None,
         if used['requests']>=40 or used['received_body_bytes']>=20_000_000 or used['elapsed_seconds']>=150:break
         limits=dict(requests=min(2,40-used['requests']),bytes=min(2_000_000,20_000_000-used['received_body_bytes']),seconds=min(40,150-used['elapsed_seconds']),worker_seconds=min(45,300-(clock()-started)))
         try:
-            result=execute_record(row,limits)
+            result=execute_record(copy.deepcopy(row),limits)
             validate_record(result,row)
             candidate=copy.deepcopy(records);candidate[n]=result
             totals(candidate,carried)

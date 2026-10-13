@@ -144,6 +144,8 @@ def observe(application_id, session_factory, *, identity=None, limits=None):
           normalized_facts=observation.fields,semantic_qualification=observation.semantic_state)
     except BoundaryFailure as error:
         audit['outcome']=error.outcome if error.outcome in FAILURES else 'PARSER_FAILURE'
+        if identity is not None and error.reason in {'unsafe or excessive factual field','date field exceeds bound'}:
+            audit['outcome']='PRIVACY_FAILURE'
         bound_exhausted=any(word in error.reason.lower() for word in ('ceiling','bound','deadline'))
         diagnostics=getattr(error,'diagnostics',None)
         if diagnostics:
