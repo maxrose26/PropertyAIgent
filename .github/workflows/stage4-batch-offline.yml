@@ -1,11 +1,15 @@
 name: Stage4 reusable batch OFFLINE disposable
 on:
+  push:
+    branches: [master]
   pull_request:
     paths:
       - 'verification/direct_reference/**'
       - 'verification/b20_native/**'
       - 'tests/test_stage4*persistence*'
       - 'tests/test_stage4_batch.py'
+      - 'tests/test_stage4_batch_registration.py'
+      - '.github/workflows/stage4-batch-production-once.yml'
       - 'tests/test_stage4_direct_reference.py'
       - 'app/pipeline/status_verification.py'
       - 'app/pipeline/run_weekly.py'
@@ -19,17 +23,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: git fetch --no-tags --depth=1 origin 27966c34d1b4dbb88c15cd59d0805d55b14af9a7
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/direct-test-venv"
       - name: Network-denied registration and accepted regressions
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_stage4_batch.py tests/test_oldham_production_registration.py tests/test_stage4_persistence_acceptance.py tests/test_stage4_direct_reference.py tests/test_stage4_direct_registration.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py -p verification.stage1_preservation_plugin tests/test_stage4_batch_registration.py tests/test_stage4_batch.py tests/test_oldham_production_registration.py tests/test_stage4_persistence_acceptance.py tests/test_stage4_direct_reference.py tests/test_stage4_direct_registration.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: batch-offline-${{ github.event.pull_request.head.sha }}
+          name: batch-offline-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/direct-registration.xml
   native:
     runs-on: ubuntu-24.04
@@ -49,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           fetch-depth: 3
       - name: Install pinned dependencies
@@ -57,7 +61,7 @@ jobs:
       - name: Frozen live facts in disposable PostgreSQL transactions
         env:
           B20_POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
-          BATCH_REPOSITORY_SHA: ${{ github.event.pull_request.head.sha }}
+          BATCH_REPOSITORY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/b20-native-evidence"
@@ -74,6 +78,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: batch-native-${{ github.event.pull_request.head.sha }}
+          name: batch-native-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/b20-native-evidence/
           retention-days: 7

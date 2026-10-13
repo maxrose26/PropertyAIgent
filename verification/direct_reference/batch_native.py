@@ -111,3 +111,24 @@ def test_native_partial_resume(engine):
     done=b.run(SHA,'resume',execute,prior=partial,prior_sha256=hashlib.sha256(b.encode(partial)).hexdigest())
     assert len(calls)==20 and len(set(calls))==20 and done['assessment']=='ACCOUNTED'
     assert all(len(r['after']['events'])==1 for r in done['records'])
+
+@pytest.mark.parametrize('case',['commit','dispose_failure'])
+def test_production_wrapper_disposable_only(engine,monkeypatch,tmp_path,case):
+    from . import batch_production as live,oldham_production,refresh
+    row=b.manifest()[0]['identity']
+    monkeypatch.setattr(live,'resource_limits',lambda:None) # supervisor limit proof is test_supervised20
+    calls=[]
+    def production_engine(**kwargs):
+        calls.append(kwargs);return engine
+    monkeypatch.setattr(oldham_production,'production_engine',production_engine)
+    monkeypatch.setattr(refresh,'requests_session',lambda:source(row))
+    if case=='dispose_failure':monkeypatch.setattr(engine,'dispose',lambda:(_ for _ in ()).throw(RuntimeError('Synthetic cleanup failure')))
+    output=tmp_path/'production-wrapper-synthetic.json'
+    assert live.worker(row,LIMITS,output)==0
+    result=json.loads(output.read_text());b.validate_record(result,row)
+    assert result['transaction']=='COMMITTED' and result['source_provenance']=='FRESH_OFFICIAL_SUMMARY'
+    # This test-only factory patch is explicitly synthetic. It is not a production
+    # observation and its individual audit is not exported as live evidence.
+    assert calls==[dict(secret_name='BATCH_DATABASE_URL',application_name='stage4_representative20_once')]
+    if case=='commit':assert result['cleanup']=='CLOSED' and result['disposition']=='COMPLETED'
+    else:assert result['cleanup']=='FAILED' and result['disposition']=='SAFETY_STOP'
