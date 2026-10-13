@@ -151,7 +151,7 @@ async def probe(case):
                  persistence=False, requests=0, responses=0, redirects=0,
                  decoded_bytes=0, encoded_bytes=0, pages=0, navigations=0, local_frames=0, frame_kinds=[],
                  requested_origins=[], navigated_origins=[], endpoints=[],
-                 blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
+                 http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', network_classification='UNKNOWN')
     started = time.monotonic()
     browser = context = None
@@ -192,6 +192,21 @@ async def probe(case):
             reason = request_failure(url, request['method'], event.get('resourceType'), destination, audit['requests'])
             if reason == 'UNREVIEWED_METHOD':
                 audit['blocked_posts'] += 1
+                metadata = post_metadata(request.get('postData'), destination)
+                if audit['http_probe'] is None and any(
+                        m.get('namespace') == 'arcuscommunity' and
+                        m.get('classname') == 'PublicRegisterViewService' and
+                        m.get('method') == 'getRecordHeaderDetails' for m in metadata):
+                    from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY
+                    if audit['requests'] >= MAX_REQUESTS or audit['decoded_bytes'] + MAX_BODY > MAX_BYTES:
+                        fail('HTTP_BUDGET_UNAVAILABLE')
+                        await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+                        return
+                    audit['http_probe'] = observed_guest_read(url, request.get('postData'), destination, reference)
+                    audit['requests'] += int(audit['http_probe']['attempted'])
+                    audit['decoded_bytes'] += audit['http_probe']['received_bytes']
+                    if audit['requests'] > MAX_REQUESTS or audit['decoded_bytes'] > MAX_BYTES:
+                        fail('HTTP_AGGREGATE_BOUND')
                 await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
                 return  # collect other blocked public-page actions; never dispatch them
             if reason:

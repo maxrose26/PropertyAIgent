@@ -65,5 +65,39 @@ class ProbeContract(unittest.TestCase):
         self.assertIsNone(request_failure(origin(url)+'/pr/s/sfsites/l/framework.js?label=download', 'GET', 'Script', url, 2))
 
 
+    def test_guest_envelope_exact_read_only(self):
+        import json
+        from urllib.parse import urlencode, urlsplit
+        from verification.direct_reference.arcus_http_probe import guest_envelope
+        destination=CASES['manchester'][2]
+        u=urlsplit(destination)
+        action={'id':'1;a','descriptor':'aura://ApexActionController/ACTION$execute','params':{
+            'namespace':'arcuscommunity','classname':'PublicRegisterViewService','method':'getRecordHeaderDetails',
+            'params':{'recordId':u.path.rsplit('/',1)[-1],'registerName':'Arcus_BE_Public_Register'}}}
+        form={'message':json.dumps({'actions':[action]}),'aura.token':'null',
+              'aura.context':json.dumps({'mode':'PROD','globals':{}}),'aura.pageURI':u.path+'?'+u.query}
+        body=urlencode(form)
+        self.assertEqual(guest_envelope(body,destination),body)
+        for change in ({'aura.token':'SECRET'}, {'message':json.dumps({'actions':[action,action]})},
+                       {'aura.pageURI':'/other'}, {'aura.context':'{"globals":{"secret":"x"}}'}):
+            with self.assertRaises(ValueError):
+                guest_envelope(urlencode(dict(form,**change)),destination)
+        action['params']['params']['recordId']='WRONG'
+        with self.assertRaises(ValueError):
+            guest_envelope(urlencode(dict(form,message=json.dumps({'actions':[action]}))),destination)
+
+    def test_guest_response_retains_only_planning_values(self):
+        import json
+        from verification.direct_reference.arcus_http_probe import response_summary
+        data={'actions':[{'state':'SUCCESS','returnValue':[
+            {'label':'Reference','value':'R'}, {'label':'Status','value':'Final'},
+            {'label':'Applicant','value':'PRIVATE_PERSON'}]}]}
+        result=response_summary(data,'R')
+        self.assertTrue(result['exact_reference_value_present'])
+        self.assertNotIn('PRIVATE_PERSON',json.dumps(result))
+        self.assertNotIn('Applicant',json.dumps(result))
+        self.assertEqual(result['planning_label_values'],[['Reference','R'],['Status','Final']])
+
+
 if __name__ == '__main__':
     unittest.main()

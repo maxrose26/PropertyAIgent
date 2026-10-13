@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - verification/direct_reference/instrumented_probe.py
+      - verification/direct_reference/arcus_http_probe.py
       - verification/direct_reference/INSTRUMENTED_PROBE.md
       - tests/test_instrumented_probe.py
       - .github/workflows/stage4-instrumented-probe.yml
@@ -26,15 +27,15 @@ jobs:
           python-version: '3.12'
       - name: Install existing browser dependencies
         run: |
-          python -m pip install playwright==1.63.0 psutil==7.2.2
+          python -m pip install playwright==1.63.0 psutil==7.2.2 requests==2.34.2
           python -m playwright install --with-deps chromium --only-shell
       - name: Focused offline contracts
         run: python -m unittest tests.test_instrumented_probe -v
-      - name: Frozen Manchester and first Trafford network observations
+      - name: Frozen Arcus guest-route observations
         run: |
           mkdir -p "$RUNNER_TEMP/stage4-probe-audit"
           probe_result=0
-          for probe_case in manchester trafford; do
+          for probe_case in manchester salford rochdale; do
             python -m verification.direct_reference.instrumented_probe --case "$probe_case" --output "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json" || probe_result=1
             python -c 'import json,sys; a=json.load(open(sys.argv[1])); sys.exit(0 if a.get("process_cleanup")=="CLOSED" and not a.get("supervisor_limit_hit",True) else 1)' "$RUNNER_TEMP/stage4-probe-audit/$probe_case.json"
           done

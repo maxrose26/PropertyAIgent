@@ -39,3 +39,17 @@ does not establish a council source failure.
 Initial probe is diagnostic only. Even a successful result cannot directly
 advance verification. Actual source admission requires reviewed transport
 semantics, focused tests, live bounds/cleanup evidence and existing B2 integration.
+
+## Observed guest HTTP diagnostic
+
+The reviewed browser metadata identified the Arcus PublicRegisterViewService
+getRecordHeaderDetails read action with a literal null guest token. One fresh
+cookieless HTTP session may replay that exact observed single-action envelope
+for the frozen record and register. No guessed context, credentials, redirects
+or retries. The response is capped at 1 MiB; socket timeout is two seconds,
+cooperative elapsed cutoff five seconds, and the existing supervisor provides
+the hard worker deadline. Browser POSTs remain blocked, including telemetry.
+Selected planning labels and structural keys only are retained, never raw JSON.
+This diagnostic is not B2-eligible and does not establish a complete source
+contract. Its HTTP attempt and decoded body bytes join aggregate counts; CDP
+encoded-byte counts exclude this separate HTTP request. Trafford is not retried.
