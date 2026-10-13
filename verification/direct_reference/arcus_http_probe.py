@@ -118,6 +118,34 @@ def unique_object(pairs):
     return result
 
 
+def bootstrap_action_shape(body):
+    """Diagnostic keys/types only; never authorise an unknown envelope key.
+
+    Host-config rejection currently identifies no actual extra key. Retain the
+    minimum evidence needed to assess that envelope instead of guessing that a
+    commonly used Aura property is the property this page supplied.
+    """
+    if not isinstance(body, str) or len(body) > 65536:
+        return []
+    try:
+        form = parse_qs(body, keep_blank_values=True)
+        if len(form.get('message', [])) != 1:
+            return []
+        message = json.loads(form['message'][0], object_pairs_hook=unique_object)
+        actions = message.get('actions')
+        if not isinstance(actions, list) or len(actions) != 1:
+            return []
+        action = actions[0]
+        if (not isinstance(action, dict) or len(action) > 20 or
+                action.get('descriptor') != HOST_CONFIG_GETTER):
+            return []
+        return [{'key': key if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,63}', key)
+                 else 'UNRETAINED', 'type': type(value).__name__}
+                for key, value in sorted(action.items())]
+    except (ValueError, TypeError, AttributeError):
+        return []
+
+
 def guest_envelope(body, destination, kind='header'):
     if not body or len(body) > 65536:
         raise ValueError('BODY_BOUND')
@@ -248,6 +276,8 @@ def observed_guest_read(url, body, destination, reference, consumer=None, kind='
             else {'r','ui-force-components-controllers-recordGlobalValueProvider.RecordGvp.getRecord'})
         if any(key not in allowed_query or len(values)!=1 or not re.fullmatch(r'[0-9]{1,10}', values[0]) for key,values in query.items()):
             raise ValueError('UNREVIEWED_QUERY')
+        if kind == 'host_config':
+            result['request_action_shape'] = bootstrap_action_shape(body)
         payload=guest_envelope(body,destination,kind)
         import requests
         with requests.Session() as session:

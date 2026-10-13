@@ -185,6 +185,28 @@ class ProbeContract(unittest.TestCase):
         self.assertEqual(delivered,[content])
         self.assertIn('elapsed_seconds',result)
 
+    def test_unknown_bootstrap_action_key_reports_shape_without_dispatch(self):
+        import json
+        from unittest.mock import patch
+        from urllib.parse import urlencode, urlsplit
+        from verification.direct_reference.arcus_http_probe import observed_guest_read, HOST_CONFIG_GETTER, bootstrap_action_shape
+        destination=CASES['salford'][2]
+        u=urlsplit(destination)
+        action={'id':'1;a','descriptor':HOST_CONFIG_GETTER,'params':{},
+                'unqualifiedFlag':'PRIVATE_VALUE'}
+        body=urlencode({'message':json.dumps({'actions':[action]}),'aura.token':'null',
+            'aura.context':'{"mode":"PROD"}','aura.pageURI':u.path+'?'+u.query})
+        with patch('requests.Session') as session:
+            result=observed_guest_read(origin(destination)+'/pr/s/sfsites/aura?r=1',body,
+                destination,'PA/2025/1084',kind='host_config')
+        session.assert_not_called()
+        self.assertEqual(result['outcome'],'UNREVIEWED_ACTION_KEYS')
+        self.assertFalse(result['attempted'])
+        self.assertIn({'key':'unqualifiedFlag','type':'str'},result['request_action_shape'])
+        self.assertNotIn('PRIVATE_VALUE',json.dumps(result))
+        self.assertEqual(bootstrap_action_shape('message=not-json'),[])
+        self.assertEqual(bootstrap_action_shape(urlencode({'message':'{"actions":[],"actions":[]}'})),[])
+
     def test_partial_read_does_not_consume_fact_slot(self):
         from verification.direct_reference.arcus_http_probe import fact_read_candidate, RECORD_GETTER
         self.assertFalse(fact_read_candidate([{'descriptor':RECORD_GETTER,'record_descriptor_closed_shape':False}]))
