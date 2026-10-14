@@ -74,3 +74,17 @@ def test_fixed_committee_shared_admission_and_b2_on_postgres(pg):
     assert [r['verification_scope'] for r in first]==['INITIAL_STATUS_ONLY','INITIAL_STATUS_ONLY','COUPLED']
     with Session(pg) as session:
         assert session.scalar(select(func.count()).select_from(Application))==3
+
+
+def test_qualified_material_three_shared_caller_on_postgres(pg):
+    from tests.test_discovery_material_admission import seed_material,source
+    from verification.discovery.material_admission import execute
+    seed_material(pg)
+    first=execute(pg,'material-pg',retrieve_evidence=source)
+    assert [r['verification_scope'] for r in first]==['COUPLED','INITIAL_STATUS_ONLY','COUPLED']
+    assert first[2]['readback']['decision_issued_date']=='2026-07-28'
+    again=execute(pg,'overlap',retrieve_evidence=lambda *_:pytest.fail('duplicate source'))
+    assert all(r['outcome']=='ALREADY_EXISTS_AT_EXECUTION' for r in again)
+    with Session(pg) as session:
+        assert session.scalar(select(func.count()).select_from(Application))==3
+        assert all(a.site_id is None for a in session.scalars(select(Application)))
