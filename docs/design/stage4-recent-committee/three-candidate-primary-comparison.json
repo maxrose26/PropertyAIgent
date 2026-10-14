@@ -1,0 +1,69 @@
+{
+  "rows": [
+    {
+      "council": "salford",
+      "reference": "PA/2025/1506",
+      "primary_comparison": "OUTSIDE_COMPARABLE_WINDOW",
+      "validated_date": "2025-12-04",
+      "source": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq00000AOwZlIAL?c__r=Arcus_BE_Public_Register",
+      "date_evidence": "Retained ordinary public portal observation: explicitly labelled Valid Date",
+      "observation_date": "2026-10-14",
+      "exact_observation_timestamp": "UNKNOWN",
+      "primary_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "primary_date_semantics": "VALIDATED",
+      "publication_timestamp": "UNKNOWN",
+      "publication_latency": "UNKNOWN",
+      "discovery_miss": "NOT_ESTABLISHED",
+      "site_relationship": "UNKNOWN",
+      "application_role": "UNKNOWN",
+      "related_reference": null
+    },
+    {
+      "council": "manchester",
+      "reference": "145583/FO/2026",
+      "primary_comparison": "OUTSIDE_COMPARABLE_WINDOW",
+      "validated_date": "2026-04-22",
+      "source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOGYMA4?c__r=Arcus_BE_Public_Register",
+      "date_evidence": "Retained ordinary public portal observation: explicitly labelled Valid Date",
+      "observation_date": "2026-10-14",
+      "exact_observation_timestamp": "UNKNOWN",
+      "primary_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "primary_date_semantics": "VALIDATED",
+      "publication_timestamp": "UNKNOWN",
+      "publication_latency": "UNKNOWN",
+      "discovery_miss": "NOT_ESTABLISHED",
+      "site_relationship": "UNKNOWN",
+      "application_role": "UNKNOWN",
+      "related_reference": null
+    },
+    {
+      "council": "manchester",
+      "reference": "143413/FO/2025",
+      "primary_comparison": "OUTSIDE_COMPARABLE_WINDOW",
+      "validated_date": "2025-08-28",
+      "source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOKjMAO?c__r=Arcus_BE_Public_Register",
+      "date_evidence": "Retained ordinary public portal observation: explicitly labelled Valid Date",
+      "observation_date": "2026-10-14",
+      "exact_observation_timestamp": "UNKNOWN",
+      "primary_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "primary_date_semantics": "VALIDATED",
+      "publication_timestamp": "UNKNOWN",
+      "publication_latency": "UNKNOWN",
+      "discovery_miss": "NOT_ESTABLISHED",
+      "site_relationship": "UNKNOWN",
+      "application_role": "UNKNOWN",
+      "related_reference": "142223/FO/2025"
+    }
+  ],
+  "window_changed_after_results": false,
+  "warning": "Validated-date membership comparison only; not publication timing or complete-history recall"
+}
