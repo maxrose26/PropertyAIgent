@@ -4,7 +4,7 @@ Source-specific qualification is supplied by reviewed adapters, never inferred
 from HTTP success. This module cannot authorise a source or production writes.
 """
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 import hashlib
 import json
@@ -185,9 +185,13 @@ def prospective_calendar(frozen_at: datetime) -> dict:
 def latency_seconds(discovered_at: datetime, published_at: datetime | None):
     if published_at is None:
         return None
-    if discovered_at.tzinfo is None or published_at.tzinfo is None or published_at > discovered_at:
+    if discovered_at.tzinfo is None or published_at.tzinfo is None:
         raise ValueError('invalid publication clock')
-    return (discovered_at - published_at).total_seconds()
+    discovered_utc = discovered_at.astimezone(timezone.utc)
+    published_utc = published_at.astimezone(timezone.utc)
+    if published_utc > discovered_utc:
+        raise ValueError('invalid publication clock')
+    return (discovered_utc - published_utc).total_seconds()
 
 
 @dataclass(frozen=True)

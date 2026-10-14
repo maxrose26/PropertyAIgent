@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   shape:
-    # One reviewed corrected execution; prior runs1/2 failed closed. No rerun/attempt2.
-    if: github.run_number == 3 && github.run_attempt == 1
+    # One reviewed corrected execution; prior runs1/2/3 failed closed. No rerun/attempt2.
+    if: github.run_number == 4 && github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -25,7 +25,7 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/discovery-browsers" "$RUNNER_TEMP/discovery-venv/bin/python" -m playwright install --with-deps chromium --only-shell
       - name: Relevant offline contracts
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_arcus_ui.py -q
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py -q
       - name: One supervised fixed Manchester listing bootstrap
         run: |
           mkdir "$RUNNER_TEMP/discovery-shape"

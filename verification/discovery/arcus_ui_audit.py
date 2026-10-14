@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import sys
 from .arcus_ui_window import CASE, DESTINATION
+from .arcus_ui_transport import combined_bytes, MAX_BYTES
 
 
 def validate(a):
@@ -16,6 +17,10 @@ def validate(a):
         raise ValueError('UI resource bound')
     if not (0<=a['encoded_bytes']<=20*1024*1024 and a['pages']==1 and 1<=a['navigations']<=2):
         raise ValueError('UI navigation/wire bound')
+    if (type(a.get('outbound_payload_bytes')) is not int or a['outbound_payload_bytes']<0
+        or combined_bytes(a)>MAX_BYTES or a.get('measured_public_ui_posts')!=a.get('public_ui_posts')
+        or not 1<=a.get('public_ui_posts',0)<=a['requests']):
+        raise ValueError('UI outbound accounting')
     rows=a['listing_records'];pages=a['listing_segments']
     if not 1<=len(pages)<=6: raise ValueError('segment bound')
     if not pages or pages[-1]['last']!=pages[-1]['total'] or len(rows)!=pages[-1]['total']: raise ValueError('total mismatch')

@@ -157,3 +157,50 @@ effects. Ten admission tests include database-trigger rollback and unchanged
 existing facts. Audit lists the checked field names and reportsNULL_CONFIRMED
 only for new rows, without emitting existing factual values. This preparation
 does not enable an operational production caller or change B2 semantics.
+
+## Independent-denominator accounting preparation
+
+A pure reconciliation helper separates confirmed/potential materiality, primary
+detection, withheld-after-detection, identity admission, already-known and
+outside-interval records. Manual committee additions cannot improve primary
+recall. Incomplete/zero denominators do not become100%; observed misses remain
+visible while the complete aggregate remainsUNKNOWN until allnine independent
+denominators are complete. The caller must freeze admission flags asof the
+comparison timestamp. No independent denominator has yet been frozen.
+
+Elapsed latency is calculated fromUTC instants. The seven-calendar-day deadline
+is calculated inEurope/London, including the25October clock change. This does
+not substitute received/validated dates for publication availability. Four
+focused tests cover manual misses, withholding, unknown denominators, overlap,
+known/outside handling, postcomparison observations andDST. Independent review
+approved this accounting preparation; it is not prospective acceptance evidence.
+
+## PR78 live results and bounded outbound measurement
+
+Bolton run38545477089 enumerated22 distinct references across3pages with
+stabletotal22, explicit last=total and independently retained received-date
+criteria28September–4October2026. Sixrequests290416bytes10.723seconds,zero
+retries/redirects,cleanupCLOSED. Manual ordinary UI enumeration independently
+matched the22 identities. This is successful source-contract evidence, not
+prospective acceptance or a registered operational source. No rerun planned.
+
+Manchester run38545477130 qualified10of57 records on the first page, then
+stoppedINCOMPLETE at NEXT_CONTROL withUNREVIEWED_METHOD.32requests,10873247
+decoded/1966817encodedbytes,4.744supervisorseconds,869675008peak ownedRSS,
+8ownedprocesses,zero survivors,cleanupCLOSED. The former64KiB predicate could
+reject omitted or larger postData, but this run did not record enough evidence
+to distinguish them. Neither cause is asserted as proven.
+
+The correction measures normal paused form-urlencoded AuraPOST payloads before
+continuation. If the pause event omits the body, Network.getRequestPostData uses
+the browser network request ID; this is local protocol inspection, not a new
+source request, replay or reconstructed RPC. Missing/unmeasurable/unsupported
+bodies fail closed. UTF8 payload bytes plus max(decoded,encoded) response bytes
+must fit the unchanged20MiB aggregate.80requests/45seconds/1GiB limits and
+cleanup remain unchanged. Only sizes/classifications are audited, never body
+content or session values. One corrected run4/attempt1 follows independent
+review and exact-headCI; no automatic retry, no Bolton rerun, no production.
+
+195 focused offline tests passed for this candidate before independent review.
+Independent review approved the approach with a non-identity Content-Encoding
+rejection. That guard and gzip regression were added;31 affected tests passed.

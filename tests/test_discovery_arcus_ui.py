@@ -1,16 +1,11 @@
 import pytest
-from verification.discovery.arcus_ui_window import public_ui_post, qualify_segment, AURA
+from verification.discovery.arcus_ui_window import qualify_segment, AURA
 
 
 def card(ref='PLA-2026-001',key='a1DSl000007WJ1tMAG',valid='02/10/2026'):
     return {'links':[{'text':ref,'href':f'https://arcusbe.manchester.gov.uk/pr/s/detail/{key}?c__r=Arcus_BE_Public_Register'}],
         'fields':[{'label':'Reference','value':ref},{'label':'Valid Date','value':valid}]}
 
-
-def test_public_ui_transport_is_only_observed_endpoint_and_post():
-    assert public_ui_post('POST',AURA,'ordinary browser-generated form')
-    for method,url,body in [('PUT',AURA,'x'),('POST',AURA+'/other','x'),('POST',AURA.replace('manchester','other'),'x'),('POST',AURA,'x'*65537)]:
-        assert not public_ui_post(method,url,body)
 
 
 def test_exact_displayed_identity_and_date_literals():
@@ -38,10 +33,10 @@ def test_audit_rejects_partial_or_unbounded_output():
     a=dict(case=CASE,destination=DESTINATION,persistence=False,failure=None,safety_failure=False,safety_events=[],
         cleanup='CONTEXT_BROWSER_CLOSED',process_cleanup='CLOSED',live_owned_survivors=0,supervisor_limit_hit=False,
         enumeration_evidence='COUNT_RECONCILED',applied_interval=['2026-09-28','2026-10-04'],completeness='UNKNOWN',
-        requests=20,decoded_bytes=1000,encoded_bytes=800,supervisor_seconds=5,pages=1,navigations=1,
+        requests=20,decoded_bytes=1000,encoded_bytes=800,outbound_payload_bytes=100,public_ui_posts=1,measured_public_ui_posts=1,supervisor_seconds=5,pages=1,navigations=1,
         listing_records=[{'reference':'TEST/26','source_record_id':'X'}],listing_segments=[{'first':1,'last':1,'total':1}])
     assert validate(a)['production_admission'] is False
-    for changes in ({'listing_failure':'X'},{'completeness':'COMPLETE'},{'encoded_bytes':30_000_000},{'pages':2},{'navigations':3},
+    for changes in ({'listing_failure':'X'},{'completeness':'COMPLETE'},{'encoded_bytes':30_000_000},{'pages':2},{'navigations':3},{'outbound_payload_bytes':20*1024*1024},{'measured_public_ui_posts':0},
                     {'listing_segments':a['listing_segments']*7}):
         with pytest.raises(ValueError):validate(dict(a,**changes))
 
