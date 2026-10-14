@@ -1,0 +1,46 @@
+name: Stage4 Manchester public listing window ONCE
+on:
+  push:
+    branches: [master]
+    paths: ['verification/discovery/arcus_ui_window.py']
+permissions:
+  contents: read
+concurrency:
+  group: stage4-discovery-source-qualification
+  cancel-in-progress: false
+jobs:
+  shape:
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Existing dependencies and disposable browser runtime
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/discovery-browsers" "$RUNNER_TEMP/discovery-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Relevant offline contracts
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_arcus_ui.py -q
+      - name: One supervised fixed Manchester listing bootstrap
+        run: |
+          mkdir "$RUNNER_TEMP/discovery-shape"
+          set +e
+          timeout --kill-after=2s 55s env -i HOME="$HOME" PATH=/usr/bin:/bin GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/discovery-browsers" "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.direct_reference.instrumented_probe --case discovery_manchester_ui_window --output "$RUNNER_TEMP/discovery-shape/audit.json" > /dev/null
+          result=$?
+          printf '{"worker_exit":%s,"supervisor_returned":true,"no_retry":true}\n' "$result" > "$RUNNER_TEMP/discovery-shape/supervisor.json"
+          set -e
+          test "$result" -eq 0
+          # Public UI evidence remains separate from source registry and acceptance.
+          test -f "$RUNNER_TEMP/discovery-shape/audit.json"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.discovery.arcus_ui_audit "$RUNNER_TEMP/discovery-shape/audit.json" > "$RUNNER_TEMP/discovery-shape/qualification.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-arcus-ui-window-${{ github.run_id }}-${{ github.sha }}
+          path: ${{ runner.temp }}/discovery-shape/*.json
+          retention-days: 14
+          if-no-files-found: error

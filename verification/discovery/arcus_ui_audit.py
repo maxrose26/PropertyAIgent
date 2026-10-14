@@ -1,0 +1,36 @@
+import json
+from pathlib import Path
+import sys
+from .arcus_ui_window import CASE, DESTINATION
+
+
+def validate(a):
+    if (a.get('case')!=CASE or a.get('destination')!=DESTINATION or a.get('persistence') is not False
+        or a.get('failure') is not None or a.get('safety_failure') is not False or a.get('safety_events')!=[]
+        or a.get('cleanup')!='CONTEXT_BROWSER_CLOSED' or a.get('process_cleanup')!='CLOSED'
+        or a.get('live_owned_survivors')!=0 or a.get('supervisor_limit_hit') is not False
+        or a.get('enumeration_evidence')!='COUNT_RECONCILED' or a.get('listing_failure') is not None
+        or a.get('completeness')!='UNKNOWN'
+        or a.get('applied_interval')!=['2026-09-28','2026-10-04']): raise ValueError('UI window failed')
+    if not (1<=a['requests']<=80 and 0<=a['decoded_bytes']<=20*1024*1024 and 0<=a['supervisor_seconds']<=45):
+        raise ValueError('UI resource bound')
+    if not (0<=a['encoded_bytes']<=20*1024*1024 and a['pages']==1 and 1<=a['navigations']<=2):
+        raise ValueError('UI navigation/wire bound')
+    rows=a['listing_records'];pages=a['listing_segments']
+    if not 1<=len(pages)<=6: raise ValueError('segment bound')
+    if not pages or pages[-1]['last']!=pages[-1]['total'] or len(rows)!=pages[-1]['total']: raise ValueError('total mismatch')
+    cursor=1; total=pages[-1]['total']
+    for segment in pages:
+        if segment['first']!=cursor or segment['last']<cursor or segment['total']!=total:
+            raise ValueError('segment continuity')
+        cursor=segment['last']+1
+    if len({r['reference'] for r in rows})!=len(rows) or len({r['source_record_id'] for r in rows})!=len(rows):
+        raise ValueError('duplicate identities')
+    return {'outcome':'PUBLIC_UI_COUNT_AND_IDENTITY_QUALIFIED','completeness':'UNKNOWN',
+        'source_registry_qualified':False,'production_admission':False,'records':len(rows),'segments':len(pages)}
+
+
+if __name__=='__main__':
+    p=Path(sys.argv[1])
+    if p.stat().st_size>=65536: raise ValueError('audit size')
+    print(json.dumps(validate(json.loads(p.read_bytes()))))
