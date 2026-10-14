@@ -93,9 +93,13 @@ def admission_environment(sha, authority):
 
 
 def validate_sources(source_retrieve=retrieve,results=None):
+    return _validate_cohort(targets(),source_retrieve,results)
+
+
+def _validate_cohort(rows,source_retrieve=retrieve,results=None):
     """Credential-free prerequisite; no identity creation or factual persistence."""
     results=[] if results is None else results
-    for row in targets():
+    for row in rows:
         resource=source_retrieve(row, None)
         observation=resource.get('observation')
         audit=dict(council=row['council'],reference=row['reference'],source=resource['audit'],
@@ -115,9 +119,13 @@ def validate_sources(source_retrieve=retrieve,results=None):
 
 
 def run(engine, run_id, source_retrieve=retrieve, results=None):
+    return _run_cohort(engine,run_id,targets(),source_retrieve,results)
+
+
+def _run_cohort(engine,run_id,rows,source_retrieve=retrieve,results=None):
     from verification.direct_reference.refresh import _refresh_row
     result = [] if results is None else results
-    for row in targets():
+    for row in rows:
         audit = dict(council=row['council'], reference=row['reference'], admission=None,
                      planning_observation='NOT_ATTEMPTED', source=None,
                      transaction='IDENTITY_ADMISSION_STARTED_UNCONFIRMED')
