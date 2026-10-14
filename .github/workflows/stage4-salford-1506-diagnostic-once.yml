@@ -1,0 +1,56 @@
+name: Stage4 Salford1506 rejection diagnostic ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed integrated revision
+        required: true
+        type: string
+      authority:
+        description: One frozen Salford reference; transport diagnostic only
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_SALFORD_PA_2025_1506_TRANSPORT_DIAGNOSTIC_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Exact revision and one invocation
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_SALFORD_PA_2025_1506_TRANSPORT_DIAGNOSTIC_ONCE ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Dependencies without production credentials
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/committee-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Credential-free transport qualification, fixed manifest
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          DIAGNOSTIC_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          mkdir "$RUNNER_TEMP/committee-audit"
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_REF="$GITHUB_REF" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" DIAGNOSTIC_WORKFLOW_SHA="$DIAGNOSTIC_WORKFLOW_SHA" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m verification.discovery.salford_diagnostic --sha "$PIN" --authority "$AUTHORITY" --output "$RUNNER_TEMP/committee-audit/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: salford-1506-diagnostic-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/committee-audit/*.json
+          if-no-files-found: error
+          retention-days: 14

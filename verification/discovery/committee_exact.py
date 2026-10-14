@@ -101,6 +101,8 @@ def validate_sources(source_retrieve=retrieve,results=None):
         audit=dict(council=row['council'],reference=row['reference'],source=resource['audit'],
                    failure=resource.get('failure'),qualified=False)
         results.append(audit)
+        from .rejection_audit import observation_audit
+        audit['observation_evidence']=observation_audit(row,resource)
         if (resource.get('failure') or observation is None
                 or resource['audit'].get('cleanup_state') != 'CLOSED'
                 or resource['audit'].get('budget_state') != 'WITHIN_LIMITS'
