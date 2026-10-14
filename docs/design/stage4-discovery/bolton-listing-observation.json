@@ -1,0 +1,33 @@
+{
+  "observed_at": "2026-10-14",
+  "method": "ordinary public UI; no detail/document retrieval",
+  "historical_received_interval": ["2026-02-19", "2026-02-19"],
+  "historical_rows": 8,
+  "historical_displayed_references": ["00302/26", "00313/26", "00306/26", "00307/26", "00309/26", "00312/26", "00310/26", "00311/26"],
+  "historical_pager": "NOT_PRESENT",
+  "historical_refine_echo": ["19/02/2026", "19/02/2026"],
+  "pagination_received_interval": ["2026-09-28", "2026-10-04"],
+  "pagination_source_total": 22,
+  "observed_segments": [[1, 10], [21, 22]],
+  "unobserved_segments": [[11, 20]],
+  "selectors": {
+    "rows": "#searchresults > li.searchresult",
+    "identity": "p.metaInfo",
+    "identity_label": "Ref. No:",
+    "proposal_link": "a.summaryLink",
+    "address": "p.address",
+    "pagers": "p.pager",
+    "next": "a.next",
+    "page_size": "select#resultsPerPage"
+  },
+  "pagination_path": "/online-applications/pagedSearchResults.do?action=page&searchCriteria.page=2",
+  "first_marker": "Showing 1-10 of 22",
+  "terminal_marker": "Showing 21-22 of 22",
+  "completeness": "UNKNOWN",
+  "resource_accounting": "UNKNOWN",
+  "database_identity_comparison": "NOT_PERFORMED",
+  "production_admission": false,
+  "tab_closed": true,
+  "hosted_preceding_run": 38538689624,
+  "hosted_artifact_sha256": "bf04e0b845048be38e4072049fcebae206b7dafd900ceccee96c83386f7435fd"
+}

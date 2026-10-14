@@ -30,3 +30,19 @@ def test_shape_observation_cannot_claim_coverage_or_hide_resource_failure():
     for changes in ({'completeness':'COMPLETE'}, {'live_owned_survivors':1},
                     {'fields':{}}, {'exact_reference':True}, {'requests':81}, {'safety_failure':True}, {'record_http_probe':{}}):
         with pytest.raises(ValueError): validate(dict(a, **changes))
+
+
+def test_only_observed_guest_bootstrap_getters_can_execute():
+    from urllib.parse import urlencode
+    from verification.discovery.manchester_search_shape import bootstrap_read_allowed, HOST, APEX
+    url='https://arcusbe.manchester.gov.uk/pr/s/sfsites/aura'
+    def body(a,token='null'):
+        return urlencode({'aura.token':token,'message':json.dumps({'actions':[a]})})
+    host={'descriptor':HOST,'params':{}}
+    assert bootstrap_read_allowed(url,body(host))
+    assert not bootstrap_read_allowed(url,body(host,'secret'))
+    assert not bootstrap_read_allowed(url.replace('manchester','evil'),body(host))
+    params=dict(namespace='',classname='DSHLC_HeaderCont',method='isSelfRegistrationEnabled',cacheable=True,isContinuation=False)
+    assert bootstrap_read_allowed(url,body({'descriptor':APEX,'params':params}))
+    for changes in ({'method':'registerUser'},{'cacheable':False},{'params':{'email':'private'}},{'namespace':'other'}):
+        assert not bootstrap_read_allowed(url,body({'descriptor':APEX,'params':dict(params,**changes)}))
