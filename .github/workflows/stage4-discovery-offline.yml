@@ -30,7 +30,7 @@ jobs:
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
       - name: Pure discovery and pagination regressions, network denied
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_contract.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_contract.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_arcus_ui.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

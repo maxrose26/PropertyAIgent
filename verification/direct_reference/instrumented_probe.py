@@ -27,6 +27,8 @@ CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
 from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed
 CASES[SEARCH_SHAPE_CASE] = (None, None, DISCOVERY_DESTINATION)
 DISCOVERY_CASES = {DISCOVERY_CASE, SEARCH_SHAPE_CASE}
+from verification.discovery.arcus_ui_window import CASE as UI_WINDOW_CASE, public_ui_post, enumerate_ui
+CASES[UI_WINDOW_CASE] = (None, None, DISCOVERY_DESTINATION)
 MAX_BYTES = 20 * 1024 * 1024
 MAX_REQUESTS = 80
 MAX_SECONDS = 45
@@ -231,6 +233,9 @@ async def probe(case):
         audit.update(purpose='DISCOVERY_LISTING_RPC_SHAPE_ONLY',
                      requested_interval=['2026-09-28', '2026-10-04'],
                      date_semantics='VALIDATED', completeness='UNKNOWN', bootstrap_reads=0, observed_action_metadata=[])
+    if case == UI_WINDOW_CASE:
+        audit.update(purpose='DISCOVERY_PUBLIC_UI_WINDOW',public_ui_posts=0,completeness='UNKNOWN',
+                     requested_interval=['2026-09-28','2026-10-04'],date_semantics='VALIDATED')
     started = time.monotonic()
     browser = context = None
     stopped = asyncio.Event()
@@ -259,7 +264,7 @@ async def probe(case):
                 audit['endpoints'].append(descriptor)
             if event.get('redirectedRequestId'):
                 audit['redirects'] += 1
-            if request['method'] not in ('GET', 'HEAD'):
+            if request['method'] not in ('GET', 'HEAD') and case != UI_WINDOW_CASE:
                 for descriptor in post_descriptors(request.get('postData')):
                     if descriptor not in audit['blocked_actions'] and len(audit['blocked_actions']) < 20:
                         audit['blocked_actions'].append(descriptor)
@@ -278,7 +283,17 @@ async def probe(case):
                 else:
                     await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
                 return
+            if (reason == 'UNREVIEWED_METHOD' and case == UI_WINDOW_CASE
+                    and not stopped.is_set() and not audit['safety_failure']
+                    and public_ui_post(request['method'],url,request.get('postData'))):
+                audit['public_ui_posts'] += 1
+                await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
+                return
             if reason == 'UNREVIEWED_METHOD':
+                if case == UI_WINDOW_CASE:
+                    fail('UNREVIEWED_METHOD')
+                    await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+                    return
                 if case == SEARCH_SHAPE_CASE:
                     for metadata in post_metadata(request.get('postData'), destination):
                         if metadata not in audit['blocked_action_metadata'] and len(audit['blocked_action_metadata']) < 20:
@@ -418,45 +433,50 @@ async def probe(case):
                     await asyncio.gather(nav, return_exceptions=True)
                 else:
                     await nav
-                    if case in DISCOVERY_CASES:
-                        # Observe bootstrap metadata only; never inspect application DOM.
+                    if case == UI_WINDOW_CASE:
+                        await enumerate_ui(page,audit,stopped)
+                        if audit.get('enumeration_evidence') != 'COUNT_RECONCILED':
+                            fail('LISTING_NOT_QUALIFIED')
+                    else:
+                        if case in DISCOVERY_CASES:
+                            # Observe bootstrap metadata only; never inspect application DOM.
+                            until = time.monotonic() + 8
+                            while not stopped.is_set() and not audit['blocked_posts'] and time.monotonic() < until:
+                                await asyncio.sleep(.2)
+                        # Read only relevant labels; never export whole HTML/body or people.
                         until = time.monotonic() + 8
-                        while not stopped.is_set() and not audit['blocked_posts'] and time.monotonic() < until:
+                        while case not in DISCOVERY_CASES and not stopped.is_set() and time.monotonic() < until:
+                            pairs = await page.evaluate("""() => {
+                              const labels = new Set(['Reference','Status','Decision','Decision notice sent date','Decision date','Decision Issued Date']);
+                              const out=[], nodes=[];
+                              function collect(root) { for(const el of root.querySelectorAll('*')) {
+                                nodes.push(el); if(nodes.length>15000)throw Error('DOM_LIMIT');
+                                if(el.shadowRoot)collect(el.shadowRoot);
+                              }}
+                              collect(document);
+                              for(const el of nodes.filter(x=>['DT','TH'].includes(x.tagName))) {
+                                const key=el.innerText.trim(); if(!labels.has(key))continue;
+                                const next=el.nextElementSibling;
+                                if(next && ['DD','TD'].includes(next.tagName)) out.push([key,next.innerText.trim().slice(0,161)]);
+                              }
+                              const hs=out.some(x=>x[0]==='Reference')?[]:nodes.filter(x=>x.tagName==='H1');
+                              for(const h of hs) if(h.innerText.trim().length<100 && !h.innerText.includes('Application Summary'))out.push(['Reference',h.innerText.trim()]);
+                              return out.slice(0,30);
+                            }""")
+                            exact, fields = qualify(pairs, reference)
+                            audit.update(exact_reference=exact, fields=fields)
+                            if (exact and fields['status']['state'] == 'PRESENT_VALUE'
+                                    or case != 'trafford' and exact_guest_record(audit, reference)):
+                                break
                             await asyncio.sleep(.2)
-                    # Read only relevant labels; never export whole HTML/body or people.
-                    until = time.monotonic() + 8
-                    while case not in DISCOVERY_CASES and not stopped.is_set() and time.monotonic() < until:
-                        pairs = await page.evaluate("""() => {
-                          const labels = new Set(['Reference','Status','Decision','Decision notice sent date','Decision date','Decision Issued Date']);
-                          const out=[], nodes=[];
-                          function collect(root) { for(const el of root.querySelectorAll('*')) {
-                            nodes.push(el); if(nodes.length>15000)throw Error('DOM_LIMIT');
-                            if(el.shadowRoot)collect(el.shadowRoot);
-                          }}
-                          collect(document);
-                          for(const el of nodes.filter(x=>['DT','TH'].includes(x.tagName))) {
-                            const key=el.innerText.trim(); if(!labels.has(key))continue;
-                            const next=el.nextElementSibling;
-                            if(next && ['DD','TD'].includes(next.tagName)) out.push([key,next.innerText.trim().slice(0,161)]);
-                          }
-                          const hs=out.some(x=>x[0]==='Reference')?[]:nodes.filter(x=>x.tagName==='H1');
-                          for(const h of hs) if(h.innerText.trim().length<100 && !h.innerText.includes('Application Summary'))out.push(['Reference',h.innerText.trim()]);
-                          return out.slice(0,30);
-                        }""")
-                        exact, fields = qualify(pairs, reference)
-                        audit.update(exact_reference=exact, fields=fields)
-                        if (exact and fields['status']['state'] == 'PRESENT_VALUE'
-                                or case != 'trafford' and exact_guest_record(audit, reference)):
-                            break
-                        await asyncio.sleep(.2)
-                    if audit['blocked_posts']:
-                        fail('UNREVIEWED_METHOD')
-                    elif case != 'trafford' and exact_guest_record(audit, reference):
-                        pass  # Partial exact-record evidence does not require DOM status.
-                    elif not audit['exact_reference']:
-                        fail('IDENTITY_NOT_ESTABLISHED')
-                    elif not audit['fields'] or audit['fields']['status']['state'] != 'PRESENT_VALUE':
-                        fail('STATUS_NOT_ESTABLISHED')
+                        if audit['blocked_posts']:
+                            fail('UNREVIEWED_METHOD')
+                        elif case != 'trafford' and exact_guest_record(audit, reference):
+                            pass  # Partial exact-record evidence does not require DOM status.
+                        elif not audit['exact_reference']:
+                            fail('IDENTITY_NOT_ESTABLISHED')
+                        elif not audit['fields'] or audit['fields']['status']['state'] != 'PRESENT_VALUE':
+                            fail('STATUS_NOT_ESTABLISHED')
                 stop.cancel()
                 await asyncio.gather(stop, return_exceptions=True)
             finally:
