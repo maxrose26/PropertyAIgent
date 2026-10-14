@@ -60,7 +60,7 @@ def from_response(case, body):
     return _project(row, source, hashlib.sha256(body).hexdigest())
 
 
-def _project(row, source, digest, *, field_level=False):
+def _project(row, source, digest, *, field_level=False, initial_status=False):
     fields, states, literals = {}, {}, {}
     for key, label in LABELS.items():
         item = source['record_field_states'][key]
@@ -95,6 +95,14 @@ def _project(row, source, digest, *, field_level=False):
     if field_level and not eligible and states['decision_date'] == 'PRESENT_VALUE':
         eligible = True
         scope = 'FIELD_LEVEL_DATE_ONLY'
+    if initial_status:
+        expected = {'manchester': 'Under Consideration', 'salford': 'Under Consultation'}
+        if (row['council'] not in expected or fields['Status'] != expected[row['council']]
+                or states['status'] != 'PRESENT_VALUE'
+                or any(states[k] not in {'PRESENT_BLANK', 'NOT_PRESENT', 'UNKNOWN', 'CONFLICTING', 'UNPARSEABLE'}
+                       for k in ('decision', 'decision_date'))):
+            fail('PARTIAL_RETRIEVAL', 'Initial status scope not supported')
+        eligible, scope = True, 'INITIAL_STATUS_ONLY'
     observation = Observation(row['application_id'], row['reference'], row['source_url'],
                        fields, states, semantic, digest, literals,
                        b2_eligible=eligible, verification_scope=scope)
@@ -111,6 +119,11 @@ def from_observed_record(application_id, source):
     """
     from .arcus_manifest import admitted_row
     row = admitted_row(application_id)
+    return _from_observed_row(row, source)
+
+
+def _from_observed_row(row, source, *, initial_status=False):
+    """Shared projection; only fixed reviewed callers supply a new identity row."""
     if (source.get('outcome') != 'GUEST_JSON_OBSERVED'
             or source.get('attempted') is not True
             or source.get('http_status') != 200
@@ -124,7 +137,7 @@ def from_observed_record(application_id, source):
             or not re.fullmatch('[0-9a-f]{64}', source['response_sha256'])
             or set(source.get('record_field_states', {})) != set(LABELS)):
         fail('AMBIGUOUS_SOURCE_RESULT', 'Arcus exact-record guest evidence absent')
-    return _project(row, source, source['response_sha256'], field_level=True)
+    return _project(row, source, source['response_sha256'], field_level=True, initial_status=initial_status)
 
 
 def refresh_representative(session, application, council, case, *, retrieve_response):

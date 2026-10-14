@@ -412,8 +412,8 @@ def current_verified_planning_field(application, field):
     import re
     from urllib.parse import urlsplit
     from app.pipeline.lapse_tracking import parse_portal_date
-    if field != "decision_date":
-        return None  # initial independent scope is date only
+    if field not in {"decision_date", "status"}:
+        return None
     try:
         raw = application.planning_field_verification
         if not isinstance(raw, str) or len(raw) > 8192:
@@ -438,12 +438,21 @@ def current_verified_planning_field(application, field):
             return None
         url = urlsplit(source)
         if (stamp.tzinfo is None or stamp > dt.datetime.now(dt.timezone.utc)
-                or item.get("scope") != "FIELD_LEVEL_DATE_ONLY"
+                or item.get("scope") != ("INITIAL_STATUS_ONLY" if field == "status" else "FIELD_LEVEL_DATE_ONLY")
                 or not isinstance(item.get("body_sha256"), str)
                 or not re.fullmatch(r"[0-9a-f]{64}", item["body_sha256"])
                 or url.scheme != "https" or not url.hostname or url.username or url.password
                 or url.port not in (None, 443)
                 or url.fragment or "\\" in source):
+            return None
+        if field == "status":
+            allowed = {'manchester': ('arcusbe.manchester.gov.uk', 'Under Consideration'),
+                       'salford': ('salfordcitycouncil.my.site.com', 'Under Consultation')}
+            origin_status = allowed.get(application.council_code)
+            if (origin_status and (url.hostname, application.status) == origin_status
+                    and item.get('state') == 'PRESENT_VALUE'
+                    and item.get('literal') == item.get('normalized') == application.status):
+                return item
             return None
         current = parse_portal_date(application.decision_issued_date)
         if (item.get("state") == "PRESENT_VALUE" and item.get("verified_at")
@@ -455,6 +464,73 @@ def current_verified_planning_field(application, field):
     except (ValueError, TypeError, KeyError, AttributeError):
         pass
     return None
+
+
+def _verify_initial_status(session, council, application, result, columns, prior):
+    """One supported initial observation; never a decision or state transition."""
+    import json
+    import re
+    from urllib.parse import urlsplit, parse_qs
+    source = urlsplit(result.summary_url)
+    allowed = {'manchester': ('arcusbe.manchester.gov.uk', 'Under Consideration'),
+               'salford': ('salfordcitycouncil.my.site.com', 'Under Consultation')}
+    fields = result.fields
+    evidence = getattr(result, 'field_evidence', None)
+    digest = getattr(result, 'body_sha256', None)
+    def fail():
+        session.rollback()
+        return VerificationOutcome(outcome=OUTCOME_FETCH_FAILED, application_reference=application.reference)
+    if (source.scheme != 'https' or source.port not in (None, 443)
+            or source.username or source.password or source.fragment
+            or not re.fullmatch(r'/pr/s/detail/[A-Za-z0-9]{18}', source.path)
+            or parse_qs(source.query) != {'c__r': ['Arcus_BE_Public_Register']}
+            or application.unit_confirmation_status != 'discovery_pending'
+            or application.site_id is not None or application.estimated_unit_count is not None
+            or any(prior[i] is not None for i in (0, 1, 2, 3, 5))
+            or set(fields) != {'Reference', 'Status'}
+            or fields.get('Reference') != application.reference
+            or council.code not in allowed
+            or (source.hostname, fields.get('Status')) != allowed[council.code]
+            or not isinstance(digest, str) or not re.fullmatch('[0-9a-f]{64}', digest)
+            or not isinstance(evidence, dict)
+            or set(evidence) != {'reference', 'status', 'decision', 'decision_date'}):
+        return fail()
+    for key, value in evidence.items():
+        if not isinstance(value, dict) or set(value) != {'state', 'value'}:
+            return fail()
+        if key in {'reference', 'status'}:
+            if value != {'state': 'PRESENT_VALUE', 'value': fields['Reference' if key == 'reference' else 'Status']}:
+                return fail()
+        elif value['state'] in {'NOT_PRESENT', 'UNKNOWN', 'CONFLICTING', 'UNPARSEABLE'}:
+            if value['value'] is not None:
+                return fail()
+        elif value['state'] == 'PRESENT_BLANK':
+            if not isinstance(value['value'], str) or value['value'].strip() or len(value['value']) > 160:
+                return fail()
+        else:
+            return fail()
+    stamp = dt.datetime.now(dt.timezone.utc)
+    metadata = {key: dict(state=evidence[key]['state'], literal=evidence[key]['value'],
+        normalized=fields['Status'] if key == 'status' else None,
+        source_url=result.summary_url, body_sha256=digest,
+        verified_at=stamp.isoformat() if key == 'status' else None,
+        scope='INITIAL_STATUS_ONLY') for key in ('status', 'decision', 'decision_date')}
+    conditions = [column.is_(None) if value is None else column == value for column, value in zip(columns, prior)]
+    try:
+        reserved = session.execute(update(Application).where(Application.id == application.id,
+            Application.reference == application.reference, Application.council_code == council.code,
+            Application.unit_confirmation_status == 'discovery_pending', Application.site_id.is_(None),
+            Application.estimated_unit_count.is_(None),
+            *conditions).values(status=fields['Status'], planning_field_verification=json.dumps(metadata),
+                                last_seen_at=prior[4]).execution_options(synchronize_session=False))
+        if reserved.rowcount != 1:
+            session.rollback()
+            return VerificationOutcome(outcome=OUTCOME_STALE_RESPONSE, application_reference=application.reference)
+        session.commit()
+    except BaseException:
+        session.rollback()
+        raise  # caller must classify commit/readback; never blind-retry
+    return VerificationOutcome(outcome=OUTCOME_FIELD_LEVEL_VERIFIED, application_reference=application.reference)
 
 
 def _verify_date_field(session, council, application, result, columns, prior,
@@ -644,7 +720,7 @@ def verify_application_status(
     if not isinstance(fields, dict) or getattr(result, "reference", None) != reference:
         return outcome(OUTCOME_FETCH_FAILED)
     status_scope = getattr(result, "verification_scope", "COUPLED")
-    if status_scope not in {"COUPLED", "UNCHANGED_PENDING_STATUS_ONLY", "FIELD_LEVEL_DATE_ONLY"}:
+    if status_scope not in {"COUPLED", "UNCHANGED_PENDING_STATUS_ONLY", "FIELD_LEVEL_DATE_ONLY", "INITIAL_STATUS_ONLY"}:
         return outcome(OUTCOME_FETCH_FAILED)
     pending_only = status_scope == "UNCHANGED_PENDING_STATUS_ONLY"
     if pending_only and (evidence_loader is None
@@ -664,6 +740,10 @@ def verify_application_status(
         return outcome(OUTCOME_FETCH_FAILED)
     if fields.get("Reference", reference) != reference:
         return outcome(OUTCOME_FETCH_FAILED)
+    if status_scope == 'INITIAL_STATUS_ONLY':
+        if evidence_loader is None:
+            return outcome(OUTCOME_FETCH_FAILED)
+        return _verify_initial_status(session, council, application, result, columns, prior)
     if status_scope == "FIELD_LEVEL_DATE_ONLY":
         if evidence_loader is None:
             return outcome(OUTCOME_FETCH_FAILED)

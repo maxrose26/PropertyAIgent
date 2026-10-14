@@ -1,0 +1,42 @@
+{
+  "interval": [
+    "2026-07-14",
+    "2026-10-14"
+  ],
+  "snapshot_timestamp": "2026-10-14 15:25:18.959051+00",
+  "targets": [
+    {
+      "case": "committee_exact_1",
+      "council": "salford",
+      "reference": "PA/2025/1506",
+      "source_identifier": "a0kSq00000AOwZlIAL",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq00000AOwZlIAL?c__r=Arcus_BE_Public_Register",
+      "trigger_url": "https://sccdemocracy.salford.gov.uk/documents/s97276/Minutes%20-%20Planning%20Panel%20-%203%20September%202026%20F.pdf",
+      "trigger_sha256": "48dba1ba76b9d70d0b7aa4cc8295d8405e06d1aa76a89e6f6f13ef63c7ad949f",
+      "portal_identity_evidence": "Independent exact heading and reference-labelled official result observed in ordinary public browser",
+      "portal_evidence_fingerprint": "53a15ad92c502feb6de5e3dfa29c1836c721439c676cb049a57a54719e4efd47"
+    },
+    {
+      "case": "committee_exact_2",
+      "council": "manchester",
+      "reference": "145583/FO/2026",
+      "source_identifier": "a1DSl000007GOGYMA4",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOGYMA4?c__r=Arcus_BE_Public_Register",
+      "trigger_url": "https://democracy.manchester.gov.uk/documents/s65746/Rochdale%20Road.pdf",
+      "trigger_sha256": "963cdc577792e0cd4c2ee707820a40d51d0d1da881118d0bff535266d2577307",
+      "portal_identity_evidence": "Independent exact heading and reference-labelled official result observed in ordinary public browser",
+      "portal_evidence_fingerprint": "cf84d5dbe6450d759cd19a999c3489c8dea33b9cfecba608865a02b518d20786"
+    },
+    {
+      "case": "committee_exact_3",
+      "council": "manchester",
+      "reference": "143413/FO/2025",
+      "source_identifier": "a1DSl000007GOKjMAO",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOKjMAO?c__r=Arcus_BE_Public_Register",
+      "trigger_url": "https://democracy.manchester.gov.uk/documents/s65713/Ryebank%20Fields.pdf",
+      "trigger_sha256": "986f3f08cee1afb95c7ee08b5dfddfef9f7d8bf65184639e405a9f2202dc751f",
+      "portal_identity_evidence": "Independent exact heading and reference-labelled official result observed in ordinary public browser",
+      "portal_evidence_fingerprint": "3989d477008398aab4bf1f4f4cdb4cb2e46ba962f8829e55f6e7f1b74e2a1020"
+    }
+  ]
+}

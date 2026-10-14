@@ -36,6 +36,53 @@ DISCOVERY_FIELDS = frozenset({'proposal', 'address', 'application_type',
 FIELD_STATES = frozenset({'PRESENT_VALUE', 'PRESENT_BLANK', 'NOT_PRESENT',
                          'CONFLICTING', 'UNPARSEABLE', 'UNKNOWN'})
 
+COMMITTEE_ORIGINS = {
+    'bolton': 'bolton.moderngov.co.uk',
+    'bury': 'councildecisions.bury.gov.uk',
+    'manchester': 'democracy.manchester.gov.uk',
+    'oldham': 'committees.oldham.gov.uk',
+    'rochdale': 'democracy.rochdale.gov.uk',
+    'salford': 'sccdemocracy.salford.gov.uk',
+    'tameside': 'tameside.moderngov.co.uk',
+    'wigan': 'wigan.moderngov.co.uk',
+}
+
+
+@dataclass(frozen=True)
+class ExactTriggerEvidence:
+    """Qualified official trigger, independent of date-window enumeration.
+
+    Reviewed callers must acquire both trigger and portal evidence. This value
+    grants no execution authority and must never advance a coverage watermark.
+    """
+    council: str
+    reference: str
+    source_url: str
+    displayed_references: tuple[str, ...]
+    body_sha256: str
+
+    def __post_init__(self):
+        import re
+        u = urlsplit(self.source_url)
+        if (self.council not in COMMITTEE_ORIGINS or u.scheme != 'https'
+                or u.hostname != COMMITTEE_ORIGINS[self.council]
+                or u.port not in (None, 443) or u.username or u.password
+                or u.fragment or len(self.source_url) > 2048
+                or not (u.path.startswith('/documents/')
+                        or u.path == '/ieListDocuments.aspx')
+                or re.search(r'[\s\\]', self.source_url)
+                or any(p in {'.', '..'} for p in u.path.split('/'))):
+            raise ValueError('trigger destination')
+        if (account_identity(self.council, self.displayed_references, frozenset())[1]
+                != self.reference or not re.fullmatch('[0-9a-f]{64}', self.body_sha256)):
+            raise ValueError('trigger identity/provenance')
+
+    def audit(self):
+        return {'mode': 'EXACT_TRIGGER', 'council': self.council,
+                'reference': self.reference, 'source': self.source_url,
+                'sha256': self.body_sha256, 'enumeration_complete': False,
+                'coverage_watermark_advanced': False}
+
 
 class Completeness(str, Enum):
     COMPLETE = 'COMPLETE'

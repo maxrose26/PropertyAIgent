@@ -22,6 +22,8 @@ CASES = {
 }
 from verification.direct_reference.arcus_manifest import case_definitions
 CASES.update(case_definitions())
+from verification.discovery.committee_exact import case_definitions as committee_case_definitions
+CASES.update(committee_case_definitions())
 from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
 CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
 from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed

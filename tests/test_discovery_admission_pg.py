@@ -61,3 +61,16 @@ def test_lost_acknowledgement_after_real_commit_stops(pg):
     with Session(pg) as s:
         assert s.scalar(select(func.count()).select_from(Application)) == 1
         assert s.scalar(select(Application)).unit_confirmation_status == 'discovery_pending'
+
+
+def test_fixed_committee_shared_admission_and_b2_on_postgres(pg):
+    from tests.test_discovery_committee_exact import seed, synthetic_source
+    from verification.discovery.committee_exact import run
+    seed(pg)
+    first=run(pg,'disposable-pg',synthetic_source)
+    second=run(pg,'disposable-pg',lambda *_: pytest.fail('known identity must not refetch'))
+    assert all(r['transaction']=='COMMIT_READBACK_CONFIRMED' for r in first)
+    assert all(r['admission']['outcome']=='ALREADY_KNOWN' for r in second)
+    assert [r['verification_scope'] for r in first]==['INITIAL_STATUS_ONLY','INITIAL_STATUS_ONLY','COUPLED']
+    with Session(pg) as session:
+        assert session.scalar(select(func.count()).select_from(Application))==3

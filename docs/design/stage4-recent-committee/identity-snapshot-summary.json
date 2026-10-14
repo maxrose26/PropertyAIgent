@@ -1,0 +1,26 @@
+{
+  "project": "zcikcfgpblzuzpanpdqd",
+  "snapshot_timestamp": "2026-10-14 15:25:18.959051+00",
+  "row_count": 1453,
+  "fields": [
+    "id",
+    "council_code",
+    "reference"
+  ],
+  "council_counts": {
+    "bolton": 87,
+    "bury": 40,
+    "manchester": 323,
+    "oldham": 92,
+    "rochdale": 124,
+    "salford": 271,
+    "stockport": 196,
+    "tameside": 57,
+    "trafford": 126,
+    "wigan": 137
+  },
+  "snapshot_sha256": "44df31298548f8801ff0534ad07208dc24b1a97ddd2aa1dbcffa52a07b52ef3d",
+  "route": "Existing signed-in Supabase production dashboard; successful BEGIN READ ONLY aggregate over all public.applications; no WHERE filter",
+  "database_writes": 0,
+  "private_identity_population_published": false
+}
