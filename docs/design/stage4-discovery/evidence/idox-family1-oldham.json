@@ -1,0 +1,153 @@
+{
+  "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+  "applied_evidence_sha256": "21947d2c21fa6fa16197b4d987a46163b7b1c6b05a7b9333f1b11f000172ac7d",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+  "completeness": "UNKNOWN",
+  "council": "oldham",
+  "date_semantics": "RECEIVED",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "execution_workflow": ".github/workflows/stage4-discovery-idox-family-once.yml",
+  "failure": null,
+  "manifest_sha256": "ba1ebc525007b76b2a8c499346cfcd81417e739349e2d3e9305f0addeb837a92",
+  "pages": [
+    {
+      "body_sha256": "a496fae8613f52c1e636b01e192601cb61582bcee7515763e0eeeed5516be7d3",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "rows": 10,
+      "terminal": null,
+      "total": 14
+    },
+    {
+      "body_sha256": "12af1854fb04da66b1f8f7e55f3a7040c40b8c97c38d07dd436d578b71857297",
+      "first": 11,
+      "last": 14,
+      "ordinal": 2,
+      "rows": 4,
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+      "total": 14
+    }
+  ],
+  "persistence": false,
+  "records": [
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "NMA/356901/26",
+      "source_key": "TM2IIQMCN4000",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2IIQMCN4000&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "NMA/356895/26",
+      "source_key": "TM2CX5MCN3Q00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2CX5MCN3Q00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356921/26",
+      "source_key": "TM8807MCFHN00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM8807MCFHN00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356919/26",
+      "source_key": "TM7WV3MCFH100",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM7WV3MCFH100&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356916/26",
+      "source_key": "TM627TMCFG800",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM627TMCFG800&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356915/26",
+      "source_key": "TM6277MCFG500",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM6277MCFG500&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356914/26",
+      "source_key": "TM4V4PMCFG000",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM4V4PMCFG000&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356912/26",
+      "source_key": "TM4FVZMCN5B00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM4FVZMCN5B00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356908/26",
+      "source_key": "TM47IPMCN4X00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM47IPMCN4X00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356905/26",
+      "source_key": "TM2TJOMCN4I00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2TJOMCN4I00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356897/26",
+      "source_key": "TM2D04MCN3U00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2D04MCN3U00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "HOU/356894/26",
+      "source_key": "TM2CWIMCN3N00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2CWIMCN3N00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "CND/356925/26",
+      "source_key": "TM8KH1MCFID00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM8KH1MCFID00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "CND/356920/26",
+      "source_key": "TM82F2MCFHG00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM82F2MCFHG00&activeTab=summary"
+    }
+  ],
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "oldham",
+    "elapsed_seconds": 9.162,
+    "outcome": "UNKNOWN",
+    "received_bytes": 278952,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "requests_attempted": 5,
+    "retries": 0
+  },
+  "run_id": "38551641270",
+  "sort": "REFERENCE_DESCENDING",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "unique_references": 14
+}

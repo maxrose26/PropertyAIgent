@@ -1,0 +1,970 @@
+{
+  "application_id": null,
+  "applied_evidence": "VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "a19ca34d48685d6c32c9dd1e57c5f62b5cbfae288b5e490c9e85a13b213474d4",
+  "blocked_actions": [],
+  "blocked_posts": 0,
+  "case": "discovery_manchester_ui_window",
+  "cleanup": "CONTEXT_BROWSER_CLOSED",
+  "completeness": "UNKNOWN",
+  "date_semantics": "VALIDATED",
+  "decoded_bytes": 10886187,
+  "destination": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTI4IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wNCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+  "elapsed_seconds": 5.189,
+  "encoded_bytes": 2228719,
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "exact_reference": false,
+  "failure": null,
+  "fields": null,
+  "frame_kinds": [
+    {
+      "direct_child": true,
+      "kind": "BLANK"
+    },
+    {
+      "direct_child": true,
+      "kind": "BLANK"
+    }
+  ],
+  "largest_observed_post_bytes": 177233,
+  "listing_records": [
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-000264",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000007WJ1tMAG",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007WJ1tMAG?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001845",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJh0HMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJh0HMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001839",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJdxZMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJdxZMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001847",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJk6DMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJk6DMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001838",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJdvxMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJdvxMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001837",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJduLMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJduLMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001828",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AINurMAH",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AINurMAH?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001711",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000A61IDMAZ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61IDMAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001827",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AIJeLMAX",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIJeLMAX?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001717",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000A61TVMAZ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61TVMAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001826",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AIDM1MAP",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIDM1MAP?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001382",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009WpBtMAK",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009WpBtMAK?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001833",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AIjs9MAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIjs9MAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001832",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AIdGTMA1",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIdGTMA1?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-000098",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000007Ky5FMAS",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007Ky5FMAS?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001644",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009ycgLMAQ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009ycgLMAQ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001674",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000A1ZpBMAV",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A1ZpBMAV?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001811",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AH2FlMAL",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AH2FlMAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001813",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AH2IzMAL",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AH2IzMAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT-2026-001814",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AH2KbMAL",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AH2KbMAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001815",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AH5S9MAL",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AH5S9MAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001816",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AH8rRMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AH8rRMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001817",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AH8ufMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AH8ufMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001821",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AHNFNMA5",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AHNFNMA5?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001824",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AHU0jMAH",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AHU0jMAH?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001872",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AMZFtMAP",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AMZFtMAP?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001809",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AGHvBMAX",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AGHvBMAX?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001570",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009rMTRMA2",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009rMTRMA2?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001510",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009ls4bMAA",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009ls4bMAA?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001841",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJeLlMAL",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJeLlMAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001842",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJfBNMA1",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJfBNMA1?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001843",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AJg7RMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJg7RMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001801",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AFpkPMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AFpkPMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-000568",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl0000083QuDMAU",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl0000083QuDMAU?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001802",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AFpndMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AFpndMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001807",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AGEHNMA5",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AGEHNMA5?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001808",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AGHtZMAX",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AGHtZMAX?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001677",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000A1dMXMAZ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A1dMXMAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001787",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEos1MAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEos1MAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001788",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEotdMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEotdMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001789",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEplBMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEplBMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT-2026-001791",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEy3NMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEy3NMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT-2026-001792",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEy4zMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEy4zMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001794",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEzVrMAL",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEzVrMAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001795",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AF1qrMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AF1qrMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001793",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AF1pFMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AF1pFMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001798",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AF51dMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AF51dMAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001799",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AF89BMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AF89BMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-000806",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000008OnNxMAK",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000008OnNxMAK?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001857",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000ALoaLMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000ALoaLMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001727",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000A7KVrMAN",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7KVrMAN?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH-2026-001690",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000A2jMfMAJ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A2jMfMAJ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001658",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009zds5MAA",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009zds5MAA?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001657",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009zdqTMAQ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009zdqTMAQ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PLA-2026-001592",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl000009sQ6nMAE",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009sQ6nMAE?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT-2026-001783",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEZ8DMAX",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEZ8DMAX?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT-2026-001785",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a1DSl00000AEktFMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEktFMAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    }
+  ],
+  "listing_segments": [
+    {
+      "evidence_sha256": "cc9112b03af289dc514c6991e004ca5bb6f11781553ba56cbcb568cfbf43e0fb",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "total": 57
+    },
+    {
+      "evidence_sha256": "92dbe3c53e5c31af47aad4f10e4476c8f6e16f27e8476ca3924d134b79ac3934",
+      "first": 11,
+      "last": 20,
+      "ordinal": 2,
+      "total": 57
+    },
+    {
+      "evidence_sha256": "1759cb93282bef61b01e599ff25bded4493a78ac8b548fa853e4cded0c7f9eff",
+      "first": 21,
+      "last": 30,
+      "ordinal": 3,
+      "total": 57
+    },
+    {
+      "evidence_sha256": "651edae12df0fc39c9694c40fabea6cc59714429947a0a578fbb2d52899630c8",
+      "first": 31,
+      "last": 40,
+      "ordinal": 4,
+      "total": 57
+    },
+    {
+      "evidence_sha256": "aad731486da26f8353501266878f871d2aeed729c13757d8cbe1f62ff76e4465",
+      "first": 41,
+      "last": 50,
+      "ordinal": 5,
+      "total": 57
+    },
+    {
+      "evidence_sha256": "b4366d9873c9f799c63904985a98d8d415ff74f01ec0a398d1a18c2107865b87",
+      "first": 51,
+      "last": 57,
+      "ordinal": 6,
+      "total": 57
+    }
+  ],
+  "listing_stage": "NEXT_CONTROL",
+  "live_owned_survivors": 0,
+  "local_frames": 2,
+  "measured_public_ui_posts": 14,
+  "navigated_origins": [
+    "https://arcusbe.manchester.gov.uk"
+  ],
+  "navigation_mismatch": null,
+  "navigations": 2,
+  "network_classification": "UNKNOWN",
+  "outbound_payload_bytes": 220722,
+  "owned_processes_seen": 8,
+  "pages": 1,
+  "peak_owned_rss": 942903296,
+  "persistence": false,
+  "post_body_cdp_reads": 0,
+  "process_cleanup": "CLOSED",
+  "public_ui_posts": 14,
+  "purpose": "DISCOVERY_PUBLIC_UI_WINDOW",
+  "redirects": 1,
+  "reference": null,
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "requested_origins": [
+    "https://arcusbe.manchester.gov.uk"
+  ],
+  "requests": 34,
+  "responses": 33,
+  "safety_events": [],
+  "safety_failure": false,
+  "source_qualification": "CANDIDATE_PUBLIC_UI_CONTRACT",
+  "supervisor_limit_hit": false,
+  "supervisor_seconds": 5.382
+}

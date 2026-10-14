@@ -2,11 +2,14 @@ import json
 from pathlib import Path
 import sys
 from .arcus_ui_window import CASE, DESTINATION
+from .arcus_ui_config import UI_CASES
 from .arcus_ui_transport import combined_bytes, MAX_BYTES
 
 
 def validate(a):
-    if (a.get('case')!=CASE or a.get('destination')!=DESTINATION or a.get('persistence') is not False
+    config=UI_CASES.get(a.get('case'))
+    if config is None:raise ValueError('unadmitted case')
+    if (a.get('destination')!=config.destination or a.get('persistence') is not False
         or a.get('failure') is not None or a.get('safety_failure') is not False or a.get('safety_events')!=[]
         or a.get('cleanup')!='CONTEXT_BROWSER_CLOSED' or a.get('process_cleanup')!='CLOSED'
         or a.get('live_owned_survivors')!=0 or a.get('supervisor_limit_hit') is not False

@@ -44,7 +44,7 @@ def source_url(council, raw, *, page=None):
     if page is None:
         require(u.path==prefix+'applicationDetails.do' and set(q) in ({'keyVal'},{'keyVal','activeTab'})
                 and q.get('activeTab','summary')=='summary'
-                and re.fullmatch(r'[A-Za-z0-9]{1,40}',q.get('keyVal','')), 'detail identity')
+                and re.fullmatch(r'_BURY_DCAPR_[0-9]{1,20}' if council=='bury' else r'[A-Za-z0-9]{1,40}',q.get('keyVal','')), 'detail identity')
         return u.geturl(), q['keyVal']
     require(type(page) is int and page>=2 and u.path==prefix+'pagedSearchResults.do'
             and q=={'action':'page','searchCriteria.page':str(page)}, 'next page')
@@ -102,22 +102,23 @@ def parse_page(body: bytes, council: str, ordinal: int, start: date, end: date, 
     require(len(rawrows)<=size, 'page overflow')
     rows=[]
     for row in rawrows:
-        links=row.select('a.summaryLink')
+        links=row.select('a[href*="applicationDetails.do"]') if council=='bury' else row.select('a.summaryLink')
         require(len(links)==1, 'record link')
         url,key=source_url(council,links[0].get('href'))
         metas=row.select('p.metaInfo')
         # Source-supported listing label, never URL-derived reference.
         refs=[]
+        separator=r'[·|]' if council=='bury' else '·'
         for m in metas:
-            refs.extend(re.findall(r'(?:^|·)\s*Ref\. No:\s*([^·]+)',text(m)))
+            refs.extend(re.findall(r'(?:^|'+separator+r')\s*Ref\. No:\s*([^·|]+)',text(m)))
         refs=[r.strip() for r in refs]
         valid=all(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9/._ -]{0,99}',r) for r in refs)
         state=('MISSING_IDENTITY' if not refs else 'CONFLICTING' if len(set(refs))!=1 else 'PRESENT_VALUE' if valid else 'UNPARSEABLE')
         ref=refs[0] if state=='PRESENT_VALUE' else None
-        fields={'proposal':literal(links,'a.summaryLink'),'address':literal(row.select('p.address'),'p.address')}
+        fields={'proposal':literal(links,'a[href*="applicationDetails.do"]' if council=='bury' else 'a.summaryLink'),'address':literal(row.select('p.address'),'p.address')}
         for label,name in [('Received','received_date'),('Validated','validated_date')]:
             values=[]
-            for m in metas: values.extend(re.findall(r'(?:^|·)\s*'+label+r':\s*([^·]+)',text(m)))
+            for m in metas: values.extend(re.findall(r'(?:^|'+separator+r')\s*'+label+r':\s*([^·|]+)',text(m)))
             if not values: field=Literal('NOT_PRESENT',None,'p.metaInfo:'+label)
             elif len(set(values))!=1: field=Literal('CONFLICTING',None,'p.metaInfo:'+label)
             else:

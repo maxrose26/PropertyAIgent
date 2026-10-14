@@ -1,0 +1,390 @@
+{
+  "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+  "applied_evidence_sha256": "a5093c8c339751d5cb9767bdc81a54b4ba6fe43aa4297f5c0739b92e459fef93",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+  "completeness": "UNKNOWN",
+  "council": "stockport",
+  "date_semantics": "VALIDATED",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "execution_workflow": ".github/workflows/stage4-discovery-idox-family-once.yml",
+  "failure": null,
+  "manifest_sha256": "ba1ebc525007b76b2a8c499346cfcd81417e739349e2d3e9305f0addeb837a92",
+  "pages": [
+    {
+      "body_sha256": "a5aa0912a8247a2398360f71afee8152186cf954ba131342e470aed54ae4e35e",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "rows": 10,
+      "terminal": null,
+      "total": 49
+    },
+    {
+      "body_sha256": "e8853e6cfb622d06fed3544ba044414caaf2370906565c0bc449a0c88e6794b5",
+      "first": 11,
+      "last": 20,
+      "ordinal": 2,
+      "rows": 10,
+      "terminal": null,
+      "total": 49
+    },
+    {
+      "body_sha256": "478a76acbcd169668efc42cc8cd3459e3bd77a3da579f7c228ae73aaa8d143ea",
+      "first": 21,
+      "last": 30,
+      "ordinal": 3,
+      "rows": 10,
+      "terminal": null,
+      "total": 49
+    },
+    {
+      "body_sha256": "27351f27b316cb944cc68401e3ddd0637d0b03db427319fe3899b653dba8295f",
+      "first": 31,
+      "last": 40,
+      "ordinal": 4,
+      "rows": 10,
+      "terminal": null,
+      "total": 49
+    },
+    {
+      "body_sha256": "fd56a20bc672dc2b5eadd7f30fd60e29a8d63a7421d906b3cf2c93ed1269e25a",
+      "first": 41,
+      "last": 49,
+      "ordinal": 5,
+      "rows": 9,
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+      "total": 49
+    }
+  ],
+  "persistence": false,
+  "records": [
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100333",
+      "source_key": "TMAF60PJHTW00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMAF60PJHTW00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100332",
+      "source_key": "TMADSGPJHTT00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMADSGPJHTT00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100331",
+      "source_key": "TMACFCPJHTK00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMACFCPJHTK00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100330",
+      "source_key": "TMA5HKPJHSW00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMA5HKPJHSW00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100329",
+      "source_key": "TMA5H6PJHSU00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMA5H6PJHSU00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100328",
+      "source_key": "TMA1ASPJHSI00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMA1ASPJHSI00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100327",
+      "source_key": "TMA19RPJHSG00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMA19RPJHSG00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100326",
+      "source_key": "TMA0YRPJ0LV00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMA0YRPJ0LV00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100319",
+      "source_key": "TM8J6APJ05V00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM8J6APJ05V00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100317",
+      "source_key": "TM812SPJHPE00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM812SPJHPE00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100316",
+      "source_key": "TM6K9TPJHO200",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM6K9TPJHO200&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100314",
+      "source_key": "TM6FGAPJ0IK00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM6FGAPJ0IK00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100313",
+      "source_key": "TM6BY7PJHMY00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM6BY7PJHMY00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100312",
+      "source_key": "TM6AJYPJHMR00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM6AJYPJHMR00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100310",
+      "source_key": "TM66ITPJHMB00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM66ITPJHMB00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100309",
+      "source_key": "TM66HVPJHM900",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM66HVPJHM900&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100308",
+      "source_key": "TM66GMPJHM700",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM66GMPJHM700&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100307",
+      "source_key": "TM66G4PJHM400",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM66G4PJHM400&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100306",
+      "source_key": "TM66G3PJHM300",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM66G3PJHM300&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100305",
+      "source_key": "TM64ZYPJHLV00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM64ZYPJHLV00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100304",
+      "source_key": "TM64XWPJ0IK00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM64XWPJ0IK00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100303",
+      "source_key": "TM5WNXPJHLE00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM5WNXPJHLE00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100301",
+      "source_key": "TM4TSVPJHL000",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM4TSVPJHL000&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100300",
+      "source_key": "TM4SDPPJHKR00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM4SDPPJHKR00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100299",
+      "source_key": "TM4O8BPJHKA00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM4O8BPJHKA00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100298",
+      "source_key": "TM4LGLPJHK500",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM4LGLPJHK500&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100293",
+      "source_key": "TM421KPJHIR00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM421KPJHIR00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100291",
+      "source_key": "TM420UPJHIN00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM420UPJHIN00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100290",
+      "source_key": "TM30IRPJHI500",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM30IRPJHI500&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100289",
+      "source_key": "TM2UZ2PJHHU00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM2UZ2PJHHU00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100287",
+      "source_key": "TM2L8CPJHGO00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM2L8CPJHGO00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100284",
+      "source_key": "TM2H43PJHFZ00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM2H43PJHFZ00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100283",
+      "source_key": "TM27EZPJHFC00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM27EZPJHFC00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100282",
+      "source_key": "TM27EPPJHFA00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM27EPPJHFA00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100281",
+      "source_key": "TM27EEPJHF800",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM27EEPJHF800&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100280",
+      "source_key": "TM27DSPJHF600",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TM27DSPJHF600&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100275",
+      "source_key": "TLVLW7PJHAP00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLVLW7PJHAP00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100270",
+      "source_key": "TLTLMMPJH7S00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLTLMMPJH7S00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100265",
+      "source_key": "TLT7C0PJ0IK00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLT7C0PJ0IK00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100253",
+      "source_key": "TLREHJPJH4000",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLREHJPJH4000&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100249",
+      "source_key": "TLPS5NPJH1S00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLPS5NPJH1S00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100247",
+      "source_key": "TLPQS6PJH1I00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLPQS6PJH1I00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100220",
+      "source_key": "TLIJ0ZPJGVG00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TLIJ0ZPJGVG00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100114",
+      "source_key": "TKU9HEPJFZU00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TKU9HEPJFZU00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100094",
+      "source_key": "TKQ2J5PJFS100",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TKQ2J5PJFS100&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/100093",
+      "source_key": "TKOUZ9PJFR600",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TKOUZ9PJFR600&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/099998",
+      "source_key": "TK1ZIQPJMR100",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TK1ZIQPJMR100&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/099871",
+      "source_key": "TJJQK3PJLYR00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TJJQK3PJLYR00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "DC/099576",
+      "source_key": "THT5SFPJJOE00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=THT5SFPJJOE00&activeTab=summary"
+    }
+  ],
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "stockport",
+    "elapsed_seconds": 18.759,
+    "outcome": "UNKNOWN",
+    "received_bytes": 481845,
+    "redirects": 0,
+    "reference": "VALIDATED:2026-09-28:2026-10-04",
+    "requests_attempted": 8,
+    "retries": 0
+  },
+  "run_id": "38551641270",
+  "sort": "REFERENCE_DESCENDING",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "unique_references": 49
+}

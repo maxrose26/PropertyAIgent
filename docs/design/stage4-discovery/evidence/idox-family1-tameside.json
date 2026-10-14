@@ -1,0 +1,159 @@
+{
+  "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+  "applied_evidence_sha256": "48d159e6824ee866303588ede5cb8baa3bff7e114c0f6cf6dd251829dd430553",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+  "completeness": "UNKNOWN",
+  "council": "tameside",
+  "date_semantics": "RECEIVED",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "execution_workflow": ".github/workflows/stage4-discovery-idox-family-once.yml",
+  "failure": null,
+  "manifest_sha256": "ba1ebc525007b76b2a8c499346cfcd81417e739349e2d3e9305f0addeb837a92",
+  "pages": [
+    {
+      "body_sha256": "ea0d7da476f9b965642e7cadb894b0a11ac36c41461deb195ebf9b8727ac3cc5",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "rows": 10,
+      "terminal": null,
+      "total": 15
+    },
+    {
+      "body_sha256": "a561caaf1b74ba4c47585170f8831141671172b30827981e1a03d4519c11810c",
+      "first": 11,
+      "last": 15,
+      "ordinal": 2,
+      "rows": 5,
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+      "total": 15
+    }
+  ],
+  "persistence": false,
+  "records": [
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00758/FUL",
+      "source_key": "TMA9LJPUJBZ00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9LJPUJBZ00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00756/MATCH",
+      "source_key": "TM8KH8PUJBC00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM8KH8PUJBC00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00753/FUL",
+      "source_key": "TM4RYYPU0MF00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4RYYPU0MF00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00752/MATCH",
+      "source_key": "TM4K0GPUJ9O00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4K0GPUJ9O00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00751/CLUD",
+      "source_key": "TM4658PUJ9G00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4658PUJ9G00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00748/FUL",
+      "source_key": "TM0P5JPUJ8900",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM0P5JPUJ8900&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00104/PLCOND",
+      "source_key": "TM8HOVPUJB800",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM8HOVPUJB800&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00103/PLCOND",
+      "source_key": "TM60YLPUJAC00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YLPUJAC00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00102/PLCOND",
+      "source_key": "TM60UFPUJAA00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60UFPUJAA00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00101/PLCOND",
+      "source_key": "TM60U2PUJA800",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60U2PUJA800&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00100/PLCOND",
+      "source_key": "TM60TPPUJA500",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60TPPUJA500&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00099/PLCOND",
+      "source_key": "TM4V7MPUJA000",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4V7MPUJA000&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00098/PLCOND",
+      "source_key": "TM4SDNPUJ9W00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4SDNPUJ9W00&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00075/TPO",
+      "source_key": "TM2PTBPUJ9100",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM2PTBPUJ9100&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "26/00007/TCA",
+      "source_key": "TM60ZAPUJAG00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60ZAPUJAG00&activeTab=summary"
+    }
+  ],
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "tameside",
+    "elapsed_seconds": 9.18,
+    "outcome": "UNKNOWN",
+    "received_bytes": 262257,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "requests_attempted": 5,
+    "retries": 0
+  },
+  "run_id": "38551641270",
+  "sort": "REFERENCE_DESCENDING",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "unique_references": 15
+}

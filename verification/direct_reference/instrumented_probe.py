@@ -28,8 +28,9 @@ from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_
 CASES[SEARCH_SHAPE_CASE] = (None, None, DISCOVERY_DESTINATION)
 DISCOVERY_CASES = {DISCOVERY_CASE, SEARCH_SHAPE_CASE}
 from verification.discovery.arcus_ui_window import CASE as UI_WINDOW_CASE, enumerate_ui
+from verification.discovery.arcus_ui_config import UI_CASES
 from verification.discovery.arcus_ui_transport import measure_post, combined_bytes
-CASES[UI_WINDOW_CASE] = (None, None, DISCOVERY_DESTINATION)
+CASES.update({name:(None,None,config.destination) for name,config in UI_CASES.items()})
 MAX_BYTES = 20 * 1024 * 1024
 MAX_REQUESTS = 80
 MAX_SECONDS = 45
@@ -162,6 +163,8 @@ def permitted_navigation(url, expected):
     if url == expected:
         return True
     a, b = urlsplit(url), urlsplit(expected)
+    if b.path == '/pr/s/register-view':
+        return False
     if b.netloc == 'pa.trafford.gov.uk' and url == 'https://pa.trafford.gov.uk/online-applications/':
         return True
     # Observed Salford client route retains the exact frozen Salesforce identity.
@@ -234,7 +237,7 @@ async def probe(case):
         audit.update(purpose='DISCOVERY_LISTING_RPC_SHAPE_ONLY',
                      requested_interval=['2026-09-28', '2026-10-04'],
                      date_semantics='VALIDATED', completeness='UNKNOWN', bootstrap_reads=0, observed_action_metadata=[])
-    if case == UI_WINDOW_CASE:
+    if case in UI_CASES:
         audit.update(purpose='DISCOVERY_PUBLIC_UI_WINDOW',public_ui_posts=0,measured_public_ui_posts=0,outbound_payload_bytes=0,
             post_body_cdp_reads=0,largest_observed_post_bytes=0,completeness='UNKNOWN',
                      requested_interval=['2026-09-28','2026-10-04'],date_semantics='VALIDATED')
@@ -266,7 +269,7 @@ async def probe(case):
                 audit['endpoints'].append(descriptor)
             if event.get('redirectedRequestId'):
                 audit['redirects'] += 1
-            if request['method'] not in ('GET', 'HEAD') and case != UI_WINDOW_CASE:
+            if request['method'] not in ('GET', 'HEAD') and case not in UI_CASES:
                 for descriptor in post_descriptors(request.get('postData')):
                     if descriptor not in audit['blocked_actions'] and len(audit['blocked_actions']) < 20:
                         audit['blocked_actions'].append(descriptor)
@@ -285,9 +288,9 @@ async def probe(case):
                 else:
                     await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
                 return
-            if (reason == 'UNREVIEWED_METHOD' and case == UI_WINDOW_CASE
+            if (reason == 'UNREVIEWED_METHOD' and case in UI_CASES
                     and not stopped.is_set() and not audit['safety_failure']):
-                measurement_failure=await measure_post(event,client,audit)
+                measurement_failure=await measure_post(event,client,audit,UI_CASES[case].aura)
                 if measurement_failure is not None or stopped.is_set() or combined_bytes(audit)>MAX_BYTES:
                     fail(measurement_failure or 'BYTE_LIMIT')
                     await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
@@ -296,7 +299,7 @@ async def probe(case):
                     await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
                 return
             if reason == 'UNREVIEWED_METHOD':
-                if case == UI_WINDOW_CASE:
+                if case in UI_CASES:
                     fail('UNREVIEWED_METHOD')
                     await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
                     return
@@ -439,8 +442,8 @@ async def probe(case):
                     await asyncio.gather(nav, return_exceptions=True)
                 else:
                     await nav
-                    if case == UI_WINDOW_CASE:
-                        await enumerate_ui(page,audit,stopped)
+                    if case in UI_CASES:
+                        await enumerate_ui(page,audit,stopped,UI_CASES[case])
                         if audit.get('enumeration_evidence') != 'COUNT_RECONCILED':
                             fail('LISTING_NOT_QUALIFIED')
                     else:

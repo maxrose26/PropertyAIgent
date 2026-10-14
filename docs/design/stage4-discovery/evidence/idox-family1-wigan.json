@@ -1,0 +1,41 @@
+{
+  "applied_interval": null,
+  "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+  "completeness": "FAILED",
+  "council": "wigan",
+  "date_semantics": "RECEIVED",
+  "execution_workflow": ".github/workflows/stage4-discovery-idox-family-once.yml",
+  "failure": "Failure:DOCUMENT_STRUCTURE",
+  "manifest_sha256": "ba1ebc525007b76b2a8c499346cfcd81417e739349e2d3e9305f0addeb837a92",
+  "pages": [],
+  "persistence": false,
+  "records": [],
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "wigan",
+    "elapsed_seconds": 2.013,
+    "outcome": "FAILED",
+    "received_bytes": 57725,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "requests_attempted": 1,
+    "retries": 0
+  },
+  "run_id": "38551641270",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  }
+}

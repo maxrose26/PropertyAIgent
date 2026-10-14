@@ -204,3 +204,43 @@ review and exact-headCI; no automatic retry, no Bolton rerun, no production.
 195 focused offline tests passed for this candidate before independent review.
 Independent review approved the approach with a non-identity Content-Encoding
 rejection. That guard and gzip regression were added;31 affected tests passed.
+
+## Resumed primary-source-only qualification
+
+Product Owner attachment14October2026 narrows this slice to primary source
+qualification. No production creation, prospective acceptance or full committee
+assessment. Committee bootstrap is reserved for the12months before its future
+frozen assessment date; new publications afterward are future scope.
+
+PR79 merge2acc49d7af1180c8e72e98f321c498aceb6cc8fd followed six exact-head
+passed workflows and independent review. Manchester38551212260 reconciled57
+references across6pages;34requests10886187decoded2228719encoded220722outbound
+bytes,14measured/continuedPOSTs,5.382supervisorseconds942903296peakRSS,zero
+survivors,closed cleanup. Minimized audit and artifact digest retained. Candidate
+raw completeness remainsUNKNOWN pending reviewed source-contract qualification.
+
+PR80 merge1d56634aaf991ee8c1d3760cba3172245bfde3d4 followed independent review
+and exact-head discovery/AH success. Five-council run38551641270 independently
+reconciledOldham14refs/2pages,Stockport49/5,Tameside15/2 withdateecho,zero
+retries,closedcleanup. Buryfailedrecordlink,WiganfailedDOCUMENT_STRUCTURE.
+No automaticrerun. Each council audit retained with full artifact digest.
+
+Ordinary BuryUI showed18results for the same receivedweek, classlessapplication
+links, _BURY_DCAPR_digits sourcekeys andpipe-separatedmetadata. NarrowBury
+projection correction retains exactidentity/origin/count/date checks.
+
+Salford ordinary advancedsearch returned26results forvalidated28Sep–4Oct;
+retainedfilters are SiteAddress/Description/Decisiondatefrom/to plusWard/Status/
+ApplicationCategory/type. Cards do not displayValidDate; do not require or infer
+it. Datewindowmembership comes from independently retained source criteria.
+Rochdale same week returned12results; filters differ includingParish, cards
+displayValidDate. SharedUIconfiguration handles only these observed differences.
+Official Salford guidance explicitly describes the Validdatefrom/to listing.
+No simpler current standalone complete publication list was established for
+either Arcus council; older list references are not claimed current capability.
+
+One correctedBurywindow, firstRochdale/SalfordboundedUIwindows andONEWigan
+formshapeGET are prepared sequentially. Wiganrequestbudget1 blocks anysecond
+source request; onlyUTF8/endHTML/formcounts/media-type/hash retained, noHTML.
+52focused tests pass; reviewrequired beforeintegration. NoBolton/Manchester
+rerun. No production, models, documents or schedules.

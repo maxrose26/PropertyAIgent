@@ -26,6 +26,7 @@ def test_same_contract_binds_each_council_and_date_semantics(config):
     stem=b'Received' if config.semantics=='RECEIVED' else b'Validated'
     echo=form.replace(b'name="date(application'+stem+b'Start)" value=""',b'name="date(application'+stem+b'Start)" value="28/09/2026"').replace(b'name="date(application'+stem+b'End)" value=""',b'name="date(application'+stem+b'End)" value="04/10/2026"')
     listing=page().replace(b'/online-applications',prefix.encode())
+    if config.council=='bury':listing=listing.replace(b'keyVal=K0',b'keyVal=_BURY_DCAPR_65225').replace(b'keyVal=K1',b'keyVal=_BURY_DCAPR_65221')
     bodies=[form,listing,listing,echo];responses=[];calls=[]
     def dispatch(method,url,**kw):
         assert url.startswith(config.base+'/')

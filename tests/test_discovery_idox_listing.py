@@ -50,3 +50,12 @@ def test_sequential_page_link_and_count():
 def test_same_reference_distinct_source_keys_withheld():
     p=parse_page(page(refs=('001/26','001/26')),'bolton',1,D,D)
     assert all(r.reference is None and r.identity_state=='CONFLICTING' for r in p.rows)
+
+
+def test_bury_observed_link_key_and_pipe_separator():
+    body=page(refs=('73718','73716')).replace(b'class="summaryLink"',b'').replace(b'keyVal=K0',b'keyVal=_BURY_DCAPR_65225').replace(b'keyVal=K1',b'keyVal=_BURY_DCAPR_65221').replace('·'.encode(),b'|')
+    p=parse_page(body,'bury',1,D,D)
+    assert [r.reference for r in p.rows]==['73718','73716']
+    assert p.rows[0].source_key=='_BURY_DCAPR_65225'
+    assert p.rows[0].fields['received_date'].state=='PRESENT_VALUE'
+    with pytest.raises(ListingError):parse_page(body.replace(b'_BURY_DCAPR_65225',b'_ARBITRARY_65225'),'bury',1,D,D)
