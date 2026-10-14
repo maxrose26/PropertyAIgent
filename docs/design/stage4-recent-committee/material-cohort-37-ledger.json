@@ -112,11 +112,15 @@
       "application_role": "UNKNOWN",
       "admission_cohort": false,
       "current_absence": "OWNER_CHECK_NO_MATCH",
-      "portal_identity": "NOT_YET_QUALIFIED",
+      "portal_identity": "NOT_QUALIFIED",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
-      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
+      "admission_cohort_status": "WITHHELD_FROM_FREEZE",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00",
+      "qualification_run": "38652271830",
+      "b2_eligible": false,
+      "qualification_failure": "SOURCE_UNAVAILABLE",
+      "rejection_reason": "NO_QUALIFIED_OBSERVATION"
     },
     {
       "council": "bolton",
@@ -380,15 +384,19 @@
       ],
       "scale_scope": "UNKNOWN",
       "scale_metric": "UNKNOWN",
-      "admission_cohort": false,
+      "admission_cohort": true,
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
       "current_absence": "OWNER_CHECK_NO_MATCH",
-      "portal_identity": "HISTORICALLY_QUALIFIED_PENDING_CURRENT_COHORT_CHECK",
+      "portal_identity": "EXACT_DISPLAYED_REFERENCE",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
-      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
+      "admission_cohort_status": "FROZEN_ELIGIBLE",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00",
+      "qualification_run": "38652271830",
+      "b2_eligible": true,
+      "qualification_failure": null,
+      "rejection_reason": null
     },
     {
       "council": "manchester",
@@ -410,15 +418,19 @@
       ],
       "scale_scope": "APPLICATION_DWELLINGS",
       "scale_metric": "DWELLINGS",
-      "admission_cohort": false,
+      "admission_cohort": true,
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
       "current_absence": "OWNER_CHECK_NO_MATCH",
-      "portal_identity": "HISTORICALLY_QUALIFIED_PENDING_CURRENT_COHORT_CHECK",
+      "portal_identity": "EXACT_DISPLAYED_REFERENCE",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
-      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
+      "admission_cohort_status": "FROZEN_ELIGIBLE",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00",
+      "qualification_run": "38652271830",
+      "b2_eligible": true,
+      "qualification_failure": null,
+      "rejection_reason": null
     },
     {
       "council": "oldham",
@@ -620,11 +632,15 @@
       "application_role": "UNKNOWN",
       "admission_cohort": false,
       "current_absence": "OWNER_CHECK_NO_MATCH",
-      "portal_identity": "NOT_YET_QUALIFIED",
+      "portal_identity": "EXACT_DISPLAYED_REFERENCE",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
-      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
+      "admission_cohort_status": "WITHHELD_FROM_FREEZE",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00",
+      "qualification_run": "38652271830",
+      "b2_eligible": false,
+      "qualification_failure": null,
+      "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE"
     },
     {
       "council": "salford",
@@ -700,20 +716,24 @@
       "materiality": "POTENTIALLY_MATERIAL",
       "supported_dwellings": null,
       "materiality_reason": "Explicit related application varying battery-storage scheme phasing/layout; residential/buyer relevance UNKNOWN. Retain under broad material-variation admission policy.",
-      "primary_comparison": "UNKNOWN",
+      "primary_comparison": "OUTSIDE_COMPARABLE_VALIDATED_WINDOW",
       "admission": "NOT_ATTEMPTED",
       "retained_proposal": "Variation of conditions2,3,6,7,8,10,11,13,14,17,18,19 and additional condition20 for phasing/layout flexibility of battery-storage facility23/00770/FUL.",
       "source_meeting_or_index": "https://tameside.moderngov.co.uk/ieListDocuments.aspx?CId=161&MId=11814",
       "proposal_evidence": "Previously inspected official report/index/minutes; retained observation reused; no new source request",
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
-      "admission_cohort": false,
+      "admission_cohort": true,
       "current_absence": "OWNER_CHECK_NO_MATCH",
-      "portal_identity": "NOT_YET_QUALIFIED",
+      "portal_identity": "EXACT_DISPLAYED_REFERENCE",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
-      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
+      "admission_cohort_status": "FROZEN_ELIGIBLE",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00",
+      "qualification_run": "38652271830",
+      "b2_eligible": true,
+      "qualification_failure": null,
+      "rejection_reason": null
     },
     {
       "council": "tameside",
@@ -874,7 +894,7 @@
       "reference": "26/00396/FUL"
     }
   ],
-  "current_absence": "PENDING_ONE_COHORT_WIDE_READ",
+  "current_absence": "OWNER_COHORT_CHECK_COMPLETE_2026_10_14_22_46_16_98426_UTC",
   "production_actions": 0,
-  "admission_cohort": "NOT_FROZEN; only proposed qualification/check cohort is frozen"
+  "admission_cohort": "FROZEN_THREE_ELIGIBLE; NOT_EXECUTED"
 }
