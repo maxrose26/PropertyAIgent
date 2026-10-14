@@ -24,6 +24,9 @@ from verification.direct_reference.arcus_manifest import case_definitions
 CASES.update(case_definitions())
 from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
 CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
+from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed
+CASES[SEARCH_SHAPE_CASE] = (None, None, DISCOVERY_DESTINATION)
+DISCOVERY_CASES = {DISCOVERY_CASE, SEARCH_SHAPE_CASE}
 MAX_BYTES = 20 * 1024 * 1024
 MAX_REQUESTS = 80
 MAX_SECONDS = 45
@@ -224,10 +227,10 @@ async def probe(case):
                  http_probe=None, record_http_probe=None, name_http_probe=None, host_config_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN',
                  safety_failure=False, safety_events=[])
-    if case == DISCOVERY_CASE:
+    if case in DISCOVERY_CASES:
         audit.update(purpose='DISCOVERY_LISTING_RPC_SHAPE_ONLY',
                      requested_interval=['2026-09-28', '2026-10-04'],
-                     date_semantics='VALIDATED', completeness='UNKNOWN')
+                     date_semantics='VALIDATED', completeness='UNKNOWN', bootstrap_reads=0, observed_action_metadata=[])
     started = time.monotonic()
     browser = context = None
     stopped = asyncio.Event()
@@ -260,13 +263,28 @@ async def probe(case):
                 for descriptor in post_descriptors(request.get('postData')):
                     if descriptor not in audit['blocked_actions'] and len(audit['blocked_actions']) < 20:
                         audit['blocked_actions'].append(descriptor)
+                metadata_slot = 'observed_action_metadata' if case == SEARCH_SHAPE_CASE else 'blocked_action_metadata'
                 for metadata in post_metadata(request.get('postData'), destination):
-                    if metadata not in audit['blocked_action_metadata'] and len(audit['blocked_action_metadata']) < 20:
-                        audit['blocked_action_metadata'].append(metadata)
+                    if metadata not in audit[metadata_slot] and len(audit[metadata_slot]) < 20:
+                        audit[metadata_slot].append(metadata)
             reason = request_failure(url, request['method'], event.get('resourceType'), destination, audit['requests'])
+            if (reason == 'UNREVIEWED_METHOD' and request['method'] == 'POST'
+                    and not stopped.is_set() and not audit['safety_failure'] and case == SEARCH_SHAPE_CASE
+                    and bootstrap_read_allowed(url, request.get('postData'))):
+                audit['bootstrap_reads'] += 1
+                if audit['bootstrap_reads'] > 3:
+                    fail('BOOTSTRAP_READ_LIMIT')
+                    await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+                else:
+                    await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
+                return
             if reason == 'UNREVIEWED_METHOD':
+                if case == SEARCH_SHAPE_CASE:
+                    for metadata in post_metadata(request.get('postData'), destination):
+                        if metadata not in audit['blocked_action_metadata'] and len(audit['blocked_action_metadata']) < 20:
+                            audit['blocked_action_metadata'].append(metadata)
                 audit['blocked_posts'] += 1
-                if case == DISCOVERY_CASE:
+                if case in DISCOVERY_CASES:
                     # Shape-only observation: no public RPC is sent and no
                     # application identity/fields are asserted.
                     await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
@@ -400,14 +418,14 @@ async def probe(case):
                     await asyncio.gather(nav, return_exceptions=True)
                 else:
                     await nav
-                    if case == DISCOVERY_CASE:
+                    if case in DISCOVERY_CASES:
                         # Observe bootstrap metadata only; never inspect application DOM.
                         until = time.monotonic() + 8
-                        while not stopped.is_set() and not audit['blocked_action_metadata'] and time.monotonic() < until:
+                        while not stopped.is_set() and not audit['blocked_posts'] and time.monotonic() < until:
                             await asyncio.sleep(.2)
                     # Read only relevant labels; never export whole HTML/body or people.
                     until = time.monotonic() + 8
-                    while case != DISCOVERY_CASE and not stopped.is_set() and time.monotonic() < until:
+                    while case not in DISCOVERY_CASES and not stopped.is_set() and time.monotonic() < until:
                         pairs = await page.evaluate("""() => {
                           const labels = new Set(['Reference','Status','Decision','Decision notice sent date','Decision date','Decision Issued Date']);
                           const out=[], nodes=[];
