@@ -17,7 +17,7 @@ class ProbeContract(unittest.TestCase):
 
     def test_frozen_routes(self):
         from verification.direct_reference.arcus_manifest import case_definitions
-        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford'} | set(case_definitions()))
+        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape'} | set(case_definitions()))
         for _, _, url in CASES.values():
             self.assertTrue(permitted_navigation(url, url))
             self.assertFalse(permitted_navigation(url + '&other=1', url))
