@@ -21,12 +21,14 @@ ENV_KEYS=('GITHUB_ACTIONS','RUNNER_ENVIRONMENT','GITHUB_EVENT_NAME','GITHUB_RUN_
           'GITHUB_REF','ARCUS_WORKFLOW_SHA','PLAYWRIGHT_BROWSERS_PATH')
 
 
-def admit(sha):
+def admit(sha, *, workflow=WORKFLOW):
+    if workflow not in {WORKFLOW,'.github/workflows/stage4-salford15-production-once.yml'}:
+        raise ValueError('WORKFLOW_SCOPE')
     required=dict(GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',
         GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_RUN_NUMBER='1',GITHUB_RUN_ATTEMPT='1',
         GITHUB_REPOSITORY='maxrose26/PropertyAIgent',GITHUB_REF='refs/heads/master',
         ARCUS_WORKFLOW_SHA=sha,
-        GITHUB_WORKFLOW_REF='maxrose26/PropertyAIgent/'+WORKFLOW+'@refs/heads/master')
+        GITHUB_WORKFLOW_REF='maxrose26/PropertyAIgent/'+workflow+'@refs/heads/master')
     if not re.fullmatch('[0-9a-f]{40}',sha) or any(os.environ.get(k)!=v for k,v in required.items()):
         raise ValueError('ADMISSION')
     if not re.fullmatch('[1-9][0-9]*',os.environ.get('GITHUB_RUN_ID','')):raise ValueError('RUN_ID')

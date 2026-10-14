@@ -13,6 +13,8 @@ CONTEXTS={name:batch.ManifestSpec(name,MANIFEST_SHA256,count,True,'ARCUS')
           for name,count in [('validation',3)]+[('catchup_'+letter,9) for letter in 'abcdef']}
 
 def manifest(spec):
+    from .salford15_manifest import CONTEXTS as continuation, manifest as continuation_manifest
+    if spec in continuation.values():return continuation_manifest(spec)
     if spec not in CONTEXTS.values():raise ValueError('ARCUS_BATCH_SCOPE')
     all_rows=rows();byid={r['application_id']:r for r in all_rows}
     validation=[byid[i] for i in (688,295,252)]
