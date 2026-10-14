@@ -1,0 +1,32 @@
+name: Stage4 discovery contract OFFLINE
+on:
+  pull_request:
+    paths:
+      - 'app/pipeline/discovery_contract.py'
+      - 'app/scrapers/idox_portal.py'
+      - 'app/scrapers/arcus_portal.py'
+      - 'tests/test_discovery_*.py'
+      - 'verification/bolton_recon/discovery_form_shape.py'
+      - '.github/workflows/stage4-discovery-offline.yml'
+  push:
+    branches: [master]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+      - name: Pure discovery and pagination regressions, network denied
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_contract.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-offline-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/discovery.xml

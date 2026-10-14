@@ -1,0 +1,42 @@
+name: Stage4 Bolton discovery form shape ONCE
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'verification/bolton_recon/discovery_form_shape.py'
+permissions:
+  contents: read
+concurrency:
+  group: stage4-discovery-source-qualification
+  cancel-in-progress: false
+jobs:
+  shape:
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+      - name: Exact integrated candidate offline acceptance
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_contract.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py -q
+      - name: Exactly one fixed form GET; no search or persistence
+        run: |
+          mkdir "$RUNNER_TEMP/discovery-form"
+          set +e
+          timeout --kill-after=2s 35s env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP/discovery-form" PYTHONDONTWRITEBYTECODE=1 "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.bolton_recon.discovery_form_shape > "$RUNNER_TEMP/discovery-form/audit.json"
+          result=$?
+          set -e
+          printf '{"worker_exit":%s,"supervisor_returned":true,"no_retry":true}\n' "$result" > "$RUNNER_TEMP/discovery-form/supervisor.json"
+          test "$result" = 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-form-${{ github.run_id }}-${{ github.sha }}
+          path: ${{ runner.temp }}/discovery-form/*.json
+          if-no-files-found: error
+          retention-days: 14

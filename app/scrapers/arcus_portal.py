@@ -129,6 +129,7 @@ def _walk_result_pages(page: Page) -> list[dict]:
     how they construct the URL navigated to before calling this."""
     rows: list[dict] = []
     seen_refs: set[str] = set()
+    seen_rows: dict[str, dict] = {}
 
     for _ in range(MAX_PAGES_PER_SEARCH):
         text = page.inner_text("body")
@@ -140,8 +141,11 @@ def _walk_result_pages(page: Page) -> list[dict]:
         ref_to_url = {l["text"]: l["href"] for l in links}
         for row in _parse_result_page(text, ref_to_url):
             if row["reference"] in seen_refs:
+                if seen_rows[row["reference"]] != row:
+                    raise RuntimeError("Discovery conflicting duplicate reference")
                 continue
             seen_refs.add(row["reference"])
+            seen_rows[row["reference"]] = row
             rows.append(row)
 
         # exact=True fails here: the pagination link's accessible text is
@@ -154,16 +158,18 @@ def _walk_result_pages(page: Page) -> list[dict]:
             break
         try:
             classes = next_link.first.evaluate("el => el.className") or ""
-        except Exception:
-            break
+        except Exception as error:
+            raise RuntimeError("Discovery pagination state unknown") from error
         if "disabled" in classes:
             break
         try:
             next_link.first.click()
             page.wait_for_load_state("networkidle", timeout=30000)
             page.wait_for_timeout(WAIT_SECONDS * 1000)
-        except Exception:
-            break
+        except Exception as error:
+            raise RuntimeError("Discovery pagination incomplete") from error
+    else:
+        raise RuntimeError("Discovery pagination page cap reached")
 
     return rows
 

@@ -257,7 +257,10 @@ def collect_result_links(page: Page, council: CouncilConfig, date_from: str, dat
     except Exception:
         pass  # not all portals expose this control
 
-    while True:
+    # A failed or capped traversal must not look like a complete date window.
+    # The caller may retain diagnostics, but cannot ingest a partial return as
+    # successful discovery. Search-contract qualification is still separate.
+    for page_number in range(60):
         html = page.content()
         if is_rate_limited(html):
             raise RuntimeError(f"Rate limited by portal while searching {date_from}-{date_to}")
@@ -274,8 +277,10 @@ def collect_result_links(page: Page, council: CouncilConfig, date_from: str, dat
             next_links.first.click()
             page.wait_for_load_state("networkidle", timeout=30000)
             time.sleep(WAIT_SECONDS)
-        except Exception:
-            break
+        except Exception as error:
+            raise RuntimeError("Discovery pagination incomplete") from error
+    else:
+        raise RuntimeError("Discovery pagination page cap reached")
 
     return sorted(links)
 
