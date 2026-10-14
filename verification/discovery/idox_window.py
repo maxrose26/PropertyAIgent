@@ -3,14 +3,15 @@
 Reuse strict form handling, bounded request accounting and disposable supervision.
 This is not an operational source registry or acceptance denominator.
 """
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import date
 import hashlib
 import json
 import time
 from urllib.parse import urlencode
 import requests
-from app.scrapers.discovery_idox import parse_page, ListingError
+from app.scrapers.discovery_idox import parse_page, ListingError, IDOX
+from app.pipeline.discovery_contract import SOURCE_ROOTS
 from .idox_sort import sort_payload, require_reference_sort
 from verification.bolton_recon.recon import form_payload, FORM_URL, POST_URLS, Failure
 from verification.stage26b_l1.request_boundary import Boundary, Budget, Policy, BoundaryFailure
@@ -21,10 +22,38 @@ COUNCIL='bolton'
 MAX_PAGES=6
 
 
+@dataclass(frozen=True)
+class WindowConfig:
+    council: str = COUNCIL
+    semantics: str = 'RECEIVED'
+    start: date = START
+    end: date = END
+
+    def __post_init__(self):
+        if self.council not in IDOX or self.semantics not in {'RECEIVED','VALIDATED'} or not self.start<=self.end or (self.end-self.start).days>27:
+            raise ValueError('unadmitted council/date window')
+
+    @property
+    def base(self):
+        host,prefix=SOURCE_ROOTS[self.council]
+        return 'https://'+host+prefix.rstrip('/')
+
+    @property
+    def form_url(self):return self.base+'/search.do?action=advanced&searchType=Application'
+
+    def payload(self,body,*,echo=False):
+        stem='Received' if self.semantics=='RECEIVED' else 'Validated'
+        return form_payload(body,{'controls':[]},form_url=self.form_url,
+            post_urls=frozenset({self.base+'/advancedSearchResults.do?action=firstPage',self.base+'/search.do'}),
+            date_fields=(f'date(application{stem}Start)',f'date(application{stem}End)'),
+            date_values=(self.start.strftime('%d/%m/%Y'),self.end.strftime('%d/%m/%Y')),allow_date_echo=echo)
+
+
 class WindowBoundary(Boundary):
-    def __init__(self, dispatch):
-        super().__init__(Policy(COUNCIL,'received:2026-09-28:2026-10-04','idox',
-            'https://paplanning.bolton.gov.uk/online-applications',FORM_URL),
+    def __init__(self, dispatch, config=WindowConfig()):
+        self.config=config
+        super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
+            config.base,config.form_url),
             Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45),dispatch)
         self.admitted_post=None
         self.admitted_body=None
@@ -34,7 +63,7 @@ class WindowBoundary(Boundary):
     def validate(self,method,url,body=None):
         self.budget.check()
         if self.closed: self.budget.reject('PARTIAL_RETRIEVAL','closed')
-        allowed=((self.phase=='FORM' and method=='GET' and url==FORM_URL and body is None)
+        allowed=((self.phase=='FORM' and method=='GET' and url==self.config.form_url and body is None)
             or (self.phase in {'SEARCH','SORT'} and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)
             or (self.phase=='PAGE' and method=='GET' and url==self.next_url and self.next_url is not None and body is None)
             or (self.phase=='REFINE' and method=='GET' and url==self.policy.base_url+'/refineSearch.do?action=refine' and body is None))
@@ -47,16 +76,15 @@ class WindowBoundary(Boundary):
         return data
 
 
-def run(dispatch):
-    b=WindowBoundary(dispatch)
-    out={'council':COUNCIL,'requested_interval':[START.isoformat(),END.isoformat()],
-        'date_semantics':'RECEIVED','applied_interval':None,'completeness':'UNKNOWN',
+def run(dispatch, config=WindowConfig()):
+    b=WindowBoundary(dispatch,config)
+    out={'council':config.council,'requested_interval':[config.start.isoformat(),config.end.isoformat()],
+        'date_semantics':config.semantics,'applied_interval':None,'completeness':'UNKNOWN',
         'source_qualification':'CANDIDATE_CONTRACT','persistence':False,'pages':[],
         'records':[],'failure':None,'cleanup':'UNKNOWN','capped':False}
     try:
-        form=b.retrieve('GET',FORM_URL)
-        fa={'controls':[]}
-        target,payload=form_payload(form,fa,date_values=(START.strftime('%d/%m/%Y'),END.strftime('%d/%m/%Y')))
+        form=b.retrieve('GET',config.form_url)
+        target,payload=config.payload(form)
         b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SEARCH'
         payload.clear()
         html=b.retrieve('POST',target,b.admitted_body)
@@ -70,7 +98,7 @@ def run(dispatch):
         keys=set(); refs={}; total=None; seen=0
         for ordinal in range(1,MAX_PAGES+1):
             require_reference_sort(html)
-            p=parse_page(html,COUNCIL,ordinal,START,END)
+            p=parse_page(html,config.council,ordinal,config.start,config.end,config.semantics)
             if p.total is not None:
                 if total is not None and total!=p.total: raise ListingError('changing source count')
                 total=p.total
@@ -96,7 +124,7 @@ def run(dispatch):
         if not out['capped']:
             b.phase='REFINE'
             echoed=b.retrieve('GET',b.policy.base_url+'/refineSearch.do?action=refine')
-            _,echo_payload=form_payload(echoed,{'controls':[]},date_values=(START.strftime('%d/%m/%Y'),END.strftime('%d/%m/%Y')),allow_date_echo=True)
+            _,echo_payload=config.payload(echoed,echo=True)
             echo_payload.clear()
             out['applied_interval']=out['requested_interval']
             out['applied_evidence']='STRICT_REFINE_FORM_ECHO'
@@ -112,15 +140,19 @@ def run(dispatch):
     return out
 
 
-def live():
+def live(config=WindowConfig()):
     with requests.Session() as s:
         s.trust_env=False
         s.mount('https://',requests.adapters.HTTPAdapter(max_retries=0))
+        previous=[None]
         def dispatch(method,url,**kwargs):
+            delay=2.5 if config.council=='stockport' else 0.4
+            if previous[0] is not None:time.sleep(max(0,delay-(time.monotonic()-previous[0])))
+            previous[0]=time.monotonic()
             kwargs.pop('deadline',None)
             kwargs['timeout']=(3,8)
             return s.request(method,url,**kwargs)
-        result=run(dispatch)
+        result=run(dispatch,config)
     result['cleanup']='SESSION_BOUNDARY_CLOSED'
     return result
 

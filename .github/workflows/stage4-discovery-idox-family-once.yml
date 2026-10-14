@@ -1,0 +1,37 @@
+name: Stage4 remaining Idox discovery windows ONCE
+on:
+  push:
+    branches: [master]
+    paths: ['verification/discovery/idox_family.py']
+permissions:
+  contents: read
+concurrency:
+  group: stage4-discovery-source-qualification
+  cancel-in-progress: false
+jobs:
+  windows:
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+      - name: Relevant offline acceptance
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py verification/bolton_recon/test_recon.py -q
+      - name: Frozen five-council source qualification, sequential and credential-free
+        env:
+          CANDIDATE: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          timeout --kill-after=2s 270s env -i HOME="$HOME" PATH=/usr/bin:/bin DISCOVERY_CANDIDATE_SHA="$CANDIDATE" DISCOVERY_RUN_ID="$RUN_ID" "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.discovery.idox_family --output "$RUNNER_TEMP/discovery-idox-family"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-idox-family-${{ github.run_id }}-${{ github.sha }}
+          path: ${{ runner.temp }}/discovery-idox-family/*.json
+          retention-days: 14
+          if-no-files-found: error
