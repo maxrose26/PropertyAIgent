@@ -1,0 +1,47 @@
+{
+  "run_id": 38544404930,
+  "artifact_sha256": "9e4d49aa4d052e3d9cb011dd7151d366be6adefafb32a3c32f05bace5026e01a",
+  "files": {
+    "audit.json": {
+      "applied_interval": null,
+      "attempt": 1,
+      "capped": false,
+      "cleanup": "SESSION_BOUNDARY_CLOSED",
+      "code_sha": "1433a8770b74c596bf5f81e25dbc3d17dadcdff6",
+      "completeness": "FAILED",
+      "council": "bolton",
+      "date_semantics": "RECEIVED",
+      "execution_workflow": ".github/workflows/stage4-discovery-bolton-window-once.yml",
+      "failure": "ListingError:sort operation/page",
+      "pages": [],
+      "persistence": false,
+      "records": [],
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "resource": {
+        "adapter": "idox",
+        "budget_exhaustion": false,
+        "council": "bolton",
+        "elapsed_seconds": 3.983,
+        "outcome": "FAILED",
+        "received_bytes": 102149,
+        "redirects": 0,
+        "reference": "received:2026-09-28:2026-10-04",
+        "requests_attempted": 2,
+        "retries": 0
+      },
+      "run_id": "38544404930",
+      "source_qualification": "CANDIDATE_CONTRACT",
+      "supervisor": {
+        "expired": false,
+        "returned": true,
+        "transport_retry_limit": 1,
+        "worker_exit": 0,
+        "worker_restarted": false
+      },
+      "validation_revision": 2
+    }
+  }
+}

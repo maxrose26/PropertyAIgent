@@ -11,6 +11,11 @@ from app.db.models import Application
 from app.pipeline.discovery_contract import Completeness, DiscoveryEnvelope
 
 PENDING = 'discovery_pending'
+# Read back the factual/verification boundary claimed by identity-only admission.
+PROTECTED_FIELDS = ('status', 'decision', 'decision_issued_date',
+    'status_verified_at', 'planning_field_verification', 'proposal', 'address',
+    'application_type', 'application_received', 'application_validated',
+    'estimated_unit_count', 'opportunity_classification')
 
 
 class UncertainDiscoveryCommit(RuntimeError):
@@ -29,7 +34,8 @@ def admit_identity(engine, envelope: DiscoveryEnvelope) -> dict:
     else:
         raise ValueError('unqualified database dialect')
     columns = (Application.id, Application.council_code, Application.reference,
-               Application.unit_confirmation_status, Application.site_id)
+               Application.unit_confirmation_status, Application.site_id,
+               *(getattr(Application, name) for name in PROTECTED_FIELDS))
     query = select(*columns).where(
         Application.council_code == envelope.council,
         Application.reference == envelope.reference).limit(2)
@@ -51,7 +57,9 @@ def admit_identity(engine, envelope: DiscoveryEnvelope) -> dict:
             inside = session.execute(query).mappings().all()
             if len(inside) != 1:
                 raise ValueError('identity readback failed')
-            if inserted is not None and (inside[0]['unit_confirmation_status'] != PENDING or inside[0]['site_id'] is not None):
+            if inserted is not None and (inside[0]['unit_confirmation_status'] != PENDING
+                    or inside[0]['site_id'] is not None
+                    or any(inside[0][name] is not None for name in PROTECTED_FIELDS)):
                 raise ValueError('new identity isolation failed')
         except Exception:
             session.rollback()
@@ -69,9 +77,14 @@ def admit_identity(engine, envelope: DiscoveryEnvelope) -> dict:
                 raise ValueError('committed identity changed or missing')
     except Exception as exc:
         raise UncertainDiscoveryCommit('post-commit readback unresolved; no retry') from exc
+    def public_identity(row):
+        return {key: row[key] for key in ('id', 'council_code', 'reference',
+            'unit_confirmation_status', 'site_id')}
     return {'outcome': 'CREATED_PENDING' if inserted is not None else 'ALREADY_KNOWN',
             'application_id': after[0]['id'], 'council': envelope.council,
-            'reference': envelope.reference, 'before': [dict(r) for r in before],
-            'after': dict(after[0]), 'transaction': 'COMMIT_READBACK_CONFIRMED',
+            'reference': envelope.reference, 'before': [public_identity(r) for r in before],
+            'after': public_identity(after[0]),
+            'protected_field_names': list(PROTECTED_FIELDS),
+            'protected_fields_readback': 'NULL_CONFIRMED' if inserted is not None else 'NOT_WRITTEN_BY_ADMISSION', 'transaction': 'COMMIT_READBACK_CONFIRMED',
             'provenance_sha256': envelope.body_sha256, 'run_id': envelope.window.run_id,
             'planning_facts_written': False, 'site_relationship': 'UNKNOWN'}

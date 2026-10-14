@@ -57,7 +57,7 @@ def test_locator_reader_uses_only_reference_and_valid_date():
         async def count(self):return 6
         def filter(self,has_text):
             choices=['Reference\nPLA-2026-001','Valid Date\n02/10/2026']
-            matches=[v for v in choices if has_text.search(v)]
+            matches=[v for v in choices if has_text.search(v.replace('\n',''))]
             assert len(matches)==1
             return Leaf(matches[0])
     class Card:

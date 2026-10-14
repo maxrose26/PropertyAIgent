@@ -142,7 +142,7 @@ def main():
     if subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=sha: raise ValueError('candidate mismatch')
     if a.worker:
         result=live()
-        result.update(code_sha=sha,run_id=run_id,attempt=1,validation_revision=2,
+        result.update(code_sha=sha,run_id=run_id,attempt=1,validation_revision=3,
             execution_workflow='.github/workflows/stage4-discovery-bolton-window-once.yml')
         raw=json.dumps(result,sort_keys=True).encode()
         if len(raw)>512000: raise ValueError('audit output bound')

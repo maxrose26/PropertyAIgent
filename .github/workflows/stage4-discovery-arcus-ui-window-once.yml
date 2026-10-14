@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   shape:
-    # One reviewed corrected execution; prior run1 failed closed. No rerun/attempt2.
-    if: github.run_number == 2 && github.run_attempt == 1
+    # One reviewed corrected execution; prior runs1/2 failed closed. No rerun/attempt2.
+    if: github.run_number == 3 && github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

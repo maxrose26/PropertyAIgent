@@ -127,3 +127,33 @@ admission, source registry qualification, prospective freeze or acceptance.
 Bury ordinary public Weekly/Monthly Lists was inspected without submitting:
 it offers validated/decided weeks, not a separate published received list.
 This is source-option evidence only, not council qualification.
+
+## PR77 corrected-run results and final compatibility correction
+
+PR77 merge1433a8770b74c596bf5f81e25dbc3d17dadcdff6 followed exact-head discovery
+and AH success. Both runs2 failed closed. Bolton38544404930 rejected unobserved
+order/1 hidden literals before sortPOST:2requests102149bytes3.983s,no retry,
+closed. These literals were a mistaken compatibility assumption, not source
+evidence. Independent review explicitly withdrew that pinning requirement.
+The narrow public sort form now preserves returned hidden state in memory and
+changes only visible Reference/Descending/10 controls. Destination/control-set/
+response continuity/date echo remain required. No hidden state is logged.
+
+Manchester38544404975 reachedROW_LOCATORS thenfield label count rejection:
+27requests10087143decoded1773734encodedbytes3.925supervisorseconds,838316032
+peak owned RSS,8processes0survivors,closed. A textContent prefix can concatenate
+label/value without a word boundary. Remove only that prefilter word boundary;
+exact first line, one matching field, reference and date checks are unchanged.
+A focused regression uses concatenatedtextContent and separateinnerTextlines.
+
+Independent review approved both corrections and one reviewed corrected
+run3/attempt1 per existing worker, subject to CI and run-count checks. Prior
+failures remain evidence, not successful discovery. No source is registered
+operational on this basis. The initial Manchester genericError remains unresolved.
+
+Admission readback additionally checks the named factual/watermark fields,
+estimated units and opportunity classification for unexpected insertion side
+effects. Ten admission tests include database-trigger rollback and unchanged
+existing facts. Audit lists the checked field names and reportsNULL_CONFIRMED
+only for new rows, without emitting existing factual values. This preparation
+does not enable an operational production caller or change B2 semantics.

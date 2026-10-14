@@ -114,3 +114,16 @@ def test_pending_legacy_b2_fetch_cannot_advance_watermark(engine):
             fetch.assert_not_called()
         s.refresh(row)
         assert row.status_verified_at is None and row.status is None
+
+
+@pytest.mark.parametrize('column,value', [('status',"'unexpected'"),('estimated_unit_count','99'),('opportunity_classification',"'promoted'")])
+def test_identity_readback_rejects_unexpected_factual_side_effect(engine,column,value):
+    from sqlalchemy import text
+    # A DB-side effect must not be hidden by an identity-only readback.
+    with engine.begin() as connection:
+        connection.execute(text(f"""CREATE TRIGGER unexpected_fact AFTER INSERT ON applications
+          BEGIN UPDATE applications SET {column}={value} WHERE id=NEW.id; END"""))
+    with pytest.raises(ValueError,match='isolation'):
+        admit_identity(engine,envelope())
+    with Session(engine) as session:
+        assert session.scalar(select(func.count()).select_from(Application))==0
