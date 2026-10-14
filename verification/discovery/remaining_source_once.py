@@ -1,6 +1,7 @@
 """Fixed remaining qualification calls. No production, documents or broad input."""
 import hashlib,json,os,re,subprocess,sys,tempfile
 from pathlib import Path
+from datetime import date
 from bs4 import BeautifulSoup
 from .idox_window import WindowConfig,WindowBoundary,live
 from verification.stage26b_l1.actions_runner import supervise
@@ -44,14 +45,14 @@ def wigan_shape():
 
 def main():
     import argparse
-    p=argparse.ArgumentParser();p.add_argument('--case',choices=('bury','wigan-shape'),required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--worker',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--case',choices=('bury','wigan-shape','wigan','bury-zero'),required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--worker',action='store_true');a=p.parse_args()
     if any(k in os.environ for k in ('DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
     sha=os.environ.get('DISCOVERY_CANDIDATE_SHA','');run_id=os.environ.get('DISCOVERY_RUN_ID','')
     if not re.fullmatch('[0-9a-f]{40}',sha) or not re.fullmatch('[0-9]{1,20}',run_id):raise ValueError('identity')
     if subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=sha:raise ValueError('candidate')
     if a.output.exists():raise ValueError('existing output')
     if a.worker:
-        d=live(WindowConfig('bury')) if a.case=='bury' else wigan_shape()
+        d=wigan_shape() if a.case=='wigan-shape' else live(WindowConfig('bury',start=date(2026,11,30),end=date(2026,11,30)) if a.case=='bury-zero' else WindowConfig(a.case))
         d.update(code_sha=sha,run_id=run_id,attempt=1)
         raw=json.dumps(d,sort_keys=True).encode()
         if len(raw)>512000:raise ValueError('output bound')
@@ -63,7 +64,7 @@ def main():
         d=json.loads(child.read_bytes());d['supervisor']={'worker_exit':code,'expired':expired,'returned':True,'worker_restarted':False}
         a.output.write_text(json.dumps(d,sort_keys=True))
         accepted=d.get('failure') is None
-        if a.case=='bury':
+        if a.case!='wigan-shape':
             accepted=accepted and d.get('enumeration_evidence')=='COUNT_RECONCILED' and not d.get('capped') and d.get('applied_interval')==d.get('requested_interval')
         return 0 if accepted else 1
 

@@ -59,3 +59,21 @@ def test_bury_observed_link_key_and_pipe_separator():
     assert p.rows[0].source_key=='_BURY_DCAPR_65225'
     assert p.rows[0].fields['received_date'].state=='PRESENT_VALUE'
     with pytest.raises(ListingError):parse_page(body.replace(b'_BURY_DCAPR_65225',b'_ARBITRARY_65225'),'bury',1,D,D)
+
+
+def test_explicit_zero_is_not_an_empty_or_error_page():
+    from app.scrapers.discovery_idox import explicit_zero
+    b='<html><h1>Planning – Applications Search</h1><div class="messagebox"><h2>Please check the search criteria:</h2><ul><li>No results found.</li></ul></div></html>'.encode()
+    assert explicit_zero(b,'bury')
+    assert not explicit_zero(b,'bolton')
+    assert not explicit_zero(b'<html><h1>Error</h1></html>','bury')
+    with pytest.raises(ListingError):explicit_zero(b.replace(b'</ul>',b'<li>Invalid date</li></ul>'),'bury')
+    with pytest.raises(ListingError):explicit_zero(b.replace(b'</html>',b''),'bury')
+
+
+def test_zero_rejects_separate_error_list_or_messagebox():
+    from app.scrapers.discovery_idox import explicit_zero
+    b='<html><h1>Planning – Applications Search</h1><div class="messagebox"><h2>Please check the search criteria:</h2><ul><li>No results found.</li></ul></div></html>'.encode()
+    for extra in (b'<ul><li>Invalid date</li></ul>',b'<div class="messagebox"><ul><li>Invalid date</li></ul></div>'):
+        changed=b.replace(b'</div></html>',extra+b'</div></html>')
+        with pytest.raises(ListingError):explicit_zero(changed,'bury')

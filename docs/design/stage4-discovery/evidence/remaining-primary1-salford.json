@@ -1,0 +1,458 @@
+{
+  "application_id": null,
+  "applied_evidence": "VISIBLE_RETAINED_VALID_DATE_CRITERIA",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+  "blocked_actions": [],
+  "blocked_posts": 0,
+  "case": "discovery_salford_ui_window",
+  "cleanup": "CONTEXT_BROWSER_CLOSED",
+  "completeness": "UNKNOWN",
+  "date_semantics": "VALIDATED",
+  "decoded_bytes": 12608397,
+  "destination": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0yOCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMDQiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+  "elapsed_seconds": 3.806,
+  "encoded_bytes": 3220918,
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "exact_reference": false,
+  "failure": null,
+  "fields": null,
+  "frame_kinds": [
+    {
+      "direct_child": true,
+      "kind": "BLANK"
+    },
+    {
+      "direct_child": true,
+      "kind": "BLANK"
+    }
+  ],
+  "largest_observed_post_bytes": 154956,
+  "listing_records": [
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1388",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MEzF3IAL",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MEzF3IAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT/2026/1385",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MEz8bIAD",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MEz8bIAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1382",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000ME7zRIAT",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000ME7zRIAT?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1281",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000Ln29RIAR",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000Ln29RIAR?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1377",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MCievIAD",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MCievIAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1357",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M8KePIAV",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M8KePIAV?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1376",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MCYm1IAH",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MCYm1IAH?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1275",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000LlPjfIAF",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000LlPjfIAF?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/0121",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kSq00000D0aX3IAJ",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq00000D0aX3IAJ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1365",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MACmPIAX",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MACmPIAX?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1368",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MAXUHIA5",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MAXUHIA5?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1370",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000MAjOzIAL",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000MAjOzIAL?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1350",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M6OnlIAF",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M6OnlIAF?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1359",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M8sTBIAZ",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M8sTBIAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1361",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M9HrPIAV",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M9HrPIAV?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1360",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M9ISTIA3",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M9ISTIA3?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1362",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M9XUjIAN",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M9XUjIAN?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1364",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M9ezGIAR",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M9ezGIAR?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1217",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000LX7hlIAD",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000LX7hlIAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1214",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000LVd0zIAD",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000LVd0zIAD?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1127",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kSq00000JvPI5IAN",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq00000JvPI5IAN?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1264",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000LijLVIAZ",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000LijLVIAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1248",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000LeLG9IAN",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000LeLG9IAN?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/1356",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M7lITIAZ",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M7lITIAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PA/2026/1355",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000M7iJCIAZ",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000M7iJCIAZ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT/2026/1328",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0kTv00000LzkrRIAR",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kTv00000LzkrRIAR?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": null,
+        "state": "UNKNOWN"
+      }
+    }
+  ],
+  "listing_segments": [
+    {
+      "evidence_sha256": "bad68a9c9242cf49c55664009dcfb90b7aff01173a084ce05c862643e3a16b61",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "total": 26
+    },
+    {
+      "evidence_sha256": "e710ac6ce6ea6d2ca60e3d76ed834f164efc28cd961415c3e34222fde245c578",
+      "first": 11,
+      "last": 20,
+      "ordinal": 2,
+      "total": 26
+    },
+    {
+      "evidence_sha256": "0ac223035ef1e886d43df5936a5e494ba6ce8bd9368ad70415b573ba3e5e7673",
+      "first": 21,
+      "last": 26,
+      "ordinal": 3,
+      "total": 26
+    }
+  ],
+  "listing_stage": "NEXT_CONTROL",
+  "live_owned_survivors": 0,
+  "local_frames": 2,
+  "measured_public_ui_posts": 11,
+  "navigated_origins": [
+    "https://salfordcitycouncil.my.site.com"
+  ],
+  "navigation_mismatch": null,
+  "navigations": 2,
+  "network_classification": "UNKNOWN",
+  "outbound_payload_bytes": 183002,
+  "owned_processes_seen": 8,
+  "pages": 1,
+  "peak_owned_rss": 891232256,
+  "persistence": false,
+  "post_body_cdp_reads": 0,
+  "process_cleanup": "CLOSED",
+  "public_ui_posts": 11,
+  "purpose": "DISCOVERY_PUBLIC_UI_WINDOW",
+  "redirects": 0,
+  "reference": null,
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "requested_origins": [
+    "https://salfordcitycouncil.my.site.com"
+  ],
+  "requests": 34,
+  "responses": 33,
+  "safety_events": [],
+  "safety_failure": false,
+  "source_qualification": "CANDIDATE_PUBLIC_UI_CONTRACT",
+  "supervisor_limit_hit": false,
+  "supervisor_seconds": 3.984
+}

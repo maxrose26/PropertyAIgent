@@ -30,7 +30,9 @@ def test_same_contract_binds_each_council_and_date_semantics(config):
     bodies=[form,listing,listing,echo];responses=[];calls=[]
     def dispatch(method,url,**kw):
         assert url.startswith(config.base+'/')
-        r=Response(bodies[len(calls)]);responses.append(r);calls.append((method,url,kw.get('data')));return r
+        r=Response(bodies[len(calls)])
+        if config.council=='wigan':r.headers={'Content-Type':'text/html;charset=UTF-8'}
+        responses.append(r);calls.append((method,url,kw.get('data')));return r
     result=run(dispatch,config)
     assert result['failure'] is None and result['enumeration_evidence']=='COUNT_RECONCILED'
     assert result['completeness']=='UNKNOWN' and result['date_semantics']==config.semantics

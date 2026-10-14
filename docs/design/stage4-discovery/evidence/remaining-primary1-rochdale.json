@@ -1,0 +1,267 @@
+{
+  "application_id": null,
+  "applied_evidence": "VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+  "blocked_actions": [],
+  "blocked_posts": 0,
+  "case": "discovery_rochdale_ui_window",
+  "cleanup": "CONTEXT_BROWSER_CLOSED",
+  "completeness": "UNKNOWN",
+  "date_semantics": "VALIDATED",
+  "decoded_bytes": 11308192,
+  "destination": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMDktMjgiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTA0IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+  "elapsed_seconds": 6.108,
+  "encoded_bytes": 2116968,
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "exact_reference": false,
+  "failure": null,
+  "fields": null,
+  "frame_kinds": [
+    {
+      "direct_child": true,
+      "kind": "BLANK"
+    },
+    {
+      "direct_child": true,
+      "kind": "BLANK"
+    }
+  ],
+  "largest_observed_post_bytes": 159286,
+  "listing_records": [
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "NOT/2026/0884",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000tpuIHIAY",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tpuIHIAY?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "02/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0906",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000uFnDEIA0",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uFnDEIA0?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "01/10/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0780",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000rPqQ2IAK",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000rPqQ2IAK?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/0901",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000uAxzRIAS",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uAxzRIAS?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/0902",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000uBMNOIA4",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uBMNOIA4?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0166",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000iI9VeIAK",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000iI9VeIAK?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "30/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0556",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000nyDmOIAU",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000nyDmOIAU?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "29/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "OTH/2026/0892",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000u0is1IAA",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000u0is1IAA?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0813",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000s2cNGIAY",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000s2cNGIAY?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0814",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000s4a4DIAQ",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000s4a4DIAQ?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0768",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000rI201IAC",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000rI201IAC?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    },
+    {
+      "field_capture_scope": [
+        "reference",
+        "validated_date"
+      ],
+      "materiality": "POTENTIALLY_MATERIAL",
+      "reference": "PL/2026/0894",
+      "relationship": "UNKNOWN",
+      "source_record_id": "a0rSl00000u2CZVIA2",
+      "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000u2CZVIA2?c__r=Arcus_BE_Public_Register",
+      "validated_date": {
+        "literal": "28/9/2026",
+        "state": "PRESENT_VALUE"
+      }
+    }
+  ],
+  "listing_segments": [
+    {
+      "evidence_sha256": "a860bd9e9841d287155ae491b6411fc8b787f353fe4f81dcd60cf92ea0319d74",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "total": 12
+    },
+    {
+      "evidence_sha256": "ffd39f885d2c7cfd7adbd76d6fbfe0ec081542233059c5bdd4b3997d0457c54e",
+      "first": 11,
+      "last": 12,
+      "ordinal": 2,
+      "total": 12
+    }
+  ],
+  "listing_stage": "NEXT_CONTROL",
+  "live_owned_survivors": 0,
+  "local_frames": 2,
+  "measured_public_ui_posts": 12,
+  "navigated_origins": [
+    "https://account.rochdale.gov.uk"
+  ],
+  "navigation_mismatch": null,
+  "navigations": 2,
+  "network_classification": "UNKNOWN",
+  "outbound_payload_bytes": 190561,
+  "owned_processes_seen": 8,
+  "pages": 1,
+  "peak_owned_rss": 862806016,
+  "persistence": false,
+  "post_body_cdp_reads": 0,
+  "process_cleanup": "CLOSED",
+  "public_ui_posts": 12,
+  "purpose": "DISCOVERY_PUBLIC_UI_WINDOW",
+  "redirects": 0,
+  "reference": null,
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "requested_origins": [
+    "https://account.rochdale.gov.uk"
+  ],
+  "requests": 36,
+  "responses": 32,
+  "safety_events": [],
+  "safety_failure": false,
+  "source_qualification": "CANDIDATE_PUBLIC_UI_CONTRACT",
+  "supervisor_limit_hit": false,
+  "supervisor_seconds": 6.257
+}

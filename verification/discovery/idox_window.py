@@ -7,10 +7,11 @@ from dataclasses import asdict, dataclass
 from datetime import date
 import hashlib
 import json
+import re
 import time
 from urllib.parse import urlencode
 import requests
-from app.scrapers.discovery_idox import parse_page, ListingError, IDOX
+from app.scrapers.discovery_idox import parse_page, ListingError, IDOX, explicit_zero
 from app.pipeline.discovery_contract import SOURCE_ROOTS
 from .idox_sort import sort_payload, require_reference_sort
 from verification.bolton_recon.recon import form_payload, FORM_URL, POST_URLS, Failure
@@ -59,6 +60,7 @@ class WindowBoundary(Boundary):
         self.admitted_body=None
         self.next_url=None
         self.phase='FORM'
+        self.response_provenance=[]
 
     def validate(self,method,url,body=None):
         self.budget.check()
@@ -73,6 +75,17 @@ class WindowBoundary(Boundary):
         status,headers,data=self.request(method,url,body=body,headers={'Content-Type':'application/x-www-form-urlencoded'} if body else {})
         if status!=200 or headers.get('Content-Type','').split(';')[0].lower() not in {'text/html','application/xhtml+xml'}:
             self.budget.reject('PARTIAL_RETRIEVAL','response shape')
+        original=data
+        encoding='UTF-8'
+        if self.config.council=='wigan':
+            declared=re.search(r'charset\s*=\s*["\']?([A-Za-z0-9_-]+)',headers.get('Content-Type',''),re.I)
+            if declared is None or declared.group(1).lower() not in {'iso-8859-1','utf-8'}:
+                self.budget.reject('PARTIAL_RETRIEVAL','unqualified source encoding')
+            encoding=declared.group(1).upper()
+            if encoding=='ISO-8859-1':data=data.decode('iso-8859-1',errors='strict').encode('utf-8')
+            if len(data)>500_000:self.budget.reject('PARTIAL_RETRIEVAL','parser body bound')
+        self.response_provenance.append({'source_encoding':encoding,'body_sha256':hashlib.sha256(original).hexdigest(),
+            'parser_body_sha256':hashlib.sha256(data).hexdigest()})
         return data
 
 
@@ -89,6 +102,15 @@ def run(dispatch, config=WindowConfig()):
         payload.clear()
         html=b.retrieve('POST',target,b.admitted_body)
         b.admitted_body=None
+        if explicit_zero(html,config.council):
+            _,echo_payload=config.payload(html,echo=True)
+            echo_payload.clear()
+            out.update(enumeration_evidence='COUNT_RECONCILED',unique_references=0,
+                applied_interval=out['requested_interval'],applied_evidence='STRICT_ZERO_RESULT_FORM_ECHO',
+                applied_evidence_sha256=hashlib.sha256(html).hexdigest(),
+                explicit_zero_evidence='NO_RESULTS_FOUND_AND_RETAINED_DATE_CRITERIA')
+            out['pages']=[{'ordinal':1,'first':0,'last':0,'total':0,'rows':0,'body_sha256':hashlib.sha256(html).hexdigest(),'terminal':'EXPLICIT_ZERO_RESULTS'}]
+            return out
         target,payload=sort_payload(html,b.policy.base_url)
         b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SORT'
         payload.clear()
@@ -137,6 +159,7 @@ def run(dispatch, config=WindowConfig()):
     finally:
         b.admitted_body=None; b.close()
         out['resource']=b.audit(out['completeness']);out['cleanup']='BOUNDARY_CLOSED'
+        out['response_provenance']=b.response_provenance
     return out
 
 
