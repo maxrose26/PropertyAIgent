@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 import pdfplumber
 
 START=date(2025,10,14);END=date(2026,10,14)
+MAX_LINKS=2000;MAX_DOCUMENTS=80;MAX_DOCUMENTS_FOLLOWED=3;MAX_COUNCIL_OUTPUT=2*1024*1024
 ROOTS={
 'bolton':'https://bolton.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=140',
 'bury':'https://councildecisions.bury.gov.uk/ieListMeetings.aspx?CommitteeId=134',
@@ -63,7 +64,7 @@ def signals(text,kind):
         for literal in ('Minded to Approve','Approve with Conditions','Recommend Approval','Recommend Refusal','Recommendation: Approve','Recommendation: Refuse'):
             if literal.lower() in low:out.append({'literal':re.search(re.escape(literal),text,re.I).group(0),'classification':'RECOMMEND_REFUSAL' if 'refus' in literal.lower() else 'RECOMMEND_APPROVAL'})
     if kind=='COMMITTEE_MINUTES':
-        for term,cls in (('resolved to approve','RESOLVED_TO_APPROVE'),('minded to approve','RESOLVED_TO_APPROVE'),('approved with conditions','APPROVED'),('refused','REFUSED'),('deferred','DEFERRED'),('withdrawn from the agenda','WITHDRAWN_FROM_AGENDA')):
+        for term,cls in (('resolved to approve','RESOLVED_TO_APPROVE'),('minded to approve','MINDED_TO_APPROVE_MENTION_NON_FINAL'),('approved with conditions','APPROVED'),('refused','REFUSED'),('deferred','DEFERRED'),('withdrawn from the agenda','WITHDRAWN_FROM_AGENDA')):
             if term in low:out.append({'literal':re.search(re.escape(term),text,re.I).group(0),'classification':cls})
         if any(x in low for x in ('section 106','s106','s.106')):out.append({'literal':re.search(r'section 106|s106|s\.106',text,re.I).group(0),'classification':'S106_CONTEXT_REQUIRES_APPLICATION_ASSOCIATION'})
     return out
@@ -128,6 +129,7 @@ class Reader:
 
 
 def source_links(soup,url):
+    if len(soup.find_all('a',href=True,limit=MAX_LINKS+1))>MAX_LINKS:raise ValueError('link cap: INCOMPLETE')
     return [(a.get_text(' ',strip=True),urljoin(url,a.get('href','')),(a.find_parent('li') or a).get_text(' ',strip=True)) for a in soup.find_all('a',href=True)]
 
 
@@ -179,11 +181,13 @@ def assess(reader,council,checkpoint=lambda d:None):
                 for label,href,_ in links:
                     if '.pdf' not in href.lower() and 'mgConvert2PDF' not in href:continue
                     kind=role(label)
+                    if len(record['documents'])>=MAX_DOCUMENTS:raise ValueError('document record cap: INCOMPLETE')
                     record['documents'].append({'label':label[:100] if kind in ('SUPPLEMENTARY_UPDATE','COMMITTEE_MINUTES','AGENDA_PACK') else kind,'url':href,'type':kind,'publication_date':'UNKNOWN','inspected':False})
                     # Do not fetch packs, maps, plans, appeals or contacts. Only the
                     # named compact application index and supplementary evidence.
                     if (council=='bury' and re.match(r'^Planning Applications\b',label)) or kind=='SUPPLEMENTARY_UPDATE':selected.append((label,href,kind))
-                for label,href,kind in selected[:3]:
+                if len(selected)>MAX_DOCUMENTS_FOLLOWED:record['gap']='selected document cap: INCOMPLETE'
+                for label,href,kind in selected[:MAX_DOCUMENTS_FOLLOWED]:
                     doc=next(x for x in record['documents'] if x['url']==href)
                     try:
                         pdf,pm=reader.get(href,council,pdf=True);doc.update(inspected=True,sha256=pm['sha256'],pages=pm['pages'],references=refs(pdf,council),unassociated_signal_mentions=signals(pdf,kind))
@@ -197,7 +201,7 @@ def assess(reader,council,checkpoint=lambda d:None):
                                 ref=sections[i];part=sections[i+1]
                                 unit=re.search(r'(?i)\b(\d+)\s*(?:no\.?\s*)?(?:dwellings|apartments|flats)\b',part)
                                 rec=re.search(r'(?i)Recommendation:\s*([^\n]+)',part)
-                                details.append({'reference':ref,'units':int(unit.group(1)) if unit else None,'metric':'DWELLINGS' if unit else 'UNKNOWN','recommendation_literal':rec.group(1).split('Site Visit')[0].strip()[:80] if rec else 'UNKNOWN'})
+                                details.append({'reference':ref,'unit_mention':int(unit.group(1)) if unit else None,'metric':'UNQUALIFIED_LITERAL' if unit else 'UNKNOWN','unit_scope':'UNIT_SCOPE_UNKNOWN','recommendation_literal':rec.group(1).split('Site Visit')[0].strip()[:80] if rec else 'UNKNOWN'})
                             doc['indexed_application_details']=details
                     except Exception as e:doc['gap']=str(e)[:100]
                     checkpoint(out)
@@ -210,6 +214,13 @@ def assess(reader,council,checkpoint=lambda d:None):
     return out
 
 
+def bounded_checkpoint(path,data):
+    serialized=json.dumps(data,indent=2,sort_keys=True)+'\n'
+    if len(serialized.encode('utf-8'))>MAX_COUNCIL_OUTPUT:
+        raise ValueError('serialized output cap: INCOMPLETE; prior checkpoint preserved')
+    path.write_text(serialized)
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     import os
@@ -220,8 +231,8 @@ def main():
     a.output.mkdir();reader=Reader()
     try:
         for council in ROOTS:
-            d=assess(reader,council,lambda d:(a.output/(council+'.json')).write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')); (a.output/(council+'.json')).write_text(json.dumps(d,indent=2,sort_keys=True)+'\n')
+            d=assess(reader,council,lambda d:bounded_checkpoint(a.output/(council+'.json'),d)); bounded_checkpoint(a.output/(council+'.json'),d)
     finally:
-        reader.close();audit={'requests':reader.requests,'bytes':reader.bytes,'elapsed_seconds':round(time.monotonic()-reader.started,3),'cleanup':'SESSION_CLOSED','production_mutation':False,'model_calls':0,'records':reader.audit}
+        reader.close();audit={'requests':reader.requests,'bytes':reader.bytes,'elapsed_seconds':round(time.monotonic()-reader.started,3),'cleanup':'SESSION_CLOSED','production_mutation':False,'model_calls':0,'limits':{'requests':250,'bytes':128*1024*1024,'deadline_seconds':600,'meetings_per_council':30,'links_per_page':MAX_LINKS,'documents_per_meeting':MAX_DOCUMENTS,'documents_followed_per_meeting':MAX_DOCUMENTS_FOLLOWED,'references_per_document':200,'council_output_bytes':MAX_COUNCIL_OUTPUT},'records':reader.audit}
         (a.output/'resource.json').write_text(json.dumps(audit,indent=2,sort_keys=True)+'\n')
 if __name__=='__main__':main()

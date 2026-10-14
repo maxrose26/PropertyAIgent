@@ -35,3 +35,16 @@ def test_boundary_filtering_cancellation_and_gap_are_explicit():
     assert d['meetings'][1]['inspection']=='EXCLUDED_CANCELLED_OR_TRAINING'
     assert d['coverage']=='INCOMPLETE' and checkpoints
     assert d['future_meetings'][0]['date']=='2026-10-14'
+
+
+def test_non_final_mentions_and_output_link_bounds(tmp_path):
+    import pytest
+    from bs4 import BeautifulSoup
+    from verification.committee_assessment_once import source_links,bounded_checkpoint,MAX_LINKS,MAX_COUNCIL_OUTPUT
+    assert signals('minded to approve','COMMITTEE_MINUTES')[0]['classification']=='MINDED_TO_APPROVE_MENTION_NON_FINAL'
+    with pytest.raises(ValueError,match='link cap'):
+        source_links(BeautifulSoup('<a href="x">x</a>'*(MAX_LINKS+1),'html.parser'),'https://example.invalid/')
+    path=tmp_path/'checkpoint.json';path.write_text('preserved')
+    with pytest.raises(ValueError,match='output cap'):
+        bounded_checkpoint(path,{'data':'x'*MAX_COUNCIL_OUTPUT})
+    assert path.read_text()=='preserved'
