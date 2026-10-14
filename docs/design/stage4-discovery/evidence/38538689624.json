@@ -1,0 +1,293 @@
+{
+  "artifact_sha256": "bf04e0b845048be38e4072049fcebae206b7dafd900ceccee96c83386f7435fd",
+  "audit": {
+    "attempt": 1,
+    "code_sha": "4a0e80f968290d44bcff7b48e09749c7bfc4a653",
+    "execution_workflow": ".github/workflows/stage4-discovery-bolton-submit-once.yml",
+    "reused_recon_contract": {
+      "accounting_complete": true,
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_verified": true,
+      "code_sha": "4a0e80f968290d44bcff7b48e09749c7bfc4a653",
+      "council": "bolton",
+      "date_basis": "RECEIVED",
+      "elapsed_seconds": 3.633883,
+      "end_date": "2026-02-19",
+      "execution_time": "2026-10-14T08:57:00.596458+00:00",
+      "failure_reason": null,
+      "form": {
+        "action_path": "/online-applications/advancedSearchResults.do",
+        "controls": [
+          {
+            "classification": "REQUIRED_SERVER_STATE",
+            "disabled": false,
+            "field": "_csrf",
+            "ordinal": 0,
+            "populated": true
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "searchCriteria.reference",
+            "ordinal": 1,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 2,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "searchCriteria.description",
+            "ordinal": 3,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "searchCriteria.applicantName",
+            "ordinal": 4,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 5,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 6,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 7,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 8,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 9,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 10,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 11,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 12,
+            "populated": false
+          },
+          {
+            "classification": "APPROVED_FIXED_SOURCE_TYPE",
+            "disabled": false,
+            "field": "caseAddressType",
+            "ordinal": 13,
+            "populated": true
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "searchCriteria.address",
+            "ordinal": 14,
+            "populated": false
+          },
+          {
+            "classification": "APPROVED_DATE_INPUT",
+            "disabled": false,
+            "field": "date(applicationReceivedStart)",
+            "ordinal": 15,
+            "populated": false
+          },
+          {
+            "classification": "APPROVED_DATE_INPUT",
+            "disabled": false,
+            "field": "date(applicationReceivedEnd)",
+            "ordinal": 16,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "date(applicationValidatedStart)",
+            "ordinal": 17,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "date(applicationValidatedEnd)",
+            "ordinal": 18,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 19,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 20,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "date(applicationDecisionStart)",
+            "ordinal": 21,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "date(applicationDecisionEnd)",
+            "ordinal": 22,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 23,
+            "populated": false
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 24,
+            "populated": false
+          },
+          {
+            "classification": "APPROVED_FIXED_SOURCE_TYPE",
+            "disabled": false,
+            "field": "searchType",
+            "ordinal": 25,
+            "populated": true
+          },
+          {
+            "classification": "APPROVED_FIXED_SUBMIT_CONTROL",
+            "disabled": false,
+            "field": null,
+            "ordinal": 26,
+            "populated": true
+          },
+          {
+            "classification": "IGNORABLE_CONTROL",
+            "disabled": false,
+            "field": "org.apache.struts.taglib.html.CANCEL",
+            "ordinal": 27,
+            "populated": true
+          }
+        ],
+        "method": "POST",
+        "selected": true
+      },
+      "http_statuses": [
+        200,
+        200
+      ],
+      "manifest_version": "bolton-discovery-recon-v1",
+      "mode": "live",
+      "outcome": "RECOGNISED_RESULTS",
+      "persistence": false,
+      "received_bytes": 90565,
+      "redirects": 0,
+      "repository": "maxrose26/PropertyAIgent",
+      "requests": 2,
+      "result": {
+        "candidates": [
+          {
+            "reference": null,
+            "source_key": "TAP4X9DEGJJ00",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAP4X9DEGJJ00"
+          },
+          {
+            "reference": null,
+            "source_key": "TAP7R1DEGJM00",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAP7R1DEGJM00"
+          },
+          {
+            "reference": null,
+            "source_key": "TAPAO1DEGJP00",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPAO1DEGJP00"
+          },
+          {
+            "reference": null,
+            "source_key": "TAPD9ADEGJS00",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPD9ADEGJS00"
+          },
+          {
+            "reference": null,
+            "source_key": "TAPITJDEGJW00",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPITJDEGJW00"
+          },
+          {
+            "reference": null,
+            "source_key": "TAPOF1DEGK000",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPOF1DEGK000"
+          },
+          {
+            "reference": null,
+            "source_key": "TAPTY2DEGK400",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPTY2DEGK400"
+          },
+          {
+            "reference": null,
+            "source_key": "TAPWPUDEGK700",
+            "source_path": "/online-applications/applicationDetails.do?activeTab=summary&keyVal=TAPWPUDEGK700"
+          }
+        ],
+        "page_ordinal": 1,
+        "pagination_present": false,
+        "qualification": "FIRST_RESPONSE_ONLY_COMPLETENESS_UNPROVED",
+        "source_count": null
+      },
+      "retries": 0,
+      "start_date": "2026-02-19",
+      "workflow": ".github/workflows/bolton-discovery-recon.yml"
+    },
+    "run_id": "38538689624"
+  },
+  "run_id": 38538689624,
+  "supervisor": {
+    "no_retry": true,
+    "supervisor_returned": true,
+    "worker_exit": 0
+  }
+}

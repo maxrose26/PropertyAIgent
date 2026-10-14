@@ -1,0 +1,198 @@
+{
+  "artifact_sha256": "ce41457690da3bf2040850aa0e798a10b77cd2291f45eb9ae9547f6dc012498f",
+  "audit": {
+    "application_id": null,
+    "blocked_action_metadata": [
+      {
+        "argument_keys": [],
+        "contains_frozen_record_id": false,
+        "descriptor": "serviceComponent://ui.force.components.controllers.hostConfig.HostConfigController/ACTION$getConfigData",
+        "parameter_keys": [],
+        "token_state": "NULL"
+      },
+      {
+        "argument_keys": [],
+        "classname": "DSHLC_HeaderCont",
+        "contains_frozen_record_id": false,
+        "descriptor": "aura://ApexActionController/ACTION$execute",
+        "method": "isSelfRegistrationEnabled",
+        "namespace": "",
+        "parameter_keys": [
+          "cacheable",
+          "classname",
+          "isContinuation",
+          "method",
+          "namespace"
+        ],
+        "token_state": "NULL"
+      },
+      {
+        "argument_keys": [],
+        "classname": "DSHLC_ConfigSettings",
+        "contains_frozen_record_id": false,
+        "descriptor": "aura://ApexActionController/ACTION$execute",
+        "method": "getCouncilPrivacyPolicyURL",
+        "namespace": "",
+        "parameter_keys": [
+          "cacheable",
+          "classname",
+          "isContinuation",
+          "method",
+          "namespace"
+        ],
+        "token_state": "NULL"
+      },
+      {
+        "argument_keys": [],
+        "classname": "DSHLC_ConfigSettings",
+        "contains_frozen_record_id": false,
+        "descriptor": "aura://ApexActionController/ACTION$execute",
+        "method": "getCouncilCookieDetailsURL",
+        "namespace": "",
+        "parameter_keys": [
+          "cacheable",
+          "classname",
+          "isContinuation",
+          "method",
+          "namespace"
+        ],
+        "token_state": "NULL"
+      },
+      {
+        "argument_keys": [],
+        "classname": "DSHLC_ConfigSettings",
+        "contains_frozen_record_id": false,
+        "descriptor": "aura://ApexActionController/ACTION$execute",
+        "method": "getCouncilAccessibilityStatementURL",
+        "namespace": "",
+        "parameter_keys": [
+          "cacheable",
+          "classname",
+          "isContinuation",
+          "method",
+          "namespace"
+        ],
+        "token_state": "NULL"
+      },
+      {
+        "argument_keys": [],
+        "classname": "DSHLC_ConfigSettings",
+        "contains_frozen_record_id": false,
+        "descriptor": "aura://ApexActionController/ACTION$execute",
+        "method": "getCouncilTermsAndConditionsURL",
+        "namespace": "",
+        "parameter_keys": [
+          "cacheable",
+          "classname",
+          "isContinuation",
+          "method",
+          "namespace"
+        ],
+        "token_state": "NULL"
+      }
+    ],
+    "blocked_actions": [
+      "serviceComponent://ui.force.components.controllers.hostConfig.HostConfigController/ACTION$getConfigData",
+      "aura://ApexActionController/ACTION$execute"
+    ],
+    "blocked_posts": 3,
+    "case": "discovery_manchester_shape",
+    "cleanup": "CONTEXT_BROWSER_CLOSED",
+    "completeness": "UNKNOWN",
+    "date_semantics": "VALIDATED",
+    "decoded_bytes": 8994761,
+    "destination": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTI4IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wNCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+    "elapsed_seconds": 2.495,
+    "encoded_bytes": 1450092,
+    "endpoints": [
+      {
+        "method": "GET",
+        "origin": "https://arcusbe.manchester.gov.uk",
+        "path": "/pr/s/[page]",
+        "resource_type": "Document"
+      },
+      {
+        "method": "GET",
+        "origin": "https://arcusbe.manchester.gov.uk",
+        "path": "/pr/s/sfsites/[resource]",
+        "resource_type": "Script"
+      },
+      {
+        "method": "GET",
+        "origin": "https://arcusbe.manchester.gov.uk",
+        "path": "/pr/s/sfsites/[resource]",
+        "resource_type": "Stylesheet"
+      },
+      {
+        "method": "GET",
+        "origin": "https://arcusbe.manchester.gov.uk",
+        "path": "/pr/resource/[resource]",
+        "resource_type": "Image"
+      },
+      {
+        "method": "POST",
+        "origin": "https://arcusbe.manchester.gov.uk",
+        "path": "/pr/s/sfsites/aura",
+        "resource_type": "XHR"
+      },
+      {
+        "method": "GET",
+        "origin": "https://arcusbe.manchester.gov.uk",
+        "path": "/[resource]",
+        "resource_type": "Font"
+      }
+    ],
+    "exact_reference": false,
+    "failure": "UNREVIEWED_METHOD",
+    "fields": null,
+    "frame_kinds": [
+      {
+        "direct_child": true,
+        "kind": "BLANK"
+      },
+      {
+        "direct_child": true,
+        "kind": "BLANK"
+      }
+    ],
+    "host_config_http_probe": null,
+    "http_probe": null,
+    "live_owned_survivors": 0,
+    "local_frames": 2,
+    "name_http_probe": null,
+    "navigated_origins": [
+      "https://arcusbe.manchester.gov.uk"
+    ],
+    "navigation_mismatch": null,
+    "navigations": 1,
+    "network_classification": "UNKNOWN",
+    "owned_processes_seen": 8,
+    "pages": 1,
+    "peak_owned_rss": 726781952,
+    "persistence": false,
+    "process_cleanup": "CLOSED",
+    "purpose": "DISCOVERY_LISTING_RPC_SHAPE_ONLY",
+    "record_http_probe": null,
+    "redirects": 0,
+    "reference": null,
+    "requested_interval": [
+      "2026-09-28",
+      "2026-10-04"
+    ],
+    "requested_origins": [
+      "https://arcusbe.manchester.gov.uk"
+    ],
+    "requests": 16,
+    "responses": 7,
+    "safety_events": [],
+    "safety_failure": false,
+    "supervisor_limit_hit": false,
+    "supervisor_seconds": 2.731
+  },
+  "run_id": 38539358210,
+  "supervisor": {
+    "no_retry": true,
+    "supervisor_returned": true,
+    "worker_exit": 1
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "run_id": 38542739487,
+  "artifact_sha256": "c24a23ca4dfa4cf2084b1cc12251e7ba18e127631ca1608bfc49c743ebd21800",
+  "files": {
+    "audit.json": {
+      "case": "discovery_manchester_ui_window",
+      "application_id": null,
+      "reference": null,
+      "destination": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTI4IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wNCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "persistence": false,
+      "requests": 27,
+      "responses": 25,
+      "redirects": 0,
+      "decoded_bytes": 10855375,
+      "encoded_bytes": 1967209,
+      "pages": 1,
+      "navigations": 2,
+      "local_frames": 2,
+      "frame_kinds": [
+        {
+          "kind": "BLANK",
+          "direct_child": true
+        },
+        {
+          "kind": "BLANK",
+          "direct_child": true
+        }
+      ],
+      "requested_origins": [
+        "https://arcusbe.manchester.gov.uk"
+      ],
+      "navigated_origins": [
+        "https://arcusbe.manchester.gov.uk"
+      ],
+      "endpoints": [
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/pr/s/[page]",
+          "method": "GET",
+          "resource_type": "Document"
+        },
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/pr/s/sfsites/[resource]",
+          "method": "GET",
+          "resource_type": "Script"
+        },
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/pr/s/sfsites/[resource]",
+          "method": "GET",
+          "resource_type": "Stylesheet"
+        },
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/pr/resource/[resource]",
+          "method": "GET",
+          "resource_type": "Image"
+        },
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/pr/s/sfsites/aura",
+          "method": "POST",
+          "resource_type": "XHR"
+        },
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/[resource]",
+          "method": "GET",
+          "resource_type": "Font"
+        },
+        {
+          "origin": "https://arcusbe.manchester.gov.uk",
+          "path": "/pr/resource/[resource]",
+          "method": "GET",
+          "resource_type": "Stylesheet"
+        }
+      ],
+      "http_probe": null,
+      "record_http_probe": null,
+      "name_http_probe": null,
+      "host_config_http_probe": null,
+      "blocked_actions": [],
+      "blocked_action_metadata": [],
+      "blocked_posts": 0,
+      "failure": "LISTING_NOT_QUALIFIED",
+      "exact_reference": false,
+      "fields": null,
+      "cleanup": "CONTEXT_BROWSER_CLOSED",
+      "navigation_mismatch": null,
+      "network_classification": "UNKNOWN",
+      "safety_failure": true,
+      "safety_events": [
+        "LISTING_NOT_QUALIFIED"
+      ],
+      "purpose": "DISCOVERY_PUBLIC_UI_WINDOW",
+      "public_ui_posts": 11,
+      "completeness": "FAILED",
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "date_semantics": "VALIDATED",
+      "listing_segments": [],
+      "listing_records": [],
+      "applied_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "source_qualification": "CANDIDATE_PUBLIC_UI_CONTRACT",
+      "applied_evidence": "VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES",
+      "listing_failure": "Error",
+      "elapsed_seconds": 6.977,
+      "supervisor_seconds": 7.107,
+      "peak_owned_rss": 852500480,
+      "owned_processes_seen": 8,
+      "live_owned_survivors": 0,
+      "supervisor_limit_hit": false,
+      "process_cleanup": "CLOSED"
+    },
+    "supervisor.json": {
+      "worker_exit": 1,
+      "supervisor_returned": true,
+      "no_retry": true
+    }
+  }
+}

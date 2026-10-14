@@ -93,3 +93,37 @@ own Reference and Valid Date. The engineering worker captures only these fields
 and official record links initially, with explicit capture scope and potential
 materiality/unknown relationship. Omitted optional fields are not claimed absent.
 This remains an engineering window, not unseen acceptance.
+
+## PR76 live window results and bounded corrections
+
+PR76 merged c59f22228dcfc422ca9707236c5c23ca3a6d90b5 after seven successful
+exact-head hosted checks and independent limited-integration approval.
+Manchester run38542739487 reached public listing and retained criteria, then
+failed before any segment was accepted (generic Playwright Error; exact cause
+not established). 27 requests,10855375 decoded/1967209 encoded bytes,7.107s
+supervision,852500480 peak owned RSS,8 processes,0 survivors,cleanup CLOSED.
+No blocked POSTs or bypass. It remains FAILED, not enumeration-qualified.
+The correction replaces generic page-script extraction with bounded ordinary
+locators reading only Reference/Valid Date. Stage labels improve privacy-safe
+failure isolation; resource limits and identity/count rules are unchanged.
+
+Bolton run38542739658 stopped INCOMPLETE after a source key repeated across
+pages under the default Date Received ordering:3 requests,160110 bytes,6.283s,
+no retry,session/boundary CLOSED. It retained one accepted page and one partial
+row from page2; no completeness or applied-interval claim.
+A manual public UI check of the SAME frozen received week using the observed
+Ref.No. descending sort enumerated22 distinct references across1–10,11–20,21–22.
+The correction submits only the observed result-sort form, preserves10/page,
+requires retained Reference/Descending on each page, and retains all duplicate
+checks. Date ties are a plausible explanation, not a proven source diagnosis.
+
+Independent admission review found no material schema/B2 redesign necessary.
+It requires qualified source/record membership, durable evidence linked to
+application IDs, bounded caller orchestration, truthful initial-fact event
+semantics, and explicit later qualification. Omitted proposal now remains
+UNKNOWN, rather than claiming NOT_PRESENT without inspection. No production
+admission, source registry qualification, prospective freeze or acceptance.
+
+Bury ordinary public Weekly/Monthly Lists was inspected without submitting:
+it offers validated/decided weeks, not a separate published received list.
+This is source-option evidence only, not council qualification.

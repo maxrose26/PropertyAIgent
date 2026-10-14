@@ -11,6 +11,7 @@ import time
 from urllib.parse import urlencode
 import requests
 from app.scrapers.discovery_idox import parse_page, ListingError
+from .idox_sort import sort_payload, require_reference_sort
 from verification.bolton_recon.recon import form_payload, FORM_URL, POST_URLS, Failure
 from verification.stage26b_l1.request_boundary import Boundary, Budget, Policy, BoundaryFailure
 
@@ -34,7 +35,7 @@ class WindowBoundary(Boundary):
         self.budget.check()
         if self.closed: self.budget.reject('PARTIAL_RETRIEVAL','closed')
         allowed=((self.phase=='FORM' and method=='GET' and url==FORM_URL and body is None)
-            or (self.phase=='SEARCH' and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)
+            or (self.phase in {'SEARCH','SORT'} and method=='POST' and url==self.admitted_post and body==self.admitted_body and body is not None)
             or (self.phase=='PAGE' and method=='GET' and url==self.next_url and self.next_url is not None and body is None)
             or (self.phase=='REFINE' and method=='GET' and url==self.policy.base_url+'/refineSearch.do?action=refine' and body is None))
         if not allowed: self.budget.reject('PARTIAL_RETRIEVAL','window request not admitted')
@@ -60,8 +61,15 @@ def run(dispatch):
         payload.clear()
         html=b.retrieve('POST',target,b.admitted_body)
         b.admitted_body=None
+        target,payload=sort_payload(html,b.policy.base_url)
+        b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SORT'
+        payload.clear()
+        html=b.retrieve('POST',target,b.admitted_body)
+        b.admitted_body=None
+        out['sort']='REFERENCE_DESCENDING'
         keys=set(); refs={}; total=None; seen=0
         for ordinal in range(1,MAX_PAGES+1):
+            require_reference_sort(html)
             p=parse_page(html,COUNCIL,ordinal,START,END)
             if p.total is not None:
                 if total is not None and total!=p.total: raise ListingError('changing source count')
@@ -134,7 +142,7 @@ def main():
     if subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=sha: raise ValueError('candidate mismatch')
     if a.worker:
         result=live()
-        result.update(code_sha=sha,run_id=run_id,attempt=1,
+        result.update(code_sha=sha,run_id=run_id,attempt=1,validation_revision=2,
             execution_workflow='.github/workflows/stage4-discovery-bolton-window-once.yml')
         raw=json.dumps(result,sort_keys=True).encode()
         if len(raw)>512000: raise ValueError('audit output bound')

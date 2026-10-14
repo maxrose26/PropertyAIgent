@@ -234,7 +234,7 @@ class DiscoveryEnvelope:
             raise ValueError('application role')
 
     def audit(self, known: frozenset[tuple[str, str]]) -> dict:
-        proposal = dict(self.fields).get('proposal', Literal('NOT_PRESENT', None, 'proposal'))
+        proposal = dict(self.fields).get('proposal', Literal('UNKNOWN', None, 'capture-scope:proposal-unobserved'))
         return {'council': self.council, 'reference': self.reference,
                 'source': self.source_url, 'source_record_id': self.source_record_id,
                 'discovered_at': self.discovered_at.isoformat(), 'run_id': self.window.run_id,

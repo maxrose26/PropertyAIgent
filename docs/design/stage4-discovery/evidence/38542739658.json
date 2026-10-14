@@ -1,0 +1,124 @@
+{
+  "run_id": 38542739658,
+  "artifact_sha256": "95760db0531852b155e1176a60b6c05ceac4a3aea8e5959a03c3cd58de2860bf",
+  "files": {
+    "audit.json": {
+      "applied_interval": null,
+      "attempt": 1,
+      "capped": false,
+      "cleanup": "SESSION_BOUNDARY_CLOSED",
+      "code_sha": "c59f22228dcfc422ca9707236c5c23ca3a6d90b5",
+      "completeness": "INCOMPLETE",
+      "council": "bolton",
+      "date_semantics": "RECEIVED",
+      "execution_workflow": ".github/workflows/stage4-discovery-bolton-window-once.yml",
+      "failure": "ListingError:repeated source key across pages",
+      "pages": [
+        {
+          "body_sha256": "fcad073a1ead464a1047c3c4ba2eaf9324c6ea45555e02bd3c96c0426378461e",
+          "first": 1,
+          "last": 10,
+          "ordinal": 1,
+          "rows": 10,
+          "terminal": null,
+          "total": 22
+        }
+      ],
+      "persistence": false,
+      "records": [
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01790/26",
+          "source_key": "TMA9MQDEKI200",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01787/26",
+          "source_key": "TM9VQ2DEKHR00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01797/26",
+          "source_key": "TMFQF4DE03B00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01786/26",
+          "source_key": "TM9T1HDEKHO00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01784/26",
+          "source_key": "TM7YC9DEKH500",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01783/26",
+          "source_key": "TM7VQZDEKH200",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01782/26",
+          "source_key": "TM7VQMDEKH000",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01785/26",
+          "source_key": "TM8139DEKH800",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01780/26",
+          "source_key": "TM6SO1DEKGU00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01776/26",
+          "source_key": "TM63LBDEKGD00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary"
+        },
+        {
+          "identity_state": "PRESENT_VALUE",
+          "reference": "01778/26",
+          "source_key": "TM6N2ADEKGO00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary"
+        }
+      ],
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "resource": {
+        "adapter": "idox",
+        "budget_exhaustion": false,
+        "council": "bolton",
+        "elapsed_seconds": 6.283,
+        "outcome": "INCOMPLETE",
+        "received_bytes": 160110,
+        "redirects": 0,
+        "reference": "received:2026-09-28:2026-10-04",
+        "requests_attempted": 3,
+        "retries": 0
+      },
+      "run_id": "38542739658",
+      "source_qualification": "CANDIDATE_CONTRACT",
+      "supervisor": {
+        "expired": false,
+        "returned": true,
+        "transport_retry_limit": 1,
+        "worker_exit": 0,
+        "worker_restarted": false
+      }
+    }
+  },
+  "minimization": "Proposal/address omitted; original ZIP hash retained."
+}
