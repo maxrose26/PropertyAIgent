@@ -22,6 +22,8 @@ CASES = {
 }
 from verification.direct_reference.arcus_manifest import case_definitions
 CASES.update(case_definitions())
+from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
+CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
 MAX_BYTES = 20 * 1024 * 1024
 MAX_REQUESTS = 80
 MAX_SECONDS = 45
@@ -222,6 +224,10 @@ async def probe(case):
                  http_probe=None, record_http_probe=None, name_http_probe=None, host_config_http_probe=None, blocked_actions=[], blocked_action_metadata=[], blocked_posts=0, failure=None, exact_reference=False, fields=None,
                  cleanup='UNKNOWN', navigation_mismatch=None, network_classification='UNKNOWN',
                  safety_failure=False, safety_events=[])
+    if case == DISCOVERY_CASE:
+        audit.update(purpose='DISCOVERY_LISTING_RPC_SHAPE_ONLY',
+                     requested_interval=['2026-09-28', '2026-10-04'],
+                     date_semantics='VALIDATED', completeness='UNKNOWN')
     started = time.monotonic()
     browser = context = None
     stopped = asyncio.Event()
@@ -260,6 +266,11 @@ async def probe(case):
             reason = request_failure(url, request['method'], event.get('resourceType'), destination, audit['requests'])
             if reason == 'UNREVIEWED_METHOD':
                 audit['blocked_posts'] += 1
+                if case == DISCOVERY_CASE:
+                    # Shape-only observation: no public RPC is sent and no
+                    # application identity/fields are asserted.
+                    await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+                    return
                 metadata = post_metadata(request.get('postData'), destination)
                 from verification.direct_reference.arcus_http_probe import observed_guest_read, MAX_BODY, fact_read_candidate, HOST_CONFIG_GETTER
                 slot = None
@@ -389,9 +400,14 @@ async def probe(case):
                     await asyncio.gather(nav, return_exceptions=True)
                 else:
                     await nav
+                    if case == DISCOVERY_CASE:
+                        # Observe bootstrap metadata only; never inspect application DOM.
+                        until = time.monotonic() + 8
+                        while not stopped.is_set() and not audit['blocked_action_metadata'] and time.monotonic() < until:
+                            await asyncio.sleep(.2)
                     # Read only relevant labels; never export whole HTML/body or people.
                     until = time.monotonic() + 8
-                    while not stopped.is_set() and time.monotonic() < until:
+                    while case != DISCOVERY_CASE and not stopped.is_set() and time.monotonic() < until:
                         pairs = await page.evaluate("""() => {
                           const labels = new Set(['Reference','Status','Decision','Decision notice sent date','Decision date','Decision Issued Date']);
                           const out=[], nodes=[];
