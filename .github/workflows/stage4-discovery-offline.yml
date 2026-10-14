@@ -36,7 +36,7 @@ jobs:
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
       - name: Rejected evidence audit, network denied
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_rejection_audit.py tests/test_discovery_manchester_145583.py -q
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_rejection_audit.py tests/test_discovery_material_qualification.py -q
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -24,6 +24,8 @@ from verification.direct_reference.arcus_manifest import case_definitions
 CASES.update(case_definitions())
 from verification.discovery.committee_exact import case_definitions as committee_case_definitions
 CASES.update(committee_case_definitions())
+from verification.discovery.material_qualification import case_definitions as material_case_definitions, IDOX_CASES
+CASES.update(material_case_definitions())
 from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
 CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
 from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed
@@ -525,7 +527,9 @@ def supervised(case, output, execution_mode="github-hosted"):
                    PYTHONNOUSERSITE='1', PYTHONDONTWRITEBYTECODE='1')
         # Browser package cache only; no inherited database, model or GitHub credentials.
         env['PLAYWRIGHT_BROWSERS_PATH'] = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', str(Path.home()/'.cache/ms-playwright'))
-        child = subprocess.Popen([sys.executable, '-m', 'verification.direct_reference.instrumented_probe', '--worker', '--case', case,
+        worker_module = ('verification.discovery.material_qualification' if case in IDOX_CASES
+                         else 'verification.direct_reference.instrumented_probe')
+        child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
                                   '--output', str(child_output)], env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)

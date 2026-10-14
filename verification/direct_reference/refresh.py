@@ -165,7 +165,12 @@ def retrieve(application_id, *, session_factory, budget):
     Invoke under the disposable-worker supervisor for an independent deadline.
     There is no search, redirect following, document or browser path.
     """
-    row = admitted_row(application_id)
+    return _retrieve_row(admitted_row(application_id), application_id, session_factory=session_factory, budget=budget)
+
+
+def _retrieve_row(row, application_id, *, session_factory, budget):
+    """Same transport/parser; only reviewed fixed callers supply a row."""
+    validate_destination(row)
     budget.check()
     if budget.rows >= 20:
         fail('PARTIAL_RETRIEVAL', 'Reference ceiling')

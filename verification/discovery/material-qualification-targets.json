@@ -1,0 +1,66 @@
+{
+  "purpose": "Credential-free fixed-five source qualification ONLY; not an admission cohort",
+  "owner_absence_timestamp": "2026-10-14 22:46:16.98426+00",
+  "targets": [
+    {
+      "council": "bolton",
+      "reference": "21080/25",
+      "source_identifier": "T2ZPN1DE02800",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T2ZPN1DE02800",
+      "case": "material_qualification_1",
+      "platform_family": "IDOX",
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "qualification_state": "FRESH_QUALIFICATION_REQUIRED",
+      "retained_materiality": "POTENTIALLY_MATERIAL"
+    },
+    {
+      "case": "material_qualification_2",
+      "council": "manchester",
+      "reference": "143413/FO/2025",
+      "source_identifier": "a1DSl000007GOKjMAO",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOKjMAO?c__r=Arcus_BE_Public_Register",
+      "trigger_url": "https://democracy.manchester.gov.uk/documents/s65713/Ryebank%20Fields.pdf",
+      "trigger_sha256": "986f3f08cee1afb95c7ee08b5dfddfef9f7d8bf65184639e405a9f2202dc751f",
+      "portal_identity_evidence": "Independent exact heading and reference-labelled official result observed in ordinary public browser",
+      "portal_evidence_fingerprint": "3989d477008398aab4bf1f4f4cdb4cb2e46ba962f8829e55f6e7f1b74e2a1020",
+      "platform_family": "ARCUS",
+      "qualification_state": "FRESH_QUALIFICATION_REQUIRED",
+      "retained_materiality": "POTENTIALLY_MATERIAL"
+    },
+    {
+      "case": "material_qualification_3",
+      "council": "manchester",
+      "reference": "145583/FO/2026",
+      "source_identifier": "a1DSl000007GOGYMA4",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007GOGYMA4?c__r=Arcus_BE_Public_Register",
+      "trigger_url": "https://democracy.manchester.gov.uk/documents/s65746/Rochdale%20Road.pdf",
+      "trigger_sha256": "963cdc577792e0cd4c2ee707820a40d51d0d1da881118d0bff535266d2577307",
+      "portal_identity_evidence": "Independent exact heading and reference-labelled official result observed in ordinary public browser",
+      "portal_evidence_fingerprint": "cf84d5dbe6450d759cd19a999c3489c8dea33b9cfecba608865a02b518d20786",
+      "platform_family": "ARCUS",
+      "qualification_state": "FRESH_QUALIFICATION_REQUIRED",
+      "retained_materiality": "CONFIRMED_MATERIAL"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2025/1664",
+      "source_identifier": "a0kSq00000BFV6nIAH",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq00000BFV6nIAH?c__r=Arcus_BE_Public_Register",
+      "case": "material_qualification_4",
+      "platform_family": "ARCUS",
+      "qualification_state": "FRESH_QUALIFICATION_REQUIRED",
+      "retained_materiality": "POTENTIALLY_MATERIAL"
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00396/FUL",
+      "source_identifier": "TEMF1DPUG6P00",
+      "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TEMF1DPUG6P00",
+      "case": "material_qualification_5",
+      "platform_family": "IDOX",
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "qualification_state": "FRESH_QUALIFICATION_REQUIRED",
+      "retained_materiality": "POTENTIALLY_MATERIAL"
+    }
+  ]
+}
