@@ -1,0 +1,38 @@
+{
+  "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+  "attempt": 1,
+  "body_sha256": "1c6ac732233eb3db6288c5e6e8967595201d1549759245b22bc3d956e6908b72",
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "86ff64c2b8babc271e4c90ae02777905cbc1dd86",
+  "council": "wigan",
+  "failure": null,
+  "forms": 1,
+  "html_closing_count": 1,
+  "media_type": "text/html;charset=ISO-8859-1",
+  "persistence": false,
+  "purpose": "FORM_SHAPE_DIAGNOSIS",
+  "received_date_forms": 1,
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "wigan",
+    "elapsed_seconds": 2.039,
+    "outcome": "UNKNOWN",
+    "received_bytes": 57725,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "requests_attempted": 1,
+    "retries": 0
+  },
+  "run_id": "38553113416",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "trailing_comment_count": 0,
+  "trailing_element_names": [],
+  "trailing_nonwhitespace": false,
+  "utf8": false
+}

@@ -155,3 +155,21 @@ def parse_page(body: bytes, council: str, ordinal: int, start: date, end: date, 
         # A short first page without a total is not independently complete.
         require(ordinal==1 and not next_url,'missing pager')
     return ListingPage(tuple(rows),first,last,total,next_url,size,terminal,hashlib.sha256(body).hexdigest())
+
+
+def explicit_zero(body,council):
+    """Observed Bury no-results form. Date echo is separately required by caller."""
+    if council!='bury':return False
+    require(type(body) is bytes and 0<len(body)<=MAX_BODY,'body bound')
+    try:html=body.decode('utf-8',errors='strict')
+    except UnicodeError:raise ListingError('encoding') from None
+    require(re.search(r'</html\s*>\s*$',html,re.I),'truncated document')
+    soup=BeautifulSoup(html,'html.parser')
+    matches=[li for li in soup.find_all('li') if text(li)=='No results found.']
+    if not matches:return False
+    require(len(matches)==1 and not soup.select('#searchresults') and not soup.find('base'),'ambiguous zero')
+    boxes=soup.select('div.messagebox')
+    require(len(boxes)==1 and matches[0].find_parent('div',class_='messagebox') is boxes[0],'zero error container')
+    require([text(x) for x in boxes[0].select('li')]==['No results found.'] and len(boxes[0].select('ul'))==1,'zero/error conflict')
+    require([text(x) for x in soup.select('h1')]==['Planning – Applications Search'] and [text(x) for x in boxes[0].select('h2')]==['Please check the search criteria:'],'zero heading')
+    return True

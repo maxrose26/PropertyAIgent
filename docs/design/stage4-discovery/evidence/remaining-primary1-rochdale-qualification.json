@@ -1,0 +1,9 @@
+{
+  "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+  "completeness": "UNKNOWN",
+  "outcome": "PUBLIC_UI_COUNT_AND_IDENTITY_QUALIFIED",
+  "production_admission": false,
+  "records": 12,
+  "segments": 2,
+  "source_registry_qualified": false
+}

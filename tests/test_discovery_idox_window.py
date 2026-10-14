@@ -78,3 +78,33 @@ def test_sort_preserves_returned_hidden_state_without_inventing_values():
     _,payload=sort_payload(body,'https://paplanning.bolton.gov.uk/online-applications')
     assert payload['action']=='source-state' and payload['searchCriteria.page']=='source-page-state'
     assert payload['orderBy']=='Reference' and payload['searchCriteria.resultsPerPage']=='10'
+
+
+def test_bury_zero_requires_independently_echoed_dates():
+    from verification.discovery.idox_window import WindowConfig
+    config=WindowConfig('bury')
+    echo=FORM.replace(b'name="date(applicationReceivedStart)" value=""',b'name="date(applicationReceivedStart)" value="28/09/2026"').replace(b'name="date(applicationReceivedEnd)" value=""',b'name="date(applicationReceivedEnd)" value="04/10/2026"')
+    zero=echo.replace(b'</html>','<h1>Planning – Applications Search</h1><div class="messagebox"><h2>Please check the search criteria:</h2><ul><li>No results found.</li></ul></div></html>'.encode())
+    for body,ok in ((zero,True),(zero.replace(b'04/10/2026',b'05/10/2026'),False)):
+        calls=[]
+        def dispatch(method,url,**kw):
+            calls.append((method,url));return Response(FORM if len(calls)==1 else body)
+        audit=run(dispatch,config)
+        assert (audit['failure'] is None)==ok
+        if ok:assert audit['unique_references']==0 and audit['explicit_zero_evidence'] and audit['completeness']=='UNKNOWN'
+        assert len(calls)==2
+
+
+def test_wigan_declared_encoding_is_not_guessed_and_hashes_original():
+    from verification.discovery.idox_window import WindowConfig
+    body='<html><p>é</p></html>'.encode('iso-8859-1')
+    response=Response(body);response.headers={'Content-Type':'text/html;charset=ISO-8859-1'}
+    b=WindowBoundary(lambda *a,**k:response,WindowConfig('wigan'))
+    assert b.retrieve('GET',b.config.form_url)==body.decode('iso-8859-1').encode('utf-8')
+    assert b.response_provenance[0]['source_encoding']=='ISO-8859-1'
+    assert b.response_provenance[0]['body_sha256']!=b.response_provenance[0]['parser_body_sha256']
+    response=Response(body);response.headers={'Content-Type':'text/html;charset=unqualified'}
+    b=WindowBoundary(lambda *a,**k:response,WindowConfig('wigan'))
+    from verification.stage26b_l1.request_boundary import BoundaryFailure
+    with __import__('pytest').raises(BoundaryFailure):b.retrieve('GET',b.config.form_url)
+    assert response.closed

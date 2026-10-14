@@ -244,3 +244,29 @@ formshapeGET are prepared sequentially. Wiganrequestbudget1 blocks anysecond
 source request; onlyUTF8/endHTML/formcounts/media-type/hash retained, noHTML.
 52focused tests pass; reviewrequired beforeintegration. NoBolton/Manchester
 rerun. No production, models, documents or schedules.
+
+## PR81 source results and final encoding/empty-window correction
+
+PR81 merge86ff64c2b8babc271e4c90ae02777905cbc1dd86 followed six exact-head
+passed workflows; Arcus branch-specific workflow skipped. Independent review
+approved52focusedtests. Run38553113416 succeeded: Bury18refs/2pages/5requests/
+187060bytes/8.072seconds; Rochdale12refs/2pages/36requests/11308192decoded+
+190561outboundbytes/6.257supervisorseconds; Salford26refs/3pages/34requests/
+12608397decoded+183002outboundbytes/3.984supervisorseconds. No retries forBury;
+Arcuszero survivingprocesses, allcleanupCLOSED. SalfordrowValidDateUNKNOWN,
+windowmembershipfromqualifiedretainedcriteria; no fabricatedoptionaldate.
+
+WiganoneGET received57725bytes in2.039seconds,declaredISO-8859-1,notUTF8;
+oneHTMLclosingtag,notrailingcontent,oneformwithreceivedfields. This isolates
+the reader's encoding mismatch. Wigan-only adaptation uses the source's explicit
+charset, records raw and parser-input hashes, preserves raw byte accounting and
+parser500kbound. No guessing/fallback for unqualifiedcharsets.
+
+BuryordinaryUI explicitzero check was predeclared30November2026receivedday.
+Observed one div.messagebox, headingPleasechecksearchcriteria and soleNoresults
+found message, same dates retained. Bury-onlyzero projection requires that exact
+errorarea and independentlyechoedstrictformdates. Additionalerrorlists/boxes
+failclosed. Independentreviewapproved28focusedIdoxtests; encoding addition
+brings affectedtests to30. Other unqualifiedzero shapes remainFAILED/UNKNOWN,
+never silentlyCOMPLETE. One finalWiganweek andBuryemptyshape worker prepared;
+no other council rerun, no production.

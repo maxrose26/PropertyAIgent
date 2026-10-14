@@ -1,0 +1,42 @@
+name: Stage4 Wigan and explicit zero discovery qualification ONCE
+on:
+  push:
+    branches: [master]
+    paths: ['.github/workflows/stage4-discovery-wigan-final-once.yml']
+permissions:
+  contents: read
+concurrency:
+  group: stage4-discovery-source-qualification
+  cancel-in-progress: false
+jobs:
+  windows:
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+      - name: Relevant offline acceptance
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py tests/test_discovery_remaining_source.py verification/bolton_recon/test_recon.py -q
+      - name: Fixed Wigan week and Bury explicit-zero window
+        env:
+          CANDIDATE: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir "$RUNNER_TEMP/discovery-final-idox"
+          failed=0
+          for case in wigan bury-zero; do
+            timeout --kill-after=2s 60s env -i HOME="$HOME" PATH=/usr/bin:/bin DISCOVERY_CANDIDATE_SHA="$CANDIDATE" DISCOVERY_RUN_ID="$RUN_ID" "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.discovery.remaining_source_once --case "$case" --output "$RUNNER_TEMP/discovery-final-idox/${case}.json" || failed=1
+          done
+          test "$failed" -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-final-idox-${{ github.run_id }}-${{ github.sha }}
+          path: ${{ runner.temp }}/discovery-final-idox/*.json
+          retention-days: 14
+          if-no-files-found: error

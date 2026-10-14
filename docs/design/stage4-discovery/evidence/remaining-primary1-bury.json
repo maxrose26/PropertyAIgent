@@ -1,0 +1,175 @@
+{
+  "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+  "applied_evidence_sha256": "841220f83ab87818f2625357136ead50816225a39c9c40dac6e7fe4fb51758a6",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "86ff64c2b8babc271e4c90ae02777905cbc1dd86",
+  "completeness": "UNKNOWN",
+  "council": "bury",
+  "date_semantics": "RECEIVED",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "failure": null,
+  "pages": [
+    {
+      "body_sha256": "dad8dc3861cfa26f02111d962cd9a9b513f003d43a5189e0f8f66d59914f09fa",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "rows": 10,
+      "terminal": null,
+      "total": 18
+    },
+    {
+      "body_sha256": "3eb33d03c8a34b467be589d129a1dbe521aac7cc33b343f6d9a215c865ed26de",
+      "first": 11,
+      "last": 18,
+      "ordinal": 2,
+      "rows": 8,
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+      "total": 18
+    }
+  ],
+  "persistence": false,
+  "records": [
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73718",
+      "source_key": "_BURY_DCAPR_65225",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65225&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73716",
+      "source_key": "_BURY_DCAPR_65221",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65221&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73713",
+      "source_key": "_BURY_DCAPR_65217",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65217&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73710",
+      "source_key": "_BURY_DCAPR_65212",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65212&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73709",
+      "source_key": "_BURY_DCAPR_65211",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65211&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73708",
+      "source_key": "_BURY_DCAPR_65210",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65210&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73707",
+      "source_key": "_BURY_DCAPR_65209",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65209&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73705",
+      "source_key": "_BURY_DCAPR_65207",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65207&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73704",
+      "source_key": "_BURY_DCAPR_65206",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65206&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73702",
+      "source_key": "_BURY_DCAPR_65204",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65204&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73701",
+      "source_key": "_BURY_DCAPR_65203",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65203&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73700",
+      "source_key": "_BURY_DCAPR_65202",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65202&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73699",
+      "source_key": "_BURY_DCAPR_65201",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65201&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73698",
+      "source_key": "_BURY_DCAPR_65199",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65199&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73697",
+      "source_key": "_BURY_DCAPR_65198",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65198&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73696",
+      "source_key": "_BURY_DCAPR_65197",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65197&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73695",
+      "source_key": "_BURY_DCAPR_65196",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65196&activeTab=summary"
+    },
+    {
+      "identity_state": "PRESENT_VALUE",
+      "reference": "73694",
+      "source_key": "_BURY_DCAPR_65195",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65195&activeTab=summary"
+    }
+  ],
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "bury",
+    "elapsed_seconds": 8.072,
+    "outcome": "UNKNOWN",
+    "received_bytes": 187060,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "requests_attempted": 5,
+    "retries": 0
+  },
+  "run_id": "38553113416",
+  "sort": "REFERENCE_DESCENDING",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "unique_references": 18
+}
