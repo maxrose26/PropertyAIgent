@@ -27,8 +27,6 @@ def sort_payload(body, base):
         elif c.name=='input' and kind=='hidden' and name in {'_csrf','searchCriteria.page','action'}:
             v=c.get('value','')
             if not isinstance(v,str) or len(v)>1024 or any(ord(x)<32 for x in v): raise ListingError('sort hidden bound')
-            if name in {'action','searchCriteria.page'} and v!={'action':'order','searchCriteria.page':'1'}[name]:
-                raise ListingError('sort operation/page')
             payload[name]=v
         else: raise ListingError('unexpected sort control')
     if set(payload)!=set(wanted)|{'_csrf','searchCriteria.page','action'}: raise ListingError('sort control set')

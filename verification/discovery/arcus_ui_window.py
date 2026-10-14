@@ -68,7 +68,7 @@ async def read_cards(page):
         if await items.count()>20: raise ValueError('field count')
         fields=[]
         for name in ('Reference','Valid Date'):
-            field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name)+r'\b',re.I))
+            field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name),re.I))
             if await field.count()!=1: raise ValueError('field label count')
             text=await field.inner_text(timeout=1500)
             parts=text.strip().split('\n',1)

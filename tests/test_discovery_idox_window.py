@@ -69,7 +69,12 @@ def test_sort_form_is_bound_and_unknown_controls_fail_closed():
     assert payload['orderBy']=='Reference'
     for b in (page().replace(b'/online-applications/pagedSearchResults.do',b'https://evil.example/submit'),
               page().replace(b'</form>',b'<input name="arbitrary" value="x"></form>'),
-              page().replace(b'value="Reference"',b'value="Other"'),
-              page().replace(b'name="action" value="order"',b'name="action" value="other"'),
-              page().replace(b'name="searchCriteria.page" value="1"',b'name="searchCriteria.page" value="2"')):
+              page().replace(b'value="Reference"',b'value="Other"')):
         with pytest.raises(ListingError):sort_payload(b,base)
+
+
+def test_sort_preserves_returned_hidden_state_without_inventing_values():
+    body=page().replace(b'name="action" value="order"',b'name="action" value="source-state"').replace(b'name="searchCriteria.page" value="1"',b'name="searchCriteria.page" value="source-page-state"')
+    _,payload=sort_payload(body,'https://paplanning.bolton.gov.uk/online-applications')
+    assert payload['action']=='source-state' and payload['searchCriteria.page']=='source-page-state'
+    assert payload['orderBy']=='Reference' and payload['searchCriteria.resultsPerPage']=='10'
