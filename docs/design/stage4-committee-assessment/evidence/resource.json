@@ -1,0 +1,509 @@
+{
+  "bytes": 10515861,
+  "cleanup": "SESSION_CLOSED",
+  "elapsed_seconds": 87.184,
+  "limits": {
+    "bytes": 134217728,
+    "council_output_bytes": 2097152,
+    "deadline_seconds": 600,
+    "documents_followed_per_meeting": 3,
+    "documents_per_meeting": 80,
+    "links_per_page": 2000,
+    "meetings_per_council": 30,
+    "references_per_document": 200,
+    "requests": 250
+  },
+  "model_calls": 0,
+  "production_mutation": false,
+  "records": [
+    {
+      "bytes": 4096,
+      "council": "bolton",
+      "failure": "ValueError:HTTP_403",
+      "http_status": 403,
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://bolton.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=140"
+    },
+    {
+      "bytes": 19486,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "e7d1319060ab2e6a2fcede5ab38516e92d50c686bd1120b4cf2bdfdd5d237f1e",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListMeetings.aspx?CommitteeId=134"
+    },
+    {
+      "bytes": 36761,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "af8a21a78697ce63d93f46f531babce94d3d6ce1f9aa2f1668cd0575d6f4ac2c",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4022&Ver=4"
+    },
+    {
+      "bytes": 682364,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 22,
+      "purpose": "NAMED_PDF",
+      "sha256": "fe28bf32265e0bf128b9aa662bbba7021b60009e67e209d09524c12124b3554d",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12318/Supplementary Agenda Information 21st-Oct-2025 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 108932,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 4,
+      "purpose": "NAMED_PDF",
+      "sha256": "d2c1a85d84133a8379fbfe089938396d71890e04ecfc5abd9286af180ac9c5e2",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s46543/Final Index.pdf"
+    },
+    {
+      "bytes": 33591,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "2959d1945019a584fa2c66e9df3f473db11d098fc9a4e31f1dc97481f1decc42",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4023&Ver=4"
+    },
+    {
+      "bytes": 151992,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 8,
+      "purpose": "NAMED_PDF",
+      "sha256": "ea987c056c7d986ee25a18897ac09026dbc9db0a9c1f22af02600a4cc3a2cf57",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12352/Supplementary Planning Information 18th-Nov-2025 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 103267,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "8130076a928e80929d5979f1749f512251552925c1afc0b2929e6c93bb3153cd",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s46882/Final Index.pdf"
+    },
+    {
+      "bytes": 38235,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "9f2fdac7c1f52ebc4ccc0185a643923971ed7f4b9465d0500dd41d84a42b530b",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4024&Ver=4"
+    },
+    {
+      "bytes": 775636,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 14,
+      "purpose": "NAMED_PDF",
+      "sha256": "ef8a6d16b287993b4877db96ccb53ce4b86c662413002ef9d9dbe867b2cfb4c2",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12386/Supplementary Planning Information 16th-Dec-2025 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 77785,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "39da8a6235c82ad1bd8bdc227b27b45f3f144c74afdab14999a793e9d813b63e",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s47345/Final Index.pdf"
+    },
+    {
+      "bytes": 727929,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 12,
+      "purpose": "NAMED_PDF",
+      "sha256": "795c09018bf3f168ab2157a66ad1413fc2834f665eafdf86eaf0390dba0e97ba",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s47454/PCC 16-12-25 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 33758,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "3e9a68a49ae49a8fc0a2cad88789b61a133799cf4dc6ab976a21877bb6762fb9",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4025&Ver=4"
+    },
+    {
+      "bytes": 164620,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 8,
+      "purpose": "NAMED_PDF",
+      "sha256": "53351b5d7fd7ad8120c5a6022a53eefc2b380a19aa085457fc4fb64b83241058",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12432/Supplementary Planning Information 27th-Jan-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 102414,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "897431a42415f4cabbb91eefc211cad71bf778b5953ae391f310fc7e26279fb0",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s47768/Final Index.pdf"
+    },
+    {
+      "bytes": 116729,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 5,
+      "purpose": "NAMED_PDF",
+      "sha256": "5c1711b08fa37fdfbac6643e4c3052577c6eefe8057d3dc3dbb6994a49b5e89c",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s47831/PCC 27-01-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 36017,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "49dab70eecdb275a9caf657be24850f063cae2eac8c05cdba1b641c37a9d1d7b",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4026&Ver=4"
+    },
+    {
+      "bytes": 340403,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 8,
+      "purpose": "NAMED_PDF",
+      "sha256": "b8123175383257523456de8bc302a1079d77e118ddf8ec9f113db737fdcfe0db",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12481/Supplementary Planning Information 24th-Feb-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 75900,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "6604d6fbafa9ca7fe57481a52309ec0c2ec369a8e861ac680aad6237fd18193d",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s48207/Agenda item 4- Final Index.pdf"
+    },
+    {
+      "bytes": 289197,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 5,
+      "purpose": "NAMED_PDF",
+      "sha256": "f888e9edd5a903029f8d57423f5d824a3825ee3df564b0c04101a5671726ab2e",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s48332/PCC 24-02-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 34634,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "c99bcb8a83147f6a07a10c9e7195b8f992266894d45096fb6cccb676ac0f2879",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4027&Ver=4"
+    },
+    {
+      "bytes": 831993,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 12,
+      "purpose": "NAMED_PDF",
+      "sha256": "6f3b0f5770106898ba33e522289e8d3ccc7a823e0c634e86bea7b6d72693708a",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12953/Supplementary Planning Information 24th-Mar-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 105485,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "e6c4917b47836c5c64307e524f91ba9aaf345c751489570cd7d28675b03deb53",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s48747/Index.pdf"
+    },
+    {
+      "bytes": 773717,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 10,
+      "purpose": "NAMED_PDF",
+      "sha256": "32ba4a649b26fc028af6c42687a2964edf86396acb839ff8313724c41f85c44a",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s49080/PCC 24-03-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 31983,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "828e3c306a23c8d3629657a91f8aad369ac6aef3fae3e83cbd659a15b128f360",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4028&Ver=4"
+    },
+    {
+      "bytes": 354432,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 6,
+      "purpose": "NAMED_PDF",
+      "sha256": "ad126a9cc625178fca5b3ab73ec789d273037c8aa3f56be34b41a6eac54f484b",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b12984/Supplementary Planning Information 21st-Apr-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 75143,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "2a86c1034eb4b9b503c8285bd0987b2ecb74e614d6d0e378e9dd6b677c804949",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s49366/Final Index.pdf"
+    },
+    {
+      "bytes": 303516,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "2515ae884bd8424b5000eacadbe3557c684ed5d1f4b8b53cf1eb42500e5460f3",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s49699/PCC 21-04-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 31333,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "d59bb015527d8a0dd4a4d391e23cc4febbb42f5b9231451168ba96567c03a6fc",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4220&Ver=4"
+    },
+    {
+      "bytes": 1278459,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 10,
+      "purpose": "NAMED_PDF",
+      "sha256": "bee314085127c5a953b3b197c08db8d267e80aa8272bce0190ffe7d23f5660f4",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b13027/Supplementary Planning Information 28th-May-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 74712,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "b371c4dd5b8fe4094358e846eb3f95e3266a3fade245899b50da6a59d3bbcdac",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s49975/Final Index.pdf"
+    },
+    {
+      "bytes": 1227319,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 8,
+      "purpose": "NAMED_PDF",
+      "sha256": "85301579268307d88995281e230c526ce8e42cbe8adf066e8dcf33f59786eaab",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s50062/PCC 28-05-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 31412,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "d55880a0a775725bce929b48fd526422ab2a948ec71cd96617c06d08b3e62e32",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4221&Ver=4"
+    },
+    {
+      "bytes": 155435,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 6,
+      "purpose": "NAMED_PDF",
+      "sha256": "fbbdb2dd2b686d7913e8401e1813361b4006b421bf555592e2abbe849095f95c",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b13064/Supplementary Planning Information 01st-Jul-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 76576,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "eacfb9f8ce66ce18e7ebf92b2467f8c5c867e43d42b67c5323aceeabe22a1b38",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s50653/Final Index.pdf"
+    },
+    {
+      "bytes": 105175,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 4,
+      "purpose": "NAMED_PDF",
+      "sha256": "e5c19466e879dba4fddf1bf693300a274567f2c30985a0accd2da905b17c5e36",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s50805/Supplementary Planning Control Committee.pdf"
+    },
+    {
+      "bytes": 33557,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "9c0e93dbfe233577ffaada74361d179886362ebd0ddf1b1067edb261f170a364",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4237&Ver=4"
+    },
+    {
+      "bytes": 317987,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 10,
+      "purpose": "NAMED_PDF",
+      "sha256": "c12724d87e919e0fa5865efc7d8c69af13913a2cfd1ba5230e0ce24657b7f2cf",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b13068/Supplementary Planning Information 28th-Jul-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 77101,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "fcbab966cc75eb655622d52c322d07c83284d243388393f28288e2cbe6e0a0d4",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s51022/Final Index.pdf"
+    },
+    {
+      "bytes": 265590,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 7,
+      "purpose": "NAMED_PDF",
+      "sha256": "dc7bcac525a08a725657248b4627ef5b9bc37e471b1d5432a812821fa4ea9449",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s51083/PCC 28-07-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 32597,
+      "council": "bury",
+      "http_status": 200,
+      "purpose": "OFFICIAL_PAGE",
+      "sha256": "4faeb3b964fb35dacea6027ecb5002d66e868c116bfdd552bbd433a7c7df5f42",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4253&Ver=4"
+    },
+    {
+      "bytes": 157829,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 10,
+      "purpose": "NAMED_PDF",
+      "sha256": "e376fdd5243bf5f135a40c9edef23568ec925610e7ef43e60e0075a08255ed60",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/b13153/Supplementary Planning Information 01st-Sep-2026 19.00 Planning Control Committee.pdf?T=9"
+    },
+    {
+      "bytes": 74100,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 3,
+      "purpose": "NAMED_PDF",
+      "sha256": "c4bc3f4efed9e3174ada11e1c49e6ce8be774cab99408186962e80f36d59efb9",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s51432/Final Index.pdf"
+    },
+    {
+      "bytes": 126184,
+      "council": "bury",
+      "http_status": 200,
+      "pages": 7,
+      "purpose": "NAMED_PDF",
+      "sha256": "6a874417b41c8525aa5bc3f06683f8f37f723b09e9a080e9135a9aa510e0e325",
+      "status": "READ",
+      "url": "https://councildecisions.bury.gov.uk/documents/s51755/PCC 01-09-26 Supplementary Information.pdf"
+    },
+    {
+      "bytes": 4096,
+      "council": "manchester",
+      "failure": "ValueError:HTTP_403",
+      "http_status": 403,
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://democracy.manchester.gov.uk/ieListMeetings.aspx?CommitteeId=151"
+    },
+    {
+      "bytes": 0,
+      "council": "oldham",
+      "failure": "ReadTimeout:HTTPSConnectionPool(host='committees.oldham.gov.uk', port=443): Read timed out. ",
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://committees.oldham.gov.uk/ieListMeetings.aspx?CommitteeId=133"
+    },
+    {
+      "bytes": 4096,
+      "council": "rochdale",
+      "failure": "ValueError:HTTP_403",
+      "http_status": 403,
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://democracy.rochdale.gov.uk/mgCommitteeDetails.aspx?ID=674"
+    },
+    {
+      "bytes": 4096,
+      "council": "salford",
+      "failure": "ValueError:HTTP_403",
+      "http_status": 403,
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://sccdemocracy.salford.gov.uk/mgListCommittees.aspx?bcr=1"
+    },
+    {
+      "bytes": 0,
+      "council": "stockport",
+      "failure": "ConnectTimeout:HTTPSConnectionPool(host='democracy.stockport.gov.uk', port=443): Max retries ex",
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://democracy.stockport.gov.uk/ieListMeetings.aspx?CommitteeId=150"
+    },
+    {
+      "bytes": 4096,
+      "council": "tameside",
+      "failure": "ValueError:HTTP_403",
+      "http_status": 403,
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://tameside.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=161"
+    },
+    {
+      "bytes": 4096,
+      "council": "wigan",
+      "failure": "ValueError:HTTP_403",
+      "http_status": 403,
+      "purpose": "OFFICIAL_PAGE",
+      "status": "FAILED",
+      "url": "https://wigan.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=120&a=1"
+    }
+  ],
+  "requests": 51
+}

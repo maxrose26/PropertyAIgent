@@ -1,0 +1,238 @@
+{
+  "council": "salford",
+  "observation_date": "2026-10-14",
+  "method": "ORDINARY_PUBLIC_BROWSER_DOM_OBSERVATION",
+  "coverage": "INCOMPLETE",
+  "meetings": [
+    {
+      "date": "2026-10-01",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9599&Ver=4",
+      "references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 0,
+      "supplementary_links_found": 0,
+      "minutes_links_found": 0,
+      "cancelled": true,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-09-17",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9598&Ver=4",
+      "references": [
+        "PA/2026/0761",
+        "PA/2025/1028",
+        "PA/2026/0700"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 17,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-09-03",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9597&Ver=4",
+      "references": [
+        "PA/2025/1506",
+        "PA/2026/0123",
+        "PA/2025/1664"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 20,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-07-16",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9596&Ver=4",
+      "references": [
+        "PA/2024/0749",
+        "PA/2026/0490",
+        "PA/2026/0629",
+        "PA/2026/0779"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 18,
+      "supplementary_links_found": 1,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-07-02",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9595&Ver=4",
+      "references": [
+        "PA/2026/0550",
+        "PA/2026/0543",
+        "PA/2026/0429"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 14,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-06-11",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9594&Ver=4",
+      "references": [
+        "PA/2025/1747",
+        "PA/2026/0340",
+        "PA/2025/0271",
+        "PA/2025/1422"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 19,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-04-30",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9530&Ver=4",
+      "references": [
+        "PA/2025/1295",
+        "PA/2026/0234"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 13,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-04-02",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9352&Ver=4",
+      "references": [
+        "PA/2025/1655",
+        "PA/2025/1656",
+        "PA/2025/1686"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 18,
+      "supplementary_links_found": 0,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-03-05",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9331&Ver=4",
+      "references": [
+        "PA/2025/1526",
+        "PA/2025/1686",
+        "PA/2025/0215",
+        "PA/2024/1827",
+        "PA/2025/1565"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 22,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2026-02-05",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9262&Ver=4",
+      "references": [
+        "PA/2025/1187",
+        "PA/2025/1268",
+        "PA/2025/1637",
+        "PA/2025/1612",
+        "PA/2025/0687"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 23,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 2,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2025-12-18",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9247&Ver=4",
+      "references": [
+        "PA/2025/1349"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 11,
+      "supplementary_links_found": 0,
+      "minutes_links_found": 0,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2025-12-04",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9227&Ver=4",
+      "references": [
+        "PA/2025/1273",
+        "PA/2025/0343"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 13,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2025-11-06",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9184&Ver=4",
+      "references": [
+        "PA/2025/0972",
+        "PA/2024/0962"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 14,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    },
+    {
+      "date": "2025-10-16",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListDocuments.aspx?CId=153&MId=9148&Ver=4",
+      "references": [
+        "21/79015/FUL",
+        "PA/2025/0817",
+        "PA/2025/0617",
+        "PA/2025/1175",
+        "PA/2025/1206",
+        "PA/2025/0829",
+        "PA/2025/0988",
+        "PA/2025/0900",
+        "PA/2025/0573"
+      ],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY_FROM_IDENTITY_COMPARISON",
+      "document_links_found": 28,
+      "supplementary_links_found": 2,
+      "minutes_links_found": 1,
+      "cancelled": false,
+      "documents_inspected": 0,
+      "body_references": []
+    }
+  ],
+  "request_bytes_elapsed": "UNKNOWN_NOT_EXPOSED_BY_BROWSER_TOOLING",
+  "agenda_pack_inspected": 0,
+  "publication_timestamps": "UNKNOWN"
+}

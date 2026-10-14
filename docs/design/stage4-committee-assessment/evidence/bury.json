@@ -1,0 +1,1882 @@
+{
+  "additional_committee_scope": "NOT_YET_RECONCILED",
+  "browse_url": "https://councildecisions.bury.gov.uk/ieListMeetings.aspx?CommitteeId=134",
+  "calendar_urls": [
+    "https://councildecisions.bury.gov.uk/mgCalendarMonthView.aspx?GL=1&bcr=1",
+    "https://councildecisions.bury.gov.uk/mgCalendarMonthView.aspx?GL=1&bcr=1"
+  ],
+  "committee_name": "Planning Control Committee",
+  "council": "bury",
+  "coverage": "INCOMPLETE",
+  "future_meetings": [
+    {
+      "date": "2026-10-20",
+      "label": "20 Oct 2026\u00a07.00 pm",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4265&Ver=4"
+    },
+    {
+      "date": "2026-11-17",
+      "label": "17 Nov 2026\u00a07.00 pm",
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4277&Ver=4"
+    }
+  ],
+  "gaps": [],
+  "identity_qualification": "EXTRACTED_MENTIONS_REQUIRE_PRINCIPAL_APPLICATION_QUALIFICATION_BEFORE_COMPARISON",
+  "index_spans_start": true,
+  "main_committee_html_coverage": "COMPLETE",
+  "meetings": [
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "af8a21a78697ce63d93f46f531babce94d3d6ce1f9aa2f1668cd0575d6f4ac2c",
+      "cancelled": false,
+      "date": "2025-10-21",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 50 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4022/Agenda frontsheet 21st-Oct-2025 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Agenda Information PDF 666 KB",
+          "pages": 22,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "70213",
+            "70214",
+            "71009",
+            "71422",
+            "71464",
+            "71926",
+            "71978",
+            "72105",
+            "72134"
+          ],
+          "sha256": "fe28bf32265e0bf128b9aa662bbba7021b60009e67e209d09524c12124b3554d",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12318/Supplementary Agenda Information 21st-Oct-2025 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 133 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4022/Printed minutes 21st-Oct-2025 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 2nd September 2025 PDF 142 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46539/Minutes Public Pack 02092025 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72134",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "71464",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "71009",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Minded to Approve Site N",
+              "reference": "71422",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72105",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "70213",
+              "unit_mention": 5,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "70214",
+              "unit_mention": 5,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "71926",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "71978",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 4,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "70213",
+            "70214",
+            "71009",
+            "71422",
+            "71464",
+            "71926",
+            "71978",
+            "72105",
+            "72134"
+          ],
+          "sha256": "d2c1a85d84133a8379fbfe089938396d71890e04ecfc5abd9286af180ac9c5e2",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Minded to Approve"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s46543/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46544/Item 1 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46545/Item 2 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46546/Item 3 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46547/Item 4 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46548/Item 5 Final1.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46540/Agenda Item 5 Delegated Decisions.pdf.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46541/Agenda Item 6 Appeals pdf.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "70213",
+        "70214",
+        "71009",
+        "71422",
+        "71464",
+        "71926",
+        "71978",
+        "72105",
+        "72134"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [
+        {
+          "classification": "MINDED_TO_APPROVE_MENTION_NON_FINAL",
+          "literal": "Minded to Approve"
+        }
+      ],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4022&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "2959d1945019a584fa2c66e9df3f473db11d098fc9a4e31f1dc97481f1decc42",
+      "cancelled": false,
+      "date": "2025-11-18",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 50 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4023/Agenda frontsheet 18th-Nov-2025 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 148 KB",
+          "pages": 8,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "71784",
+            "71888",
+            "72236",
+            "72334"
+          ],
+          "sha256": "ea987c056c7d986ee25a18897ac09026dbc9db0a9c1f22af02600a4cc3a2cf57",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12352/Supplementary Planning Information 18th-Nov-2025 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 197 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4023/Printed minutes 18th-Nov-2025 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 21st October 2025 PDF 143 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46881/Minutes Public Pack 21102025 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "71888",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72236",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72334",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "71784",
+              "unit_mention": 2,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "71784",
+            "71888",
+            "72236",
+            "72334"
+          ],
+          "sha256": "8130076a928e80929d5979f1749f512251552925c1afc0b2929e6c93bb3153cd",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s46882/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46883/Item 1 Final1.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46884/Item 2 Final 2-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46885/Item 3 - Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46886/Item 4 - Final 1-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47037/Supp Agenda 18-11-25.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46887/Agenda item 5 - delegated decisons 131025-091125.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s46888/Agenda item 6 - appeals 131025-091125.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "71784",
+        "71888",
+        "72236",
+        "72334"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4023&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "9f2fdac7c1f52ebc4ccc0185a643923971ed7f4b9465d0500dd41d84a42b530b",
+      "cancelled": false,
+      "date": "2025-12-16",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 52 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4024/Agenda frontsheet 16th-Dec-2025 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 757 KB",
+          "pages": 14,
+          "publication_date": "UNKNOWN",
+          "references": [],
+          "sha256": "ef8a6d16b287993b4877db96ccb53ce4b86c662413002ef9d9dbe867b2cfb4c2",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12386/Supplementary Planning Information 16th-Dec-2025 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 232 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4024/Printed minutes 16th-Dec-2025 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 18th November 2025 PDF 205 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47344/Minutes Public Pack 18112025 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Minded to Approve",
+              "reference": "71426",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72127",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Minded to Approve",
+              "reference": "72240",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72327",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72425",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "71426",
+            "72127",
+            "72240",
+            "72327",
+            "72425"
+          ],
+          "sha256": "39da8a6235c82ad1bd8bdc227b27b45f3f144c74afdab14999a793e9d813b63e",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Minded to Approve"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s47345/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47356/Item 01_compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47347/Item 02.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47357/Item 03_compressed 1.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47349/Item 04.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47350/Item 05.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 16-12-25 Supplementary Information , item PCC.4 PDF 711 KB",
+          "pages": 12,
+          "publication_date": "UNKNOWN",
+          "references": [],
+          "sha256": "795c09018bf3f168ab2157a66ad1413fc2834f665eafdf86eaf0390dba0e97ba",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s47454/PCC 16-12-25 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47358/PCC Report - proposed HMO Art4 - final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47359/HMO evidence base December 2025.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47351/Agenda Item 5 Delegated Decisions-combined6 copy.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47355/Agenda item 6 appeals.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "71426",
+        "72127",
+        "72240",
+        "72327",
+        "72425"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [
+        {
+          "classification": "MINDED_TO_APPROVE_MENTION_NON_FINAL",
+          "literal": "Minded to Approve"
+        }
+      ],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4024&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "3e9a68a49ae49a8fc0a2cad88789b61a133799cf4dc6ab976a21877bb6762fb9",
+      "cancelled": false,
+      "date": "2026-01-27",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 52 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4025/Agenda frontsheet 27th-Jan-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 161 KB",
+          "pages": 8,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72368",
+            "72460",
+            "72554"
+          ],
+          "sha256": "53351b5d7fd7ad8120c5a6022a53eefc2b380a19aa085457fc4fb64b83241058",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12432/Supplementary Planning Information 27th-Jan-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 230 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4025/Printed minutes 27th-Jan-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 16th December 2025 PDF 241 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47776/Minutes Public Pack 16122025 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72368",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72554",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Minded to Approve Site N",
+              "reference": "72460",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72368",
+            "72460",
+            "72554"
+          ],
+          "sha256": "897431a42415f4cabbb91eefc211cad71bf778b5953ae391f310fc7e26279fb0",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Minded to Approve"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s47768/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47769/Item 1 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47770/Item 2 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47771/Item 3 Final.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 27-01-26 Supplementary Information , item PCC.4 PDF 114 KB",
+          "pages": 5,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72368",
+            "72460",
+            "72554"
+          ],
+          "sha256": "5c1711b08fa37fdfbac6643e4c3052577c6eefe8057d3dc3dbb6994a49b5e89c",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s47831/PCC 27-01-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47772/Agenda Item 5 Delegated Decisions-combined8-compressed 1.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47773/Agenda Item 6 Appeals-combined6-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s47777/Agenda Item 7 Final.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72368",
+        "72460",
+        "72554"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [
+        {
+          "classification": "MINDED_TO_APPROVE_MENTION_NON_FINAL",
+          "literal": "Minded to Approve"
+        },
+        {
+          "classification": "S106_CONTEXT_REQUIRES_APPLICATION_ASSOCIATION",
+          "literal": "Section 106"
+        }
+      ],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4025&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "49dab70eecdb275a9caf657be24850f063cae2eac8c05cdba1b641c37a9d1d7b",
+      "cancelled": false,
+      "date": "2026-02-24",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 54 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4026/Agenda frontsheet 24th-Feb-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 332 KB",
+          "pages": 8,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "71284",
+            "72383",
+            "72454"
+          ],
+          "sha256": "b8123175383257523456de8bc302a1079d77e118ddf8ec9f113db737fdcfe0db",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12481/Supplementary Planning Information 24th-Feb-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 131 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4026/Printed minutes 24th-Feb-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 27th January 2026 PDF 239 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48206/Minutes Public Pack 27012026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "71284",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72383",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72454",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "71284",
+            "72383",
+            "72454"
+          ],
+          "sha256": "6604d6fbafa9ca7fe57481a52309ec0c2ec369a8e861ac680aad6237fd18193d",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s48207/Agenda item 4- Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48208/Agenda Item 4. 01 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48209/Agenda Item 4. 02 Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48210/Agenda Item 4. 03 Final.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 24-02-26 Supplementary Information , item PCC.4 PDF 282 KB",
+          "pages": 5,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "71284",
+            "72383",
+            "72454"
+          ],
+          "sha256": "f888e9edd5a903029f8d57423f5d824a3825ee3df564b0c04101a5671726ab2e",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s48332/PCC 24-02-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48211/Agenda Item 5 Delegated Decisions 190126-150226.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48212/Agenda Item 6 Appeals-combined8-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48213/Agenda item 7 - SBI report.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48214/Agenda item 8- TPO 367 PCC report-combined1-compressed.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "71284",
+        "72383",
+        "72454"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [
+        {
+          "classification": "DEFERRED",
+          "literal": "deferred"
+        }
+      ],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4026&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "c99bcb8a83147f6a07a10c9e7195b8f992266894d45096fb6cccb676ac0f2879",
+      "cancelled": false,
+      "date": "2026-03-24",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 153 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4027/Agenda frontsheet 24th-Mar-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 812 KB",
+          "pages": 12,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72656",
+            "72678"
+          ],
+          "sha256": "6f3b0f5770106898ba33e522289e8d3ccc7a823e0c634e86bea7b6d72693708a",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12953/Supplementary Planning Information 24th-Mar-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 230 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4027/Printed minutes 24th-Mar-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 24th February 2026 PDF 139 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48746/Minutes Public Pack 24022026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72678",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions Site N",
+              "reference": "72656",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72656",
+            "72678"
+          ],
+          "sha256": "e6c4917b47836c5c64307e524f91ba9aaf345c751489570cd7d28675b03deb53",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s48747/Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48748/Item 1.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48749/Item 2.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 24-03-26 Supplementary Information , item PCC.4 PDF 756 KB",
+          "pages": 10,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72656",
+            "72678"
+          ],
+          "sha256": "32ba4a649b26fc028af6c42687a2964edf86396acb839ff8313724c41f85c44a",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s49080/PCC 24-03-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48750/Agenda Item 5 Delegated Decisions-combined10-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48753/Agenda Item 6 Appeals-combined9-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48751/Agenda item 7 TPO PCC report_Ram Amb Stn -compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s48752/Agenda item 8 PCC Report Validation March 2026 v2-compressed.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72656",
+        "72678"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4027&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "828e3c306a23c8d3629657a91f8aad369ac6aef3fae3e83cbd659a15b128f360",
+      "cancelled": false,
+      "date": "2026-04-21",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 78 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4028/Agenda frontsheet 21st-Apr-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 346 KB",
+          "pages": 6,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72700",
+            "72790",
+            "72816"
+          ],
+          "sha256": "ad126a9cc625178fca5b3ab73ec789d273037c8aa3f56be34b41a6eac54f484b",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b12984/Supplementary Planning Information 21st-Apr-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 219 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4028/Printed minutes 21st-Apr-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 24th March 2026 PDF 238 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49365/Minutes Public Pack 24032026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72700",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72790",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72816",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72700",
+            "72790",
+            "72816"
+          ],
+          "sha256": "2a86c1034eb4b9b503c8285bd0987b2ecb74e614d6d0e378e9dd6b677c804949",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s49366/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49690/Item 01-v2.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49368/Item 02-Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49369/Item 03-Final.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 21-04-26 Supplementary Information , item PCC.4 PDF 296 KB",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72700",
+            "72790",
+            "72816"
+          ],
+          "sha256": "2515ae884bd8424b5000eacadbe3557c684ed5d1f4b8b53cf1eb42500e5460f3",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s49699/PCC 21-04-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49405/Agenda Item 51.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49406/Agenda Item 62.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72700",
+        "72790",
+        "72816"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4028&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "d59bb015527d8a0dd4a4d391e23cc4febbb42f5b9231451168ba96567c03a6fc",
+      "cancelled": false,
+      "date": "2026-05-28",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 50 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4220/Agenda frontsheet 28th-May-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 1 MB",
+          "pages": 10,
+          "publication_date": "UNKNOWN",
+          "references": [],
+          "sha256": "bee314085127c5a953b3b197c08db8d267e80aa8272bce0190ffe7d23f5660f4",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b13027/Supplementary Planning Information 28th-May-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 118 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4220/Printed minutes 28th-May-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 21st April 2026 PDF 225 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49974/Minutes Public Pack 21042026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72692",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72972",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72950",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72692",
+            "72950",
+            "72972"
+          ],
+          "sha256": "b371c4dd5b8fe4094358e846eb3f95e3266a3fade245899b50da6a59d3bbcdac",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s49975/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49976/Item 01 - Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49977/Item 02 - Final.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49978/Item 03 - Final.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 28-05-26 Supplementary Information , item PCC.4 PDF 1 MB",
+          "pages": 8,
+          "publication_date": "UNKNOWN",
+          "references": [],
+          "sha256": "85301579268307d88995281e230c526ce8e42cbe8adf066e8dcf33f59786eaab",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s50062/PCC 28-05-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49979/Agenda 5.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s49980/Agenda Item 6.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72692",
+        "72950",
+        "72972"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4220&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "d55880a0a775725bce929b48fd526422ab2a948ec71cd96617c06d08b3e62e32",
+      "cancelled": false,
+      "date": "2026-07-01",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 50 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4221/Agenda frontsheet 01st-Jul-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 152 KB",
+          "pages": 6,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72863",
+            "72939",
+            "72968"
+          ],
+          "sha256": "fbbdb2dd2b686d7913e8401e1813361b4006b421bf555592e2abbe849095f95c",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b13064/Supplementary Planning Information 01st-Jul-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 118 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4221/Printed minutes 01st-Jul-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 28th May 2026 PDF 124 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s50652/Minutes Public Pack 28052026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72863",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72939",
+              "unit_mention": 2,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72968",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72863",
+            "72939",
+            "72968"
+          ],
+          "sha256": "eacfb9f8ce66ce18e7ebf92b2467f8c5c867e43d42b67c5323aceeabe22a1b38",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s50653/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s50654/Item 01.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s50655/Item 02.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s50656/Item 03.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Control Committee , item PCC.4 PDF 103 KB",
+          "pages": 4,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72863",
+            "72939",
+            "72968"
+          ],
+          "sha256": "e5c19466e879dba4fddf1bf693300a274567f2c30985a0accd2da905b17c5e36",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s50805/Supplementary Planning Control Committee.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s50657/Agenda Item 5 Delegated Decisions-combined-compressed.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s50658/Agenda Item 6 Appeals-combined-compressed.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72863",
+        "72939",
+        "72968"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4221&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "9c0e93dbfe233577ffaada74361d179886362ebd0ddf1b1067edb261f170a364",
+      "cancelled": false,
+      "date": "2026-07-28",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 50 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4237/Agenda frontsheet 28th-Jul-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 311 KB",
+          "pages": 10,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72682",
+            "72750",
+            "73065",
+            "73083"
+          ],
+          "sha256": "c12724d87e919e0fa5865efc7d8c69af13913a2cfd1ba5230e0ce24657b7f2cf",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b13068/Supplementary Planning Information 28th-Jul-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed minutes PDF 229 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4237/Printed minutes 28th-Jul-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 1st July 2026 PDF 124 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51017/Minutes Public Pack 01072026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72682",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "72750",
+              "unit_mention": 2,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "73065",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNKNOWN",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "73083",
+              "unit_mention": null,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72682",
+            "72750",
+            "73065",
+            "73083"
+          ],
+          "sha256": "fcbab966cc75eb655622d52c322d07c83284d243388393f28288e2cbe6e0a0d4",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s51022/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51023/Item 01.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51024/Item 02.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51025/Item 03.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51026/Item 04.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 28-07-26 Supplementary Information , item PCC.4 PDF 259 KB",
+          "pages": 7,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72682",
+            "72750",
+            "73065",
+            "73083"
+          ],
+          "sha256": "dc7bcac525a08a725657248b4627ef5b9bc37e471b1d5432a812821fa4ea9449",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s51083/PCC 28-07-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51018/Agenda Item 5 Delegated Decisions.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51019/Agenda Item 6 Appeals.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72682",
+        "72750",
+        "73065",
+        "73083"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4237&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "body_fingerprint": "4faeb3b964fb35dacea6027ecb5002d66e868c116bfdd552bbd433a7c7df5f42",
+      "cancelled": false,
+      "date": "2026-09-01",
+      "documents": [
+        {
+          "inspected": false,
+          "label": "Agenda frontsheet PDF 36 KB",
+          "publication_date": "UNKNOWN",
+          "type": "AGENDA_PACK",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4253/Agenda frontsheet 01st-Sep-2026 19.00 Planning Control Committee.pdf?T=0"
+        },
+        {
+          "inspected": true,
+          "label": "Supplementary Planning Information PDF 154 KB",
+          "pages": 10,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72542",
+            "73410"
+          ],
+          "sha256": "e376fdd5243bf5f135a40c9edef23568ec925610e7ef43e60e0075a08255ed60",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/b13153/Supplementary Planning Information 01st-Sep-2026 19.00 Planning Control Committee.pdf?T=9"
+        },
+        {
+          "inspected": false,
+          "label": "Printed draft minutes PDF 55 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/g4253/Printed minutes 01st-Sep-2026 19.00 Planning Control Committee.pdf?T=1"
+        },
+        {
+          "inspected": false,
+          "label": "Minutes of the meeting held on the 28th July 2026 PDF 237 KB",
+          "publication_date": "UNKNOWN",
+          "type": "COMMITTEE_MINUTES",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51431/Minutes Public Pack 28072026 Planning Control Committee.pdf"
+        },
+        {
+          "indexed_application_details": [
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Minded to Approve",
+              "reference": "72542",
+              "unit_mention": 12,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            },
+            {
+              "metric": "UNQUALIFIED_LITERAL",
+              "recommendation_literal": "Approve with Conditions",
+              "reference": "73410",
+              "unit_mention": 3,
+              "unit_scope": "UNIT_SCOPE_UNKNOWN"
+            }
+          ],
+          "inspected": true,
+          "label": "OFFICER_REPORT",
+          "pages": 3,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72542",
+            "73410"
+          ],
+          "sha256": "c4bc3f4efed9e3174ada11e1c49e6ce8be774cab99408186962e80f36d59efb9",
+          "type": "OFFICER_REPORT",
+          "unassociated_signal_mentions": [
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Minded to Approve"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Approve with Conditions"
+            },
+            {
+              "classification": "RECOMMEND_APPROVAL",
+              "literal": "Recommendation: Approve"
+            }
+          ],
+          "url": "https://councildecisions.bury.gov.uk/documents/s51432/Final Index.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51433/Item 01.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51434/Item 02.pdf"
+        },
+        {
+          "inspected": true,
+          "label": "PCC 01-09-26 Supplementary Information , item PCC.4 PDF 123 KB",
+          "pages": 7,
+          "publication_date": "UNKNOWN",
+          "references": [
+            "72542",
+            "73410"
+          ],
+          "sha256": "6a874417b41c8525aa5bc3f06683f8f37f723b09e9a080e9135a9aa510e0e325",
+          "type": "SUPPLEMENTARY_UPDATE",
+          "unassociated_signal_mentions": [],
+          "url": "https://councildecisions.bury.gov.uk/documents/s51755/PCC 01-09-26 Supplementary Information.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "DELEGATED_DECISION_LIST",
+          "publication_date": "UNKNOWN",
+          "type": "DELEGATED_DECISION_LIST",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51435/Agenda Item 5 Delegated Decisions.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "APPEAL_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "APPEAL_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51436/Agenda Item 6 Appeals.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "UNKNOWN_DOCUMENT_TYPE",
+          "publication_date": "UNKNOWN",
+          "type": "UNKNOWN_DOCUMENT_TYPE",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51583/PCC item for noting - scheme of delegation.pdf"
+        },
+        {
+          "inspected": false,
+          "label": "OFFICER_REPORT",
+          "publication_date": "UNKNOWN",
+          "type": "OFFICER_REPORT",
+          "url": "https://councildecisions.bury.gov.uk/documents/s51741/National Scheme of Delegation Full Council Report.pdf"
+        }
+      ],
+      "inspection": "INSPECTED_HTML",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [
+        "72542",
+        "73410"
+      ],
+      "training": false,
+      "unassociated_signal_mentions": [
+        {
+          "classification": "MINDED_TO_APPROVE_MENTION_NON_FINAL",
+          "literal": "Minded to Approve"
+        },
+        {
+          "classification": "S106_CONTEXT_REQUIRES_APPLICATION_ASSOCIATION",
+          "literal": "Section 106"
+        }
+      ],
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4253&Ver=4"
+    },
+    {
+      "agenda_publication_date": "UNKNOWN",
+      "cancelled": true,
+      "date": "2026-09-22",
+      "documents": [],
+      "inspection": "EXCLUDED_CANCELLED_OR_TRAINING",
+      "minutes_publication_date": "UNKNOWN",
+      "references": [],
+      "training": false,
+      "url": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4254&Ver=4"
+    }
+  ],
+  "publication_rule": "PUBLICATION_RULE_UNKNOWN",
+  "publication_timing": "UNKNOWN",
+  "root": "https://councildecisions.bury.gov.uk/ieListMeetings.aspx?CommitteeId=134"
+}

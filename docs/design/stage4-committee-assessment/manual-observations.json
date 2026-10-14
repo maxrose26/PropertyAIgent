@@ -1,0 +1,135 @@
+{
+  "evidence_kind": "BOUNDED_MANUAL_PUBLIC_OBSERVATIONS",
+  "period": [
+    "2025-10-14",
+    "2026-10-14"
+  ],
+  "publication_observation_date": "2026-10-14",
+  "raw_document_retention": false,
+  "observations": [
+    {
+      "council": "bury",
+      "meeting_date": "2026-09-01",
+      "source": "https://councildecisions.bury.gov.uk/documents/s51432/Final%20Index.pdf",
+      "type": "OFFICER_REPORT_APPLICATION_INDEX",
+      "principal_reference": "72542",
+      "parent_reference": "68815",
+      "identity_basis": "explicit App No. section in official compact application index",
+      "proposal_unit_mention": 12,
+      "unit_scope": "reserved-matters proposal following outline; not net-additional or whole-site count",
+      "recommendation": "MINDED_TO_APPROVE",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "materiality": "CONFIRMED_MATERIAL",
+      "materiality_basis": "explicit residential reserved-matters proposal for 12 dwellings; existing 10-dwelling qualification threshold",
+      "database_comparison": "ALREADY_KNOWN_TO_PROPERTYAIGENT",
+      "primary_comparison": "UNKNOWN",
+      "primary_interval_basis": "application received/validated date not established"
+    },
+    {
+      "council": "bury",
+      "meeting_date": "2026-09-01",
+      "source": "https://councildecisions.bury.gov.uk/documents/s51432/Final%20Index.pdf",
+      "type": "OFFICER_REPORT_APPLICATION_INDEX",
+      "principal_reference": "73410",
+      "identity_basis": "explicit App No. section in official compact application index",
+      "proposal_unit_mention": 3,
+      "unit_scope": "application proposal for three dwellings; net-additional/whole-site unknown",
+      "recommendation": "APPROVE_WITH_CONDITIONS",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "materiality_basis": "below known numerical threshold; relationship/buyer relevance not independently established; no confident exclusion",
+      "database_comparison": "UNKNOWN_DATABASE_COMPARISON",
+      "primary_comparison": "UNKNOWN"
+    },
+    {
+      "council": "manchester",
+      "meeting_date": "2026-01-15",
+      "source": "https://democracy.manchester.gov.uk/ieListDocuments.aspx?CId=151&MId=5027&Ver=4",
+      "type": "COMMITTEE_MINUTES_OR_DECISION",
+      "principal_reference": "142535/FO/2025",
+      "identity_basis": "explicit application reference in late-representations minutes paragraph, independently associated with separate item minutes describing the principal proposal; not title alone",
+      "proposal_unit_mention": 752,
+      "unit_scope": "principal application proposal up to 752 apartments; not net-additional whole-site count",
+      "metric": "DWELLINGS",
+      "materiality": "CONFIRMED_MATERIAL",
+      "materiality_basis": "minutes explicitly describe proposal for 752 residential apartments",
+      "recommendation": "UNKNOWN",
+      "committee_outcome": "RESOLUTION_MINDED_TO_REFUSE",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "supplementary_signal": "late representations circulated, received and noted; precise material change not qualified",
+      "database_comparison": "ALREADY_KNOWN_TO_PROPERTYAIGENT",
+      "primary_comparison": "UNKNOWN",
+      "primary_interval_basis": "received/validated date not independently acquired; meeting date alone insufficient",
+      "application_id": 692
+    }
+  ],
+  "rules": [
+    {
+      "council": "salford",
+      "source": "https://www.salford.gov.uk/planning-building-and-regeneration/planning-applications/planning-decisions/planning-and-transportation-panel/",
+      "rule": "full report published five working days before meeting",
+      "source_explicit": true,
+      "observed_historical_publication_timing": "UNKNOWN"
+    },
+    {
+      "council": "manchester",
+      "source": "https://www.manchester.gov.uk/planning-and-regeneration/planning/how-to-comment-on-a-planning-application/planning-committee",
+      "rule": "supplementary late-representation report published when ready before committee starts; late comments cutoff noon Tuesday before meeting",
+      "source_explicit": true,
+      "agenda_publication_rule": "PUBLICATION_RULE_UNKNOWN",
+      "observed_historical_publication_timing": "UNKNOWN"
+    }
+  ],
+  "future_routes": [
+    {
+      "council": "manchester",
+      "source": "https://democracy.manchester.gov.uk/mgAgendaManagementTimetable.aspx?RP=151",
+      "next_meeting": "2026-10-22",
+      "later_meetings": [
+        "2026-11-19",
+        "2026-12-17",
+        "2027-01-14"
+      ],
+      "agenda_deadline": "PUBLICATION_RULE_UNKNOWN",
+      "observation": "ordinary public browser shows meeting dates only; no publication deadline visible"
+    },
+    {
+      "council": "salford",
+      "source": "https://sccdemocracy.salford.gov.uk/ieListMeetings.aspx?CommitteeId=153",
+      "next_meeting": "2026-10-15",
+      "later_meetings": [
+        "2026-11-05",
+        "2026-11-19"
+      ],
+      "calendar": "https://sccdemocracy.salford.gov.uk/mgCalendarMonthView.aspx?GL=1&bcr=1",
+      "observation": "ordinary public browser selected exact Planning and Transportation Regulatory Panel (153) from official structure and inspected dated meeting links"
+    }
+  ],
+  "additional_committee_routes": [
+    {
+      "council": "tameside",
+      "source": "https://tameside.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=162",
+      "committee": "Strategic Planning and Capital Monitoring Panel",
+      "coverage": "INCOMPLETE",
+      "observation": "Ordinary public browser inspected both in-scope meeting pages: no documents available. This is an evidence gap, not zero material applications. No future meeting shown on this index.",
+      "meetings_in_period": 2,
+      "meetings_inspected": 2,
+      "meeting_dates": [
+        "2025-11-20",
+        "2026-03-19"
+      ],
+      "meeting_sources": [
+        "https://tameside.moderngov.co.uk/ieListDocuments.aspx?CId=162&MId=10324&Ver=4",
+        "https://tameside.moderngov.co.uk/ieListDocuments.aspx?CId=162&MId=10390&Ver=4"
+      ],
+      "next_meeting": "UNKNOWN"
+    },
+    {
+      "council": "stockport",
+      "source": "https://democracy.stockport.gov.uk/mgListCommittees.aspx?bcr=1",
+      "committee": "Area Committees",
+      "coverage": "UNKNOWN",
+      "observation": "Official committee structure lookup timed out; ordinary public browser returned 502 connection refused. Indexed material is stale and cannot establish current twelve-month Area Committee coverage. No bot/access-control inference."
+    }
+  ]
+}
