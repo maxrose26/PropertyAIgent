@@ -40,90 +40,270 @@
   "persistence": false,
   "records": [
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 05 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00758/FUL",
       "source_key": "TMA9LJPUJBZ00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9LJPUJBZ00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00756/MATCH",
       "source_key": "TM8KH8PUJBC00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM8KH8PUJBC00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00753/FUL",
       "source_key": "TM4RYYPU0MF00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4RYYPU0MF00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00752/MATCH",
       "source_key": "TM4K0GPUJ9O00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4K0GPUJ9O00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00751/CLUD",
       "source_key": "TM4658PUJ9G00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4658PUJ9G00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00748/FUL",
       "source_key": "TM0P5JPUJ8900",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM0P5JPUJ8900&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00104/PLCOND",
       "source_key": "TM8HOVPUJB800",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM8HOVPUJB800&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00103/PLCOND",
       "source_key": "TM60YLPUJAC00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YLPUJAC00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00102/PLCOND",
       "source_key": "TM60UFPUJAA00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60UFPUJAA00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00101/PLCOND",
       "source_key": "TM60U2PUJA800",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60U2PUJA800&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00100/PLCOND",
       "source_key": "TM60TPPUJA500",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM60TPPUJA500&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00099/PLCOND",
       "source_key": "TM4V7MPUJA000",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4V7MPUJA000&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00098/PLCOND",
       "source_key": "TM4SDNPUJ9W00",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM4SDNPUJ9W00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00075/TPO",
       "source_key": "TM2PTBPUJ9100",
       "source_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?keyVal=TM2PTBPUJ9100&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "26/00007/TCA",
       "source_key": "TM60ZAPUJAG00",
@@ -146,6 +326,7 @@
     "requests_attempted": 5,
     "retries": 0
   },
+  "retention_note": "Exact identities and literal date states retained; proposal/address and other optional fields omitted from this repository copy. Artifact digest refers to original bounded ZIP.",
   "run_id": "38551641270",
   "sort": "REFERENCE_DESCENDING",
   "source_qualification": "CANDIDATE_CONTRACT",

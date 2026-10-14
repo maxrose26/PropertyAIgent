@@ -1,0 +1,271 @@
+{
+  "acceptance_claims": {
+    "completed_through_watermark_advanced": false,
+    "general_publication_recall": "NOT_ASSESSED",
+    "production_ingestion": "NOT_AUTHORISED_IN_THIS_SLICE",
+    "prospective_recall": "NOT_ASSESSED"
+  },
+  "committee_scope": {
+    "assessment_freeze": "NOT_SET",
+    "full_assessment_performed": false,
+    "future": "NEW_RELEVANT_PUBLICATIONS_AFTER_FREEZE",
+    "historical_bootstrap": "EXACTLY_12_MONTHS_PRECEDING_FUTURE_ASSESSMENT_FREEZE"
+  },
+  "explicit_zero": {
+    "code_sha": "eb9696728e5199a3ace010245fa57509b0e75317",
+    "council": "bury",
+    "evidence_path": "evidence/final-idox1-bury-zero.json",
+    "interval": [
+      "2026-11-30",
+      "2026-11-30"
+    ],
+    "proof": "SOLE_NO_RESULTS_MESSAGE_AND_STRICT_RETAINED_DATE_ECHO",
+    "qualification": "COMPLETE_EXPLICIT_ZERO_SHAPE",
+    "raw_completeness": "UNKNOWN",
+    "references": 0,
+    "run_id": "38554185271"
+  },
+  "independent_review": "APPROVED_NO_BOUNDED_ISSUE_REMAINS_FOR_PRIMARY_SOURCE_SLICE",
+  "limitations": [
+    "Historical primary source qualification only; no publication availability, latency or prospective recall acceptance.",
+    "Salford per-record validated dates remain UNKNOWN; retained date-window criteria support membership.",
+    "Only observed source shapes are qualified. Unrecognised empty, short or changed layouts fail/withhold; never COMPLETE and never advance watermark.",
+    "No independent reference denominator, database identity comparison or production admission in this slice.",
+    "Trafford explicitly deferred."
+  ],
+  "production_admission": false,
+  "prospective_acceptance": false,
+  "rows": [
+    {
+      "artifact_zip_sha256": "07e0c8fbde791b42258fd2da5d2a5e75f72c8fee646eddcdd98230744f575246",
+      "code_sha": "24ed30aa4cbb05b6aa7f8540eeb12f1c08ebba86",
+      "council": "bolton",
+      "date_semantics": "RECEIVED_DATE",
+      "evidence_path": "evidence/bolton-window3-38545477089.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_IDOX_SEARCH_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 22,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38545477089",
+      "segments": 3,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "IDOX_SEARCH",
+      "workflow_path": ".github/workflows/stage4-discovery-bolton-window-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+      "code_sha": "86ff64c2b8babc271e4c90ae02777905cbc1dd86",
+      "council": "bury",
+      "date_semantics": "RECEIVED_DATE",
+      "evidence_path": "evidence/remaining-primary1-bury.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_IDOX_SEARCH_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://planning.bury.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 18,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38553113416",
+      "segments": 2,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "IDOX_SEARCH",
+      "workflow_path": ".github/workflows/stage4-discovery-remaining-primary-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "a19ca34d48685d6c32c9dd1e57c5f62b5cbfae288b5e490c9e85a13b213474d4",
+      "code_sha": "2acc49d7af1180c8e72e98f321c498aceb6cc8fd",
+      "council": "manchester",
+      "date_semantics": "VALIDATED_DATE",
+      "evidence_path": "evidence/manchester-window4-38551212260.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_ARCUS_PUBLIC_UI_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 57,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38551212260",
+      "segments": 6,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "PUBLIC_LISTING_UI",
+      "workflow_path": ".github/workflows/stage4-discovery-arcus-ui-window-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+      "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+      "council": "oldham",
+      "date_semantics": "RECEIVED_DATE",
+      "evidence_path": "evidence/idox-family1-oldham.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_IDOX_SEARCH_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://planningpa.oldham.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 14,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38551641270",
+      "segments": 2,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "IDOX_SEARCH",
+      "workflow_path": ".github/workflows/stage4-discovery-idox-family-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+      "code_sha": "86ff64c2b8babc271e4c90ae02777905cbc1dd86",
+      "council": "rochdale",
+      "date_semantics": "VALIDATED_DATE",
+      "evidence_path": "evidence/remaining-primary1-rochdale.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_ARCUS_PUBLIC_UI_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 12,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38553113416",
+      "segments": 2,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "PUBLIC_LISTING_UI",
+      "workflow_path": ".github/workflows/stage4-discovery-remaining-primary-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "a2aa5cd8c11b0e775bd0a664ea2105eb4861f385a2d148c489dbd14417e64e4f",
+      "code_sha": "86ff64c2b8babc271e4c90ae02777905cbc1dd86",
+      "council": "salford",
+      "date_semantics": "VALIDATED_DATE",
+      "evidence_path": "evidence/remaining-primary1-salford.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_ARCUS_PUBLIC_UI_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 26,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38553113416",
+      "segments": 3,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "PUBLIC_LISTING_UI",
+      "workflow_path": ".github/workflows/stage4-discovery-remaining-primary-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+      "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+      "council": "stockport",
+      "date_semantics": "VALIDATED_DATE",
+      "evidence_path": "evidence/idox-family1-stockport.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_IDOX_SEARCH_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://planning.stockport.gov.uk/PlanningData-live/search.do?action=advanced&searchType=Application",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 49,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38551641270",
+      "segments": 5,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "IDOX_SEARCH",
+      "workflow_path": ".github/workflows/stage4-discovery-idox-family-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "ea58c15c5a6300ab554cf8e6dfede367ce729800026cdd910b2e975501fddc20",
+      "code_sha": "1d56634aaf991ee8c1d3760cba3172245bfde3d4",
+      "council": "tameside",
+      "date_semantics": "RECEIVED_DATE",
+      "evidence_path": "evidence/idox-family1-tameside.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_IDOX_SEARCH_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://publicaccess.tameside.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 15,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38551641270",
+      "segments": 2,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "IDOX_SEARCH",
+      "workflow_path": ".github/workflows/stage4-discovery-idox-family-once.yml"
+    },
+    {
+      "artifact_zip_sha256": "a42ddd0c292afaba39faaa3864a81dd52c32c2e1578976f22a3222b5c470c15a",
+      "code_sha": "eb9696728e5199a3ace010245fa57509b0e75317",
+      "council": "wigan",
+      "date_semantics": "RECEIVED_DATE",
+      "evidence_path": "evidence/final-idox1-wigan.json",
+      "latency": "NOT_ASSESSED",
+      "operational_recommendation": "SHARED_BOUNDED_IDOX_SEARCH_WITH_COUNCIL_CONFIGURATION",
+      "primary_url": "https://planning.wigan.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "proof_scope": "COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_ONLY",
+      "publication_timestamp": "UNKNOWN",
+      "qualification_status": "INDEPENDENTLY_REVIEWED_HISTORICAL_SOURCE_WINDOW",
+      "raw_audit_completeness": "UNKNOWN",
+      "references": 17,
+      "requested_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "run_attempt": 1,
+      "run_id": "38554185271",
+      "segments": 2,
+      "selected_window_completeness": "COMPLETE",
+      "source_type": "IDOX_SEARCH",
+      "workflow_path": ".github/workflows/stage4-discovery-wigan-final-once.yml"
+    }
+  ],
+  "scope": "NINE_COUNCILS_TRAFFORD_DEFERRED",
+  "selected_window_totals": {
+    "references": 230,
+    "segments": 27
+  },
+  "status": "GO_PRIMARY_DISCOVERY_SOURCES_QUALIFIED_OBSERVED_SHAPES"
+}

@@ -1,0 +1,21 @@
+{
+  "committee_assessment_date": "2026-10-14",
+  "timezone": "Europe/London",
+  "historical_start_inclusive": "2025-10-14",
+  "historical_end_exclusive": "2026-10-14",
+  "councils": [
+    "bolton",
+    "bury",
+    "manchester",
+    "oldham",
+    "rochdale",
+    "salford",
+    "stockport",
+    "tameside",
+    "wigan"
+  ],
+  "trafford": "DEFERRED",
+  "historical_meeting_selection": "Meeting date within frozen interval; publication timestamps kept separately, UNKNOWN when unavailable. Any older companion document must be necessary to interpret an in-scope meeting/application and explicitly marked.",
+  "production_mutation": false,
+  "source_code_master": "eb9696728e5199a3ace010245fa57509b0e75317"
+}

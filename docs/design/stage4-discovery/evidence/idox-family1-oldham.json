@@ -40,84 +40,252 @@
   "persistence": false,
   "records": [
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "NMA/356901/26",
       "source_key": "TM2IIQMCN4000",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2IIQMCN4000&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "NMA/356895/26",
       "source_key": "TM2CX5MCN3Q00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2CX5MCN3Q00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 08 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356921/26",
       "source_key": "TM8807MCFHN00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM8807MCFHN00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356919/26",
       "source_key": "TM7WV3MCFH100",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM7WV3MCFH100&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356916/26",
       "source_key": "TM627TMCFG800",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM627TMCFG800&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356915/26",
       "source_key": "TM6277MCFG500",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM6277MCFG500&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356914/26",
       "source_key": "TM4V4PMCFG000",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM4V4PMCFG000&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356912/26",
       "source_key": "TM4FVZMCN5B00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM4FVZMCN5B00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 08 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356908/26",
       "source_key": "TM47IPMCN4X00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM47IPMCN4X00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356905/26",
       "source_key": "TM2TJOMCN4I00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2TJOMCN4I00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356897/26",
       "source_key": "TM2D04MCN3U00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2D04MCN3U00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "HOU/356894/26",
       "source_key": "TM2CWIMCN3N00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2CWIMCN3N00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "CND/356925/26",
       "source_key": "TM8KH1MCFID00",
       "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM8KH1MCFID00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "CND/356920/26",
       "source_key": "TM82F2MCFHG00",
@@ -140,6 +308,7 @@
     "requests_attempted": 5,
     "retries": 0
   },
+  "retention_note": "Exact identities and literal date states retained; proposal/address and other optional fields omitted from this repository copy. Artifact digest refers to original bounded ZIP.",
   "run_id": "38551641270",
   "sort": "REFERENCE_DESCENDING",
   "source_qualification": "CANDIDATE_CONTRACT",
