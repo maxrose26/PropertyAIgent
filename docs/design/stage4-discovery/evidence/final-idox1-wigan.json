@@ -1,0 +1,401 @@
+{
+  "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+  "applied_evidence_sha256": "de79f916ae923bf3b5795d52951ab7b3bde9cc38bf270bef99ea38287381bed4",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "artifact_zip_sha256": "a42ddd0c292afaba39faaa3864a81dd52c32c2e1578976f22a3222b5c470c15a",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "eb9696728e5199a3ace010245fa57509b0e75317",
+  "completeness": "UNKNOWN",
+  "council": "wigan",
+  "date_semantics": "RECEIVED",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "failure": null,
+  "pages": [
+    {
+      "body_sha256": "098a9c6d7be474057332aa5bdf9ee8f2c1ce5cdf33f1f9b54a80813fef804bcb",
+      "first": 1,
+      "last": 10,
+      "ordinal": 1,
+      "rows": 10,
+      "terminal": null,
+      "total": 17
+    },
+    {
+      "body_sha256": "8adfd27766a8a224c9d7ee1b8c57c544271bb6928e36d9f9352280b42972ef20",
+      "first": 11,
+      "last": 17,
+      "ordinal": 2,
+      "rows": 7,
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+      "total": 17
+    }
+  ],
+  "persistence": false,
+  "records": [
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101620/NMAS",
+      "source_key": "TMHFTKRR08C00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TMHFTKRR08C00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101609/CON",
+      "source_key": "TMAB2KRRLH900",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TMAB2KRRLH900&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101607/CON",
+      "source_key": "TMA8AHRRLH400",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TMA8AHRRLH400&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101606/CON",
+      "source_key": "TMA5I8RRLH100",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TMA5I8RRLH100&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101604/PDE",
+      "source_key": "TM9YYPRR0DH00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM9YYPRR0DH00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101603/PDE",
+      "source_key": "TM9Y0WRR0DH00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM9Y0WRR0DH00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101602/WTTCA",
+      "source_key": "TM8CDCRR01P00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM8CDCRR01P00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101600/FULL",
+      "source_key": "TM8ABURRLG500",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM8ABURRLG500&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101599/HH",
+      "source_key": "TM84QURRLG100",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM84QURRLG100&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101595/CON",
+      "source_key": "TM6NLQRRLF800",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM6NLQRRLF800&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101594/WTTPO",
+      "source_key": "TM6HSIRR01P00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM6HSIRR01P00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101591/WTTPO",
+      "source_key": "TM65E0RR01P00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM65E0RR01P00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101590/WTTPO",
+      "source_key": "TM4NPTRR01P00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM4NPTRR01P00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101589/CON",
+      "source_key": "TM4HA0RRLE300",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM4HA0RRLE300&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101587/HH",
+      "source_key": "TM304LRRLDE00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM304LRRLDE00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101584/CON",
+      "source_key": "TM2GJ1RRLCX00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM2GJ1RRLCX00&activeTab=summary"
+    },
+    {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 08 Oct 2026"
+        }
+      },
+      "identity_state": "PRESENT_VALUE",
+      "reference": "A/26/101583/HH",
+      "source_key": "TM2FMERR0DF00",
+      "source_url": "https://planning.wigan.gov.uk/online-applications/applicationDetails.do?keyVal=TM2FMERR0DF00&activeTab=summary"
+    }
+  ],
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "wigan",
+    "elapsed_seconds": 9.891,
+    "outcome": "UNKNOWN",
+    "received_bytes": 283416,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "requests_attempted": 5,
+    "retries": 0
+  },
+  "response_provenance": [
+    {
+      "body_sha256": "435e5721b01dcf7d217b5cda8d96105f79cb303e13dcade695aa79720dc0758a",
+      "parser_body_sha256": "9971b73138a147cac903e4d58885a218b57a7e04cf2a1ca9a733b92cf45f1721",
+      "source_encoding": "ISO-8859-1"
+    },
+    {
+      "body_sha256": "91f5d5717705335caff3d639e3bfaf759e117719b28ef282b79fd7446704903c",
+      "parser_body_sha256": "91f5d5717705335caff3d639e3bfaf759e117719b28ef282b79fd7446704903c",
+      "source_encoding": "ISO-8859-1"
+    },
+    {
+      "body_sha256": "098a9c6d7be474057332aa5bdf9ee8f2c1ce5cdf33f1f9b54a80813fef804bcb",
+      "parser_body_sha256": "098a9c6d7be474057332aa5bdf9ee8f2c1ce5cdf33f1f9b54a80813fef804bcb",
+      "source_encoding": "ISO-8859-1"
+    },
+    {
+      "body_sha256": "8adfd27766a8a224c9d7ee1b8c57c544271bb6928e36d9f9352280b42972ef20",
+      "parser_body_sha256": "8adfd27766a8a224c9d7ee1b8c57c544271bb6928e36d9f9352280b42972ef20",
+      "source_encoding": "ISO-8859-1"
+    },
+    {
+      "body_sha256": "02793c801d466c81d3338cc6ca6204edc9a5182f7503a59bfd256347e2444fbe",
+      "parser_body_sha256": "de79f916ae923bf3b5795d52951ab7b3bde9cc38bf270bef99ea38287381bed4",
+      "source_encoding": "ISO-8859-1"
+    }
+  ],
+  "retention_note": "Exact identities and literal date states retained; proposal/address and other optional fields omitted from this repository copy. Artifact digest refers to original bounded ZIP.",
+  "run_id": "38554185271",
+  "sort": "REFERENCE_DESCENDING",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "unique_references": 17
+}

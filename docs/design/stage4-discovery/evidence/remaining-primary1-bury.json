@@ -38,108 +38,324 @@
   "persistence": false,
   "records": [
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73718",
       "source_key": "_BURY_DCAPR_65225",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65225&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73716",
       "source_key": "_BURY_DCAPR_65221",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65221&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 09 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73713",
       "source_key": "_BURY_DCAPR_65217",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65217&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73710",
       "source_key": "_BURY_DCAPR_65212",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65212&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73709",
       "source_key": "_BURY_DCAPR_65211",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65211&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73708",
       "source_key": "_BURY_DCAPR_65210",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65210&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 12 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73707",
       "source_key": "_BURY_DCAPR_65209",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65209&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73705",
       "source_key": "_BURY_DCAPR_65207",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65207&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73704",
       "source_key": "_BURY_DCAPR_65206",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65206&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73702",
       "source_key": "_BURY_DCAPR_65204",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65204&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 29 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73701",
       "source_key": "_BURY_DCAPR_65203",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65203&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73700",
       "source_key": "_BURY_DCAPR_65202",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65202&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 29 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73699",
       "source_key": "_BURY_DCAPR_65201",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65201&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 05 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73698",
       "source_key": "_BURY_DCAPR_65199",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65199&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73697",
       "source_key": "_BURY_DCAPR_65198",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65198&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73696",
       "source_key": "_BURY_DCAPR_65197",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65197&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73695",
       "source_key": "_BURY_DCAPR_65196",
       "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65196&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "73694",
       "source_key": "_BURY_DCAPR_65195",
@@ -162,6 +378,7 @@
     "requests_attempted": 5,
     "retries": 0
   },
+  "retention_note": "Exact identities and literal date states retained; proposal/address and other optional fields omitted from this repository copy. Artifact digest refers to original bounded ZIP.",
   "run_id": "38553113416",
   "sort": "REFERENCE_DESCENDING",
   "source_qualification": "CANDIDATE_CONTRACT",

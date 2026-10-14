@@ -1,0 +1,69 @@
+{
+  "applied_evidence": "STRICT_ZERO_RESULT_FORM_ECHO",
+  "applied_evidence_sha256": "9aa8ea77dd730d1405d775a94b711869face976e06f35269fa2f23acab93a3be",
+  "applied_interval": [
+    "2026-11-30",
+    "2026-11-30"
+  ],
+  "artifact_zip_sha256": "a42ddd0c292afaba39faaa3864a81dd52c32c2e1578976f22a3222b5c470c15a",
+  "attempt": 1,
+  "capped": false,
+  "cleanup": "SESSION_BOUNDARY_CLOSED",
+  "code_sha": "eb9696728e5199a3ace010245fa57509b0e75317",
+  "completeness": "UNKNOWN",
+  "council": "bury",
+  "date_semantics": "RECEIVED",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "explicit_zero_evidence": "NO_RESULTS_FOUND_AND_RETAINED_DATE_CRITERIA",
+  "failure": null,
+  "pages": [
+    {
+      "body_sha256": "9aa8ea77dd730d1405d775a94b711869face976e06f35269fa2f23acab93a3be",
+      "first": 0,
+      "last": 0,
+      "ordinal": 1,
+      "rows": 0,
+      "terminal": "EXPLICIT_ZERO_RESULTS",
+      "total": 0
+    }
+  ],
+  "persistence": false,
+  "records": [],
+  "requested_interval": [
+    "2026-11-30",
+    "2026-11-30"
+  ],
+  "resource": {
+    "adapter": "idox",
+    "budget_exhaustion": false,
+    "council": "bury",
+    "elapsed_seconds": 3.159,
+    "outcome": "UNKNOWN",
+    "received_bytes": 82943,
+    "redirects": 0,
+    "reference": "RECEIVED:2026-11-30:2026-11-30",
+    "requests_attempted": 2,
+    "retries": 0
+  },
+  "response_provenance": [
+    {
+      "body_sha256": "845831f1fff42c8bb8ccaab16cabdb30cda86b3b4d7d9dbaef04d6e0ac792c33",
+      "parser_body_sha256": "845831f1fff42c8bb8ccaab16cabdb30cda86b3b4d7d9dbaef04d6e0ac792c33",
+      "source_encoding": "UTF-8"
+    },
+    {
+      "body_sha256": "9aa8ea77dd730d1405d775a94b711869face976e06f35269fa2f23acab93a3be",
+      "parser_body_sha256": "9aa8ea77dd730d1405d775a94b711869face976e06f35269fa2f23acab93a3be",
+      "source_encoding": "UTF-8"
+    }
+  ],
+  "run_id": "38554185271",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "supervisor": {
+    "expired": false,
+    "returned": true,
+    "worker_exit": 0,
+    "worker_restarted": false
+  },
+  "unique_references": 0
+}

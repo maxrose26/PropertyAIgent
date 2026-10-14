@@ -30,6 +30,13 @@
       "kind": "BLANK"
     }
   ],
+  "hosted_execution_metadata": {
+    "attempt": 1,
+    "head_sha": "86ff64c2b8babc271e4c90ae02777905cbc1dd86",
+    "run_id": "38553113416",
+    "source": "AUTHENTICATED_HOSTED_RUN_METADATA",
+    "workflow_path": ".github/workflows/stage4-discovery-remaining-primary-once.yml"
+  },
   "largest_observed_post_bytes": 159286,
   "listing_records": [
     {

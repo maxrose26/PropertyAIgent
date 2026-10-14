@@ -48,132 +48,396 @@
   "persistence": false,
   "records": [
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01797/26",
       "source_key": "TMFQF4DE03B00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01790/26",
       "source_key": "TMA9MQDEKI200",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01787/26",
       "source_key": "TM9VQ2DEKHR00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 02 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01786/26",
       "source_key": "TM9T1HDEKHO00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01785/26",
       "source_key": "TM8139DEKH800",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01784/26",
       "source_key": "TM7YC9DEKH500",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01783/26",
       "source_key": "TM7VQZDEKH200",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 01 Oct 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Fri 09 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01782/26",
       "source_key": "TM7VQMDEKH000",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 06 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01780/26",
       "source_key": "TM6SO1DEKGU00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01778/26",
       "source_key": "TM6N2ADEKGO00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01776/26",
       "source_key": "TM63LBDEKGD00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01775/26",
       "source_key": "TM60YGDEKGA00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YGDEKGA00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 30 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01769/26",
       "source_key": "TM4EHVDEKFN00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Tue 29 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Wed 07 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01768/26",
       "source_key": "TM4CENDE02800",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01767/26",
       "source_key": "TM2V0FDEKFB00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2V0FDEKFB00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 08 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01766/26",
       "source_key": "TM2UZFDEKF900",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2UZFDEKF900&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01764/26",
       "source_key": "TM2UYJDEKF500",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2UYJDEKF500&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01763/26",
       "source_key": "TM2S4VDEKF200",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2S4VDEKF200&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01762/26",
       "source_key": "TM2PD0DEKEZ00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2PD0DEKEZ00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01759/26",
       "source_key": "TM2BQBDEKEQ00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2BQBDEKEQ00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01758/26",
       "source_key": "TM2BP6DEKEO00",
       "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM2BP6DEKEO00&activeTab=summary"
     },
     {
+      "fields": {
+        "received_date": {
+          "locator": "p.metaInfo:Received",
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026"
+        },
+        "validated_date": {
+          "locator": "p.metaInfo:Validated",
+          "state": "PRESENT_VALUE",
+          "value": "Thu 08 Oct 2026"
+        }
+      },
       "identity_state": "PRESENT_VALUE",
       "reference": "01757/26",
       "source_key": "TM2BOPDEKEM00",
@@ -196,7 +460,7 @@
     "requests_attempted": 6,
     "retries": 0
   },
-  "retention_note": "Application identities retained; optional literal fields omitted from repository copy. Full bounded audit remains in referenced CI artifact.",
+  "retention_note": "Exact identities and literal date states retained; proposal/address and other optional fields omitted from this repository copy. Artifact digest refers to original bounded ZIP.",
   "run_id": "38545477089",
   "sort": "REFERENCE_DESCENDING",
   "source_qualification": "CANDIDATE_CONTRACT",
