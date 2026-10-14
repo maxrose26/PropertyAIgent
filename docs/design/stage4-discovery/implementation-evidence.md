@@ -46,3 +46,11 @@ Official source-option check (not enumeration qualification):
 
 No recurring schedule, deployment, model call or production mutation authorised
 by this implementation evidence document.
+
+CI reconciliation: the disposable PostgreSQL discovery job passed both tests.
+The wider B2 workflows each reported 594 passing and one immutable-byte pin
+failure: PR72's fail-closed pagination change changed idox_portal.py. Preserve
+the exact original parser bytes in history/idox-v1.py.txt and retain the original
+accepted-dependencies-v1.json unchanged; the current pin now identifies the
+reviewed pagination correction. The historical test reads the archived original
+for that parser. This records dependency evolution without rewriting live history.
