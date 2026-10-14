@@ -88,6 +88,9 @@ def post_metadata(body, destination):
                 value=params.get(key)
                 if isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9_.$]{0,160}',value):
                     record[key] = value
+            record['action_keys'] = sorted(k for k in action if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20]
+            record['params_present'] = 'params' in action
+            record['boolean_controls'] = {k:v for k,v in params.items() if k in ('cacheable','isContinuation') and type(v) is bool}
             record['parameter_keys'] = sorted(k for k in params if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20]
             inner=params.get('params', {})
             record['argument_keys'] = sorted(k for k in inner if isinstance(k,str) and re.fullmatch(r'[A-Za-z0-9_]{1,80}',k))[:20] if isinstance(inner,dict) else []

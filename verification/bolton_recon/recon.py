@@ -54,9 +54,9 @@ def require(ok, outcome, reason):
     if not ok: raise Failure(outcome, reason)
 
 
-def safe_url(raw, allowed):
+def safe_url(raw, allowed, base=FORM_URL):
     require(isinstance(raw,str) and len(raw)<=512 and not re.search(r'[\s\\%]',raw), 'FORM_REJECTED','FORM_ACTION')
-    url = urljoin(FORM_URL, raw)
+    url = urljoin(base, raw)
     require(url in allowed, 'FORM_REJECTED','FORM_ACTION')
     return url
 
@@ -85,14 +85,18 @@ def soup_for(body):
     return BeautifulSoup(text,'html.parser')
 
 
-def form_payload(body, audit):
+def form_payload(body, audit, *, form_url=FORM_URL, post_urls=POST_URLS, date_fields=DATE_FIELDS, date_values=None, allow_date_echo=False):
+    # Alternate frozen discovery windows reuse this strict form reader. The
+    # caller must independently bind transport to the returned exact payload.
+    date_values = date_values or (DATE_VALUE, DATE_VALUE)
+    require(len(date_fields)==len(date_values)==2 and all(re.fullmatch(r"\d{2}/\d{2}/\d{4}",v) for v in date_values), "FORM_REJECTED", "DATE_CONTROL")
     soup=soup_for(body)
-    forms=[f for f in soup.find_all('form') if all(f.find('input',attrs={'name':n}) for n in DATE_FIELDS)]
+    forms=[f for f in soup.find_all('form') if all(f.find('input',attrs={'name':n}) for n in date_fields)]
     require(len(forms)==1 and len(soup.find_all('form'))<=10,'FORM_REJECTED','FORM_SELECTION')
     form=forms[0]
     require(form.get('method','get').lower()=='post' and form.get('enctype','application/x-www-form-urlencoded').lower()=='application/x-www-form-urlencoded',
             'FORM_REJECTED','FORM_METHOD')
-    target=safe_url(form.get('action',''),POST_URLS)
+    target=safe_url(form.get('action',''),post_urls,form_url)
     require(not form.has_attr('target') and not soup.find('base'), 'FORM_REJECTED','FORM_STRUCTURE')
     # External form-associated controls / per-control action overrides are not understood.
     require(not soup.select('[form]') and not form.select('[formaction],[formmethod],[formenctype]'), 'FORM_REJECTED','FORM_STRUCTURE')
@@ -118,9 +122,9 @@ def form_payload(body, audit):
             row['classification']='IGNORABLE_CONTROL'; continue
         if name:
             require(name not in seen,'FORM_REJECTED','DUPLICATE_CONTROL'); seen.add(name)
-        if name in DATE_FIELDS:
-            require(kind=='text' and not value and not el.has_attr('readonly'),'FORM_REJECTED','DATE_CONTROL')
-            data[name]=DATE_VALUE; row['classification']='APPROVED_DATE_INPUT'
+        if name in date_fields:
+            require(kind=='text' and (value==date_values[date_fields.index(name)] if allow_date_echo else not value) and not el.has_attr('readonly'),'FORM_REJECTED','DATE_CONTROL')
+            data[name]=date_values[date_fields.index(name)]; row['classification']='APPROVED_DATE_INPUT'
         elif name in STATE_FIELDS:
             row['classification']='REQUIRED_SERVER_STATE'
             require(kind=='hidden' and bool(re.fullmatch(r'[A-Za-z0-9_+/=.-]{1,256}',value)), 'FORM_REJECTED','STATE_CONTROL')
@@ -144,7 +148,7 @@ def form_payload(body, audit):
             raise Failure('FORM_REJECTED','POPULATED_CRITERION')
         else:
             raise Failure('FORM_REJECTED','UNKNOWN_CONTROL')
-    require(submits==1 and all(data.get(n)==DATE_VALUE for n in DATE_FIELDS),'FORM_REJECTED','DATE_CONTROL')
+    require(submits==1 and all(data.get(n)==v for n,v in zip(date_fields,date_values)),'FORM_REJECTED','DATE_CONTROL')
     # Tokens are local to this returned form/action and never included in the audit.
     return target,data
 

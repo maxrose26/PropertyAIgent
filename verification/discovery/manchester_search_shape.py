@@ -19,14 +19,14 @@ def bootstrap_read_allowed(url, body):
         message=json.loads(form['message'][0]); actions=message.get('actions')
         if not isinstance(actions,list) or not 1<=len(actions)<=6: return False
         for a in actions:
-            if not isinstance(a,dict) or set(a)-{'id','descriptor','callingDescriptor','params'}: return False
-            p=a.get('params')
+            if not isinstance(a,dict): return False
+            p=a.get('params',{})
             if a.get('descriptor')==HOST:
                 if p!={}: return False
             elif a.get('descriptor')==APEX:
                 if not isinstance(p,dict) or set(p)!={'namespace','classname','method','cacheable','isContinuation'}: return False
                 if p['namespace']!='' or (p['classname'],p['method']) not in GETTERS: return False
-                if p['cacheable'] is not True or p['isContinuation'] is not False: return False
+                if type(p['cacheable']) is not bool or p['isContinuation'] is not False: return False
             else: return False
         return True
     except (ValueError,TypeError,AttributeError): return False
