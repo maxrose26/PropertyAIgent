@@ -1,0 +1,26 @@
+{
+  "purpose": "Synthetic local guard/control-flow proof; not actual credential diagnosis",
+  "actual_mismatch_category": "UNKNOWN",
+  "cases": [
+    {
+      "form": "explicit_native_exact_route",
+      "mock_factory_calls": 1
+    },
+    {
+      "form": "plain_postgresql_same_route",
+      "mock_factory_calls": 0
+    },
+    {
+      "form": "legacy_postgres_same_route",
+      "mock_factory_calls": 0
+    },
+    {
+      "form": "omitted_default_port_same_route",
+      "mock_factory_calls": 0
+    }
+  ],
+  "real_credentials_used": false,
+  "database_connections": 0,
+  "source_requests": 0,
+  "production_code_changed": false
+}

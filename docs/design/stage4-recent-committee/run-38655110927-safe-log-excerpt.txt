@@ -1,0 +1,12 @@
+2026-10-14T23:37:47.0200206Z Traceback (most recent call last):
+2026-10-14T23:37:47.0201414Z   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-10-14T23:37:47.0202165Z   File "<frozen runpy>", line 88, in _run_code
+2026-10-14T23:37:47.0203348Z   File "/home/runner/work/PropertyAIgent/PropertyAIgent/verification/discovery/material_admission.py", line 128, in <module>
+2026-10-14T23:37:47.0206969Z   File "/home/runner/work/PropertyAIgent/PropertyAIgent/verification/discovery/material_admission.py", line 117, in main
+2026-10-14T23:37:47.0208604Z     engine=checked_engine(os.environ['COMMITTEE_DATABASE_URL'])
+2026-10-14T23:37:47.0211289Z   File "/home/runner/work/PropertyAIgent/PropertyAIgent/verification/discovery/committee_exact.py", line 79, in checked_engine
+2026-10-14T23:37:47.0212854Z     raise ValueError('existing production route only')
+2026-10-14T23:37:47.0213752Z ValueError: existing production route only
+2026-10-14T23:37:47.0840894Z ##[error]Process completed with exit code 1.
+2026-10-14T23:37:47.6944719Z Uploaded bytes 406
+2026-10-14T23:37:48.1495036Z Cleaning up orphan processes
