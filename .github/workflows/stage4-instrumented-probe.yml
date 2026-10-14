@@ -6,6 +6,8 @@ on:
       - app/pipeline/status_verification.py
       - app/db/models.py
       - tests/test_arcus*
+      - tests/test_salford15_continuation.py
+      - .github/workflows/stage4-salford15-production-once.yml
       - tests/test_field_level_verification.py
       - verification/direct_reference/arcus_http_probe.py
       - verification/direct_reference/INSTRUMENTED_PROBE.md
@@ -18,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   probe:
-    if: github.repository == 'maxrose26/PropertyAIgent' && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'stage4/instrumented-source-probe'
+    if: github.repository == 'maxrose26/PropertyAIgent' && github.event.pull_request.head.repo.full_name == github.repository && (github.head_ref == 'stage4/instrumented-source-probe' || github.head_ref == 'stage4/salford15-continuation')
     runs-on: ubuntu-24.04
     timeout-minutes: 7
     steps:
@@ -34,4 +36,4 @@ jobs:
           bash verification/ah_pg/setup.sh "$RUNNER_TEMP/arcus-offline-venv"
       - name: Focused offline contracts
         run: |
-          "$RUNNER_TEMP/arcus-offline-venv/bin/python" -m pytest tests/test_instrumented_probe.py tests/test_render_disposable_job.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py tests/test_arcus_batch.py tests/test_field_level_verification.py tests/test_arcus_production.py -q
+          "$RUNNER_TEMP/arcus-offline-venv/bin/python" -m pytest tests/test_instrumented_probe.py tests/test_render_disposable_job.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py tests/test_arcus_batch.py tests/test_field_level_verification.py tests/test_arcus_production.py tests/test_salford15_continuation.py -q

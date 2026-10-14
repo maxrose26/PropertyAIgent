@@ -1,0 +1,145 @@
+{
+  "accepted_merge": "898c0c93889aa9df8fa5454818cf45de0a920d25",
+  "prior_run": "38475718624",
+  "quarantined": [
+    266
+  ],
+  "rows": [
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 534,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2024/1313",
+      "source_identifier": "a0kSq000002tuejIAA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000002tuejIAA?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 540,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2024/1538",
+      "source_identifier": "a0kSq000003cb01IAA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000003cb01IAA?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 545,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2024/1621",
+      "source_identifier": "a0kSq000003trBdIAI",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000003trBdIAI?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 547,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2024/1622",
+      "source_identifier": "a0kSq000003tpOcIAI",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000003tpOcIAI?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 554,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2025/0043",
+      "source_identifier": "a0kSq0000054eNNIAY",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000054eNNIAY?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 566,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "23/81719/HYBEIA",
+      "source_identifier": "a0kSq0000000nxcIAA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000nxcIAA?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1146,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "23/81238/OUTEIA",
+      "source_identifier": "a0kSq0000000mCcIAI",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000mCcIAI?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1149,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "23/81742/HYBEIA",
+      "source_identifier": "a0kSq0000000nvlIAA",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000nvlIAA?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1155,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "23/82436/FUL",
+      "source_identifier": "a0kSq0000000ojWIAQ",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000ojWIAQ?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1156,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "23/81788/FUL",
+      "source_identifier": "a0kSq0000000qXjIAI",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000qXjIAI?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1159,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2023/0425",
+      "source_identifier": "a0kSq000000DhVNIA0",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000DhVNIA0?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1165,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2023/0550",
+      "source_identifier": "a0kSq000000LqWfIAK",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000LqWfIAK?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1167,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2023/0532",
+      "source_identifier": "a0kSq000000L0TFIA0",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000L0TFIA0?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1177,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "PA/2023/0556",
+      "source_identifier": "a0kSq000000M66nIAC",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq000000M66nIAC?c__r=Arcus_BE_Public_Register"
+    },
+    {
+      "admission": "ADMITTED_ARCUS_ROUTE",
+      "application_id": 1181,
+      "council": "salford",
+      "platform_family": "ARCUS",
+      "reference": "20/76664/OUT",
+      "source_identifier": "a0kSq0000000oQSIAY",
+      "source_url": "https://salfordcitycouncil.my.site.com/pr/s/detail/a0kSq0000000oQSIAY?c__r=Arcus_BE_Public_Register"
+    }
+  ],
+  "schema": 1
+}
