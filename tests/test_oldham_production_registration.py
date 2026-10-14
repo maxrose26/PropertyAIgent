@@ -55,7 +55,7 @@ def test_environment_is_exclusive_to_live_job():
     assert live['jobs']['audit']['environment']=='stage4-production-canary'
     for path,workflow in workflows.items():
         for job_id,job in workflow.get('jobs',{}).items():
-            if (path,job_id) not in {(p.WORKFLOW,'audit'),('.github/workflows/stage4-batch-production-once.yml','live'),('.github/workflows/stage4-catchup-a-production-once.yml','live'),('.github/workflows/stage4-catchup-b-production-once.yml','live'),('.github/workflows/stage4-closure-pending-production-once.yml','live'),('.github/workflows/stage4-closure-expanded-production-once.yml','live'),('.github/workflows/stage4-arcus-production-once.yml','live'),('.github/workflows/stage4-salford15-production-once.yml','live'),('.github/workflows/stage4-committee-admission-once.yml','admission')}:
+            if (path,job_id) not in {(p.WORKFLOW,'audit'),('.github/workflows/stage4-batch-production-once.yml','live'),('.github/workflows/stage4-catchup-a-production-once.yml','live'),('.github/workflows/stage4-catchup-b-production-once.yml','live'),('.github/workflows/stage4-closure-pending-production-once.yml','live'),('.github/workflows/stage4-closure-expanded-production-once.yml','live'),('.github/workflows/stage4-arcus-production-once.yml','live'),('.github/workflows/stage4-salford15-production-once.yml','live'),('.github/workflows/stage4-committee-admission-once.yml','admission'),('.github/workflows/stage4-manchester-145583-admission-once.yml','admission')}:
                 assert 'environment' not in job or 'stage4-production-canary' not in str(job['environment'])
     job=live['jobs']['audit']
     assert 'env' not in live and 'env' not in job

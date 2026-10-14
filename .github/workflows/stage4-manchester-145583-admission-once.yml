@@ -1,0 +1,95 @@
+name: Stage4 Manchester145583 admission ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed integrated revision
+        required: true
+        type: string
+      authority:
+        description: One frozen Manchester reference; shared admission and B2
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_MANCHESTER_145583_FO_2026_ADMISSION_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Exact revision and one invocation
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_MANCHESTER_145583_FO_2026_ADMISSION_ONCE ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Dependencies without production credentials
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/committee-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Credential-free transport qualification, fixed manifest
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          COMMITTEE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          mkdir "$RUNNER_TEMP/committee-audit"
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_REF="$GITHUB_REF" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" COMMITTEE_WORKFLOW_SHA="$COMMITTEE_WORKFLOW_SHA" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m verification.discovery.manchester_145583 --sha "$PIN" --authority "$AUTHORITY" --transport-only --output "$RUNNER_TEMP/committee-audit/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: manchester-145583-transport-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/committee-audit/*.json
+          if-no-files-found: error
+          retention-days: 14
+  admission:
+    needs: transport
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Exact revision and one invocation
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_MANCHESTER_145583_FO_2026_ADMISSION_ONCE ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Dependencies without production credentials
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/committee-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Shared admission and B2, fixed manifest
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          COMMITTEE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          COMMITTEE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir "$RUNNER_TEMP/committee-audit"
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_REF="$GITHUB_REF" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" COMMITTEE_WORKFLOW_SHA="$COMMITTEE_WORKFLOW_SHA" COMMITTEE_DATABASE_URL="$COMMITTEE_DATABASE_URL" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m verification.discovery.manchester_145583 --sha "$PIN" --authority "$AUTHORITY" --output "$RUNNER_TEMP/committee-audit/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: manchester-145583-admission-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/committee-audit/*.json
+          if-no-files-found: error
+          retention-days: 14
