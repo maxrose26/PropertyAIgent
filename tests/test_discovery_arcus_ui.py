@@ -70,3 +70,16 @@ def test_locator_reader_uses_only_reference_and_valid_date():
     rows=done.value.value
     assert [f['label'] for f in rows[0]['fields']]==['Reference','Valid Date']
     assert qualify_segment('Showing 1 to 1 of 1 results',rows,1)[3][0]['reference']=='PLA-2026-001'
+
+
+def test_council_configuration_preserves_missing_optional_date():
+    from verification.discovery.arcus_ui_config import SALFORD,ROCHDALE,UI_CASES
+    assert set(UI_CASES)=={'discovery_manchester_ui_window','discovery_salford_ui_window','discovery_rochdale_ui_window'}
+    c=card();c['links'][0]['href']=c['links'][0]['href'].replace('arcusbe.manchester.gov.uk',SALFORD.host)
+    c['fields']=c['fields'][:1]
+    _,_,_,rows=qualify_segment('Showing 1 to 1 of 1 results',[c],1,config=SALFORD)
+    assert rows[0]['validated_date']=={'state':'UNKNOWN','literal':None}
+    assert rows[0]['field_capture_scope']==['reference']
+    with pytest.raises(ValueError):qualify_segment('Showing 1 to 1 of 1 results',[c],1,config=ROCHDALE)
+    c=card();c['links'][0]['href']=c['links'][0]['href'].replace('arcusbe.manchester.gov.uk',ROCHDALE.host)
+    assert qualify_segment('Showing 1 to 1 of 1 results',[c],1,config=ROCHDALE)[3][0]['reference']=='PLA-2026-001'

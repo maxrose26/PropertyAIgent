@@ -1,0 +1,50 @@
+name: Stage4 remaining primary discovery qualification ONCE
+on:
+  push:
+    branches: [master]
+    paths: ['verification/discovery/remaining_source_once.py']
+permissions:
+  contents: read
+concurrency:
+  group: stage4-discovery-source-qualification
+  cancel-in-progress: false
+jobs:
+  qualify:
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/discovery-browsers" "$RUNNER_TEMP/discovery-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Focused source contracts
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_remaining_source.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_family.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py tests/test_instrumented_probe.py -q
+      - name: Fixed remaining calls, sequential with no persistence
+        env:
+          CANDIDATE: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir "$RUNNER_TEMP/discovery-remaining"
+          failed=0
+          for council in rochdale salford; do
+            timeout --kill-after=2s 55s env -i HOME="$HOME" PATH=/usr/bin:/bin GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/discovery-browsers" "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.direct_reference.instrumented_probe --case "discovery_${council}_ui_window" --output "$RUNNER_TEMP/discovery-remaining/${council}.json" > /dev/null || failed=1
+            if test -f "$RUNNER_TEMP/discovery-remaining/${council}.json"; then
+              env -i HOME="$HOME" PATH=/usr/bin:/bin "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.discovery.arcus_ui_audit "$RUNNER_TEMP/discovery-remaining/${council}.json" > "$RUNNER_TEMP/discovery-remaining/${council}-qualification.json" || failed=1
+            fi
+          done
+          for case in bury wigan-shape; do
+            timeout --kill-after=2s 60s env -i HOME="$HOME" PATH=/usr/bin:/bin DISCOVERY_CANDIDATE_SHA="$CANDIDATE" DISCOVERY_RUN_ID="$RUN_ID" "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.discovery.remaining_source_once --case "$case" --output "$RUNNER_TEMP/discovery-remaining/${case}.json" || failed=1
+          done
+          test "$failed" -eq 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-remaining-primary-${{ github.run_id }}-${{ github.sha }}
+          path: ${{ runner.temp }}/discovery-remaining/*.json
+          retention-days: 14
+          if-no-files-found: error

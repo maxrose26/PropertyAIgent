@@ -8,9 +8,9 @@ def combined_bytes(audit):
     return max(audit.get('decoded_bytes',0),audit.get('encoded_bytes',0))+audit.get('outbound_payload_bytes',0)
 
 
-async def measure_post(event,client,audit):
+async def measure_post(event,client,audit,expected_aura=AURA):
     request=event['request'];u=urlsplit(request['url'])
-    if request['method']!='POST' or u._replace(query='').geturl()!=AURA:
+    if request['method']!='POST' or u._replace(query='').geturl()!=expected_aura:
         return 'POST_DESTINATION'
     headers={k.lower():v for k,v in request.get('headers',{}).items()}
     if headers.get('content-encoding','identity').strip().lower()!='identity':return 'POST_CONTENT_ENCODING'
