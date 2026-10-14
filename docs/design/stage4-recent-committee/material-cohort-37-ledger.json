@@ -111,11 +111,12 @@
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
       "admission_cohort": false,
-      "current_absence": "NOT_CHECKED",
+      "current_absence": "OWNER_CHECK_NO_MATCH",
       "portal_identity": "NOT_YET_QUALIFIED",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; CURRENT_ABSENCE_AND_PORTAL_QUALIFICATION_PENDING"
+      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
     },
     {
       "council": "bolton",
@@ -382,11 +383,12 @@
       "admission_cohort": false,
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
-      "current_absence": "NOT_CHECKED",
+      "current_absence": "OWNER_CHECK_NO_MATCH",
       "portal_identity": "HISTORICALLY_QUALIFIED_PENDING_CURRENT_COHORT_CHECK",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; CURRENT_ABSENCE_AND_PORTAL_QUALIFICATION_PENDING"
+      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
     },
     {
       "council": "manchester",
@@ -411,11 +413,12 @@
       "admission_cohort": false,
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
-      "current_absence": "NOT_CHECKED",
+      "current_absence": "OWNER_CHECK_NO_MATCH",
       "portal_identity": "HISTORICALLY_QUALIFIED_PENDING_CURRENT_COHORT_CHECK",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; CURRENT_ABSENCE_AND_PORTAL_QUALIFICATION_PENDING"
+      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
     },
     {
       "council": "oldham",
@@ -616,11 +619,12 @@
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
       "admission_cohort": false,
-      "current_absence": "NOT_CHECKED",
+      "current_absence": "OWNER_CHECK_NO_MATCH",
       "portal_identity": "NOT_YET_QUALIFIED",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; CURRENT_ABSENCE_AND_PORTAL_QUALIFICATION_PENDING"
+      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
     },
     {
       "council": "salford",
@@ -704,11 +708,12 @@
       "site_relationship": "UNKNOWN",
       "application_role": "UNKNOWN",
       "admission_cohort": false,
-      "current_absence": "NOT_CHECKED",
+      "current_absence": "OWNER_CHECK_NO_MATCH",
       "portal_identity": "NOT_YET_QUALIFIED",
       "discovery_retained_for_qualification": true,
       "proposed_current_absence_check": true,
-      "admission_cohort_status": "NOT_FROZEN; CURRENT_ABSENCE_AND_PORTAL_QUALIFICATION_PENDING"
+      "admission_cohort_status": "NOT_FROZEN; PORTAL_QUALIFICATION_PENDING",
+      "current_absence_timestamp": "2026-10-14 22:46:16.98426+00"
     },
     {
       "council": "tameside",

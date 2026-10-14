@@ -1,0 +1,43 @@
+{
+  "evidence_type": "OWNER_REPORTED_READ_ONLY_ACCEPTANCE_CHECK",
+  "snapshot_timestamp": "2026-10-14 22:46:16.98426+00",
+  "fields": [
+    "id",
+    "council_code",
+    "reference"
+  ],
+  "targets": [
+    {
+      "council": "bolton",
+      "reference": "21080/25",
+      "matching_rows_up_to_two": 0,
+      "matches": []
+    },
+    {
+      "council": "manchester",
+      "reference": "143413/FO/2025",
+      "matching_rows_up_to_two": 0,
+      "matches": []
+    },
+    {
+      "council": "manchester",
+      "reference": "145583/FO/2026",
+      "matching_rows_up_to_two": 0,
+      "matches": []
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2025/1664",
+      "matching_rows_up_to_two": 0,
+      "matches": []
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00396/FUL",
+      "matching_rows_up_to_two": 0,
+      "matches": []
+    }
+  ],
+  "database_writes": 0,
+  "operational_requirement": "Admission must automatically recheck exact identity and enforce duplicate/idempotency constraints; owner SQL is acceptance-only."
+}

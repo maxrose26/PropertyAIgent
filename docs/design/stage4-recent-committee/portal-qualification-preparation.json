@@ -1,0 +1,43 @@
+{
+  "purpose": "Bounded official portal route assessment; not production qualification or new application admission",
+  "observations": [
+    {
+      "council": "tameside",
+      "reference": "26/00396/FUL",
+      "official_url": "https://publicaccess.tameside.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=TEMF1DPUG6P00",
+      "displayed_reference": "26/00396/FUL",
+      "identity": "INDEPENDENT_OFFICIAL_REFERENCE_ROW_OBSERVED",
+      "literal_fields": {
+        "Status": "Decided",
+        "Decision": "Approve",
+        "Decision Issued Date": "Tue 28 Jul 2026"
+      },
+      "validated_date": "Wed 06 May 2026",
+      "source_locator": "Third-party directory supplied link only; facts and exact reference independently read from official council response."
+    },
+    {
+      "council": "bolton",
+      "reference": "21080/25",
+      "official_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?activeTab=summary&keyVal=T2ZPN1DE02800",
+      "identity": "UNQUALIFIED",
+      "observations": [
+        "Public lookup timeout",
+        "One local bounded request failed with ConnectionError; no response fields obtained"
+      ],
+      "source_locator": "Directory link is a locator hint only, not identity evidence."
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2025/1664",
+      "official_url": "https://salfordcitycouncil.my.site.com/pr/s/planning-application/a0kSq00000BFV6nIAH/pa20251664",
+      "identity": "UNQUALIFIED",
+      "observations": [
+        "Official destination resolved; lookup returned loading/CSS-error shell only"
+      ],
+      "source_locator": "Directory link is a locator hint only, not identity evidence."
+    }
+  ],
+  "fresh_supervised_qualification_required": true,
+  "production_database_access": false,
+  "production_writes": 0
+}
