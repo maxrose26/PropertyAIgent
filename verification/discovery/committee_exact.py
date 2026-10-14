@@ -72,11 +72,8 @@ def retrieve(row, application_id, runner=None):
 
 
 def checked_engine(raw):
-    u = make_url(raw)
-    if (u.drivername != 'postgresql+psycopg' or u.host != 'aws-0-eu-west-2.pooler.supabase.com'
-            or u.port != 5432 or u.database != 'postgres' or u.username != 'postgres.zcikcfgpblzuzpanpdqd'
-            or u.query):
-        raise ValueError('existing production route only')
+    from .route_validation import validate_route
+    u = validate_route(raw)
     return create_engine(u, connect_args={'connect_timeout': 5, 'sslmode': 'require',
         'options': '-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=40000'},
         pool_size=1, max_overflow=0, pool_timeout=3)
