@@ -44,3 +44,34 @@ def test_audit_rejects_partial_or_unbounded_output():
     for changes in ({'listing_failure':'X'},{'completeness':'COMPLETE'},{'encoded_bytes':30_000_000},{'pages':2},{'navigations':3},
                     {'listing_segments':a['listing_segments']*7}):
         with pytest.raises(ValueError):validate(dict(a,**changes))
+
+
+def test_locator_reader_uses_only_reference_and_valid_date():
+    from verification.discovery.arcus_ui_window import read_cards
+    class Leaf:
+        def __init__(self,text,href=None):self.text=text;self.href=href
+        async def count(self):return 1
+        async def inner_text(self,**kw):return self.text
+        async def get_attribute(self,name,**kw):assert name=='href';return self.href
+    class Items:
+        async def count(self):return 6
+        def filter(self,has_text):
+            choices=['Reference\nPLA-2026-001','Valid Date\n02/10/2026']
+            matches=[v for v in choices if has_text.search(v)]
+            assert len(matches)==1
+            return Leaf(matches[0])
+    class Card:
+        def locator(self,selector):
+            if selector=='a[href*="/detail/"]':return Leaf('PLA-2026-001','/pr/s/detail/a1DSl000007WJ1tMAG?c__r=Arcus_BE_Public_Register')
+            assert selector=='[role="listitem"]';return Items()
+    class Cards:
+        async def count(self):return 1
+        def nth(self,i):assert i==0;return Card()
+    class Page:
+        def locator(self,selector):assert selector=='div[role="list"].slds-box';return Cards()
+    task=read_cards(Page())
+    with pytest.raises(StopIteration) as done:
+        task.send(None)
+    rows=done.value.value
+    assert [f['label'] for f in rows[0]['fields']]==['Reference','Valid Date']
+    assert qualify_segment('Showing 1 to 1 of 1 results',rows,1)[3][0]['reference']=='PLA-2026-001'

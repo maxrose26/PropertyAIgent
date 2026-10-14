@@ -48,8 +48,40 @@ def qualify_segment(marker,cards,expected_first,previous_total=None):
     return first,last,total,rows
 
 
+async def read_cards(page):
+    """Read only the two qualified fields through ordinary bounded locators."""
+    cards=page.locator('div[role="list"].slds-box')
+    count=await cards.count()
+    if not 1<=count<=10: raise ValueError('card count')
+    out=[]
+    for i in range(count):
+        card=cards.nth(i)
+        links=card.locator('a[href*="/detail/"]')
+        if await links.count()!=1: raise ValueError('record link count')
+        ref=await links.inner_text(timeout=1500)
+        href=await links.get_attribute('href',timeout=1500)
+        # DOM href may be relative; qualify_segment still restricts the destination.
+        from urllib.parse import urljoin
+        href=urljoin(DESTINATION,href or '')
+        if len(ref)>100 or len(href)>512: raise ValueError('link bound')
+        items=card.locator('[role="listitem"]')
+        if await items.count()>20: raise ValueError('field count')
+        fields=[]
+        for name in ('Reference','Valid Date'):
+            field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name)+r'\b',re.I))
+            if await field.count()!=1: raise ValueError('field label count')
+            text=await field.inner_text(timeout=1500)
+            parts=text.strip().split('\n',1)
+            if len(parts)!=2 or parts[0].strip().lower()!=name.lower(): raise ValueError('field label')
+            value=parts[1].strip()
+            if len(value)>160: raise ValueError('field value bound')
+            fields.append({'label':name,'value':value})
+        out.append({'links':[{'text':ref,'href':href}],'fields':fields})
+    return out
+
+
 async def enumerate_ui(page,audit,stopped):
-    audit.update(listing_segments=[],listing_records=[],completeness='UNKNOWN',applied_interval=None,
+    audit.update(listing_stage='CRITERIA',listing_segments=[],listing_records=[],completeness='UNKNOWN',applied_interval=None,
                  source_qualification='CANDIDATE_PUBLIC_UI_CONTRACT')
     try:
         await page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000)
@@ -71,29 +103,14 @@ async def enumerate_ui(page,audit,stopped):
             if stopped.is_set(): raise ValueError('resource stop')
             until=time.monotonic()+5
             while True:
+                audit['listing_stage']='PAGE_MARKER'
                 marker=' '.join((await page.locator('p.pr-pagination__results').inner_text()).split())
                 if re.match(r'Showing\s+'+str(expected_first)+r'\s+to\s+',marker): break
                 if time.monotonic()>until or stopped.is_set(): raise ValueError('pagination did not advance')
                 await asyncio.sleep(.1)
-            cards=await page.locator('div[role="list"].slds-box').evaluate_all("""els => {
-              if(els.length>10)throw Error('CARD_LIMIT');
-              return els.map(el => {
-                const links=Array.from(el.querySelectorAll('a')).filter(a => a.href.includes('/detail/'));
-                if(links.length!==1)throw Error('LINK_COUNT');
-                const items=Array.from(el.querySelectorAll('[role="listitem"]'));
-                if(items.length>20)throw Error('FIELD_COUNT');
-                const fields=[];
-                for(const x of items){
-                  const parts=x.innerText.trim().split('\\n'),label=parts.shift().trim();
-                  if(!['reference','valid date'].includes(label.toLowerCase()))continue;
-                  const value=parts.join('\\n').trim();
-                  if(value.length>160)throw Error('VALUE_LIMIT');
-                  fields.push({label,value});
-                }
-                if(links[0].innerText.length>100||links[0].href.length>512)throw Error('LINK_BOUND');
-                return {links:links.map(a=>({text:a.innerText,href:a.href})),fields};
-              });
-            }""")
+            audit['listing_stage']='ROW_LOCATORS'
+            cards=await read_cards(page)
+            audit['listing_stage']='ROW_QUALIFICATION'
             first,last,total,rows=qualify_segment(marker,cards,expected_first,total)
             for r in rows:
                 if r['reference'] in seen_refs or r['source_record_id'] in seen_keys: raise ValueError('cross-page duplicate')
@@ -101,6 +118,7 @@ async def enumerate_ui(page,audit,stopped):
             audit['listing_records'].extend(rows)
             audit['listing_segments'].append({'ordinal':ordinal,'first':first,'last':last,'total':total,
                 'evidence_sha256':hashlib.sha256(json.dumps(rows,sort_keys=True).encode()).hexdigest()})
+            audit['listing_stage']='NEXT_CONTROL'
             next_link=page.locator('a.pr-pagination__link').filter(has_text='Next')
             count=await next_link.count()
             if last==total:

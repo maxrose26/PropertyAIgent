@@ -89,3 +89,14 @@ def test_envelope_binds_identity_and_provenance():
     with pytest.raises(ValueError): replace(e, displayed_references=('124/26',))
     with pytest.raises(ValueError): replace(e, site_relationship='EXISTING_SITE')
     with pytest.raises(ValueError): replace(e, body_sha256='unknown')
+
+
+def test_omitted_proposal_is_unknown_not_source_absence():
+    from app.pipeline.discovery_contract import DiscoveryEnvelope
+    e = DiscoveryEnvelope('bolton', '123/26',
+        'https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=X',
+        'X', datetime(2026, 10, 14, tzinfo=timezone.utc), window(), ('123/26',),
+        'a' * 64, ())
+    assert e.audit(frozenset())['materiality']['reason'] == 'UNKNOWN'
+    inspected = replace(e, fields=(('proposal', Literal('NOT_PRESENT', None, 'listing:proposal')),))
+    assert inspected.audit(frozenset())['materiality']['reason'] == 'NOT_PRESENT'
