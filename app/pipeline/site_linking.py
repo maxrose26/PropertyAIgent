@@ -138,6 +138,8 @@ def _create_site(session: Session, application: Application, normalised: str) ->
 
 
 def link_application_to_site(session: Session, application: Application) -> None:
+    if application.unit_confirmation_status == "discovery_pending":
+        return  # identity capture does not establish a site relationship
     if application.site_id is not None or application.site_link_method is not None:
         return  # already processed (idempotent)
 

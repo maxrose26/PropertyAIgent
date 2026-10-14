@@ -383,6 +383,11 @@ def _upsert_scraped_application(
         select(Application).where(Application.council_code == council.code, Application.reference == app.reference)
     ).scalar_one_or_none()
 
+    # Discovery capture is not qualification. Legacy scraper paths must not
+    # promote or overwrite pending identities outside reviewed B2 admission.
+    if existing is not None and existing.unit_confirmation_status == "discovery_pending" and not status_only:
+        return existing
+
     old_state = None if existing is None else ApplicationState(
         status=existing.status, decision=existing.decision, estimated_unit_count=existing.estimated_unit_count,
     )
@@ -827,6 +832,8 @@ def stage_fetch_related_applications(
                 application = _upsert_scraped_application(
                     session, council, result, batch_id=None, unit_confirmation_status=status,
                 )
+                if application.unit_confirmation_status == "discovery_pending":
+                    continue
                 application.site_id = parent.site_id
                 application.site_link_method = "related_search"
                 # Gate 2B-0B - `application` is guaranteed brand-new here
@@ -910,6 +917,8 @@ def stage_fetch_related_applications(
             application = _upsert_scraped_application(
                 session, council, result, batch_id=None, unit_confirmation_status=status,
             )
+            if application.unit_confirmation_status == "discovery_pending":
+                continue
             application.site_id = parent.site_id
             application.site_link_method = "related_search"
             # Gate 2B-0B - `application` is guaranteed brand-new here (the
@@ -940,6 +949,8 @@ def stage_link_sites(session: Session, council: CouncilConfig) -> int:
         select(Application).where(
             Application.council_code == council.code,
             Application.site_link_method.is_(None),
+            or_(Application.unit_confirmation_status.is_(None),
+                Application.unit_confirmation_status != "discovery_pending"),
         )
     ).scalars().all()
     print(f"\n[site-link] {len(pending)} applications need site linking")

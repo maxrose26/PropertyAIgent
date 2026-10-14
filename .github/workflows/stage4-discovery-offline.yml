@@ -2,11 +2,14 @@ name: Stage4 discovery contract OFFLINE
 on:
   pull_request:
     paths:
-      - 'app/pipeline/discovery_contract.py'
+      - 'app/pipeline/discovery_*.py'
+      - 'app/pipeline/run_weekly.py'
+      - 'app/pipeline/site_linking.py'
+      - 'app/pipeline/status_verification.py'
       - 'app/scrapers/idox_portal.py'
       - 'app/scrapers/arcus_portal.py'
       - 'tests/test_discovery_*.py'
-      - 'verification/bolton_recon/discovery_form_shape.py'
+      - 'verification/bolton_recon/*.py'
       - '.github/workflows/stage4-discovery-offline.yml'
   push:
     branches: [master]
@@ -24,9 +27,39 @@ jobs:
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
       - name: Pure discovery and pagination regressions, network denied
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_contract.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_contract.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: discovery-offline-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/discovery.xml
+  postgres-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: discovery_test
+          POSTGRES_PASSWORD: disposable_test_only
+          POSTGRES_DB: stage4_discovery_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+      - name: Disposable database concurrency and lost acknowledgement
+        run: |
+          timeout --kill-after=2s 60s env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: DISCOVERY_TEST_POSTGRES_URL=postgresql+psycopg://discovery_test:disposable_test_only@127.0.0.1:5432/stage4_discovery_test "$RUNNER_TEMP/discovery-venv/bin/python" -m pytest tests/test_discovery_admission_pg.py -q --junitxml="$RUNNER_TEMP/discovery-pg.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-pg-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/discovery-pg.xml

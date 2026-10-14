@@ -24,6 +24,8 @@ POST_URLS = frozenset({BASE + '/advancedSearchResults.do?action=firstPage', BASE
 DATE = '2026-02-19'
 DATE_FIELDS = ('date(applicationReceivedStart)', 'date(applicationReceivedEnd)')
 DATE_VALUE = '19/02/2026'
+FIXED_TYPE_FIELDS = frozenset({'caseAddressType', 'searchType'})
+CANCEL_CONTROL = 'org.apache.struts.taglib.html.CANCEL'
 STATE_FIELDS = frozenset({'_csrf', 'csrfToken', 'org.apache.struts.taglib.html.TOKEN'})
 MAX_BODY, MAX_TOTAL, MAX_AUDIT, MAX_ROWS = 500_000, 1_000_000, 32_768, 20
 OUTCOMES = frozenset({'RECOGNISED_RESULTS','RECOGNISED_ZERO_RESULTS','FORM_REJECTED','SOURCE_UNAVAILABLE',
@@ -34,8 +36,8 @@ REASONS = frozenset({'FORM_SELECTION','FORM_METHOD','FORM_ACTION','FORM_STRUCTUR
     'TIMEOUT','DOCUMENT_STRUCTURE','RESULT_STRUCTURE','RESULT_LIMIT','IDENTITY_CONFLICT','LINK_DENIED',
     'ARTIFACT_LIMIT','WORKER_INTERRUPTED','OUTPUT_INVALID'})
 CLASSES = frozenset({'REQUIRED_SERVER_STATE','APPROVED_DATE_INPUT','APPROVED_FIXED_SUBMIT_CONTROL',
-                    'IGNORABLE_CONTROL','PROHIBITED_SEARCH_EXPANSION','UNKNOWN'})
-SAFE_NAMES = STATE_FIELDS | set(DATE_FIELDS) | {'action','searchCriteria.reference','searchCriteria.applicantName',
+                    'IGNORABLE_CONTROL','APPROVED_FIXED_SOURCE_TYPE','PROHIBITED_SEARCH_EXPANSION','UNKNOWN'})
+SAFE_NAMES = STATE_FIELDS | FIXED_TYPE_FIELDS | {CANCEL_CONTROL} | set(DATE_FIELDS) | {'action','searchCriteria.reference','searchCriteria.applicantName',
     'searchCriteria.applicant','searchCriteria.address','searchCriteria.postcode','searchCriteria.description',
     'searchCriteria.proposal','searchCriteria.status','searchCriteria.decision',
     'date(applicationValidatedStart)','date(applicationValidatedEnd)',
@@ -123,6 +125,12 @@ def form_payload(body, audit):
             row['classification']='REQUIRED_SERVER_STATE'
             require(kind=='hidden' and bool(re.fullmatch(r'[A-Za-z0-9_+/=.-]{1,256}',value)), 'FORM_REJECTED','STATE_CONTROL')
             data[name]=value
+        elif name in FIXED_TYPE_FIELDS:
+            require(kind=='hidden' and value=='Application', 'FORM_REJECTED','UNKNOWN_CONTROL')
+            data[name]='Application'; row['classification']='APPROVED_FIXED_SOURCE_TYPE'
+        elif name==CANCEL_CONTROL:
+            require(kind=='submit', 'FORM_REJECTED','SUBMIT_CONTROL')
+            row['classification']='IGNORABLE_CONTROL'  # not the clicked submitter
         elif kind=='submit':
             require(value=='Search' and name in ('','action'),'FORM_REJECTED','SUBMIT_CONTROL')
             submits+=1; row['classification']='APPROVED_FIXED_SUBMIT_CONTROL'
@@ -142,10 +150,11 @@ def form_payload(body, audit):
 
 
 def admit_payload(data):
-    require(type(data) is dict and set(DATE_FIELDS)<=set(data) and set(data)<=set(DATE_FIELDS)|STATE_FIELDS|{'action'},
+    require(type(data) is dict and set(DATE_FIELDS)<=set(data) and set(data)<=set(DATE_FIELDS)|STATE_FIELDS|FIXED_TYPE_FIELDS|{'action'},
             'FORM_REJECTED','REQUEST_DENIED')
     require(all(data[n]==DATE_VALUE for n in DATE_FIELDS),'FORM_REJECTED','REQUEST_DENIED')
     for k,v in data.items():
+        if k in FIXED_TYPE_FIELDS: require(v=='Application','FORM_REJECTED','UNKNOWN_CONTROL')
         if k in STATE_FIELDS: require(isinstance(v,str) and bool(re.fullmatch(r'[A-Za-z0-9_+/=.-]{1,256}',v)), 'FORM_REJECTED','STATE_CONTROL')
         if k=='action': require(v=='Search','FORM_REJECTED','SUBMIT_CONTROL')
 

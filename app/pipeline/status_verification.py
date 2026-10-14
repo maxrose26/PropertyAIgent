@@ -599,6 +599,10 @@ def verify_application_status(
     # This stage owns its transaction, never commits another caller's pending work.
     if session.new or session.dirty or session.deleted:
         raise ValueError("Status verification requires a clean session")
+    # Discovery identities have not entered the legacy broad scraper path.
+    # Only explicitly qualified B2 evidence may verify their factual fields.
+    if application.unit_confirmation_status == "discovery_pending" and evidence_loader is None:
+        return outcome(OUTCOME_FETCH_FAILED)
     columns = (Application.status, Application.decision, Application.decision_issued_date,
                Application.status_verified_at, Application.last_seen_at,
                Application.planning_field_verification)
