@@ -12,11 +12,6 @@ AURA='https://arcusbe.manchester.gov.uk/pr/s/sfsites/aura'
 MAX_SEGMENTS=6
 
 
-def public_ui_post(method,url,body):
-    u=urlsplit(url)
-    return (method=='POST' and u._replace(query='').geturl()==AURA
-            and isinstance(body,str) and len(body.encode())<=65536)
-
 
 def qualify_segment(marker,cards,expected_first,previous_total=None):
     m=re.fullmatch(r'Showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)\s+results',marker.strip())

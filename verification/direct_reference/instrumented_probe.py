@@ -27,7 +27,8 @@ CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
 from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed
 CASES[SEARCH_SHAPE_CASE] = (None, None, DISCOVERY_DESTINATION)
 DISCOVERY_CASES = {DISCOVERY_CASE, SEARCH_SHAPE_CASE}
-from verification.discovery.arcus_ui_window import CASE as UI_WINDOW_CASE, public_ui_post, enumerate_ui
+from verification.discovery.arcus_ui_window import CASE as UI_WINDOW_CASE, enumerate_ui
+from verification.discovery.arcus_ui_transport import measure_post, combined_bytes
 CASES[UI_WINDOW_CASE] = (None, None, DISCOVERY_DESTINATION)
 MAX_BYTES = 20 * 1024 * 1024
 MAX_REQUESTS = 80
@@ -234,7 +235,8 @@ async def probe(case):
                      requested_interval=['2026-09-28', '2026-10-04'],
                      date_semantics='VALIDATED', completeness='UNKNOWN', bootstrap_reads=0, observed_action_metadata=[])
     if case == UI_WINDOW_CASE:
-        audit.update(purpose='DISCOVERY_PUBLIC_UI_WINDOW',public_ui_posts=0,completeness='UNKNOWN',
+        audit.update(purpose='DISCOVERY_PUBLIC_UI_WINDOW',public_ui_posts=0,measured_public_ui_posts=0,outbound_payload_bytes=0,
+            post_body_cdp_reads=0,largest_observed_post_bytes=0,completeness='UNKNOWN',
                      requested_interval=['2026-09-28','2026-10-04'],date_semantics='VALIDATED')
     started = time.monotonic()
     browser = context = None
@@ -247,7 +249,7 @@ async def probe(case):
     def charge(event):
         audit['decoded_bytes'] += event.get('dataLength', 0)
         audit['encoded_bytes'] += event.get('encodedDataLength', 0)
-        if max(audit['decoded_bytes'], audit['encoded_bytes']) > MAX_BYTES:
+        if combined_bytes(audit) > MAX_BYTES:
             fail('BYTE_LIMIT')
 
     async def route_handler(event):
@@ -284,10 +286,14 @@ async def probe(case):
                     await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
                 return
             if (reason == 'UNREVIEWED_METHOD' and case == UI_WINDOW_CASE
-                    and not stopped.is_set() and not audit['safety_failure']
-                    and public_ui_post(request['method'],url,request.get('postData'))):
-                audit['public_ui_posts'] += 1
-                await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
+                    and not stopped.is_set() and not audit['safety_failure']):
+                measurement_failure=await measure_post(event,client,audit)
+                if measurement_failure is not None or stopped.is_set() or combined_bytes(audit)>MAX_BYTES:
+                    fail(measurement_failure or 'BYTE_LIMIT')
+                    await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+                else:
+                    audit['public_ui_posts'] += 1
+                    await client.send('Fetch.continueRequest', {'requestId':event['requestId']})
                 return
             if reason == 'UNREVIEWED_METHOD':
                 if case == UI_WINDOW_CASE:
