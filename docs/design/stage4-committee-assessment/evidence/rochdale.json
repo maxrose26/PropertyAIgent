@@ -1,0 +1,13 @@
+{
+  "additional_committee_scope": "NOT_YET_RECONCILED",
+  "council": "rochdale",
+  "coverage": "UNKNOWN",
+  "future_meetings": [],
+  "gaps": [
+    "HTTP_403"
+  ],
+  "meetings": [],
+  "publication_rule": "PUBLICATION_RULE_UNKNOWN",
+  "publication_timing": "UNKNOWN",
+  "root": "https://democracy.rochdale.gov.uk/mgCommitteeDetails.aspx?ID=674"
+}

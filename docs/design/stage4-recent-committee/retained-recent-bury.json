@@ -1,0 +1,192 @@
+{
+  "reuse_only": true,
+  "new_source_requests": 0,
+  "source_evidence": "docs/design/stage4-committee-assessment/evidence/bury.json",
+  "meetings": [
+    {
+      "date": "2026-07-28",
+      "source": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4237&Ver=4",
+      "classification": "HELD",
+      "references": [
+        "72682",
+        "72750",
+        "73065",
+        "73083"
+      ],
+      "inspection": "INSPECTED_HTML"
+    },
+    {
+      "date": "2026-09-01",
+      "source": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4253&Ver=4",
+      "classification": "HELD",
+      "references": [
+        "72542",
+        "73410"
+      ],
+      "inspection": "INSPECTED_HTML"
+    },
+    {
+      "date": "2026-09-22",
+      "source": "https://councildecisions.bury.gov.uk/ieListDocuments.aspx?CId=134&MId=4254&Ver=4",
+      "classification": "CANCELLED",
+      "references": [],
+      "inspection": "EXCLUDED_CANCELLED_OR_TRAINING"
+    }
+  ],
+  "reference_rows": [
+    {
+      "council": "bury",
+      "reference": "72682",
+      "reference_role": "PRINCIPAL_APPLICATION",
+      "identity_qualification": "EXPLICIT_APP_NO_IN_OFFICIAL_INDEX_SECTION",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "materiality_basis": "Proposal scale/type/relationship not qualified from retained compact extraction; retained for qualification, not excluded",
+      "database_comparison": "UNKNOWN_DATABASE_COMPARISON",
+      "application_ids": [],
+      "primary_comparison": "UNKNOWN",
+      "primary_comparison_reason": "No independently established received date inside qualified primary interval; absence from selected window is not a miss",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "sources": [
+        {
+          "meeting_date": "2026-07-28",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51022/Final Index.pdf",
+          "sha256": "fcbab966cc75eb655622d52c322d07c83284d243388393f28288e2cbe6e0a0d4",
+          "recommendation_literal": "Approve with Conditions",
+          "unit_mention": null,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
+    },
+    {
+      "council": "bury",
+      "reference": "72750",
+      "reference_role": "PRINCIPAL_APPLICATION",
+      "identity_qualification": "EXPLICIT_APP_NO_IN_OFFICIAL_INDEX_SECTION",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "materiality_basis": "Proposal scale/type/relationship not qualified from retained compact extraction; retained for qualification, not excluded",
+      "database_comparison": "UNKNOWN_DATABASE_COMPARISON",
+      "application_ids": [],
+      "primary_comparison": "UNKNOWN",
+      "primary_comparison_reason": "No independently established received date inside qualified primary interval; absence from selected window is not a miss",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "sources": [
+        {
+          "meeting_date": "2026-07-28",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51022/Final Index.pdf",
+          "sha256": "fcbab966cc75eb655622d52c322d07c83284d243388393f28288e2cbe6e0a0d4",
+          "recommendation_literal": "Approve with Conditions",
+          "unit_mention": 2,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
+    },
+    {
+      "council": "bury",
+      "reference": "73065",
+      "reference_role": "PRINCIPAL_APPLICATION",
+      "identity_qualification": "EXPLICIT_APP_NO_IN_OFFICIAL_INDEX_SECTION",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "materiality_basis": "Proposal scale/type/relationship not qualified from retained compact extraction; retained for qualification, not excluded",
+      "database_comparison": "UNKNOWN_DATABASE_COMPARISON",
+      "application_ids": [],
+      "primary_comparison": "UNKNOWN",
+      "primary_comparison_reason": "No independently established received date inside qualified primary interval; absence from selected window is not a miss",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "sources": [
+        {
+          "meeting_date": "2026-07-28",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51022/Final Index.pdf",
+          "sha256": "fcbab966cc75eb655622d52c322d07c83284d243388393f28288e2cbe6e0a0d4",
+          "recommendation_literal": "Approve with Conditions",
+          "unit_mention": null,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
+    },
+    {
+      "council": "bury",
+      "reference": "73083",
+      "reference_role": "PRINCIPAL_APPLICATION",
+      "identity_qualification": "EXPLICIT_APP_NO_IN_OFFICIAL_INDEX_SECTION",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "materiality_basis": "Proposal scale/type/relationship not qualified from retained compact extraction; retained for qualification, not excluded",
+      "database_comparison": "UNKNOWN_DATABASE_COMPARISON",
+      "application_ids": [],
+      "primary_comparison": "UNKNOWN",
+      "primary_comparison_reason": "No independently established received date inside qualified primary interval; absence from selected window is not a miss",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "sources": [
+        {
+          "meeting_date": "2026-07-28",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51022/Final Index.pdf",
+          "sha256": "fcbab966cc75eb655622d52c322d07c83284d243388393f28288e2cbe6e0a0d4",
+          "recommendation_literal": "Approve with Conditions",
+          "unit_mention": null,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
+    },
+    {
+      "council": "bury",
+      "reference": "72542",
+      "reference_role": "PRINCIPAL_APPLICATION",
+      "identity_qualification": "EXPLICIT_APP_NO_IN_OFFICIAL_INDEX_SECTION",
+      "materiality": "CONFIRMED_MATERIAL",
+      "materiality_basis": "Manual index inspection establishes reserved-matters proposal for 12 dwellings",
+      "database_comparison": "ALREADY_KNOWN_TO_PROPERTYAIGENT",
+      "application_ids": [
+        17
+      ],
+      "primary_comparison": "UNKNOWN",
+      "primary_comparison_reason": "No independently established received date inside qualified primary interval; absence from selected window is not a miss",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "sources": [
+        {
+          "meeting_date": "2026-09-01",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51432/Final Index.pdf",
+          "sha256": "c4bc3f4efed9e3174ada11e1c49e6ce8be774cab99408186962e80f36d59efb9",
+          "recommendation_literal": "Minded to Approve",
+          "unit_mention": 12,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
+    },
+    {
+      "council": "bury",
+      "reference": "73410",
+      "reference_role": "PRINCIPAL_APPLICATION",
+      "identity_qualification": "EXPLICIT_APP_NO_IN_OFFICIAL_INDEX_SECTION",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "materiality_basis": "Proposal scale/type/relationship not qualified from retained compact extraction; retained for qualification, not excluded",
+      "database_comparison": "UNKNOWN_DATABASE_COMPARISON",
+      "application_ids": [],
+      "primary_comparison": "UNKNOWN",
+      "primary_comparison_reason": "No independently established received date inside qualified primary interval; absence from selected window is not a miss",
+      "committee_outcome": "UNKNOWN_APPLICATION_ASSOCIATION",
+      "formal_decision_notice": "NOT_ACQUIRED",
+      "sources": [
+        {
+          "meeting_date": "2026-09-01",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51432/Final Index.pdf",
+          "sha256": "c4bc3f4efed9e3174ada11e1c49e6ce8be774cab99408186962e80f36d59efb9",
+          "recommendation_literal": "Approve with Conditions",
+          "unit_mention": 3,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
+    }
+  ],
+  "current_database_denominator": "NOT_RETRIEVED_DUE_TO_EARLIER_STOP",
+  "negative_database_comparison": "UNKNOWN"
+}

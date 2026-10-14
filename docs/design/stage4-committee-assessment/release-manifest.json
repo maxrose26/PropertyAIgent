@@ -1,0 +1,33 @@
+{
+  "executed_code_head": "3c9aaaf6ca5cf0a72b608af3097e2c7324e6fb25",
+  "candidate_head": "8380f403c14690004b7724160983c0ec8a8affaf",
+  "candidate_tree": "0ab52c85970c575bac698673fc36f285a31463a0",
+  "pr": 83,
+  "hosted_run": 38562539216,
+  "run_number": 1,
+  "attempt": 1,
+  "artifact_id": 11892657761,
+  "artifact_zip_sha256": "1e7a2b29208ee2f6a521e7d6f98cf9a1f27118339c86da770c8a03981e2a41d9",
+  "files": {
+    "docs/design/stage4-committee-assessment/CHECKPOINT.md": "1eef8d58c14f13b89477e07c70bd3801802f7a28a3d4b05484626c57a1f4b4f5",
+    "docs/design/stage4-committee-assessment/INDEPENDENT-REVIEW.md": "3ac26245cd3c1ff346f45b84f893d024b6863a22ad880206785bc7071037e45e",
+    "docs/design/stage4-committee-assessment/RESULT.md": "ed3ee6942b384290137cac03b45325fef5e17ab0c0a168e2171e7511a4969b1c",
+    "docs/design/stage4-committee-assessment/application-ledger.json": "6acef160c4d7f773fe908778d3e11f0818d660fd44677b2ae995009d12f1bd9a",
+    "docs/design/stage4-committee-assessment/council-matrix.json": "b7ac51a1e790035f8e6622d54650bd5809ce23944a8659a1d1167cff1f44a677",
+    "docs/design/stage4-committee-assessment/evidence/bolton-browser.json": "e89937a5b05ffcb2693692d7c747239b2a4a5c79505db5278656038909b623eb",
+    "docs/design/stage4-committee-assessment/evidence/bolton.json": "38869dff5d9377317fddcc0d96137eeb24482f28ddb77b2ffc55cba8fc1bbeb7",
+    "docs/design/stage4-committee-assessment/evidence/bury.json": "40ef6124c2c75187d551a40d9def22873794fee3c1dc3ea3f95c65220b0c18d8",
+    "docs/design/stage4-committee-assessment/evidence/manchester.json": "99d862a517b173916f3bf9bfcde5e5da3088208212d58aca9290059c2c53dc65",
+    "docs/design/stage4-committee-assessment/evidence/oldham.json": "24cb4ddf9033b7d791cf061910889fa3f35c6750f138be1908c68487699a1467",
+    "docs/design/stage4-committee-assessment/evidence/resource.json": "238bcc4b9574abff831986d98acf2803de25b2a685595037e7a0cf7b417f267b",
+    "docs/design/stage4-committee-assessment/evidence/rochdale.json": "0f8370f4ecdde6542de0be65fc61f0e32c4eda7978e984296fa1f88c9a114957",
+    "docs/design/stage4-committee-assessment/evidence/salford-browser.json": "8931084aeacc0902b25f1b7b63ee55bcfbf92e6f8a34b545c6c0c3df8bba1fcd",
+    "docs/design/stage4-committee-assessment/evidence/salford.json": "3faaa477e8614e97bf4389f8b292a542b7929b07b8de79c7d30dd9e645357224",
+    "docs/design/stage4-committee-assessment/evidence/stockport.json": "45f0129dbb71f72704049d62ba014c186120d47e3eebf99a188f65ebd88a69ab",
+    "docs/design/stage4-committee-assessment/evidence/tameside.json": "8b3a2c881f8022d39ad49458bc9c4dbb0674119f7af7b63840b46ea42c2c6d39",
+    "docs/design/stage4-committee-assessment/evidence/wigan.json": "9f6a13db0f69cd3aa4ae7dd9369e17e18ceb13b0ad5d5afb9bbaed24d834dd7e",
+    "docs/design/stage4-committee-assessment/freeze.json": "e0e3d0a8083600a8f2c67aaa268a91e060a83f1960bb9830f219d42dddceb3ea",
+    "docs/design/stage4-committee-assessment/manual-observations.json": "7963eaf8c81da3934cd3b5ffaaeafd1d2e2026587958d9b7c593dd4d61ebc654",
+    "docs/design/stage4-committee-assessment/retained-known-identities.json": "e43e5e955b62f8a5b5a0aa52f0e65d57ba94797b5de848c9294d4c5186ff9022"
+  }
+}

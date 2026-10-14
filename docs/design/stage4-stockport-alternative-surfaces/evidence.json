@@ -1,0 +1,112 @@
+{
+  "interval_start_inclusive": "2026-07-14",
+  "interval_end_exclusive": "2026-10-14",
+  "timezone": "Europe/London",
+  "scope": "Stockport alternative official publication surfaces only",
+  "observations": [
+    {
+      "container": "COMBINED_REPORTS_PACK",
+      "url": "https://democracy.stockport.gov.uk/documents/g30539/Public%20reports%20pack%2024th-Sep-2026%2018.00%20Planning%20Highways%20Regulation%20Committee.pdf?T=10",
+      "result": "Web timeout; ordinary browser 502 / connection refused",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "AGENDA_FRONTSHEET",
+      "url": "https://democracy.stockport.gov.uk/documents/g30539/Agenda%20frontsheet%2024th-Sep-2026%2018.00%20Planning%20Highways%20Regulation%20Committee.pdf?T=0",
+      "result": "Web timeout",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "CENTRAL_MEETING_PAGE",
+      "url": "https://democracy.stockport.gov.uk/ieListDocuments.aspx?CId=150&MId=30539",
+      "result": "Web timeout",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "SUPPLEMENTARY_BUNDLE",
+      "url": "https://democracy.stockport.gov.uk/documents/b94698/Agenda%20Item%205%20-%20Site%20Visits%20-%20item%20previously%20marked%20as%20to%20follow%2024th-Sep-2026%2018.00%20Planning.pdf?T=9",
+      "result": "Web timeout",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "AUGUST_COMBINED_PACK",
+      "url": "https://democracy.stockport.gov.uk/documents/g30538/Public%20reports%20pack%2013th-Aug-2026%2018.00%20Planning%20Highways%20Regulation%20Committee.pdf?T=10",
+      "result": "Web timeout",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "INCIDENTAL_FRONT_COVER",
+      "url": "https://democracy.stockport.gov.uk/documents/s266362/PHR%20front%20cover.pdf",
+      "result": "Web timeout; changed third-party link ID; not combined-pack evidence",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "AREA_MEETING_PAGE",
+      "url": "https://democracy.stockport.gov.uk/ieListDocuments.aspx?CId=142&MId=30591",
+      "result": "Web timeout",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "AREA_COMBINED_PACK",
+      "url": "https://democracy.stockport.gov.uk/documents/g30591/Public%20reports%20pack%2010th-Sep-2026%2018.30%20Bramhall%20Cheadle%20Hulme%20South%20Area%20Committee.pdf?T=10",
+      "result": "Web timeout",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "DOCUMENT_INDEX",
+      "url": "https://democracy.stockport.gov.uk/ieDocHome.aspx?bcr=1",
+      "result": "Not accessible via web tool",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "COUNCIL_MINUTES_CONTENT",
+      "url": "https://democracy.stockport.gov.uk/mgConvert2PDF.aspx?ID=268229",
+      "result": "Not accessible via web tool",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "HISTORICAL_DECISIONS_POINTER",
+      "url": "https://www.stockport.gov.uk/planningdecisions",
+      "result": "Not accessible via web tool; pointer from 2019; current route unqualified",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "COUNCIL_WEBCAST_INDEX",
+      "url": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828",
+      "result": "Readable web/browser; 15 exact minutes links identified; content not established",
+      "planning_content_qualified": false
+    },
+    {
+      "container": "AREA_WEBCAST",
+      "url": "https://stockport.public-i.tv/core/portal/webcast_interactive/1118100",
+      "result": "Readable web; Development Applications chapter lacks explicit application body evidence",
+      "planning_content_qualified": false
+    }
+  ],
+  "third_party_use": "Official URL pointers only; no third-party facts or AI summaries admitted",
+  "positive_held_meetings": 16,
+  "complete_meeting_denominator": false,
+  "qualified_stockport_application_references": 0,
+  "qualified_material_stockport_schemes": 0,
+  "zero_observation_not_zero_universe": true,
+  "retained_title_only_references": [
+    "DC/098847",
+    "DC/093405",
+    "DC/097509"
+  ],
+  "production_reads": 0,
+  "production_writes": 0,
+  "model_calls": 0,
+  "code_changes": 0,
+  "identical_failed_individual_report_retries": 0,
+  "browser_tabs_created": [
+    20,
+    21
+  ],
+  "browser_tabs_closed": [
+    20,
+    21
+  ],
+  "request_byte_accounting": "UNKNOWN: research tools do not expose full accounting",
+  "raw_documents_retained": false
+}

@@ -1,0 +1,14 @@
+{
+  "production_reads": 0,
+  "production_writes": 0,
+  "model_calls": 0,
+  "browser_retries": 0,
+  "research_tab_17": "CLOSED",
+  "stop_condition": 1,
+  "files": {
+    "docs/design/stage4-recent-committee/RESULT.md": "2131d4f0a9596b7f9444fa4d58605bac794b33fce9b8122cdbee2783dfc6b2be",
+    "docs/design/stage4-recent-committee/retained-recent-bury.json": "6440e26904f39c246bd29459f10efa483cb831d20e0d8efc2d5628b98bafb84a",
+    "docs/design/stage4-recent-committee/freeze.json": "f7137daa2b17e0bb62fbe68510caf16fc117566ca987e05f99b0dedddd06aa96",
+    "docs/design/stage4-recent-committee/INDEPENDENT-REVIEW.md": "b1db0d9840925ba94f7a6297500a5dd550d5d15d296903f25688aad55439de12"
+  }
+}

@@ -1,0 +1,3 @@
+Independent reviewer: /root/primary_source_review
+
+Recommend ACCEPT LIMITATION for supplementary Stockport committee evidence, subject to REVIEW. Different official containers were tested but depend on inaccessible democracy host. Sixteen meetings remain positive evidence, not complete denominator. Three title-only references remain unqualified. Newly recovered Area minutes links are identified, not newly tested. Historical pointers do not prove current content. Third-party AI summaries excluded. No universal source-absence/bot/zero-material/complete-coverage claim. Primary discovery unchanged. Committee evidence cannot grade false negatives. No obvious alternative official container demonstrated. Reviewer performed no research or edits.

@@ -1,0 +1,205 @@
+{
+  "scope": "Stockport first-task official alternatives only; stop condition2 reached",
+  "assessment_interval": [
+    "2026-07-14",
+    "2026-10-14"
+  ],
+  "meeting_set": "POSITIVE_LOWER_BOUND_NOT_COMPLETE_DENOMINATOR",
+  "meeting_count": 16,
+  "body_count": 8,
+  "meetings": [
+    {
+      "committee": "Planning & Highways Regulation Committee",
+      "date": "2026-08-13",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Planning & Highways Regulation Committee",
+      "date": "2026-09-24",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": null
+    },
+    {
+      "committee": "Bramhall & Cheadle Hulme South Area Committee",
+      "date": "2026-08-03",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Bramhall & Cheadle Hulme South Area Committee",
+      "date": "2026-09-10",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Central Stockport Area Committee",
+      "date": "2026-08-03",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Central Stockport Area Committee",
+      "date": "2026-09-10",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Cheadle Area Committee",
+      "date": "2026-07-28",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Cheadle Area Committee",
+      "date": "2026-09-08",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Heatons & Reddish Area Committee",
+      "date": "2026-07-27",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Heatons & Reddish Area Committee",
+      "date": "2026-09-07",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Marple Area Committee",
+      "date": "2026-07-29",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Marple Area Committee",
+      "date": "2026-09-09",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Stepping Hill Area Committee",
+      "date": "2026-07-28",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Stepping Hill Area Committee",
+      "date": "2026-09-08",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Werneth Area Committee",
+      "date": "2026-07-27",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    },
+    {
+      "committee": "Werneth Area Committee",
+      "date": "2026-09-07",
+      "classification": "HELD",
+      "evidence": "https://stockport.public-i.tv/core/portal/webcasts",
+      "corroborating_council_minutes_index": "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828"
+    }
+  ],
+  "unresolved": [
+    "cancelled/unrecorded/unpublished meetings",
+    "complete effective planning-delegation scope during interval",
+    "planning reports/supplements/minutes content"
+  ],
+  "working_routes": [
+    "https://stockport.public-i.tv/core/portal/webcasts",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1123828",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1114197",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1121377",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1118100",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1117868",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1118031",
+    "https://stockport.public-i.tv/core/portal/webcast_interactive/1119112"
+  ],
+  "document_observations": [
+    {
+      "role": "OFFICER_REPORT_LINK",
+      "title_reference": "DC/097509",
+      "url": "https://democracy.stockport.gov.uk/mgConvert2PDF.aspx?ID=267791",
+      "ordinary_browser_result": "502 Bad Gateway; [Errno 111] Connection refused",
+      "public_lookup_result": "Internal retrieval error",
+      "content_inspected": false
+    },
+    {
+      "role": "OFFICER_REPORT_LINK",
+      "title_reference": "DC/093405",
+      "url": "https://democracy.stockport.gov.uk/mgConvert2PDF.aspx?ID=267790",
+      "public_lookup_result": "Internal retrieval error",
+      "content_inspected": false
+    },
+    {
+      "role": "PRIOR_MEETING_MINUTES_LINK",
+      "url": "https://democracy.stockport.gov.uk/mgConvert2PDF.aspx?ID=267726",
+      "content_inspected": false,
+      "note": "Exact visible resource URL retained; no repeated request"
+    }
+  ],
+  "withheld_title_references": [
+    {
+      "reference": "DC/098847",
+      "identity": "IDENTITY_UNKNOWN_TITLE_ONLY",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "database_comparison": "NOT_ATTEMPTED",
+      "portal_admission": "NOT_ATTEMPTED"
+    },
+    {
+      "reference": "DC/093405",
+      "identity": "IDENTITY_UNKNOWN_TITLE_ONLY",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "database_comparison": "NOT_ATTEMPTED",
+      "portal_admission": "NOT_ATTEMPTED"
+    },
+    {
+      "reference": "DC/097509",
+      "identity": "IDENTITY_UNKNOWN_TITLE_ONLY",
+      "materiality": "INSUFFICIENT_EVIDENCE",
+      "database_comparison": "NOT_ATTEMPTED",
+      "portal_admission": "NOT_ATTEMPTED"
+    }
+  ],
+  "limitation_classification": {
+    "A_meeting_dates": "16known; full denominator not established",
+    "B_dates_known_documents_unavailable": "document links exist; content unavailable to tested retrieval",
+    "C_documents_known_inaccessible": true,
+    "D_area_scope": "sevenAreasidentified; effective delegated scope not fully qualified",
+    "E_reference_evidence": "title mentions visible, independent content identity unavailable",
+    "F_transport": "connection/refusal and retrieval errors; transience UNKNOWN"
+  },
+  "production_reads": 0,
+  "production_writes": 0,
+  "model_calls": 0,
+  "new_infrastructure": false,
+  "identical_failure_retries": 0,
+  "raw_html_pdf_video_retained": false,
+  "failed_minutes_lookup": {
+    "source_meeting": "2026-08-13",
+    "target_url": "UNKNOWN_FROM_RETRIEVAL_ERROR",
+    "target_minutes_date": "UNKNOWN",
+    "content_inspected": false
+  }
+}

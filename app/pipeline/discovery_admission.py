@@ -8,7 +8,7 @@ caller's responsibility; an uncertain commit MUST stop that run.
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from app.db.models import Application
-from app.pipeline.discovery_contract import Completeness, DiscoveryEnvelope
+from app.pipeline.discovery_contract import Completeness, DiscoveryEnvelope, ExactTriggerEvidence
 
 PENDING = 'discovery_pending'
 # Read back the factual/verification boundary claimed by identity-only admission.
@@ -22,8 +22,12 @@ class UncertainDiscoveryCommit(RuntimeError):
     """Do not retry; reconcile identity and transaction separately."""
 
 
-def admit_identity(engine, envelope: DiscoveryEnvelope) -> dict:
-    if envelope.window.outcome != Completeness.COMPLETE:
+def admit_identity(engine, envelope: DiscoveryEnvelope, *, trigger: ExactTriggerEvidence | None = None) -> dict:
+    if trigger is not None:
+        if (not isinstance(trigger, ExactTriggerEvidence)
+                or (trigger.council, trigger.reference) != (envelope.council, envelope.reference)):
+            raise ValueError('exact trigger/portal mismatch')
+    elif envelope.window.outcome != Completeness.COMPLETE:
         raise ValueError('incomplete discovery window cannot admit production identities')
     dialect = engine.dialect.name
     if dialect == 'postgresql':
@@ -81,6 +85,8 @@ def admit_identity(engine, envelope: DiscoveryEnvelope) -> dict:
         return {key: row[key] for key in ('id', 'council_code', 'reference',
             'unit_confirmation_status', 'site_id')}
     return {'outcome': 'CREATED_PENDING' if inserted is not None else 'ALREADY_KNOWN',
+            'admission_mode': 'EXACT_TRIGGER' if trigger else 'COMPLETE_WINDOW',
+            'trigger': trigger.audit() if trigger else None,
             'application_id': after[0]['id'], 'council': envelope.council,
             'reference': envelope.reference, 'before': [public_identity(r) for r in before],
             'after': public_identity(after[0]),

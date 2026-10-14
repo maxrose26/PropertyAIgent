@@ -1,0 +1,74 @@
+{
+  "council": "bolton",
+  "method": "ORDINARY_PUBLIC_BROWSER",
+  "coverage": "INCOMPLETE",
+  "meetings": [
+    {
+      "date": "2026-10-01",
+      "source_url": "https://bolton.moderngov.co.uk/ieListDocuments.aspx?CId=140&MId=5470&Ver=4",
+      "title_references": [
+        "21536/25"
+      ],
+      "body_references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY",
+      "document_links_found": 7,
+      "minutes_links_found": 3,
+      "documents_inspected": 0
+    },
+    {
+      "date": "2026-09-10",
+      "source_url": "https://bolton.moderngov.co.uk/ieListDocuments.aspx?CId=140&MId=5469&Ver=4",
+      "title_references": [
+        "00991/26",
+        "00985/26"
+      ],
+      "body_references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY",
+      "document_links_found": 9,
+      "minutes_links_found": 3,
+      "documents_inspected": 0
+    },
+    {
+      "date": "2026-08-20",
+      "source_url": "https://bolton.moderngov.co.uk/ieListDocuments.aspx?CId=140&MId=5468&Ver=4",
+      "title_references": [],
+      "body_references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY",
+      "document_links_found": 14,
+      "minutes_links_found": 2,
+      "documents_inspected": 0
+    },
+    {
+      "date": "2026-07-09",
+      "source_url": "https://bolton.moderngov.co.uk/ieListDocuments.aspx?CId=140&MId=5467&Ver=4",
+      "title_references": [],
+      "body_references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY",
+      "document_links_found": 12,
+      "minutes_links_found": 3,
+      "documents_inspected": 0
+    },
+    {
+      "date": "2026-06-18",
+      "source_url": "https://bolton.moderngov.co.uk/ieListDocuments.aspx?CId=140&MId=5466&Ver=4",
+      "title_references": [],
+      "body_references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY",
+      "document_links_found": 21,
+      "minutes_links_found": 3,
+      "documents_inspected": 0
+    },
+    {
+      "date": "2026-04-16",
+      "source_url": "https://bolton.moderngov.co.uk/ieListDocuments.aspx?CId=140&MId=5138&Ver=4",
+      "title_references": [],
+      "body_references": [],
+      "identity_qualification": "WITHHOLD_TITLE_ONLY",
+      "document_links_found": 10,
+      "minutes_links_found": 3,
+      "documents_inspected": 0
+    }
+  ],
+  "subsequent_browser_batch": "TIMED_OUT_AND_RESET; unconfirmed inspections excluded; not rerun",
+  "resource_accounting": "BYTES_AND_HTTP_REQUESTS_UNKNOWN"
+}

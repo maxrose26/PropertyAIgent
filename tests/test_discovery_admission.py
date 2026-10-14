@@ -127,3 +127,70 @@ def test_identity_readback_rejects_unexpected_factual_side_effect(engine,column,
         admit_identity(engine,envelope())
     with Session(engine) as session:
         assert session.scalar(select(func.count()).select_from(Application))==0
+
+
+def test_exact_trigger_reuses_transaction_without_enumeration_claim(engine):
+    from app.pipeline.discovery_contract import ExactTriggerEvidence, completed_through
+    e = envelope()
+    e = replace(e, window=replace(e.window, source_contract=None, applied_evidence=None))
+    trigger = ExactTriggerEvidence('bolton', 'TEST/26',
+        'https://bolton.moderngov.co.uk/documents/s1/report.pdf', ('TEST/26',), 'b'*64)
+    first = admit_identity(engine, e, trigger=trigger)
+    second = admit_identity(engine, e, trigger=trigger)
+    assert first['outcome'] == 'CREATED_PENDING'
+    assert second['outcome'] == 'ALREADY_KNOWN'
+    assert first['application_id'] == second['application_id']
+    assert first['trigger']['enumeration_complete'] is False
+    assert first['trigger']['coverage_watermark_advanced'] is False
+    prior = date(2026, 9, 30)
+    assert completed_through(prior, [e.window], council='bolton', date_semantics='RECEIVED') == prior
+    with Session(engine) as s:
+        row = s.scalar(select(Application))
+        assert row.site_id is None and row.status is None and row.proposal is None
+
+
+def test_exact_trigger_mismatch_and_untrusted_shape_fail_before_write(engine):
+    from app.pipeline.discovery_contract import ExactTriggerEvidence
+    t = ExactTriggerEvidence('bolton', 'OTHER/26',
+        'https://bolton.moderngov.co.uk/documents/s1/report.pdf', ('OTHER/26',), 'b'*64)
+    with pytest.raises(ValueError): admit_identity(engine, envelope(), trigger=t)
+    with pytest.raises(ValueError): admit_identity(engine, envelope(), trigger=SimpleNamespace())
+    with pytest.raises(ValueError): replace(t, displayed_references=('OTHER/26', 'TEST/26'))
+    with pytest.raises(ValueError): replace(t, source_url='https://example.com/report.pdf')
+    with Session(engine) as s:
+        assert s.scalar(select(func.count()).select_from(Application)) == 0
+
+
+def test_exact_trigger_uncertain_commit_is_not_retried(engine):
+    from app.pipeline.discovery_contract import ExactTriggerEvidence
+    t = ExactTriggerEvidence('bolton', 'TEST/26',
+        'https://bolton.moderngov.co.uk/documents/s1/report.pdf', ('TEST/26',), 'b'*64)
+    with patch.object(Session, 'commit', side_effect=RuntimeError('lost acknowledgement')) as commit:
+        with pytest.raises(UncertainDiscoveryCommit): admit_identity(engine, envelope(), trigger=t)
+        assert commit.call_count == 1
+
+
+@pytest.mark.parametrize('council,status,host', [('manchester','Under Consideration','arcusbe.manchester.gov.uk'),('salford','Under Consultation','salfordcitycouncil.my.site.com')])
+def test_initial_status_only_b2_never_promotes_or_verifies_missing_fields(engine,council,status,host):
+    import json
+    from app.pipeline.status_verification import verify_application_status,current_verified_planning_field
+    with Session(engine) as s:
+        s.add(Council(code=council,name=council,base_url='https://'+host+'/pr',date_field_mode='validated',doc_system='arcus'))
+        app=Application(council_code=council,reference='R',unit_confirmation_status=PENDING)
+        s.add(app);s.commit()
+        result=SimpleNamespace(reference='R',summary_url='https://'+host+'/pr/s/detail/a1DSl000007GOGYMA4?c__r=Arcus_BE_Public_Register',body_sha256='a'*64,
+            verification_scope='INITIAL_STATUS_ONLY',fields={'Reference':'R','Status':status},
+            field_evidence={'reference':{'state':'PRESENT_VALUE','value':'R'},'status':{'state':'PRESENT_VALUE','value':status},
+                'decision':{'state':'NOT_PRESENT','value':None},'decision_date':{'state':'PRESENT_BLANK','value':''}})
+        cfg=SimpleNamespace(code=council,base_url='https://'+host+'/pr',doc_system='arcus')
+        outcome=verify_application_status(s,None,cfg,app,evidence_loader=lambda prior:result)
+        assert outcome.outcome=='field_level_verified' and not outcome.material_change_reasons
+        s.refresh(app)
+        assert app.status==status and app.decision is None and app.decision_issued_date is None and app.status_verified_at is None
+        assert app.unit_confirmation_status==PENDING and app.site_id is None and not app.evidence_refresh_required
+        assert current_verified_planning_field(app,'status')
+        assert current_verified_planning_field(app,'decision_date') is None
+        assert json.loads(app.planning_field_verification)['decision']['verified_at'] is None
+        assert verify_application_status(s,None,cfg,app,evidence_loader=lambda prior:result).outcome=='fetch_failed'
+        app.status='Changed'
+        assert current_verified_planning_field(app,'status') is None

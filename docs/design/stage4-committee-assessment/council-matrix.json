@@ -1,0 +1,95 @@
+{
+  "scope": "Nine councils; meeting/document observations are lower bounds, not complete archive reconciliation",
+  "rows": [
+    {
+      "council": "bolton",
+      "committee": "Planning Committee",
+      "source_url": "https://bolton.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=140",
+      "listed_meetings": 12,
+      "meeting_pages_with_evidence": 6,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-11-05",
+      "gap": "Six pages inspected; application-bearing documents not inspected; three title-only references withheld."
+    },
+    {
+      "council": "bury",
+      "committee": "Planning Control Committee",
+      "source_url": "https://councildecisions.bury.gov.uk/ieListMeetings.aspx?CommitteeId=134",
+      "listed_meetings": 12,
+      "meeting_pages_with_evidence": 11,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-10-20",
+      "gap": "Eleven held meetings plus one cancelled; compact indexes and supplements inspected. Outcome/application binding and publication times remain incomplete."
+    },
+    {
+      "council": "manchester",
+      "committee": "Planning Committee",
+      "source_url": "https://democracy.manchester.gov.uk/ieListMeetings.aspx?CommitteeId=151",
+      "listed_meetings": 13,
+      "meeting_pages_with_evidence": 2,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-10-22",
+      "gap": "Thirteen meetings visible in current index, not exhaustive-period proof; two meeting pages inspected. Report/minutes coverage incomplete."
+    },
+    {
+      "council": "oldham",
+      "committee": "Planning Committee",
+      "source_url": "https://committees.oldham.gov.uk/ieListMeetings.aspx?CommitteeId=133",
+      "listed_meetings": 11,
+      "meeting_pages_with_evidence": 0,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-10-21",
+      "gap": "Eight noncancelled ordinary meetings, two cancellations and one training meeting listed. Meeting-page inspection after interrupted browser batch is unconfirmed and not counted."
+    },
+    {
+      "council": "rochdale",
+      "committee": "Planning and Licensing Committee",
+      "source_url": "https://democracy.rochdale.gov.uk/mgCommitteeDetails.aspx?ID=674",
+      "listed_meetings": null,
+      "meeting_pages_with_evidence": 0,
+      "coverage": "UNKNOWN",
+      "next_meeting": "UNKNOWN",
+      "gap": "HTTP403; browser returned Azure Front Door OriginTimeout504. Historical meeting denominator and document evidence unavailable."
+    },
+    {
+      "council": "salford",
+      "committee": "Planning and Transportation Regulatory Panel",
+      "source_url": "https://sccdemocracy.salford.gov.uk/ieListMeetings.aspx?CommitteeId=153",
+      "listed_meetings": 14,
+      "meeting_pages_with_evidence": 13,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-10-15",
+      "gap": "All14listed pages inspected, including one cancelled;13published meetings.45unique title-only reference mentions withheld; no linked PDFs inspected."
+    },
+    {
+      "council": "stockport",
+      "committee": "Planning & Highways Regulation Committee; Area Committee scope unresolved",
+      "source_url": "https://democracy.stockport.gov.uk/ieListMeetings.aspx?CommitteeId=150",
+      "listed_meetings": null,
+      "meeting_pages_with_evidence": 0,
+      "coverage": "UNKNOWN",
+      "next_meeting": "UNKNOWN",
+      "gap": "HTTP transport failed; browser committee structure502connection refused. Indexed information stale; no current12-month denominator or Area Committee reconciliation."
+    },
+    {
+      "council": "tameside",
+      "committee": "Speakers Panel (Planning); Strategic Planning and Capital Monitoring Panel",
+      "source_url": "https://tameside.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=161",
+      "listed_meetings": 12,
+      "meeting_pages_with_evidence": 2,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-11-11",
+      "gap": "Ten Speakers Panel meetings listed; its PDFs uninspected. Both additional strategic-panel meetings inspected: source says no documents available. Strategic next dateUNKNOWN."
+    },
+    {
+      "council": "wigan",
+      "committee": "Planning Committee",
+      "source_url": "https://wigan.moderngov.co.uk/ieListMeetings.aspx?CommitteeId=120&a=1",
+      "listed_meetings": 11,
+      "meeting_pages_with_evidence": 0,
+      "coverage": "INCOMPLETE",
+      "next_meeting": "2026-10-27",
+      "gap": "Nine noncancelled plus two cancelled meetings indexed; meeting documents uninspected.3Novemberfuturemeetingcancelled."
+    }
+  ]
+}

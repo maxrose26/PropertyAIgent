@@ -28,6 +28,12 @@ def empty_audit():
 def qualify_worker(application_id, audit):
     """Optional denied actions cannot conceal a later sticky safety failure."""
     row = admitted_row(application_id)
+    return _qualify_row(application_id, audit, row, 'arcus_' + str(application_id),
+                        lambda source: from_observed_record(application_id, source))
+
+
+def _qualify_row(application_id, audit, row, case, projector):
+    """Common resource/identity boundary; caller admission stays separate."""
     compact = empty_audit()
     if not isinstance(audit, dict):
         return dict(observation=None, audit=compact, failure='INVALID_ARTIFACT')
@@ -43,7 +49,7 @@ def qualify_worker(application_id, audit):
             compact[target] = value
     def failure(code):
         return dict(observation=None, audit=compact, failure=code)
-    if (audit.get('case') != 'arcus_' + str(application_id)
+    if (audit.get('case') != case
             or audit.get('application_id') != application_id
             or audit.get('reference') != row['reference']
             or audit.get('destination') != row['source_url']
@@ -96,7 +102,7 @@ def qualify_worker(application_id, audit):
             or audit['requested_origins'] != [allowed] or audit['navigated_origins'] != [allowed]):
         return failure('ACCOUNTING_FAILURE')
     try:
-        observation = from_observed_record(application_id, source)
+        observation = projector(source)
     except BoundaryFailure as exc:
         return failure(exc.outcome)
     except (ValueError, TypeError, KeyError):

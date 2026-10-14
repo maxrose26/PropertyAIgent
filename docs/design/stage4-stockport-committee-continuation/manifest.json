@@ -1,0 +1,18 @@
+{
+  "parent_evidence_commit": "eebfc4e8c398fef4f168490b63036da3cc658ffd",
+  "frozen_interval": [
+    "2026-07-14",
+    "2026-10-14"
+  ],
+  "stop_condition": 2,
+  "production_reads": 0,
+  "production_writes": 0,
+  "models": 0,
+  "research_tabs_18_19": "CLOSED",
+  "files": {
+    "docs/design/stage4-stockport-committee-continuation/stockport-evidence.json": "79e4d68249c783e91c1a9d2a956ec84d234336b1970194ea7609b73156d3cefe",
+    "docs/design/stage4-stockport-committee-continuation/RESULT.md": "0238a4d52a86b0bf23951109f7e5d8439329f3fc5aa3b45056ed81ceb09f5ce0",
+    "docs/design/stage4-stockport-committee-continuation/freeze.json": "f7137daa2b17e0bb62fbe68510caf16fc117566ca987e05f99b0dedddd06aa96",
+    "docs/design/stage4-stockport-committee-continuation/INDEPENDENT-REVIEW.md": "52884517ae321f8e62636ad158678f12768f7220723d9d1df8ecfda9f8ab2774"
+  }
+}

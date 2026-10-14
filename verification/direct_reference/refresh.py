@@ -302,6 +302,17 @@ def _refresh_row(session, application, council, row, *, retrieve_evidence):
             if (observation.application_id != row['application_id'] or
                 observation.reference != row['reference'] or observation.source_url != row['source_url']):
                 fail('AMBIGUOUS_SOURCE_RESULT', 'Handoff identity mismatch')
+            if observation.verification_scope == 'INITIAL_STATUS_ONLY':
+                if not observation.literal_verified or not observation.b2_eligible:
+                    fail('PARTIAL_RETRIEVAL', 'Initial observation not qualified')
+                result=ScrapedApplication(reference=row['reference'],
+                    fields={'Reference':row['reference'],'Status':observation.fields['Status']},
+                    summary_url=row['source_url'],further_info_url='',keyval=None,estimated_unit_count=None,
+                    application_category='',opportunity_classification='',qualifies=False)
+                result.verification_scope='INITIAL_STATUS_ONLY'
+                result.field_evidence=observation.field_evidence
+                result.body_sha256=observation.body_sha256
+                return result
             if observation.verification_scope == 'FIELD_LEVEL_DATE_ONLY':
                 if (not observation.literal_verified or not observation.b2_eligible
                         or observation.field_states.get('reference') != 'PRESENT_VALUE'
