@@ -17,6 +17,22 @@ from app.scrapers.unit_filter import qualify
 RULE_VERSION = 'stage4-discovery-v1'
 COUNCILS = frozenset({'bolton', 'bury', 'manchester', 'oldham', 'rochdale',
                      'salford', 'stockport', 'tameside', 'wigan'})
+# These are destination restrictions, NOT evidence that enumeration is qualified.
+SOURCE_ROOTS = {
+    'bolton': ('paplanning.bolton.gov.uk', '/online-applications/'),
+    'bury': ('planning.bury.gov.uk', '/online-applications/'),
+    'oldham': ('planningpa.oldham.gov.uk', '/online-applications/'),
+    'stockport': ('planning.stockport.gov.uk', '/PlanningData-live/'),
+    'tameside': ('publicaccess.tameside.gov.uk', '/online-applications/'),
+    'wigan': ('planning.wigan.gov.uk', '/online-applications/'),
+    'manchester': ('arcusbe.manchester.gov.uk', '/pr/'),
+    'rochdale': ('account.rochdale.gov.uk', '/pr/'),
+    'salford': ('salfordcitycouncil.my.site.com', '/pr/'),
+}
+DISCOVERY_FIELDS = frozenset({'proposal', 'address', 'application_type',
+    'received_date', 'validated_date', 'publication_date', 'units', 'bedspaces',
+    'unit_metric', 'unit_scope', 'status', 'decision', 'decision_date',
+    'parent_reference', 'related_reference'})
 FIELD_STATES = frozenset({'PRESENT_VALUE', 'PRESENT_BLANK', 'NOT_PRESENT',
                          'CONFLICTING', 'UNPARSEABLE', 'UNKNOWN'})
 
@@ -35,8 +51,10 @@ class Literal:
     locator: str
 
     def __post_init__(self):
-        if self.state not in FIELD_STATES or not self.locator:
+        if self.state not in FIELD_STATES or not self.locator or len(self.locator) > 256:
             raise ValueError('field state/provenance')
+        if self.value is not None and (not isinstance(self.value, str) or len(self.value) > 8192):
+            raise ValueError('field value bound')
         if self.state == 'PRESENT_VALUE':
             if not isinstance(self.value, str) or not self.value.strip():
                 raise ValueError('missing literal value')
@@ -196,10 +214,17 @@ class DiscoveryEnvelope:
         u = urlsplit(self.source_url)
         if u.scheme != 'https' or not u.hostname or u.username or u.password or u.fragment:
             raise ValueError('source URL')
-        if not self.source_record_id or not re.fullmatch('[0-9a-f]{64}', self.body_sha256):
+        host, prefix = SOURCE_ROOTS[self.council]
+        if (u.hostname != host or u.port not in (None, 443) or not u.path.startswith(prefix)
+                or len(self.source_url) > 2048 or re.search(r'[\s\\%]', u.path)
+                or any(p in {'.', '..'} for p in u.path.split('/'))):
+            raise ValueError('source destination not admitted')
+        if not self.source_record_id or len(self.source_record_id) > 256 or not re.fullmatch('[0-9a-f]{64}', self.body_sha256):
             raise ValueError('source provenance')
         if self.discovered_at.tzinfo is None:
             raise ValueError('discovery clock')
+        if any(k not in DISCOVERY_FIELDS or not isinstance(v, Literal) for k, v in self.fields):
+            raise ValueError('unapproved discovery field')
         if len({k for k, _ in self.fields}) != len(self.fields):
             raise ValueError('duplicate field')
         if self.site_relationship != 'UNKNOWN':

@@ -330,3 +330,19 @@ def test_duplicate_result_rows_fail_instead_of_count_ambiguity():
     row=RESULT[RESULT.index(b'<li '):RESULT.index(b'</li>')+5]
     r,_,_=observe(result=b'<html><ul id="searchresults">'+row+row+b'</ul></html>')
     assert r['outcome']=='PARTIAL_RETRIEVAL' and r['failure_reason']=='IDENTITY_CONFLICT'
+
+
+def test_observed_application_type_and_cancel_controls():
+    # Qualified form shape: run 38534362595, body SHA 74b4be1a...68607591.
+    controls = (b'<input type="hidden" name="caseAddressType" value="Application">'
+                b'<input type="hidden" name="searchType" value="Application">'
+                b'<input type="submit" name="org.apache.struts.taglib.html.CANCEL" value="Cancel">')
+    r, seen, _ = observe(form=FORM.replace(b'</form>', controls+b'</form>'))
+    assert r['outcome'] == 'RECOGNISED_RESULTS'
+    payload = parse_qs(seen[1].body)
+    assert payload['caseAddressType'] == ['Application']
+    assert payload['searchType'] == ['Application']
+    assert CANCEL_CONTROL not in payload
+    for wrong in (b'Appeal', b'All', b''):
+        r, seen, _ = observe(form=FORM.replace(b'</form>', controls.replace(b'value="Application"', b'value="'+wrong+b'"')+b'</form>'))
+        assert r['outcome'] == 'FORM_REJECTED' and len(seen) == 1

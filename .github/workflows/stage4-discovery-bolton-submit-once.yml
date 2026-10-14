@@ -1,0 +1,42 @@
+name: Stage4 Bolton corrected form submission ONCE
+on:
+  push:
+    branches: [master]
+    paths: ['verification/bolton_recon/discovery_submit_once.py']
+permissions:
+  contents: read
+concurrency:
+  group: stage4-discovery-source-qualification
+  cancel-in-progress: false
+jobs:
+  submit:
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+      - name: Exact candidate offline verification
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py verification/bolton_recon/test_recon.py tests/test_discovery_contract.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py -q
+      - name: Fixed Bolton GET and POST only, no persistence
+        env:
+          CANDIDATE: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/discovery-submit"
+          set +e
+          timeout --kill-after=2s 35s env -i HOME="$HOME" PATH=/usr/bin:/bin DISCOVERY_CANDIDATE_SHA="$CANDIDATE" DISCOVERY_RUN_ID="$RUN_ID" "$RUNNER_TEMP/discovery-venv/bin/python" -m verification.bolton_recon.discovery_submit_once > "$RUNNER_TEMP/discovery-submit/audit.json"
+          result=$?
+          printf '{"worker_exit":%s,"supervisor_returned":true,"no_retry":true}\n' "$result" > "$RUNNER_TEMP/discovery-submit/supervisor.json"
+          exit "$result"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: discovery-submit-${{ github.run_id }}-${{ github.sha }}
+          path: ${{ runner.temp }}/discovery-submit/*.json
+          if-no-files-found: error
+          retention-days: 14

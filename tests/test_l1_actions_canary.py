@@ -132,13 +132,21 @@ def test_total_request_accounting_ceiling():
     assert first.requests + second.requests == 20
 
 
-def test_existing_generic_idox_functions_unchanged():
+def test_existing_generic_idox_functions_preserve_history_and_scoped_discovery_change():
     import ast
     source = 'app/scrapers/idox_portal.py'
     before = subprocess.check_output(['git', 'show', '27966c34d1b4dbb88c15cd59d0805d55b14af9a7:' + source], cwd=ROOT, text=True)
     old = {n.name: ast.dump(n) for n in ast.parse(before).body if isinstance(n, ast.FunctionDef)}
     new = {n.name: ast.dump(n) for n in ast.parse((ROOT / source).read_text()).body if isinstance(n, ast.FunctionDef)}
-    assert all(new[name] == value for name, value in old.items())
+    # Historical L1 qualification is immutable. Stage4 discovery subsequently
+    # authorised fail-closed result pagination; no other generic function changed.
+    archived = (ROOT / 'verification/direct_reference/history/idox-v1.py.txt').read_text()
+    historical = {n.name: ast.dump(n) for n in ast.parse(archived).body if isinstance(n, ast.FunctionDef)}
+    assert all(historical[name] == value for name, value in old.items())
+    assert {name for name, value in old.items() if new[name] != value} == {'collect_result_links'}
+    import hashlib, json
+    pins = json.loads((ROOT / 'verification/direct_reference/accepted-dependencies.json').read_text())
+    assert hashlib.sha256((ROOT / source).read_bytes()).hexdigest() == pins[source]
 
 
 def test_redirects_accounted():
