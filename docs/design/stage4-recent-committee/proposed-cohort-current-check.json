@@ -1,0 +1,34 @@
+{
+  "purpose": "One current identity-only absence reconciliation for proposed material/potential qualification cohort; not production admission",
+  "targets": [
+    {
+      "council": "bolton",
+      "reference": "21080/25"
+    },
+    {
+      "council": "manchester",
+      "reference": "143413/FO/2025"
+    },
+    {
+      "council": "manchester",
+      "reference": "145583/FO/2026"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2025/1664"
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00396/FUL"
+    }
+  ],
+  "withheld": [
+    {
+      "council": "salford",
+      "reference": "PA/2025/1506"
+    }
+  ],
+  "identity_denominator": "1453 snapshot2026-10-14T15:25:18.959051Z",
+  "portal_qualification_required": true,
+  "production_admission_authorised": false
+}
