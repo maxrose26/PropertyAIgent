@@ -1,0 +1,21 @@
+{
+  "assessment_date": "2026-10-14",
+  "timezone": "Europe/London",
+  "interval_start_inclusive": "2026-07-14",
+  "interval_end_exclusive": "2026-10-14",
+  "calendar_rule": "assessment_date minus three calendar months, half-open interval",
+  "date_selection": "chosen at task start from supplied current date; persisted after bounded access checks; unchanged after observations",
+  "scope": [
+    "bolton",
+    "bury",
+    "manchester",
+    "oldham",
+    "rochdale",
+    "salford",
+    "stockport",
+    "tameside",
+    "wigan"
+  ],
+  "trafford": "DEFERRED",
+  "production_mutation": false
+}
