@@ -39,6 +39,33 @@ def test_exact_cohort_and_no_enumeration_claim():
     with pytest.raises(ValueError): checked_engine('postgresql+psycopg://x:y@127.0.0.1/other')
 
 
+def test_transport_prerequisite_has_no_production_credentials():
+    import yaml
+    from pathlib import Path
+    from verification.discovery.committee_exact import WORKFLOW
+    workflow=yaml.load(Path(WORKFLOW).read_text(),Loader=yaml.BaseLoader)
+    assert set(workflow['on'])=={'workflow_dispatch'}
+    transport=workflow['jobs']['transport'];admission=workflow['jobs']['admission']
+    assert 'secrets.' not in str(transport) and 'environment' not in transport
+    assert '--transport-only' in str(transport)
+    assert admission['needs']=='transport'
+    assert admission['environment']=='stage4-production-canary'
+    assert str(admission).count('secrets.')==1
+    assert all(j['timeout-minutes']=='8' for j in workflow['jobs'].values())
+
+
+def test_transport_failure_preserves_progress_and_never_uses_database():
+    from verification.discovery.committee_exact import validate_sources
+    progress=[]
+    def bad(row,application_id):
+        assert application_id is None
+        return {'observation':None,'failure':'PARSER_FAILURE',
+                'audit':{'cleanup_state':'CLOSED','budget_state':'WITHIN_LIMITS'}}
+    with pytest.raises(RuntimeError,match='transport-only qualification failed'):
+        validate_sources(bad,progress)
+    assert len(progress)==1 and not progress[0]['qualified']
+
+
 def test_shared_caller_identity_and_b2_idempotency(engine):
     seed(engine)
     first=run(engine,'offline',source_retrieve=synthetic_source)

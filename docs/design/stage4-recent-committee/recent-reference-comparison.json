@@ -156,9 +156,22 @@
       "application_id": 17,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 12,
-      "materiality_reason": null,
+      "materiality_reason": "Reserved matters for12dwellings followingoutline68815",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "scale_scope": "RESERVED_MATTERS_DWELLINGS",
+      "scale_metric": "DWELLINGS",
+      "sources": [
+        {
+          "meeting_date": "2026-09-01",
+          "source_url": "https://councildecisions.bury.gov.uk/documents/s51432/Final Index.pdf",
+          "sha256": "c4bc3f4efed9e3174ada11e1c49e6ce8be774cab99408186962e80f36d59efb9",
+          "recommendation_literal": "Minded to Approve",
+          "unit_mention": 12,
+          "unit_scope": "UNIT_SCOPE_UNKNOWN",
+          "evidence_type": "OFFICER_REPORT_APPLICATION_INDEX"
+        }
+      ]
     },
     {
       "council": "bury",
@@ -202,7 +215,17 @@
       "supported_dwellings": null,
       "materiality_reason": "Related woodland/meadow proposal; officer report identifies competing residential application142223/FO/2025 (existing680)",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "sources": [
+        {
+          "url": "https://democracy.manchester.gov.uk/documents/s65713/Ryebank%20Fields.pdf",
+          "sha256": "986f3f08cee1afb95c7ee08b5dfddfef9f7d8bf65184639e405a9f2202dc751f",
+          "evidence_type": "OFFICER_REPORT",
+          "supporting_proposal": "Related woodland/meadow proposal; officer report identifies competing residential application142223/FO/2025 (existing680)"
+        }
+      ],
+      "scale_scope": "UNKNOWN",
+      "scale_metric": "UNKNOWN"
     },
     {
       "council": "manchester",
@@ -211,9 +234,19 @@
       "application_id": null,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 153,
-      "materiality_reason": null,
+      "materiality_reason": "17storey residential development153homes",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "sources": [
+        {
+          "url": "https://democracy.manchester.gov.uk/documents/s65746/Rochdale%20Road.pdf",
+          "sha256": "963cdc577792e0cd4c2ee707820a40d51d0d1da881118d0bff535266d2577307",
+          "evidence_type": "OFFICER_REPORT",
+          "supporting_proposal": "17storey residential scheme comprising153homes"
+        }
+      ],
+      "scale_scope": "APPLICATION_DWELLINGS",
+      "scale_metric": "DWELLINGS"
     },
     {
       "council": "oldham",
@@ -255,9 +288,19 @@
       "application_id": 1178,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 282,
-      "materiality_reason": null,
+      "materiality_reason": "Outline multi-phased development with all matters reserved for up to282dwellings",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "scale_scope": "MAXIMUM_SCHEME_DWELLINGS",
+      "scale_metric": "DWELLINGS",
+      "sources": [
+        {
+          "url": "https://sccdemocracy.salford.gov.uk/documents/s95950/Merged%20Header%20Index%20-%2016%20July%202026.pdf",
+          "sha256": "3e569c1279afcafb717aad4928c75c5d5370e89a43b5ef8f51c1f0be74614272",
+          "evidence_type": "OFFICER_REPORT_OR_APPLICATION_INDEX",
+          "supporting_proposal": "Outline multi-phased development with all matters reserved for up to282dwellings"
+        }
+      ]
     },
     {
       "council": "salford",
@@ -301,7 +344,17 @@
       "supported_dwellings": null,
       "materiality_reason": "Care-home redevelopment; unit/bedspace scale unknown",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "sources": [
+        {
+          "url": "https://sccdemocracy.salford.gov.uk/documents/s97276/Minutes%20-%20Planning%20Panel%20-%203%20September%202026%20F.pdf",
+          "sha256": "48dba1ba76b9d70d0b7aa4cc8295d8405e06d1aa76a89e6f6f13ef63c7ad949f",
+          "evidence_type": "COMMITTEE_MINUTES",
+          "supporting_proposal": "Care-home redevelopment; unit/bedspace scale unknown"
+        }
+      ],
+      "scale_scope": "UNKNOWN",
+      "scale_metric": "UNKNOWN"
     },
     {
       "council": "salford",
@@ -343,9 +396,19 @@
       "application_id": 253,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 126,
-      "materiality_reason": null,
+      "materiality_reason": "Six-storey residential development comprising126apartments",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "scale_scope": "APPLICATION_DWELLINGS",
+      "scale_metric": "DWELLINGS",
+      "sources": [
+        {
+          "url": "https://sccdemocracy.salford.gov.uk/documents/s97231/Merged%20Header%20Index%20-%20Main%20Report%20-%2017%20September%202026.pdf",
+          "sha256": "35e51174509cfe5f8a44c2cdd70b753f10d19880ef4d550e83a54b953466036c",
+          "evidence_type": "OFFICER_REPORT_OR_APPLICATION_INDEX",
+          "supporting_proposal": "Six-storey residential development comprising126apartments"
+        }
+      ]
     },
     {
       "council": "salford",
@@ -365,9 +428,19 @@
       "application_id": 54,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 175,
-      "materiality_reason": null,
+      "materiality_reason": "Reserved matters for175dwellings pursuant to18/00159/OUT",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "scale_scope": "RESERVED_MATTERS_DWELLINGS",
+      "scale_metric": "DWELLINGS",
+      "sources": [
+        {
+          "url": "https://tameside.moderngov.co.uk/documents/s208975/26.00004.REM%20Speakers%20Panel%20Report.pdf",
+          "sha256": "23db7fe39d9fd8086056daed42ded0b6d6d093cf4e5dc85b91ee33623ba4fa56",
+          "evidence_type": "OFFICER_REPORT_OR_APPLICATION_INDEX",
+          "supporting_proposal": "Reserved matters for175dwellings pursuant to18/00159/OUT"
+        }
+      ]
     },
     {
       "council": "tameside",
@@ -420,9 +493,19 @@
       "application_id": 56,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 49,
-      "materiality_reason": null,
+      "materiality_reason": "Redevelopment to17dwellings and32unit apartmentbuilding",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "scale_scope": "APPLICATION_DWELLINGS_SUM_17_PLUS_32",
+      "scale_metric": "DWELLINGS",
+      "sources": [
+        {
+          "url": "https://tameside.moderngov.co.uk/documents/s210930/26.00098.FUL%20-%20Britannia%20New%20Mill%20Queen%20Street%20Mossley%20-%20Speakers%20Report.pdf",
+          "sha256": "01a1f87c5b5d7e7aad67aafa515a630daf77763e06ece0e60c8508383ce823b8",
+          "evidence_type": "OFFICER_REPORT_OR_APPLICATION_INDEX",
+          "supporting_proposal": "Redevelopment to17dwellings and32unit apartmentbuilding"
+        }
+      ]
     },
     {
       "council": "tameside",
@@ -453,9 +536,19 @@
       "application_id": 59,
       "materiality": "CONFIRMED_MATERIAL",
       "supported_dwellings": 10,
-      "materiality_reason": null,
+      "materiality_reason": "Change warehouse/designstudio toresidential10flats",
       "primary_comparison": "UNKNOWN",
-      "admission": "NOT_ATTEMPTED"
+      "admission": "NOT_ATTEMPTED",
+      "scale_scope": "APPLICATION_DWELLINGS",
+      "scale_metric": "DWELLINGS",
+      "sources": [
+        {
+          "url": "https://tameside.moderngov.co.uk/documents/s210947/Panel%20Report%2026.00152.FUL%2011%20Railway%20Street.pdf",
+          "sha256": "ba931cc2345775c6c1a7a8c2ebc3fcbf0af0a624b466e50c978c0a96c4caf92f",
+          "evidence_type": "OFFICER_REPORT_OR_APPLICATION_INDEX",
+          "supporting_proposal": "Change warehouse/designstudio toresidential10flats"
+        }
+      ]
     },
     {
       "council": "wigan",
@@ -479,5 +572,7 @@
       "primary_comparison": "UNKNOWN",
       "admission": "NOT_ATTEMPTED"
     }
-  ]
+  ],
+  "comparison_valid_as_of": "2026-10-14 15:25:18.959051+00",
+  "primary_misses": "NONE_PROVEN; UNKNOWN is not proof of no misses"
 }
