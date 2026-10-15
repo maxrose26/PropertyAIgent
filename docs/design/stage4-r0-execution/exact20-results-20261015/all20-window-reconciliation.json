@@ -1,0 +1,742 @@
+[
+  {
+    "applied_interval": [
+      "2026-09-17",
+      "2026-09-23"
+    ],
+    "comparison": "IDENTITY_SETS_MATCH_ACROSS_OBSERVATIONS",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:41:25.587Z",
+      "observed_started_at": "2026-10-15T13:40:36.250Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 13,
+    "listing_segments": [
+      {
+        "evidence_sha256": "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+        "first": 1,
+        "last": 10,
+        "ordinal": 1,
+        "total": 13
+      },
+      {
+        "evidence_sha256": "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7",
+        "first": 11,
+        "last": 13,
+        "ordinal": 2,
+        "total": 13
+      }
+    ],
+    "listing_stage": "NEXT_CONTROL",
+    "parser_miss_claimed": false,
+    "primary_enumeration": "COMPLETE",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "primary_only": [],
+    "reference_count": 13,
+    "requested_interval": [
+      "2026-09-17",
+      "2026-09-23"
+    ],
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "applied_interval": [
+      "2026-09-24",
+      "2026-09-30"
+    ],
+    "comparison": "IDENTITY_SETS_MATCH_ACROSS_OBSERVATIONS",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:41:48.210Z",
+      "observed_started_at": "2026-10-15T13:41:42.222Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 15,
+    "listing_segments": [
+      {
+        "evidence_sha256": "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+        "first": 1,
+        "last": 10,
+        "ordinal": 1,
+        "total": 15
+      },
+      {
+        "evidence_sha256": "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57",
+        "first": 11,
+        "last": 15,
+        "ordinal": 2,
+        "total": 15
+      }
+    ],
+    "listing_stage": "NEXT_CONTROL",
+    "parser_miss_claimed": false,
+    "primary_enumeration": "COMPLETE",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "primary_only": [],
+    "reference_count": 15,
+    "requested_interval": [
+      "2026-09-24",
+      "2026-09-30"
+    ],
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "applied_interval": [
+      "2026-10-01",
+      "2026-10-07"
+    ],
+    "comparison": "UNRESOLVED_DIFFERENCE",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:42:02.855Z",
+      "observed_started_at": "2026-10-15T13:41:59.576Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 17,
+    "listing_segments": [
+      {
+        "evidence_sha256": "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+        "first": 1,
+        "last": 10,
+        "ordinal": 1,
+        "total": 18
+      },
+      {
+        "evidence_sha256": "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65",
+        "first": 11,
+        "last": 18,
+        "ordinal": 2,
+        "total": 18
+      }
+    ],
+    "listing_stage": "NEXT_CONTROL",
+    "parser_miss_claimed": false,
+    "primary_enumeration": "COMPLETE",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "primary_only": [
+      "PL/2026/0922"
+    ],
+    "reference_count": 18,
+    "requested_interval": [
+      "2026-10-01",
+      "2026-10-07"
+    ],
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY_QUALIFICATION",
+    "coverage": "FAILED",
+    "failure": "LISTING_NOT_QUALIFIED",
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:42:06.128Z",
+      "observed_started_at": "2026-10-15T13:42:02.855Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 8,
+    "listing_segments": [],
+    "listing_stage": "CRITERIA",
+    "parser_miss_claimed": false,
+    "primary_enumeration": "FAILED",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:45.436825+00:00",
+      "started_at": "2026-10-15T18:34:31.468492+00:00"
+    },
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": [
+      "2026-10-08",
+      "2026-10-14"
+    ],
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:42:37.268Z",
+      "observed_started_at": "2026-10-15T13:42:22.986Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 39,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "salford",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:42:44.077Z",
+      "observed_started_at": "2026-10-15T13:42:37.268Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 37,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "salford",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:43:07.100Z",
+      "observed_started_at": "2026-10-15T13:43:01.572Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 27,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "salford",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:43:11.354Z",
+      "observed_started_at": "2026-10-15T13:43:07.100Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 11,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "salford",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 47,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "COMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": true,
+    "window": {
+      "council": "stockport",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "stockport",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "stockport",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "stockport",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "tameside",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "tameside",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 16,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "INCOMPLETE",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "tameside",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "NOT_ATTEMPTED",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "tameside",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "NOT_ATTEMPTED",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "wigan",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "NOT_ATTEMPTED",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "wigan",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "NOT_ATTEMPTED",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "wigan",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "applied_interval": null,
+    "comparison": "UNAVAILABLE_PRIMARY",
+    "coverage": "UNKNOWN",
+    "failure": null,
+    "independent_observation": {
+      "assessor": "/root/r0_recovery_blind",
+      "assessor_session": "r0-independent-recovery-20261015",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+      "tab_id": "12"
+    },
+    "independent_only": [],
+    "independent_references": 0,
+    "listing_segments": [],
+    "listing_stage": null,
+    "parser_miss_claimed": false,
+    "primary_enumeration": "NOT_ATTEMPTED",
+    "primary_observation": null,
+    "primary_only": [],
+    "reference_count": 0,
+    "requested_interval": null,
+    "retained_independent_status": "NOT_ATTEMPTED",
+    "source_change_uncertainty": true,
+    "usable_independent_denominator": false,
+    "window": {
+      "council": "wigan",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    }
+  }
+]

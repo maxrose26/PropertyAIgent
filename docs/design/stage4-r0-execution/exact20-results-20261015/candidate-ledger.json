@@ -1,0 +1,1520 @@
+[
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0882",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "23/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tnpbVIAQ",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tnpbVIAQ?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0503",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "22/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000n78hfIAA",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000n78hfIAA?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "OTH/2026/0880",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "22/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tjv7MIAQ",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tjv7MIAQ?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "OTH/2026/0876",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "22/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000ti3PGIAY",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000ti3PGIAY?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0796",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "22/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000rjpzEIAQ",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000rjpzEIAQ?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0878",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "22/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tj2HRIAY",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tj2HRIAY?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "OTH/2026/0866",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "21/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tcvk4IAA",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tcvk4IAA?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "OTH/2026/0852",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "18/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tXKjcIAG",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tXKjcIAG?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0861",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "17/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tY68aIAC",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tY68aIAC?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "25/00943/HOUS",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "17/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000e8EkMIAU",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000e8EkMIAU?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "OTH/2026/0851",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "17/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tTkRCIA0",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tTkRCIA0?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0785",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "17/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000raBudIAE",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000raBudIAE?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:19.509018+00:00",
+      "started_at": "2026-10-15T18:34:12.194265+00:00"
+    },
+    "provenance": [
+      "ea14ed1ac827c1edc2263d17c874f15f9d7f8a4e0104855338f7ef86258244d5",
+      "bac80557bcf4bc3a4ae3ba97a18180ed61b48ce6f59c22432bdc02edd8012fe7"
+    ],
+    "reference": "PL/2026/0585",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "17/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000oL84DIAS",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000oL84DIAS?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0166",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "30/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000iI9VeIAK",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000iI9VeIAK?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0780",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "30/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000rPqQ2IAK",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000rPqQ2IAK?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "OTH/2026/0901",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "30/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uAxzRIAS",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uAxzRIAS?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "OTH/2026/0902",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "30/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uBMNOIA4",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uBMNOIA4?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0556",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "29/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000nyDmOIAU",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000nyDmOIAU?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0768",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "28/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000rI201IAC",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000rI201IAC?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0813",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "28/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000s2cNGIAY",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000s2cNGIAY?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "OTH/2026/0892",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "28/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000u0is1IAA",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000u0is1IAA?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0814",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "28/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000s4a4DIAQ",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000s4a4DIAQ?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0894",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "28/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000u2CZVIA2",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000u2CZVIA2?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0724",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "25/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000qVDY0IAO",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000qVDY0IAO?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0752",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "24/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000qxsBJIAY",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000qxsBJIAY?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "PL/2026/0777",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "24/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000rMMWaIAO",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000rMMWaIAO?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "OTH/2026/0886",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "24/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000trRc0IAE",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000trRc0IAE?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:25.693283+00:00",
+      "started_at": "2026-10-15T18:34:19.510270+00:00"
+    },
+    "provenance": [
+      "566ade616e5d274a38393277119b3bbc0c4ea52a9e63ff6f2c145c2f4b70766c",
+      "7b5b0f718e2f817218c83bdb5d772c65ad32a7ec6667a7d6ddf675c2dcfa7c57"
+    ],
+    "reference": "OTH/2026/0888",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "24/9/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tu1ppIAA",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tu1ppIAA?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0928",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "07/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uc5srIAA",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uc5srIAA?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0924",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "07/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uZ2EyIAK",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uZ2EyIAK?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0713",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "07/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000qOMpaIAG",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000qOMpaIAG?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0655",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "07/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000pZg3rIAC",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000pZg3rIAC?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0889",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "07/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tuZUtIAM",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tuZUtIAM?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0922",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "07/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uZ2rdIAC",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uZ2rdIAC?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0879",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "06/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tjjPnIAI",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tjjPnIAI?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0911",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uQb5JIAS",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uQb5JIAS?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0918",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uRPN5IAO",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uRPN5IAO?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0913",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uQG7QIAW",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uQG7QIAW?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0864",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000td1PjIAI",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000td1PjIAI?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "OTH/2026/0881",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tm031IAA",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tm031IAA?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0631",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000pA8i6IAC",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000pA8i6IAC?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0915",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uQOzqIAG",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uQOzqIAG?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0917",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uQQzfIAG",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uQQzfIAG?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "NOT/2026/0912",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "05/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uQVJLIA4",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uQVJLIA4?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "NOT/2026/0884",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "02/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000tpuIHIAY",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000tpuIHIAY?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  },
+  {
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "application_role": "UNKNOWN",
+    "council": "rochdale",
+    "database_presence": "UNKNOWN_NOT_QUERIED",
+    "exact_detection_timestamp": "UNKNOWN_WITHIN_RECORDED_OBSERVATION_INTERVAL",
+    "exact_record_identity": "NOT_QUALIFIED",
+    "materiality": "POTENTIALLY_MATERIAL_REQUIRES_QUALIFICATION",
+    "primary_observation": {
+      "ended_at": "2026-10-15T18:34:31.466862+00:00",
+      "started_at": "2026-10-15T18:34:25.694563+00:00"
+    },
+    "provenance": [
+      "802190c1297ab7175bff23fb45af4bb69573dc5ad0d1430e819c1cabee23d4bf",
+      "34aad0f4fa74b87b99de10c5116c0fa3c456b677cd31717de75d604aa0ae8d65"
+    ],
+    "reference": "PL/2026/0906",
+    "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+    "site_relationship": "UNKNOWN",
+    "source_date_literal": "01/10/2026",
+    "source_date_semantics": "VALIDATED",
+    "source_date_state": "PRESENT_VALUE",
+    "source_record_id": "a0rSl00000uFnDEIA0",
+    "source_run": 38786550045,
+    "source_url": "https://account.rochdale.gov.uk/pr/s/detail/a0rSl00000uFnDEIA0?c__r=Arcus_BE_Public_Register",
+    "suspension_target_membership": "IN_TARGET",
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "sealed_at": "2026-10-15T13:24:35.113641+00:00",
+  "ledger_sha256": "715da66d96a643800c7a30df9ae88481e7fc2576d89fc55a4ec93484a2049f17",
+  "ledger_bytes": 29300,
+  "rows": 28,
+  "independent_complete": 0,
+  "incomplete": 2,
+  "not_attempted": 26,
+  "primary_reveal": "NOT_OCCURRED",
+  "immutable_after_seal": true
+}
