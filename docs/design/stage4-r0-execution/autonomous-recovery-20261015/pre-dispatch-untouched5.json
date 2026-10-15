@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-10-15T21:49:19.453Z",
+  "scope": "untouched5",
+  "sha": "f6525edffb514a79343191860056e1bed3e66082",
+  "tree": "2bb275249896ec5e6a7506a2e40ce0ba2b116ffe",
+  "manifest_sha": "8da4fb190c65075246c8f1ca07c4e476075c0639dc5ca11304d9aebc318109f7",
+  "authority": "AUTHORISE_R0_MANDATE_UNTOUCHED5_ONCE",
+  "history_total": 33,
+  "returned": 33,
+  "prior_scope_runs": 0,
+  "prior_partition_run": 38812359777,
+  "prior_accounting_complete": true,
+  "prior_cleanup": "CLOSED",
+  "prior_survivors": 0,
+  "prior_stop": null
+}
