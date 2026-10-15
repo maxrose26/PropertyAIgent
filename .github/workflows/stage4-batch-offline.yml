@@ -22,10 +22,14 @@ on:
       - '.github/workflows/stage4-route-preflight-once.yml'
       - 'tests/test_oldham_production_registration.py'
       - '.github/workflows/stage4-route-qualified-material-admission-once.yml'
+      - '.github/workflows/stage4-r0-source-date-once.yml'
       - '.github/workflows/stage4-discovery-offline.yml'
       - 'verification/discovery/material_admission_route_qualified.py'
       - 'tests/test_discovery_admission_proposal.py'
       - 'tests/test_discovery_route_validation.py'
+      - 'tests/test_discovery_r0_proposal.py'
+      - 'verification/discovery/r0_proposal.py'
+      - 'docs/design/stage4-r0-execution/**'
 permissions:
   contents: read
 jobs:

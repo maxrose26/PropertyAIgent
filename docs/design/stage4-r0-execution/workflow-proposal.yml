@@ -1,4 +1,4 @@
-# UNREGISTERED proposal. Copying into .github/workflows requires separate REVIEW.
+# Canonical registered R0 workflow; execution requires separate confirmation.
 name: Stage4 R0 source-date observation ONCE
 on:
   workflow_dispatch:
