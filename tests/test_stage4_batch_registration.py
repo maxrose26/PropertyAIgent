@@ -43,6 +43,10 @@ def test_workflow_scope():
     assert 'GITHUB_RUN_NUMBER' in steps[0]['run'] and 'GITHUB_RUN_ATTEMPT' in steps[0]['run']
     assert w['concurrency']['cancel-in-progress']=='false'
     for path in Path('.github/workflows').glob('*.yml'):
+        if path.name=='stage4-r0-selective5-admission-once.yml':
+            from tests.test_discovery_autonomous_mandate import assert_selected_registered
+            assert_selected_registered(path.read_bytes())
+            continue
         if path.name=='stage4-r0-identity-comparison-once.yml':
             from tests.test_discovery_r0_registration import assert_registered
             assert_registered('comparison',path.read_text())

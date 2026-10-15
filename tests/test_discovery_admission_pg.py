@@ -167,3 +167,16 @@ def test_bolton53_rollback_before_identity_commit(pg):
         result=a.record(pg,next(a.rows()),retrieve=lambda _:pytest.fail('source'))
     assert result['identity']=='FAILED_OR_UNCERTAIN'
     with Session(pg) as s:assert s.scalar(select(func.count()).select_from(Application))==0
+
+
+def test_selective5_actual_fixed_subset_on_disposable_postgres(pg):
+    from verification.discovery import selective5 as chosen
+    from tests.test_discovery_bolton53_admission import synthetic
+    first=chosen.run(engine_factory=lambda:pg,reader=synthetic,checkpoint=lambda _:None,journal=lambda *_:None)
+    assert first['stop'] is None and len(first['results'])==5
+    assert [r['reference'] for r in first['results']]==['01768/26','01769/26','01827/26','DC/100094','DC/100393']
+    assert all(r['facts']=='INITIAL_FACTS_VERIFIED' for r in first['results'][:3])
+    assert all(r['transaction']=='NOT_STARTED' and r['identity']=='WITHHELD' for r in first['results'][3:])
+    again=chosen.run(engine_factory=lambda:pg,reader=lambda _:pytest.fail('existing must not refetch'),checkpoint=lambda _:None,journal=lambda *_:None)
+    assert all(r['identity']=='ALREADY_KNOWN' and r['facts']=='EXISTING_NOT_WRITTEN' for r in again['results'][:3])
+    with Session(pg) as session:assert session.scalar(select(func.count()).select_from(Application))==3

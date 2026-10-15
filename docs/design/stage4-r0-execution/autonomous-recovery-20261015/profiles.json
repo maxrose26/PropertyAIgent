@@ -1,0 +1,41 @@
+{
+  "partitions8": {
+    "authority": "AUTHORISE_R0_MANDATE_PARTITIONS8_ONCE",
+    "bytes": 131829120,
+    "calls": 8,
+    "job_seconds": 905,
+    "manifest_sha": "cf8c2d1fcd8dc95a41e9b03144a09e24af5c5c1db887d9bfafbf6876009ee376",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 500,
+    "seconds": 440,
+    "setup_seconds": 260,
+    "workflow": ".github/workflows/stage4-r0-mandate-partitions8-once.yml"
+  },
+  "unresolved4": {
+    "authority": "AUTHORISE_R0_MANDATE_UNRESOLVED4_ONCE",
+    "bytes": 29971520,
+    "calls": 4,
+    "job_seconds": 685,
+    "manifest_sha": "41710d316e5024129a3874f930adc32f266abd00a1314c6045a2e37dfaf6031b",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 110,
+    "seconds": 220,
+    "setup_seconds": 260,
+    "workflow": ".github/workflows/stage4-r0-mandate-unresolved4-once.yml"
+  },
+  "untouched5": {
+    "authority": "AUTHORISE_R0_MANDATE_UNTOUCHED5_ONCE",
+    "bytes": 15000000,
+    "calls": 5,
+    "job_seconds": 740,
+    "manifest_sha": "8da4fb190c65075246c8f1ca07c4e476075c0639dc5ca11304d9aebc318109f7",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 50,
+    "seconds": 275,
+    "setup_seconds": 260,
+    "workflow": ".github/workflows/stage4-r0-mandate-untouched5-once.yml"
+  }
+}
