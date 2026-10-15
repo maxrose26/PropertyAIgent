@@ -78,20 +78,37 @@ async def read_cards(page,config=MANCHESTER):
     return out
 
 
+CRITERIA_OPERATIONS=frozenset({'RESULT_MARKER_VISIBLE','CRITERIA_DISCLOSURE','VALID_FROM','VALID_TO',
+    'BLANK_INPUT','BLANK_COMBO','CATEGORY'})
+LOCAL_TIMEOUT='SOURCE_LOCAL_CRITERIA_CONTROL_TIMEOUT'
+
+async def criteria_control(operation, action, audit):
+    # Only the actual Playwright locator timeout at a named operation qualifies.
+    # A same-named builtin exception, generic stage or arbitrary payload cannot.
+    from playwright.async_api import TimeoutError as LocatorTimeout
+    if operation not in CRITERIA_OPERATIONS:raise ValueError('criteria operation')
+    try:return await action()
+    except LocatorTimeout:
+        audit['criteria_control_timeout']={'code':LOCAL_TIMEOUT,'operation':operation,
+            'exception_contract':'PLAYWRIGHT_LOCATOR_TIMEOUT_V1'}
+        raise
+
+
 async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
     audit.update(listing_stage='CRITERIA',listing_segments=[],listing_records=[],completeness='UNKNOWN',applied_interval=None,
-                 source_qualification='CANDIDATE_PUBLIC_UI_CONTRACT')
+                 source_qualification='CANDIDATE_PUBLIC_UI_CONTRACT',enumeration_evidence=None)
     try:
-        await page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000)
+        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000),audit)
         # An ordinary disclosure toggle exposes the source's retained filters.
-        await page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000)
+        await criteria_control('CRITERIA_DISCLOSURE',lambda:page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000),audit)
         expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
         for label,value in expected.items():
-            if await page.get_by_label(label,exact=True).input_value(timeout=1500)!=value: raise ValueError('applied filter mismatch')
+            operation='VALID_FROM' if label=='Valid date from' else 'VALID_TO' if label=='Valid date to' else 'BLANK_INPUT'
+            if await criteria_control(operation,lambda:page.get_by_label(label,exact=True).input_value(timeout=1500),audit)!=value: raise ValueError('applied filter mismatch')
         for label in config.blank_combos:
-            if (await page.get_by_role('combobox',name=label,exact=True).inner_text()).strip()!='Select an option':
+            if (await criteria_control('BLANK_COMBO',lambda:page.get_by_role('combobox',name=label,exact=True).inner_text(timeout=1500),audit)).strip()!='Select an option':
                 raise ValueError('hidden filter')
-        if (await page.get_by_role('combobox',name='Category',exact=True).inner_text()).strip()!='Planning Applications':
+        if (await criteria_control('CATEGORY',lambda:page.get_by_role('combobox',name='Category',exact=True).inner_text(timeout=1500),audit)).strip()!='Planning Applications':
             raise ValueError('category')
         audit['applied_interval']=[config.start,config.end]
         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'

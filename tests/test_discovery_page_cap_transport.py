@@ -26,7 +26,7 @@ class Page:
         page=self
         class Locator:
             async def wait_for(self, **kw): pass
-            async def inner_text(self):
+            async def inner_text(self, **kw):
                 return f'Showing {page.segment*10+1} to {page.segment*10+10} of 73 results'
             def filter(self, **kw): return self
             async def count(self): return 1
@@ -45,7 +45,7 @@ class Page:
     def get_by_role(self, role, name, exact=True):
         class Role:
             async def click(self, **kw): pass
-            async def inner_text(self):return 'Planning Applications' if name=='Category' else 'Select an option'
+            async def inner_text(self, **kw):return 'Planning Applications' if name=='Category' else 'Select an option'
         return Role()
 
 

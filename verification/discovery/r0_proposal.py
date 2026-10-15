@@ -95,9 +95,11 @@ def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS
     from their fixed manifest/controller; arbitrary deadlines cannot expand it.
     Hosted VM teardown remains final containment, not hostile-process isolation.
     """
-    registered=worker_module=='verification.discovery.r0_registered_scopes'
+    registered=worker_module in {'verification.discovery.r0_registered_scopes','verification.discovery.r0_exact16'}
     if registered:
         from .r0_registered_scopes import validate_plan,audit_bytes,AUDIT_RESERVE
+        if worker_module=='verification.discovery.r0_exact16':
+            from .r0_exact16 import validate_plan
         profile=validate_plan(plan);maximum=profile['output_bytes'];audit_root=output.parent
         if deadline!=profile['seconds'] or audit_bytes(audit_root)>AUDIT_RESERVE:
             raise ValueError('ROUND_BOUNDARY')

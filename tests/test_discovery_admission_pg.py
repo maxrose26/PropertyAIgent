@@ -118,3 +118,52 @@ def test_fixed80_identity_comparison_real_read_only_transaction(pg):
 def test_bolton_initial_literal_real_shared_path_on_postgres(pg):
     from tests.test_discovery_initial_application_contract import assert_bolton_path
     assert_bolton_path(pg)
+
+
+def test_bolton53_primary_discovery_initial_b2_disposable(pg):
+    from tests.test_discovery_bolton53_admission import exercise
+    exercise(pg)
+
+
+def test_bolton53_primary_race_and_lost_commit(pg):
+    from verification.discovery import bolton53_admission as a
+    row=next(a.rows());barrier=Barrier(2,timeout=3)
+    def one():
+        barrier.wait();return admit_identity(pg,a.envelope(row))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=[f.result(timeout=15) for f in [pool.submit(one),pool.submit(one)]]
+    assert sorted(x['outcome'] for x in results)==['ALREADY_KNOWN','CREATED_PENDING']
+    row=list(a.rows())[1];original=Session.commit
+    def lost(session):original(session);raise RuntimeError('synthetic lost commit')
+    with patch.object(Session,'commit',lost):
+        result=a.record(pg,row,retrieve=lambda _:pytest.fail('source after uncertainty'))
+    assert result['identity']=='UNKNOWN_COMMIT' and result['transaction']=='UNCERTAIN_STOP_NO_RETRY'
+    with Session(pg) as s:
+        records=s.scalars(select(Application).where(Application.reference==row['reference'])).all()
+        assert len(records)==1 and records[0].status is None
+
+
+def test_bolton53_source_failure_after_identity_and_readback_uncertainty(pg):
+    from verification.discovery import bolton53_admission as a
+    from tests.test_discovery_bolton53_admission import synthetic
+    row=next(a.rows())
+    result=a.record(pg,row,retrieve=lambda _:(_ for _ in ()).throw(RuntimeError('synthetic source failure')))
+    assert result['identity']=='CREATED_PENDING' and result['stop']
+    with Session(pg) as s:assert s.get(Application,result['application_id']).status is None
+    row=list(a.rows())[1]
+    with patch.object(a,'readback',side_effect=RuntimeError('synthetic readback failure')):
+        result=a.record(pg,row,retrieve=synthetic)
+    assert result['facts']=='UNCERTAIN_COMMIT_OR_READBACK' and result['stop']
+    with Session(pg) as s:assert s.get(Application,result['application_id']).status=='Deposited'
+
+
+def test_bolton53_rollback_before_identity_commit(pg):
+    from verification.discovery import bolton53_admission as a
+    original=Session.execute
+    def reject(session,statement,*args,**kwargs):
+        if getattr(statement,'is_insert',False):raise RuntimeError('synthetic insertion rejection')
+        return original(session,statement,*args,**kwargs)
+    with patch.object(Session,'execute',reject):
+        result=a.record(pg,next(a.rows()),retrieve=lambda _:pytest.fail('source'))
+    assert result['identity']=='FAILED_OR_UNCERTAIN'
+    with Session(pg) as s:assert s.scalar(select(func.count()).select_from(Application))==0
