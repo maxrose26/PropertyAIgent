@@ -1,8 +1,8 @@
-"""Unregistered R0 recovery proposal; no CLI, dispatch, credentials or writer.
+"""Unregistered R0 recovery executable proposal; no dispatch, credentials or writer.
 
 Only the 28 untouched windows are admitted. Existing R0 execution is unchanged.
-The caller must be registered with reviewed revision/run/authority and use the
-existing outer supervisor before any live execution can be proposed as ready.
+The executable binding and outer supervisor are proposed, not registered or
+authorised for live use.
 """
 import os
 import math
@@ -29,6 +29,22 @@ def proposal():
 
 PLAN = proposal()
 PLAN_HASH = f.digest(PLAN)
+WORKFLOW = '.github/workflows/stage4-r0-untouched-recovery-once.yml'
+AUTHORITY = 'AUTHORISE_SEVEN_COUNCIL_R0_UNTOUCHED_WINDOW_RECOVERY_ONCE'
+
+
+def admit(env, sha, manifest_hash):
+    """New proposed binding; old R0 authority/context never admits recovery."""
+    expected = dict(GITHUB_ACTIONS='true', RUNNER_ENVIRONMENT='github-hosted',
+        GITHUB_REPOSITORY='maxrose26/PropertyAIgent', GITHUB_EVENT_NAME='workflow_dispatch',
+        GITHUB_REF='refs/heads/master', GITHUB_SHA=sha, GITHUB_WORKFLOW_SHA=sha,
+        GITHUB_WORKFLOW_REF=f'maxrose26/PropertyAIgent/{WORKFLOW}@refs/heads/master',
+        GITHUB_RUN_NUMBER='1', GITHUB_RUN_ATTEMPT='1', RECOVERY_AUTHORITY=AUTHORITY)
+    if (not isinstance(sha, str) or not re.fullmatch('[0-9a-f]{40}', sha)
+            or manifest_hash != PLAN_HASH or any(env.get(k) != v for k, v in expected.items())
+            or any(k in env for k in ('DATABASE_URL', 'COMMITTEE_DATABASE_URL',
+                                      'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'))):
+        raise ValueError('RECOVERY_ADMISSION_REJECTED') from None
 
 
 def resources(row, audit):
@@ -131,7 +147,7 @@ def local_gap(row, a):
 
 
 def execute(plan, expected_hash, *, reader, clock=time.monotonic):
-    """Preparation API with explicit reader injection; no live entrypoint."""
+    """Fixed-plan execution API; source use requires separate registered authority."""
     if plan != PLAN or expected_hash != PLAN_HASH:
         raise ValueError('RECOVERY_MANIFEST_REJECTED')
     if any(k in os.environ for k in ('DATABASE_URL', 'COMMITTEE_DATABASE_URL',
@@ -185,3 +201,49 @@ def execute(plan, expected_hash, *, reader, clock=time.monotonic):
     if len(json.dumps(result).encode()) > LIMITS['output_bytes']:
         raise ValueError('OUTPUT_LIMIT')
     return result
+
+
+def supervise(plan, output, *, runner=None):
+    """Use existing hard supervisor, selecting only the new fixed worker."""
+    if plan != PLAN:
+        raise ValueError('RECOVERY_MANIFEST_REJECTED')
+    kwargs = {} if runner is None else dict(runner=runner)
+    return original.supervise_round(plan, output,
+        worker_module='verification.discovery.r0_recovery_proposal', **kwargs)
+
+
+def main():
+    import argparse, hashlib, json, resource, subprocess
+    from pathlib import Path
+    p = argparse.ArgumentParser()
+    p.add_argument('--worker', type=Path); p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--reviewed-sha'); p.add_argument('--manifest-sha')
+    args = p.parse_args()
+    if args.worker:
+        if args.worker.stat().st_size > 20_000 or args.output.exists():
+            raise ValueError('WORKER_FILE_BOUNDARY')
+        resource.setrlimit(resource.RLIMIT_FSIZE, (LIMITS['output_bytes'], LIMITS['output_bytes']))
+        plan = json.loads(args.worker.read_bytes())
+        result = execute(plan, PLAN_HASH, reader=f.read)
+        args.output.write_text(json.dumps(result, sort_keys=True))
+        return
+    admit(os.environ, args.reviewed_sha, args.manifest_sha)
+    if (subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() != args.reviewed_sha
+            or subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()):
+        raise ValueError('CHECKOUT_MISMATCH')
+    args.output.mkdir(exist_ok=False)
+    metadata = dict(sha=args.reviewed_sha, manifest_sha256=PLAN_HASH,
+        run_id=os.environ['GITHUB_RUN_ID'], run_number=1, attempt=1,
+        started_at=datetime.now(timezone.utc).isoformat(), persistence=False,
+        publication_coverage='UNKNOWN', latency='UNKNOWN',
+        code_hashes={str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in (
+            Path(__file__), Path(original.__file__), Path(f.__file__),
+            Path(__file__).with_name('arcus_ui_config.py'), Path(__file__).with_name('idox_window.py'))})
+    (args.output/'execution.json').write_text(json.dumps(metadata, sort_keys=True))
+    supervise(PLAN, args.output/'round.json')
+    metadata['ended_at'] = datetime.now(timezone.utc).isoformat()
+    (args.output/'execution.json').write_text(json.dumps(metadata, sort_keys=True))
+
+
+if __name__ == '__main__':
+    main()

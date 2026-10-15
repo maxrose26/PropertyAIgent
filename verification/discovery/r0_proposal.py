@@ -87,18 +87,21 @@ def reference_difference(primary,independent):
         cause='NOT_APPLICABLE' if a==b else 'UNKNOWN_SOURCE_CHANGE_OR_ENUMERATION')
 
 
-def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS):
+def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS,
+                    worker_module='verification.discovery.r0_proposal'):
     """Hard parent wait, owned group termination, bounded child files.
 
     Child source workers retain their own existing process supervision. Hosted
     VM teardown is final containment, not a hostile-detachment sandbox claim.
     """
-    if deadline!=ROUND_SECONDS or output.exists():raise ValueError('ROUND_BOUNDARY')
+    if (deadline!=ROUND_SECONDS or output.exists() or worker_module not in {
+            'verification.discovery.r0_proposal', 'verification.discovery.r0_recovery_proposal'}):
+        raise ValueError('ROUND_BOUNDARY')
     if int(Path('/proc/self/stat').read_text().split()[0])!=os.getpid():raise ValueError('PROCESS_NAMESPACE_MISMATCH')
     with tempfile.TemporaryDirectory(prefix='r0-round-') as td:
         inp=Path(td)/'plan.json'; out=Path(td)/'result.json';inp.write_text(json.dumps(plan))
         env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1',GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',PLAYWRIGHT_BROWSERS_PATH=os.environ.get('PLAYWRIGHT_BROWSERS_PATH',str(Path.home()/'.cache/ms-playwright')))
-        child=runner([sys.executable,'-m','verification.discovery.r0_proposal','--worker',str(inp),'--output',str(out)],
+        child=runner([sys.executable,'-m',worker_module,'--worker',str(inp),'--output',str(out)],
             env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         import psutil
         expired=False; started=time.monotonic(); seen={}; peak=0
