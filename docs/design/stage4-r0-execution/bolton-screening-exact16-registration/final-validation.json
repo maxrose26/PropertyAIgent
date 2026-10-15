@@ -1,0 +1,159 @@
+{
+  "master": "0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4",
+  "tree": "9a089d3ce66098f1ec7b2a55ca4c097d4144b925",
+  "integration": {
+    "pr101": "41a61a546b18040184fe4905663577979a9182eb",
+    "pr102": "0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4",
+    "registration_head": "ed13814ed16599614a75a6ae5e937b556bbd3a1d"
+  },
+  "head_checks": [
+    {
+      "id": 116634491530,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796595749/job/116634491530"
+    },
+    {
+      "id": 116634491016,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796595588/job/116634491016"
+    },
+    {
+      "id": 116634490973,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796595749/job/116634490973"
+    },
+    {
+      "id": 116634490511,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796595667/job/116634490511"
+    },
+    {
+      "id": 116634490239,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796595667/job/116634490239"
+    },
+    {
+      "id": 116634489705,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796595588/job/116634489705"
+    },
+    {
+      "id": 116634476620,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796591701/job/116634476620"
+    },
+    {
+      "id": 116634476409,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38796591701/job/116634476409"
+    }
+  ],
+  "post_merge_checks": [
+    {
+      "id": 116635988922,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38797022043/job/116635988922"
+    },
+    {
+      "id": 116635988554,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38797022043/job/116635988554"
+    },
+    {
+      "id": 116635987663,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38797021434/job/116635987663"
+    },
+    {
+      "id": 116635987395,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38797021434/job/116635987395"
+    },
+    {
+      "id": 116635987011,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38797021365/job/116635987011"
+    },
+    {
+      "id": 116635986748,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38797021365/job/116635986748"
+    }
+  ],
+  "history": {
+    "checked_at": "2026-10-15T19:53:02.052Z",
+    "total_manual_runs": 28,
+    "returned_manual_runs": 28,
+    "exact16_runs": 0,
+    "dispatched_this_task": false
+  },
+  "workflow": {
+    "path": ".github/workflows/stage4-r0-untouched16-once.yml",
+    "blob": "d6c20cfab796f9359cca4ac61253325fdc44dddd",
+    "sha256": "f8d0e33c29f3ba396b314026ebb6b86f6e4b010159e404fd59f3bb08146c6391",
+    "manifest_sha256": "aaabab2f0757ba8c373c7588322618ee6d9bbeff3f21fdd08638b147d8be6283",
+    "authority_proposed": "AUTHORISE_R0_16_UNTOUCHED_PRIMARY_WINDOWS_ONCE",
+    "execution_authorised": false
+  },
+  "bolton_admission": {
+    "registered": false,
+    "executed": false,
+    "held": true
+  },
+  "local_tests": 155,
+  "independent_registration_tests": 29,
+  "screening_review": "PASS all53 retained rows",
+  "source_requests": 0,
+  "production_access": false,
+  "postmerge_test_counts": {
+    "discovery": [
+      485,
+      121,
+      48
+    ],
+    "batch_offline": 734,
+    "postgres_admission": 10
+  },
+  "artifacts_github_reported": [
+    {
+      "id": 12002442715,
+      "sha256": "10a654adef35710e7f8d85f4ac0ce2b4d5ab89f22f82286bb369ad01f92f6ba4"
+    },
+    {
+      "id": 12002696371,
+      "sha256": "0a64886600120894a6ab14ae4647b0210b3f1e76bf02fd86fe93134a1ca3979c"
+    },
+    {
+      "id": 12001934385,
+      "sha256": "e08082ed7bc86d5b7f1a495d0cadef4176be5fea72139fa77683f3983a463e12"
+    }
+  ]
+}
