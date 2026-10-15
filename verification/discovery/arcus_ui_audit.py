@@ -27,6 +27,12 @@ def validate(a,config=None):
     rows=a['listing_records'];pages=a['listing_segments']
     if not 1<=len(pages)<=6: raise ValueError('segment bound')
     if not pages or pages[-1]['last']!=pages[-1]['total'] or len(rows)!=pages[-1]['total']: raise ValueError('total mismatch')
+    if not rows:
+        if (pages!=[dict(ordinal=1,first=0,last=0,total=0,evidence_sha256=__import__('hashlib').sha256(b'No results found').hexdigest())]
+            or a.get('explicit_zero_evidence')!='EXACT_VISIBLE_ZERO_AND_RETAINED_CRITERIA_NO_ROWS_OR_NEXT'):
+            raise ValueError('zero evidence')
+        return {'outcome':'PUBLIC_UI_EXPLICIT_ZERO_AND_CRITERIA_QUALIFIED','completeness':'UNKNOWN',
+            'source_registry_qualified':False,'production_admission':False,'records':0,'segments':1}
     cursor=1; total=pages[-1]['total']
     for segment in pages:
         if segment['first']!=cursor or segment['last']<cursor or segment['total']!=total:

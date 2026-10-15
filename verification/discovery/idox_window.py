@@ -29,8 +29,11 @@ class WindowConfig:
     semantics: str = 'RECEIVED'
     start: date = START
     end: date = END
+    max_transport_retries: int = 1
 
     def __post_init__(self):
+        if type(self.max_transport_retries) is not int or self.max_transport_retries not in (0,1):
+            raise ValueError('retry policy')
         if self.council not in IDOX or self.semantics not in {'RECEIVED','VALIDATED'} or not self.start<=self.end or (self.end-self.start).days>27:
             raise ValueError('unadmitted council/date window')
 
@@ -55,7 +58,8 @@ class WindowBoundary(Boundary):
         self.config=config
         super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
             config.base,config.form_url),
-            Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45),dispatch)
+            Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45),dispatch,
+            max_retries=config.max_transport_retries)
         self.admitted_post=None
         self.admitted_body=None
         self.next_url=None

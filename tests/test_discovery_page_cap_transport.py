@@ -29,7 +29,7 @@ class Page:
             async def inner_text(self, **kw):
                 return f'Showing {page.segment*10+1} to {page.segment*10+10} of 73 results'
             def filter(self, **kw): return self
-            async def count(self): return 1
+            async def count(self): return 0 if selector=='p:text-is("No results found")' else 1
             async def get_attribute(self, name): return '#'
             async def click(self, **kw): page.segment+=1
         return Locator()
