@@ -1,0 +1,55 @@
+# Reviewed connection-free preflight; single-use execution controls below.
+name: Stage4 connection-free route preflight ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_CONNECTION_FREE_ROUTE_PREFLIGHT_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  preflight:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Single invocation and exact revision
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" && "$PIN" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_CONNECTION_FREE_ROUTE_PREFLIGHT_ONCE ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Offline dependencies, no production secret
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/preflight-venv"
+      - name: Pure route validation only
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          PREFLIGHT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          PREFLIGHT_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir "$RUNNER_TEMP/preflight-audit"
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_SHA="$GITHUB_SHA" GITHUB_REF="$GITHUB_REF" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" PREFLIGHT_WORKFLOW_SHA="$PREFLIGHT_WORKFLOW_SHA" PREFLIGHT_DATABASE_URL="$PREFLIGHT_DATABASE_URL" "$RUNNER_TEMP/preflight-venv/bin/python" verification/ah-offline-route-preflight.py --sha "$PIN" --authority "$AUTHORITY" --output "$RUNNER_TEMP/preflight-audit/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: route-preflight-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/preflight-audit/result.json
+          if-no-files-found: error
+          retention-days: 14

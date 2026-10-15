@@ -1,4 +1,4 @@
-# REVIEW TEMPLATE ONLY. Do not copy into .github/workflows or dispatch without approval.
+# Reviewed connection-free preflight; single-use execution controls below.
 name: Stage4 connection-free route preflight ONCE
 on:
   workflow_dispatch:

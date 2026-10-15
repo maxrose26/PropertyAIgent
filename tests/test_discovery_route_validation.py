@@ -53,13 +53,22 @@ def test_connection_free_entry_has_no_capabilities():
     assert 'synthetic-only' not in json.dumps(result)
 
 
-def test_unregistered_template_and_single_use_controls():
-    assert not Path(WORKFLOW).exists()
+def test_registered_template_and_single_use_controls():
+    assert Path(WORKFLOW).read_text()==Path('verification/discovery/proposals/stage4-route-preflight-once.yml.txt').read_text()
     w=yaml.load(Path('verification/discovery/proposals/stage4-route-preflight-once.yml.txt').read_text(),Loader=yaml.BaseLoader)
     assert set(w['on'])=={'workflow_dispatch'} and set(w['jobs'])=={'preflight'}
     assert w['jobs']['preflight']['environment']=='stage4-production-canary'
     assert str(w).count('secrets.DATABASE_URL')==1
     assert 'ah-offline-route-preflight.py' in str(w)
+    assert w['permissions']=={'contents':'read'}
+    assert w['concurrency']=={'group':'stage4-knownref-closure-production','cancel-in-progress':'false'}
+    assert w['jobs']['preflight']['timeout-minutes']=='5'
+    steps=w['jobs']['preflight']['steps']
+    assert len(steps)==5
+    assert 'GITHUB_RUN_NUMBER' in steps[0]['run'] and 'GITHUB_RUN_ATTEMPT' in steps[0]['run']
+    assert 'env -i' in steps[3]['run']
+    assert 'DATABASE_URL' not in str(steps[:3])
+    assert 'DATABASE_URL' not in str(steps[4:])
     env=dict(GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',GITHUB_SHA='a'*40,PREFLIGHT_WORKFLOW_SHA='a'*40,GITHUB_REF='refs/heads/master',GITHUB_RUN_NUMBER='1',GITHUB_RUN_ATTEMPT='1',GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REPOSITORY='maxrose26/PropertyAIgent',GITHUB_WORKFLOW_REF='maxrose26/PropertyAIgent/'+WORKFLOW+'@refs/heads/master')
     assert admitted('a'*40,AUTHORITY,env)
     assert not admitted('a'*40,AUTHORITY,dict(env,GITHUB_RUN_ATTEMPT='2'))
