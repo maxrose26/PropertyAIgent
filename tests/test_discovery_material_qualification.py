@@ -83,7 +83,7 @@ def test_idox_worker_reuses_existing_transport_and_excludes_raw_payload(monkeypa
     from verification.direct_reference.refresh import Observation
     monkeypatch.setattr('verification.direct_reference.batch_supervisor.resource_limits',lambda:None)
     row=targets()[0]
-    def same_transport(r,app_id,*,session_factory,budget):
+    def same_transport(r,app_id,*,session_factory,budget,diagnostic=None):
         assert r is row and app_id is None and budget.request_limit==2 and budget.seconds==40
         budget.requests=1;budget.bytes=500
         return Observation(None,r['reference'],r['source_url'],

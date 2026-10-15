@@ -35,6 +35,10 @@ on:
       - 'tests/test_discovery_r0_proposal.py'
       - 'verification/discovery/r0_proposal.py'
       - 'verification/discovery/r0_registered_scopes.py'
+      - 'verification/discovery/source_diagnostics.py'
+      - 'verification/discovery/material_qualification.py'
+      - 'verification/discovery/idox_window.py'
+      - 'tests/test_discovery_initial_application_contract.py'
       - 'verification/discovery/r0_recovery_proposal.py'
       - 'verification/discovery/r0_fixed80_qualification.py'
       - 'tests/test_discovery_r0_registered_scopes.py'
@@ -54,7 +58,7 @@ jobs:
       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/direct-test-venv"
       - name: Network-denied registration and accepted regressions
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_r0_registered_scopes.py -p verification.stage1_preservation_plugin tests/test_discovery_r0_registration.py tests/test_stage4_closure.py tests/test_stage4_status_only.py tests/test_stage4_catchup.py tests/test_stage4_batch_registration.py tests/test_stage4_batch.py tests/test_oldham_production_registration.py tests/test_stage4_persistence_acceptance.py tests/test_stage4_direct_reference.py tests/test_stage4_direct_registration.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_initial_application_contract.py tests/test_discovery_r0_registered_scopes.py -p verification.stage1_preservation_plugin tests/test_discovery_r0_registration.py tests/test_stage4_closure.py tests/test_stage4_status_only.py tests/test_stage4_catchup.py tests/test_stage4_batch_registration.py tests/test_stage4_batch.py tests/test_oldham_production_registration.py tests/test_stage4_persistence_acceptance.py tests/test_stage4_direct_reference.py tests/test_stage4_direct_registration.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

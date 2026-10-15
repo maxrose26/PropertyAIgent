@@ -1,0 +1,1316 @@
+{
+  "artifact_id": 11985255295,
+  "artifact_sha256": "4efd1716953bca638e84ad65481fc4c21c890aac6d30425d2a75b36e224b8d8f",
+  "execution_authorised": false,
+  "persistence": false,
+  "purpose": "RETAINED_EVIDENCE_NOT_A_SOURCE_FIXTURE",
+  "registered": false,
+  "requires_fresh_source_at_future_admission": true,
+  "requires_fresh_source_for_offline_assessment": false,
+  "rows": [
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "51fb851fb6ec147850227756a87dadf1b1c5c338fedb26dbf9086417e684150b",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01780/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01780/26",
+        "retrieved_at": "2026-10-15T15:13:19.922436+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01780/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01780/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "25c24aed0cb39a8fbdb0b010b54fb10549624ee29982b64edaa4489c939bb03e",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01778/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01778/26",
+        "retrieved_at": "2026-10-15T15:13:25.808034+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01778/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01778/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "6dd075f9bb991af1d33db477986544d4501d9b0b16389890275c9ccd4cbb93e1",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01776/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01776/26",
+        "retrieved_at": "2026-10-15T15:13:29.118026+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01776/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01776/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "de9aa9c3f1f4b017f9812fbf93ebb1dbad45db758f32d304468e2379d44b99a6",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01775/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01775/26",
+        "retrieved_at": "2026-10-15T15:13:32.421136+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YGDEKGA00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01775/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01775/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "5332ec64e3c188d43b643a39008310c707785d8b016253a1b0adfbd8e615009c",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01769/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01769/26",
+        "retrieved_at": "2026-10-15T15:13:35.755973+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01769/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01769/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "8c1d294b409804b7e75a294b4c0efe9f8895d60f2bcf3ca4190c52ea0e680e37",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01768/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01768/26",
+        "retrieved_at": "2026-10-15T15:13:38.848242+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01768/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01768/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "57eba5770bbded948bb6753335021532eb3e4d13d57c5692d3fda90f048cfb2f",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01821/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01821/26",
+        "retrieved_at": "2026-10-15T15:13:42.045901+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMJLR9DEKKP00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01821/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01821/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "5d0311c1dd8e8e01d080334f7385f41bb5a25612de23552298d0c4845bcaaea7",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01816/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01816/26",
+        "retrieved_at": "2026-10-15T15:13:45.172933+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZHKDEKKF00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01816/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01816/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "85b11902e304da52bd6922dabe45ea786521c50abecb095c543c403ea172472e",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01815/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01815/26",
+        "retrieved_at": "2026-10-15T15:13:48.170734+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZGWDEKKD00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01815/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01815/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "b4dda62e35baa2c6e482257ed592cac331a733ac229dd80f93116e9655b594c7",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01813/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01813/26",
+        "retrieved_at": "2026-10-15T15:13:51.278880+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHLLSDEKJZ00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01813/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01813/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "3febc791d0ec58cf8eab848f03cb942425d24d4a0c277ef5664ab4ee14cbfe52",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01811/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01811/26",
+        "retrieved_at": "2026-10-15T15:13:54.283101+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHD72DEKJU00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01811/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01811/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "875b8a4ff554176382e5650792ad09af8946f8d45389e4d12e3968847c7fade1",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01810/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01810/26",
+        "retrieved_at": "2026-10-15T15:13:57.487646+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAG1DEKJR00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01810/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01810/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "3ca3bfccfb912aa82b09c6fd71f6cf00f517d64d24e5d59132249605fc1e4422",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01809/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01809/26",
+        "retrieved_at": "2026-10-15T15:14:00.586920+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAESDEKJP00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01809/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01809/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "57f6c220c344895081c2ee3b8723824dc76bfa55c218f81fc639393bf4752b6c",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01808/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01808/26",
+        "retrieved_at": "2026-10-15T15:14:03.477605+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4U2DEKJL00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01808/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01808/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "739cdb26585c2ef17678d4b11d1324b675876b20af306d41b136bc9ef2f7a5fe",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01807/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01807/26",
+        "retrieved_at": "2026-10-15T15:14:06.575098+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TVDEKJJ00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01807/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01807/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "56b339a7a4d27edf829ab34a9063f8cce94ab1bd67dd9c38f146dcec3ea3072f",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01806/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01806/26",
+        "retrieved_at": "2026-10-15T15:14:12.251148+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TNDEKJH00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01806/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01806/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "59859e9cebb191d1ad708ea9adb4c23882b2ca0578f3f392238b5d72e1a5abca",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01805/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01805/26",
+        "retrieved_at": "2026-10-15T15:14:15.370062+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4SVDEKJF00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01805/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01805/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "2e9d520ee6641aed5fb44620ad88ec219bfe5ebe53d651e1ac9ddae26f09b672",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01804/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01804/26",
+        "retrieved_at": "2026-10-15T15:14:18.478360+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMG1X6DEKJ900&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01804/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01804/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "13f8271d7cd94030df0bdc66d2046163cac9972be5ee511d34a5d249fa583b29",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01801/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01801/26",
+        "retrieved_at": "2026-10-15T15:14:21.576000+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFWDUDEKJ500&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01801/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01801/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "aeaf591a1ec51b8bf511dcf0ce61fb1c0fb9581e07284e0877a4b6009eb0dd3e",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01800/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01800/26",
+        "retrieved_at": "2026-10-15T15:14:24.694738+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFUWXDE02800&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01800/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01800/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "c16f8f435bf27b998288cccac8d08fcf71f133330da61c0aa7619280dd2a727a",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01799/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01799/26",
+        "retrieved_at": "2026-10-15T15:14:27.813883+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFTLRDEKJ200&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01799/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01799/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "fb6701eecefce1540db51e3a95b6f879de08b60965137a62e383307303bfaef8",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01797/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01797/26",
+        "retrieved_at": "2026-10-15T15:14:30.828753+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01797/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01797/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "29e2cf6eb5f30a57e03ff64d77d399f8329ad07cef1f886166d3bbfc03bcbc68",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01796/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01796/26",
+        "retrieved_at": "2026-10-15T15:14:33.926068+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFLB8DEKIV00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01796/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01796/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "a40719171925ec1203311eed9d8385ecb398dbd9ef7f9b94536278980e244fc1",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01795/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01795/26",
+        "retrieved_at": "2026-10-15T15:14:37.022950+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFITADE03B00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01795/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01795/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "d35aad649b47f2ea90372b4236e08f516ffa864923c9ff95f17aff79ec5a5ca6",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01794/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01794/26",
+        "retrieved_at": "2026-10-15T15:14:40.222860+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFII5DEKIS00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01794/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01794/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "5b78d25fc33a420189f5f1af18d011b0b1a163babfb23ec01d6e0cfc116aeb66",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01793/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01793/26",
+        "retrieved_at": "2026-10-15T15:14:43.422874+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA8DDEKIN00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01793/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01793/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "d0b974aeefa7907ed2de2c72bbb2b820646bb76088556d59814cf26c07599e95",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01791/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01791/26",
+        "retrieved_at": "2026-10-15T15:14:46.622647+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA63DEKIJ00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01791/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01791/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "0df4c0b3b8aba02f850c5a847323b1dc8ddac5d2b7814b2ac536feb85e523fe0",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01790/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01790/26",
+        "retrieved_at": "2026-10-15T15:14:49.723427+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01790/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01790/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "0aa0a6be6bb2fc3b5677db0be95fe5527875eb708d639408445ecd9cd1cf8421",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01789/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01789/26",
+        "retrieved_at": "2026-10-15T15:14:52.721801+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA19DDEKHX00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01789/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01789/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "4d8601d1c202c9f4c923d2091e5cef576f01dca4618a179e02e3061b50aa3a68",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01787/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01787/26",
+        "retrieved_at": "2026-10-15T15:14:55.817146+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01787/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01787/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "97e9ff959234875eba1883c871ae6abd646179d3415711ada553acbebb74a984",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01786/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01786/26",
+        "retrieved_at": "2026-10-15T15:15:01.285759+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01786/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01786/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "fc8a9fbca66ae4ad20e6de51fd118fbf2d0bbc6095cb661a96a57d533548bea6",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01785/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01785/26",
+        "retrieved_at": "2026-10-15T15:15:06.858415+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01785/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01785/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "57b97d354d6edf602b685e48ad260a5b219554bbfdb5c0b6082a6c0391201c87",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01784/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01784/26",
+        "retrieved_at": "2026-10-15T15:15:10.160618+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01784/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01784/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "fe579b541f3170f6ae05409e1428006ccee818904bb09ae50dd75284cbb61de9",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01783/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01783/26",
+        "retrieved_at": "2026-10-15T15:15:13.154789+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01783/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01783/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "2859bd366ff06111d34e35afbed61c860e629ea7a4dc4862652bf2b6093ad899",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01782/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01782/26",
+        "retrieved_at": "2026-10-15T15:15:16.157894+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01782/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01782/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "c4718f9c56c6d3f9e581cc00a46f902878e85232ebce774326186254d52d575b",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01858/26/PREMIN",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01858/26/PREMIN",
+        "retrieved_at": "2026-10-15T15:15:19.359099+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMXZKVDE07600&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01858/26/PREMIN",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01858/26/PREMIN"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "c9a1a727c7e31420149be7fdd54e547feba20c8ca80453784e26e49cfe4fdee4",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01852/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01852/26",
+        "retrieved_at": "2026-10-15T15:15:22.685199+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW58NDE04Y00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01852/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01852/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "1ed41a66f19adecfef63ec1f0c4b018de5e7e712db804c445744d80376179cec",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01851/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01851/26",
+        "retrieved_at": "2026-10-15T15:15:25.993803+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW3QTDEKO500&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01851/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01851/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "f9964efca11a52b66cac4ead109bce0bc36076f527e228edc112193592ef3929",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01848/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01848/26",
+        "retrieved_at": "2026-10-15T15:15:29.402249+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUV92DEKNT00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01848/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01848/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "6a43dd7664597da1e1ddf010f80529e941a1bb59fa0643792f37c67b19860811",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01847/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01847/26",
+        "retrieved_at": "2026-10-15T15:15:32.398028+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUK6MDEKNN00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01847/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01847/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "51f817c65e90bc7222301b5631ce1dd8f1ae383d2301c3c4b12eaf6f56bc210f",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01845/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01845/26",
+        "retrieved_at": "2026-10-15T15:15:35.394186+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUEP5DEKNJ00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01845/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01845/26"
+    },
+    {
+      "council": "bolton",
+      "observation_evidence": {
+        "b2_eligible": false,
+        "body_sha256": "0755869ae892d6e5ee906b6bcecb2173d3e39046ebf1032344be3984b5f5379d",
+        "diagnostic_conditions": [
+          "DECISION_NOT_PRESENT",
+          "DECISION_DATE_NOT_PRESENT",
+          "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+        ],
+        "displayed_reference": "01843/26",
+        "field_states": {
+          "decision": "NOT_PRESENT",
+          "decision_date": "NOT_PRESENT",
+          "reference": "PRESENT_VALUE",
+          "status": "PRESENT_VALUE"
+        },
+        "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+        "rejection_reason": "B2_EVIDENCE_SCOPE_INELIGIBLE",
+        "requested_reference": "01843/26",
+        "retrieved_at": "2026-10-15T15:15:38.493448+00:00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3ITDEKND00&activeTab=summary",
+        "supported_literal_facts": {
+          "Reference": "01843/26",
+          "Status": "Deposited"
+        },
+        "verification_scope": "COUPLED"
+      },
+      "offline_disposition": "NO_PROMOTION_UNACCEPTED_IDOX_INITIAL_CONTRACT",
+      "reference": "01843/26"
+    }
+  ],
+  "source_evidence_commit": "b83e9586a90aa10470a886b797242bb798b853e9",
+  "version": 1
+}

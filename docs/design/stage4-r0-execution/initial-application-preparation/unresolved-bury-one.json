@@ -1,0 +1,30 @@
+{
+  "execution_authorised": false,
+  "existing_per_window_limits": {
+    "bytes": 3000000,
+    "output_bytes": 1048576,
+    "requests": 10,
+    "seconds": 55
+  },
+  "persistence": false,
+  "purpose": "UNRESOLVED_WINDOW_NO_RETRY_AUTHORITY",
+  "registered": false,
+  "retained_candidates": [
+    "73755",
+    "73748",
+    "73743",
+    "73742",
+    "73741"
+  ],
+  "rows": [
+    {
+      "council": "bury",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "source_run": 38731487848,
+      "start": "2026-10-08"
+    }
+  ],
+  "source_evidence_commit": "b83e9586a90aa10470a886b797242bb798b853e9",
+  "version": 1
+}

@@ -168,8 +168,14 @@ def retrieve(application_id, *, session_factory, budget):
     return _retrieve_row(admitted_row(application_id), application_id, session_factory=session_factory, budget=budget)
 
 
-def _retrieve_row(row, application_id, *, session_factory, budget):
+def _retrieve_row(row, application_id, *, session_factory, budget, diagnostic=None):
     """Same transport/parser; only reviewed fixed callers supply a row."""
+    if diagnostic is not None:
+        diagnostic.update(stage='DESTINATION',body=b'')
+    def mark(stage,body=None):
+        if diagnostic is not None:
+            diagnostic['stage']=stage
+            if body is not None:diagnostic['body']=body
     validate_destination(row)
     budget.check()
     if budget.rows >= 20:
@@ -190,6 +196,7 @@ def _retrieve_row(row, application_id, *, session_factory, budget):
                                 budget.seconds - (time.monotonic()-budget.started))
                 if remaining <= 0:
                     fail('TIMEOUT', 'Reference deadline')
+                mark('REQUEST')
                 response = session.get(row['source_url'], stream=True, allow_redirects=False,
                     timeout=(min(3, remaining), min(8, remaining)),
                     headers={'Accept': 'text/html', 'Accept-Encoding': 'identity',
@@ -197,6 +204,7 @@ def _retrieve_row(row, application_id, *, session_factory, budget):
                 # Requests must not have internally followed any destination.
                 if response.url != row['source_url'] or getattr(response, 'history', []):
                     fail('PARTIAL_RETRIEVAL', 'Unexpected response destination')
+                mark('HEADERS')
                 status = response.status_code
                 if 300 <= status < 400:
                     fail('PARTIAL_RETRIEVAL', 'Redirect not admitted')
@@ -215,6 +223,7 @@ def _retrieve_row(row, application_id, *, session_factory, budget):
                     declared = response.headers.get('Content-Length')
                     if declared and (not declared.isdigit() or int(declared) > 1_000_000):
                         fail('PARTIAL_RETRIEVAL', 'Declared response bound')
+                    mark('BODY')
                     body = bytearray()
                     for chunk in response.iter_content(chunk_size=16384):
                         budget.check()
@@ -228,15 +237,19 @@ def _retrieve_row(row, application_id, *, session_factory, budget):
                         body.extend(chunk)
                     if declared and len(body) != int(declared):
                         fail('PARTIAL_RETRIEVAL', 'Truncated response')
+                    mark('DECODE',bytes(body))
                     try:
                         html = body.decode('utf-8', errors='strict')
                     except UnicodeDecodeError:
                         fail('PARSER_FAILURE', 'Unsupported response encoding')
                     # Bound parser work in addition to bytes. No script execution.
+                    mark('STRUCTURE')
                     if html.count('<') > 20000 or html.lower().count('<tr') > 256:
                         fail('PARSER_FAILURE', 'Parser structural ceiling')
+                    mark('SUMMARY_PARSE')
                     fields = parse_summary(html, SimpleNamespace(reference=row['reference']))
                     # Existing parser permits case normalisation; require literal agreement here.
+                    mark('EXACT_REFERENCE')
                     from bs4 import BeautifulSoup
                     refs = [tr.find_all(['th','td'])[1].get_text(strip=True)
                         for tr in BeautifulSoup(html, 'html.parser').select('#simpleDetailsTable tr')
@@ -244,6 +257,7 @@ def _retrieve_row(row, application_id, *, session_factory, budget):
                         tr.find_all(['th','td'])[0].get_text(strip=True) == 'Reference']
                     if refs != [row['reference']]:
                         fail('AMBIGUOUS_SOURCE_RESULT', 'Independent exact displayed identity required')
+                    mark('OBSERVATION')
                     missing = any(fields.evidence[k] == 'NOT_PRESENT' for k in ('decision','decision_date'))
                     semantic = 'UNKNOWN_UNMAPPED' if fields.evidence['decision']=='NOT_PRESENT' else semantic_state(fields)
                     budget.check()

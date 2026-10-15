@@ -1,0 +1,25 @@
+{
+  "cause": "UNKNOWN_RESPONSE_SHAPE",
+  "execution_authorised": false,
+  "limits": {
+    "bytes": 3000000,
+    "calls": 1,
+    "output_bytes": 1048576,
+    "requests": 10,
+    "seconds": 55
+  },
+  "persistence": false,
+  "purpose": "REVIEW_ONLY_FAILURE_ASSESSMENT_NOT_RETRY_AUTHORITY",
+  "registered": false,
+  "rows": [
+    {
+      "council": "oldham",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    }
+  ],
+  "source_evidence_commit": "b83e9586a90aa10470a886b797242bb798b853e9",
+  "source_run": 38758465439,
+  "version": 1
+}

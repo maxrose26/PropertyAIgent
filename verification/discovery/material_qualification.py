@@ -55,9 +55,9 @@ def idox_worker(row):
     budget=Budget(request_limit=2,byte_limit=2_000_000,seconds=40)
     result=dict(case=row['case'],reference=row['reference'],destination=row['source_url'],
                 application_id=None,persistence=False,observation=None,failure=None)
-    start=time.monotonic()
+    start=time.monotonic();diagnostic={}
     try:
-        observation=_retrieve_row(row,None,session_factory=requests_session,budget=budget)
+        observation=_retrieve_row(row,None,session_factory=requests_session,budget=budget,diagnostic=diagnostic)
         allowed={'Reference','Status','Decision','Decision Issued Date'}
         if (set(observation.fields)!=allowed or any(v is not None and
                 (not isinstance(v,str) or len(v)>160) for v in observation.literal_fields.values())):
@@ -67,6 +67,9 @@ def idox_worker(row):
         result['failure']=exc.outcome
     except Exception:
         result['failure']='PARSER_FAILURE'
+    if result['failure'] is not None:
+        from .source_diagnostics import shape
+        result['failure_diagnostic']=shape(diagnostic.get('body',b''),diagnostic.get('stage','UNKNOWN'),result['failure'])
     result.update(requests=budget.requests,received_body_bytes=budget.bytes,
                   elapsed_seconds=round(time.monotonic()-start,3),retrieved_at=datetime.now(timezone.utc).isoformat())
     return result
@@ -86,6 +89,10 @@ def project_idox(row,source):
             and 0<=source[k]<=45 for k in ('elapsed_seconds','supervisor_seconds'))
     bounded=bounded and source.get('supervisor_limit_hit') is False
     audit['budget_state']='WITHIN_LIMITS' if bounded else 'EXHAUSTED'
+    if 'failure_diagnostic' in source:
+        from .source_diagnostics import validate
+        try:audit['failure_diagnostic']=validate(source['failure_diagnostic'])
+        except ValueError:return dict(observation=None,audit=audit,failure='INVALID_ARTIFACT')
     def failed(code):return dict(observation=None,audit=audit,failure=code)
     if not closed:return failed('CLEANUP_FAILURE')
     if not bounded:return failed('ACCOUNTING_FAILURE')

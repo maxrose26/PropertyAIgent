@@ -1,0 +1,1127 @@
+{
+  "execution_authorised": false,
+  "limits": {
+    "bytes": 74000000,
+    "calls": 37,
+    "cleanup_upload_reserve_seconds": 120,
+    "job_seconds": 2460,
+    "output_bytes": 5000000,
+    "requests": 74,
+    "rss_bytes": 1610612736,
+    "seconds": 2035,
+    "setup_seconds": 280
+  },
+  "persistence": false,
+  "purpose": "REVIEW_ONLY_UNATTEMPTED_QUALIFICATION",
+  "registered": false,
+  "rows": [
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_43",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01841/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMU3H8DEKN900",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3H8DEKN900&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_44",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01840/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSXUQDEKN200",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSXUQDEKN200&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_45",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01839/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSPI5DEKMV00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSPI5DEKMV00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_46",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01838/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSO41DE02800",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSO41DE02800&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_47",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01836/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSMQ4DEKMS00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSMQ4DEKMS00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_48",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01833/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMS8TZDEKMJ00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8TZDEKMJ00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_49",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01832/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMS8SXDEKMH00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8SXDEKMH00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_50",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01827/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMLJ88DEKLK00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_51",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01826/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMLGCZDEKLH00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLGCZDEKLH00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_52",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01825/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMKYQPDE04Y00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKYQPDE04Y00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_53",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01823/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMKU6ADEKL500",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKU6ADEKL500&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_54",
+      "council": "bury",
+      "listing_provenance": [
+        "7ca78b7a015049f4075325840f8793379fea17ba0efdbd0b32cb13e7520bab75",
+        "3b97e8e5ab966b1e6d1644c487ad786eda3796ad00c7eb186c3a3be4c08ffed2",
+        "835aab4f59d6015b458fc4fa120bfb3be76e5cedc55dc51253a7a08439b4d687",
+        "945381e1773286a28372c3a0eb3e060c8c196be0037eb643e051b4e2edc3b235",
+        "88b5945f6ecd61bbc17bb531f21f87c343c3c0c2a7dcc4c2ebe283f513a7cd90"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73701",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore - under 10 units",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65203",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65203&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_55",
+      "council": "bury",
+      "listing_provenance": [
+        "7ca78b7a015049f4075325840f8793379fea17ba0efdbd0b32cb13e7520bab75",
+        "3b97e8e5ab966b1e6d1644c487ad786eda3796ad00c7eb186c3a3be4c08ffed2",
+        "835aab4f59d6015b458fc4fa120bfb3be76e5cedc55dc51253a7a08439b4d687",
+        "945381e1773286a28372c3a0eb3e060c8c196be0037eb643e051b4e2edc3b235",
+        "88b5945f6ecd61bbc17bb531f21f87c343c3c0c2a7dcc4c2ebe283f513a7cd90"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73700",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65202",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65202&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_56",
+      "council": "bury",
+      "listing_provenance": [
+        "7ca78b7a015049f4075325840f8793379fea17ba0efdbd0b32cb13e7520bab75",
+        "3b97e8e5ab966b1e6d1644c487ad786eda3796ad00c7eb186c3a3be4c08ffed2",
+        "835aab4f59d6015b458fc4fa120bfb3be76e5cedc55dc51253a7a08439b4d687",
+        "945381e1773286a28372c3a0eb3e060c8c196be0037eb643e051b4e2edc3b235",
+        "88b5945f6ecd61bbc17bb531f21f87c343c3c0c2a7dcc4c2ebe283f513a7cd90"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73699",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65201",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65201&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_57",
+      "council": "bury",
+      "listing_provenance": [
+        "7ca78b7a015049f4075325840f8793379fea17ba0efdbd0b32cb13e7520bab75",
+        "3b97e8e5ab966b1e6d1644c487ad786eda3796ad00c7eb186c3a3be4c08ffed2",
+        "835aab4f59d6015b458fc4fa120bfb3be76e5cedc55dc51253a7a08439b4d687",
+        "945381e1773286a28372c3a0eb3e060c8c196be0037eb643e051b4e2edc3b235",
+        "88b5945f6ecd61bbc17bb531f21f87c343c3c0c2a7dcc4c2ebe283f513a7cd90"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73698",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65199",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65199&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_58",
+      "council": "bury",
+      "listing_provenance": [
+        "7ca78b7a015049f4075325840f8793379fea17ba0efdbd0b32cb13e7520bab75",
+        "3b97e8e5ab966b1e6d1644c487ad786eda3796ad00c7eb186c3a3be4c08ffed2",
+        "835aab4f59d6015b458fc4fa120bfb3be76e5cedc55dc51253a7a08439b4d687",
+        "945381e1773286a28372c3a0eb3e060c8c196be0037eb643e051b4e2edc3b235",
+        "88b5945f6ecd61bbc17bb531f21f87c343c3c0c2a7dcc4c2ebe283f513a7cd90"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73697",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65198",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65198&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_59",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73736",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65245",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65245&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_60",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73733",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65242",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65242&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_61",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73730",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65239",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65239&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_62",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73729",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65238",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65238&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_63",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73728",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65237",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65237&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_64",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73726",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65235",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65235&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_65",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73725",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65234",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65234&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_66",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73723",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65232",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65232&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_67",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73722",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65231",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65231&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_68",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73721",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65230",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65230&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_69",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73720",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65229",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65229&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_70",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73719",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65228",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65228&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_71",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73718",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65225",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65225&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_72",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73716",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65221",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65221&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_73",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73713",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65217",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65217&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_74",
+      "council": "bury",
+      "listing_provenance": [
+        "7a17d6b09a86124fd26588f6d00b6037c123e20559629802ff2c6287d410773f",
+        "608c328d9fc606bf202248ce885bf063552b14370cf23a22471f33c1ce1fda5b",
+        "ad33ed37c482b45793c83ff1a84294b66941a091287c5f9a5de4d3b25d2404b0",
+        "01e562f7fba8f15a644338b0153b32da6f08583fad4bed4e284c8bdec846addf",
+        "8405afdaf24798cfef07f6698938d0c0639aa244ceb718b990ca75330de806a3"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73708",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65210",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65210&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_75",
+      "council": "bury",
+      "listing_provenance": [
+        "1d69cd11c71f6005667c536b898d332fc84f38b7ebd208d7f04c7c4930277ac5",
+        "d3445fa06f1a80b59b24a42329b4b520cf0f77c331dc7ae6c574619b30187a7b",
+        "a90d4449b1268631dbddd4d0547d422ae9babfb625f7d4357d9c005a9ed7e8a1",
+        "0765bb3e9a7c5e7a0e14ccd78761f698446af18193e30faa5853fc536713901b"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73755",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore - under 10 units",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65265",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65265&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_76",
+      "council": "bury",
+      "listing_provenance": [
+        "1d69cd11c71f6005667c536b898d332fc84f38b7ebd208d7f04c7c4930277ac5",
+        "d3445fa06f1a80b59b24a42329b4b520cf0f77c331dc7ae6c574619b30187a7b",
+        "a90d4449b1268631dbddd4d0547d422ae9babfb625f7d4357d9c005a9ed7e8a1",
+        "0765bb3e9a7c5e7a0e14ccd78761f698446af18193e30faa5853fc536713901b"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73748",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Excluded - secondary/admin",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65258",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65258&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_77",
+      "council": "bury",
+      "listing_provenance": [
+        "1d69cd11c71f6005667c536b898d332fc84f38b7ebd208d7f04c7c4930277ac5",
+        "d3445fa06f1a80b59b24a42329b4b520cf0f77c331dc7ae6c574619b30187a7b",
+        "a90d4449b1268631dbddd4d0547d422ae9babfb625f7d4357d9c005a9ed7e8a1",
+        "0765bb3e9a7c5e7a0e14ccd78761f698446af18193e30faa5853fc536713901b"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73743",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65252",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65252&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_78",
+      "council": "bury",
+      "listing_provenance": [
+        "1d69cd11c71f6005667c536b898d332fc84f38b7ebd208d7f04c7c4930277ac5",
+        "d3445fa06f1a80b59b24a42329b4b520cf0f77c331dc7ae6c574619b30187a7b",
+        "a90d4449b1268631dbddd4d0547d422ae9babfb625f7d4357d9c005a9ed7e8a1",
+        "0765bb3e9a7c5e7a0e14ccd78761f698446af18193e30faa5853fc536713901b"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73742",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65251",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65251&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_79",
+      "council": "bury",
+      "listing_provenance": [
+        "1d69cd11c71f6005667c536b898d332fc84f38b7ebd208d7f04c7c4930277ac5",
+        "d3445fa06f1a80b59b24a42329b4b520cf0f77c331dc7ae6c574619b30187a7b",
+        "a90d4449b1268631dbddd4d0547d422ae9babfb625f7d4357d9c005a9ed7e8a1",
+        "0765bb3e9a7c5e7a0e14ccd78761f698446af18193e30faa5853fc536713901b"
+      ],
+      "platform_family": "IDOX",
+      "reference": "73741",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "_BURY_DCAPR_65250",
+      "source_url": "https://planning.bury.gov.uk/online-applications/applicationDetails.do?keyVal=_BURY_DCAPR_65250&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    }
+  ],
+  "source_evidence_commit": "b83e9586a90aa10470a886b797242bb798b853e9",
+  "source_run": 38758282951,
+  "version": 1
+}
