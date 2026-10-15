@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "start": "2026-09-29",
+  "cut_exclusive": "2026-10-16",
+  "timezone": "Europe/London",
+  "overlap_days": 28,
+  "rounds": [
+    {
+      "purpose": "SUSPENSION_CATCHUP",
+      "start": "2026-09-18",
+      "end": "2026-10-15",
+      "rule": "stage4-discovery-v1",
+      "limits": {
+        "calls": 36,
+        "requests": 1200,
+        "bytes": 323658240,
+        "seconds": 1900,
+        "output_bytes": 20000000
+      },
+      "rows": [
+        {
+          "council": "bolton",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bolton",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bolton",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bolton",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bury",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bury",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bury",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "bury",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "manchester",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "manchester",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "manchester",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "manchester",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "oldham",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "oldham",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "oldham",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "oldham",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "rochdale",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "rochdale",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "rochdale",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "rochdale",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "salford",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "salford",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "salford",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "salford",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "stockport",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "stockport",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "stockport",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "stockport",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED"
+        },
+        {
+          "council": "tameside",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "tameside",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "tameside",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "tameside",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "wigan",
+          "start": "2026-09-18",
+          "end": "2026-09-24",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "wigan",
+          "start": "2026-09-25",
+          "end": "2026-10-01",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "wigan",
+          "start": "2026-10-02",
+          "end": "2026-10-08",
+          "semantics": "RECEIVED"
+        },
+        {
+          "council": "wigan",
+          "start": "2026-10-09",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED"
+        }
+      ]
+    }
+  ],
+  "publication_coverage": "UNKNOWN",
+  "latency": "UNKNOWN",
+  "persistence": false,
+  "watermark_advance": false
+}

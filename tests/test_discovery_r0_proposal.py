@@ -16,8 +16,8 @@ def context():
 
 
 def test_r0_scope_overlap_and_explicit_older_partitions():
-    p=r.proposal();assert p['start']=='2026-09-29' and p['cut_exclusive']=='2026-10-16'
-    assert p['rounds'][0]['start']=='2026-09-18' and p['rounds'][-1]['end']=='2026-10-15'
+    p=r.proposal();assert p['start']=='2026-09-29' and p['cut_exclusive']=='2026-10-15'
+    assert p['rounds'][0]['start']=='2026-09-17' and p['rounds'][-1]['end']=='2026-10-14'
     assert len(p['rounds'][0]['rows'])==36
     with patch.object(r,'CUT','2026-11-06'):
         p=r.proposal();assert len(p['rounds'])==2
@@ -85,7 +85,7 @@ def test_hard_supervisor_offline_child_cleanup(tmp_path,monkeypatch):
 
 def test_cut_guard_before_sources():
     with pytest.raises(ValueError,match='CUT_NOT_REACHED'):
-        r.admit(context(),'a'*40,r.PLAN_HASH,now=datetime(2026,10,15,tzinfo=timezone.utc))
+        r.admit(context(),'a'*40,r.PLAN_HASH,now=datetime(2026,10,14,22,59,59,tzinfo=timezone.utc))
 
 
 def test_supervisor_deadline_preserves_unknown_and_terminates(monkeypatch,tmp_path):
@@ -167,3 +167,18 @@ def test_registration_mutations_rejected(old,new):
     with pytest.raises(AssertionError):assert_registered_workflow(text.replace(old,new))
 
 WORKFLOW_SHA256='5766acc2a137d50c4072d3153b6a0c52e7966580a66298c602d4d68484e4d893'
+
+
+def test_revised_cut_boundary_manifest_and_superseded_rejection():
+    import json
+    root=Path(__file__).resolve().parents[1]/'docs/design/stage4-r0-execution'
+    assert json.loads((root/'manifest.json').read_text())==r.PLAN
+    old=json.loads((root/'manifest-superseded-cut-2026-10-16.json').read_text())
+    assert r.f.digest(old)=='99a5bff2f627111f7c2addc3457caf4725312d1a4a8e935de205d5e6bd85d3f4'
+    assert r.PLAN_HASH!=r.f.digest(old)
+    r.admit(context(),'a'*40,r.PLAN_HASH,now=datetime(2026,10,14,23,tzinfo=timezone.utc))
+    with pytest.raises(ValueError,match='R0_ADMISSION_REJECTED'):
+        r.admit(context(),'a'*40,r.f.digest(old),now=datetime(2026,10,15,tzinfo=timezone.utc))
+    for council in r.f.COUNCILS:
+        rows=[x for x in r.PLAN['rounds'][0]['rows'] if x['council']==council]
+        assert [(x['start'],x['end']) for x in rows]==[('2026-09-17','2026-09-23'),('2026-09-24','2026-09-30'),('2026-10-01','2026-10-07'),('2026-10-08','2026-10-14')]
