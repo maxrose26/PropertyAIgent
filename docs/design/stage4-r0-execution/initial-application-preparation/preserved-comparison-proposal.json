@@ -1,0 +1,16 @@
+{
+  "councils": {
+    "manchester": 128,
+    "oldham": 19
+  },
+  "execution_authorised": false,
+  "identities": 147,
+  "independent_only_references_preserved": 283,
+  "path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/proposed-additional-identity-comparison.json",
+  "persistence": false,
+  "registered": false,
+  "sha256": "2aaacbd60bf8e729c082d6464b708cb73639ce4675062c51f351976ee895aba0",
+  "source_evidence_commit": "b83e9586a90aa10470a886b797242bb798b853e9",
+  "uncertain_date_references_added": 0,
+  "version": 1
+}

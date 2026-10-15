@@ -30,7 +30,15 @@ def test_exact_cohort_and_shared_bytes():
     # Immutable accepted blob digests, independent of that local checkout.
     expected=json.loads((root/'accepted-dependencies.json').read_text())
     for path,digest in expected.items():
-        assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
+        if path=='verification/direct_reference/refresh.py':
+            # Keep the consumed accepted dependency immutable. Only the exact
+            # reviewed optional-diagnostic revision is a current-code exception.
+            assert digest=='914445cc890ac3d7882f969399d0867f098229631b1abb468d08a409c476ebc9'
+            archive=root/'history/refresh-pre-diagnostics.py.txt'
+            assert hashlib.sha256(archive.read_bytes()).hexdigest()==digest
+            assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2'
+        else:
+            assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
     assert len(load_manifest())==202
     # The authorised status-scope evolution never replaces historical evidence.
     historical=json.loads((root/'accepted-dependencies-v1.json').read_text())
@@ -211,3 +219,12 @@ def test_old_setup_refused_before_worker(monkeypatch,tmp_path):
     monkeypatch.setattr(r,'admit',lambda *a:None)
     monkeypatch.setattr(r.time,'time',lambda:200)
     with pytest.raises(ValueError):r.execute('a'*40,'live',r.AUTHORITY,tmp_path/'out',job_start_epoch=0)
+
+
+def test_unreviewed_refresh_mutation_does_not_use_diagnostic_exception(monkeypatch):
+    original=Path.read_bytes
+    def altered(path):
+        raw=original(path)
+        return raw+b'\n# unreviewed mutation\n' if str(path)=='verification/direct_reference/refresh.py' else raw
+    monkeypatch.setattr(Path,'read_bytes',altered)
+    with pytest.raises(AssertionError):test_exact_cohort_and_shared_bytes()

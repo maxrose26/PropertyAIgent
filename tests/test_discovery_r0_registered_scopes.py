@@ -118,7 +118,7 @@ def proc_namespace():
     return patch.object(Path,'read_text',fake)
 
 
-@pytest.mark.parametrize('scope,expected', [('fixed80',80),('untouched27',27)])
+@pytest.mark.parametrize('scope,expected', [('fixed80',80),('untouched27',27),('untouched20',20)])
 def test_actual_parent_outer_worker_checkpoint_delegation(scope,expected,tmp_path,monkeypatch):
     directory=tmp_path/'audit';p=s.PROFILES[scope];calls=[];launches=[]
     def reader80(i,row):
@@ -152,7 +152,7 @@ def test_actual_parent_outer_worker_checkpoint_delegation(scope,expected,tmp_pat
     assert result['outer_supervisor']['cleanup']=='CLOSED' and not result['outer_supervisor']['expired']
     assert s.verify_export(scope,directory,context(scope))==s.audit_bytes(directory)<=p['output_bytes']
     assert metadata['aggregate_audit_bytes']==s.audit_bytes(directory)
-    if scope=='untouched27':
+    if scope!='fixed80':
         assert result['results'][0]['safe_local_gap'] and result['results'][0]['enumeration_completeness']=='INCOMPLETE'
         assert len(result['results'][0]['source']['listing_records'])==60
         assert result['completeness']=='INCOMPLETE' and not result['completed_through_advanced']
@@ -215,13 +215,14 @@ def test_clean_checkout_and_output_export_fail_closed(tmp_path):
  {'failure':'SOURCE_EXCEPTION'}, {'safety_failure':True}, {'destination':'https://wrong.invalid/'},
  {'applied_interval':None}, {'process_cleanup':'UNKNOWN'}, {'requests':None},
 ])
-def test_real_capped_transport_mutated_hard_failures_stop_new27(change,tmp_path):
+@pytest.mark.parametrize('scope', ['untouched27','untouched20'])
+def test_real_capped_transport_mutated_hard_failures_stop_new27(change,tmp_path,scope):
     calls=[]
     def reader(row):
         calls.append(row);return dict(capped_transport(row),**change)
-    with patch.object(finite,'read',reader):s.execute_worker(s.plan('untouched27'),tmp_path/'result.json',tmp_path)
+    with patch.object(finite,'read',reader):s.execute_worker(s.plan(scope),tmp_path/'result.json',tmp_path)
     out=json.loads((tmp_path/'result.json').read_bytes())
-    assert len(calls)==1 and len(out['not_attempted'])==26 and out['stop_reason']
+    assert len(calls)==1 and len(out['not_attempted'])==s.PROFILES[scope]['calls']-1 and out['stop_reason']
     assert out['completeness']=='INCOMPLETE' and len(list((tmp_path/'checkpoints').glob('*.json')))==1
 
 

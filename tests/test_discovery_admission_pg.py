@@ -113,3 +113,8 @@ def test_fixed80_identity_comparison_real_read_only_transaction(pg):
             connection.exec_driver_sql('ROLLBACK')
     with Session(pg) as session:
         assert session.scalar(select(func.count()).select_from(Application)) == before
+
+
+def test_bolton_initial_literal_real_shared_path_on_postgres(pg):
+    from tests.test_discovery_initial_application_contract import assert_bolton_path
+    assert_bolton_path(pg)

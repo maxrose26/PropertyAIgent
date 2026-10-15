@@ -480,17 +480,20 @@ def _verify_initial_status(session, council, application, result, columns, prior
     def fail():
         session.rollback()
         return VerificationOutcome(outcome=OUTCOME_FETCH_FAILED, application_reference=application.reference)
-    if (source.scheme != 'https' or source.port not in (None, 443)
-            or source.username or source.password or source.fragment
-            or not re.fullmatch(r'/pr/s/detail/[A-Za-z0-9]{18}', source.path)
-            or parse_qs(source.query) != {'c__r': ['Arcus_BE_Public_Register']}
+    from app.pipeline.bolton_initial_status import evidence as bolton_evidence
+    bolton = bolton_evidence(council.code,result.summary_url,application.reference,fields,evidence)
+    arcus = (source.scheme == 'https' and source.port in (None,443)
+             and not source.username and not source.password and not source.fragment
+             and re.fullmatch(r'/pr/s/detail/[A-Za-z0-9]{18}',source.path)
+             and parse_qs(source.query)=={'c__r':['Arcus_BE_Public_Register']}
+             and council.code in allowed
+             and (source.hostname,fields.get('Status'))==allowed[council.code])
+    if (not (bolton or arcus)
             or application.unit_confirmation_status != 'discovery_pending'
             or application.site_id is not None or application.estimated_unit_count is not None
             or any(prior[i] is not None for i in (0, 1, 2, 3, 5))
             or set(fields) != {'Reference', 'Status'}
             or fields.get('Reference') != application.reference
-            or council.code not in allowed
-            or (source.hostname, fields.get('Status')) != allowed[council.code]
             or not isinstance(digest, str) or not re.fullmatch('[0-9a-f]{64}', digest)
             or not isinstance(evidence, dict)
             or set(evidence) != {'reference', 'status', 'decision', 'decision_date'}):

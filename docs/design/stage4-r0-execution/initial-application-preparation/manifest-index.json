@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "execution_authorised": false,
+  "registered": false,
+  "persistence": false,
+  "sha256": {
+    "capped-manchester-three.json": "84a49c538b8ca6bf47907be20ecfbdda510004f3513a1edcece8d10d3f01e2ac",
+    "failed-bolton-one.json": "43e331248637c3db2c2e7efda1ebdf9b2f817ae0e6eb90191665b27edccae618",
+    "failed-oldham-one.json": "4ce6c3e3918012cc714cdd7f204a29954fc927974270ae1a4b6b582fe5d9c827",
+    "preserved-comparison-proposal.json": "53e70b615871b103abae54d3a3d0e7c82c2f9534c8a88035784b69ef1666ab93",
+    "primary-unattempted20.json": "7c46a54e91201ba2cff1b392e4d606f592f79a8752827e3536135bfb3912e66c",
+    "qualification-unattempted37.json": "c4f8513b6e402a6ee0104822fe188dab1342e9308cfd17addc9c37ff3397894b",
+    "retained42-offline-assessment.json": "f409337981c1c64186ab6c07b21c84b19ce34371600acb744ccf396fc070cc3e",
+    "unresolved-bury-one.json": "23ec924e3949cad99a195d9d0dbe0bf6c1c225a9571bc936becd584d5fd61cee"
+  }
+}

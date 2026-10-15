@@ -1,0 +1,49 @@
+{
+  "cause": "UNKNOWN_PARSER_SUBCAUSE",
+  "execution_authorised": false,
+  "limits": {
+    "bytes": 2000000,
+    "calls": 1,
+    "output_bytes": 65536,
+    "requests": 2,
+    "seconds": 55
+  },
+  "persistence": false,
+  "purpose": "REVIEW_ONLY_FAILURE_ASSESSMENT_NOT_RETRY_AUTHORITY",
+  "registered": false,
+  "rows": [
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "admission_reason": "PROPOSED_FIXED80_QUALIFICATION_ONLY",
+      "application_id": null,
+      "application_role": "UNKNOWN",
+      "case": "r0_fixed80_42",
+      "council": "bolton",
+      "listing_provenance": [
+        "bdaeae06e58856883ff77237e27e0c29d81564641ff5c29d6a361d21a37e1c54",
+        "3d971a9af9b78fc7c7477bd0da7f6c3b3028aaadb58c3fd8c8abfdfa42971ee4",
+        "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+        "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0",
+        "4b91f9a083cd4bdeef4e0a7fdbe31327edfb8a3fbf85f1fc35d4ae4faed1a98f"
+      ],
+      "platform_family": "IDOX",
+      "reference": "01842/26",
+      "retained_materiality": {
+        "outcome": "POTENTIALLY_MATERIAL",
+        "qualification": "Ignore",
+        "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+        "rule_version": "stage4-discovery-v1"
+      },
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMU3HTDEKNB00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3HTDEKNB00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    }
+  ],
+  "source_evidence_commit": "b83e9586a90aa10470a886b797242bb798b853e9",
+  "source_run": 38758282951,
+  "version": 1
+}

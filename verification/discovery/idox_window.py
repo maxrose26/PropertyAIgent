@@ -95,13 +95,17 @@ def run(dispatch, config=WindowConfig()):
         'date_semantics':config.semantics,'applied_interval':None,'completeness':'UNKNOWN',
         'source_qualification':'CANDIDATE_CONTRACT','persistence':False,'pages':[],
         'records':[],'failure':None,'cleanup':'UNKNOWN','capped':False}
+    diagnostic_stage='FORM_REQUEST';diagnostic_body=b''
     try:
         form=b.retrieve('GET',config.form_url)
+        diagnostic_stage='FORM_PARSE';diagnostic_body=form
         target,payload=config.payload(form)
         b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SEARCH'
         payload.clear()
+        diagnostic_stage='SEARCH_REQUEST';diagnostic_body=b''
         html=b.retrieve('POST',target,b.admitted_body)
         b.admitted_body=None
+        diagnostic_stage='ZERO_CHECK';diagnostic_body=html
         if explicit_zero(html,config.council):
             _,echo_payload=config.payload(html,echo=True)
             echo_payload.clear()
@@ -111,15 +115,19 @@ def run(dispatch, config=WindowConfig()):
                 explicit_zero_evidence='NO_RESULTS_FOUND_AND_RETAINED_DATE_CRITERIA')
             out['pages']=[{'ordinal':1,'first':0,'last':0,'total':0,'rows':0,'body_sha256':hashlib.sha256(html).hexdigest(),'terminal':'EXPLICIT_ZERO_RESULTS'}]
             return out
+        diagnostic_stage='SORT_FORM_PARSE'
         target,payload=sort_payload(html,b.policy.base_url)
         b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SORT'
         payload.clear()
+        diagnostic_stage='SORT_REQUEST';diagnostic_body=b''
         html=b.retrieve('POST',target,b.admitted_body)
         b.admitted_body=None
         out['sort']='REFERENCE_DESCENDING'
         keys=set(); refs={}; total=None; seen=0
         for ordinal in range(1,MAX_PAGES+1):
+            diagnostic_stage='SORT_VERIFY';diagnostic_body=html
             require_reference_sort(html)
+            diagnostic_stage='PAGE_PARSE'
             p=parse_page(html,config.council,ordinal,config.start,config.end,config.semantics)
             if p.total is not None:
                 if total is not None and total!=p.total: raise ListingError('changing source count')
@@ -141,20 +149,32 @@ def run(dispatch, config=WindowConfig()):
             if ordinal==MAX_PAGES:
                 out['capped']=True; out['completeness']='INCOMPLETE';break
             b.phase='PAGE';b.next_url=p.next_url
+            diagnostic_stage='PAGE_REQUEST';diagnostic_body=b''
             html=b.retrieve('GET',p.next_url)
         out['unique_references']=len(refs)
         if not out['capped']:
             b.phase='REFINE'
+            diagnostic_stage='REFINE_REQUEST';diagnostic_body=b''
             echoed=b.retrieve('GET',b.policy.base_url+'/refineSearch.do?action=refine')
+            diagnostic_stage='CRITERIA_ECHO';diagnostic_body=echoed
             _,echo_payload=config.payload(echoed,echo=True)
             echo_payload.clear()
             out['applied_interval']=out['requested_interval']
             out['applied_evidence']='STRICT_REFINE_FORM_ECHO'
             out['applied_evidence_sha256']=hashlib.sha256(echoed).hexdigest()
     except (ListingError,BoundaryFailure,Failure) as e:
-        out['failure']=type(e).__name__+':'+str(e)[:100]
+        from .source_diagnostics import shape
+        # Only these fixed known messages retain their legacy spelling. Other
+        # exceptions never export arbitrary str(e), URLs, tokens or source text.
+        known={'sort selector':('sort selector','SORT_SELECTOR_COUNT'),
+               'ambiguous reference across pages':('ambiguous reference across pages','DUPLICATE_REFERENCE')}
+        label,code=known.get(str(e),('SOURCE_CONTRACT_REJECTED','SOURCE_CONTRACT_REJECTED'))
+        out['failure']=type(e).__name__+':'+label
+        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,code)
         out['completeness']='INCOMPLETE' if out['pages'] else 'FAILED'
     except Exception:
+        from .source_diagnostics import shape
+        out['failure_diagnostic']=shape(diagnostic_body,diagnostic_stage,'UNCLASSIFIED_FAILURE')
         out['failure']='UNCLASSIFIED_FAILURE';out['completeness']='FAILED'
     finally:
         b.admitted_body=None; b.close()
