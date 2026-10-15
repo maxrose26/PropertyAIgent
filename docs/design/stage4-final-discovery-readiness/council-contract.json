@@ -1,0 +1,156 @@
+{
+  "status": "PROPOSAL_ONLY_NO_LIVE_WINDOWS",
+  "engineering_baseline_sha": "db8779467017d3973c00dc6b34eefba3e94a767e",
+  "final_execution_candidate_sha": null,
+  "calendar_rule": "FIRST_MONDAY_STRICTLY_AFTER_FINAL_FREEZE_EUROPE_LONDON_TWO_CONSECUTIVE_WEEKS_PLUS_NEXT_CYCLE_AUDIT",
+  "overlap_calendar_days": 28,
+  "latency_calendar_days": 7,
+  "independent_denominator_complete": false,
+  "trafford": "DEFERRED",
+  "rows": [
+    {
+      "council": "bolton",
+      "primary_url": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "family": "IDOX_SEARCH",
+      "date_semantics": "RECEIVED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 22,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "bury",
+      "primary_url": "https://planning.bury.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "family": "IDOX_SEARCH",
+      "date_semantics": "RECEIVED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 18,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "manchester",
+      "primary_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "family": "PUBLIC_LISTING_UI",
+      "date_semantics": "VALIDATED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 57,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "oldham",
+      "primary_url": "https://planningpa.oldham.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "family": "IDOX_SEARCH",
+      "date_semantics": "RECEIVED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 14,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "rochdale",
+      "primary_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "family": "PUBLIC_LISTING_UI",
+      "date_semantics": "VALIDATED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 12,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "salford",
+      "primary_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "family": "PUBLIC_LISTING_UI",
+      "date_semantics": "VALIDATED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 26,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "stockport",
+      "primary_url": "https://planning.stockport.gov.uk/PlanningData-live/search.do?action=advanced&searchType=Application",
+      "family": "IDOX_SEARCH",
+      "date_semantics": "VALIDATED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 49,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "tameside",
+      "primary_url": "https://publicaccess.tameside.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "family": "IDOX_SEARCH",
+      "date_semantics": "RECEIVED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 15,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    },
+    {
+      "council": "wigan",
+      "primary_url": "https://planning.wigan.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "family": "IDOX_SEARCH",
+      "date_semantics": "RECEIVED_DATE",
+      "historical_interval": [
+        "2026-09-28",
+        "2026-10-04"
+      ],
+      "historical_references": 17,
+      "independent_method": "SEPARATE_ASSESSOR_MANUAL_OFFICIAL_PORTAL_ENUMERATION_BLINDED_TO_PRIMARY_OUTPUT",
+      "denominator_state": "UNESTABLISHED",
+      "public_availability_latency": "UNKNOWN",
+      "window_1": null,
+      "window_2": null
+    }
+  ]
+}
