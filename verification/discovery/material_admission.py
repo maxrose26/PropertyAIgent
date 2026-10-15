@@ -114,15 +114,38 @@ def main():
         qualification_run='38652271830',results=[],model_calls=0,completed_through_advanced=False,
         site_creation=False,opportunity_creation=False,execution='UNKNOWN')
     try:
+        from .route_validation import route_audit,RouteRejection
+        audit['route_validation']=route_audit(os.environ.get('COMMITTEE_DATABASE_URL',''))
+        if audit['route_validation']['result']=='REJECTED':
+            raise RouteRejection(audit['route_validation']['reason_code']) from None
+        audit['phase']='ENGINE_CONSTRUCTION_STARTED'
         engine=checked_engine(os.environ['COMMITTEE_DATABASE_URL'])
+        audit['phase']='ENGINE_CREATED_NO_CONNECTION_ASSERTION'
+        audit['phase']='ADMISSION_EXECUTION_STARTED'
         execute(engine,audit['run_id'],results=audit['results'])
+        audit['phase']='EXECUTION_COMPLETED'
         audit['execution']='COMPLETED'
     except BaseException:
-        audit['execution']='STOP_UNCERTAIN_OR_FAILED_NO_RETRY';raise
+        if audit.get('route_validation',{}).get('result')=='REJECTED':
+            audit['phase']='REJECTED_BEFORE_ENGINE_CREATION'
+            audit['execution']='REJECTED_BEFORE_ENGINE_CREATION_NO_TRANSACTION'
+        else:
+            audit['execution']='STOP_UNCERTAIN_OR_FAILED_NO_RETRY'
+        # Fixed exception only: never expose a secret-bearing exception chain.
+        raise RuntimeError('ADMISSION_STOP_NO_RETRY') from None
     finally:
-        if engine is not None:engine.dispose()
+        cleanup_failed=False
+        audit['engine_cleanup']='NOT_CREATED' if engine is None else 'PENDING'
+        if engine is not None:
+            try:
+                engine.dispose();audit['engine_cleanup']='DISPOSED'
+            except BaseException:
+                cleanup_failed=True
+                audit['engine_cleanup']='FAILED'
+                audit['execution']='CLEANUP_FAILED_NO_RETRY'
         raw=json.dumps(audit,sort_keys=True,default=str)
         if len(raw.encode())>65536:raise ValueError('audit bound')
         Path(a.output).write_text(raw+'\n')
+        if cleanup_failed:raise RuntimeError('ADMISSION_CLEANUP_STOP_NO_RETRY') from None
 
 if __name__=='__main__':main()
