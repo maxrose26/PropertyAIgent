@@ -1,4 +1,4 @@
-"""Unregistered workflow mappings and actual supervisor/worker delegation."""
+"""Registered exact16 and inert admission-proposal mappings/delegation."""
 import hashlib,json,os,time
 from pathlib import Path
 from unittest.mock import patch
@@ -30,7 +30,9 @@ def mapping(module):
 def test_actual_proposed_mapping_and_mutated_context(module,monkeypatch):
     monkeypatch.delenv('DATABASE_URL',raising=False)
     workflow,env,replacements=mapping(module);steps=workflow['jobs']['source']['steps']
-    assert not Path(module.WORKFLOW).exists()
+    if module is x:
+        assert Path(module.WORKFLOW).read_bytes()==module.TEMPLATE.read_bytes()
+    else:assert not Path(module.WORKFLOW).exists()
     for step in [s for s in steps[1:] if 'env' in s]:
         mapped={k:replacements[v] for k,v in step['env'].items() if v in replacements}
         valid=dict(env,**mapped);manifest=mapped['MANIFEST_SHA']
