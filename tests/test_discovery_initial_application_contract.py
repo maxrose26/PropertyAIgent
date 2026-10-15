@@ -160,3 +160,15 @@ def test_arbitrary_exception_is_not_exported_in_window_diagnostic():
         result=run(lambda *a,**k:Response(b'<html></html>'))
     assert result['failure']=='Failure:SOURCE_CONTRACT_REJECTED'
     assert 'SECRET' not in str(result) and result['completeness']=='FAILED'
+
+
+def test_failed_request_does_not_report_previous_response_as_failure_body():
+    from tests.test_discovery_idox_window import perform,page
+    from verification.bolton_recon.fixtures import FORM
+    # Synthetic third response absent: fail inside SORT_REQUEST, before any new
+    # response is returned. Earlier valid response content must not be mislabelled.
+    out,calls=perform([FORM,page()])
+    assert len(calls)==3 and out['failure']=='UNCLASSIFIED_FAILURE'
+    d=out['failure_diagnostic']
+    assert d['stage']=='SORT_REQUEST' and d['body_bytes']==0 and d['shape_available'] is False
+    assert out['completeness']=='FAILED'

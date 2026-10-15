@@ -95,13 +95,14 @@ def run(dispatch, config=WindowConfig()):
         'date_semantics':config.semantics,'applied_interval':None,'completeness':'UNKNOWN',
         'source_qualification':'CANDIDATE_CONTRACT','persistence':False,'pages':[],
         'records':[],'failure':None,'cleanup':'UNKNOWN','capped':False}
-    diagnostic_stage='FORM_PARSE';diagnostic_body=b''
+    diagnostic_stage='FORM_REQUEST';diagnostic_body=b''
     try:
         form=b.retrieve('GET',config.form_url)
-        diagnostic_body=form
+        diagnostic_stage='FORM_PARSE';diagnostic_body=form
         target,payload=config.payload(form)
         b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SEARCH'
         payload.clear()
+        diagnostic_stage='SEARCH_REQUEST';diagnostic_body=b''
         html=b.retrieve('POST',target,b.admitted_body)
         b.admitted_body=None
         diagnostic_stage='ZERO_CHECK';diagnostic_body=html
@@ -118,6 +119,7 @@ def run(dispatch, config=WindowConfig()):
         target,payload=sort_payload(html,b.policy.base_url)
         b.admitted_post=target; b.admitted_body=urlencode(payload).encode(); b.phase='SORT'
         payload.clear()
+        diagnostic_stage='SORT_REQUEST';diagnostic_body=b''
         html=b.retrieve('POST',target,b.admitted_body)
         b.admitted_body=None
         out['sort']='REFERENCE_DESCENDING'
@@ -147,10 +149,12 @@ def run(dispatch, config=WindowConfig()):
             if ordinal==MAX_PAGES:
                 out['capped']=True; out['completeness']='INCOMPLETE';break
             b.phase='PAGE';b.next_url=p.next_url
+            diagnostic_stage='PAGE_REQUEST';diagnostic_body=b''
             html=b.retrieve('GET',p.next_url)
         out['unique_references']=len(refs)
         if not out['capped']:
             b.phase='REFINE'
+            diagnostic_stage='REFINE_REQUEST';diagnostic_body=b''
             echoed=b.retrieve('GET',b.policy.base_url+'/refineSearch.do?action=refine')
             diagnostic_stage='CRITERIA_ECHO';diagnostic_body=echoed
             _,echo_payload=config.payload(echoed,echo=True)
