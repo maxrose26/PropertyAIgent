@@ -1,0 +1,241 @@
+{
+  "master": "fd3b00e23c82533df1abd4c9f0d00506abc7fe6e",
+  "master_tree": "89b2613354e6cf1d8428a53d99b58ae7518dc639",
+  "pr103": {
+    "head": "1976125eb5a2bc70b4cb8b416b91abc360e39c53",
+    "merge": "1f9d88d5eb36f0714387befc2e6aac28a854c6a5",
+    "tree": "f032f6b4ede324aed16444915f21795eecee0b7c"
+  },
+  "registration": {
+    "pr": 104,
+    "head": "7fec16ef4f469a7531383d16e5c992e13ff4d554",
+    "merge": "fd3b00e23c82533df1abd4c9f0d00506abc7fe6e",
+    "workflow": ".github/workflows/stage4-r0-untouched9-once.yml",
+    "blob": "b03b704c47fb4d24425a6a73d5b008ab78001747",
+    "sha256": "57489b54cf402e7aa11dc0428806e063b337247cf278d6bef30c950347e6e825",
+    "manifest": "c90d75ea1d5863976e1a176c3a484a3866069ea8f7eb2b3034deaf2315619262",
+    "pre_merge_checks": [
+      {
+        "name": "native",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803278381/job/116657534192"
+      },
+      {
+        "name": "web",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803278163/job/116657533902"
+      },
+      {
+        "name": "offline",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803278381/job/116657533754"
+      },
+      {
+        "name": "offline",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803278119/job/116657533671"
+      },
+      {
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803278163/job/116657533517"
+      },
+      {
+        "name": "postgres-admission",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803278119/job/116657533421"
+      },
+      {
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803276032/job/116657526977"
+      },
+      {
+        "name": "web",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803276032/job/116657526740"
+      }
+    ],
+    "post_merge_checks": [
+      {
+        "name": "web",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803742961/job/116659128770"
+      },
+      {
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803742961/job/116659128264"
+      },
+      {
+        "name": "native",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803742823/job/116659128227"
+      },
+      {
+        "name": "offline",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803742823/job/116659127572"
+      },
+      {
+        "name": "offline",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803742788/job/116659127389"
+      },
+      {
+        "name": "postgres-admission",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38803742788/job/116659127052"
+      }
+    ]
+  },
+  "parent": {
+    "pr": 105,
+    "head": "fe9e12df96397c54a461358b603bbde9eb8fb456",
+    "tree": "5e95ef6467ed525e7e11c8c71080cb954e06b479",
+    "files": [
+      {
+        "path": "verification/discovery/r0_parent_metadata.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c49b959081bda9db6cf28481c1d9de1748674c78"
+      },
+      {
+        "path": "verification/discovery/r0_proposal.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "be2e30ebd85638eb9d45d496f7338f412d0a93eb"
+      },
+      {
+        "path": "verification/discovery/r0_registered_scopes.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00306e91e17526d2a5a6bb18d26bcfdf5680f812"
+      },
+      {
+        "path": "tests/test_discovery_parent_controls.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d595180406d673d364a595bb707bba16a9834e2e"
+      },
+      {
+        "path": ".github/workflows/stage4-discovery-offline.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a500ce030d2dab2f979a1b44f52c3e11f84b573e"
+      },
+      {
+        "path": ".github/workflows/stage4-batch-offline.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fbfe6c8d940e61e518f2446d21369c1434820c9e"
+      },
+      {
+        "path": "docs/design/stage4-r0-execution/exact9-registration-parent-controls/capped-partition-proposal.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3e40c1ac7552a8c08f0e9d6f867ff1387cfbeaaf"
+      },
+      {
+        "path": "docs/design/stage4-r0-execution/exact9-registration-parent-controls/two-parent-manifest.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "edf7269cecab64a2b5623b0512ff044986ad54c5"
+      },
+      {
+        "path": "docs/design/stage4-r0-execution/exact9-registration-parent-controls/stage4-bolton-two-parent-metadata-once.yml.txt",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ff2a0ba801adc904fb32de530be03044c9148c29"
+      },
+      {
+        "path": "docs/design/stage4-r0-execution/exact9-registration-parent-controls/REVIEW.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "228399c714309728d09831f0ac5b8708af01beaa"
+      },
+      {
+        "path": "docs/design/stage4-r0-execution/exact9-registration-parent-controls/INDEPENDENT-REVIEW.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f9ca098c0e553eab5f0f6fa6a3119e10b5326d35"
+      },
+      {
+        "path": "docs/design/stage4-r0-execution/exact9-registration-parent-controls/checksums.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4af992028d15019e9b159038b748e397691b5e76"
+      }
+    ],
+    "checks": [
+      {
+        "name": "offline",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804199036/job/116660690942"
+      },
+      {
+        "name": "web",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804199077/job/116660689651"
+      },
+      {
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804199077/job/116660689432"
+      },
+      {
+        "name": "native",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804199036/job/116660689316"
+      },
+      {
+        "name": "offline",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804199002/job/116660689219"
+      },
+      {
+        "name": "postgres-admission",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804199002/job/116660689029"
+      },
+      {
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804188791/job/116660657351"
+      },
+      {
+        "name": "web",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38804188791/job/116660657102"
+      }
+    ],
+    "manifest": "9997f55e9af0e646ccf376137f79534fbc73e75e0c0984dffc222ee811f711fa",
+    "template_sha256": "386def0b214f8511d096ebe9905cb4c8e048ff741d23b36fe2088b2500192117",
+    "registered": false,
+    "merged": false,
+    "executed": false
+  },
+  "history": {
+    "observed_at": "2026-10-15T20:46:44.414Z",
+    "total": 29,
+    "returned": 29,
+    "exact9_runs": 0,
+    "parent_runs": 0
+  },
+  "independent_review": {
+    "verdict": "PASS",
+    "reviewer": "/root/review_cap_screen",
+    "affected_tests_passed": 32,
+    "final_audit_correction_tests_passed": 19
+  },
+  "local_validation": {
+    "affected_passed": 103,
+    "discovery_passed": 468,
+    "discovery_skipped": 10,
+    "skips": "No local disposable PostgreSQL configured; exact-head hosted disposable checks passed"
+  },
+  "production_reads": 0,
+  "production_writes": 0,
+  "live_source_requests": 0,
+  "stage4": "OPEN"
+}
