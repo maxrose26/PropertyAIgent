@@ -108,7 +108,7 @@ class AuditStore:
         if len(self.records)>=self.p['calls'] or len(raw)>=self.p['record_output_bytes']:
             raise ValueError('CHECKPOINT_RECORD_BOUND')
         # Checkpoint + final result copy; reserve all fixed envelopes up front.
-        if 2*(self.bytes+len(raw))+AUDIT_RESERVE>self.p['output_bytes']:
+        if 2*(self.bytes+len(raw))+self.p.get('audit_reserve',AUDIT_RESERVE)>self.p['output_bytes']:
             raise ValueError('AGGREGATE_AUDIT_BOUND')
         path=self.directory/f'{len(self.records):03}.json'
         with path.open('xb') as target:
