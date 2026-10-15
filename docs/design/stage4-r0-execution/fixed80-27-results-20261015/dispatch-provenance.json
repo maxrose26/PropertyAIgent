@@ -1,0 +1,70 @@
+{
+  "verified_at": "2026-10-15",
+  "reviewed_sha": "77356e04ef855f7373b96b9210f593e9b96c897c",
+  "tree": "1f36311cbc66ef3b474110cb15723d81cb4ed8ca",
+  "checks": [
+    {
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38756459469/job/116496084535"
+    },
+    {
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38756459469/job/116496083827"
+    },
+    {
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38756459252/job/116496082682"
+    },
+    {
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38756459252/job/116496082073"
+    },
+    {
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38756459122/job/116496079584"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38756459122/job/116496079368"
+    }
+  ],
+  "before_dispatch": {
+    "manual_runs": 24,
+    "fixed80": 0,
+    "untouched27": 0
+  },
+  "dispatches": [
+    {
+      "id": 38758465439,
+      "path": ".github/workflows/stage4-r0-untouched27-once.yml",
+      "sha": "77356e04ef855f7373b96b9210f593e9b96c897c",
+      "run_number": 1,
+      "attempt": 1,
+      "created_at": "2026-10-15T15:13:48Z",
+      "actor": "maxrose26"
+    },
+    {
+      "id": 38758282951,
+      "path": ".github/workflows/stage4-r0-fixed80-qualification-once.yml",
+      "sha": "77356e04ef855f7373b96b9210f593e9b96c897c",
+      "run_number": 1,
+      "attempt": 1,
+      "created_at": "2026-10-15T15:12:34Z",
+      "actor": "maxrose26"
+    }
+  ],
+  "no_database_authority": true,
+  "no_retry": true
+}

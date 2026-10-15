@@ -1,0 +1,35 @@
+{
+  "bridge_start": "2026-10-15",
+  "candidate_councils": {
+    "manchester": 163,
+    "oldham": 43
+  },
+  "candidate_membership": {
+    "IN_TARGET": 147,
+    "OVERLAP_CONTEXT": 59
+  },
+  "database_catchup": "INCOMPLETE",
+  "eligible_admission_cohort": [],
+  "exclusions": 0,
+  "fixed80_outcomes": {
+    "NOT_ATTEMPTED": 37,
+    "WITHHELD_B2_INELIGIBLE": 42,
+    "WITHHELD_PARSER_FAILURE": 1
+  },
+  "identity_set_matches": 3,
+  "independent_unavailable": 15,
+  "independent_usable": 12,
+  "latency": "UNKNOWN",
+  "no_new_independent_observation": true,
+  "parent_r0": "INCOMPLETE",
+  "primary_candidates": 206,
+  "primary_windows": {
+    "COMPLETE": 4,
+    "FAILED": 1,
+    "INCOMPLETE": 2,
+    "NOT_ATTEMPTED": 20
+  },
+  "proposed_new_comparison": 147,
+  "publication_recall": "UNKNOWN",
+  "unresolved_differences": 0
+}

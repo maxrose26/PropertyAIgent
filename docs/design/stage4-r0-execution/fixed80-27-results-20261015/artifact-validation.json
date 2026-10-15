@@ -1,0 +1,68 @@
+{
+  "fixed80": {
+    "all_checkpoint_hashes_and_values_verified": true,
+    "authority": "CONSUMED",
+    "checkpoint_bytes": 81740,
+    "checkpoints": 43,
+    "execution_sha256": "f607181fbdcc26932ffaeffd37322a349bed6c1a55ebe02fc9c8150896258874",
+    "expanded_bytes": 170541,
+    "no_database_access": true,
+    "resources": {
+      "bytes": null,
+      "elapsed_seconds": 144.68157508499996,
+      "outer_supervisor": {
+        "audit_byte_limit": 8000000,
+        "cleanup": "CLOSED",
+        "deadline_seconds": 4400,
+        "elapsed_seconds": 145.294,
+        "exit_code": 0,
+        "expired": false,
+        "final_containment": "DISPOSABLE_HOSTED_VM",
+        "limit_hit": null,
+        "live_owned_survivors": 0,
+        "peak_owned_rss": 146853888,
+        "restarted": false,
+        "rss_limit_bytes": 1610612736
+      },
+      "received_bytes": 1504324,
+      "requests": 43
+    },
+    "result_sha256": "965c05bb4ab461cbfa829a24b161e9dc3b1be3b8903a61031e1fdf583da67f58",
+    "run": 38758282951,
+    "run_revision_manifest_verified": true,
+    "zip_sha256": "4efd1716953bca638e84ad65481fc4c21c890aac6d30425d2a75b36e224b8d8f"
+  },
+  "untouched27": {
+    "all_checkpoint_hashes_and_values_verified": true,
+    "authority": "CONSUMED",
+    "checkpoint_bytes": 121119,
+    "checkpoints": 7,
+    "execution_sha256": "6d38b9196737171a0013073c8eabb17fcc22a6cec5c6e3cd21f3569efe7043a7",
+    "expanded_bytes": 247098,
+    "no_database_access": true,
+    "resources": {
+      "bytes": 34221862,
+      "elapsed_seconds": null,
+      "outer_supervisor": {
+        "audit_byte_limit": 20000000,
+        "cleanup": "CLOSED",
+        "deadline_seconds": 1900,
+        "elapsed_seconds": 52.629,
+        "exit_code": 0,
+        "expired": false,
+        "final_containment": "DISPOSABLE_HOSTED_VM",
+        "limit_hit": null,
+        "live_owned_survivors": 0,
+        "peak_owned_rss": 1050144768,
+        "restarted": false,
+        "rss_limit_bytes": 1610612736
+      },
+      "received_bytes": null,
+      "requests": 115
+    },
+    "result_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "run": 38758465439,
+    "run_revision_manifest_verified": true,
+    "zip_sha256": "19279ea9886b950f3b90b6f85a12d26d3a1c03477d621710736177181f212526"
+  }
+}

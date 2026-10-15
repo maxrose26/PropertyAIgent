@@ -1,0 +1,20 @@
+{
+  "REVIEW.md": "2cae9a3b3798d89608f8227a3192f812e5a970b9faf692df4c6afdafdca2bdc7",
+  "all27-window-reconciliation.json": "050578a686ff951fb83631271529206067abbe7d84cae6a2e1fa027b5d19b826",
+  "artifact-validation.json": "619f243b05a14bdfcb00981d6785fdbcb8167b153364bb7cb8d11a808788c530",
+  "dispatch-provenance.json": "2bb12566d180c8dad705d92e1a8309755499f055f70a3373cb019220fa08d314",
+  "fixed80/artifact.zip": "4efd1716953bca638e84ad65481fc4c21c890aac6d30425d2a75b36e224b8d8f",
+  "fixed80/extracted/execution.json": "f607181fbdcc26932ffaeffd37322a349bed6c1a55ebe02fc9c8150896258874",
+  "fixed80/extracted/result.json": "965c05bb4ab461cbfa829a24b161e9dc3b1be3b8903a61031e1fdf583da67f58",
+  "github-evidence.json": "1fbc44d192f8020d7583f0296f023fbe0758057b788bfafa4cc2514a15daadfe",
+  "new-primary-candidate-ledger.json": "a5f2bdbbe9df55f5455a8694b24c19e8d97bbaa0fdb1aea91e4913400f4324a0",
+  "proposed-additional-identity-comparison.json": "2aaacbd60bf8e729c082d6464b708cb73639ce4675062c51f351976ee895aba0",
+  "qualification-all80.csv": "46e44b73dd3478724608fb70d57ff483a87a47b460d2ef5225851541aabfd19b",
+  "qualification-all80.json": "4345c251d3357cb4cffd36d8213aa8382bb103925b1d1114bb198cbbd503a08d",
+  "reconcile.py": "0e11d8c838b8257eca4c11d1b7e67e154648bb58864b1309ddd6eb1e57b347a6",
+  "reconciliation-summary.json": "13ba06a8af1179b1b62873ae22c44cd9e81a02525548649f66faa51a7db18daf",
+  "retained-283-reconciliation.json": "b19a21f2dda00cd6f722104a9cd70c600c83a0b749ddc42dd2830d7894ba35d8",
+  "untouched27/artifact.zip": "19279ea9886b950f3b90b6f85a12d26d3a1c03477d621710736177181f212526",
+  "untouched27/extracted/execution.json": "6d38b9196737171a0013073c8eabb17fcc22a6cec5c6e3cd21f3569efe7043a7",
+  "untouched27/extracted/result.json": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57"
+}

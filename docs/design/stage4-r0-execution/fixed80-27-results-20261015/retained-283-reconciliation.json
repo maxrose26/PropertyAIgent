@@ -1,0 +1,1425 @@
+{
+  "original_independent_only_count": 283,
+  "original_seals_unchanged": true,
+  "new_primary_also_observed": 53,
+  "not_observed_in_newrun": 230,
+  "database_presence": "NOT_QUERIED_UNKNOWN",
+  "differences_are_not_proven_parser_misses": true,
+  "rows": [
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001811",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001821",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001824",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000098",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001644",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001674",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001816",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001817",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001872",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001961",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "ADV/356852/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CBS2D/356873/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CBS2D/356878/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CEU/356844/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356846/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356871/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356886/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356920/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356925/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "DEM/356875/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "FUL/356859/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "FUL/356879/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356843/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356847/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356850/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356851/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356855/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356860/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356861/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356881/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356894/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356897/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356905/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356907/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356908/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356912/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356914/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356915/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356916/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356919/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356921/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356926/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356930/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356933/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "LBC/356842/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356845/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356895/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356901/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356927/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "PRA2D/356853/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "SONDPR/356849/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "VAR/356891/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "oldham",
+      "reference": "VAR/356938/26",
+      "new_primary_also_observed": true
+    },
+    {
+      "council": "rochdale",
+      "reference": "25/00943/HOUS",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "NOT/2026/0884",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "NOT/2026/0912",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0851",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0852",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0866",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0876",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0880",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0881",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0886",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0888",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0891",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0892",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0901",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0902",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0166",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0503",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0556",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0585",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0631",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0652",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0655",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0713",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0724",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0740",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0752",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0758",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0768",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0777",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0780",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0785",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0796",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0813",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0814",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0822",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0845",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0861",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0864",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0878",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0879",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0882",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0883",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0889",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0894",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0906",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0911",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0913",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0915",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0917",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0918",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0919",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0924",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0928",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1218",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1266",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1304",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1307",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1308",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1323",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1328",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1329",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1385",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1405",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1412",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1302",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1306",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1309",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1310",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1317",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1318",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1320",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1325",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1326",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1332",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1335",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1336",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1338",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1341",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1342",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1347",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1356",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1360",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1361",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1362",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1364",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1370",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1373",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1374",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1376",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1377",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1379",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1382",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1388",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1395",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1396",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1397",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1414",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1425",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1426",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/0121",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/0478",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1007",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1030",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1033",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1047",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1063",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1098",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1125",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1127",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1132",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1144",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1147",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1151",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1191",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1192",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1203",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1207",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1210",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1211",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1214",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1217",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1224",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1225",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1226",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1228",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1229",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1230",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1243",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1244",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1248",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1254",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1264",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1275",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1280",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1281",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1288",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1299",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1301",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1303",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1311",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1313",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1314",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1315",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1316",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1319",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1321",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1322",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1324",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1330",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1331",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1333",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1334",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1337",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1344",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1348",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1349",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1350",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1353",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1355",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1357",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1359",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1365",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1368",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1369",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1371",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1378",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1380",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/096934",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/098618",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/099097",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/099806",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/099853",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100006",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100199",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100204",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100206",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100208",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100212",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100213",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100214",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100215",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100216",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100217",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100218",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100219",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100221",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100222",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100223",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100224",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100225",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100226",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100227",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100228",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100229",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100230",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100233",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100236",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100237",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100238",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100239",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100241",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100242",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100243",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100244",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100245",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100246",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100251",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100257",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100263",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100267",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100268",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100269",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100272",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "stockport",
+      "reference": "DC/100296",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00076/TPO",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00104/PLCOND",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00105/PLCOND",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00106/PLCOND",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00756/MATCH",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00758/FUL",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00759/FUL",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00760/CPUD",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00761/FUL",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00763/FUL",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00765/CPUD",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00766/HHPD",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00768/FUL",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00770/CPUD",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00772/FUL",
+      "new_primary_also_observed": false
+    },
+    {
+      "council": "tameside",
+      "reference": "26/00774/FUL",
+      "new_primary_also_observed": false
+    }
+  ]
+}
