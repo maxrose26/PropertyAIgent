@@ -1,0 +1,202 @@
+{
+  "status": "PROPOSAL_NOT_FROZEN",
+  "suspension_start": "2026-09-29",
+  "cut_rule": "FIRST_LOCAL_MIDNIGHT_AFTER_REVIEWED_FREEZE_BEFORE_OBSERVATION",
+  "rows": [
+    {
+      "council": "bolton",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 22,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "RECEIVED_DATE",
+      "official_url": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "bury",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 18,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "RECEIVED_DATE",
+      "official_url": "https://planning.bury.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "manchester",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 57,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [
+        1501,
+        1502
+      ],
+      "date_semantics": "VALIDATED_DATE",
+      "official_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "oldham",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 14,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "RECEIVED_DATE",
+      "official_url": "https://planningpa.oldham.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "rochdale",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 12,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "VALIDATED_DATE",
+      "official_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "salford",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 26,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "VALIDATED_DATE",
+      "official_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__r=Arcus_BE_Public_Register",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "stockport",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 49,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "VALIDATED_DATE",
+      "official_url": "https://planning.stockport.gov.uk/PlanningData-live/search.do?action=advanced&searchType=Application",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "tameside",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 15,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [
+        1503
+      ],
+      "date_semantics": "RECEIVED_DATE",
+      "official_url": "https://publicaccess.tameside.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    },
+    {
+      "council": "wigan",
+      "known_reference_refresh": "ACCEPTED_SCOPED_ONLY_NOT_NEW_DISCOVERY",
+      "source_qualification": {
+        "interval": [
+          "2026-09-28",
+          "2026-10-04"
+        ],
+        "references": 17,
+        "scope": "HISTORICAL_SOURCE_DATE_ENUMERATION_NOT_CATCHUP"
+      },
+      "suspension_coverage": "PARTIAL",
+      "new_application_catchup": "UNPROVEN",
+      "after_2026_10_04": "UNCOVERED_BY_RETAINED_PRIMARY_ENUMERATION",
+      "committee_admissions": [],
+      "date_semantics": "RECEIVED_DATE",
+      "official_url": "https://planning.wigan.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "publication_route_qualification": "NOT_ESTABLISHED",
+      "independent_assessor": "SEPARATE_DEVELOPMENT_ASSESSOR_NOT_PRODUCT_OWNER",
+      "denominator_state": "NOT_POPULATED"
+    }
+  ],
+  "trafford": "DEFERRED"
+}
