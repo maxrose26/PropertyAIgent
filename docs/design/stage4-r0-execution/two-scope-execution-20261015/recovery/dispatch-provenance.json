@@ -1,0 +1,23 @@
+{
+  "reviewed_sha": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+  "tree": "5bf6f27756b587e7d35d9b2302ad3e3acb6a2d3c",
+  "checked_at": "2026-10-15T13:36:00.774Z",
+  "master_matches": true,
+  "workflow_blob": "7eeb078194c58fbc6789dd883f2f537057336c5e",
+  "manifest_blob": "ee9ab90064f7b56cf63878c1d4edca92df35551b",
+  "canonical_manifest_sha256": "5e4170c781314ba76583682e39ef0072ec932926617f3be169316873485ee9ae",
+  "prior_recovery_runs": 0,
+  "complete_manual_history_count": 23,
+  "all_exact_head_checks_success": true,
+  "dispatch_count": 1,
+  "run_id": 38744118357,
+  "run_number": 1,
+  "attempt": 1,
+  "created_at": "2026-10-15T13:36:19Z",
+  "completed_updated_at": "2026-10-15T13:37:47Z",
+  "conclusion": "success",
+  "artifact_id": 11977431980,
+  "zip_sha256": "143828a4d725bcdae5f086dfc6c617bcc4d62777f42b0808f01b2304f3a98ea7",
+  "artifact_contents_unopened_pending_independent_seal": true,
+  "browser_observation_after_dispatch": "CREDENTIAL_PROTECTION_RESTRICTED; connector metadata verified dispatch; no bypass or duplicate"
+}
