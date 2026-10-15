@@ -55,6 +55,10 @@ def test_environment_is_exclusive_to_live_job():
     assert live['jobs']['audit']['environment']=='stage4-production-canary'
     for path,workflow in workflows.items():
         for job_id,job in workflow.get('jobs',{}).items():
+            if (path,job_id)==('.github/workflows/stage4-r0-identity-comparison-once.yml','comparison'):
+                from tests.test_discovery_r0_registration import assert_registered
+                assert_registered('comparison',Path(path).read_text())
+                continue
             if (path,job_id)==('.github/workflows/stage4-route-qualified-material-admission-once.yml','admission'):
                 import hashlib
                 assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='d82a20c4b39c61866aeb59fcbc360e72843a9b4e7d0b8026c831061659ef96e3'

@@ -28,10 +28,10 @@ def context(workflow):
 
 def test_actual_recovery_workflow_mapping_and_authority_binding():
     assert r.PLAN_HASH=='5e4170c781314ba76583682e39ef0072ec932926617f3be169316873485ee9ae'
-    workflow=yaml.load((DOC/'recovery-workflow.yml').read_text(),Loader=yaml.BaseLoader)
+    workflow=yaml.load((ROOT/r.WORKFLOW).read_text(),Loader=yaml.BaseLoader)
     assert set(workflow['on'])=={'workflow_dispatch'}
     job=workflow['jobs']['observation'];assert 'environment' not in job
-    assert not (ROOT/r.WORKFLOW).exists()
+    assert (ROOT/r.WORKFLOW).read_bytes()==(DOC/'recovery-workflow.yml').read_bytes()
     replacements={'${{ inputs.reviewed_sha }}':'a'*40,'${{ inputs.manifest_sha }}':r.PLAN_HASH,
                   '${{ inputs.authority }}':r.AUTHORITY,'${{ github.workflow_sha }}':'a'*40}
     for step in job['steps']:
@@ -85,11 +85,11 @@ def test_new_worker_entrypoint_uses_recovery_not_historical_execute(tmp_path,mon
     assert json.loads(out.read_text())['completeness']=='INCOMPLETE'
 
 
-def test_comparison_proposal_is_protected_fixed_and_not_registered():
-    w=yaml.load((DOC/'comparison-workflow.yml').read_text(),Loader=yaml.BaseLoader)
+def test_comparison_registration_is_protected_fixed_and_equivalent():
+    w=yaml.load((ROOT/c.WORKFLOW).read_text(),Loader=yaml.BaseLoader)
     assert set(w['on'])=={'workflow_dispatch'}
     assert w['jobs']['comparison']['environment']=='stage4-production-canary'
-    assert not (ROOT/c.WORKFLOW).exists()
+    assert (ROOT/c.WORKFLOW).read_bytes()==(DOC/'comparison-workflow.yml').read_bytes()
     text=(DOC/'comparison-workflow.yml').read_text()
     assert text.count('${{ secrets.DATABASE_URL }}')==1 and 'timeout --signal=TERM --kill-after=5s 60s' in text
     assert 'admission' not in text and 'playwright' not in text
