@@ -168,7 +168,7 @@ def test_failed_request_does_not_report_previous_response_as_failure_body():
     # Synthetic third response absent: fail inside SORT_REQUEST, before any new
     # response is returned. Earlier valid response content must not be mislabelled.
     out,calls=perform([FORM,page()])
-    assert len(calls)==3 and out['failure']=='UNCLASSIFIED_FAILURE'
+    assert len(calls)==3 and out['failure']=='BoundaryFailure:SOURCE_CONTRACT_REJECTED'
     d=out['failure_diagnostic']
     assert d['stage']=='SORT_REQUEST' and d['body_bytes']==0 and d['shape_available'] is False
     assert out['completeness']=='FAILED'
