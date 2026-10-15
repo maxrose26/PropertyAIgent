@@ -1,5 +1,5 @@
 """Unregistered R0 caller. No database, registration or scheduling authority."""
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 import argparse, hashlib, json, os, re, signal, subprocess, sys, tempfile, time
 from pathlib import Path
 from . import finite_acceptance as f
@@ -26,15 +26,17 @@ def proposal():
 PLAN=proposal()
 PLAN_HASH=f.digest(PLAN)
 
-def admit(env,sha,manifest_hash):
+def admit(env,sha,manifest_hash,*,now=None):
     if (not re.fullmatch('[0-9a-f]{40}',sha) or manifest_hash!=PLAN_HASH
         or env.get('GITHUB_ACTIONS')!='true' or env.get('RUNNER_ENVIRONMENT')!='github-hosted'
         or env.get('GITHUB_REPOSITORY')!='maxrose26/PropertyAIgent'
+        or env.get('GITHUB_EVENT_NAME')!='workflow_dispatch'
         or env.get('GITHUB_REF')!='refs/heads/master' or env.get('GITHUB_SHA')!=sha
         or env.get('GITHUB_WORKFLOW_SHA')!=sha
         or env.get('GITHUB_WORKFLOW_REF')!=f'maxrose26/PropertyAIgent/{WORKFLOW}@refs/heads/master'
         or env.get('GITHUB_RUN_NUMBER')!='1' or env.get('GITHUB_RUN_ATTEMPT')!='1'
         or env.get('R0_AUTHORITY')!=AUTHORITY):raise ValueError('R0_ADMISSION_REJECTED')
+    if (now or datetime.now(timezone.utc))<datetime(2026,10,15,23,tzinfo=timezone.utc):raise ValueError('CUT_NOT_REACHED')
     if any(k in env for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_CONTEXT_REJECTED')
 
@@ -129,10 +131,19 @@ def main():
         result=f.execute(plan,f.digest(plan));a.output.write_text(json.dumps(result,sort_keys=True));return
     admit(os.environ,a.reviewed_sha,a.manifest_sha)
     actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-    if actual!=a.reviewed_sha:raise ValueError('CHECKOUT_MISMATCH')
+    if actual!=a.reviewed_sha or subprocess.check_output(['git','status','--porcelain'],text=True).strip():raise ValueError('CHECKOUT_MISMATCH')
     a.output.mkdir(exist_ok=False)
+    metadata=dict(sha=a.reviewed_sha,manifest_sha256=PLAN_HASH,run_id=os.environ['GITHUB_RUN_ID'],
+        run_number=1,attempt=1,started_at=datetime.now(timezone.utc).isoformat(),persistence=False,
+        publication_coverage='UNKNOWN',latency='UNKNOWN',
+        config_hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in [
+            Path(__file__),Path(f.__file__),Path(__file__).with_name('arcus_ui_config.py'),
+            Path(__file__).with_name('idox_window.py')]})
+    (a.output/'execution.json').write_text(json.dumps(metadata,sort_keys=True))
     for i,plan in enumerate(PLAN['rounds']):
         result=supervise_round(plan,a.output/f'round-{i+1}.json')
         if result.get('enumeration_completeness')!='COMPLETE':break
+    metadata['ended_at']=datetime.now(timezone.utc).isoformat()
+    (a.output/'execution.json').write_text(json.dumps(metadata,sort_keys=True))
 
 if __name__=='__main__':main()

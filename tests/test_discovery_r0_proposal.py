@@ -2,6 +2,7 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 import os, pytest
+from datetime import datetime,timezone
 from verification.discovery import r0_proposal as r
 from tests.test_discovery_finite_acceptance import evidence
 
@@ -9,7 +10,7 @@ from tests.test_discovery_finite_acceptance import evidence
 def context():
     sha='a'*40
     return dict(GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',GITHUB_REPOSITORY='maxrose26/PropertyAIgent',
-        GITHUB_REF='refs/heads/master',GITHUB_SHA=sha,GITHUB_WORKFLOW_SHA=sha,
+        GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REF='refs/heads/master',GITHUB_SHA=sha,GITHUB_WORKFLOW_SHA=sha,
         GITHUB_WORKFLOW_REF=f'maxrose26/PropertyAIgent/{r.WORKFLOW}@refs/heads/master',
         GITHUB_RUN_NUMBER='1',GITHUB_RUN_ATTEMPT='1',R0_AUTHORITY=r.AUTHORITY)
 
@@ -26,8 +27,8 @@ def test_r0_scope_overlap_and_explicit_older_partitions():
 @pytest.mark.parametrize('key,value', [('GITHUB_RUN_NUMBER','2'),('GITHUB_RUN_ATTEMPT','2'),('GITHUB_REF','refs/heads/other'),
     ('GITHUB_WORKFLOW_SHA','b'*40),('R0_AUTHORITY','old'),('GITHUB_WORKFLOW_REF','other'),('DATABASE_URL','synthetic')])
 def test_admission_closed_before_any_execution(key,value):
-    env=context();r.admit(env,'a'*40,r.PLAN_HASH);env[key]=value
-    with pytest.raises(ValueError):r.admit(env,'a'*40,r.PLAN_HASH)
+    env=context();r.admit(env,'a'*40,r.PLAN_HASH,now=datetime(2026,10,16,tzinfo=timezone.utc));env[key]=value
+    with pytest.raises(ValueError):r.admit(env,'a'*40,r.PLAN_HASH,now=datetime(2026,10,16,tzinfo=timezone.utc))
 
 
 def test_manifest_revision_mismatch():
@@ -74,3 +75,35 @@ def test_hard_supervisor_offline_child_cleanup(tmp_path,monkeypatch):
     assert result['outer_supervisor']['cleanup']=='CLOSED'
     assert result['outer_supervisor']['live_owned_survivors']==0
     assert result['accounting_complete'] is False and result['completeness']=='UNKNOWN'
+
+
+def test_cut_guard_before_sources():
+    with pytest.raises(ValueError,match='CUT_NOT_REACHED'):
+        r.admit(context(),'a'*40,r.PLAN_HASH,now=datetime(2026,10,15,tzinfo=timezone.utc))
+
+
+def test_supervisor_deadline_preserves_unknown_and_terminates(monkeypatch,tmp_path):
+    import psutil
+    class Process:
+        pid=123
+        alive=True
+        def __init__(self,*a):pass
+        def children(self,recursive):return []
+        def create_time(self):return 42
+        def memory_info(self):return type('M',(),{'rss':1})()
+        def status(self):return 'running' if self.alive else psutil.STATUS_ZOMBIE
+        def kill(self):Process.alive=False
+    class Child:
+        pid=123
+        returncode=None
+        def poll(self):return None
+        def wait(self,timeout):self.returncode=-9;return -9
+    monkeypatch.setattr(psutil,'Process',Process)
+    monkeypatch.setattr(psutil,'wait_procs',lambda *a,**k:([],[]))
+    monkeypatch.setattr(r.os,'getpid',lambda:int(Path('/proc/self/stat').read_text().split()[0]))
+    killed=[];monkeypatch.setattr(r.os,'killpg',lambda *a:killed.append(a))
+    times=iter([0,1901,1902]);monkeypatch.setattr(r.time,'monotonic',lambda:next(times))
+    result=r.supervise_round(r.PLAN['rounds'][0],tmp_path/'audit.json',runner=lambda *a,**k:Child())
+    assert killed and result['outer_supervisor']['expired']
+    assert result['completeness']=='UNKNOWN' and result['accounting_complete'] is False
+    assert result['outer_supervisor']['cleanup']=='CLOSED'
