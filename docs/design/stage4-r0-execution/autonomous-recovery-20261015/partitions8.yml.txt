@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: stage4-r0-mandate-partitions8-once
+  group: stage4-r0-mandate-source-sequential
   cancel-in-progress: false
 jobs:
   source:

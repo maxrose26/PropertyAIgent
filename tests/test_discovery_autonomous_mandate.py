@@ -26,7 +26,7 @@ def test_frozen17_budget_and_no_replays():
 @pytest.mark.parametrize('scope',list(m.PROFILES))
 def test_actual_workflow_mapping_and_mutations(scope):
  p=m.profile(scope);raw=Path(p['workflow']).read_bytes();assert raw==(m.PACK/(scope+'.yml.txt')).read_bytes()
- w=yaml.load(raw,Loader=yaml.BaseLoader);assert set(w['on'])=={'workflow_dispatch'};assert 'secrets.' not in raw.decode() and 'environment:' not in raw.decode()
+ w=yaml.load(raw,Loader=yaml.BaseLoader);assert set(w['on'])=={'workflow_dispatch'};assert w['concurrency']['group']=='stage4-r0-mandate-source-sequential';assert 'secrets.' not in raw.decode() and 'environment:' not in raw.decode()
  env=dict(context('bolton53'),GITHUB_WORKFLOW_REF='maxrose26/PropertyAIgent/'+p['workflow']+'@refs/heads/master')
  values={'${{ inputs.reviewed_sha }}':'a'*40,'${{ inputs.manifest_sha }}':p['manifest_sha'],'${{ inputs.authority }}':p['authority'],'${{ github.workflow_sha }}':'a'*40,'${{ env.SOURCE_JOB_STARTED_EPOCH }}':str(int(time.time()))}
  for step in w['jobs']['source']['steps'][1:]:
