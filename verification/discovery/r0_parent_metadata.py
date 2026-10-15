@@ -120,7 +120,8 @@ def execute(output,audit_dir,*,reader=read,clock=time.monotonic,store_factory=sh
         stop_reason=stop,accounting_complete=stop is None,
         requests=used_requests if stop is None else None,received_bytes=used_bytes if stop is None else None,
         known_verified_requests=used_requests,known_verified_received_bytes=used_bytes,
-        source_seconds=source_seconds,elapsed_seconds=clock()-started,persistence=False,admission_authorised=False)
+        source_seconds=source_seconds if stop is None else None,known_verified_source_seconds=source_seconds,
+        elapsed_seconds=clock()-started,persistence=False,admission_authorised=False)
     store.finish(result,output);return result
 
 

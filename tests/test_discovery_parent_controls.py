@@ -84,6 +84,7 @@ def test_uncertainty_stops_before_second_parent(tmp_path,change):
     def reader(i):calls.append(i);a=supervised_value(i);change(a);return a
     out=p.execute(tmp_path/'result.json',tmp_path,reader=reader)
     assert calls==[0] and out['stop_reason'] and out['not_attempted']==['20683/25']
+    assert out['requests'] is None and out['received_bytes'] is None and out['source_seconds'] is None
 
 
 def test_checkpoint_failure_and_deadline_stop(tmp_path):
