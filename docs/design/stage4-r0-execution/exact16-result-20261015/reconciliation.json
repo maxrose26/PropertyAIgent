@@ -1,0 +1,381 @@
+{
+  "run": 38798433667,
+  "revision": "0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4",
+  "artifact": 12003596349,
+  "artifact_sha256": "de435e9ca672172e609304ac56a764932084f3fb17f1001b9b3a1c9d7828c1e7",
+  "windows": [
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      },
+      "enumeration": "COMPLETE",
+      "coverage": "UNKNOWN",
+      "references": 39,
+      "capped": false,
+      "applied_interval": [
+        "2026-09-17",
+        "2026-09-23"
+      ],
+      "observation": {
+        "ended_at": "2026-10-15T20:01:29.718090+00:00",
+        "started_at": "2026-10-15T20:01:22.878354+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      },
+      "enumeration": "COMPLETE",
+      "coverage": "UNKNOWN",
+      "references": 37,
+      "capped": false,
+      "applied_interval": [
+        "2026-09-24",
+        "2026-09-30"
+      ],
+      "observation": {
+        "ended_at": "2026-10-15T20:01:35.374398+00:00",
+        "started_at": "2026-10-15T20:01:29.721916+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      },
+      "enumeration": "COMPLETE",
+      "coverage": "UNKNOWN",
+      "references": 29,
+      "capped": false,
+      "applied_interval": [
+        "2026-10-01",
+        "2026-10-07"
+      ],
+      "observation": {
+        "ended_at": "2026-10-15T20:01:40.408621+00:00",
+        "started_at": "2026-10-15T20:01:35.376106+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      },
+      "enumeration": "COMPLETE",
+      "coverage": "UNKNOWN",
+      "references": 12,
+      "capped": false,
+      "applied_interval": [
+        "2026-10-08",
+        "2026-10-14"
+      ],
+      "observation": {
+        "ended_at": "2026-10-15T20:01:46.901077+00:00",
+        "started_at": "2026-10-15T20:01:40.410189+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      },
+      "enumeration": "COMPLETE",
+      "coverage": "UNKNOWN",
+      "references": 47,
+      "capped": false,
+      "applied_interval": [
+        "2026-09-17",
+        "2026-09-23"
+      ],
+      "observation": {
+        "ended_at": "2026-10-15T20:02:06.120997+00:00",
+        "started_at": "2026-10-15T20:01:46.903226+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      },
+      "enumeration": "COMPLETE",
+      "coverage": "UNKNOWN",
+      "references": 39,
+      "capped": false,
+      "applied_interval": [
+        "2026-09-24",
+        "2026-09-30"
+      ],
+      "observation": {
+        "ended_at": "2026-10-15T20:02:22.578688+00:00",
+        "started_at": "2026-10-15T20:02:06.122683+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      },
+      "enumeration": "INCOMPLETE",
+      "coverage": "INCOMPLETE",
+      "references": 60,
+      "capped": true,
+      "applied_interval": null,
+      "observation": {
+        "ended_at": "2026-10-15T20:02:41.693369+00:00",
+        "started_at": "2026-10-15T20:02:22.580115+00:00"
+      }
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "tameside",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "tameside",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "wigan",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "wigan",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    },
+    {
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      },
+      "enumeration": "NOT_ATTEMPTED",
+      "coverage": "UNKNOWN",
+      "references": 0
+    }
+  ],
+  "independent_comparisons": [
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      },
+      "independent_observed_started_at": "2026-10-15T13:42:22.986Z",
+      "independent_observed_ended_at": "2026-10-15T13:42:37.268Z",
+      "primary_observation": {
+        "ended_at": "2026-10-15T20:01:29.718090+00:00",
+        "started_at": "2026-10-15T20:01:22.878354+00:00"
+      },
+      "independent_count": 39,
+      "primary_count": 39,
+      "intersection": 39,
+      "primary_only": [],
+      "independent_only": [],
+      "interpretation": "CROSS_OBSERVATION_ONLY_SOURCE_CHANGE_UNRESOLVED_COVERAGE_UNKNOWN"
+    },
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      },
+      "independent_observed_started_at": "2026-10-15T13:42:37.268Z",
+      "independent_observed_ended_at": "2026-10-15T13:42:44.077Z",
+      "primary_observation": {
+        "ended_at": "2026-10-15T20:01:35.374398+00:00",
+        "started_at": "2026-10-15T20:01:29.721916+00:00"
+      },
+      "independent_count": 37,
+      "primary_count": 37,
+      "intersection": 37,
+      "primary_only": [],
+      "independent_only": [],
+      "interpretation": "CROSS_OBSERVATION_ONLY_SOURCE_CHANGE_UNRESOLVED_COVERAGE_UNKNOWN"
+    },
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      },
+      "independent_observed_started_at": "2026-10-15T13:43:01.572Z",
+      "independent_observed_ended_at": "2026-10-15T13:43:07.100Z",
+      "primary_observation": {
+        "ended_at": "2026-10-15T20:01:40.408621+00:00",
+        "started_at": "2026-10-15T20:01:35.376106+00:00"
+      },
+      "independent_count": 27,
+      "primary_count": 29,
+      "intersection": 27,
+      "primary_only": [
+        "OTH/2026/1387",
+        "PA/2026/1381"
+      ],
+      "independent_only": [],
+      "interpretation": "CROSS_OBSERVATION_ONLY_SOURCE_CHANGE_UNRESOLVED_COVERAGE_UNKNOWN"
+    },
+    {
+      "window": {
+        "council": "salford",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      },
+      "independent_observed_started_at": "2026-10-15T13:43:07.100Z",
+      "independent_observed_ended_at": "2026-10-15T13:43:11.354Z",
+      "primary_observation": {
+        "ended_at": "2026-10-15T20:01:46.901077+00:00",
+        "started_at": "2026-10-15T20:01:40.410189+00:00"
+      },
+      "independent_count": 11,
+      "primary_count": 12,
+      "intersection": 11,
+      "primary_only": [
+        "PA/2026/0980"
+      ],
+      "independent_only": [],
+      "interpretation": "CROSS_OBSERVATION_ONLY_SOURCE_CHANGE_UNRESOLVED_COVERAGE_UNKNOWN"
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      },
+      "independent_observed_started_at": "2026-10-15T13:43:11.354Z",
+      "independent_observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "primary_observation": {
+        "ended_at": "2026-10-15T20:02:06.120997+00:00",
+        "started_at": "2026-10-15T20:01:46.903226+00:00"
+      },
+      "independent_count": 47,
+      "primary_count": 47,
+      "intersection": 47,
+      "primary_only": [],
+      "independent_only": [],
+      "interpretation": "CROSS_OBSERVATION_ONLY_SOURCE_CHANGE_UNRESOLVED_COVERAGE_UNKNOWN"
+    }
+  ],
+  "candidate_occurrences": 263,
+  "unique_identities": 263,
+  "membership": {
+    "UNKNOWN": 117,
+    "OVERLAP": 76,
+    "IN_TARGET": 70
+  },
+  "checkpoint_hashes_verified": 7,
+  "resources": {
+    "requests": 155,
+    "bytes": 52395099,
+    "checkpoint_bytes": 194764,
+    "outer_supervisor": {
+      "audit_byte_limit": 20000000,
+      "cleanup": "CLOSED",
+      "deadline_seconds": 1000,
+      "elapsed_seconds": 79.171,
+      "exit_code": 0,
+      "expired": false,
+      "final_containment": "DISPOSABLE_HOSTED_VM",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 1036439552,
+      "restarted": false,
+      "rss_limit_bytes": 1610612736
+    },
+    "accounting_complete": true
+  },
+  "production": "NO_DATABASE_CAPABILITY_PERSISTENCE_FALSE",
+  "stop": "SAFETY_OR_UNCLASSIFIED_FAILURE"
+}

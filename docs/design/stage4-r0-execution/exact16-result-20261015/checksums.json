@@ -1,0 +1,16 @@
+{
+  "candidate-ledger.json": "d5e04524a58a02a41e356c0dece884176ce5c154121b714f60d2096617d54d5b",
+  "REVIEW.md": "aaf156373ceb2007e4d7314221b8be626bc683d15cb6869d52c5d08e1def426b",
+  "reconcile.py": "0af6adaca3b4d68b1af37a6766220c3cfd612a17806a599ab040e5cee93f4bc4",
+  "artifact.zip": "de435e9ca672172e609304ac56a764932084f3fb17f1001b9b3a1c9d7828c1e7",
+  "reconciliation.json": "0731d39e8470be943d029dfe2bef01d3ebc7a4ee16fba28ad717ad1a945c1319",
+  "artifact/result.json": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+  "artifact/execution.json": "752cda8fc9a94538eef416118d79413f02233491a2b851face19bcca51823ebe",
+  "artifact/checkpoints/002.json": "f17eb90a3980a21a6fe087317a71b01a487aab1c1df34b976499f395edfce30e",
+  "artifact/checkpoints/006.json": "da30786248f02a692b6b38ed351bf788743e54cf06ec8eb9ece7b75614099c03",
+  "artifact/checkpoints/000.json": "853b29131575c654678eebff15b33764588f452a9c366f8944af54dbc9aab394",
+  "artifact/checkpoints/001.json": "41c24132ba5e2773f616b2f3fcc1aae0c83b2d10c87157303d7b4da83d0f3016",
+  "artifact/checkpoints/005.json": "a796a8f0cd6db27ae38ca70d0ba65f150c125c6b4e6933c40f54670179544113",
+  "artifact/checkpoints/003.json": "21100116ff4611e6be7e1d9929e98bdea29d97e380ebea1e219bfcebbd4bef61",
+  "artifact/checkpoints/004.json": "09ac546d4330bd0513d83bf3e710dca351a34b02b443de1987cc3138980eb505"
+}
