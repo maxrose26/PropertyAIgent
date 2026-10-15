@@ -147,18 +147,28 @@ def local_gap(row, a):
 
 
 def execute(plan, expected_hash, *, reader, clock=time.monotonic):
-    """Fixed-plan execution API; source use requires separate registered authority."""
+    """Preserve the historical fixed28 admission and behaviour."""
     if plan != PLAN or expected_hash != PLAN_HASH:
         raise ValueError('RECOVERY_MANIFEST_REJECTED')
+    return _execute_fixed(plan,expected_hash,reader=reader,limits=LIMITS,
+                          checkpoint=lambda _:None,clock=clock)
+
+
+def _execute_fixed(plan, expected_hash, *, reader, limits, checkpoint, clock=time.monotonic):
+    """Fixed-plan execution API; source use requires separate registered authority."""
     if any(k in os.environ for k in ('DATABASE_URL', 'COMMITTEE_DATABASE_URL',
                                     'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_CONTEXT_REJECTED')
     started = clock(); results = []; requests = size = 0; stop = None; certain = True
+    def record(value):
+        results.append(value)
+        try:checkpoint(value);return True
+        except Exception:return False
     for row in plan['rows']:
         arc = row['council'] in f.ARCUS
-        if (requests + (80 if arc else 10) > LIMITS['requests']
-                or size + (20*1024*1024 if arc else 3_000_000) > LIMITS['bytes']
-                or clock() - started + 55 > LIMITS['seconds']):
+        if (requests + (80 if arc else 10) > limits['requests']
+                or size + (20*1024*1024 if arc else 3_000_000) > limits['bytes']
+                or clock() - started + 55 > limits['seconds']):
             stop = 'ROUND_BUDGET'; break
         stamp = datetime.now(timezone.utc).isoformat()
         try:
@@ -166,12 +176,12 @@ def execute(plan, expected_hash, *, reader, clock=time.monotonic):
             a['primary_observation'] = dict(started_at=stamp, ended_at=datetime.now(timezone.utc).isoformat())
         except Exception:
             certain = False
-            results.append(dict(window=row, enumeration_completeness='FAILED', completeness='FAILED', reason='SOURCE_EXCEPTION'))
+            record(dict(window=row, enumeration_completeness='FAILED', completeness='FAILED', reason='SOURCE_EXCEPTION'))
             stop = 'SOURCE_EXCEPTION'; break
         cost = resources(row, a)
         if cost is None:
             certain = False
-            results.append(dict(window=row, enumeration_completeness='UNKNOWN', completeness='UNKNOWN', reason='RESOURCE_ACCOUNTING'))
+            record(dict(window=row, source=a, enumeration_completeness='UNKNOWN', completeness='UNKNOWN', reason='RESOURCE_ACCOUNTING'))
             stop = 'RESOURCE_ACCOUNTING'; break
         requests += cost[0]; size += cost[1]
         if a.get('accounting_complete') is False:
@@ -182,14 +192,15 @@ def execute(plan, expected_hash, *, reader, clock=time.monotonic):
         if not safe:
             state = 'FAILED'
         local = safe and state != 'COMPLETE' and local_gap(row, a)
-        results.append(dict(window=row, source=a, enumeration_completeness=state,
+        if not record(dict(window=row, source=a, enumeration_completeness=state,
                             completeness='UNKNOWN' if state == 'COMPLETE' else state,
-                            safe_local_gap=local))
+                            safe_local_gap=local)):
+            certain=False;stop='CHECKPOINT_FAILURE_NO_NEXT_CALL';break
         if not safe or (state != 'COMPLETE' and not local):
             stop = 'SAFETY_OR_UNCLASSIFIED_FAILURE'; break
-    if stop is None and clock() - started > LIMITS['seconds']:
+    if stop is None and clock() - started > limits['seconds']:
         stop = 'ROUND_DEADLINE'
-    result = dict(manifest_sha256=PLAN_HASH, results=results,
+    result = dict(manifest_sha256=expected_hash, results=results,
                   not_attempted=plan['rows'][len(results):], stop_reason=stop,
                   enumeration_completeness='COMPLETE' if stop is None and all(
                       x['enumeration_completeness'] == 'COMPLETE' for x in results) else 'INCOMPLETE',
@@ -198,7 +209,7 @@ def execute(plan, expected_hash, *, reader, clock=time.monotonic):
                   accounting_complete=certain, requests=requests, bytes=size,
                   persistence=False, completed_through_advanced=False)
     import json
-    if len(json.dumps(result).encode()) > LIMITS['output_bytes']:
+    if len(json.dumps(result).encode()) > limits['output_bytes']:
         raise ValueError('OUTPUT_LIMIT')
     return result
 

@@ -35,7 +35,8 @@ def test_exact80_routes_and_no_arbitrary_input():
     assert {(r['council'],r['reference']) for r in rows}=={(r['council_code'],r['reference']) for r in original['identities']}
     with pytest.raises(ValueError):q.read(80,rows[0])
     with pytest.raises(ValueError):q.read(0,dict(rows[0],reference='OTHER'))
-    assert not Path('.github/workflows/stage4-r0-fixed80-qualification-once.yml').exists()
+    from verification.discovery.r0_registered_scopes import PROFILES,WORKFLOW_HASHES
+    assert hashlib.sha256(Path(PROFILES['fixed80']['workflow']).read_bytes()).hexdigest()==WORKFLOW_HASHES['fixed80']
 
 
 def test_80_capacity_uses_actual_bounds_and_checkpoints_sparse_fields(tmp_path):

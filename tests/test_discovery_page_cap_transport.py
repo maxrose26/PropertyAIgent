@@ -53,7 +53,7 @@ def capped_transport(row):
     config=dated_config(UI_CASES['discovery_manchester_ui_window'],row['start'],row['end'])
     page=Page(config);audit=evidence(row);stopped=asyncio.Event()
     async def cards(page, config):
-        return [card(ref=f'TEST/{page.segment*10+i:03}',key=f'a1DSl00000{page.segment*10+i:08}',valid='18/09/2026') for i in range(10)]
+        return [card(ref=f'TEST/{page.segment*10+i:03}',key=f'a1DSl00000{page.segment*10+i:08}',valid=__import__('datetime').date.fromisoformat(config.start).strftime('%d/%m/%Y')) for i in range(10)]
     with patch('verification.discovery.arcus_ui_window.read_cards',cards):
         task=enumerate_ui(page,audit,stopped,config)
         with pytest.raises(StopIteration): task.send(None)

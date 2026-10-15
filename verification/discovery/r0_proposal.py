@@ -89,42 +89,76 @@ def reference_difference(primary,independent):
 
 def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS,
                     worker_module='verification.discovery.r0_proposal'):
-    """Hard parent wait, owned group termination, bounded child files.
+    """Existing owned-process envelope, with two exact registered profiles.
 
-    Child source workers retain their own existing process supervision. Hosted
-    VM teardown is final containment, not a hostile-detachment sandbox claim.
+    Legacy modules retain their 1900s/20MB profile. New scope limits derive only
+    from their fixed manifest/controller; arbitrary deadlines cannot expand it.
+    Hosted VM teardown remains final containment, not hostile-process isolation.
     """
-    if (deadline!=ROUND_SECONDS or output.exists() or worker_module not in {
-            'verification.discovery.r0_proposal', 'verification.discovery.r0_recovery_proposal'}):
-        raise ValueError('ROUND_BOUNDARY')
+    registered=worker_module=='verification.discovery.r0_registered_scopes'
+    if registered:
+        from .r0_registered_scopes import validate_plan,audit_bytes,AUDIT_RESERVE
+        profile=validate_plan(plan);maximum=profile['output_bytes'];audit_root=output.parent
+        if deadline!=profile['seconds'] or audit_bytes(audit_root)>AUDIT_RESERVE:
+            raise ValueError('ROUND_BOUNDARY')
+    else:
+        maximum=f.LIMITS['output_bytes'];audit_root=None
+        if (deadline!=ROUND_SECONDS or worker_module not in {
+                'verification.discovery.r0_proposal','verification.discovery.r0_recovery_proposal'}):
+            raise ValueError('ROUND_BOUNDARY')
+    if output.exists():raise ValueError('ROUND_BOUNDARY')
     if int(Path('/proc/self/stat').read_text().split()[0])!=os.getpid():raise ValueError('PROCESS_NAMESPACE_MISMATCH')
     with tempfile.TemporaryDirectory(prefix='r0-round-') as td:
         inp=Path(td)/'plan.json'; out=Path(td)/'result.json';inp.write_text(json.dumps(plan))
         env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1',GITHUB_ACTIONS='true',RUNNER_ENVIRONMENT='github-hosted',PLAYWRIGHT_BROWSERS_PATH=os.environ.get('PLAYWRIGHT_BROWSERS_PATH',str(Path.home()/'.cache/ms-playwright')))
-        child=runner([sys.executable,'-m',worker_module,'--worker',str(inp),'--output',str(out)],
-            env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        command=[sys.executable,'-m',worker_module,'--worker',str(inp),'--output',str(out)]
+        if registered:command+=['--audit-dir',str(audit_root)]
+        launch_started=time.monotonic() if registered else None
+        child=runner(command,env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         import psutil
-        expired=False; started=time.monotonic(); seen={}; peak=0
+        expired=False;started=launch_started if registered else time.monotonic();seen={};peak=0;limit_hit=None;accounting_certain=True
+        def output_bound():
+            if not registered:return False
+            try:return audit_bytes(audit_root)+(out.stat().st_size if out.exists() else 0)>maximum-32768
+            except Exception:return True
         try:parent=psutil.Process(child.pid)
         except psutil.NoSuchProcess:parent=None
+        except Exception:
+            if not registered:raise
+            parent=None;accounting_certain=False;expired=True;limit_hit='RESOURCE_ACCOUNTING'
         try:
             while child.poll() is None:
                 rss=0
                 try:owned=[] if parent is None else [parent]+parent.children(recursive=True)
-                except psutil.NoSuchProcess:break
+                except psutil.NoSuchProcess:
+                    if registered:accounting_certain=False;limit_hit='RESOURCE_ACCOUNTING'
+                    break
                 for process in owned:
-                    try:
-                        seen[process.pid]=process.create_time();rss+=process.memory_info().rss
+                    try:seen[process.pid]=process.create_time();rss+=process.memory_info().rss
                     except psutil.NoSuchProcess:pass
+                    except Exception:
+                        if not registered:raise
+                        accounting_certain=False;limit_hit='RESOURCE_ACCOUNTING';break
                 peak=max(peak,rss)
-                if time.monotonic()-started>=deadline or rss>1536*1024*1024:
-                    expired=True;break
+                if time.monotonic()-started>=deadline:limit_hit='DEADLINE'
+                elif rss>1536*1024*1024:limit_hit='RSS'
+                elif output_bound():limit_hit='AUDIT_BYTES'
+                if limit_hit:expired=True;break
                 time.sleep(.1)
+        except Exception:
+            if not registered:raise
+            accounting_certain=False;expired=True;limit_hit='RESOURCE_ACCOUNTING'
         finally:
             if child.returncode is None:
                 try:os.killpg(child.pid,signal.SIGKILL)
                 except ProcessLookupError:pass
-            code=child.wait(timeout=5)
+                except Exception:
+                    if not registered:raise
+                    accounting_certain=False;limit_hit='CLEANUP'
+            try:code=child.wait(timeout=5)
+            except Exception:
+                if not registered:raise
+                code=None;accounting_certain=False;limit_hit='CLEANUP'
             killed=[]
             for pid,born in seen.items():
                 try:
@@ -132,20 +166,48 @@ def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS
                     if process.create_time()==born and process.status()!=psutil.STATUS_ZOMBIE:
                         process.kill();killed.append(process)
                 except psutil.NoSuchProcess:pass
-            psutil.wait_procs(killed,timeout=3)
+                except Exception:
+                    if not registered:raise
+                    accounting_certain=False;limit_hit='CLEANUP'
+            try:psutil.wait_procs(killed,timeout=3)
+            except Exception:
+                if not registered:raise
+                accounting_certain=False;limit_hit='CLEANUP'
         survivors=[]
         for pid,born in seen.items():
             try:
                 process=psutil.Process(pid)
                 if process.create_time()==born and process.status()!=psutil.STATUS_ZOMBIE:survivors.append(pid)
             except psutil.NoSuchProcess:pass
+            except Exception:
+                if not registered:raise
+                accounting_certain=False;limit_hit='CLEANUP'
+        if registered and output_bound():expired=True;limit_hit=limit_hit or 'AUDIT_BYTES'
+        if registered and time.monotonic()-started>=deadline:expired=True;limit_hit=limit_hit or 'DEADLINE'
         result=dict(completeness='UNKNOWN',enumeration_completeness='UNKNOWN',
             accounting_complete=False,stop_reason='OUTER_DEADLINE' if expired else 'WORKER_FAILURE',persistence=False)
-        if not expired and not survivors and code==0 and out.is_file() and out.stat().st_size<=f.LIMITS['output_bytes']:
-            result=json.loads(out.read_bytes())
+        if not expired and not survivors and code==0 and out.is_file() and out.stat().st_size<=maximum:
+            try:result=json.loads(out.read_bytes())
+            except (ValueError,UnicodeError):pass
         result['outer_supervisor']=dict(expired=expired,exit_code=code,elapsed_seconds=round(time.monotonic()-started,3),
             peak_owned_rss=peak,live_owned_survivors=len(survivors),cleanup='CLOSED' if not survivors else 'FAILED',final_containment='DISPOSABLE_HOSTED_VM',restarted=False)
-        output.write_text(json.dumps(result,sort_keys=True))
+        if registered:
+            if not accounting_certain:
+                result['accounting_complete']=False
+                result['stop_reason']='OUTER_ACCOUNTING_OR_CLEANUP_UNCERTAIN'
+                result['outer_supervisor']['cleanup']='UNKNOWN'
+            result['outer_supervisor'].update(limit_hit=limit_hit,rss_limit_bytes=1536*1024*1024,
+                deadline_seconds=deadline,audit_byte_limit=maximum)
+            raw=json.dumps(result,sort_keys=True).encode()
+            if audit_bytes(audit_root)+len(raw)+16384>maximum:
+                # Preserve already bounded checkpoints; export only a small safe
+                # failure envelope if final worker output cannot fit beside them.
+                result=dict(completeness='UNKNOWN',accounting_complete=False,persistence=False,
+                    stop_reason='FINAL_AUDIT_BOUND',outer_supervisor=result['outer_supervisor'])
+                raw=json.dumps(result,sort_keys=True).encode()
+            if audit_bytes(audit_root)+len(raw)+16384>maximum:raise ValueError('AUDIT_FAILURE_NO_EXPORT')
+            with output.open('xb') as target:target.write(raw);target.flush();os.fsync(target.fileno())
+        else:output.write_text(json.dumps(result,sort_keys=True))
         return result
 
 def main():
