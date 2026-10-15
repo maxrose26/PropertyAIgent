@@ -1,0 +1,2837 @@
+{
+  "accepted_rule_sha256": "57227e0f3ef6c3d333e8f7a56570626b4065b1f2bde4de231454f0c9bab9102e",
+  "accepted_rule_source": "app/scrapers/unit_filter.py:qualify",
+  "cohort_sha256": "98b682d893cc8a695c032a6a2aed059bcfd56b805ae06117e5f50480b3045bce",
+  "discovery_override_source": "app/pipeline/discovery_contract.py:candidate_materiality",
+  "field_availability": {
+    "address_present": 53,
+    "explicit_parent_records": 9,
+    "proposal_present": 53,
+    "structured_application_type_unknown": 53,
+    "supported49apartment_record": 1,
+    "unique_explicit_parent_refs": 8
+  },
+  "legacy_counts": {
+    "Confirmed - 10+ units": 1,
+    "Excluded - non-residential": 1,
+    "Excluded - secondary/admin": 9,
+    "Ignore": 40,
+    "Ignore - under 10 units": 2
+  },
+  "manual_assessment_only": true,
+  "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+  "production_access": false,
+  "rows": [
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "116 Beaumont Chase Bolton BL3 4XH"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "First-floor extension/garage conversion/outbuilding/garden room; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF FIRST FLOOR EXTENSION AND CONVERSION OF GARAGE TO HABITABLE ROOM WITH RETENTION OF 1 NO. OUTBUILDING TOGETHER WITH ERECTION OF BASEMENT GARDEN ROOM"
+      },
+      "provenance": {
+        "interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "observed_at": "2026-10-15T12:02:24.334614+00:00",
+        "page_body_sha256": [
+          "e15b6ba462a3dd88cc154fa0fc56be8abb3fb4a432004bb36bcc74e3431c82f8",
+          "4d8f6711871988946ea1ce202251c5afe841c5ab22eaf6da3fcdea5b01343c66",
+          "b94354c00dddd0ad83524ce1afe5ea21e97a471396dd29bd1709f2cc7bec92df"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01780/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF FIRST FLOOR EXTENSION AND CONVERSION OF GARAGE TO HABITABLE ROOM WITH RETENTION OF 1 NO. OUTBUILDING TOGETHER WITH ERECTION OF BASEMENT GARDEN ROOM",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Stoneyacre Foxholes Road Bolton BL6 6AL"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning named trees; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "NOTICE OF INTENTION TO :- PRUNING OF 2 NO. CHERRY, 1 NO. CYPRESS, 1 NO. WILLOW, 1 NO. STAGHORN"
+      },
+      "provenance": {
+        "interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "observed_at": "2026-10-15T12:02:24.334614+00:00",
+        "page_body_sha256": [
+          "e15b6ba462a3dd88cc154fa0fc56be8abb3fb4a432004bb36bcc74e3431c82f8",
+          "4d8f6711871988946ea1ce202251c5afe841c5ab22eaf6da3fcdea5b01343c66",
+          "b94354c00dddd0ad83524ce1afe5ea21e97a471396dd29bd1709f2cc7bec92df"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01778/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "NOTICE OF INTENTION TO :- PRUNING OF 2 NO. CHERRY, 1 NO. CYPRESS, 1 NO. WILLOW, 1 NO. STAGHORN",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Ormstons Farm Wingates Lane Bolton BL5 3LT"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "00031/26"
+      ],
+      "legacy_rule_result": {
+        "category": "non_target_admin_or_minor",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "External alterations cite prior approval00031/26; underlying use/scale and material effect unknown; retain related evidence.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "EXTERNAL ALTERATIONS TO EXISTING BUILDING APPROVED UNDER PRIOR APPROVAL APPLICATION 00031/26"
+      },
+      "provenance": {
+        "interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "observed_at": "2026-10-15T12:02:24.334614+00:00",
+        "page_body_sha256": [
+          "e15b6ba462a3dd88cc154fa0fc56be8abb3fb4a432004bb36bcc74e3431c82f8",
+          "4d8f6711871988946ea1ce202251c5afe841c5ab22eaf6da3fcdea5b01343c66",
+          "b94354c00dddd0ad83524ce1afe5ea21e97a471396dd29bd1709f2cc7bec92df"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01776/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "EXTERNAL ALTERATIONS TO EXISTING BUILDING APPROVED UNDER PRIOR APPROVAL APPLICATION 00031/26",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "2 Clarendon Gardens Bolton BL7 9GX"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning/felling named trees; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PART A - PRUNING OF 5 NO. SYCAMORE, 1 NO. NORWEGIAN MAPLE, 1 NO. MOUNTAIN ASH AND 1 NO. LIME PART B - FELL 3 NO ASH"
+      },
+      "provenance": {
+        "interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "observed_at": "2026-10-15T12:02:24.334614+00:00",
+        "page_body_sha256": [
+          "e15b6ba462a3dd88cc154fa0fc56be8abb3fb4a432004bb36bcc74e3431c82f8",
+          "4d8f6711871988946ea1ce202251c5afe841c5ab22eaf6da3fcdea5b01343c66",
+          "b94354c00dddd0ad83524ce1afe5ea21e97a471396dd29bd1709f2cc7bec92df"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YGDEKGA00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01775/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PART A - PRUNING OF 5 NO. SYCAMORE, 1 NO. NORWEGIAN MAPLE, 1 NO. MOUNTAIN ASH AND 1 NO. LIME PART B - FELL 3 NO ASH",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Horwich Golf Club Victoria Road Bolton BL6 5PH"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "00284/26"
+      ],
+      "legacy_rule_result": {
+        "category": "variation_or_amendment",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Fenestration/dormer amendment affects many numbered plots across phases1E/2; credible larger-scheme relationship; parent00284/26 unqualified.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "NON-MATERIAL AMENDMENT TO APPLICATION 00284/26 TO AMEND FENESTRATION AND REMOVE DORMERS FROM PHASE 1E PLOT NOS. 151, 157, 164-165, 175-176, 177, 188, 192, 193, 198, 204 AND 205 AND PHASE 2 PLOT NOS. 7, 12, 13, 27, 31, 31, 35, 38, 43, 44, 45, 46 AND 47"
+      },
+      "provenance": {
+        "interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "observed_at": "2026-10-15T12:02:24.334614+00:00",
+        "page_body_sha256": [
+          "e15b6ba462a3dd88cc154fa0fc56be8abb3fb4a432004bb36bcc74e3431c82f8",
+          "4d8f6711871988946ea1ce202251c5afe841c5ab22eaf6da3fcdea5b01343c66",
+          "b94354c00dddd0ad83524ce1afe5ea21e97a471396dd29bd1709f2cc7bec92df"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Prioritise relationship-aware qualification, not automatic exclusion.",
+      "reference": "01769/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "NON-MATERIAL AMENDMENT TO APPLICATION 00284/26 TO AMEND FENESTRATION AND REMOVE DORMERS FROM PHASE 1E PLOT NOS. 151, 157, 164-165, 175-176, 177, 188, 192, 193, 198, 204 AND 205 AND PHASE 2 PLOT NOS. 7, 12, 13, 27, 31, 31, 35, 38, 43, 44, 45, 46 AND 47",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land Between Bank Street And Queen Street Farnworth Bolton BL4 7PA"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Confirmed - 10+ units",
+        "qualifies": true,
+        "unit_count": 49
+      },
+      "plausible_acquisition_relevance": "Explicit49self-contained C3apartments in4blocks; supported material residential scale. Ownership, availability and buyer relevance unproven.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DEMOLITION OF 4 NO. BUILDINGS AND ERECTION OF 4 NO. APARTMENT BLOCKS COMPRISING OF NO. 49 SELF CONTAINED APARTMENTS (CLASS C3) TOGETHER WITH ACCESS, LANDSCAPING AND CAR PARKING"
+      },
+      "provenance": {
+        "interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "observed_at": "2026-10-15T12:02:24.334614+00:00",
+        "page_body_sha256": [
+          "e15b6ba462a3dd88cc154fa0fc56be8abb3fb4a432004bb36bcc74e3431c82f8",
+          "4d8f6711871988946ea1ce202251c5afe841c5ab22eaf6da3fcdea5b01343c66",
+          "b94354c00dddd0ad83524ce1afe5ea21e97a471396dd29bd1709f2cc7bec92df"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Prioritise supported49apartment scheme for REVIEW.",
+      "reference": "01768/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": 49,
+        "literal_context": "DEMOLITION OF 4 NO. BUILDINGS AND ERECTION OF 4 NO. APARTMENT BLOCKS COMPRISING OF NO. 49 SELF CONTAINED APARTMENTS (CLASS C3) TOGETHER WITH ACCESS, LANDSCAPING AND CAR PARKING",
+        "supported_residential_units": 49,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Unit D1 Bridgewater Avenue Bolton BL5 1EE"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": "Existing qualify: Excluded - non-residential; proposal battery-storage units, no residential signal.",
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Excluded - non-residential",
+        "qualifies": false,
+        "unit_count": 2
+      },
+      "plausible_acquisition_relevance": "Two battery-storage units, not two homes; positive non-residential evidence supports existing deeper-extraction exclusion only.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "INSTALLATION OF 2NO. BATTERY STORAGE UNITS"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMJLR9DEKKP00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01821/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": 2,
+        "literal_context": "INSTALLATION OF 2NO. BATTERY STORAGE UNITS",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "1 Longhirst Close Bolton BL1 6NF"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning one silver birch; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRUNING OF 1NO. SILVER BIRCH TREE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZHKDEKKF00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01816/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRUNING OF 1NO. SILVER BIRCH TREE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "54, 55 And 56 The Linkway Bolton BL6 6JA"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "20610/25"
+      ],
+      "legacy_rule_result": {
+        "category": "variation_or_amendment",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Amendment to window/firedoor/rooflight/cladding cites20610/25; parent scale/use and material effect unknown; retain.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "NON-MATERIAL AMENDMENT TO APPLICATION 20610/25 TO REMOVE 1 NO. WINDOW AND REPLACE WITH CLADDING RELOCATION OF FIRE DOOR TO FRONT ELEVATION TOGETHER WITH AMENDMENT TO REMOVE ROOF LIGHTS AND FELT FLAT ROOF TO INFILL AREA AND REPLACE WITH ROOF CLADDING"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZGWDEKKD00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01815/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "NON-MATERIAL AMENDMENT TO APPLICATION 20610/25 TO REMOVE 1 NO. WINDOW AND REPLACE WITH CLADDING RELOCATION OF FIRE DOOR TO FRONT ELEVATION TOGETHER WITH AMENDMENT TO REMOVE ROOF LIGHTS AND FELT FLAT ROOF TO INFILL AREA AND REPLACE WITH ROOF CLADDING",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land North Of Alderbank Close Alderbank Close Bolton"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "17828/24"
+      ],
+      "legacy_rule_result": {
+        "category": "condition_discharge_or_details",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Biodiversity/materials-management discharge cites17828/24; parent scale/use and delivery significance unknown; retain.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DISCHARGE OF CONDITIONS 4 (BIODIVERSITY) AND 7 (MATERIALS MANAGEMENT PLAN) ON APPLICATION 17828/24"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHLLSDEKJZ00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01813/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DISCHARGE OF CONDITIONS 4 (BIODIVERSITY) AND 7 (MATERIALS MANAGEMENT PLAN) ON APPLICATION 17828/24",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land At Former Horwich Loco Works Horwich Bolton"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "91352/14"
+      ],
+      "legacy_rule_result": {
+        "category": "condition_discharge_or_details",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "eCEMP/EcMP discharge cites91352/14; parent scale/use and delivery significance unknown; retain.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DISCHARGE OF CONDITIONS 25 (eCEMP) AND 26 (EcMP) ON APPLICATION 91352/14"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHD72DEKJU00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01811/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DISCHARGE OF CONDITIONS 25 (eCEMP) AND 26 (EcMP) ON APPLICATION 91352/14",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Jeffs Auto Electrics 30 - 36 Bury Old Road Bolton BL2 2BZ"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Garage-to-vehicle-repair/MOT workshop ClassB2; no residential development stated; legacy Ignore is not a proven site-relationship exclusion.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CHANGE OF USE FROM AUTO ELECTRICS GARAGE TO VEHICLE REPAIR WORKSHOP WITH MOT TESTING AND ANCILLARY FACILITIES (CLASS B2)"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAG1DEKJR00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01810/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CHANGE OF USE FROM AUTO ELECTRICS GARAGE TO VEHICLE REPAIR WORKSHOP WITH MOT TESTING AND ANCILLARY FACILITIES (CLASS B2)",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land At Former Horwich Loco Works Horwich Bolton"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "91352/14"
+      ],
+      "legacy_rule_result": {
+        "category": "condition_discharge_or_details",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "eCEMP/EcMP discharge cites91352/14; separate identity, same parent as01811/26; retain without duplicate-site inference.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DISCHARGE OF CONDITIONS 25 (eCEMP) AND 26 (EcMP) ON APPLICATION 91352/14"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAESDEKJP00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01809/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DISCHARGE OF CONDITIONS 25 (eCEMP) AND 26 (EcMP) ON APPLICATION 91352/14",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "96 Castle Street Bolton BL2 1JL"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Felling one hawthorn; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "FELLING OF 1 NO. HAWTHORN"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4U2DEKJL00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01808/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "FELLING OF 1 NO. HAWTHORN",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "1 Hartwell Close Bolton BL2 3BA"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning one lime; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRUNING OF 1 NO. LIME"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TVDEKJJ00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01807/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRUNING OF 1 NO. LIME",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "68 Church Street Bolton BL6 5EQ"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Existing C3 dwelling to six-bedroom contractor/holiday accommodation; bedrooms are not six residential units. Wider relationship unknown.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CHANGE OF USE FROM DWELLING (CLASS C3) TO 6 NO. BEDROOM SHORT TERM CONTRACTOR OR HOLIDAY ACCOMMODATION (SUI GENERIS)"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TNDEKJH00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01806/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CHANGE OF USE FROM DWELLING (CLASS C3) TO 6 NO. BEDROOM SHORT TERM CONTRACTOR OR HOLIDAY ACCOMMODATION (SUI GENERIS)",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "24 Threadfold Way Bolton BL7 9DN"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Block-paved driveway installation; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "INSTALLATION OF BLOCK PAVED DRIVEWAY"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4SVDEKJF00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01805/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "INSTALLATION OF BLOCK PAVED DRIVEWAY",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "20 The Grange Bolton BL7 9GF"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning one sycamore; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRUNING OF 1NO. SYCAMORE TREE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMG1X6DEKJ900&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01804/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRUNING OF 1NO. SYCAMORE TREE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Breeze Hill 78 Junction Road Bolton BL3 4NE"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Extensions/outbuilding/garage alterations; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF TWO STOREY FRONT, SINGLE STOREY SIDE WITH ENLARGMENT TO SINGLE STOREY REAR EXTENSION TOGETHER WITH ERECTION OF OUTBUILDING AND ALTERATIONS TO GARAGE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFWDUDEKJ500&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01801/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF TWO STOREY FRONT, SINGLE STOREY SIDE WITH ENLARGMENT TO SINGLE STOREY REAR EXTENSION TOGETHER WITH ERECTION OF OUTBUILDING AND ALTERATIONS TO GARAGE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "12 Russell Close Bolton BL1 4BL"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Single-storey rear extension; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF SINGLE STOREY REAR EXTENSION"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFUWXDE02800&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01800/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF SINGLE STOREY REAR EXTENSION",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "19-35 Egerton Street Bolton BL4 7LB"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "One waiting-room enclosure; no residential development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "INSTALLATION OF 1 NO. WAITING ROOM ENCLOSURE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFTLRDEKJ200&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01799/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "INSTALLATION OF 1 NO. WAITING ROOM ENCLOSURE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Farnworth Leisure Centre Brackley Street Bolton BL4 9DZ"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore - under 10 units",
+        "qualifies": false,
+        "unit_count": 1
+      },
+      "plausible_acquisition_relevance": "One air-handling unit, not one dwelling. Existing generic-unit count is not a valid residential-scale exclusion; no material housing stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "REMOVAL OF ROOF MOUNTED EXTRACT DUCTWORK AND INSTALLATION OF 1 NO. AIR HANDLING UNIT (AHU) TOGETHER WITH DUCTING AND ACOUSTIC FENCING"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01797/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": 1,
+        "literal_context": "REMOVAL OF ROOF MOUNTED EXTRACT DUCTWORK AND INSTALLATION OF 1 NO. AIR HANDLING UNIT (AHU) TOGETHER WITH DUCTING AND ACOUSTIC FENCING",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "57 Rydal Road Bolton BL1 5LJ"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning elm/sycamore/lime; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRUNING OF 1NO. ELM TREE, 1NO. SYCAMORE TREE AND 1NO. LIME TREE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFLB8DEKIV00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01796/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRUNING OF 1NO. ELM TREE, 1NO. SYCAMORE TREE AND 1NO. LIME TREE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "8 Glentress Mews Bolton BL1 5JS"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Felling one horse chestnut; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "FELLING OF 1 NO. HORSE CHESTNUT"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFITADE03B00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01795/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "FELLING OF 1 NO. HORSE CHESTNUT",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "19 - 29 Egerton Street Bolton BL4 7LB"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Hanging signs, one illuminated; no material residential development stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "INSTALLATION OF 4 NO. HANGING SIGNS 1 NO. INTERNALLY ILLUMINATED"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFII5DEKIS00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01794/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "INSTALLATION OF 4 NO. HANGING SIGNS 1 NO. INTERNALLY ILLUMINATED",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "192 Paulhan Street Bolton BL3 3DX"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Larger-home-extension notification with dimensions; no new dwelling count or material scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRIOR NOTIFICATION APPLICATION FOR A PROPOSED LARGER HOME EXTENSION AT REAR (5.00M LONG 3.00M MAX HEIGHT 3.00M EAVES HEIGHT)"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA8DDEKIN00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01793/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRIOR NOTIFICATION APPLICATION FOR A PROPOSED LARGER HOME EXTENSION AT REAR (5.00M LONG 3.00M MAX HEIGHT 3.00M EAVES HEIGHT)",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "3 Clifton Drive Bolton BL6 5ET"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Lawfulness certificate for rear dormer; no material residential scheme stated. Actual application-type field unobserved.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CERTIFICATE OF LAWFULNESS (S192) FOR THE PROPOSED ERECTION OF A DORMER AT REAR"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA63DEKIJ00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01791/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CERTIFICATE OF LAWFULNESS (S192) FOR THE PROPOSED ERECTION OF A DORMER AT REAR",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land At Marsden Road Bolton BL1 2PF"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Replacement illuminated hoarding; no material residential development stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "INSTALLATION OF 1 NO. INTERNALLY ILLUMINATED REPLACEMENT HOARDING"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01790/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "INSTALLATION OF 1 NO. INTERNALLY ILLUMINATED REPLACEMENT HOARDING",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "3 Morrison Street Bolton BL3 3AN"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Rear extension and hip-to-gable conversion; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF SINGLE STOREY FIRST FLOOR REAR EXTENSION TOGETHER WTH HIP TO GABLE ROOF CONVERSION"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA19DDEKHX00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01789/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF SINGLE STOREY FIRST FLOOR REAR EXTENSION TOGETHER WTH HIP TO GABLE ROOF CONVERSION",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "44 Lower Leigh Road Bolton BL5 2EH"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Existing dwelling to C3bcare for six young persons; six persons are not six new units. Certificate/relationship evidence must not be invented.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CERTIFICATE OF LAWFULNESS PROPOSED (S192) FOR CHANGE OF USE FROM DWELLING (C3) TO (C3b) RESIDENTIAL CARE FACILITY FOR 6 NO. YOUNG PERSONS"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01787/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CERTIFICATE OF LAWFULNESS PROPOSED (S192) FOR CHANGE OF USE FROM DWELLING (C3) TO (C3b) RESIDENTIAL CARE FACILITY FOR 6 NO. YOUNG PERSONS",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Greenthorn Ladybridge Lane Bolton BL1 5DE"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Felling one cypress; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "NOTICE OF INTENTION TO FELL 1 NO. CYPRESS"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01786/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "NOTICE OF INTENTION TO FELL 1 NO. CYPRESS",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Toro 69 Church Street Bolton BL6 6AA"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Seven-bedroom B&B with dormers/terrace; seven bedrooms are not seven residential units. No material housing stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CHANGE OF USE OF FIRST AND SECOND FLOORS TO CREATE 7NO. BEDROOM BED AND BREAKFAST TOGETHER WITH THE ERECTION OF 2NO. REAR DORMERS WITH THE ALTERATION OF FIRST FLOOR FENESTRATION TO FORM ACCESS AND EXTEND EXISTING TERRACE AT REAR"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01785/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CHANGE OF USE OF FIRST AND SECOND FLOORS TO CREATE 7NO. BEDROOM BED AND BREAKFAST TOGETHER WITH THE ERECTION OF 2NO. REAR DORMERS WITH THE ALTERATION OF FIRST FLOOR FENESTRATION TO FORM ACCESS AND EXTEND EXISTING TERRACE AT REAR",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Unit A6b Lea Field Way Bolton BL5 1ED"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Fence/gates/footpath diversion at LeaFieldWay may be access-related; underlying development relationship unavailable; retain uncertainty.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF FENCE AND ACCESS CONTROL GATES TO LEA FIELD WAY TOGETHER WITH CONSTRUCTION OF FOOTPATH FOR PUBLIC RIGHT OF WAY DIVERSION"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01784/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF FENCE AND ACCESS CONTROL GATES TO LEA FIELD WAY TOGETHER WITH CONSTRUCTION OF FOOTPATH FOR PUBLIC RIGHT OF WAY DIVERSION",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "18 Crescent Road Bolton BL4 8LF"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Larger-home-extension notification with dimensions; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRIOR NOTIFICATION APPLICATION FOR A PROPOSED LARGER HOME EXTENSION AT REAR (6.00M LONG 4.00M MAX HEIGHT 3.00M EAVES HEIGHT)"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01783/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRIOR NOTIFICATION APPLICATION FOR A PROPOSED LARGER HOME EXTENSION AT REAR (6.00M LONG 4.00M MAX HEIGHT 3.00M EAVES HEIGHT)",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Unit H1 To H2 Europa Way Stoneclough Radcliffe Bolton Manchester M26 1GG"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Industrial-unit demolition/storage/offices/training/carpark;78is parking spaces, not homes. No residential development stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DEMOLITION OF UNIT H2 TO CREATE OPEN AIR STORAGE AREA, PARTIAL DEMOLITION AND ALTERATION OF UNIT H1 TO CREATE OFFICES AND TRAINING FACILITY TOGETHER WITH INSTALLATION OF BOUNDARY FENCING, TREE PLANTING, LANDSCAPING, DROPPED KERBS AND ENLARGEMENT TO EXISTING CAR PARK TO CREATE A TOTAL OF NO. 78 PARKING SPACES"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "observed_at": "2026-10-15T12:02:36.640863+00:00",
+        "page_body_sha256": [
+          "2a1612fa87542e04ef4d399745b254469d23db15f1f1ce17e929bde0342ce77c",
+          "725fa15802dcc461899357d85f6d4f68983eedd3540edd9f1f25c3ed1cc00c93",
+          "79b0f58a31680eb7c6f7d9859742fe6f7d0acb846c552ce9d3fa03e4ba8df5a9"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01782/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DEMOLITION OF UNIT H2 TO CREATE OPEN AIR STORAGE AREA, PARTIAL DEMOLITION AND ALTERATION OF UNIT H1 TO CREATE OFFICES AND TRAINING FACILITY TOGETHER WITH INSTALLATION OF BOUNDARY FENCING, TREE PLANTING, LANDSCAPING, DROPPED KERBS AND ENLARGEMENT TO EXISTING CAR PARK TO CREATE A TOTAL OF NO. 78 PARKING SPACES",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "37 Hulme Road Bolton BL2 4BS"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": "Existing qualify: Ignore - under10units; explicit one dwelling, not reference-prefix inference.",
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore - under 10 units",
+        "qualifies": false,
+        "unit_count": 1
+      },
+      "plausible_acquisition_relevance": "Proposal explicitly demolition/erection of one dwelling; existing under10residential-unit rule supports deeper-extraction exclusion only; not excluded by prefix.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DEMOLITION AND ERECTION OF 1 NO. DWELLING"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMXZKVDE07600&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01858/26/PREMIN",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": 1,
+        "literal_context": "DEMOLITION AND ERECTION OF 1 NO. DWELLING",
+        "supported_residential_units": 1,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "770 Manchester Road Bolton BL5 1AY"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Felling/pruning beech trees; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PART A; FELLING OF 1NO.BEECH TREE PART B; PRUNING OF 2NO. BEECH TREES"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW58NDE04Y00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01852/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PART A; FELLING OF 1NO.BEECH TREE PART B; PRUNING OF 2NO. BEECH TREES",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Pendleburys Farm Cottage Longshaw Ford Road Bolton BL1 7PL"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Listed-building structural repairs/windows/insulation/rewiring/boiler; building scale and relationship absent, no new housing stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "LISTED BUILDING CONSENT FOR STRUCTURAL REPAIRS TO INCLUDE INSTALLATION OF WINDOWS, WALL AND LOFT INSULATION, REWIRING AND REPLACEMENT BOILER"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW3QTDEKO500&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01851/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "LISTED BUILDING CONSENT FOR STRUCTURAL REPAIRS TO INCLUDE INSTALLATION OF WINDOWS, WALL AND LOFT INSULATION, REWIRING AND REPLACEMENT BOILER",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "47 Oakwood Drive Bolton BL1 5EE"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Lawfulness certificate for fenestration/porch; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CERTIFICATE OF LAWFULNESS EXISTING (S191) FOR AMENDMENTS TO EXTERNAL FENESTRATION AND ENLARGEMENT OF PORCH"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUV92DEKNT00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01848/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CERTIFICATE OF LAWFULNESS EXISTING (S191) FOR AMENDMENTS TO EXTERNAL FENESTRATION AND ENLARGEMENT OF PORCH",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land North East Of Back Holly Street Back Holly Street Bolton BL1 8QT"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "19527/24"
+      ],
+      "legacy_rule_result": {
+        "category": "condition_discharge_or_details",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Biodiversity/land/landscape/materials condition discharge cites19527/24; parent scale/use and delivery significance unknown; retain.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DISCHARGE OF CONDITION 3 (BIODIVERSITY), 4 (CONTAMINATED LAND),5 (LANDSCAPE) 6, (MATERIALS) ON APPLICATION 19527/24"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUK6MDEKNN00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01847/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DISCHARGE OF CONDITION 3 (BIODIVERSITY), 4 (CONTAMINATED LAND),5 (LANDSCAPE) 6, (MATERIALS) ON APPLICATION 19527/24",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Paragon Business Park Chorley New Road Bolton BL6 6HG"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "20163/25"
+      ],
+      "legacy_rule_result": {
+        "category": "condition_discharge_or_details",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Watermains/drainage/HMMP discharge cites20163/25; parent scale/use and delivery significance unknown; retain.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DISCHARGE OF CONDITIONS 3(WATER MAINS), CONDITION 9(DRAINAGE SCHEME) AND CONDITION 11(HMMP) ON APPLICATION 20163/25"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUEP5DEKNJ00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Hold related record for parent/scale qualification; no automatic admin exclusion.",
+      "reference": "01845/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DISCHARGE OF CONDITIONS 3(WATER MAINS), CONDITION 9(DRAINAGE SCHEME) AND CONDITION 11(HMMP) ON APPLICATION 20163/25",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "11 Winton Grove Bolton BL3 4UX"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Rear extension/dormer/raised roof; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DEMOLITION OF EXISTING CONSERVATORY AND ERECTION OF A PART SINGLE/PART TWO STOREY REAR EXTENSION INSTALLATION OF REAR DORMER WITH RAISING OF EXISTING ROOF"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3ITDEKND00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01843/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "DEMOLITION OF EXISTING CONSERVATORY AND ERECTION OF A PART SINGLE/PART TWO STOREY REAR EXTENSION INSTALLATION OF REAR DORMER WITH RAISING OF EXISTING ROOF",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "8 Whiteland Avenue Bolton BL3 5QB"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Side/rear extension; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF TWO STOREY SIDE AND PART SINGLE/PART TWO STOREY REAR EXTENSION"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3H8DEKN900&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01841/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF TWO STOREY SIDE AND PART SINGLE/PART TWO STOREY REAR EXTENSION",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "The Lion Of Vienna 158 Chorley New Road Bolton BL1 4PE"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning one beech; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRUNING OF 1 NO. BEECH"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSXUQDEKN200&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01840/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRUNING OF 1 NO. BEECH",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "4 Spinney Way Bolton BL5 3FL"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Additional single-operator taxi-base use of existing C3 property for one vehicle; vehicle count is not housing scale.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CERTIFICATE OF LAWFUL DEVELOPMENT (S192) FOR THE PROPOSED ADDITIONAL USE OF THE PROPERTY (CLASS C3) AS A PRIVATE HIRE SINGLE OPERATOR TAXI BASE FOR 1 VEHICLE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSPI5DEKMV00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01839/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CERTIFICATE OF LAWFUL DEVELOPMENT (S192) FOR THE PROPOSED ADDITIONAL USE OF THE PROPERTY (CLASS C3) AS A PRIVATE HIRE SINGLE OPERATOR TAXI BASE FOR 1 VEHICLE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "6 Windermere Avenue Little Lever Bolton BL3 1DU"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Front dormer; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF FRONT DORMER"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSO41DE02800&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01838/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF FRONT DORMER",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Egerton Manor Care Centre Blackburn Road Bolton BL7 9PL"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Felling one holly; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "NOTICE OF INTENTION:- FELL 1 NO. HOLLY"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSMQ4DEKMS00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01836/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "NOTICE OF INTENTION:- FELL 1 NO. HOLLY",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "29 Hardmans Bolton BL7 9XR"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Rear extension/carport-to-garage; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF SINGLE STOREY REAR EXTENSION TOGETHER WITH CONVERSION OF EXISTING SIDE CAR PORT INTO AN ENCLOSED GARAGE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8TZDEKMJ00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01833/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF SINGLE STOREY REAR EXTENSION TOGETHER WITH CONVERSION OF EXISTING SIDE CAR PORT INTO AN ENCLOSED GARAGE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "9 Kingsland Road Bolton BL4 0HW"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "primary_residential",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Front porch; no new material dwelling scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "ERECTION OF FRONT PORCH"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8SXDEKMH00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01832/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "ERECTION OF FRONT PORCH",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land South Of Doris Avenue Colenso Road Bolton BL2 6DB"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [
+        "20683/25"
+      ],
+      "legacy_rule_result": {
+        "category": "variation_or_amendment",
+        "classification": "Excluded - secondary/admin",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Variation changes ground levels/internal road/siting plots18\u201332/boundaries plots2\u201314/drainage; credible larger-development relationship; parent20683/25 unqualified.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "VARIATION OF CONDITION 2 (APPROVED PLANS CONDITION) ON APPLICATION 20683/25, TO AMEND GROUND LEVELS, THE INTERNAL ROAD LAYOUT, THE SITING OF PLOT NOS. 18-32, THE REAR BOUNDARIES OF PLOT NOS. 2-14, AND THE APPROVED DRAINAGE PLAN"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "Prioritise relationship-aware qualification, not automatic exclusion.",
+      "reference": "01827/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "VARIATION OF CONDITION 2 (APPROVED PLANS CONDITION) ON APPLICATION 20683/25, TO AMEND GROUND LEVELS, THE INTERNAL ROAD LAYOUT, THE SITING OF PLOT NOS. 18-32, THE REAR BOUNDARIES OF PLOT NOS. 2-14, AND THE APPROVED DRAINAGE PLAN",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Parent use/scale, exact related application/site evidence and material effect."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "22 Longsight Bolton BL2 3HR"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Additional taxi-base use of existing C3 property for1\u20132vehicles; vehicle count is not residential scale.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "CERTIFICATE OF LAWFUL DEVELOPMENT (S192) FOR PROPOSED ADDITIONAL USE OF PROPERTY (CLASS C3) FOR PRIVATE HIRE SINGLE OPERATOR TAXI BASE FOR 1-2 VEHICLES"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLGCZDEKLH00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01826/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "CERTIFICATE OF LAWFUL DEVELOPMENT (S192) FOR PROPOSED ADDITIONAL USE OF PROPERTY (CLASS C3) FOR PRIVATE HIRE SINGLE OPERATOR TAXI BASE FOR 1-2 VEHICLES",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "125 Rutherford Drive Bolton BL5 1DW"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "High-hedge complaint; no material residential development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "HIGH HEDGE COMPLAINT FOR EVERGREEN HEDGE"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKYQPDE04Y00&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01825/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "HIGH HEDGE COMPLAINT FOR EVERGREEN HEDGE",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    },
+    {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "67A Albert Road West Bolton BL1 5HW"
+      },
+      "application_type": {
+        "reason": "Not captured in retained listing or INITIAL_STATUS_ONLY observation; do not infer structured type from wording.",
+        "state": "UNKNOWN"
+      },
+      "clear_deeper_processing_exclusion": null,
+      "council": "bolton",
+      "exclusion_applied_to_discovery_or_identity": false,
+      "explicit_related_references": [],
+      "legacy_rule_result": {
+        "category": "unknown",
+        "classification": "Ignore",
+        "qualifies": false,
+        "unit_count": null
+      },
+      "plausible_acquisition_relevance": "Pruning one oak; no material development or parent scheme stated.",
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "PRUNE 1 NO. OAK"
+      },
+      "provenance": {
+        "interval": [
+          "2026-10-08",
+          "2026-10-14"
+        ],
+        "observed_at": "2026-10-15T12:02:50.147490+00:00",
+        "page_body_sha256": [
+          "e6ebe89c20c5818dac14fcb9af12604c2e579de3cc176d16467faf4a4515cd45",
+          "ab8de6a48365051a0c5df9e508df3eb0a3e3c2c920d194db4558b45ef11820e0"
+        ],
+        "primary_evidence_sha256": "2fc2bb69cdba4b0f466d17b510457a4070bff363372586f4af647692cd1bf67d",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKU6ADEKL500&activeTab=summary",
+        "window_run": 38731487848
+      },
+      "recommended_processing": "No deeper extraction justified by current proposal; retain identity/evidence and uncertainty.",
+      "reference": "01823/26",
+      "related_reference_provenance": "Explicit proposal literal only; no parent lookup or site identity established.",
+      "relationship_state": "UNKNOWN",
+      "scale_indicator": {
+        "legacy_extracted_generic_count": null,
+        "literal_context": "PRUNE 1 NO. OAK",
+        "supported_residential_units": null,
+        "warning": "Generic count is not verified residential scale; bedrooms/people/AHU/storage/parking/plot numbers are distinct."
+      },
+      "specific_missing_evidence": "Structured application type and any supported relationship to a material scheme; ownership/availability/buyer fit unassessed."
+    }
+  ],
+  "screening_policy_changed": false,
+  "source_requests": 0
+}
