@@ -58,6 +58,22 @@ def idox_worker(row):
     start=time.monotonic();diagnostic={}
     try:
         observation=_retrieve_row(row,None,session_factory=requests_session,budget=budget,diagnostic=diagnostic)
+        # Additive NEW-application projection only. Default known-reference parser
+        # and historical COUPLED observations are never relabelled.
+        from app.pipeline.bolton_initial_status import evidence, LABELS
+        from bs4 import BeautifulSoup
+        soup=BeautifulSoup(diagnostic.get('body',b''),'html.parser')
+        rows=[tr.find_all(['th','td']) for tr in soup.select('#simpleDetailsTable tr')]
+        counts={label:sum(len(cells)==2 and cells[0].get_text(strip=True)==label for cells in rows)
+                for label in ('Reference','Status')}
+        values={key:dict(state=observation.field_states[key],value=observation.literal_fields.get(label))
+                for key,label in LABELS.items()}
+        initial_fields={'Reference':observation.fields.get('Reference'),'Status':observation.literal_fields.get('Status')}
+        if (counts=={'Reference':1,'Status':1} and observation.semantic_state=='UNKNOWN_UNMAPPED'
+            and evidence(row['council'],observation.source_url,row['reference'],initial_fields,values)):
+            observation.verification_scope='INITIAL_STATUS_ONLY'
+            observation.field_evidence=values
+            observation.b2_eligible=True
         allowed={'Reference','Status','Decision','Decision Issued Date'}
         if (set(observation.fields)!=allowed or any(v is not None and
                 (not isinstance(v,str) or len(v)>160) for v in observation.literal_fields.values())):
@@ -110,8 +126,8 @@ def project_idox(row,source):
         states={'PRESENT_VALUE','PRESENT_BLANK','NOT_PRESENT','CONFLICTING','UNPARSEABLE','UNKNOWN'}
         if (set(obs.fields)!=labels or not set(obs.literal_fields)<=labels
             or set(obs.field_states)!={'reference','status','decision','decision_date'}
-            or not set(obs.field_states.values())<=states or obs.verification_scope!='COUPLED'
-            or obs.field_evidence is not None or type(obs.b2_eligible) is not bool
+            or not set(obs.field_states.values())<=states or obs.verification_scope not in {'COUPLED','INITIAL_STATUS_ONLY'}
+            or type(obs.b2_eligible) is not bool
             or any(v is not None and (not isinstance(v,str) or len(v)>160)
                    for v in list(obs.fields.values())+list(obs.literal_fields.values()))):
             return failed('INVALID_ARTIFACT')
@@ -121,6 +137,14 @@ def project_idox(row,source):
             or not re.fullmatch('[0-9a-f]{64}',obs.body_sha256)):
             return failed('AMBIGUOUS_SOURCE_RESULT')
     except (TypeError,ValueError,AttributeError):return failed('INVALID_ARTIFACT')
+    if obs.verification_scope=='INITIAL_STATUS_ONLY':
+        from app.pipeline.bolton_initial_status import evidence, LABELS
+        expected={key:dict(state=obs.field_states[key],value=obs.literal_fields.get(label)) for key,label in LABELS.items()}
+        if (not obs.b2_eligible or obs.semantic_state!='UNKNOWN_UNMAPPED' or obs.field_evidence!=expected
+            or not evidence(row['council'],obs.source_url,row['reference'],
+                            {'Reference':obs.fields['Reference'],'Status':obs.fields['Status']},obs.field_evidence)):
+            return failed('INVALID_ARTIFACT')
+    elif obs.field_evidence is not None:return failed('INVALID_ARTIFACT')
     audit['source_sha256']=obs.body_sha256
     return dict(observation=obs,audit=audit,failure=None)
 

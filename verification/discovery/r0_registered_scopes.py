@@ -1,4 +1,4 @@
-"""Two closed credential-free R0 registrations. No dispatch or persistence API."""
+"""Closed credential-free R0 registrations. No dispatch or persistence API."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -24,11 +24,18 @@ PROFILES={
    manifest=ROOT/'docs/design/stage4-r0-execution/page-cap-correction/untouched27-manifest.json',
    manifest_sha='f99d86a5deb251f45c0787af295836aa948d8250d9f7b180062db229c6dc0e3d',
    calls=27,requests=1040,bytes=278686720,seconds=1900,output_bytes=20_000_000,record_output_bytes=1_048_576,job_seconds=2280),
+ 'untouched20':dict(workflow='.github/workflows/stage4-r0-untouched20-once.yml',
+   authority='AUTHORISE_R0_20_UNTOUCHED_PRIMARY_WINDOWS_ONCE',
+   manifest=ROOT/'docs/design/stage4-r0-execution/initial-application-preparation/primary-unattempted20.json',
+   manifest_sha='7c46a54e91201ba2cff1b392e4d606f592f79a8752827e3536135bfb3912e66c',
+   calls=20,requests=760,bytes=203772160,seconds=1220,output_bytes=20_000_000,
+   record_output_bytes=1_048_576,job_seconds=1620,setup_seconds=260),
 }
 RSS_LIMIT=1536*1024*1024
 AUDIT_RESERVE=131072  # metadata, result envelope, not-attempted identities, outer audit
 WORKFLOW_HASHES={'fixed80': 'daf3e452d0a89cd74a725a28aca7c14fb6bdbd63ce3eb0d37176e588dc89f32d', 'untouched27': 'a358223c5707c22d0550c9b966ea3b67f463f856f1624b5196b86d89ebb8583e'}
 
+WORKFLOW_HASHES['untouched20']='0a6a9a647663fa17ef0bd3ada628633f398142003819d53952e1d2db3b3aef66'
 
 def plan(scope):
     if scope not in PROFILES:raise ValueError('SCOPE_REJECTED')
@@ -59,7 +66,7 @@ def admit(scope,sha,manifest_sha,authority,env):
         or any(env.get(k)!=v for k,v in expected.items())):raise ValueError('REGISTRATION_REJECTED')
     plan(scope)
     started=env.get('JOB_STARTED_EPOCH','')
-    if (re.fullmatch('[0-9]{10}',started) is None or not 0<=time.time()-int(started)<=p['job_seconds']-p['seconds']-120):
+    if (re.fullmatch('[0-9]{10}',started) is None or not 0<=time.time()-int(started)<=min(p['job_seconds']-p['seconds']-120,p.get('setup_seconds',10**9))):
         raise ValueError('SETUP_BUDGET_REJECTED')
     raw=(ROOT/p['workflow']).read_bytes()
     if hashlib.sha256(raw).hexdigest()!=WORKFLOW_HASHES.get(scope):raise ValueError('WORKFLOW_CONTENT_REJECTED')

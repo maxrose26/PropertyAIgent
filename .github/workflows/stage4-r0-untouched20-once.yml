@@ -1,0 +1,84 @@
+# Registered for execution REVIEW only; no dispatch authority from registration.
+name: Stage4 R0 untouched20 ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      manifest_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: stage4-r0-untouched20-once
+  cancel-in-progress: false
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 27
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-r0-untouched20-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_R0_20_UNTOUCHED_PRIMARY_WINDOWS_ONCE'
+          test "$MANIFEST_SHA" = '7c46a54e91201ba2cff1b392e4d606f592f79a8752827e3536135bfb3912e66c'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.r0_registered_scopes import admit, checkout
+          admit('untouched20',os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ)
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - run: "$RUNNER_TEMP/r0-venv/bin/python -m playwright install --with-deps chromium"
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 1250s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.r0_registered_scopes --scope untouched20 --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --output "$RUNNER_TEMP/untouched20-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.r0_registered_scopes --verify-audit --scope untouched20 --output "$RUNNER_TEMP/untouched20-audit"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: r0-untouched20-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/untouched20-audit
+          if-no-files-found: error
+          retention-days: 14

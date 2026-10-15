@@ -1,6 +1,6 @@
 """Retained evidence reassessment and explicitly SYNTHETIC offline transport tests.
 
-No live source compatibility, Bolton initial-status acceptance or production proof.
+No live source compatibility or production proof. Bolton literal contract is offline approved.
 """
 import copy,json
 from pathlib import Path
@@ -40,7 +40,7 @@ def test_retained42_cannot_be_promoted_offline_under_accepted_contract():
         assert e['b2_eligible'] is False
 
 
-@pytest.mark.parametrize('status',['Deposited','Awaiting decision','Unknown synthetic status'])
+@pytest.mark.parametrize('status',['Awaiting decision','Unknown synthetic status'])
 def test_real_idox_worker_projector_audit_preserves_unaccepted_initial_status(status):
     body=summary(targets()[0]['reference'],status=status,omit=('Decision','Decision Issued Date'))
     row,raw,resource=projected(body);obs=resource['observation'];audit=observation_audit(row,resource)
@@ -103,7 +103,7 @@ def test_unaccepted_idox_literal_cannot_enter_initial_b2_by_relabel(engine):
     from verification.discovery.committee_exact import _run_cohort
     row=targets()[0];row=dict(row,trigger_url='https://bolton.moderngov.co.uk/ieListDocuments.aspx?MId=SYNTHETIC',trigger_sha256='b'*64,portal_evidence_fingerprint='a'*64)
     def source(r,app_id):
-        _,_,resource=projected(summary(r['reference'],status='Deposited',omit=('Decision','Decision Issued Date')))
+        _,_,resource=projected(summary(r['reference'],status='Awaiting decision',omit=('Decision','Decision Issued Date')))
         obs=resource['observation'];obs.application_id=app_id
         # Explicit adversarial mutation: B2 must still reject council/route/literal.
         obs.verification_scope='INITIAL_STATUS_ONLY';obs.b2_eligible=True
@@ -172,3 +172,95 @@ def test_failed_request_does_not_report_previous_response_as_failure_body():
     d=out['failure_diagnostic']
     assert d['stage']=='SORT_REQUEST' and d['body_bytes']==0 and d['shape_available'] is False
     assert out['completeness']=='FAILED'
+
+
+def bolton_row():
+    return dict(targets()[0],trigger_url='https://bolton.moderngov.co.uk/ieListDocuments.aspx?MId=SYNTHETIC',
+                trigger_sha256='b'*64,portal_evidence_fingerprint='a'*64)
+
+
+def bolton_source(row,app_id):
+    # Explicit SYNTHETIC source: real bounded worker/parser/projector/audit.
+    _,_,resource=projected(summary(row['reference'],status='Deposited',omit=('Decision','Decision Issued Date')))
+    obs=resource['observation'];obs.application_id=app_id
+    assert observation_audit(row,resource)['b2_eligible']
+    return resource
+
+
+def assert_bolton_path(engine):
+    from verification.discovery.committee_exact import _run_cohort
+    row=bolton_row()
+    result=_run_cohort(engine,'SYNTHETIC-BOLTON',[row],bolton_source)
+    assert result[0]['planning_observation']=='FIELD_LEVEL_VERIFIED'
+    assert result[0]['verification_scope']=='INITIAL_STATUS_ONLY'
+    assert result[0]['transaction']=='COMMIT_READBACK_CONFIRMED'
+    with DBSession(engine) as session:
+        app=session.scalar(select(Application).where(Application.reference==row['reference']))
+        assert app.status=='Deposited' and app.status_verified_at is None
+        assert app.decision is app.decision_issued_date is app.site_id is app.estimated_unit_count is None
+        assert app.unit_confirmation_status=='discovery_pending'
+        meta=json.loads(app.planning_field_verification)
+        assert meta['status']['literal']=='Deposited' and meta['status']['verified_at']
+        for key in ('decision','decision_date'):
+            assert meta[key]['state']=='NOT_PRESENT' and meta[key]['verified_at'] is None
+        app.status='CHANGED_SYNTHETIC';session.commit()
+    again=_run_cohort(engine,'SYNTHETIC-NO-RESET',[row],lambda *_:pytest.fail('existing identity must not refetch'))
+    assert again[0]['admission']['outcome']=='ALREADY_KNOWN'
+    with DBSession(engine) as session:
+        assert session.scalar(select(Application).where(Application.reference==row['reference'])).status=='CHANGED_SYNTHETIC'
+
+
+def test_bolton_actual_worker_projector_audit_shared_b2_readback(engine):
+    assert_bolton_path(engine)
+
+
+@pytest.mark.parametrize('mutation',['council','host','path','query','reference','literal','missing_evidence','state','semantic'])
+def test_bolton_initial_projector_rejects_unsupported_handoffs(mutation):
+    row,raw,r=projected(summary(targets()[0]['reference'],status='Deposited',omit=('Decision','Decision Issued Date')))
+    assert r['observation'].verification_scope=='INITIAL_STATUS_ONLY' and r['observation'].b2_eligible
+    obs=raw['observation']
+    if mutation=='council':row=dict(row,council='bury')
+    elif mutation in {'host','path','query'}:
+        url=row['source_url'].replace('paplanning.bolton.gov.uk','wrong.example') if mutation=='host' else row['source_url'].replace('applicationDetails.do','wrong.do') if mutation=='path' else row['source_url']+'&extra=1'
+        row=dict(row,source_url=url);raw['destination']=url;obs['source_url']=url
+    elif mutation=='reference':obs['reference']='WRONG'
+    elif mutation=='literal':obs['fields']['Status']='Awaiting decision'
+    elif mutation=='missing_evidence':obs['field_evidence']=None
+    elif mutation=='state':obs['field_evidence']['decision_date']={'state':'PRESENT_VALUE','value':'1 January 2026'}
+    else:obs['semantic_state']='GRANTED'
+    assert q.project_idox(row,raw)['failure']
+
+
+def test_duplicate_identical_status_is_not_promoted():
+    body=summary(targets()[0]['reference'],status='Deposited',omit=('Decision','Decision Issued Date'))
+    body=body.replace(b'</table>',b'<tr><th>Status</th><td>Deposited</td></tr></table>')
+    _,_,r=projected(body)
+    assert r['failure'] or not r['observation'].b2_eligible
+
+
+def test_bolton_literal_has_no_semantic_mapping():
+    row,_,r=projected(summary(targets()[0]['reference'],status='Deposited',omit=('Decision','Decision Issued Date')))
+    obs=r['observation'];audit=observation_audit(row,r)
+    assert obs.semantic_state=='UNKNOWN_UNMAPPED' and obs.fields['Status']=='Deposited'
+    assert audit['verification_scope']=='INITIAL_STATUS_ONLY' and audit['rejection_reason'] is None
+
+
+@pytest.mark.parametrize('prior', ['status','decision','metadata','units','not_pending'])
+def test_bolton_initial_b2_does_not_overwrite_nonvirgin_records(engine,prior):
+    from app.config import get_council
+    from verification.direct_reference.refresh import _refresh_row
+    row=bolton_row()
+    with DBSession(engine) as session:
+        app=Application(council_code='bolton',reference=row['reference'],unit_confirmation_status='discovery_pending')
+        if prior=='status':app.status='Retained'
+        elif prior=='decision':app.decision='Retained'
+        elif prior=='metadata':app.planning_field_verification='{}'
+        elif prior=='units':app.estimated_unit_count=12
+        else:app.unit_confirmation_status='confirmed_qualifying'
+        session.add(app);session.commit()
+        before=(app.status,app.decision,app.planning_field_verification,app.estimated_unit_count,app.unit_confirmation_status)
+        result=_refresh_row(session,app,get_council('bolton'),dict(row,application_id=app.id),
+                            retrieve_evidence=lambda:bolton_source(row,app.id)['observation'])
+        assert not result['accepted']
+        session.refresh(app)
+        assert before==(app.status,app.decision,app.planning_field_verification,app.estimated_unit_count,app.unit_confirmation_status)
