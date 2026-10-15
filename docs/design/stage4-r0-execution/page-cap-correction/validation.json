@@ -1,0 +1,29 @@
+{
+  "base": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+  "network_denied_tests": 125,
+  "failed": 0,
+  "tests": [
+    "test_discovery_page_cap_transport",
+    "test_discovery_fixed80_qualification",
+    "test_discovery_r0_recovery_proposal",
+    "test_discovery_material_qualification",
+    "test_discovery_arcus_ui",
+    "test_instrumented_probe",
+    "test_discovery_finite_acceptance",
+    "test_discovery_r0_registration"
+  ],
+  "sealed_evidence_unchanged": {
+    "independent/ledger.json": "715da66d96a643800c7a30df9ae88481e7fc2576d89fc55a4ec93484a2049f17",
+    "independent/append-ledger.json": "7a46aa77843e85b226f1f1a0982feff79a2d111a4a93596a37ad953a0c7ceb23",
+    "recovery/artifact.zip": "143828a4d725bcdae5f086dfc6c617bcc4d62777f42b0808f01b2304f3a98ea7"
+  },
+  "source_calls": 0,
+  "production_queries": 0,
+  "production_writes": 0,
+  "merge": false,
+  "workflow_registration": false,
+  "qualification_execution_authorised": false,
+  "outer_qualification_supervision": "PROPOSED_NOT_IMPLEMENTED",
+  "hosted_checks": "PENDING_PUBLICATION",
+  "independent_focused_tests": 32
+}

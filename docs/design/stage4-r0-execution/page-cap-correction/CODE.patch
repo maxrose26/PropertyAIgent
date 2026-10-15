@@ -1,0 +1,547 @@
+--- a/verification/direct_reference/instrumented_probe.py
++++ b/verification/direct_reference/instrumented_probe.py
+@@ -26,6 +26,9 @@
+ CASES.update(committee_case_definitions())
+ from verification.discovery.material_qualification import case_definitions as material_case_definitions, IDOX_CASES
+ CASES.update(material_case_definitions())
++from verification.discovery.r0_fixed80_qualification import case_definitions as fixed80_case_definitions
++FIXED80_CASES = fixed80_case_definitions()
++CASES.update(FIXED80_CASES)
+ from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
+ CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
+ from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed
+@@ -209,6 +212,26 @@
+         events = audit.setdefault('safety_events', [])
+         if reason not in events and len(events) < 8:
+             events.append(reason)
++
++
++def classify_ui_enumeration(audit, fail):
++    """Transport boundary: a normal page cap is incomplete, not a safety event.
++
++    Never erase an earlier failure. Parser/criteria/navigation exceptions and
++    unknown termination shapes still take the original fatal path. Resource,
++    identity and cleanup validation remains the caller's independent duty.
++    """
++    if audit.get('enumeration_evidence') == 'COUNT_RECONCILED':
++        return
++    if (audit.get('enumeration_evidence') == 'PAGE_CAP'
++            and audit.get('completeness') == 'INCOMPLETE'
++            and audit.get('listing_failure') is None
++            and audit.get('failure') is None
++            and audit.get('safety_failure') is False
++            and audit.get('safety_events') == []):
++        audit['listing_outcome'] = 'BOUNDED_PAGE_CAP'
++        return
++    fail('LISTING_NOT_QUALIFIED')
+ 
+ 
+ def exact_guest_record(audit, reference):
+@@ -453,8 +476,7 @@
+                     await nav
+                     if case in UI_CASES:
+                         await enumerate_ui(page,audit,stopped,ui_config)
+-                        if audit.get('enumeration_evidence') != 'COUNT_RECONCILED':
+-                            fail('LISTING_NOT_QUALIFIED')
++                        classify_ui_enumeration(audit, fail)
+                     else:
+                         if case in DISCOVERY_CASES:
+                             # Observe bootstrap metadata only; never inspect application DOM.
+@@ -536,7 +558,8 @@
+                    PYTHONNOUSERSITE='1', PYTHONDONTWRITEBYTECODE='1')
+         # Browser package cache only; no inherited database, model or GitHub credentials.
+         env['PLAYWRIGHT_BROWSERS_PATH'] = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', str(Path.home()/'.cache/ms-playwright'))
+-        worker_module = ('verification.discovery.material_qualification' if case in IDOX_CASES
++        worker_module = ('verification.discovery.r0_fixed80_qualification' if case in FIXED80_CASES
++                         else 'verification.discovery.material_qualification' if case in IDOX_CASES
+                          else 'verification.direct_reference.instrumented_probe')
+         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
+                                   '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else []), env=env, start_new_session=True,
+--- a/tests/test_instrumented_probe.py
++++ b/tests/test_instrumented_probe.py
+@@ -19,7 +19,8 @@
+         from verification.direct_reference.arcus_manifest import case_definitions
+         from verification.discovery.committee_exact import case_definitions as committee_cases
+         from verification.discovery.material_qualification import case_definitions as material_cases
+-        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape', 'discovery_manchester_search_shape', 'discovery_manchester_ui_window', 'discovery_salford_ui_window', 'discovery_rochdale_ui_window'} | set(case_definitions()) | set(committee_cases()) | set(material_cases()))
++        from verification.discovery.r0_fixed80_qualification import case_definitions as fixed80_cases
++        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape', 'discovery_manchester_search_shape', 'discovery_manchester_ui_window', 'discovery_salford_ui_window', 'discovery_rochdale_ui_window'} | set(case_definitions()) | set(committee_cases()) | set(material_cases()) | set(fixed80_cases()))
+         for _, _, url in CASES.values():
+             self.assertTrue(permitted_navigation(url, url))
+             self.assertFalse(permitted_navigation(url + '&other=1', url))
+--- a/.github/workflows/stage4-discovery-offline.yml
++++ b/.github/workflows/stage4-discovery-offline.yml
+@@ -10,6 +10,8 @@
+       - 'app/scrapers/discovery_idox.py'
+       - 'app/scrapers/arcus_portal.py'
+       - 'tests/test_discovery_*.py'
++      - 'tests/test_instrumented_probe.py'
++      - 'tests/fixtures/discovery/**'
+       - 'verification/bolton_recon/*.py'
+       - 'verification/discovery/**'
+       - 'docs/design/stage4-r0-execution/**'
+@@ -39,7 +41,7 @@
+       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+       - name: Pure discovery and pagination regressions, network denied
+         run: |
+-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_finite_acceptance.py tests/test_discovery_r0_proposal.py tests/test_discovery_r0_recovery_proposal.py tests/test_discovery_r0_executable_proposals.py tests/test_discovery_r0_registration.py tests/test_discovery_contract.py tests/test_discovery_acceptance.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py tests/test_discovery_remaining_source.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
++          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_page_cap_transport.py tests/test_discovery_fixed80_qualification.py tests/test_discovery_finite_acceptance.py tests/test_discovery_r0_proposal.py tests/test_discovery_r0_recovery_proposal.py tests/test_discovery_r0_executable_proposals.py tests/test_discovery_r0_registration.py tests/test_discovery_contract.py tests/test_discovery_acceptance.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py tests/test_discovery_remaining_source.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
+       - name: Fixed committee caller and field-level B2, network denied
+         run: |
+           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
+--- /dev/null
++++ b/verification/discovery/r0_fixed80_qualification.py
+@@ -0,0 +1,151 @@
++"""Unregistered fixed80 qualification proposal; no DB, admission or live authority.
++
++Only worker entry exists. Parent caller requires an explicitly injected reader;
++registration/review must wire that reader under the proposed outer supervision.
++"""
++import hashlib
++import json
++import os
++from pathlib import Path
++import time
++
++ROOT=Path(__file__).resolve().parents[2]
++MANIFEST=ROOT/'docs/design/stage4-r0-execution/page-cap-correction/fixed80-qualification-manifest.json'
++MANIFEST_SHA='1c4cb696cfd352532a0c19fe9e919e86059908cc3cf21ed37f8be2ec8ab23b12'
++LIMITS=dict(calls=80,requests=160,bytes=160_000_000,seconds=4400,output_bytes=8_000_000,
++            record_requests=2,record_bytes=2_000_000,record_seconds=55,record_output_bytes=65536,
++            worker_rss=1024**3)
++HARD=frozenset({'CLEANUP_FAILURE','ACCOUNTING_FAILURE','INVALID_ARTIFACT','UNSUPPORTED_ROUTE',
++                'SCOPE_ESCAPE','AMBIGUOUS_SOURCE_RESULT','PARTIAL_RETRIEVAL','PARSER_FAILURE'})
++LOCAL=frozenset({'TIMEOUT','SOURCE_UNAVAILABLE','RATE_LIMITED'})
++
++
++def credential_free(env):
++    if any('DATABASE' in k or k.startswith(('SUPABASE_','OPENAI_','ANTHROPIC_')) for k in env):
++        raise ValueError('CREDENTIAL_CONTEXT_REJECTED') from None
++
++
++def targets():
++    raw=MANIFEST.read_bytes()
++    if hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA:raise ValueError('FIXED80_MANIFEST_REJECTED')
++    rows=json.loads(raw)['rows']
++    if (len(rows)!=80 or len({(x['council'],x['reference']) for x in rows})!=80
++        or sum(x['council']=='bolton' for x in rows)!=54 or sum(x['council']=='bury' for x in rows)!=26):
++        raise ValueError('FIXED80_MANIFEST_REJECTED')
++    from verification.direct_reference.refresh import validate_destination
++    for i,row in enumerate(rows):
++        if row['case']!=f'r0_fixed80_{i:02d}' or row['application_id'] is not None:
++            raise ValueError('FIXED80_ROW_REJECTED')
++        validate_destination(row)
++    return rows
++
++
++def worker(index):
++    # Existing exact displayed-reference parser, request/byte/deadline bounds,
++    # session/response closure and process resource limits, no factual writer.
++    from .material_qualification import idox_worker
++    credential_free(os.environ)
++    if type(index) is not int or not 0<=index<80:raise ValueError('FIXED80_INDEX_REJECTED')
++    return idox_worker(targets()[index])
++
++
++def case_definitions():
++    return {r['case']:(None,r['reference'],r['source_url']) for r in targets()}
++
++
++def read(index,row):
++    """Proposed binding to the existing owned-process supervisor/worker schema."""
++    import contextlib
++    import tempfile
++    from verification.direct_reference.instrumented_probe import supervised
++    credential_free(os.environ)
++    if type(index) is not int or not 0<=index<80 or row!=targets()[index]:
++        raise ValueError('FIXED80_ROW_REJECTED')
++    with tempfile.TemporaryDirectory(prefix='r0-fixed80-qualification-') as directory:
++        out=Path(directory)/'audit.json'
++        with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink):
++            supervised(row['case'],out)
++        if not out.is_file() or out.stat().st_size>=LIMITS['record_output_bytes']:
++            raise ValueError('INVALID_ARTIFACT')
++        return json.loads(out.read_bytes())
++
++
++def project(row,source):
++    from .material_qualification import project_idox
++    return project_idox(row,source)
++
++
++def durable_checkpoint(path,result):
++    """Create-only bounded JSON checkpoint; fsync before any subsequent call."""
++    raw=json.dumps(result,sort_keys=True).encode()+b'\n'
++    if len(raw)>=LIMITS['record_output_bytes']:raise ValueError('CHECKPOINT_BOUND')
++    with Path(path).open('xb') as out:
++        out.write(raw);out.flush();os.fsync(out.fileno())
++
++
++def qualify(*,reader,checkpoint,clock=time.monotonic):
++    """No default/live reader: proposed finite caller, not a dispatch capability.
++
++    reader must return existing supervised idox worker schema. Checkpoint each
++    bounded result before another call; checkpoint failure stops, never replay.
++    """
++    from .rejection_audit import observation_audit
++    credential_free(os.environ);rows=targets();start=clock();used_requests=used_bytes=0;results=[];stop=None;attempted=0
++    for i,row in enumerate(rows):
++        if (clock()-start+LIMITS['record_seconds']>LIMITS['seconds']
++            or used_requests+2>LIMITS['requests'] or used_bytes+2_000_000>LIMITS['bytes']):
++            stop='AGGREGATE_RESERVATION';break
++        attempted+=1
++        try:source=reader(i,row)
++        except Exception:
++            results.append(dict(council=row['council'],reference=row['reference'],
++                admission_readiness='UNKNOWN_SOURCE_OR_SUPERVISOR_EXCEPTION',admission_authorised=False))
++            stop='SOURCE_OR_SUPERVISOR_EXCEPTION_ACCOUNTING_UNKNOWN';break
++        try:resource=project(row,source)
++        except Exception:
++            results.append(dict(council=row['council'],reference=row['reference'],
++                admission_readiness='UNKNOWN_INVALID_ARTIFACT',admission_authorised=False))
++            stop='SOURCE_OR_SUPERVISOR_EXCEPTION_ACCOUNTING_UNKNOWN';break
++        audit=resource['audit'];failure=resource['failure']
++        if (audit.get('cleanup_state')!='CLOSED' or audit.get('budget_state')!='WITHIN_LIMITS'):
++            results.append(dict(council=row['council'],reference=row['reference'],source_audit=audit,
++                failure=failure,admission_readiness='WITHHELD_RESOURCE_OR_CLEANUP',admission_authorised=False))
++            stop='RESOURCE_OR_CLEANUP';break
++        # project_idox verifies finite nonnegative counters and hard limits.
++        used_requests+=audit['requests'];used_bytes+=audit['received_body_bytes']
++        evidence=observation_audit(row,resource)
++        identity=evidence['identity_qualification']=='EXACT_DISPLAYED_REFERENCE'
++        eligible=identity and evidence['b2_eligible'] is True and failure is None
++        result=dict(council=row['council'],reference=row['reference'],source_url=row['source_url'],
++            retrieved_at=evidence['retrieved_at'],identity_qualification=evidence['identity_qualification'],
++            observation_evidence=evidence,source_audit=audit,failure=failure,
++            conservative_materiality=row['retained_materiality'],site_relationship='UNKNOWN',application_role='UNKNOWN',
++            admission_readiness='ELIGIBLE_FOR_REVIEW_ONLY' if eligible else 'WITHHELD_PENDING_EVIDENCE',
++            admission_authorised=False,production_writes=0)
++        results.append(result)
++        try:checkpoint(result)
++        except Exception:stop='CHECKPOINT_FAILURE_NO_NEXT_CALL';break
++        if (failure is not None and failure not in LOCAL) or failure in HARD:
++            stop='HARD_OR_UNCLASSIFIED_FAILURE';break
++        if len(json.dumps(results,sort_keys=True).encode())>LIMITS['output_bytes']:
++            stop='OUTPUT_LIMIT';break
++    return dict(manifest_sha256=MANIFEST_SHA,results=results,stop_reason=stop,
++        attempted=attempted,not_attempted=[dict(council=x['council'],reference=x['reference']) for x in rows[attempted:]],
++        requests=used_requests,received_bytes=used_bytes,elapsed_seconds=clock()-start,
++        accounting_complete=stop not in {'SOURCE_OR_SUPERVISOR_EXCEPTION_ACCOUNTING_UNKNOWN','RESOURCE_OR_CLEANUP'},
++        persistence=False,admission_authorised=False)
++
++
++def main():
++    import argparse
++    p=argparse.ArgumentParser();p.add_argument('--worker',action='store_true',required=True)
++    p.add_argument('--case',choices=case_definitions(),required=True);p.add_argument('--output',type=Path,required=True)
++    a=p.parse_args();credential_free(os.environ)
++    if a.output.exists():raise ValueError('EXISTING_OUTPUT')
++    # Worker only. No CLI parent, authority or arbitrary destination/reference.
++    index=next(i for i,r in enumerate(targets()) if r['case']==a.case)
++    result=worker(index);raw=json.dumps(result,sort_keys=True)
++    if len(raw.encode())>=LIMITS['record_output_bytes']:raise ValueError('RECORD_OUTPUT_LIMIT')
++    with a.output.open('x') as out:out.write(raw+'\n')
++
++if __name__=='__main__':main()
+--- /dev/null
++++ b/tests/test_discovery_page_cap_transport.py
+@@ -0,0 +1,135 @@
++"""Offline UI enumeration -> real transport classifier -> reader -> recovery.
++
++The browser is a finite locator double; no source/DB calls or historical edits.
++"""
++import asyncio
++from copy import deepcopy
++import hashlib
++import inspect
++import json
++from pathlib import Path
++from unittest.mock import patch
++import pytest
++from verification.direct_reference import instrumented_probe as transport
++from verification.discovery import r0_recovery_proposal as recovery
++from verification.discovery import finite_acceptance as finite
++from verification.discovery.arcus_ui_config import dated_config, UI_CASES
++from verification.discovery.arcus_ui_window import enumerate_ui
++from tests.test_discovery_r0_recovery_proposal import evidence
++from tests.test_discovery_arcus_ui import card
++
++
++class Page:
++    def __init__(self, config):
++        self.config=config; self.segment=0
++    def locator(self, selector):
++        page=self
++        class Locator:
++            async def wait_for(self, **kw): pass
++            async def inner_text(self):
++                return f'Showing {page.segment*10+1} to {page.segment*10+10} of 73 results'
++            def filter(self, **kw): return self
++            async def count(self): return 1
++            async def get_attribute(self, name): return '#'
++            async def click(self, **kw): page.segment+=1
++        return Locator()
++    def get_by_label(self, label, exact=True):
++        page=self
++        class Label:
++            async def input_value(self, **kw):
++                from datetime import date
++                if label=='Valid date from':return date.fromisoformat(page.config.start).strftime('%d/%m/%Y')
++                if label=='Valid date to':return date.fromisoformat(page.config.end).strftime('%d/%m/%Y')
++                return ''
++        return Label()
++    def get_by_role(self, role, name, exact=True):
++        class Role:
++            async def click(self, **kw): pass
++            async def inner_text(self):return 'Planning Applications' if name=='Category' else 'Select an option'
++        return Role()
++
++
++def capped_transport(row):
++    config=dated_config(UI_CASES['discovery_manchester_ui_window'],row['start'],row['end'])
++    page=Page(config);audit=evidence(row);stopped=asyncio.Event()
++    async def cards(page, config):
++        return [card(ref=f'TEST/{page.segment*10+i:03}',key=f'a1DSl00000{page.segment*10+i:08}',valid='18/09/2026') for i in range(10)]
++    with patch('verification.discovery.arcus_ui_window.read_cards',cards):
++        task=enumerate_ui(page,audit,stopped,config)
++        with pytest.raises(StopIteration): task.send(None)
++    def fail(code):transport.record_failure(audit,code);stopped.set()
++    transport.classify_ui_enumeration(audit,fail)
++    return audit
++
++
++@pytest.fixture(autouse=True)
++def credential_free(monkeypatch):monkeypatch.delenv('DATABASE_URL',raising=False)
++
++
++def test_actual_transport_boundary_and_real_reader_continue_cap(tmp_path):
++    row=recovery.PLAN['rows'][0];audit=capped_transport(row)
++    assert audit['failure'] is None and not audit['safety_events']
++    assert audit['listing_outcome']=='BOUNDED_PAGE_CAP' and len(audit['listing_records'])==60
++    calls=[]
++    def supervised(case,path,**kw):
++        calls.append(case);path.write_text(json.dumps(audit))
++    def reader(current):
++        return finite.read(current) if not calls else evidence(current)
++    with patch.object(transport,'supervised',supervised):
++        result=recovery.execute(recovery.PLAN,recovery.PLAN_HASH,reader=reader,clock=lambda:0)
++    assert len(result['results'])==28 and not result['not_attempted']
++    first=result['results'][0]
++    assert first['safe_local_gap'] and first['enumeration_completeness']=='INCOMPLETE'
++    assert len(first['source']['listing_records'])==60
++    assert result['completeness']=='INCOMPLETE' and not result['completed_through_advanced']
++    # This helper is called at the actual post-enumeration transport boundary.
++    assert 'classify_ui_enumeration(audit, fail)' in inspect.getsource(transport.probe)
++
++
++@pytest.mark.parametrize('change',[
++ {'failure':'SOURCE_EXCEPTION'}, {'safety_failure':True}, {'safety_events':['ORIGIN_DENIED']},
++ {'listing_failure':'ValueError:date outside interval'}, {'destination':'https://wrong.invalid/'},
++ {'requested_interval':['2026-01-01','2026-01-02']}, {'applied_interval':None},
++ {'cleanup':'FAILED'}, {'process_cleanup':'UNKNOWN'}, {'live_owned_survivors':1},
++ {'requests':None}, {'accounting_complete':False},
++ {'listing_records':[{'reference':None,'source_record_id':'X'}]},
++])
++def test_mutated_hard_failure_never_reaches_second_source(change):
++    row=recovery.PLAN['rows'][0];audit=capped_transport(row);audit.update(deepcopy(change))
++    transport.classify_ui_enumeration(audit,lambda code:transport.record_failure(audit,code))
++    calls=[]
++    def reader(_):calls.append(1);return audit
++    result=recovery.execute(recovery.PLAN,recovery.PLAN_HASH,reader=reader,clock=lambda:0)
++    assert len(calls)==1 and len(result['not_attempted'])==27
++    assert result['stop_reason'] in {'SAFETY_OR_UNCLASSIFIED_FAILURE','RESOURCE_ACCOUNTING'}
++    assert result['completeness']=='INCOMPLETE'
++
++
++def test_missing_total_is_not_reinterpreted_as_safe_arcus_cap():
++    audit=capped_transport(recovery.PLAN['rows'][0])
++    audit.update(enumeration_evidence='TOTAL_UNKNOWN',listing_failure='ValueError:page marker')
++    transport.classify_ui_enumeration(audit,lambda code:transport.record_failure(audit,code))
++    assert audit['failure']=='LISTING_NOT_QUALIFIED' and audit['safety_failure']
++
++
++def test_retained_ordinary_idox_missing_total_already_continues():
++    # Use actual retained Bury source shape, not an idealised clean failure flag.
++    old=json.loads(Path('tests/fixtures/discovery/r0-bury-total-unknown.json').read_text())
++    source=deepcopy(old['source'])
++    assert source['enumeration_evidence']=='TOTAL_UNKNOWN' and source.get('failure') is None
++    row=old['window']
++    assert recovery.safety(row,source) and recovery.local_gap(row,source)
++
++
++def test_consumed_artifact_remains_byte_identical_and_not_rewritten():
++    import zipfile
++    fixture=Path('tests/fixtures/discovery/r0-recovery-38744118357.zip')
++    before=fixture.read_bytes()
++    assert hashlib.sha256(before).hexdigest()=='143828a4d725bcdae5f086dfc6c617bcc4d62777f42b0808f01b2304f3a98ea7'
++    with zipfile.ZipFile(fixture) as z:
++        consumed=json.loads(z.read('round.json'))['results'][0]['source']
++    assert consumed['failure']=='LISTING_NOT_QUALIFIED' and consumed['safety_failure']
++    # New results are generated by the corrected boundary, never by editing the
++    # consumed audit or clearing its recorded flags.
++    fresh=capped_transport(recovery.PLAN['rows'][0])
++    assert fresh['failure'] is None and fixture.read_bytes()==before
+--- /dev/null
++++ b/tests/test_discovery_fixed80_qualification.py
+@@ -0,0 +1,161 @@
++from copy import deepcopy
++from dataclasses import asdict
++import hashlib
++import json
++from pathlib import Path
++from unittest.mock import patch
++import pytest
++from verification.discovery import r0_fixed80_qualification as q
++from verification.direct_reference.refresh import Observation
++
++@pytest.fixture(autouse=True)
++def credential_free(monkeypatch):
++    import os
++    for key in list(os.environ):
++        if 'DATABASE' in key or key.startswith(('SUPABASE_','OPENAI_','ANTHROPIC_')):
++            monkeypatch.delenv(key,raising=False)
++
++
++def source(row,eligible=True):
++    states=dict(reference='PRESENT_VALUE',status='PRESENT_VALUE',decision='NOT_PRESENT',decision_date='NOT_PRESENT')
++    fields={'Reference':row['reference'],'Status':'Pending Consideration','Decision':None,'Decision Issued Date':None}
++    obs=Observation(None,row['reference'],row['source_url'],fields,states,'UNKNOWN_UNMAPPED','a'*64,
++                    {'Reference':row['reference'],'Status':'Pending Consideration'},b2_eligible=eligible)
++    return dict(case=row['case'],reference=row['reference'],destination=row['source_url'],application_id=None,
++        persistence=False,observation=asdict(obs),failure=None,requests=1,received_body_bytes=500,
++        elapsed_seconds=1.0,supervisor_seconds=1.1,peak_owned_rss=100000,owned_processes_seen=1,
++        live_owned_survivors=0,process_cleanup='CLOSED',supervisor_limit_hit=False)
++
++
++def test_exact80_routes_and_no_arbitrary_input():
++    rows=q.targets();assert len(rows)==80
++    assert sum(x['council']=='bolton' for x in rows)==54
++    assert {'73755','73748','73743','73742','73741'}<=set(x['reference'] for x in rows if x['council']=='bury')
++    original=json.loads(Path('docs/design/stage4-r0-execution/recovery-preparation/comparison-80-manifest.json').read_text())
++    assert {(r['council'],r['reference']) for r in rows}=={(r['council_code'],r['reference']) for r in original['identities']}
++    with pytest.raises(ValueError):q.read(80,rows[0])
++    with pytest.raises(ValueError):q.read(0,dict(rows[0],reference='OTHER'))
++    assert not Path('.github/workflows/stage4-r0-fixed80-qualification-once.yml').exists()
++
++
++def test_80_capacity_uses_actual_bounds_and_checkpoints_sparse_fields(tmp_path):
++    calls=[];checkpoints=[]
++    def reader(index,row):calls.append(row['reference']);return source(row,False)
++    def checkpoint(result):
++        path=tmp_path/f'{len(checkpoints):02}.json';q.durable_checkpoint(path,result);checkpoints.append(path)
++    result=q.qualify(reader=reader,checkpoint=checkpoint,clock=lambda:0)
++    assert len(calls)==len(checkpoints)==result['attempted']==80 and not result['not_attempted']
++    assert result['requests']==80 and result['received_bytes']==40000
++    assert all(x['observation_evidence']['field_states']['decision']=='NOT_PRESENT' for x in result['results'])
++    assert all(x['site_relationship']==x['application_role']=='UNKNOWN' for x in result['results'])
++    assert all(x['admission_readiness']=='WITHHELD_PENDING_EVIDENCE' for x in result['results'])
++    assert not result['persistence'] and not result['admission_authorised']
++    with pytest.raises(FileExistsError):q.durable_checkpoint(checkpoints[0],result['results'][0])
++
++
++@pytest.mark.parametrize('change,stop',[
++ ({'live_owned_survivors':1},'RESOURCE_OR_CLEANUP'),
++ ({'requests':3},'RESOURCE_OR_CLEANUP'),
++ ({'reference':'WRONG'},'HARD_OR_UNCLASSIFIED_FAILURE'),
++ ({'destination':'https://wrong.invalid/'},'HARD_OR_UNCLASSIFIED_FAILURE'),
++ ({'failure':'AMBIGUOUS_SOURCE_RESULT'},'HARD_OR_UNCLASSIFIED_FAILURE'),
++ ({'failure':'PARSER_FAILURE'},'HARD_OR_UNCLASSIFIED_FAILURE'),
++])
++def test_unsafe_results_stop_before_next_call(change,stop):
++    calls=[]
++    def reader(i,row):calls.append(i);return dict(source(row),**change)
++    out=q.qualify(reader=reader,checkpoint=lambda _:None,clock=lambda:0)
++    assert calls==[0] and out['attempted']==1 and len(out['not_attempted'])==79
++    assert out['stop_reason']==stop
++
++
++def test_local_source_failure_continues_only_closed_certain_accounting():
++    def reader(i,row):
++        r=source(row)
++        if i==0:r.update(failure='TIMEOUT',observation=None)
++        return r
++    out=q.qualify(reader=reader,checkpoint=lambda _:None,clock=lambda:0)
++    assert out['attempted']==80 and out['results'][0]['admission_readiness']=='WITHHELD_PENDING_EVIDENCE'
++
++
++def test_unknown_exception_no_next_call_and_budget_reservation():
++    def raised(*_):raise RuntimeError('not exported')
++    out=q.qualify(reader=raised,checkpoint=lambda _:None,clock=lambda:0)
++    assert out['attempted']==1 and not out['accounting_complete'] and 'not exported' not in str(out)
++    clock=iter([0,4400,4400]);out=q.qualify(reader=lambda *_:pytest.fail('no source'),checkpoint=lambda _:None,clock=lambda:next(clock))
++    assert out['attempted']==0 and len(out['not_attempted'])==80
++
++
++def test_checkpoint_failure_and_credentials_fail_closed():
++    calls=[]
++    def reader(i,row):calls.append(i);return source(row)
++    def failed(_):raise OSError('disk unavailable')
++    out=q.qualify(reader=reader,checkpoint=failed,clock=lambda:0)
++    assert calls==[0] and out['stop_reason']=='CHECKPOINT_FAILURE_NO_NEXT_CALL'
++    for key in ['DATABASE_URL','SUPABASE_SERVICE_KEY','OPENAI_API_KEY']:
++        with pytest.raises(ValueError):q.credential_free({key:'synthetic'})
++
++
++def test_shared_supervisor_delegation_not_new_transport(tmp_path):
++    from verification.direct_reference import instrumented_probe as probe
++    rows=q.targets();called=[]
++    def supervised(case,path):
++        called.append(case);path.write_text(json.dumps(source(rows[0])))
++    with patch.object(probe,'supervised',supervised):
++        assert q.read(0,rows[0])['reference']==rows[0]['reference']
++    assert called==[rows[0]['case']]
++    assert set(q.case_definitions())<=set(probe.CASES)
++    import inspect
++    assert "'verification.discovery.r0_fixed80_qualification' if case in FIXED80_CASES" in inspect.getsource(probe.supervised)
++    with patch('verification.discovery.material_qualification.idox_worker',lambda row: row):
++        assert q.worker(0)==rows[0]
++
++
++def test_actual_supervisor_launches_fixed_worker_with_credential_free_env(tmp_path,monkeypatch):
++    from unittest.mock import MagicMock
++    from verification.direct_reference import instrumented_probe as probe
++    import psutil
++    row=q.targets()[0];launched=[]
++    monkeypatch.setenv('GITHUB_ACTIONS','true');monkeypatch.setenv('RUNNER_ENVIRONMENT','github-hosted')
++    monkeypatch.setenv('DATABASE_URL','synthetic-not-forwarded');monkeypatch.setenv('GITHUB_TOKEN','synthetic-not-forwarded')
++    def popen(argv,**kw):
++        launched.append((argv,kw))
++        assert argv[1:6]==['-m','verification.discovery.r0_fixed80_qualification','--worker','--case',row['case']]
++        assert set(kw['env'])=={'PATH','HOME','TMPDIR','LANG','PYTHONNOUSERSITE','PYTHONDONTWRITEBYTECODE','PLAYWRIGHT_BROWSERS_PATH'}
++        assert kw['start_new_session'] is True and 'DATABASE_URL' not in kw['env'] and 'GITHUB_TOKEN' not in kw['env']
++        Path(argv[argv.index('--output')+1]).write_text(json.dumps(source(row)))
++        child=MagicMock(pid=999999,returncode=0);child.poll.return_value=0;child.wait.return_value=0
++        return child
++    import os
++    original_read=Path.read_text
++    def namespace_read(path,*a,**kw):
++        return str(os.getpid())+' synthetic-stat' if str(path)=='/proc/self/stat' else original_read(path,*a,**kw)
++    with patch.object(Path,'read_text',namespace_read),patch.object(probe.subprocess,'Popen',popen),patch.object(psutil,'Process',return_value=MagicMock()),patch.object(psutil,'wait_procs',return_value=([],[])):
++        assert probe.supervised(row['case'],tmp_path/'audit.json')==0
++    assert len(launched)==1
++    audit=json.loads((tmp_path/'audit.json').read_text())
++    assert audit['process_cleanup']=='CLOSED' and audit['live_owned_survivors']==0
++
++
++def test_untouched27_matches_consumed_run_without_capped_or_bury_retry():
++    import zipfile
++    path=Path('docs/design/stage4-r0-execution/page-cap-correction/untouched27-manifest.json')
++    assert hashlib.sha256(path.read_bytes()).hexdigest()=='f99d86a5deb251f45c0787af295836aa948d8250d9f7b180062db229c6dc0e3d'
++    plan=json.loads(path.read_text())
++    with zipfile.ZipFile('tests/fixtures/discovery/r0-recovery-38744118357.zip') as z:
++        consumed=json.loads(z.read('round.json'))
++    assert plan['rows']==consumed['not_attempted'] and len(plan['rows'])==27
++    assert all(x['council'] not in {'bolton','bury','trafford'} for x in plan['rows'])
++    assert not any(x['council']=='manchester' and x['start']=='2026-09-17' for x in plan['rows'])
++    arc=sum(x['council'] in {'manchester','rochdale','salford'} for x in plan['rows'])
++    assert plan['limits']['requests']==arc*80+(27-arc)*10
++    assert plan['limits']['bytes']==arc*20*1024*1024+(27-arc)*3_000_000
++
++
++def test_independent_only_candidates_visible_not_primary_or_db_success():
++    d=json.loads(Path('docs/design/stage4-r0-execution/page-cap-correction/independent-only-candidates.json').read_text())
++    pairs={(x['council'],r) for x in d['windows'] for r in x['literal_references']}
++    assert len(pairs)==d['reference_count']==283
++    assert all(x['primary_detection']=='NOT_ESTABLISHED' and x['database_presence']=='UNKNOWN_NOT_QUERIED' for x in d['windows'])
++    assert all(x['date_membership']=='UNKNOWN_NO_INDIVIDUAL_LITERAL_DATE' for x in d['windows'])
++    assert not d['database_query_authorised'] and not d['admission_authorised']

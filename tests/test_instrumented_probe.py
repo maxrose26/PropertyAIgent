@@ -19,7 +19,8 @@ class ProbeContract(unittest.TestCase):
         from verification.direct_reference.arcus_manifest import case_definitions
         from verification.discovery.committee_exact import case_definitions as committee_cases
         from verification.discovery.material_qualification import case_definitions as material_cases
-        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape', 'discovery_manchester_search_shape', 'discovery_manchester_ui_window', 'discovery_salford_ui_window', 'discovery_rochdale_ui_window'} | set(case_definitions()) | set(committee_cases()) | set(material_cases()))
+        from verification.discovery.r0_fixed80_qualification import case_definitions as fixed80_cases
+        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape', 'discovery_manchester_search_shape', 'discovery_manchester_ui_window', 'discovery_salford_ui_window', 'discovery_rochdale_ui_window'} | set(case_definitions()) | set(committee_cases()) | set(material_cases()) | set(fixed80_cases()))
         for _, _, url in CASES.values():
             self.assertTrue(permitted_navigation(url, url))
             self.assertFalse(permitted_navigation(url + '&other=1', url))

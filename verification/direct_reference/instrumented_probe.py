@@ -26,6 +26,9 @@ from verification.discovery.committee_exact import case_definitions as committee
 CASES.update(committee_case_definitions())
 from verification.discovery.material_qualification import case_definitions as material_case_definitions, IDOX_CASES
 CASES.update(material_case_definitions())
+from verification.discovery.r0_fixed80_qualification import case_definitions as fixed80_case_definitions
+FIXED80_CASES = fixed80_case_definitions()
+CASES.update(FIXED80_CASES)
 from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
 CASES[DISCOVERY_CASE] = (None, None, DISCOVERY_DESTINATION)
 from verification.discovery.manchester_search_shape import CASE as SEARCH_SHAPE_CASE, bootstrap_read_allowed
@@ -209,6 +212,26 @@ def record_failure(audit, reason):
         events = audit.setdefault('safety_events', [])
         if reason not in events and len(events) < 8:
             events.append(reason)
+
+
+def classify_ui_enumeration(audit, fail):
+    """Transport boundary: a normal page cap is incomplete, not a safety event.
+
+    Never erase an earlier failure. Parser/criteria/navigation exceptions and
+    unknown termination shapes still take the original fatal path. Resource,
+    identity and cleanup validation remains the caller's independent duty.
+    """
+    if audit.get('enumeration_evidence') == 'COUNT_RECONCILED':
+        return
+    if (audit.get('enumeration_evidence') == 'PAGE_CAP'
+            and audit.get('completeness') == 'INCOMPLETE'
+            and audit.get('listing_failure') is None
+            and audit.get('failure') is None
+            and audit.get('safety_failure') is False
+            and audit.get('safety_events') == []):
+        audit['listing_outcome'] = 'BOUNDED_PAGE_CAP'
+        return
+    fail('LISTING_NOT_QUALIFIED')
 
 
 def exact_guest_record(audit, reference):
@@ -453,8 +476,7 @@ async def probe(case, window=None):
                     await nav
                     if case in UI_CASES:
                         await enumerate_ui(page,audit,stopped,ui_config)
-                        if audit.get('enumeration_evidence') != 'COUNT_RECONCILED':
-                            fail('LISTING_NOT_QUALIFIED')
+                        classify_ui_enumeration(audit, fail)
                     else:
                         if case in DISCOVERY_CASES:
                             # Observe bootstrap metadata only; never inspect application DOM.
@@ -536,7 +558,8 @@ def supervised(case, output, execution_mode="github-hosted", window=None):
                    PYTHONNOUSERSITE='1', PYTHONDONTWRITEBYTECODE='1')
         # Browser package cache only; no inherited database, model or GitHub credentials.
         env['PLAYWRIGHT_BROWSERS_PATH'] = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', str(Path.home()/'.cache/ms-playwright'))
-        worker_module = ('verification.discovery.material_qualification' if case in IDOX_CASES
+        worker_module = ('verification.discovery.r0_fixed80_qualification' if case in FIXED80_CASES
+                         else 'verification.discovery.material_qualification' if case in IDOX_CASES
                          else 'verification.direct_reference.instrumented_probe')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
                                   '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else []), env=env, start_new_session=True,
