@@ -1,0 +1,30 @@
+{
+  "checkpoint": "PROTECTED_ENVIRONMENT_APPROVAL_REQUIRED",
+  "timestamp_utc": "2026-10-15T23:11:25.035462+00:00",
+  "master": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+  "tree": "c24de41feb6245c9a3579acefb6ca4f82515bb61",
+  "pr": 108,
+  "comparison_run": 38821962637,
+  "run_number": 1,
+  "attempt": 1,
+  "state_observed": "waiting",
+  "manifest_sha256": "34d6fe5ee4941b258afe88c2c6ffa196fb3d0bc052b73cb0667bb4e49acb8d5d",
+  "workflow_blob": "e5e90749bea2b4161cd8cb16e3f863e7f9d000d3",
+  "pre_dispatch_complete_manual_history_count": 35,
+  "pre_dispatch_matching_runs": 0,
+  "post_merge_required_checks": "PASS",
+  "manual_probe": "SKIPPED_NOT_REQUIRED",
+  "independent_ledger_sha256": "51798ac6bebdb6a28a9c8cd4120b8de23c6a5b5d0af7d2c782e46b98e202ab30",
+  "independent_seal": "2026-10-15T23:08:42.822381Z",
+  "independent_rows": {
+    "complete": 19,
+    "unknown": 8
+  },
+  "new_primary_artifact_reveal": "NOT_OCCURRED",
+  "source_runs_dispatched": 0,
+  "production_write_runs_dispatched": 0,
+  "database_effects": "NOT_ESTABLISHED_PENDING_RUN_RESULT",
+  "access_blocker": "Browser credential protection blocks run-page observation; manual owner handoff opened. No access-control bypass.",
+  "owner_action": "Approve existing run 38821962637 stage4-production-canary environment only. Do not rerun or dispatch another.",
+  "remaining_authority": "Other approved scopes unexecuted; resume after approval and reconcile existing comparison run first."
+}
