@@ -154,17 +154,20 @@ def execute(plan, expected_hash, *, reader, clock=time.monotonic):
                           checkpoint=lambda _:None,clock=clock)
 
 
-def _execute_fixed(plan, expected_hash, *, reader, limits, checkpoint, clock=time.monotonic):
+def _execute_fixed(plan, expected_hash, *, reader, limits, checkpoint, clock=time.monotonic, containment=False):
     """Fixed-plan execution API; source use requires separate registered authority."""
     if any(k in os.environ for k in ('DATABASE_URL', 'COMMITTEE_DATABASE_URL',
                                     'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_CONTEXT_REJECTED')
-    started = clock(); results = []; requests = size = 0; stop = None; certain = True
+    started = clock(); results = []; requests = size = 0; stop = None; certain = True; quarantined=set(); skipped=[]
     def record(value):
         results.append(value)
         try:checkpoint(value);return True
         except Exception:return False
     for row in plan['rows']:
+        if row['council'] in quarantined:
+            skipped.append(dict(window=row,outcome='NOT_ATTEMPTED_COUNCIL_QUARANTINED'))
+            continue
         arc = row['council'] in f.ARCUS
         if (requests + (80 if arc else 10) > limits['requests']
                 or size + (20*1024*1024 if arc else 3_000_000) > limits['bytes']
@@ -188,20 +191,26 @@ def _execute_fixed(plan, expected_hash, *, reader, limits, checkpoint, clock=tim
             certain = False
         state = f.classify(row, a)
         safe = safety(row, a)
+        from .criteria_containment import eligible
+        contained = containment and eligible(row,a)
         # Safety dominates even an apparently COMPLETE child.
-        if not safe:
+        if not safe or contained:
             state = 'FAILED'
         local = safe and state != 'COMPLETE' and local_gap(row, a)
         if not record(dict(window=row, source=a, enumeration_completeness=state,
                             completeness='UNKNOWN' if state == 'COMPLETE' else state,
-                            safe_local_gap=local)):
+                            safe_local_gap=local,source_local_contained=contained)):
             certain=False;stop='CHECKPOINT_FAILURE_NO_NEXT_CALL';break
+        if contained:
+            quarantined.add(row['council'])
+            continue  # checkpoint succeeded; next call reserves its full budget
         if not safe or (state != 'COMPLETE' and not local):
             stop = 'SAFETY_OR_UNCLASSIFIED_FAILURE'; break
     if stop is None and clock() - started > limits['seconds']:
         stop = 'ROUND_DEADLINE'
     result = dict(manifest_sha256=expected_hash, results=results,
-                  not_attempted=plan['rows'][len(results):], stop_reason=stop,
+                  not_attempted=[r for r in plan['rows'] if r not in [x['window'] for x in results]],
+                  quarantined_windows=skipped, stop_reason=stop,
                   enumeration_completeness='COMPLETE' if stop is None and all(
                       x['enumeration_completeness'] == 'COMPLETE' for x in results) else 'INCOMPLETE',
                   # Prior Bury gap alone prevents parent R0 coverage COMPLETE.

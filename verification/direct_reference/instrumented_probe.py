@@ -234,6 +234,18 @@ def classify_ui_enumeration(audit, fail):
             and audit.get('safety_events') == []):
         audit['listing_outcome'] = 'BOUNDED_PAGE_CAP'
         return
+    from verification.discovery.arcus_ui_window import LOCAL_TIMEOUT,CRITERIA_OPERATIONS
+    typed=audit.get('criteria_control_timeout',{})
+    if (typed.get('code')==LOCAL_TIMEOUT and typed.get('operation') in CRITERIA_OPERATIONS
+        and typed.get('exception_contract')=='PLAYWRIGHT_LOCATOR_TIMEOUT_V1'
+        and audit.get('listing_stage')=='CRITERIA' and audit.get('applied_interval') is None
+        and audit.get('failure') is None and audit.get('safety_failure') is False
+        and audit.get('safety_events')==[]):
+        audit['source_contract_failure']=LOCAL_TIMEOUT
+        # No safety event is erased. Cleanup/accounting are checked AFTER browser
+        # and owned-process closure by the parent before council containment.
+        audit['listing_outcome']=LOCAL_TIMEOUT
+        return
     fail('LISTING_NOT_QUALIFIED')
 
 
@@ -616,6 +628,9 @@ def supervised(case, output, execution_mode="github-hosted", window=None):
         result.update(supervisor_seconds=round(time.monotonic()-start, 3), peak_owned_rss=peak,
                       owned_processes_seen=len(seen), live_owned_survivors=len(survivors),
                       supervisor_limit_hit=expired, process_cleanup='CLOSED' if not survivors else 'FAILED')
+        if result.get('source_contract_failure')=='SOURCE_LOCAL_CRITERIA_CONTROL_TIMEOUT':
+            result['containment_accounting_verified']=(child.returncode==0 and not expired and not survivors)
+            result['accounting_complete']=result['containment_accounting_verified']
         if expired or survivors:
             result['failure'] = 'SUPERVISOR_BOUND_OR_CLEANUP'
         output.write_text(json.dumps(result, indent=2) + '\n')

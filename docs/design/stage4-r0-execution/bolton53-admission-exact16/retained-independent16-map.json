@@ -1,0 +1,280 @@
+{
+  "no_new_observation": true,
+  "rows": [
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:42:37.268Z",
+      "observed_started_at": "2026-10-15T13:42:22.986Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 39,
+      "retained_status": "COMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": true,
+      "window": {
+        "council": "salford",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:42:44.077Z",
+      "observed_started_at": "2026-10-15T13:42:37.268Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 37,
+      "retained_status": "COMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": true,
+      "window": {
+        "council": "salford",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:43:07.100Z",
+      "observed_started_at": "2026-10-15T13:43:01.572Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 27,
+      "retained_status": "COMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": true,
+      "window": {
+        "council": "salford",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:43:11.354Z",
+      "observed_started_at": "2026-10-15T13:43:07.100Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 11,
+      "retained_status": "COMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": true,
+      "window": {
+        "council": "salford",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 47,
+      "retained_status": "COMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": true,
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "INCOMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "INCOMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "INCOMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "INCOMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "tameside",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "INCOMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "tameside",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": "2026-10-15T13:50:19.182Z",
+      "observed_started_at": "2026-10-15T13:43:11.354Z",
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 16,
+      "retained_status": "INCOMPLETE",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "NOT_ATTEMPTED",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "NOT_ATTEMPTED",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "wigan",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "NOT_ATTEMPTED",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "wigan",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "NOT_ATTEMPTED",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "assessor_session": "r0-independent-recovery-20261015",
+      "coverage": "UNKNOWN",
+      "observed_ended_at": null,
+      "observed_started_at": null,
+      "primary_comparison": "NOT_OBSERVED",
+      "references": 0,
+      "retained_status": "NOT_ATTEMPTED",
+      "source_change_uncertainty": true,
+      "usable_retained_denominator": false,
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    }
+  ],
+  "unavailable": 11,
+  "usable": 5,
+  "version": 1
+}

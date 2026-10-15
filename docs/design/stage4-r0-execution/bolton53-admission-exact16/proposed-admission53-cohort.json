@@ -1,0 +1,971 @@
+{
+  "automatic_current_duplicate_and_race_protection_required": true,
+  "current_absence_proven": false,
+  "execution_authorised": false,
+  "fresh_evidence_required": true,
+  "purpose": "REVIEW_ONLY_PRIMARY_DISCOVERY_PENDING_APPLICATION_ADMISSION",
+  "qualification_replay_for_facts_forbidden": true,
+  "qualification_result_sha256": "5870fdfa4ca5c69f20f8b4caaaa3a6d6a0a239ed72f29f76f60e62f4c6c4b00d",
+  "qualification_revision": "88ae288abf6e0e233502059cf3d74e1c9f6c929d",
+  "qualification_run": 38789547636,
+  "qualification_zip_sha256": "8f335c7fa7d9c6aeb96fddff67670aeb97760e649b3b5def8f580fe0e88938d1",
+  "registered": false,
+  "rows": [
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:39.659870+00:00",
+      "qualification_body_sha256": "a411c33f858897fec6fbd8594f60b674e9fcd1a7245209a7f229e3099ceef288",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01780/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM6SO1DEKGU00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:42.672452+00:00",
+      "qualification_body_sha256": "00346275bbc2c6b9afb028806464f90a9807834a0305585e57e3f3a841af6edb",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01778/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM6N2ADEKGO00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:45.579824+00:00",
+      "qualification_body_sha256": "af3b28041e2dbd9b11f444610c1422ec3c8137c2d0ce006cdac942d5e54e7766",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01776/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM63LBDEKGD00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:48.383534+00:00",
+      "qualification_body_sha256": "6e826738f96900a7b27950aafbe2937d876e03747eeb37a27c99480cc0d1a896",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01775/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM60YGDEKGA00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YGDEKGA00&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:51.288663+00:00",
+      "qualification_body_sha256": "56255c33c847e52f9405df272fb33b5e34ca20fe8e787f0c6930a7c355d6e465",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01769/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM4EHVDEKFN00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:54.429450+00:00",
+      "qualification_body_sha256": "864c97d920c11ccd8e9659e5ebacd5e666028c83ef2b908696f3a9ae275cb65e",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01768/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM4CENDE02800",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+      "source_window": [
+        "2026-09-24",
+        "2026-09-30"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:55:57.345047+00:00",
+      "qualification_body_sha256": "f7da4eacfd6f0016661995aec43cd9e9c1b3e86bbbdaf25cde0ac6eb32e47a41",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01821/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMJLR9DEKKP00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMJLR9DEKKP00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:03.459350+00:00",
+      "qualification_body_sha256": "03acc89e1a44c50b93ad6accbd17d90ad62496cc486fce2bd386d2073d2b1d7f",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01816/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMIZHKDEKKF00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZHKDEKKF00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:06.370508+00:00",
+      "qualification_body_sha256": "7742616380ae6f3989e8de637475914bf5cda16a55bf23f6be694a16269fafd0",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01815/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMIZGWDEKKD00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZGWDEKKD00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:09.405272+00:00",
+      "qualification_body_sha256": "5196a80817d121d6c1368d0a84da927fe02e0824d67abc0240fcfb03045b94c3",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01813/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMHLLSDEKJZ00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHLLSDEKJZ00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:12.422117+00:00",
+      "qualification_body_sha256": "9bf1424865fb001467c8392318a12d5130aad910aaad0209d0443382deaef118",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01811/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMHD72DEKJU00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHD72DEKJU00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:15.326979+00:00",
+      "qualification_body_sha256": "e94a2c856eb85f8d0c59f22dc62e5fcc713b71dc133a8a5d92cfe475d209b99b",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01810/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMHAG1DEKJR00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAG1DEKJR00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:18.235019+00:00",
+      "qualification_body_sha256": "c3e9ede709f110a8a78b8a8ec3f2dc8e9d79c9040102ad7a79c1c3ce2f801ff6",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01809/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMHAESDEKJP00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAESDEKJP00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:21.135405+00:00",
+      "qualification_body_sha256": "5316942efd410cad52e6d23e6043ff7bc7808cbd26f68b1f1d063a96525ce0ac",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01808/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMH4U2DEKJL00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4U2DEKJL00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:24.141891+00:00",
+      "qualification_body_sha256": "4ce0c5ed24b1ef40074fc8c4e91e4b41639f85e14f673894bae4795ac7fa9543",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01807/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMH4TVDEKJJ00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TVDEKJJ00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:28.594174+00:00",
+      "qualification_body_sha256": "d63287b1435455979939e03010998ef79e9e50da02d6733a1204ec56b87edaea",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01806/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMH4TNDEKJH00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TNDEKJH00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:31.599451+00:00",
+      "qualification_body_sha256": "129bb460cf3d21ba802ce2ad277af11a8171cdf62f006cade0d2aaa3e2bf0e32",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01805/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMH4SVDEKJF00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4SVDEKJF00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:34.499047+00:00",
+      "qualification_body_sha256": "b4159d6e876fdd44fd01cae64c863e1343e92df91d2773266d09eea6c01ea00b",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01804/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMG1X6DEKJ900",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMG1X6DEKJ900&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:37.293623+00:00",
+      "qualification_body_sha256": "eeb6391d93ca5017d6ed9b6f1235cf9b604ecc59147f30a5b937322969238d9d",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01801/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFWDUDEKJ500",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFWDUDEKJ500&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:42.682509+00:00",
+      "qualification_body_sha256": "592d295866f48e6c5acb636245dee82ec0c2f81e84f318a809e2e83f72c0f82b",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01800/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFUWXDE02800",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFUWXDE02800&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:45.797745+00:00",
+      "qualification_body_sha256": "1522d13f66d2359a4f1729a3a24610cf5bed8460f2106004b0b0c1eb88bd87ef",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01799/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFTLRDEKJ200",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFTLRDEKJ200&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:48.803615+00:00",
+      "qualification_body_sha256": "407edfdb223c9758c7005ba4bfdd0427ad059e6a6cffae26ee87dfb3badc4a21",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01797/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFQF4DE03B00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:52.018836+00:00",
+      "qualification_body_sha256": "abc83e03e874f30ca206323ffc534818d2474855aadfb358379ab4a0623fb7ac",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01796/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFLB8DEKIV00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFLB8DEKIV00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:55.026724+00:00",
+      "qualification_body_sha256": "7e52af249f96f18fd6e73b36e493f52cba2046824d6fe20add8887f3ea3aa0c4",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01795/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFITADE03B00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFITADE03B00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:56:58.034020+00:00",
+      "qualification_body_sha256": "7e4aa7090a8b10c88d9d1813f4baa2a5d2f89f33ed1e1e594b746007af7bcaa5",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01794/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFII5DEKIS00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFII5DEKIS00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:01.052291+00:00",
+      "qualification_body_sha256": "d02dd3fd4c8f84aafb0b5527242a5df1fd274713821ca3d425df820f5dfd8c8e",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01793/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFA8DDEKIN00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA8DDEKIN00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:03.964136+00:00",
+      "qualification_body_sha256": "1cabbee11cc502f3a28162add7ffb746f9d1a99b3fe733af09ba6631962aeae4",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01791/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMFA63DEKIJ00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA63DEKIJ00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:06.867902+00:00",
+      "qualification_body_sha256": "c3e694e8901c05751fe5104e1c6c222121817ac48f5c20af93321ebee747c338",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01790/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMA9MQDEKI200",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:09.564358+00:00",
+      "qualification_body_sha256": "da961e889c4da179519db12ed8dd064fc2cf380f340d8ea1fd2441d33ab5201d",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01789/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMA19DDEKHX00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA19DDEKHX00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:12.467126+00:00",
+      "qualification_body_sha256": "524d9185bad5a260b990d360f78b8b4beac4734569c1d0dd0dab6948ea614022",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01787/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM9VQ2DEKHR00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:15.472902+00:00",
+      "qualification_body_sha256": "53d9ab6b2798bcfa2d2f1443b8367bfa05d7ff21dc610371a623011cf0937cf4",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01786/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM9T1HDEKHO00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:18.484086+00:00",
+      "qualification_body_sha256": "679012c3b95145651256f8728eaace72c4c240bbeb01cfd1748178717d68d8c6",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01785/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM8139DEKH800",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:21.593981+00:00",
+      "qualification_body_sha256": "eca123f042b8f85af5fc6e5f01554a2436fd044807088ef4c65706b651a9e4be",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01784/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM7YC9DEKH500",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:26.257829+00:00",
+      "qualification_body_sha256": "79249362756d8af8af8ed22d1b9eb2db5b461c5b2899873feaf9637d05666fd9",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01783/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM7VQZDEKH200",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:29.058939+00:00",
+      "qualification_body_sha256": "9754ec33f21f622f1f2151701f1784dbe0a0f76c963c570e9e3877e31c067503",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01782/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TM7VQMDEKH000",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary",
+      "source_window": [
+        "2026-10-01",
+        "2026-10-07"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:31.865958+00:00",
+      "qualification_body_sha256": "f2b33de44a0b6a6f0f7516f6f64203c60f824a1e92ebeb7394788fe89f0ee2a4",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01858/26/PREMIN",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMXZKVDE07600",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMXZKVDE07600&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:34.769585+00:00",
+      "qualification_body_sha256": "0ffaea35ba20f10ff4677eef9805c20a868510412d737acea32f3799e201783a",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01852/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMW58NDE04Y00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW58NDE04Y00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:39.121966+00:00",
+      "qualification_body_sha256": "1ea15d403a6cdbd6bd78d1491abcb2da0cdae4ec117c22df9324cb1d994ebbdc",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01851/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMW3QTDEKO500",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW3QTDEKO500&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:41.918932+00:00",
+      "qualification_body_sha256": "ac509aeb785a9228fdf660e206317005d59861f247a0dcf066e24c98d96deaa7",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01848/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMUV92DEKNT00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUV92DEKNT00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:44.828356+00:00",
+      "qualification_body_sha256": "789da2d50405645713c84c041387c8643b2cb9897801c0718e3a84553cf53eb9",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01847/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMUK6MDEKNN00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUK6MDEKNN00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:47.525048+00:00",
+      "qualification_body_sha256": "c48211b986fd2b9f3b5fb2608394e014ca1811b84d646f5316cb1425ff098f60",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01845/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMUEP5DEKNJ00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUEP5DEKNJ00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:50.428938+00:00",
+      "qualification_body_sha256": "3af2fbe292fca34f63ac0703a5c7bfe1cb0d44646c21ed0bc266d5e8009a5089",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01843/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMU3ITDEKND00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3ITDEKND00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:53.642933+00:00",
+      "qualification_body_sha256": "b3ad1753c9369727271be4bd36bfdfaa584e49ef0b1d28daaf0a6c0645a01ab7",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01841/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMU3H8DEKN900",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3H8DEKN900&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:56.337946+00:00",
+      "qualification_body_sha256": "087b2fb74e249b3d31bc5394bd586594df721ad602c78b132ebfecdd890c0f13",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01840/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSXUQDEKN200",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSXUQDEKN200&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:57:59.240772+00:00",
+      "qualification_body_sha256": "be340e88680d083a62b64e11fb3e7f7900cf0719b6654186377394280e375564",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01839/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSPI5DEKMV00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSPI5DEKMV00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:02.043949+00:00",
+      "qualification_body_sha256": "9084e9e08649c719729e14bf73d49e550211c917aa73bf1587be633e40769b7b",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01838/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSO41DE02800",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSO41DE02800&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:06.399806+00:00",
+      "qualification_body_sha256": "5bdd1aebebf424ba3963face59428b3e001af0f63f072f85ff92f8e5952770cb",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01836/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMSMQ4DEKMS00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSMQ4DEKMS00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:09.095393+00:00",
+      "qualification_body_sha256": "26450233d8e5b9abec2da190f94f57d1a0617646459c648d2f67fca6d25601cf",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01833/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMS8TZDEKMJ00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8TZDEKMJ00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:11.999982+00:00",
+      "qualification_body_sha256": "d62d2669d45cd556745bfcd5c2031dc7e4977a616f738fbdec174a65eabefb21",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01832/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMS8SXDEKMH00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8SXDEKMH00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:14.806137+00:00",
+      "qualification_body_sha256": "37e0b9d8cbea1e0486b0099739eb697c01bb9dec57b4ee6c9faa99c78e69e5a9",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01827/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMLJ88DEKLK00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:17.619732+00:00",
+      "qualification_body_sha256": "4c094ff9aef9f03407e4291b70d7a8725bc6908f4e7cc1de40f827ca8a52699a",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01826/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMLGCZDEKLH00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLGCZDEKLH00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:20.212161+00:00",
+      "qualification_body_sha256": "5aa44cfa9af02e907b6ac8a86549ac5c3a9c7b98ced422c1ca3991792ecb5b6a",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01825/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMKYQPDE04Y00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKYQPDE04Y00&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    },
+    {
+      "application_role": "UNKNOWN",
+      "cohort_origin": "UNATTEMPTED_11",
+      "council": "bolton",
+      "materiality": "POTENTIALLY_MATERIAL",
+      "platform_family": "IDOX",
+      "qualification_at": "2026-10-15T18:58:23.011194+00:00",
+      "qualification_body_sha256": "571c05b7b8f4b4dd1cbe41dab0886f461975ae82e36726ce4728991590b5916b",
+      "qualification_scope": "INITIAL_STATUS_ONLY",
+      "reference": "01823/26",
+      "site_relationship": "UNKNOWN",
+      "source_identifier": "TMKU6ADEKL500",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKU6ADEKL500&activeTab=summary",
+      "source_window": [
+        "2026-10-08",
+        "2026-10-14"
+      ]
+    }
+  ],
+  "sites_links_opportunities_forbidden": true,
+  "version": 1
+}
