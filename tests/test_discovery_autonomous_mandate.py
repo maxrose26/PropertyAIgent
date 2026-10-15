@@ -135,6 +135,7 @@ def test_selected_actual_private_worker_shared_handoff(engine,tmp_path,monkeypat
 
 def test_selected_export_revision_and_path_guards(tmp_path,monkeypatch):
  import sys
+ tmp_path=tmp_path/'selected-audit';tmp_path.mkdir()
  monkeypatch.setenv('GITHUB_SHA','a'*40);monkeypatch.setenv('GITHUB_RUN_ID','123')
  (tmp_path/'execution.json').write_text(json.dumps(dict(sha='a'*40,run_id='123',cohort_sha256=s.COHORT_SHA,run_number=1,attempt=1)))
  (tmp_path/'supervisor.json').write_text(json.dumps(dict(cohort_sha256=s.COHORT_SHA,primary_sha256=s.PRIMARY_SHA)))
