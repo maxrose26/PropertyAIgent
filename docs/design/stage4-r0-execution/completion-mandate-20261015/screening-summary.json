@@ -1,0 +1,21 @@
+{
+  "accepted_no_refetch": 3,
+  "current_comparison": 944,
+  "membership": {
+    "IN_TARGET": 431,
+    "OVERLAP_CONTEXT": 375,
+    "UNKNOWN": 117
+  },
+  "now_primary": 259,
+  "original_independent_only": 283,
+  "primary": 923,
+  "processing": {
+    "DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE": 34,
+    "INSUFFICIENT_EVIDENCE": 757,
+    "RELATED_APPLICATION_FOLLOW_THROUGH": 126,
+    "SUPPORTED_PROCESSING_PRIORITY": 6
+  },
+  "proposal_missing": 415,
+  "proposal_present": 508,
+  "still_independent_only": 24
+}

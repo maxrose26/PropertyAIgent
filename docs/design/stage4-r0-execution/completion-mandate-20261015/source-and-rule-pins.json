@@ -1,0 +1,342 @@
+{
+  "code_was_not_executed_against_sources": true,
+  "local_retained_code_sha256": {
+    "app/pipeline/bolton_initial_status.py": "b1e0679c50aee896d59578c504a01b41d6ddd9e95b68cb2479c85173641e830d",
+    "app/pipeline/discovery_admission.py": "d4d71e94585bb688856072efc2bb9ac787cd30e197ae41c4261bea459d92af05",
+    "app/pipeline/discovery_contract.py": "41f8421569e17ff1e04d0c67442f4793b4089037a2926121748fdecc603f7aa4",
+    "app/pipeline/discovery_screening.py": "f8ef4037dbd8e2c42ea007e5e90681aff3312106de397f9abccb446e721a4867",
+    "app/scrapers/unit_filter.py": "57227e0f3ef6c3d333e8f7a56570626b4065b1f2bde4de231454f0c9bab9102e",
+    "verification/direct_reference/refresh.py": "e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2",
+    "verification/discovery/arcus_ui_config.py": "e54427a09482cc3749f1b42dd4554ff5a9df281a2279b52bf49bc28ab74341a5",
+    "verification/discovery/bolton53_admission.py": "751f2f3cfd8a0d9784c84608745479ed2a2e27cbd76cf4e7ec3200d3dd816b5d",
+    "verification/discovery/finite_acceptance.py": "63a6c91654c991f44ca353384c688798543304f98d928cc509e41f5650828d81",
+    "verification/discovery/idox_window.py": "93d5ca4146f66492cac606a4f1be5bc37445f7797ded7b436eac90fd9f2b88ff",
+    "verification/discovery/r0_identity_comparison.py": "4909d362d8e5000618a0731c9f043aa5bd7266403c2b78f591ee07fb336c2913"
+  },
+  "observation_destinations": [
+    {
+      "allowed_host": "planning.bury.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://planning.bury.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "residual-four.json",
+      "window": {
+        "council": "bury",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "allowed_host": "planningpa.oldham.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://planningpa.oldham.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "residual-four.json",
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "allowed_host": "account.rochdale.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMDgiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTE0IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+      "manifest": "residual-four.json",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "allowed_host": "publicaccess.tameside.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://publicaccess.tameside.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "residual-four.json",
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTE3IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0xOSIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-19",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTIwIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0yMyIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-20"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTI0IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0yNiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-26",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTI3IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0zMCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-27"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTAxIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wMyIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTA0IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wNyIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-04"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTA4IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0xNCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "allowed_host": "account.rochdale.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMDktMTciLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTIzIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "allowed_host": "account.rochdale.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMDktMjQiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTA5LTMwIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "allowed_host": "account.rochdale.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMDEiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTA3IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "allowed_host": "salfordcitycouncil.my.site.com",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0xNyIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMDktMjMiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "salford",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "allowed_host": "salfordcitycouncil.my.site.com",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0wOS0yNCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMDktMzAiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "salford",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "allowed_host": "salfordcitycouncil.my.site.com",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wMSIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMDciLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "salford",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "allowed_host": "salfordcitycouncil.my.site.com",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0wOCIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMTQiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+      "manifest": "screening-metadata-fourteen.json",
+      "window": {
+        "council": "salford",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "allowed_host": "paplanning.bolton.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "planning.bury.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://planning.bury.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "bury",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "arcusbe.manchester.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTE1IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0xNSIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "planningpa.oldham.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://planningpa.oldham.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "account.rochdale.gov.uk",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMTUiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTE1IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "salfordcitycouncil.my.site.com",
+      "allowed_path_prefix": "/pr/",
+      "entry_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0xNSIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMTUiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "salford",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "planning.stockport.gov.uk",
+      "allowed_path_prefix": "/PlanningData-live/",
+      "entry_url": "https://planning.stockport.gov.uk/PlanningData-live/search.do?action=advanced&searchType=Application",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "publicaccess.tameside.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://publicaccess.tameside.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "allowed_host": "planning.wigan.gov.uk",
+      "allowed_path_prefix": "/online-applications/",
+      "entry_url": "https://planning.wigan.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "manifest": "bridge-nine.json",
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    }
+  ]
+}

@@ -55,6 +55,10 @@ def test_environment_is_exclusive_to_live_job():
     assert live['jobs']['audit']['environment']=='stage4-production-canary'
     for path,workflow in workflows.items():
         for job_id,job in workflow.get('jobs',{}).items():
+            if (path,job_id)==('.github/workflows/stage4-catchup-completion-comparison944-once.yml','comparison'):
+                from tests.test_discovery_completion import assert_comparison_registered
+                assert_comparison_registered(Path(path).read_bytes())
+                continue
             if (path,job_id)==('.github/workflows/stage4-r0-selective5-admission-once.yml','source'):
                 from tests.test_discovery_autonomous_mandate import assert_selected_registered
                 assert_selected_registered(Path(path).read_bytes())

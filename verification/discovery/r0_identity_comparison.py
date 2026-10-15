@@ -43,9 +43,9 @@ def admit(env, sha, manifest_sha, authority):
     identities()
 
 
-def statement():
+def statement(rows=None):
     # Parameter names are generated internally; literals never become SQL.
-    rows = identities(); params = {}
+    rows = identities() if rows is None else rows; params = {}
     values = []
     for n, row in enumerate(rows):
         values.append(f'(:c{n}, :r{n})')
@@ -65,7 +65,7 @@ LEFT JOIN LATERAL (
     return sql, params
 
 
-def query(connection, audit=None):
+def query(connection, audit=None, *, exact_rows=None, output_bound=100_000):
     """One explicit read-only transaction; success/failure always ROLLBACK."""
     from sqlalchemy import text
     audit = {} if audit is None else audit
@@ -79,10 +79,11 @@ def query(connection, audit=None):
         if connection.exec_driver_sql('SHOW transaction_read_only').scalar_one() != 'on':
             raise ValueError('READ_ONLY_NOT_CONFIRMED')
         audit['read_only_confirmed'] = True
-        sql, params = statement()
+        requested=identities() if exact_rows is None else exact_rows
+        sql, params = statement(requested)
         rows = list(connection.execute(text(sql), params).mappings())
-        expected = {(x['council_code'], x['reference']) for x in identities()}
-        if len(rows) != 80 or {(x['council_code'], x['reference']) for x in rows} != expected:
+        expected = {(x['council_code'], x['reference']) for x in requested}
+        if len(rows) != len(requested) or {(x['council_code'], x['reference']) for x in rows} != expected:
             raise ValueError('COMPARISON_RESULT_REJECTED')
         result = []
         stamps = set()
@@ -102,10 +103,10 @@ def query(connection, audit=None):
                 outcome=('ABSENT', 'ONE_MATCH', 'DUPLICATE_DETECTED')[n]))
         if len(stamps) != 1:
             raise ValueError('COMPARISON_RESULT_REJECTED')
-        out = dict(snapshot_timestamp=stamps.pop(), requested_identities=80,
+        out = dict(snapshot_timestamp=stamps.pop(), requested_identities=len(requested),
             comparison=result, transaction='READ_ONLY_ROLLED_BACK', production_writes=0,
             source_requests=0, admission_calls=0)
-        if len(json.dumps(out).encode()) > 100_000:
+        if len(json.dumps(out).encode()) > output_bound:
             raise ValueError('OUTPUT_LIMIT')
         return out
     finally:
@@ -116,7 +117,12 @@ def query(connection, audit=None):
 
 
 def run(raw):
+    return run_exact(raw,None)
+
+def run_exact(raw,exact_rows,*,output_bound=100_000):
     """Validate exact destination before engine creation; no exception text leaves."""
+    if exact_rows is not None and (not isinstance(exact_rows,list) or not 1<=len(exact_rows)<=1000 or any(set(r)!={'council_code','reference'} or not isinstance(r['reference'],str) or not 1<=len(r['reference'])<=100 for r in exact_rows) or len({(r['council_code'],r['reference']) for r in exact_rows})!=len(exact_rows)):
+        raise ValueError('EXACT_COHORT_REJECTED')
     from sqlalchemy import create_engine
     from sqlalchemy.pool import NullPool
     engine = None
@@ -133,7 +139,7 @@ def run(raw):
         with engine.connect() as connection:
             audit['connected'] = True
             audit['phase'] = 'READ_ONLY_COMPARISON_REQUESTED'
-            result = query(connection, audit)
+            result = query(connection, audit,exact_rows=exact_rows,output_bound=output_bound)
             audit.update(result)
         audit['result'] = 'COMPLETED'
     except Exception:

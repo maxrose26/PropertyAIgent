@@ -1,0 +1,47 @@
+{
+  "bridge9": {
+    "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_BRIDGE9_ONCE",
+    "bytes": 80914560,
+    "calls": 9,
+    "cleanup_upload_seconds": 205,
+    "job_seconds": 960,
+    "manifest": "bridge-nine.json",
+    "manifest_sha": "0ef15c5c3bb33e91ca7146fc7cbc09e80fd56cd6d93eb8b3f354ab150ef1aac2",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 300,
+    "seconds": 495,
+    "setup_seconds": 260,
+    "workflow": ".github/workflows/stage4-catchup-completion-bridge9-once.yml"
+  },
+  "residual4": {
+    "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_RESIDUAL4_ONCE",
+    "bytes": 29971520,
+    "calls": 4,
+    "cleanup_upload_seconds": 180,
+    "job_seconds": 660,
+    "manifest": "residual-four.json",
+    "manifest_sha": "ffd1822558d8075023580dcda59d9b1a35e5af99fcfa4b56e8c1d8108bc7e4af",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 110,
+    "seconds": 220,
+    "setup_seconds": 260,
+    "workflow": ".github/workflows/stage4-catchup-completion-residual4-once.yml"
+  },
+  "screen14": {
+    "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_SCREEN14_ONCE",
+    "bytes": 293601280,
+    "calls": 14,
+    "cleanup_upload_seconds": 230,
+    "job_seconds": 1260,
+    "manifest": "screening-metadata-fourteen.json",
+    "manifest_sha": "0a9e75b35357742cf4084a3ff680d2a9b4233030900942baa95ed88950d89db3",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 1120,
+    "seconds": 770,
+    "setup_seconds": 260,
+    "workflow": ".github/workflows/stage4-catchup-completion-screen14-once.yml"
+  }
+}

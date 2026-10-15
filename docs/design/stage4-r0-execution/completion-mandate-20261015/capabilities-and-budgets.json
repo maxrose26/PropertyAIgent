@@ -1,0 +1,61 @@
+{
+  "comparison": {
+    "active_seconds": 120,
+    "audit_bytes": 2000000,
+    "connect_seconds": 5,
+    "connections_max": 2,
+    "data_statements": 2,
+    "delta_identities_max": 1000,
+    "fixed_identities": 944,
+    "idle_transaction_seconds": 20,
+    "limit_per_identity": 2,
+    "lock_seconds": 2,
+    "statement_seconds": 15
+  },
+  "independent": {
+    "navigation_actions": 270,
+    "network_request_bytes": "UNKNOWN_WHERE_UNINSTRUMENTED",
+    "references": 1620,
+    "rows": 27,
+    "seconds": 5400,
+    "segments": 162
+  },
+  "proposal_only": true,
+  "selective_capture": {
+    "active_seconds": 3000,
+    "audit_bytes": 8000000,
+    "capacity_derivation": "floor((3000active-120supervision)/180perrecord)=16; five concrete priorities plus at most11new evidence-backed subjects, not a policy threshold",
+    "cleanup_upload_seconds": 200,
+    "committed_readbacks_max": 32,
+    "connect_seconds": 5,
+    "connection_transaction_phases_max": 64,
+    "data_changing_commits_max": 32,
+    "job_seconds": 3600,
+    "lock_seconds": 3,
+    "received_bytes": 32000000,
+    "record_allocation_seconds": 2880,
+    "record_seconds": 180,
+    "records_max": 16,
+    "requests": 32,
+    "rss_bytes": 1610612736,
+    "setup_seconds": 280,
+    "source_allocation_seconds": 880,
+    "source_calls": 16,
+    "statement_seconds": 10,
+    "supervision_checkpoint_reserve_seconds": 120
+  },
+  "source": {
+    "accounted_bytes": 404487360,
+    "audit_bytes_per_scope": 20000000,
+    "audit_bytes_total": 60000000,
+    "calls": 27,
+    "cleanup_upload_seconds": 615,
+    "no_parallel_stacking": true,
+    "requests": 1530,
+    "rss_bytes": 1610612736,
+    "scopes": 3,
+    "setup_seconds": 780,
+    "total_allocated_seconds": 2880,
+    "worker_seconds": 1485
+  }
+}

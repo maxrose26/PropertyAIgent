@@ -180,3 +180,18 @@ def test_selective5_actual_fixed_subset_on_disposable_postgres(pg):
     again=chosen.run(engine_factory=lambda:pg,reader=lambda _:pytest.fail('existing must not refetch'),checkpoint=lambda _:None,journal=lambda *_:None)
     assert all(r['identity']=='ALREADY_KNOWN' and r['facts']=='EXISTING_NOT_WRITTEN' for r in again['results'][:3])
     with Session(pg) as session:assert session.scalar(select(func.count()).select_from(Application))==3
+
+
+def test_completion944_exact_readonly_query_and_rollback(pg):
+    from verification.discovery.completion_comparison import identities
+    from verification.discovery.r0_identity_comparison import query
+    first=next(r for r in identities() if r['council_code']=='bolton')
+    with Session(pg) as session:
+        session.add(Application(council_code='bolton',reference=first['reference']))
+        session.commit()
+    with pg.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
+        audit={};result=query(connection,audit,exact_rows=identities(),output_bound=1000000)
+        assert result['requested_identities']==944 and audit['read_only_confirmed'] is True
+        assert result['production_writes']==0 and audit['transaction']=='READ_ONLY_ROLLED_BACK'
+        assert sum(x['matching_rows_up_to_two'] for x in result['comparison'])==1
+    with Session(pg) as session:assert session.scalar(select(func.count()).select_from(Application))==1

@@ -1,0 +1,72 @@
+{
+  "approval_status": "PROPOSAL_ONLY",
+  "baseline_revision": "f6525edffb514a79343191860056e1bed3e66082",
+  "workflows": [
+    {
+      "attempt": 1,
+      "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_RESIDUAL4_ONCE",
+      "manifest": "residual-four.json",
+      "manifest_sha256": "ffd1822558d8075023580dcda59d9b1a35e5af99fcfa4b56e8c1d8108bc7e4af",
+      "path": ".github/workflows/stage4-catchup-completion-residual4-once.yml",
+      "registration_status": "NOT_CREATED",
+      "reviewed_sha": "FUTURE_VERIFIED_INTEGRATED_SHA_NOT_YET_FROZEN",
+      "run_number": 1,
+      "scope": "residual4"
+    },
+    {
+      "attempt": 1,
+      "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_SCREEN14_ONCE",
+      "manifest": "screening-metadata-fourteen.json",
+      "manifest_sha256": "0a9e75b35357742cf4084a3ff680d2a9b4233030900942baa95ed88950d89db3",
+      "path": ".github/workflows/stage4-catchup-completion-screen14-once.yml",
+      "registration_status": "NOT_CREATED",
+      "reviewed_sha": "FUTURE_VERIFIED_INTEGRATED_SHA_NOT_YET_FROZEN",
+      "run_number": 1,
+      "scope": "screen14"
+    },
+    {
+      "attempt": 1,
+      "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_BRIDGE9_ONCE",
+      "manifest": "bridge-nine.json",
+      "manifest_sha256": "0ef15c5c3bb33e91ca7146fc7cbc09e80fd56cd6d93eb8b3f354ab150ef1aac2",
+      "path": ".github/workflows/stage4-catchup-completion-bridge9-once.yml",
+      "registration_status": "NOT_CREATED",
+      "reviewed_sha": "FUTURE_VERIFIED_INTEGRATED_SHA_NOT_YET_FROZEN",
+      "run_number": 1,
+      "scope": "bridge9"
+    },
+    {
+      "attempt": 1,
+      "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_COMPARISON944_ONCE",
+      "manifest": "comparison-944.json",
+      "manifest_sha256": "34d6fe5ee4941b258afe88c2c6ffa196fb3d0bc052b73cb0667bb4e49acb8d5d",
+      "path": ".github/workflows/stage4-catchup-completion-comparison944-once.yml",
+      "registration_status": "NOT_CREATED",
+      "reviewed_sha": "FUTURE_VERIFIED_INTEGRATED_SHA_NOT_YET_FROZEN",
+      "run_number": 1,
+      "scope": "comparison944"
+    },
+    {
+      "attempt": 1,
+      "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_COMPARISON_DELTA_ONCE",
+      "manifest": "DERIVED_AFTER_SOURCE_RESULTS_NOT_YET_FROZEN",
+      "manifest_sha256": null,
+      "path": ".github/workflows/stage4-catchup-completion-comparison_delta-once.yml",
+      "registration_status": "NOT_CREATED",
+      "reviewed_sha": "FUTURE_VERIFIED_INTEGRATED_SHA_NOT_YET_FROZEN",
+      "run_number": 1,
+      "scope": "comparison_delta"
+    },
+    {
+      "attempt": 1,
+      "authority": "AUTHORISE_STAGE4_CATCHUP_COMPLETION_CAPTURE16_ONCE",
+      "manifest": "DERIVED_ELIGIBLE_SUBSET_NOT_YET_FROZEN",
+      "manifest_sha256": null,
+      "path": ".github/workflows/stage4-catchup-completion-capture16-once.yml",
+      "registration_status": "NOT_CREATED",
+      "reviewed_sha": "FUTURE_VERIFIED_INTEGRATED_SHA_NOT_YET_FROZEN",
+      "run_number": 1,
+      "scope": "capture16"
+    }
+  ]
+}

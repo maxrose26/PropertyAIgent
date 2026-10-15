@@ -1,0 +1,68 @@
+{
+  "bytes": 80914560,
+  "context_is_not_fresh_correction_audit": true,
+  "exclusive_cut": "2026-10-16T00:00:00+01:00",
+  "not_before_utc": "2026-10-15T23:00:00Z",
+  "overlap_context": [
+    "2026-09-18",
+    "2026-10-14"
+  ],
+  "requests": 300,
+  "rows": [
+    {
+      "council": "bolton",
+      "end": "2026-10-15",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "bury",
+      "end": "2026-10-15",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-15",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "oldham",
+      "end": "2026-10-15",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-10-15",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-15",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-15",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-15",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-10-15",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    }
+  ],
+  "worker_seconds": 495
+}
