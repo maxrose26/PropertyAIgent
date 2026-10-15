@@ -91,6 +91,10 @@ def qualify(*,reader,checkpoint,clock=time.monotonic):
     """
     from .rejection_audit import observation_audit
     credential_free(os.environ);rows=targets();start=clock();used_requests=used_bytes=0;results=[];stop=None;attempted=0
+    def preserve(value):
+        results.append(value)
+        try:checkpoint(value);return True
+        except Exception:return False
     for i,row in enumerate(rows):
         if (clock()-start+LIMITS['record_seconds']>LIMITS['seconds']
             or used_requests+2>LIMITS['requests'] or used_bytes+2_000_000>LIMITS['bytes']):
@@ -98,17 +102,17 @@ def qualify(*,reader,checkpoint,clock=time.monotonic):
         attempted+=1
         try:source=reader(i,row)
         except Exception:
-            results.append(dict(council=row['council'],reference=row['reference'],
+            preserve(dict(council=row['council'],reference=row['reference'],
                 admission_readiness='UNKNOWN_SOURCE_OR_SUPERVISOR_EXCEPTION',admission_authorised=False))
             stop='SOURCE_OR_SUPERVISOR_EXCEPTION_ACCOUNTING_UNKNOWN';break
         try:resource=project(row,source)
         except Exception:
-            results.append(dict(council=row['council'],reference=row['reference'],
+            preserve(dict(council=row['council'],reference=row['reference'],
                 admission_readiness='UNKNOWN_INVALID_ARTIFACT',admission_authorised=False))
             stop='SOURCE_OR_SUPERVISOR_EXCEPTION_ACCOUNTING_UNKNOWN';break
         audit=resource['audit'];failure=resource['failure']
         if (audit.get('cleanup_state')!='CLOSED' or audit.get('budget_state')!='WITHIN_LIMITS'):
-            results.append(dict(council=row['council'],reference=row['reference'],source_audit=audit,
+            preserve(dict(council=row['council'],reference=row['reference'],source_audit=audit,
                 failure=failure,admission_readiness='WITHHELD_RESOURCE_OR_CLEANUP',admission_authorised=False))
             stop='RESOURCE_OR_CLEANUP';break
         # project_idox verifies finite nonnegative counters and hard limits.
@@ -122,9 +126,7 @@ def qualify(*,reader,checkpoint,clock=time.monotonic):
             conservative_materiality=row['retained_materiality'],site_relationship='UNKNOWN',application_role='UNKNOWN',
             admission_readiness='ELIGIBLE_FOR_REVIEW_ONLY' if eligible else 'WITHHELD_PENDING_EVIDENCE',
             admission_authorised=False,production_writes=0)
-        results.append(result)
-        try:checkpoint(result)
-        except Exception:stop='CHECKPOINT_FAILURE_NO_NEXT_CALL';break
+        if not preserve(result):stop='CHECKPOINT_FAILURE_NO_NEXT_CALL';break
         if (failure is not None and failure not in LOCAL) or failure in HARD:
             stop='HARD_OR_UNCLASSIFIED_FAILURE';break
         if len(json.dumps(results,sort_keys=True).encode())>LIMITS['output_bytes']:
