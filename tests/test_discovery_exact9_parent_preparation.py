@@ -15,12 +15,12 @@ def credential_free_test_context(monkeypatch):
             monkeypatch.delenv(k,raising=False)
 
 
-def test_exact9_provenance_limits_and_unregistered_template():
+def test_exact9_provenance_limits_and_registered_template():
     m=json.loads(nine.MANIFEST.read_bytes());p=nine.plan()
     prior=json.loads((nine.PACK/'source-exact16-result.json').read_bytes())
     assert m['rows']==prior['not_attempted'] and len(m['rows'])==9
     assert nine.PROFILE['requests']==9*10 and nine.PROFILE['bytes']==9*3_000_000
-    assert nine.PROFILE['seconds']==9*55 and not (nine.ROOT/nine.WORKFLOW).exists()
+    assert nine.PROFILE['seconds']==9*55 and (nine.ROOT/nine.WORKFLOW).read_bytes()==nine.TEMPLATE.read_bytes()
     assert p['manifest_sha256']==hashlib.sha256(nine.MANIFEST.read_bytes()).hexdigest()
     template=nine.TEMPLATE.read_text();assert 'GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}' in template
     assert 'verification.discovery.r0_exact9' in template and 'environment:' not in template and 'DATABASE_URL' not in template
