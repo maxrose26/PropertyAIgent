@@ -53,14 +53,38 @@ def qualify(row,source,independent):
               'criteria_verified':True,'terminal_verified':True}
     if any(independent.get(k)!=v for k,v in required.items()):return 'UNKNOWN'
     if not re.fullmatch('[0-9a-f]{64}',independent.get('evidence_sha256','')):return 'UNKNOWN'
+    try:
+        def stamp(value):
+            parsed=datetime.fromisoformat(value)
+            if parsed.utcoffset() is None:raise ValueError('timestamp timezone')
+            return parsed
+        observed=source['primary_observation']
+        primary_start,primary_end=stamp(observed['started_at']),stamp(observed['ended_at'])
+        independent_start,independent_end=stamp(independent['observed_started_at']),stamp(independent['observed_ended_at'])
+        sealed,revealed=stamp(independent['sealed_at']),stamp(independent['primary_revealed_at'])
+        if not primary_start<=primary_end<=revealed or not independent_start<=independent_end<=sealed<=revealed:return 'UNKNOWN'
+        assessor,session,primary_session=(independent[k] for k in ('assessor','assessor_session','primary_session'))
+        if not all(isinstance(x,str) and 1<=len(x)<=100 for x in (assessor,session,primary_session)) or session==primary_session:return 'UNKNOWN'
+    except (KeyError,TypeError,ValueError):return 'UNKNOWN'
     refs=independent.get('references');segments=independent.get('segments')
     if (not isinstance(refs,list) or not all(isinstance(x,str) and x for x in refs)
         or len(set(refs))!=len(refs) or type(segments) is not int or not 1<=segments<=6
         or (not refs and independent.get('explicit_zero') is not True)):return 'UNKNOWN'
     actual=source.get('listing_records' if row['council'] in f.ARCUS else 'records',[])
     primary=[r.get('reference') for r in actual]
-    if set(primary)!=set(refs):return 'INCOMPLETE'
+    # A discrepancy blocks acceptance, but changing public source state is a
+    # possible cause. Preserve the sets/timestamps for review, never self-label
+    # this as a parser defect or silently add the missing reference.
+    if set(primary)!=set(refs):return 'UNKNOWN'
     return 'COMPLETE'
+
+def reference_difference(primary,independent):
+    """Comparison ledger only; call with previously qualified literal references."""
+    a,b=set(primary),set(independent)
+    return dict(outcome='MATCH' if a==b else 'UNRESOLVED_REFERENCE_DIFFERENCE',
+        primary_only=sorted(a-b),independent_only=sorted(b-a),
+        cause='NOT_APPLICABLE' if a==b else 'UNKNOWN_SOURCE_CHANGE_OR_ENUMERATION')
+
 
 def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS):
     """Hard parent wait, owned group termination, bounded child files.

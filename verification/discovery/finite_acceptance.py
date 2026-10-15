@@ -3,7 +3,7 @@
 Registration must pin the reviewed manifest/hash/revision and supervise this
 caller with the declared hard outer deadline before any live execution.
 """
-from datetime import date,timedelta
+from datetime import date,timedelta,datetime,timezone
 import hashlib,json,time
 from pathlib import Path
 import tempfile,contextlib,os,sys
@@ -82,7 +82,10 @@ def execute(plan,expected_hash,reader=read,clock=time.monotonic):
         arc=row['council'] in ARCUS;rq=80 if arc else 10;by=20*1024*1024 if arc else 3_000_000
         if requests+rq>LIMITS['requests'] or body_bytes+by>LIMITS['bytes'] or clock()-started+55>LIMITS['seconds']:
             stop='ROUND_BUDGET';break
-        try:a=reader(row)
+        observed_start=datetime.now(timezone.utc).isoformat()
+        try:
+            a=reader(row)
+            a=dict(a,primary_observation=dict(started_at=observed_start,ended_at=datetime.now(timezone.utc).isoformat()))
         except Exception:
             accounting_complete=False
             results.append(dict(window=row,enumeration_completeness='FAILED',completeness='FAILED',reason='SOURCE_EXCEPTION'));stop='SOURCE_EXCEPTION';break

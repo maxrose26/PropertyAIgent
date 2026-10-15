@@ -37,15 +37,17 @@ def test_manifest_revision_mismatch():
 
 
 def test_new_window_qualification_needs_independent_seal():
-    row=r.PLAN['rounds'][0]['rows'][0];source=evidence(row)
+    row=r.PLAN['rounds'][0]['rows'][0];source=dict(evidence(row),primary_observation={'started_at':'2026-10-16T00:00:00+00:00','ended_at':'2026-10-16T00:01:00+00:00'})
     assert r.qualify(row,source,{})=='UNKNOWN'
     independent=dict(council=row['council'],interval=[row['start'],row['end']],semantics=row['semantics'],complete=True,
         sealed_before_primary_reveal=True,criteria_verified=True,terminal_verified=True,evidence_sha256='b'*64,
-        references=[],segments=1,explicit_zero=True)
+        references=[],segments=1,explicit_zero=True,assessor='independent-operator',assessor_session='blind-session',primary_session='primary-session',
+        observed_started_at='2026-10-16T00:00:00+00:00',observed_ended_at='2026-10-16T00:02:00+00:00',
+        sealed_at='2026-10-16T00:03:00+00:00',primary_revealed_at='2026-10-16T00:04:00+00:00')
     assert r.qualify(row,source,independent)=='COMPLETE'
-    for k,v in [('sealed_before_primary_reveal',False),('criteria_verified',False),('semantics','PUBLICATION'),('explicit_zero',False)]:
+    for k,v in [('sealed_before_primary_reveal',False),('criteria_verified',False),('semantics','PUBLICATION'),('explicit_zero',False),('sealed_at','2026-10-16T00:05:00+00:00'),('assessor_session','primary-session'),('primary_revealed_at',None)]:
         assert r.qualify(row,source,dict(independent,**{k:v}))=='UNKNOWN'
-    assert r.qualify(row,source,dict(independent,references=['MISSING/26']))=='INCOMPLETE'
+    assert r.qualify(row,source,dict(independent,references=['MISSING/26']))=='UNKNOWN'
     assert r.qualify(row,dict(source,capped=True),independent)=='UNKNOWN'
 
 
@@ -131,3 +133,8 @@ def test_actual_workflow_parent_environment_mapping(monkeypatch):
                 with pytest.raises(ValueError,match='R0_ADMISSION_REJECTED'):
                     r.admit(broken,broken['REVIEWED_SHA'],broken['MANIFEST_SHA'],now=datetime(2026,10,16,tzinfo=timezone.utc))
             source.assert_not_called()
+
+
+def test_reference_difference_is_unresolved_not_parser_failure():
+    out=r.reference_difference(['A/26'],['B/26'])
+    assert out==dict(outcome='UNRESOLVED_REFERENCE_DIFFERENCE',primary_only=['A/26'],independent_only=['B/26'],cause='UNKNOWN_SOURCE_CHANGE_OR_ENUMERATION')
