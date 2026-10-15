@@ -1,0 +1,18 @@
+{
+  "run": "38811609389",
+  "artifact_id": 12008762318,
+  "zip_sha256": "f58c1cf37ba415343069fba0e19acd32783dad86c580162f5b72dd3bf4b5cb70",
+  "production_effects": "THREE_PENDING_IDENTITIES_AND_THREE_INITIAL_LITERAL_STATUS_FACTS_COMMITTED_READBACK_CONFIRMED",
+  "existing": 0,
+  "created": 3,
+  "withheld_no_transaction": 2,
+  "uncertain": 0,
+  "source_requests": 3,
+  "source_bytes": 106446,
+  "elapsed_seconds": 33.85886120800001,
+  "peak_owned_rss": 311648256,
+  "cleanup": "CLOSED",
+  "survivors": 0,
+  "engine_disposal_phases": 3,
+  "checksums_verified": 5
+}

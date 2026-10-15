@@ -1,0 +1,16 @@
+{
+  "scope": "partitions8",
+  "checked_at": "2026-10-15T21:44:07.335Z",
+  "sha": "f6525edffb514a79343191860056e1bed3e66082",
+  "tree": "2bb275249896ec5e6a7506a2e40ce0ba2b116ffe",
+  "history_total": 32,
+  "history_returned": 32,
+  "prior_scope_runs": 0,
+  "prior_selective_run": "38811609389",
+  "prior_cleanup": "CLOSED",
+  "prior_accounting_certain": true,
+  "prior_uncertain_transactions": 0,
+  "independent_seal": "4a11d2f4bda65f1879b0d9adc0985ff19dac080ea95caa4a3e6c656e64d083fb",
+  "manifest_sha": "cf8c2d1fcd8dc95a41e9b03144a09e24af5c5c1db887d9bfafbf6876009ee376",
+  "authority": "AUTHORISE_R0_MANDATE_PARTITIONS8_ONCE"
+}
