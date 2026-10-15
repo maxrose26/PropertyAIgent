@@ -1,0 +1,20 @@
+{
+  "count": 3,
+  "excludes": "fixed944 and accepted1504-1506",
+  "execution": "BLOCKED_GLOBAL_STOP",
+  "identities": [
+    {
+      "council_code": "bolton",
+      "reference": "01859/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01860/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01861/26"
+    }
+  ],
+  "purpose": "FROZEN_AUTHORISED_SUCCESSOR_IDENTITIES_NOT_QUERIED"
+}

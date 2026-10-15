@@ -1,0 +1,2242 @@
+{
+  "aggregate": {
+    "accounted_bytes": 186122844,
+    "audit_bytes": 1728466,
+    "internal_transport_retries": 1,
+    "observation_calls": 19,
+    "outer_execution_seconds": 118.28999999999999,
+    "peak_owned_rss": 1060761600,
+    "requests": 553,
+    "sequential_scopes": 3,
+    "setup_to_job_completion_seconds": 322
+  },
+  "bounded_mandate_completed": false,
+  "bridge_rows": [
+    {
+      "candidate_count": 3,
+      "checkpoint_sha256": "cc889da923d436d2880bec469452e64fbc5568cf3e8335358b8e37c0daadff90",
+      "contained": false,
+      "enumeration": "UNKNOWN",
+      "failure": null,
+      "listing_failure": null,
+      "observation": {
+        "ended_at": "2026-10-15T23:34:58.334955+00:00",
+        "started_at": "2026-10-15T23:34:51.619207+00:00"
+      },
+      "retry_counter": 0,
+      "safe_gap": true,
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": 0,
+      "checkpoint_sha256": "3c404681e83f77b54fd96424a3a998143daf65af08a8c4ca3c96881c3d8a261b",
+      "contained": false,
+      "enumeration": "COMPLETE",
+      "failure": null,
+      "listing_failure": null,
+      "observation": {
+        "ended_at": "2026-10-15T23:35:09.781476+00:00",
+        "started_at": "2026-10-15T23:34:58.340397+00:00"
+      },
+      "retry_counter": 1,
+      "safe_gap": false,
+      "window": {
+        "council": "bury",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": 0,
+      "checkpoint_sha256": "7e60b37aadd4ce442edde2de96e1ff10ad8e0a569e9c303c9566ab1384f773b4",
+      "contained": true,
+      "enumeration": "FAILED",
+      "failure": null,
+      "listing_failure": "TimeoutError",
+      "observation": {
+        "ended_at": "2026-10-15T23:35:23.090009+00:00",
+        "started_at": "2026-10-15T23:35:09.784180+00:00"
+      },
+      "retry_counter": 0,
+      "safe_gap": false,
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": 0,
+      "checkpoint_sha256": "42c137df1ed39a0b4be9669f3e1d15f08b09f0bd3b889d7227d4c45b73ab2910",
+      "contained": false,
+      "enumeration": "FAILED",
+      "failure": "ListingError:sort selector",
+      "listing_failure": null,
+      "observation": {
+        "ended_at": "2026-10-15T23:35:26.664135+00:00",
+        "started_at": "2026-10-15T23:35:23.091383+00:00"
+      },
+      "retry_counter": 0,
+      "safe_gap": false,
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": null,
+      "enumeration": "NOT_ATTEMPTED_GLOBAL_STOP",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": null,
+      "enumeration": "NOT_ATTEMPTED_GLOBAL_STOP",
+      "window": {
+        "council": "salford",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": null,
+      "enumeration": "NOT_ATTEMPTED_GLOBAL_STOP",
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": null,
+      "enumeration": "NOT_ATTEMPTED_GLOBAL_STOP",
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "candidate_count": null,
+      "enumeration": "NOT_ATTEMPTED_GLOBAL_STOP",
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    }
+  ],
+  "capture": {
+    "bolton01702": "ALREADY_KNOWN_ID1493_NO_REFETCH",
+    "eligible_count": "NOT_ESTABLISHED",
+    "excess_eligible_count": "UNKNOWN_NOT_A_ZERO",
+    "oldham_priorities": "NOT_ATTEMPTED_GLOBAL_STOP_FRESH_COUPLED_ELIGIBILITY_UNPROVEN",
+    "result": "NOT_EXECUTED_GLOBAL_STOP",
+    "stockport_priorities": "WITHHELD_EXACT_SOURCE_FACTUAL_CONTRACT_UNQUALIFIED"
+  },
+  "database_catchup_complete": false,
+  "delta": {
+    "comparison": "NOT_EXECUTED_GLOBAL_STOP",
+    "count": 3,
+    "current_presence": "UNKNOWN",
+    "identities": [
+      {
+        "council_code": "bolton",
+        "reference": "01859/26"
+      },
+      {
+        "council_code": "bolton",
+        "reference": "01860/26"
+      },
+      {
+        "council_code": "bolton",
+        "reference": "01861/26"
+      }
+    ]
+  },
+  "historical_windows": [
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 32,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 32,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bolton",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 25,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 25,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bolton",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 29,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 29,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 19,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 19,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 19,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 19,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bury",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 18,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 18,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bury",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 16,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 16,
+      "run": "38731487848",
+      "successor_observation": null,
+      "window": {
+        "council": "bury",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": {
+        "outcome": "BLOCKED_UNRESOLVED",
+        "reason": "NO_SUPPORTED_NEW_PROOF_PATH_RETAINED",
+        "window": {
+          "council": "bury",
+          "end": "2026-10-14",
+          "semantics": "RECEIVED",
+          "start": "2026-10-08"
+        }
+      },
+      "count": 5,
+      "coverage": "UNKNOWN",
+      "enumeration": "UNKNOWN",
+      "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "UNKNOWN",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "UNKNOWN",
+      "retained_candidate_count": 5,
+      "run": "38731487848",
+      "successor_observation": 38813486644,
+      "window": {
+        "council": "bury",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "FAILED",
+      "enumeration": "FAILED",
+      "evidence_path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/extracted/round.json",
+      "evidence_sha256": "bdca7591e6dc48a79bc2d2edd258d6dbb266c71247716c06df6fb978ffd72202",
+      "failure": "LISTING_NOT_QUALIFIED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "CAPPED",
+      "retained_candidate_count": 60,
+      "run": "38744118357",
+      "successor_basis": "TWO_CONTIGUOUS_COMPLETE_PARTITIONS_NOT_ORIGINAL_DETECTION",
+      "successor_observation": 38812359777,
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "INCOMPLETE",
+      "enumeration": "INCOMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "CAPPED",
+      "retained_candidate_count": 60,
+      "run": "38758465439",
+      "successor_basis": "TWO_CONTIGUOUS_COMPLETE_PARTITIONS_NOT_ORIGINAL_DETECTION",
+      "successor_observation": 38812359777,
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "INCOMPLETE",
+      "enumeration": "INCOMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "CAPPED",
+      "retained_candidate_count": 60,
+      "run": "38758465439",
+      "successor_basis": "TWO_CONTIGUOUS_COMPLETE_PARTITIONS_NOT_ORIGINAL_DETECTION",
+      "successor_observation": 38812359777,
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 43,
+      "run": "38758465439",
+      "successor_observation": null,
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 19,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 19,
+      "run": "38758465439",
+      "successor_observation": null,
+      "window": {
+        "council": "oldham",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 13,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 13,
+      "run": "38758465439",
+      "successor_observation": null,
+      "window": {
+        "council": "oldham",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 11,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 11,
+      "run": "38758465439",
+      "successor_observation": null,
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": {
+        "outcome": "BLOCKED_UNRESOLVED",
+        "reason": "NO_SUPPORTED_NEW_PROOF_PATH_RETAINED",
+        "window": {
+          "council": "oldham",
+          "end": "2026-10-14",
+          "semantics": "RECEIVED",
+          "start": "2026-10-08"
+        }
+      },
+      "count": 0,
+      "coverage": "FAILED",
+      "enumeration": "FAILED",
+      "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "failure": "ListingError:sort selector",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "FAILED",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "FAILED",
+      "retained_candidate_count": 0,
+      "run": "38758465439",
+      "successor_observation": 38813486644,
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+      "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 13,
+      "run": "38786550045",
+      "successor_observation": null,
+      "window": {
+        "council": "rochdale",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+      "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 15,
+      "run": "38786550045",
+      "successor_observation": null,
+      "window": {
+        "council": "rochdale",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+      "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 18,
+      "run": "38786550045",
+      "successor_observation": null,
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": {
+        "candidate_count": 0,
+        "checkpoint_sha256": "2aa39d9937cb8f0bd8383e419f941c1c08c75c103c7bfab0c6361a1642cfd7ea",
+        "contained": true,
+        "enumeration": "FAILED",
+        "failure": null,
+        "listing_failure": "TimeoutError",
+        "observation": {
+          "ended_at": "2026-10-15T23:32:37.623235+00:00",
+          "started_at": "2026-10-15T23:32:22.714711+00:00"
+        },
+        "retry_counter": 0,
+        "safe_gap": false,
+        "window": {
+          "council": "rochdale",
+          "end": "2026-10-14",
+          "semantics": "VALIDATED",
+          "start": "2026-10-08"
+        }
+      },
+      "count": 0,
+      "coverage": "FAILED",
+      "enumeration": "FAILED",
+      "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+      "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+      "failure": "LISTING_NOT_QUALIFIED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "FAILED",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "FAILED",
+      "retained_candidate_count": 0,
+      "run": "38786550045",
+      "successor_observation": null,
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 39,
+      "run": "38798433667",
+      "successor_observation": null,
+      "window": {
+        "council": "salford",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 37,
+      "run": "38798433667",
+      "successor_observation": null,
+      "window": {
+        "council": "salford",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 29,
+      "run": "38798433667",
+      "successor_observation": null,
+      "window": {
+        "council": "salford",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": null,
+      "completion_mandate_successor": null,
+      "count": 0,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 12,
+      "run": "38798433667",
+      "successor_observation": null,
+      "window": {
+        "council": "salford",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 47,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 47,
+      "run": "38798433667",
+      "successor_observation": null,
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 39,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 39,
+      "run": "38798433667",
+      "successor_observation": null,
+      "window": {
+        "council": "stockport",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": true,
+      "completion_mandate_successor": null,
+      "count": 60,
+      "coverage": "INCOMPLETE",
+      "enumeration": "INCOMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+      "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "CAPPED",
+      "retained_candidate_count": 60,
+      "run": "38798433667",
+      "successor_basis": "TWO_CONTIGUOUS_COMPLETE_PARTITIONS_NOT_ORIGINAL_DETECTION",
+      "successor_observation": 38812359777,
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 33,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+      "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 33,
+      "run": "38805348801",
+      "successor_observation": null,
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 23,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+      "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 23,
+      "run": "38805348801",
+      "successor_observation": null,
+      "window": {
+        "council": "tameside",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": null,
+      "count": 15,
+      "coverage": "UNKNOWN",
+      "enumeration": "COMPLETE",
+      "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+      "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+      "failure": null,
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "COMPLETE",
+      "retained_candidate_count": 15,
+      "run": "38805348801",
+      "successor_observation": null,
+      "window": {
+        "council": "tameside",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "capped": false,
+      "completion_mandate_successor": {
+        "outcome": "BLOCKED_UNRESOLVED",
+        "reason": "NO_SUPPORTED_NEW_PROOF_PATH_RETAINED",
+        "window": {
+          "council": "tameside",
+          "end": "2026-10-07",
+          "semantics": "RECEIVED",
+          "start": "2026-10-01"
+        }
+      },
+      "count": 0,
+      "coverage": "FAILED",
+      "enumeration": "FAILED",
+      "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+      "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+      "failure": "BoundaryFailure:SOURCE_CONTRACT_REJECTED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "FAILED",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "FAILED",
+      "retained_candidate_count": 0,
+      "run": "38805348801",
+      "successor_observation": null,
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "completion_mandate_successor": null,
+      "coverage": "NOT_ATTEMPTED",
+      "enumeration": "NOT_ATTEMPTED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "NOT_ATTEMPTED",
+      "run": null,
+      "successor_observation": 38812885933,
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "completion_mandate_successor": null,
+      "coverage": "NOT_ATTEMPTED",
+      "enumeration": "NOT_ATTEMPTED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "NOT_ATTEMPTED",
+      "run": null,
+      "successor_observation": 38812885933,
+      "window": {
+        "council": "wigan",
+        "end": "2026-09-23",
+        "semantics": "RECEIVED",
+        "start": "2026-09-17"
+      }
+    },
+    {
+      "completion_mandate_successor": null,
+      "coverage": "NOT_ATTEMPTED",
+      "enumeration": "NOT_ATTEMPTED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "NOT_ATTEMPTED",
+      "run": null,
+      "successor_observation": 38812885933,
+      "window": {
+        "council": "wigan",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      }
+    },
+    {
+      "completion_mandate_successor": null,
+      "coverage": "NOT_ATTEMPTED",
+      "enumeration": "NOT_ATTEMPTED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "NOT_ATTEMPTED",
+      "run": null,
+      "successor_observation": 38812885933,
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "completion_mandate_successor": null,
+      "coverage": "NOT_ATTEMPTED",
+      "enumeration": "NOT_ATTEMPTED",
+      "historical_state_preserved": true,
+      "independent_coverage": "NOT_AUTOMATICALLY_ACCEPTED",
+      "latest_enumeration": "COMPLETE",
+      "publication_recall": "UNKNOWN",
+      "residual_category": "NOT_ATTEMPTED",
+      "run": null,
+      "successor_observation": 38812885933,
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    }
+  ],
+  "independent": {
+    "exposure_limitations": "ledger/counts exposed permandate; priorownindependentrefs known; do notclaimfullyblind. Newprimaryreference sets notaccessed. No adjustmentofsource-date/publicationsemantics.",
+    "ledger_sha256": "51798ac6bebdb6a28a9c8cd4120b8de23c6a5b5d0af7d2c782e46b98e202ab30",
+    "network_bytes": "UNKNOWN",
+    "network_requests": "UNKNOWN",
+    "reconciled_rows": [
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 27,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 27,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-09-19",
+          "semantics": "VALIDATED",
+          "start": "2026-09-17"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 46,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 46,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-09-23",
+          "semantics": "VALIDATED",
+          "start": "2026-09-20"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 25,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 25,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-09-26",
+          "semantics": "VALIDATED",
+          "start": "2026-09-24"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 44,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 44,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-09-30",
+          "semantics": "VALIDATED",
+          "start": "2026-09-27"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 14,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 14,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-10-03",
+          "semantics": "VALIDATED",
+          "start": "2026-10-01"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 53,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 53,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-10-07",
+          "semantics": "VALIDATED",
+          "start": "2026-10-04"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 43,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 43,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "manchester",
+          "end": "2026-10-14",
+          "semantics": "VALIDATED",
+          "start": "2026-10-08"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 13,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 13,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "rochdale",
+          "end": "2026-09-23",
+          "semantics": "VALIDATED",
+          "start": "2026-09-17"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 15,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 15,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "rochdale",
+          "end": "2026-09-30",
+          "semantics": "VALIDATED",
+          "start": "2026-09-24"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 18,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 18,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "rochdale",
+          "end": "2026-10-07",
+          "semantics": "VALIDATED",
+          "start": "2026-10-01"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 39,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 39,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "salford",
+          "end": "2026-09-23",
+          "semantics": "VALIDATED",
+          "start": "2026-09-17"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 37,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 37,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "salford",
+          "end": "2026-09-30",
+          "semantics": "VALIDATED",
+          "start": "2026-09-24"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 29,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 29,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "salford",
+          "end": "2026-10-07",
+          "semantics": "VALIDATED",
+          "start": "2026-10-01"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 12,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 12,
+        "primary_state": "COMPLETE",
+        "source_run": 38823673985,
+        "window": {
+          "council": "salford",
+          "end": "2026-10-14",
+          "semantics": "VALIDATED",
+          "start": "2026-10-08"
+        }
+      },
+      {
+        "accepted_complete_comparison": false,
+        "equality": false,
+        "independent_only": [
+          "OTH/2026/0891",
+          "PL/2026/0652",
+          "PL/2026/0740",
+          "PL/2026/0758",
+          "PL/2026/0822",
+          "PL/2026/0845",
+          "PL/2026/0883",
+          "PL/2026/0919"
+        ],
+        "independent_reference_count": 8,
+        "independent_status": "UNKNOWN",
+        "primary_only": [],
+        "primary_reference_count": 0,
+        "primary_state": "FAILED",
+        "source_run": 38824069251,
+        "window": {
+          "council": "rochdale",
+          "end": "2026-10-14",
+          "semantics": "VALIDATED",
+          "start": "2026-10-08"
+        }
+      },
+      {
+        "accepted_complete_comparison": false,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 3,
+        "independent_status": "UNKNOWN",
+        "primary_only": [],
+        "primary_reference_count": 3,
+        "primary_state": "UNKNOWN",
+        "source_run": 38824329688,
+        "window": {
+          "council": "bolton",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED",
+          "start": "2026-10-15"
+        }
+      },
+      {
+        "accepted_complete_comparison": true,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 0,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 0,
+        "primary_state": "COMPLETE",
+        "source_run": 38824329688,
+        "window": {
+          "council": "bury",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED",
+          "start": "2026-10-15"
+        }
+      },
+      {
+        "accepted_complete_comparison": false,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 0,
+        "independent_status": "COMPLETE",
+        "primary_only": [],
+        "primary_reference_count": 0,
+        "primary_state": "FAILED",
+        "source_run": 38824329688,
+        "window": {
+          "council": "manchester",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED",
+          "start": "2026-10-15"
+        }
+      },
+      {
+        "accepted_complete_comparison": false,
+        "equality": true,
+        "independent_only": [],
+        "independent_reference_count": 0,
+        "independent_status": "UNKNOWN",
+        "primary_only": [],
+        "primary_reference_count": 0,
+        "primary_state": "FAILED",
+        "source_run": 38824329688,
+        "window": {
+          "council": "oldham",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED",
+          "start": "2026-10-15"
+        }
+      }
+    ],
+    "seal_timestamp": "2026-10-15T23:08:42.822381Z",
+    "statuses": {
+      "COMPLETE": 19,
+      "UNKNOWN": 8
+    },
+    "unobserved_primary_rows": 8
+  },
+  "master_stage": "4 OPEN",
+  "new_candidates": [
+    {
+      "council_code": "bolton",
+      "date_membership": "BRIDGE_2026_10_15",
+      "reference": "01861/26",
+      "run_id": 38824329688,
+      "source": {
+        "fields": {
+          "address": {
+            "locator": "p.address",
+            "state": "PRESENT_VALUE",
+            "value": "4 Torrisdale Close Bolton BL3 5RR"
+          },
+          "proposal": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE",
+            "value": "DISCHARGE OF CONDITION 3 (LANDSCAPE SCHEME) ON APPLICATION 03783/18"
+          },
+          "received_date": {
+            "locator": "p.metaInfo:Received",
+            "state": "PRESENT_VALUE",
+            "value": "Thu 15 Oct 2026"
+          },
+          "validated_date": {
+            "locator": "p.metaInfo:Validated",
+            "state": "PRESENT_VALUE",
+            "value": "Thu 15 Oct 2026"
+          }
+        },
+        "identity_state": "PRESENT_VALUE",
+        "processing_screen": {
+          "count_metric": "UNKNOWN",
+          "exclusion": false,
+          "existing_qualification": "Excluded - secondary/admin",
+          "materiality": {
+            "outcome": "POTENTIALLY_MATERIAL",
+            "qualification": "Excluded - secondary/admin",
+            "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+            "rule_version": "stage4-discovery-v1"
+          },
+          "parent_reference": null,
+          "proposal_evidence": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE"
+          },
+          "provenance": {
+            "criteria_sha256": "7493fb897ec99aaa1aacf05635f53f17ec0a1509905d767581d8de48d33bd75c",
+            "requested_interval": [
+              "2026-10-15",
+              "2026-10-15"
+            ],
+            "segment_sha256": [
+              "8fce8fb9fb8a3133df69fcb32131e72cdf39a59880cf8ba15f809f661e13efb6"
+            ]
+          },
+          "raw_generic_count": null,
+          "reasons": [
+            "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED"
+          ],
+          "related_reference_literals": [
+            "03783/18"
+          ],
+          "relationship": "UNKNOWN",
+          "residential_dwelling_count": null,
+          "retained": true,
+          "rule_version": "stage4-retained-screen-v1",
+          "source_record_id": "TMY6ORDEKOX00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMY6ORDEKOX00&activeTab=summary",
+          "unqualified_parent_prefix": null
+        },
+        "reference": "01861/26",
+        "source_key": "TMY6ORDEKOX00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMY6ORDEKOX00&activeTab=summary"
+      },
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "council_code": "bolton",
+      "date_membership": "BRIDGE_2026_10_15",
+      "reference": "01860/26",
+      "run_id": 38824329688,
+      "source": {
+        "fields": {
+          "address": {
+            "locator": "p.address",
+            "state": "PRESENT_VALUE",
+            "value": "Plot 3 Grundy Hall Farm Bolton BL6 6GR"
+          },
+          "proposal": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE",
+            "value": "VARIATION OF CONDITION 16 (APPROVED PLANS) ON APPLICATION 15975/23 TO VARY PLOT 3 TO ADJUST POSITION OF DETACHED GARAGE TOGETHER WITH EXTERNAL WORKS TO SIDE AND REAR ELEVATION"
+          },
+          "received_date": {
+            "locator": "p.metaInfo:Received",
+            "state": "PRESENT_VALUE",
+            "value": "Thu 15 Oct 2026"
+          },
+          "validated_date": {
+            "locator": "p.metaInfo:Validated",
+            "state": "PRESENT_VALUE",
+            "value": "Thu 15 Oct 2026"
+          }
+        },
+        "identity_state": "PRESENT_VALUE",
+        "processing_screen": {
+          "count_metric": "UNKNOWN",
+          "exclusion": false,
+          "existing_qualification": "Excluded - secondary/admin",
+          "materiality": {
+            "outcome": "POTENTIALLY_MATERIAL",
+            "qualification": "Excluded - secondary/admin",
+            "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+            "rule_version": "stage4-discovery-v1"
+          },
+          "parent_reference": null,
+          "proposal_evidence": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE"
+          },
+          "provenance": {
+            "criteria_sha256": "7493fb897ec99aaa1aacf05635f53f17ec0a1509905d767581d8de48d33bd75c",
+            "requested_interval": [
+              "2026-10-15",
+              "2026-10-15"
+            ],
+            "segment_sha256": [
+              "8fce8fb9fb8a3133df69fcb32131e72cdf39a59880cf8ba15f809f661e13efb6"
+            ]
+          },
+          "raw_generic_count": null,
+          "reasons": [
+            "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED"
+          ],
+          "related_reference_literals": [
+            "15975/23"
+          ],
+          "relationship": "UNKNOWN",
+          "residential_dwelling_count": null,
+          "retained": true,
+          "rule_version": "stage4-retained-screen-v1",
+          "source_record_id": "TMY3YUDEKOU00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMY3YUDEKOU00&activeTab=summary",
+          "unqualified_parent_prefix": "15975"
+        },
+        "reference": "01860/26",
+        "source_key": "TMY3YUDEKOU00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMY3YUDEKOU00&activeTab=summary"
+      },
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "council_code": "bolton",
+      "date_membership": "BRIDGE_2026_10_15",
+      "reference": "01859/26",
+      "run_id": 38824329688,
+      "source": {
+        "fields": {
+          "address": {
+            "locator": "p.address",
+            "state": "PRESENT_VALUE",
+            "value": "25 Barley Brook Meadow Bolton BL1 7HP"
+          },
+          "proposal": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE",
+            "value": "CERTIFICATE OF LAWFULNESS PROPOSED (S192) FOR DEMOLITION OF CONSERVATORY AND ERECTION OF SINGLE STOREY REAR EXTENSION, CONVERSION OF GARAGE AND LOFT INTO HABITABLE ROOMS TOGETHER WITH INSTALLATION OF REAR DORMER TO GARAGE"
+          },
+          "received_date": {
+            "locator": "p.metaInfo:Received",
+            "state": "PRESENT_VALUE",
+            "value": "Thu 15 Oct 2026"
+          },
+          "validated_date": {
+            "locator": "p.metaInfo:Validated",
+            "state": "PRESENT_VALUE",
+            "value": "Thu 15 Oct 2026"
+          }
+        },
+        "identity_state": "PRESENT_VALUE",
+        "processing_screen": {
+          "count_metric": "UNKNOWN",
+          "exclusion": false,
+          "existing_qualification": "Ignore",
+          "materiality": {
+            "outcome": "POTENTIALLY_MATERIAL",
+            "qualification": "Ignore",
+            "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+            "rule_version": "stage4-discovery-v1"
+          },
+          "parent_reference": null,
+          "proposal_evidence": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE"
+          },
+          "provenance": {
+            "criteria_sha256": "7493fb897ec99aaa1aacf05635f53f17ec0a1509905d767581d8de48d33bd75c",
+            "requested_interval": [
+              "2026-10-15",
+              "2026-10-15"
+            ],
+            "segment_sha256": [
+              "8fce8fb9fb8a3133df69fcb32131e72cdf39a59880cf8ba15f809f661e13efb6"
+            ]
+          },
+          "raw_generic_count": null,
+          "reasons": [
+            "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED"
+          ],
+          "related_reference_literals": [],
+          "relationship": "UNKNOWN",
+          "residential_dwelling_count": null,
+          "retained": true,
+          "rule_version": "stage4-retained-screen-v1",
+          "source_record_id": "TMY3YJDEKOS00",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMY3YJDEKOS00&activeTab=summary",
+          "unqualified_parent_prefix": null
+        },
+        "reference": "01859/26",
+        "source_key": "TMY3YJDEKOS00",
+        "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMY3YJDEKOS00&activeTab=summary"
+      },
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    }
+  ],
+  "production": {
+    "accepted_ids_preserved": [
+      1504,
+      1505,
+      1506
+    ],
+    "new_admission_calls": 0,
+    "new_pending": 0,
+    "new_verified_facts": 0,
+    "new_writes": 0,
+    "uncertain_commits": 0
+  },
+  "reconciled_at": "2026-10-15T23:37:23.940574+00:00",
+  "result": "BLOCKED_GLOBAL_STOP_AND_EXHAUSTED_PROOF_ALLOWANCES",
+  "runtime_revision": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+  "scopes": {
+    "bridge9": {
+      "accounted_bytes": 11416947,
+      "artifact_id": 12014740569,
+      "attempt": 1,
+      "audit_bytes": 35940,
+      "blocked_unresolved": [],
+      "checkpoint_bytes": 17073,
+      "execution": {
+        "attempt": 1,
+        "manifest_sha256": "0ef15c5c3bb33e91ca7146fc7cbc09e80fd56cd6d93eb8b3f354ab150ef1aac2",
+        "persistence": false,
+        "run_id": "38824329688",
+        "run_number": 1,
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c"
+      },
+      "not_attempted": [
+        {
+          "council": "rochdale",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED",
+          "start": "2026-10-15"
+        },
+        {
+          "council": "salford",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED",
+          "start": "2026-10-15"
+        },
+        {
+          "council": "stockport",
+          "end": "2026-10-15",
+          "semantics": "VALIDATED",
+          "start": "2026-10-15"
+        },
+        {
+          "council": "tameside",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED",
+          "start": "2026-10-15"
+        },
+        {
+          "council": "wigan",
+          "end": "2026-10-15",
+          "semantics": "RECEIVED",
+          "start": "2026-10-15"
+        }
+      ],
+      "outer": {
+        "audit_byte_limit": 20000000,
+        "cleanup": "CLOSED",
+        "deadline_seconds": 495,
+        "elapsed_seconds": 35.299,
+        "exit_code": 0,
+        "expired": false,
+        "final_containment": "DISPOSABLE_HOSTED_VM",
+        "limit_hit": null,
+        "live_owned_survivors": 0,
+        "peak_owned_rss": 918851584,
+        "restarted": false,
+        "rss_limit_bytes": 1610612736
+      },
+      "requests": 42,
+      "results": [
+        {
+          "candidate_count": 3,
+          "checkpoint_sha256": "cc889da923d436d2880bec469452e64fbc5568cf3e8335358b8e37c0daadff90",
+          "contained": false,
+          "enumeration": "UNKNOWN",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:34:58.334955+00:00",
+            "started_at": "2026-10-15T23:34:51.619207+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": true,
+          "window": {
+            "council": "bolton",
+            "end": "2026-10-15",
+            "semantics": "RECEIVED",
+            "start": "2026-10-15"
+          }
+        },
+        {
+          "candidate_count": 0,
+          "checkpoint_sha256": "3c404681e83f77b54fd96424a3a998143daf65af08a8c4ca3c96881c3d8a261b",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:35:09.781476+00:00",
+            "started_at": "2026-10-15T23:34:58.340397+00:00"
+          },
+          "retry_counter": 1,
+          "safe_gap": false,
+          "window": {
+            "council": "bury",
+            "end": "2026-10-15",
+            "semantics": "RECEIVED",
+            "start": "2026-10-15"
+          }
+        },
+        {
+          "candidate_count": 0,
+          "checkpoint_sha256": "7e60b37aadd4ce442edde2de96e1ff10ad8e0a569e9c303c9566ab1384f773b4",
+          "contained": true,
+          "enumeration": "FAILED",
+          "failure": null,
+          "listing_failure": "TimeoutError",
+          "observation": {
+            "ended_at": "2026-10-15T23:35:23.090009+00:00",
+            "started_at": "2026-10-15T23:35:09.784180+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-10-15",
+            "semantics": "VALIDATED",
+            "start": "2026-10-15"
+          }
+        },
+        {
+          "candidate_count": 0,
+          "checkpoint_sha256": "42c137df1ed39a0b4be9669f3e1d15f08b09f0bd3b889d7227d4c45b73ab2910",
+          "contained": false,
+          "enumeration": "FAILED",
+          "failure": "ListingError:sort selector",
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:35:26.664135+00:00",
+            "started_at": "2026-10-15T23:35:23.091383+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "oldham",
+            "end": "2026-10-15",
+            "semantics": "RECEIVED",
+            "start": "2026-10-15"
+          }
+        }
+      ],
+      "run_id": 38824329688,
+      "run_number": 1,
+      "stop_reason": "SAFETY_OR_UNCLASSIFIED_FAILURE",
+      "zip_sha256": "d7e0416de5f642da084ab585375247c9d4aaabcfd67b78957c8ac61a3b764c58"
+    },
+    "residual4": {
+      "accounted_bytes": 11517777,
+      "artifact_id": 12014078910,
+      "attempt": 1,
+      "audit_bytes": 12012,
+      "blocked_unresolved": [
+        {
+          "outcome": "BLOCKED_UNRESOLVED",
+          "reason": "NO_SUPPORTED_NEW_PROOF_PATH_RETAINED",
+          "window": {
+            "council": "bury",
+            "end": "2026-10-14",
+            "semantics": "RECEIVED",
+            "start": "2026-10-08"
+          }
+        },
+        {
+          "outcome": "BLOCKED_UNRESOLVED",
+          "reason": "NO_SUPPORTED_NEW_PROOF_PATH_RETAINED",
+          "window": {
+            "council": "oldham",
+            "end": "2026-10-14",
+            "semantics": "RECEIVED",
+            "start": "2026-10-08"
+          }
+        },
+        {
+          "outcome": "BLOCKED_UNRESOLVED",
+          "reason": "NO_SUPPORTED_NEW_PROOF_PATH_RETAINED",
+          "window": {
+            "council": "tameside",
+            "end": "2026-10-07",
+            "semantics": "RECEIVED",
+            "start": "2026-10-01"
+          }
+        }
+      ],
+      "checkpoint_bytes": 5045,
+      "execution": {
+        "attempt": 1,
+        "manifest_sha256": "ffd1822558d8075023580dcda59d9b1a35e5af99fcfa4b56e8c1d8108bc7e4af",
+        "persistence": false,
+        "run_id": "38824069251",
+        "run_number": 1,
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c"
+      },
+      "not_attempted": [
+        {
+          "council": "bury",
+          "end": "2026-10-14",
+          "semantics": "RECEIVED",
+          "start": "2026-10-08"
+        },
+        {
+          "council": "oldham",
+          "end": "2026-10-14",
+          "semantics": "RECEIVED",
+          "start": "2026-10-08"
+        },
+        {
+          "council": "tameside",
+          "end": "2026-10-07",
+          "semantics": "RECEIVED",
+          "start": "2026-10-01"
+        }
+      ],
+      "outer": {
+        "audit_byte_limit": 20000000,
+        "cleanup": "CLOSED",
+        "deadline_seconds": 220,
+        "elapsed_seconds": 15.17,
+        "exit_code": 0,
+        "expired": false,
+        "final_containment": "DISPOSABLE_HOSTED_VM",
+        "limit_hit": null,
+        "live_owned_survivors": 0,
+        "peak_owned_rss": 956993536,
+        "restarted": false,
+        "rss_limit_bytes": 1610612736
+      },
+      "requests": 39,
+      "results": [
+        {
+          "candidate_count": 0,
+          "checkpoint_sha256": "2aa39d9937cb8f0bd8383e419f941c1c08c75c103c7bfab0c6361a1642cfd7ea",
+          "contained": true,
+          "enumeration": "FAILED",
+          "failure": null,
+          "listing_failure": "TimeoutError",
+          "observation": {
+            "ended_at": "2026-10-15T23:32:37.623235+00:00",
+            "started_at": "2026-10-15T23:32:22.714711+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "rochdale",
+            "end": "2026-10-14",
+            "semantics": "VALIDATED",
+            "start": "2026-10-08"
+          }
+        }
+      ],
+      "run_id": 38824069251,
+      "run_number": 1,
+      "stop_reason": null,
+      "zip_sha256": "9a4038d43590b5b5ed51acfd2f18355cabb54b69ff31ae2dd57bdb67ed277424"
+    },
+    "screen14": {
+      "accounted_bytes": 163188120,
+      "artifact_id": 12014114130,
+      "attempt": 1,
+      "audit_bytes": 1680514,
+      "blocked_unresolved": [],
+      "checkpoint_bytes": 839262,
+      "execution": {
+        "attempt": 1,
+        "manifest_sha256": "0a9e75b35357742cf4084a3ff680d2a9b4233030900942baa95ed88950d89db3",
+        "persistence": false,
+        "run_id": "38823673985",
+        "run_number": 1,
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c"
+      },
+      "not_attempted": [],
+      "outer": {
+        "audit_byte_limit": 20000000,
+        "cleanup": "CLOSED",
+        "deadline_seconds": 770,
+        "elapsed_seconds": 67.821,
+        "exit_code": 0,
+        "expired": false,
+        "final_containment": "DISPOSABLE_HOSTED_VM",
+        "limit_hit": null,
+        "live_owned_survivors": 0,
+        "peak_owned_rss": 1060761600,
+        "restarted": false,
+        "rss_limit_bytes": 1610612736
+      },
+      "requests": 472,
+      "results": [
+        {
+          "candidate_count": 27,
+          "checkpoint_sha256": "390436990769f6346e4fd65bbe0df1cf89667132d68697b7a6135b9462722d50",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:28:32.467482+00:00",
+            "started_at": "2026-10-15T23:28:25.718878+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-09-19",
+            "semantics": "VALIDATED",
+            "start": "2026-09-17"
+          }
+        },
+        {
+          "candidate_count": 46,
+          "checkpoint_sha256": "e68563b499b7b2abb32af3e88beee01fd8c55db3a2b7712f5e9bbd46ec16a0f6",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:28:38.603284+00:00",
+            "started_at": "2026-10-15T23:28:32.557497+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-09-23",
+            "semantics": "VALIDATED",
+            "start": "2026-09-20"
+          }
+        },
+        {
+          "candidate_count": 25,
+          "checkpoint_sha256": "b9ebeb5cfd800b19edc1b11f0878f408377709ec2e3d0d89dc8b736f40a2ea53",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:28:43.086310+00:00",
+            "started_at": "2026-10-15T23:28:38.604997+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-09-26",
+            "semantics": "VALIDATED",
+            "start": "2026-09-24"
+          }
+        },
+        {
+          "candidate_count": 44,
+          "checkpoint_sha256": "22420054e03a760e8876735674e2bfebc19c1fcb1f260f0e969943f29e3c681b",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:28:48.295882+00:00",
+            "started_at": "2026-10-15T23:28:43.088689+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-09-30",
+            "semantics": "VALIDATED",
+            "start": "2026-09-27"
+          }
+        },
+        {
+          "candidate_count": 14,
+          "checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:28:52.985386+00:00",
+            "started_at": "2026-10-15T23:28:48.297722+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-10-03",
+            "semantics": "VALIDATED",
+            "start": "2026-10-01"
+          }
+        },
+        {
+          "candidate_count": 53,
+          "checkpoint_sha256": "82282cc95d6a784de6987c8346ddf16f461e2194b3102da151a9f965c91513d7",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:28:58.715629+00:00",
+            "started_at": "2026-10-15T23:28:52.986922+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-10-07",
+            "semantics": "VALIDATED",
+            "start": "2026-10-04"
+          }
+        },
+        {
+          "candidate_count": 43,
+          "checkpoint_sha256": "d9ac6592d8eb3b8b2e8505b4dd82c8173d869793bd5943e045b2f1e39cde79d8",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:03.724636+00:00",
+            "started_at": "2026-10-15T23:28:58.717552+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "manchester",
+            "end": "2026-10-14",
+            "semantics": "VALIDATED",
+            "start": "2026-10-08"
+          }
+        },
+        {
+          "candidate_count": 13,
+          "checkpoint_sha256": "d2d7349ea85710aadb804c8a547934d4d034f0a9984a9f19c1a58586117f6da1",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:08.302493+00:00",
+            "started_at": "2026-10-15T23:29:03.726381+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "rochdale",
+            "end": "2026-09-23",
+            "semantics": "VALIDATED",
+            "start": "2026-09-17"
+          }
+        },
+        {
+          "candidate_count": 15,
+          "checkpoint_sha256": "11b52b863f7b4ec6808231ae8c6fe61eaa6849e4d2f245328336ad4338f62be0",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:13.190916+00:00",
+            "started_at": "2026-10-15T23:29:08.310300+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "rochdale",
+            "end": "2026-09-30",
+            "semantics": "VALIDATED",
+            "start": "2026-09-24"
+          }
+        },
+        {
+          "candidate_count": 18,
+          "checkpoint_sha256": "394a0614d408e624c61014738e615a72f7b74b17ac4b501af6ae69d95f831c2a",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:17.981034+00:00",
+            "started_at": "2026-10-15T23:29:13.192335+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "rochdale",
+            "end": "2026-10-07",
+            "semantics": "VALIDATED",
+            "start": "2026-10-01"
+          }
+        },
+        {
+          "candidate_count": 39,
+          "checkpoint_sha256": "6dd380013e262e290e8a28e1c4e3cb9209eaac7a1ffc10d1e32f65238ae0144e",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:22.242031+00:00",
+            "started_at": "2026-10-15T23:29:17.982608+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "salford",
+            "end": "2026-09-23",
+            "semantics": "VALIDATED",
+            "start": "2026-09-17"
+          }
+        },
+        {
+          "candidate_count": 37,
+          "checkpoint_sha256": "edd642139aa7676e45a668ce7245dac6586239e8be9a27826c1cc44fb81afcf7",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:26.006610+00:00",
+            "started_at": "2026-10-15T23:29:22.243844+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "salford",
+            "end": "2026-09-30",
+            "semantics": "VALIDATED",
+            "start": "2026-09-24"
+          }
+        },
+        {
+          "candidate_count": 29,
+          "checkpoint_sha256": "dc36ad9df8cd61cce4f9493521ff076d79fd2223220cfec61764beaccb770ca6",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:29.859616+00:00",
+            "started_at": "2026-10-15T23:29:26.008482+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "salford",
+            "end": "2026-10-07",
+            "semantics": "VALIDATED",
+            "start": "2026-10-01"
+          }
+        },
+        {
+          "candidate_count": 12,
+          "checkpoint_sha256": "50f493a5ce4f18f1c44bd6f1acf0202cc48b2fec6430a54b16432381dc0cc536",
+          "contained": false,
+          "enumeration": "COMPLETE",
+          "failure": null,
+          "listing_failure": null,
+          "observation": {
+            "ended_at": "2026-10-15T23:29:33.299410+00:00",
+            "started_at": "2026-10-15T23:29:29.861235+00:00"
+          },
+          "retry_counter": 0,
+          "safe_gap": false,
+          "window": {
+            "council": "salford",
+            "end": "2026-10-14",
+            "semantics": "VALIDATED",
+            "start": "2026-10-08"
+          }
+        }
+      ],
+      "run_id": 38823673985,
+      "run_number": 1,
+      "stop_reason": null,
+      "zip_sha256": "5c116b92481e335160f7f6f1e7772ed1ff46b2a7f31ccb9b6d79de98849997af"
+    }
+  },
+  "source_date_enumeration_reconciled": false,
+  "stage4_accepted": false,
+  "tree": "c24de41feb6245c9a3579acefb6ca4f82515bb61"
+}
