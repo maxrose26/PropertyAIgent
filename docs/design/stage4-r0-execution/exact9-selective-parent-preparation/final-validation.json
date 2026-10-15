@@ -1,0 +1,177 @@
+{
+  "base": "0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4",
+  "head": "1976125eb5a2bc70b4cb8b416b91abc360e39c53",
+  "tree": "f032f6b4ede324aed16444915f21795eecee0b7c",
+  "pr": 103,
+  "files": [
+    {
+      "path": "app/pipeline/discovery_screening.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8ff528a924092fe7664a9d6bfc08f76ada4216d"
+    },
+    {
+      "path": "verification/discovery/idox_window.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a996f913917051542f38d24aab3428ac3014fdcf"
+    },
+    {
+      "path": "verification/discovery/finite_acceptance.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f3dc2eb146e61d96f9b51d71be653d3ab2041642"
+    },
+    {
+      "path": "verification/discovery/r0_proposal.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7d842d204189681d661d1b967e4a4f06a5a8648"
+    },
+    {
+      "path": "verification/discovery/r0_exact9.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5b757df19ab204183c062638fa25878b1a9f045"
+    },
+    {
+      "path": "verification/discovery/bolton_parent_metadata.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4353289abc715c6abe12e3ec8414980ce3897d6c"
+    },
+    {
+      "path": "tests/test_discovery_capped_criteria_screening.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "152b87969c90c078bc7a652b10c130e0395fb4ed"
+    },
+    {
+      "path": "tests/test_discovery_exact9_parent_preparation.py",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5e1aa2456bc55fb84a1456e86d1a426960019207"
+    },
+    {
+      "path": ".github/workflows/stage4-discovery-offline.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c6697a2386565189450bcfbb1142ce54b2c7be4"
+    },
+    {
+      "path": ".github/workflows/stage4-batch-offline.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "81b3d22f0e78ee50f9b1f4672669e400107719b0"
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/exact9-selective-parent-preparation/REVIEW.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b0247829c0298f01425a89130f6b79df46f9e328"
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/exact9-selective-parent-preparation/INDEPENDENT-REVIEW.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f2769def8a4566ee5760aaa2826fcf2b73a13176"
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/exact9-selective-parent-preparation/source-exact16-result.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea4223ec5a6bab1f55fd1ff8a403827635fa1143"
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/exact9-selective-parent-preparation/checksums.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18cbc5db65483033b87ef6787d1f38d9735bab98"
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/exact9-selective-parent-preparation/untouched9-manifest.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4e34d55d2008aa51139d489678f0fcbed207ca5f"
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/exact9-selective-parent-preparation/stage4-r0-untouched9-once.yml.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b03b704c47fb4d24425a6a73d5b008ab78001747"
+    }
+  ],
+  "checks": [
+    {
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801210323/job/116650410110",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801210323/job/116650409746",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801210302/job/116650409447",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801210049/job/116650409085",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801210302/job/116650409021",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801210049/job/116650408593",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801204899/job/116650391939",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38801204899/job/116650391530",
+      "head_sha": "1976125eb5a2bc70b4cb8b416b91abc360e39c53"
+    }
+  ],
+  "local": {
+    "discovery_passed": 444,
+    "discovery_skipped": 10,
+    "additional_exact9_delegation_passed": 1
+  },
+  "independent": {
+    "verdict": "PASS_OFFLINE_PREPARATION_ONLY",
+    "reviewer": "/root/review_cap_screen",
+    "affected_tests_passed": 22
+  },
+  "registered": false,
+  "merged": false,
+  "live_calls": 0,
+  "production_access": false,
+  "admission": false
+}
