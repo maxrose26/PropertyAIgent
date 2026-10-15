@@ -56,14 +56,14 @@ def test_real_main_outer_record_worker_and_checkpoint_chain(tmp_path,monkeypatch
         child=MagicMock(pid=999999,returncode=0);child.poll.return_value=0;child.wait.return_value=0;return child
     real=outer.supervise_round;original_source=p.source_worker;admit=p.admit
     monkeypatch.setattr(sys,'argv',['parent','--reviewed-sha','a'*40,'--manifest-sha',p.MANIFEST_SHA,'--authority',p.AUTHORITY,'--output',str(root)])
-    with proc_namespace(),patch.object(p,'admit',side_effect=lambda s,m,a,e:admit(s,m,a,e,workflow_bytes=p.TEMPLATE.read_bytes())),patch.object(shared,'checkout'),patch.object(p,'source_worker',source),patch.object(outer,'supervise_round',side_effect=lambda a,b,**kw:real(a,b,runner=runner,**kw)),patch.object(psutil_module(),'Process',return_value=MagicMock()),patch.object(psutil_module(),'wait_procs',return_value=([],[])):
+    with proc_namespace(),patch.object(shared,'checkout'),patch.object(p,'source_worker',source),patch.object(outer,'supervise_round',side_effect=lambda a,b,**kw:real(a,b,runner=runner,**kw)),patch.object(psutil_module(),'Process',return_value=MagicMock()),patch.object(psutil_module(),'wait_procs',return_value=([],[])):
         assert p.main()==0
     d=json.loads((root/'result.json').read_bytes())
     assert sessions==closed==[0,1] and len(launches)==3
     assert d['requests']==6 and d['received_bytes']<=6000000 and d['accounting_complete']
     assert len(d['checkpoint_sha256'])==2 and shared.audit_bytes(root)<=131072
     for i,h in enumerate(d['checkpoint_sha256']):assert hashlib.sha256((root/f'checkpoints/{i:03}.json').read_bytes()).hexdigest()==h
-    assert d['outer_supervisor']['cleanup']=='CLOSED' and not (p.ROOT/p.WORKFLOW).exists()
+    assert d['outer_supervisor']['cleanup']=='CLOSED' and (p.ROOT/p.WORKFLOW).read_bytes()==p.TEMPLATE.read_bytes()
 
 
 def psutil_module():
