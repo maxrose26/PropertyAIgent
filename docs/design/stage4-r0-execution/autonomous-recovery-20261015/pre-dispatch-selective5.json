@@ -1,0 +1,55 @@
+{
+  "checked_at": "2026-10-15T21:39:12.449Z",
+  "scope": "selective5",
+  "sha": "f6525edffb514a79343191860056e1bed3e66082",
+  "tree": "2bb275249896ec5e6a7506a2e40ce0ba2b116ffe",
+  "workflow": ".github/workflows/stage4-r0-selective5-admission-once.yml",
+  "workflow_blob": "fb75677f29a47c26d421a16c4ef6dde460014d63",
+  "manifest_sha": "b540e74c6ccabe64636adf00f723c6a2bcfcbc499a39079f098e51d21185191f",
+  "authority": "AUTHORISE_R0_SELECTIVE5_PRIMARY_ADMISSION_ONCE",
+  "history_total": 31,
+  "history_returned": 31,
+  "prior_scope_runs": 0,
+  "checks": [
+    {
+      "name": "offline",
+      "id": 116684620436,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38811217919/job/116684620436"
+    },
+    {
+      "name": "native",
+      "id": 116684619882,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38811217919/job/116684619882"
+    },
+    {
+      "name": "offline",
+      "id": 116684619666,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38811217930/job/116684619666"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "id": 116684619399,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38811217894/job/116684619399"
+    },
+    {
+      "name": "postgres-admission",
+      "id": 116684619269,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38811217930/job/116684619269"
+    },
+    {
+      "name": "web",
+      "id": 116684618984,
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38811217894/job/116684618984"
+    }
+  ],
+  "environment": "stage4-production-canary",
+  "secret_name": "DATABASE_URL",
+  "secret_value": "NOT_ACCESSED_OR_EXPORTED",
+  "retry": false
+}
