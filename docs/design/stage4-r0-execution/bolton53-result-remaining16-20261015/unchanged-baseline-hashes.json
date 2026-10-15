@@ -1,0 +1,10 @@
+{
+  "docs/design/stage4-r0-execution/bolton53-result-remaining16-20261015/retained-comparison147.json": "2aaacbd60bf8e729c082d6464b708cb73639ce4675062c51f351976ee895aba0",
+  "docs/design/stage4-r0-execution/exact20-results-20261015/proposed-new-identity-comparison.json": "8855b4a01807eedb3cd952cd959987698c0ac0bff8b3a3ded4ec9f2510376805",
+  "docs/design/stage4-r0-execution/exact20-results-20261015/retained-independent/append-ledger.json": "7a46aa77843e85b226f1f1a0982feff79a2d111a4a93596a37ad953a0c7ceb23",
+  "docs/design/stage4-r0-execution/exact20-results-20261015/retained-independent/ledger.json": "715da66d96a643800c7a30df9ae88481e7fc2576d89fc55a4ec93484a2049f17",
+  "verification/direct_reference/instrumented_probe.py": "3aa2ecc66e54107eaf4cdd2eefabdbf46bf507f96d17c1f6ad84121611988a21",
+  "verification/discovery/finite_acceptance.py": "6d3dfc3d4697251fa0cbd60912304c9fe5983c8382d337e24e0c957c1da29915",
+  "verification/discovery/r0_recovery_proposal.py": "693a7fa04b529857d72985d0b36b8aadb9406cd2f4e3c5c3ec014817a06adce0",
+  "verification/discovery/r0_registered_scopes.py": "0ee396dd9822886f08206bbf78f0ee3bf6a13ef43bed272c0661e6d1500bf96c"
+}

@@ -1,0 +1,602 @@
+{
+  "current_duplicate_protection_required_at_future_admission": true,
+  "identities": [
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001811"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001824"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001821"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001644"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001817"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001816"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000098"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001961"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001674"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001872"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001815"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001814"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001813"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001809"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001808"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001807"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001802"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001801"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001842"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001841"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001677"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001843"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001510"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001570"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000568"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001790"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001800"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001904"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001903"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001902"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001901"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001899"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001897"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001896"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001906"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001890"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001905"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001249"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001287"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001907"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001387"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001512"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001486"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001487"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001775"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001216"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001511"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001870"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001871"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001873"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001874"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001876"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001877"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001879"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001880"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001594"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001885"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001636"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001650"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001681"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001760"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001777"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001893"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001888"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001422"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001886"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001865"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001703"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001849"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001851"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001853"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001855"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001856"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001858"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001861"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001863"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001866"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001883"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000264"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001847"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001845"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001839"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001838"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001837"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001833"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001218"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000583"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001810"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001852"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001219"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001840"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001947"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001566"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001822"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001867"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001949"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001908"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001945"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001942"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001933"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001617"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001731"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001776"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001779"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001780"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001819"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001825"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001848"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001891"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001926"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001927"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001928"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001929"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001930"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001931"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001932"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001946"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001922"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001924"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001925"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001914"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001916"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001920"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001913"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001910"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001909"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001705"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001812"
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356901/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356895/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356914/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356912/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356908/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356905/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356897/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356894/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "VAR/356938/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "NMA/356927/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356933/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356930/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356926/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356921/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356919/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356916/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "HOU/356915/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356925/26"
+    },
+    {
+      "council": "oldham",
+      "reference": "CND/356920/26"
+    }
+  ],
+  "per_identity_limit": 2,
+  "purpose": "REVIEW_ONLY_NO_DATABASE_AUTHORITY",
+  "query_fields": [
+    "id",
+    "council_code",
+    "reference"
+  ],
+  "read_only": true,
+  "source_run": 38758465439
+}

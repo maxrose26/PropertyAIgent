@@ -1,0 +1,63 @@
+{
+  "aggregate_audit_bytes": 207355,
+  "all_53_checkpoints_verified": true,
+  "application_role": {
+    "UNKNOWN": 53
+  },
+  "artifact": 11999062153,
+  "attempt": 1,
+  "attempted": 53,
+  "authority": "CONSUMED",
+  "commercial_materiality_proven": 0,
+  "excluded": 0,
+  "execution_sha256": "226866555ee41bac8f8987ecdfe03dfaf607c46645948589146fe99f8977576b",
+  "identity_qualified": 53,
+  "literal_status_counts": {
+    "Deposited": 53
+  },
+  "materiality": {
+    "POTENTIALLY_MATERIAL": 53
+  },
+  "not_attempted": 0,
+  "production_admission_authorised": false,
+  "production_connections": 0,
+  "production_reads": 0,
+  "production_writes": 0,
+  "proposed_admission_review_cohort": 53,
+  "resources": {
+    "accounting_complete": true,
+    "checkpoint_bytes": 100574,
+    "elapsed_seconds": 166.37674130800002,
+    "outer_supervisor": {
+      "audit_byte_limit": 8000000,
+      "cleanup": "CLOSED",
+      "deadline_seconds": 2915,
+      "elapsed_seconds": 167.101,
+      "exit_code": 0,
+      "expired": false,
+      "final_containment": "DISPOSABLE_HOSTED_VM",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 147533824,
+      "restarted": false,
+      "rss_limit_bytes": 1610612736
+    },
+    "received_bytes": 1850643,
+    "requests": 53
+  },
+  "result_sha256": "5870fdfa4ca5c69f20f8b4caaaa3a6d6a0a239ed72f29f76f60e62f4c6c4b00d",
+  "revision": "88ae288abf6e0e233502059cf3d74e1c9f6c929d",
+  "run": 38789547636,
+  "run_number": 1,
+  "site_relationship": {
+    "UNKNOWN": 53
+  },
+  "source_b2_eligible": 53,
+  "stage4": "OPEN",
+  "stop_reason": null,
+  "verification_scopes": {
+    "INITIAL_STATUS_ONLY": 53
+  },
+  "withheld": 0,
+  "zip_sha256": "8f335c7fa7d9c6aeb96fddff67670aeb97760e649b3b5def8f580fe0e88938d1"
+}

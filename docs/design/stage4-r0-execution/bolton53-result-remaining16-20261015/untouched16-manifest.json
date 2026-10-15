@@ -1,0 +1,137 @@
+{
+  "bridge_start": "2026-10-15",
+  "excluded_residuals": [
+    "FAILED_ROCHDALE_2026-10-08_2026-10-14",
+    "FAILED_OLDHAM",
+    "CAPPED_MANCHESTER",
+    "BOLTON",
+    "BURY"
+  ],
+  "exclusive_cut": "2026-10-15T00:00:00+01:00",
+  "execution_authorised": false,
+  "latency": "UNKNOWN",
+  "limits": {
+    "bytes": 119886080,
+    "calls": 16,
+    "cleanup_upload_reserve_seconds": 120,
+    "job_seconds": 1440,
+    "output_bytes": 20000000,
+    "proposed_kill_grace_seconds": 10,
+    "proposed_secondary_timeout_seconds": 1030,
+    "requests": 440,
+    "rss_bytes": 1610612736,
+    "seconds": 1000,
+    "setup_seconds": 260
+  },
+  "observation_end": "2026-10-14",
+  "observation_start": "2026-09-17",
+  "persistence": false,
+  "publication_recall": "UNKNOWN",
+  "purpose": "REVIEW_ONLY_EXACT16_GENUINELY_UNTOUCHED",
+  "registered": false,
+  "rows": [
+    {
+      "council": "salford",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "salford",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    }
+  ],
+  "source_manifest_sha256": "7c46a54e91201ba2cff1b392e4d606f592f79a8752827e3536135bfb3912e66c",
+  "source_result_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+  "source_revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+  "source_run": 38786550045,
+  "suspension_target_start": "2026-09-29",
+  "version": 1,
+  "watermark_advance": false
+}

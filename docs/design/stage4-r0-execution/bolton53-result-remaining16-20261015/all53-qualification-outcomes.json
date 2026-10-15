@@ -1,0 +1,3659 @@
+[
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "a411c33f858897fec6fbd8594f60b674e9fcd1a7245209a7f229e3099ceef288",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01780/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01780/26",
+      "retrieved_at": "2026-10-15T18:55:39.659870+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01780/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01780/26",
+    "retrieved_at": "2026-10-15T18:55:39.659870+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.324,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73801728,
+      "received_body_bytes": 35120,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:39.505459+00:00",
+      "source_sha256": "a411c33f858897fec6fbd8594f60b674e9fcd1a7245209a7f229e3099ceef288",
+      "supervisor_seconds": 2.996
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "00346275bbc2c6b9afb028806464f90a9807834a0305585e57e3f3a841af6edb",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01778/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01778/26",
+      "retrieved_at": "2026-10-15T18:55:42.672452+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01778/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01778/26",
+    "retrieved_at": "2026-10-15T18:55:42.672452+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.395,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73064448,
+      "received_body_bytes": 34884,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:42.590276+00:00",
+      "source_sha256": "00346275bbc2c6b9afb028806464f90a9807834a0305585e57e3f3a841af6edb",
+      "supervisor_seconds": 3.006
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6N2ADEKGO00&activeTab=summary",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "af3b28041e2dbd9b11f444610c1422ec3c8137c2d0ce006cdac942d5e54e7766",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01776/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01776/26",
+      "retrieved_at": "2026-10-15T18:55:45.579824+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01776/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01776/26",
+    "retrieved_at": "2026-10-15T18:55:45.579824+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.265,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73793536,
+      "received_body_bytes": 34991,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:45.477991+00:00",
+      "source_sha256": "af3b28041e2dbd9b11f444610c1422ec3c8137c2d0ce006cdac942d5e54e7766",
+      "supervisor_seconds": 2.905
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM63LBDEKGD00&activeTab=summary",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "6e826738f96900a7b27950aafbe2937d876e03747eeb37a27c99480cc0d1a896",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01775/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01775/26",
+      "retrieved_at": "2026-10-15T18:55:48.383534+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YGDEKGA00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01775/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01775/26",
+    "retrieved_at": "2026-10-15T18:55:48.383534+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.129,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73801728,
+      "received_body_bytes": 34960,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:48.244499+00:00",
+      "source_sha256": "6e826738f96900a7b27950aafbe2937d876e03747eeb37a27c99480cc0d1a896",
+      "supervisor_seconds": 2.801
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM60YGDEKGA00&activeTab=summary",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "56255c33c847e52f9405df272fb33b5e34ca20fe8e787f0c6930a7c355d6e465",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01769/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01769/26",
+      "retrieved_at": "2026-10-15T18:55:51.288663+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01769/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01769/26",
+    "retrieved_at": "2026-10-15T18:55:51.288663+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.183,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73498624,
+      "received_body_bytes": 35541,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:51.091726+00:00",
+      "source_sha256": "56255c33c847e52f9405df272fb33b5e34ca20fe8e787f0c6930a7c355d6e465",
+      "supervisor_seconds": 2.902
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Confirmed - 10+ units",
+      "reason": "QUALIFICATION_REQUIRED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "864c97d920c11ccd8e9659e5ebacd5e666028c83ef2b908696f3a9ae275cb65e",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01768/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01768/26",
+      "retrieved_at": "2026-10-15T18:55:54.429450+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01768/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01768/26",
+    "retrieved_at": "2026-10-15T18:55:54.429450+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.415,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73404416,
+      "received_body_bytes": 35324,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:54.237392+00:00",
+      "source_sha256": "864c97d920c11ccd8e9659e5ebacd5e666028c83ef2b908696f3a9ae275cb65e",
+      "supervisor_seconds": 3.138
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - non-residential",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "f7da4eacfd6f0016661995aec43cd9e9c1b3e86bbbdaf25cde0ac6eb32e47a41",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01821/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01821/26",
+      "retrieved_at": "2026-10-15T18:55:57.345047+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMJLR9DEKKP00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01821/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01821/26",
+    "retrieved_at": "2026-10-15T18:55:57.345047+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.285,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73744384,
+      "received_body_bytes": 34684,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:55:57.240047+00:00",
+      "source_sha256": "f7da4eacfd6f0016661995aec43cd9e9c1b3e86bbbdaf25cde0ac6eb32e47a41",
+      "supervisor_seconds": 2.913
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMJLR9DEKKP00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "03acc89e1a44c50b93ad6accbd17d90ad62496cc486fce2bd386d2073d2b1d7f",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01816/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01816/26",
+      "retrieved_at": "2026-10-15T18:56:03.459350+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZHKDEKKF00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01816/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01816/26",
+    "retrieved_at": "2026-10-15T18:56:03.459350+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 5.433,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73781248,
+      "received_body_bytes": 34610,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:03.333622+00:00",
+      "source_sha256": "03acc89e1a44c50b93ad6accbd17d90ad62496cc486fce2bd386d2073d2b1d7f",
+      "supervisor_seconds": 6.111
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZHKDEKKF00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "7742616380ae6f3989e8de637475914bf5cda16a55bf23f6be694a16269fafd0",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01815/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01815/26",
+      "retrieved_at": "2026-10-15T18:56:06.370508+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZGWDEKKD00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01815/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01815/26",
+    "retrieved_at": "2026-10-15T18:56:06.370508+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.173,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73281536,
+      "received_body_bytes": 35611,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:06.180284+00:00",
+      "source_sha256": "7742616380ae6f3989e8de637475914bf5cda16a55bf23f6be694a16269fafd0",
+      "supervisor_seconds": 2.907
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMIZGWDEKKD00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "5196a80817d121d6c1368d0a84da927fe02e0824d67abc0240fcfb03045b94c3",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01813/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01813/26",
+      "retrieved_at": "2026-10-15T18:56:09.405272+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHLLSDEKJZ00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01813/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01813/26",
+    "retrieved_at": "2026-10-15T18:56:09.405272+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.309,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73756672,
+      "received_body_bytes": 35057,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:09.228901+00:00",
+      "source_sha256": "5196a80817d121d6c1368d0a84da927fe02e0824d67abc0240fcfb03045b94c3",
+      "supervisor_seconds": 3.032
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHLLSDEKJZ00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "9bf1424865fb001467c8392318a12d5130aad910aaad0209d0443382deaef118",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01811/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01811/26",
+      "retrieved_at": "2026-10-15T18:56:12.422117+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHD72DEKJU00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01811/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01811/26",
+    "retrieved_at": "2026-10-15T18:56:12.422117+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.307,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73940992,
+      "received_body_bytes": 34935,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:12.251487+00:00",
+      "source_sha256": "9bf1424865fb001467c8392318a12d5130aad910aaad0209d0443382deaef118",
+      "supervisor_seconds": 3.014
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHD72DEKJU00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "e94a2c856eb85f8d0c59f22dc62e5fcc713b71dc133a8a5d92cfe475d209b99b",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01810/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01810/26",
+      "retrieved_at": "2026-10-15T18:56:15.326979+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAG1DEKJR00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01810/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01810/26",
+    "retrieved_at": "2026-10-15T18:56:15.326979+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.272,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73428992,
+      "received_body_bytes": 35060,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:15.236535+00:00",
+      "source_sha256": "e94a2c856eb85f8d0c59f22dc62e5fcc713b71dc133a8a5d92cfe475d209b99b",
+      "supervisor_seconds": 2.902
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAG1DEKJR00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "c3e9ede709f110a8a78b8a8ec3f2dc8e9d79c9040102ad7a79c1c3ce2f801ff6",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01809/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01809/26",
+      "retrieved_at": "2026-10-15T18:56:18.235019+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAESDEKJP00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01809/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01809/26",
+    "retrieved_at": "2026-10-15T18:56:18.235019+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.216,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73723904,
+      "received_body_bytes": 34935,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:18.072359+00:00",
+      "source_sha256": "c3e9ede709f110a8a78b8a8ec3f2dc8e9d79c9040102ad7a79c1c3ce2f801ff6",
+      "supervisor_seconds": 2.906
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMHAESDEKJP00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "5316942efd410cad52e6d23e6043ff7bc7808cbd26f68b1f1d063a96525ce0ac",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01808/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01808/26",
+      "retrieved_at": "2026-10-15T18:56:21.135405+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4U2DEKJL00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01808/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01808/26",
+    "retrieved_at": "2026-10-15T18:56:21.135405+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.22,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73768960,
+      "received_body_bytes": 34576,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:20.990569+00:00",
+      "source_sha256": "5316942efd410cad52e6d23e6043ff7bc7808cbd26f68b1f1d063a96525ce0ac",
+      "supervisor_seconds": 2.898
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4U2DEKJL00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "4ce0c5ed24b1ef40074fc8c4e91e4b41639f85e14f673894bae4795ac7fa9543",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01807/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01807/26",
+      "retrieved_at": "2026-10-15T18:56:24.141891+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TVDEKJJ00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01807/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01807/26",
+    "retrieved_at": "2026-10-15T18:56:24.141891+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.299,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73707520,
+      "received_body_bytes": 34561,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:23.973626+00:00",
+      "source_sha256": "4ce0c5ed24b1ef40074fc8c4e91e4b41639f85e14f673894bae4795ac7fa9543",
+      "supervisor_seconds": 3.004
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TVDEKJJ00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "d63287b1435455979939e03010998ef79e9e50da02d6733a1204ec56b87edaea",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01806/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01806/26",
+      "retrieved_at": "2026-10-15T18:56:28.594174+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TNDEKJH00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01806/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01806/26",
+    "retrieved_at": "2026-10-15T18:56:28.594174+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 3.755,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73703424,
+      "received_body_bytes": 34940,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:28.441737+00:00",
+      "source_sha256": "d63287b1435455979939e03010998ef79e9e50da02d6733a1204ec56b87edaea",
+      "supervisor_seconds": 4.45
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4TNDEKJH00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "129bb460cf3d21ba802ce2ad277af11a8171cdf62f006cade0d2aaa3e2bf0e32",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01805/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01805/26",
+      "retrieved_at": "2026-10-15T18:56:31.599451+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4SVDEKJF00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01805/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01805/26",
+    "retrieved_at": "2026-10-15T18:56:31.599451+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.356,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73748480,
+      "received_body_bytes": 34624,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:31.485343+00:00",
+      "source_sha256": "129bb460cf3d21ba802ce2ad277af11a8171cdf62f006cade0d2aaa3e2bf0e32",
+      "supervisor_seconds": 3.002
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMH4SVDEKJF00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "b4159d6e876fdd44fd01cae64c863e1343e92df91d2773266d09eea6c01ea00b",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01804/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01804/26",
+      "retrieved_at": "2026-10-15T18:56:34.499047+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMG1X6DEKJ900&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01804/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01804/26",
+    "retrieved_at": "2026-10-15T18:56:34.499047+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.209,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73834496,
+      "received_body_bytes": 34581,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:34.353321+00:00",
+      "source_sha256": "b4159d6e876fdd44fd01cae64c863e1343e92df91d2773266d09eea6c01ea00b",
+      "supervisor_seconds": 2.897
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMG1X6DEKJ900&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "eeb6391d93ca5017d6ed9b6f1235cf9b604ecc59147f30a5b937322969238d9d",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01801/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01801/26",
+      "retrieved_at": "2026-10-15T18:56:37.293623+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFWDUDEKJ500&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01801/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01801/26",
+    "retrieved_at": "2026-10-15T18:56:37.293623+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.111,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73920512,
+      "received_body_bytes": 35166,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:37.149807+00:00",
+      "source_sha256": "eeb6391d93ca5017d6ed9b6f1235cf9b604ecc59147f30a5b937322969238d9d",
+      "supervisor_seconds": 2.792
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFWDUDEKJ500&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "592d295866f48e6c5acb636245dee82ec0c2f81e84f318a809e2e83f72c0f82b",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01800/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01800/26",
+      "retrieved_at": "2026-10-15T18:56:42.682509+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFUWXDE02800&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01800/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01800/26",
+    "retrieved_at": "2026-10-15T18:56:42.682509+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 4.721,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73789440,
+      "received_body_bytes": 34638,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:42.546834+00:00",
+      "source_sha256": "592d295866f48e6c5acb636245dee82ec0c2f81e84f318a809e2e83f72c0f82b",
+      "supervisor_seconds": 5.386
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFUWXDE02800&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "1522d13f66d2359a4f1729a3a24610cf5bed8460f2106004b0b0c1eb88bd87ef",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01799/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01799/26",
+      "retrieved_at": "2026-10-15T18:56:45.797745+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFTLRDEKJ200&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01799/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01799/26",
+    "retrieved_at": "2026-10-15T18:56:45.797745+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.34,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73809920,
+      "received_body_bytes": 34771,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:45.588582+00:00",
+      "source_sha256": "1522d13f66d2359a4f1729a3a24610cf5bed8460f2106004b0b0c1eb88bd87ef",
+      "supervisor_seconds": 3.112
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFTLRDEKJ200&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore - under 10 units",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "407edfdb223c9758c7005ba4bfdd0427ad059e6a6cffae26ee87dfb3badc4a21",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01797/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01797/26",
+      "retrieved_at": "2026-10-15T18:56:48.803615+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01797/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01797/26",
+    "retrieved_at": "2026-10-15T18:56:48.803615+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.259,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73707520,
+      "received_body_bytes": 35108,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:48.613347+00:00",
+      "source_sha256": "407edfdb223c9758c7005ba4bfdd0427ad059e6a6cffae26ee87dfb3badc4a21",
+      "supervisor_seconds": 3.003
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFQF4DE03B00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "abc83e03e874f30ca206323ffc534818d2474855aadfb358379ab4a0623fb7ac",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01796/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01796/26",
+      "retrieved_at": "2026-10-15T18:56:52.018836+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFLB8DEKIV00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01796/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01796/26",
+    "retrieved_at": "2026-10-15T18:56:52.018836+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.492,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73809920,
+      "received_body_bytes": 34717,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:51.842878+00:00",
+      "source_sha256": "abc83e03e874f30ca206323ffc534818d2474855aadfb358379ab4a0623fb7ac",
+      "supervisor_seconds": 3.212
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFLB8DEKIV00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "7e52af249f96f18fd6e73b36e493f52cba2046824d6fe20add8887f3ea3aa0c4",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01795/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01795/26",
+      "retrieved_at": "2026-10-15T18:56:55.026724+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFITADE03B00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01795/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01795/26",
+    "retrieved_at": "2026-10-15T18:56:55.026724+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.227,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73637888,
+      "received_body_bytes": 34603,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:54.828899+00:00",
+      "source_sha256": "7e52af249f96f18fd6e73b36e493f52cba2046824d6fe20add8887f3ea3aa0c4",
+      "supervisor_seconds": 3.004
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFITADE03B00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "7e4aa7090a8b10c88d9d1813f4baa2a5d2f89f33ed1e1e594b746007af7bcaa5",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01794/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01794/26",
+      "retrieved_at": "2026-10-15T18:56:58.034020+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFII5DEKIS00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01794/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01794/26",
+    "retrieved_at": "2026-10-15T18:56:58.034020+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.262,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73723904,
+      "received_body_bytes": 34756,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:56:57.858603+00:00",
+      "source_sha256": "7e4aa7090a8b10c88d9d1813f4baa2a5d2f89f33ed1e1e594b746007af7bcaa5",
+      "supervisor_seconds": 3.004
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFII5DEKIS00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "d02dd3fd4c8f84aafb0b5527242a5df1fd274713821ca3d425df820f5dfd8c8e",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01793/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01793/26",
+      "retrieved_at": "2026-10-15T18:57:01.052291+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA8DDEKIN00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01793/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01793/26",
+    "retrieved_at": "2026-10-15T18:57:01.052291+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.236,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73797632,
+      "received_body_bytes": 34980,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:00.831026+00:00",
+      "source_sha256": "d02dd3fd4c8f84aafb0b5527242a5df1fd274713821ca3d425df820f5dfd8c8e",
+      "supervisor_seconds": 3.015
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA8DDEKIN00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "1cabbee11cc502f3a28162add7ffb746f9d1a99b3fe733af09ba6631962aeae4",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01791/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01791/26",
+      "retrieved_at": "2026-10-15T18:57:03.964136+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA63DEKIJ00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01791/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01791/26",
+    "retrieved_at": "2026-10-15T18:57:03.964136+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.212,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73740288,
+      "received_body_bytes": 34784,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:03.844783+00:00",
+      "source_sha256": "1cabbee11cc502f3a28162add7ffb746f9d1a99b3fe733af09ba6631962aeae4",
+      "supervisor_seconds": 2.909
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMFA63DEKIJ00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "c3e694e8901c05751fe5104e1c6c222121817ac48f5c20af93321ebee747c338",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01790/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01790/26",
+      "retrieved_at": "2026-10-15T18:57:06.867902+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01790/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01790/26",
+    "retrieved_at": "2026-10-15T18:57:06.867902+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.222,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73838592,
+      "received_body_bytes": 34752,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:06.757902+00:00",
+      "source_sha256": "c3e694e8901c05751fe5104e1c6c222121817ac48f5c20af93321ebee747c338",
+      "supervisor_seconds": 2.901
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA9MQDEKI200&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "da961e889c4da179519db12ed8dd064fc2cf380f340d8ea1fd2441d33ab5201d",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01789/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01789/26",
+      "retrieved_at": "2026-10-15T18:57:09.564358+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA19DDEKHX00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01789/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01789/26",
+    "retrieved_at": "2026-10-15T18:57:09.564358+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 1.985,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73891840,
+      "received_body_bytes": 34896,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:09.406694+00:00",
+      "source_sha256": "da961e889c4da179519db12ed8dd064fc2cf380f340d8ea1fd2441d33ab5201d",
+      "supervisor_seconds": 2.693
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMA19DDEKHX00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "524d9185bad5a260b990d360f78b8b4beac4734569c1d0dd0dab6948ea614022",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01787/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01787/26",
+      "retrieved_at": "2026-10-15T18:57:12.467126+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01787/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01787/26",
+    "retrieved_at": "2026-10-15T18:57:12.467126+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.206,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73711616,
+      "received_body_bytes": 35036,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:12.317615+00:00",
+      "source_sha256": "524d9185bad5a260b990d360f78b8b4beac4734569c1d0dd0dab6948ea614022",
+      "supervisor_seconds": 2.9
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9VQ2DEKHR00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "53d9ab6b2798bcfa2d2f1443b8367bfa05d7ff21dc610371a623011cf0937cf4",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01786/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01786/26",
+      "retrieved_at": "2026-10-15T18:57:15.472902+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01786/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01786/26",
+    "retrieved_at": "2026-10-15T18:57:15.472902+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.29,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73928704,
+      "received_body_bytes": 34681,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:15.328435+00:00",
+      "source_sha256": "53d9ab6b2798bcfa2d2f1443b8367bfa05d7ff21dc610371a623011cf0937cf4",
+      "supervisor_seconds": 3.003
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM9T1HDEKHO00&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "679012c3b95145651256f8728eaace72c4c240bbeb01cfd1748178717d68d8c6",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01785/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01785/26",
+      "retrieved_at": "2026-10-15T18:57:18.484086+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01785/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01785/26",
+    "retrieved_at": "2026-10-15T18:57:18.484086+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.264,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73715712,
+      "received_body_bytes": 35410,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:18.272356+00:00",
+      "source_sha256": "679012c3b95145651256f8728eaace72c4c240bbeb01cfd1748178717d68d8c6",
+      "supervisor_seconds": 3.008
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM8139DEKH800&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "eca123f042b8f85af5fc6e5f01554a2436fd044807088ef4c65706b651a9e4be",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01784/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01784/26",
+      "retrieved_at": "2026-10-15T18:57:21.593981+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01784/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01784/26",
+    "retrieved_at": "2026-10-15T18:57:21.593981+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.333,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73695232,
+      "received_body_bytes": 35030,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:21.385624+00:00",
+      "source_sha256": "eca123f042b8f85af5fc6e5f01554a2436fd044807088ef4c65706b651a9e4be",
+      "supervisor_seconds": 3.107
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7YC9DEKH500&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "79249362756d8af8af8ed22d1b9eb2db5b461c5b2899873feaf9637d05666fd9",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01783/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01783/26",
+      "retrieved_at": "2026-10-15T18:57:26.257829+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01783/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01783/26",
+    "retrieved_at": "2026-10-15T18:57:26.257829+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 3.98,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73781248,
+      "received_body_bytes": 34972,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:26.129972+00:00",
+      "source_sha256": "79249362756d8af8af8ed22d1b9eb2db5b461c5b2899873feaf9637d05666fd9",
+      "supervisor_seconds": 4.661
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQZDEKH200&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "9754ec33f21f622f1f2151701f1784dbe0a0f76c963c570e9e3877e31c067503",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01782/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01782/26",
+      "retrieved_at": "2026-10-15T18:57:29.058939+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01782/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01782/26",
+    "retrieved_at": "2026-10-15T18:57:29.058939+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.124,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73846784,
+      "received_body_bytes": 35878,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:28.946104+00:00",
+      "source_sha256": "9754ec33f21f622f1f2151701f1784dbe0a0f76c963c570e9e3877e31c067503",
+      "supervisor_seconds": 2.798
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM7VQMDEKH000&activeTab=summary",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore - under 10 units",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "f2b33de44a0b6a6f0f7516f6f64203c60f824a1e92ebeb7394788fe89f0ee2a4",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01858/26/PREMIN",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01858/26/PREMIN",
+      "retrieved_at": "2026-10-15T18:57:31.865958+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMXZKVDE07600&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01858/26/PREMIN",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01858/26/PREMIN",
+    "retrieved_at": "2026-10-15T18:57:31.865958+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.043,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73736192,
+      "received_body_bytes": 34272,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:31.658762+00:00",
+      "source_sha256": "f2b33de44a0b6a6f0f7516f6f64203c60f824a1e92ebeb7394788fe89f0ee2a4",
+      "supervisor_seconds": 2.804
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMXZKVDE07600&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "0ffaea35ba20f10ff4677eef9805c20a868510412d737acea32f3799e201783a",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01852/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01852/26",
+      "retrieved_at": "2026-10-15T18:57:34.769585+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW58NDE04Y00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01852/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01852/26",
+    "retrieved_at": "2026-10-15T18:57:34.769585+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.166,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73662464,
+      "received_body_bytes": 34772,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:34.606669+00:00",
+      "source_sha256": "0ffaea35ba20f10ff4677eef9805c20a868510412d737acea32f3799e201783a",
+      "supervisor_seconds": 2.901
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW58NDE04Y00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "1ea15d403a6cdbd6bd78d1491abcb2da0cdae4ec117c22df9324cb1d994ebbdc",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01851/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01851/26",
+      "retrieved_at": "2026-10-15T18:57:39.121966+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW3QTDEKO500&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01851/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01851/26",
+    "retrieved_at": "2026-10-15T18:57:39.121966+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 3.649,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73719808,
+      "received_body_bytes": 35144,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:38.980369+00:00",
+      "source_sha256": "1ea15d403a6cdbd6bd78d1491abcb2da0cdae4ec117c22df9324cb1d994ebbdc",
+      "supervisor_seconds": 4.349
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMW3QTDEKO500&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "ac509aeb785a9228fdf660e206317005d59861f247a0dcf066e24c98d96deaa7",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01848/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01848/26",
+      "retrieved_at": "2026-10-15T18:57:41.918932+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUV92DEKNT00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01848/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01848/26",
+    "retrieved_at": "2026-10-15T18:57:41.918932+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.108,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73699328,
+      "received_body_bytes": 34900,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:41.791614+00:00",
+      "source_sha256": "ac509aeb785a9228fdf660e206317005d59861f247a0dcf066e24c98d96deaa7",
+      "supervisor_seconds": 2.794
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUV92DEKNT00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "789da2d50405645713c84c041387c8643b2cb9897801c0718e3a84553cf53eb9",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01847/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01847/26",
+      "retrieved_at": "2026-10-15T18:57:44.828356+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUK6MDEKNN00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01847/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01847/26",
+    "retrieved_at": "2026-10-15T18:57:44.828356+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.16,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73785344,
+      "received_body_bytes": 35224,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:44.649073+00:00",
+      "source_sha256": "789da2d50405645713c84c041387c8643b2cb9897801c0718e3a84553cf53eb9",
+      "supervisor_seconds": 2.906
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUK6MDEKNN00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "c48211b986fd2b9f3b5fb2608394e014ca1811b84d646f5316cb1425ff098f60",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01845/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01845/26",
+      "retrieved_at": "2026-10-15T18:57:47.525048+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUEP5DEKNJ00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01845/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01845/26",
+    "retrieved_at": "2026-10-15T18:57:47.525048+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.024,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73781248,
+      "received_body_bytes": 35129,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:47.419137+00:00",
+      "source_sha256": "c48211b986fd2b9f3b5fb2608394e014ca1811b84d646f5316cb1425ff098f60",
+      "supervisor_seconds": 2.694
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMUEP5DEKNJ00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "HISTORICAL_42_REQUIRES_FRESH_CONTRACT_EVIDENCE",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "3af2fbe292fca34f63ac0703a5c7bfe1cb0d44646c21ed0bc266d5e8009a5089",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01843/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01843/26",
+      "retrieved_at": "2026-10-15T18:57:50.428938+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3ITDEKND00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01843/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01843/26",
+    "retrieved_at": "2026-10-15T18:57:50.428938+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.22,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73846784,
+      "received_body_bytes": 35090,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:50.302542+00:00",
+      "source_sha256": "3af2fbe292fca34f63ac0703a5c7bfe1cb0d44646c21ed0bc266d5e8009a5089",
+      "supervisor_seconds": 2.901
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3ITDEKND00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "b3ad1753c9369727271be4bd36bfdfaa584e49ef0b1d28daaf0a6c0645a01ab7",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01841/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01841/26",
+      "retrieved_at": "2026-10-15T18:57:53.642933+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3H8DEKN900&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01841/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01841/26",
+    "retrieved_at": "2026-10-15T18:57:53.642933+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.447,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73764864,
+      "received_body_bytes": 34780,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:53.436725+00:00",
+      "source_sha256": "b3ad1753c9369727271be4bd36bfdfaa584e49ef0b1d28daaf0a6c0645a01ab7",
+      "supervisor_seconds": 3.211
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMU3H8DEKN900&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "087b2fb74e249b3d31bc5394bd586594df721ad602c78b132ebfecdd890c0f13",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01840/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01840/26",
+      "retrieved_at": "2026-10-15T18:57:56.337946+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSXUQDEKN200&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01840/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01840/26",
+    "retrieved_at": "2026-10-15T18:57:56.337946+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 1.968,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73728000,
+      "received_body_bytes": 34656,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:56.178700+00:00",
+      "source_sha256": "087b2fb74e249b3d31bc5394bd586594df721ad602c78b132ebfecdd890c0f13",
+      "supervisor_seconds": 2.692
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSXUQDEKN200&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "be340e88680d083a62b64e11fb3e7f7900cf0719b6654186377394280e375564",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01839/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01839/26",
+      "retrieved_at": "2026-10-15T18:57:59.240772+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSPI5DEKMV00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01839/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01839/26",
+    "retrieved_at": "2026-10-15T18:57:59.240772+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.169,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73707520,
+      "received_body_bytes": 35090,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:57:59.064596+00:00",
+      "source_sha256": "be340e88680d083a62b64e11fb3e7f7900cf0719b6654186377394280e375564",
+      "supervisor_seconds": 2.9
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSPI5DEKMV00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "9084e9e08649c719729e14bf73d49e550211c917aa73bf1587be633e40769b7b",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01838/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01838/26",
+      "retrieved_at": "2026-10-15T18:58:02.043949+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSO41DE02800&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01838/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01838/26",
+    "retrieved_at": "2026-10-15T18:58:02.043949+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.074,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73748480,
+      "received_body_bytes": 34741,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:01.872631+00:00",
+      "source_sha256": "9084e9e08649c719729e14bf73d49e550211c917aa73bf1587be633e40769b7b",
+      "supervisor_seconds": 2.8
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSO41DE02800&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "5bdd1aebebf424ba3963face59428b3e001af0f63f072f85ff92f8e5952770cb",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01836/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01836/26",
+      "retrieved_at": "2026-10-15T18:58:06.399806+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSMQ4DEKMS00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01836/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01836/26",
+    "retrieved_at": "2026-10-15T18:58:06.399806+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 3.548,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73695232,
+      "received_body_bytes": 34724,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:06.192524+00:00",
+      "source_sha256": "5bdd1aebebf424ba3963face59428b3e001af0f63f072f85ff92f8e5952770cb",
+      "supervisor_seconds": 4.351
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMSMQ4DEKMS00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "26450233d8e5b9abec2da190f94f57d1a0617646459c648d2f67fca6d25601cf",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01833/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01833/26",
+      "retrieved_at": "2026-10-15T18:58:09.095393+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8TZDEKMJ00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01833/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01833/26",
+    "retrieved_at": "2026-10-15T18:58:09.095393+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 1.979,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73723904,
+      "received_body_bytes": 34916,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:08.948069+00:00",
+      "source_sha256": "26450233d8e5b9abec2da190f94f57d1a0617646459c648d2f67fca6d25601cf",
+      "supervisor_seconds": 2.692
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8TZDEKMJ00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "d62d2669d45cd556745bfcd5c2031dc7e4977a616f738fbdec174a65eabefb21",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01832/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01832/26",
+      "retrieved_at": "2026-10-15T18:58:11.999982+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8SXDEKMH00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01832/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01832/26",
+    "retrieved_at": "2026-10-15T18:58:11.999982+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.218,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73801728,
+      "received_body_bytes": 34568,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:11.867667+00:00",
+      "source_sha256": "d62d2669d45cd556745bfcd5c2031dc7e4977a616f738fbdec174a65eabefb21",
+      "supervisor_seconds": 2.901
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMS8SXDEKMH00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "37e0b9d8cbea1e0486b0099739eb697c01bb9dec57b4ee6c9faa99c78e69e5a9",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01827/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01827/26",
+      "retrieved_at": "2026-10-15T18:58:14.806137+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01827/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01827/26",
+    "retrieved_at": "2026-10-15T18:58:14.806137+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.051,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73748480,
+      "received_body_bytes": 35581,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:14.602434+00:00",
+      "source_sha256": "37e0b9d8cbea1e0486b0099739eb697c01bb9dec57b4ee6c9faa99c78e69e5a9",
+      "supervisor_seconds": 2.802
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "4c094ff9aef9f03407e4291b70d7a8725bc6908f4e7cc1de40f827ca8a52699a",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01826/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01826/26",
+      "retrieved_at": "2026-10-15T18:58:17.619732+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLGCZDEKLH00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01826/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01826/26",
+    "retrieved_at": "2026-10-15T18:58:17.619732+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.11,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73859072,
+      "received_body_bytes": 35064,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:17.478759+00:00",
+      "source_sha256": "4c094ff9aef9f03407e4291b70d7a8725bc6908f4e7cc1de40f827ca8a52699a",
+      "supervisor_seconds": 2.81
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLGCZDEKLH00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "5aa44cfa9af02e907b6ac8a86549ac5c3a9c7b98ced422c1ca3991792ecb5b6a",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01825/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01825/26",
+      "retrieved_at": "2026-10-15T18:58:20.212161+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKYQPDE04Y00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01825/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01825/26",
+    "retrieved_at": "2026-10-15T18:58:20.212161+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 1.81,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73752576,
+      "received_body_bytes": 34268,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:19.994007+00:00",
+      "source_sha256": "5aa44cfa9af02e907b6ac8a86549ac5c3a9c7b98ced422c1ca3991792ecb5b6a",
+      "supervisor_seconds": 2.589
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKYQPDE04Y00&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "admission_readiness": "ELIGIBLE_FOR_REVIEW_ONLY",
+    "application_role": "UNKNOWN",
+    "cohort_origin": "UNATTEMPTED_11",
+    "commercial_relevance": "UNPROVEN",
+    "conservative_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "council": "bolton",
+    "current_database_presence": "UNKNOWN_NOT_QUERIED",
+    "decision_date_verified_at": null,
+    "decision_verified_at": null,
+    "failure": null,
+    "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+    "observation_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "571c05b7b8f4b4dd1cbe41dab0886f461975ae82e36726ce4728991590b5916b",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01823/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01823/26",
+      "retrieved_at": "2026-10-15T18:58:23.011194+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKU6ADEKL500&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01823/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "production_admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "production_writes": 0,
+    "reference": "01823/26",
+    "retrieved_at": "2026-10-15T18:58:23.011194+00:00",
+    "semantic_interpretation": "UNKNOWN_UNMAPPED",
+    "site_relationship": "UNKNOWN",
+    "source_audit": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.109,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73859072,
+      "received_body_bytes": 34552,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T18:58:22.866067+00:00",
+      "source_sha256": "571c05b7b8f4b4dd1cbe41dab0886f461975ae82e36726ce4728991590b5916b",
+      "supervisor_seconds": 2.796
+    },
+    "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMKU6ADEKL500&activeTab=summary",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  }
+]
