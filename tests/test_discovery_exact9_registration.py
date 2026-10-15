@@ -19,7 +19,8 @@ def test_registered_exact9_identity_scope_and_ceilings():
     assert job['timeout-minutes']=='16'
     assert (x.PROFILE['calls'],x.PROFILE['requests'],x.PROFILE['bytes'],x.PROFILE['seconds'])==(9,90,27000000,495)
     assert 960-260-525-10>=120
-    assert not Path('.github/workflows/stage4-bolton-two-parent-metadata-once.yml').exists()
+    from verification.discovery.r0_parent_metadata import WORKFLOW,TEMPLATE
+    assert Path(WORKFLOW).read_bytes()==TEMPLATE.read_bytes()
 
 
 def test_actual_registered_mapping_and_content_rejection(monkeypatch):
