@@ -1,0 +1,66 @@
+# UNREGISTERED REVIEW PROPOSAL; no execution authority granted.
+name: Stage4 route-qualified three material admission ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed integrated revision
+        required: true
+        type: string
+      authority:
+        description: Three eligible frozen references; shared identity admission and B2
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_ROUTE_QUALIFIED_THREE_MATERIAL_ADMISSIONS_ONCE]
+      manifest_sha256:
+        description: Exact frozen three-reference manifest digest
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  admission:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Exact revision and one invocation
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" && "$PIN" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_ROUTE_QUALIFIED_THREE_MATERIAL_ADMISSIONS_ONCE ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Dependencies without production credentials
+        run: |
+          bash verification/ah_pg/setup.sh "$RUNNER_TEMP/committee-venv"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m playwright install --with-deps chromium --only-shell
+      - name: Shared three-record admission and B2, fixed manifest
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          COMMITTEE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha256 }}
+          COMMITTEE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          [[ -n "$COMMITTEE_DATABASE_URL" ]]
+          [[ "$MANIFEST_SHA" == 91be2de17f9e7fd0f4e62c7e95b611ef91bb1484673191f489f928b9879e5981 ]]
+          mkdir "$RUNNER_TEMP/committee-audit"
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 OPENBLAS_NUM_THREADS=1 GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_REF="$GITHUB_REF" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" COMMITTEE_WORKFLOW_SHA="$COMMITTEE_WORKFLOW_SHA" COMMITTEE_DATABASE_URL="$COMMITTEE_DATABASE_URL" PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/committee-browsers" "$RUNNER_TEMP/committee-venv/bin/python" -m verification.discovery.material_admission_route_qualified --sha "$PIN" --authority "$AUTHORITY" --manifest-sha "$MANIFEST_SHA" --output "$RUNNER_TEMP/committee-audit/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: material-cohort-admission-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/committee-audit/*.json
+          if-no-files-found: error
+          retention-days: 14
