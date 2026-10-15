@@ -76,7 +76,7 @@ def execute(plan,expected_hash,reader=read,clock=time.monotonic):
     canonical=manifest(plan['start'],plan['end'],plan['purpose'])
     if plan!=canonical or digest(plan)!=expected_hash:raise ValueError('unreviewed manifest')
     if any(k in os.environ for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
-    started=clock();results=[];requests=body_bytes=0;stop=None
+    started=clock();results=[];requests=body_bytes=0;stop=None;accounting_complete=True
     for row in plan['rows']:
         # Reserve worst-case cost before each child, never increase a cap.
         arc=row['council'] in ARCUS;rq=80 if arc else 10;by=20*1024*1024 if arc else 3_000_000
@@ -84,10 +84,12 @@ def execute(plan,expected_hash,reader=read,clock=time.monotonic):
             stop='ROUND_BUDGET';break
         try:a=reader(row)
         except Exception:
+            accounting_complete=False
             results.append(dict(window=row,enumeration_completeness='FAILED',completeness='FAILED',reason='SOURCE_EXCEPTION'));stop='SOURCE_EXCEPTION';break
         resource=a if arc else a.get('resource',{})
         count=resource.get('requests',resource.get('requests_attempted'));size=(max(a.get('decoded_bytes',0),a.get('encoded_bytes',0))+a.get('outbound_payload_bytes',0)) if arc else resource.get('received_bytes')
         if type(count) is not int or type(size) is not int or not 0<=count<=rq or not 0<=size<=by:
+            accounting_complete=False
             results.append(dict(window=row,enumeration_completeness='UNKNOWN',completeness='UNKNOWN',reason='RESOURCE_ACCOUNTING'));stop='RESOURCE_ACCOUNTING';break
         requests+=count;body_bytes+=size
         state=classify(row,a);results.append(dict(window=row,enumeration_completeness=state,completeness='UNKNOWN' if state=='COMPLETE' else state,source=a))
@@ -96,7 +98,7 @@ def execute(plan,expected_hash,reader=read,clock=time.monotonic):
     complete=stop is None and len(results)==len(plan['rows']) and all(r['enumeration_completeness']=='COMPLETE' for r in results)
     state='COMPLETE' if complete else ('FAILED' if any(r['enumeration_completeness']=='FAILED' for r in results) else 'INCOMPLETE')
     out=dict(manifest_sha256=expected_hash,enumeration_completeness=state,completeness='UNKNOWN' if state=='COMPLETE' else state,source_contract_qualified=False,results=results,not_attempted=plan['rows'][len(results):],
-        stop_reason=stop,requests=requests,bytes=body_bytes,persistence=False,completed_through_advanced=False)
+        stop_reason=stop,accounting_complete=accounting_complete,requests=requests,bytes=body_bytes,persistence=False,completed_through_advanced=False)
     if len(json.dumps(out,default=str).encode())>LIMITS['output_bytes']:raise ValueError('bounded output exceeded')
     return out
 

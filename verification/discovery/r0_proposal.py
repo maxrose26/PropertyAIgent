@@ -75,11 +75,12 @@ def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS
             env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         import psutil
         expired=False; started=time.monotonic(); seen={}; peak=0
-        parent=psutil.Process(child.pid)
+        try:parent=psutil.Process(child.pid)
+        except psutil.NoSuchProcess:parent=None
         try:
             while child.poll() is None:
                 rss=0
-                try:owned=[parent]+parent.children(recursive=True)
+                try:owned=[] if parent is None else [parent]+parent.children(recursive=True)
                 except psutil.NoSuchProcess:break
                 for process in owned:
                     try:
@@ -111,7 +112,7 @@ def supervise_round(plan,output,*,runner=subprocess.Popen,deadline=ROUND_SECONDS
         result=dict(completeness='UNKNOWN',enumeration_completeness='UNKNOWN',
             accounting_complete=False,stop_reason='OUTER_DEADLINE' if expired else 'WORKER_FAILURE',persistence=False)
         if not expired and not survivors and code==0 and out.is_file() and out.stat().st_size<=f.LIMITS['output_bytes']:
-            result=json.loads(out.read_bytes());result['accounting_complete']=True
+            result=json.loads(out.read_bytes())
         result['outer_supervisor']=dict(expired=expired,exit_code=code,elapsed_seconds=round(time.monotonic()-started,3),
             peak_owned_rss=peak,live_owned_survivors=len(survivors),cleanup='CLOSED' if not survivors else 'FAILED',final_containment='DISPOSABLE_HOSTED_VM',restarted=False)
         output.write_text(json.dumps(result,sort_keys=True))

@@ -52,6 +52,7 @@ def test_exception_budget_and_missing_accounting_stop():
     p=f.manifest('2026-10-15','2026-10-15','BACKFILL_AUDIT')
     r=f.execute(p,f.digest(p),reader=lambda r:(_ for _ in ()).throw(RuntimeError('unsafe payload')),clock=lambda:0)
     assert r['stop_reason']=='SOURCE_EXCEPTION' and 'unsafe payload' not in str(r)
+    assert r['accounting_complete'] is False
     values=iter([0,1900]);r=f.execute(p,f.digest(p),reader=lambda r:pytest.fail('no dispatch'),clock=lambda:next(values))
     assert r['stop_reason']=='ROUND_BUDGET' and len(r['not_attempted'])==9
     r=f.execute(p,f.digest(p),reader=lambda r:dict(evidence(r),resource={}),clock=lambda:0)
