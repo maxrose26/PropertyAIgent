@@ -14,6 +14,10 @@ on:
       - 'verification/discovery/**'
       - 'verification/direct_reference/instrumented_probe.py'
       - '.github/workflows/stage4-discovery-offline.yml'
+      - '.github/workflows/stage4-route-qualified-material-admission-once.yml'
+      - '.github/workflows/stage4-batch-offline.yml'
+      - 'tests/test_stage4_batch_registration.py'
+      - 'tests/test_oldham_production_registration.py'
   push:
     branches: [master]
 permissions:
@@ -36,7 +40,7 @@ jobs:
           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
       - name: Rejected evidence audit, network denied
         run: |
-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_rejection_audit.py tests/test_discovery_material_qualification.py tests/test_discovery_material_admission.py tests/test_discovery_route_validation.py -q
+          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_rejection_audit.py tests/test_discovery_material_qualification.py tests/test_discovery_material_admission.py tests/test_discovery_route_validation.py tests/test_discovery_admission_proposal.py -q
       - uses: actions/upload-artifact@v4
         if: always()
         with:
