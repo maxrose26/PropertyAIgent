@@ -1,0 +1,12 @@
+{
+  ".github/workflows/stage4-discovery-offline.yml": "6f52adb7f17af585172570f5d2f52f68ccfe887ad33888b32293d485f817526e",
+  "docs/design/stage4-r0-execution/recovery-preparation/INDEPENDENT-REVIEW.md": "3a1e803be5113dbca802ef58a9bc5b12206b2084161985f67b4ac64579db0af4",
+  "docs/design/stage4-r0-execution/recovery-preparation/REVIEW.md": "27ccff1941b8cb6cff68b331c6c6009d97109d482badd6b25e1920f97ed9bf5e",
+  "docs/design/stage4-r0-execution/recovery-preparation/code.diff": "870fea6cabb348ebe9b0e885e918a1e82b930355a75859ed09cac554cea049c5",
+  "docs/design/stage4-r0-execution/recovery-preparation/comparison-80-manifest.json": "cf31d3a5dd69da7c65348428473a0bb15cf38071caab41b5db76b6d5ea8845cd",
+  "docs/design/stage4-r0-execution/recovery-preparation/comparison-80-read-only.sql": "b5ec913f40d2c167859986366a0c63615dbcd8539a08433003b74ed1646c5f18",
+  "docs/design/stage4-r0-execution/recovery-preparation/qualification-80.json": "e0b19790d13253b782aaf720d09eaf5763719682b11c248069569cdd8c455add",
+  "docs/design/stage4-r0-execution/recovery-preparation/remaining-28-manifest.json": "7202f16381d01db734ee7d31bfd2e469325e1b801d5e4a627028df57d413e63f",
+  "tests/test_discovery_r0_recovery_proposal.py": "c7bbd98396025747f172ae5b041bf6f876965b63a245b601258807ddda9e289d",
+  "verification/discovery/r0_recovery_proposal.py": "714e0ab59329d861d0c1ab63d85e6332a0235acbeece03220fd9f2b0529b550b"
+}
