@@ -1,0 +1,184 @@
+{
+  "parentregchecks": [
+    {
+      "id": 116666674660,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805937247/job/116666674660",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666674366,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805937247/job/116666674366",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666671118,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805936836/job/116666671118",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666670969,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805936714/job/116666670969",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666670701,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805936836/job/116666670701",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666670631,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805936714/job/116666670631",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666655382,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805931955/job/116666655382",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    },
+    {
+      "id": 116666654912,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805931955/job/116666654912",
+      "sha": "fab5db6e0914908aea3750fadf7c9a4030d9ed82"
+    }
+  ],
+  "c105post": [
+    {
+      "id": 116665093983,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805479179/job/116665093983",
+      "sha": "2157cc42cb35ff24682c141d06b87d71ceeb2ecf"
+    },
+    {
+      "id": 116665093927,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805479209/job/116665093927",
+      "sha": "2157cc42cb35ff24682c141d06b87d71ceeb2ecf"
+    },
+    {
+      "id": 116665093518,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805479209/job/116665093518",
+      "sha": "2157cc42cb35ff24682c141d06b87d71ceeb2ecf"
+    },
+    {
+      "id": 116665093306,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805479165/job/116665093306",
+      "sha": "2157cc42cb35ff24682c141d06b87d71ceeb2ecf"
+    },
+    {
+      "id": 116665092909,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805479165/job/116665092909",
+      "sha": "2157cc42cb35ff24682c141d06b87d71ceeb2ecf"
+    },
+    {
+      "id": 116665092603,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38805479179/job/116665092603",
+      "sha": "2157cc42cb35ff24682c141d06b87d71ceeb2ecf"
+    }
+  ],
+  "finalchecks": [
+    {
+      "id": 116667918040,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38806294285/job/116667918040",
+      "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    },
+    {
+      "id": 116667917682,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38806294285/job/116667917682",
+      "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    },
+    {
+      "id": 116667917201,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38806294133/job/116667917201",
+      "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    },
+    {
+      "id": 116667917168,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38806294213/job/116667917168",
+      "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    },
+    {
+      "id": 116667916570,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38806294213/job/116667916570",
+      "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    },
+    {
+      "id": 116667916535,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38806294133/job/116667916535",
+      "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    }
+  ],
+  "finalhistory": {
+    "total_count": 30,
+    "returned": 30,
+    "parent_runs": 0,
+    "exact9": [
+      {
+        "id": 38805348801,
+        "sha": "fd3b00e23c82533df1abd4c9f0d00506abc7fe6e",
+        "attempt": 1,
+        "number": 1,
+        "conclusion": "failure"
+      }
+    ]
+  },
+  "final_history_checked_at": "2026-10-15T21:02:04.370Z",
+  "independent_final_ledger_review": "PASS: ZIP/four checkpoints/71 unique identities/43 target+28 overlap/36-window ledger verified against retained evidence"
+}
