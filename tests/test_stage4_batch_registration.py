@@ -43,6 +43,10 @@ def test_workflow_scope():
     assert 'GITHUB_RUN_NUMBER' in steps[0]['run'] and 'GITHUB_RUN_ATTEMPT' in steps[0]['run']
     assert w['concurrency']['cancel-in-progress']=='false'
     for path in Path('.github/workflows').glob('*.yml'):
+        if path.name=='stage4-route-preflight-once.yml':
+            # Exact reviewed connection-free registration, not a blanket environment exception.
+            assert hashlib.sha256(path.read_bytes()).hexdigest()=='e6142ecdbd296130cd70f6143a0a1dddfec2989651474e35e6639bf22e622773'
+            continue
         if path.name in ('stage4-batch-production-once.yml','stage4-oldham-production-once.yml','stage4-catchup-a-production-once.yml','stage4-catchup-b-production-once.yml','stage4-closure-pending-production-once.yml','stage4-closure-expanded-production-once.yml','stage4-arcus-production-once.yml','stage4-salford15-production-once.yml','stage4-committee-admission-once.yml','stage4-material-cohort-admission-once.yml'):continue
         other=yaml.load(path.read_text(),Loader=yaml.BaseLoader)
         assert 'stage4-production-canary' not in str(other)
