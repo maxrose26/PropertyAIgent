@@ -1,0 +1,127 @@
+{
+  "frozen_at": "2026-10-15T21:21:29.384174+00:00",
+  "deadline": "2026-10-15T22:16:29.384174+00:00",
+  "assessor": "/root/r0_recovery_blind",
+  "session": "r0-independent-autonomous-20261015-2121",
+  "primary_session": "root-primary-autonomous-20261015",
+  "code_revision": "NOT_EXECUTED_BY_ASSESSOR_CONFIG_HASHES_BELOW",
+  "method_sha256": "e923b71cec9eaa3b562f3038719a2f9bd0d57ee64c8e1714b6f6ad05bceb4cd3",
+  "approved_method_sha256": "87f0add587ab6066cc9630bbec13cb78e2fd50c37588c2eb7a330c0a5fb8967d",
+  "limits": {
+    "rows": 17,
+    "segments": 102,
+    "references": 1020,
+    "navigation": 170,
+    "seconds": 3300
+  },
+  "exposure": "Originalwholewindowcounts73/69/67/64seeninmandatedscopefile;NOprimaryreferences/logs/artifactsseen",
+  "rows": [
+    {
+      "council": "tameside",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-17",
+      "end": "2026-09-19",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-20",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-24",
+      "end": "2026-09-26",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-27",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-10-01",
+      "end": "2026-10-03",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-10-04",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "stockport",
+      "start": "2026-10-01",
+      "end": "2026-10-03",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "stockport",
+      "start": "2026-10-04",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "bury",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "oldham",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "rochdale",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "tameside",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED"
+    }
+  ],
+  "hashes": {
+    "verification/discovery/arcus_ui_config.py": "e54427a09482cc3749f1b42dd4554ff5a9df281a2279b52bf49bc28ab74341a5",
+    "verification/discovery/manchester_shape.py": "0ce5ce67c1ad0296894eb188326abfa9b13c12437a60d44cb37b0800cd0b0b66",
+    "app/pipeline/discovery_contract.py": "41f8421569e17ff1e04d0c67442f4793b4089037a2926121748fdecc603f7aa4"
+  }
+}

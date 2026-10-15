@@ -1,0 +1,202 @@
+{
+  "master": "f6525edffb514a79343191860056e1bed3e66082",
+  "tree": "2bb275249896ec5e6a7506a2e40ce0ba2b116ffe",
+  "head": "97f8e2406542c79f7e1b8105384a20512f62d311",
+  "pr": 107,
+  "frozen_at": "2026-10-15T21:37:24.581Z",
+  "planned_sequential_order": [
+    "selective5",
+    "partitions8",
+    "untouched5",
+    "unresolved4"
+  ],
+  "workflow_blobs": [
+    {
+      "path": ".github/workflows/stage4-r0-mandate-unresolved4-once.yml",
+      "blob": "4fb7fdbd353fa08f7959e3b93294df4dfa2b1a3a"
+    },
+    {
+      "path": ".github/workflows/stage4-r0-mandate-partitions8-once.yml",
+      "blob": "edcb498c64ba680000bc7f8bed54886b54a7869e"
+    },
+    {
+      "path": ".github/workflows/stage4-r0-mandate-untouched5-once.yml",
+      "blob": "bfbb1d515bdb3a7959b7406909856f9ef400428c"
+    },
+    {
+      "path": ".github/workflows/stage4-r0-selective5-admission-once.yml",
+      "blob": "fb75677f29a47c26d421a16c4ef6dde460014d63"
+    }
+  ],
+  "source_config_rule_hashes": [
+    {
+      "path": "verification/discovery/r0_mandate.py",
+      "sha256": "679c3444e77160f27d7aedfc9beb8fbe6eb6146246f3d94ac7f4ff01de62e979",
+      "git_blob": "6091f2101c6a57206942d4eeb0da9ae01879f71e"
+    },
+    {
+      "path": "verification/discovery/r0_recovery_proposal.py",
+      "sha256": "f122475afdd4d41053c3a4b1f37db534e10047687ad29b16a6ecde628350a2d2",
+      "git_blob": "88c3e5f90708e03d49722c5f7bfbedb2f34f9462"
+    },
+    {
+      "path": "verification/discovery/r0_proposal.py",
+      "sha256": "ec3b3f3961df122b83059f83e61a18e9807a21c23e6dbf74cbc057e12e3aa1ac",
+      "git_blob": "667b1b5393ee203d4b6d2733e9063745f4018990"
+    },
+    {
+      "path": "verification/discovery/finite_acceptance.py",
+      "sha256": "63a6c91654c991f44ca353384c688798543304f98d928cc509e41f5650828d81",
+      "git_blob": "f3dc2eb146e61d96f9b51d71be653d3ab2041642"
+    },
+    {
+      "path": "verification/discovery/idox_window.py",
+      "sha256": "93d5ca4146f66492cac606a4f1be5bc37445f7797ded7b436eac90fd9f2b88ff",
+      "git_blob": "a996f913917051542f38d24aab3428ac3014fdcf"
+    },
+    {
+      "path": "verification/discovery/arcus_ui_config.py",
+      "sha256": "e54427a09482cc3749f1b42dd4554ff5a9df281a2279b52bf49bc28ab74341a5",
+      "git_blob": "7ede9398c3cfa0e28dabfb56688a862afaa3247a"
+    },
+    {
+      "path": "verification/discovery/arcus_ui_audit.py",
+      "sha256": "300ab33d571a10e3ddc28ca23b75d008492f737a3d7102ee9318c5d2be9fd2ab",
+      "git_blob": "2e9032f69384d6d6dc82eb1cea20ee0bad2bbecd"
+    },
+    {
+      "path": "verification/discovery/arcus_ui_window.py",
+      "sha256": "ebad5ab5ee1c4cf61748155cc8747408ace9d150a5e006234a65ca3d652a366a",
+      "git_blob": "f829b80d010ca21c7a717b2f32adfbe1d519c49d"
+    },
+    {
+      "path": "verification/direct_reference/instrumented_probe.py",
+      "sha256": "de950fccefd2cdd4f0a326ea61f8f51de576a4d8f30f786468256d27caab8280",
+      "git_blob": "d371fa63fb4ae44fa20ae4fbc6f1b639c07bd0cf"
+    },
+    {
+      "path": "app/pipeline/discovery_contract.py",
+      "sha256": "41f8421569e17ff1e04d0c67442f4793b4089037a2926121748fdecc603f7aa4",
+      "git_blob": "2c6a2e9a0b4b3555b43a75b2d868272bb62e39b4"
+    },
+    {
+      "path": "app/pipeline/discovery_screening.py",
+      "sha256": "f8ef4037dbd8e2c42ea007e5e90681aff3312106de397f9abccb446e721a4867",
+      "git_blob": "b8ff528a924092fe7664a9d6bfc08f76ada4216d"
+    },
+    {
+      "path": "app/pipeline/discovery_admission.py",
+      "sha256": "d4d71e94585bb688856072efc2bb9ac787cd30e197ae41c4261bea459d92af05",
+      "git_blob": "e45df7b882bcf5917e59b15e14180329ca30864f"
+    },
+    {
+      "path": "verification/discovery/selective5.py",
+      "sha256": "e0b49a084beba5c2e154bbed0091d770d5007f23516608d81a4bf73b815f9c11",
+      "git_blob": "6335684b58937d1b280e87822e5670031b97bbe2"
+    },
+    {
+      "path": "verification/discovery/selective5_binding.py",
+      "sha256": "4dfc87b6f23f0e899f3d232564f1dd560658fca026bc1c7b8fe1624523352f91",
+      "git_blob": "dc6c95205e5766e1b32f2343fb20b562949a6eb6"
+    },
+    {
+      "path": "verification/discovery/selective5_supervisor.py",
+      "sha256": "a06b429293cac2ba209cd47218920335b88bf2c235eb59c6c446a54e5ea02747",
+      "git_blob": "23dfccc5d0a7b2d3350df642fed9f8b0ba98fee7"
+    },
+    {
+      "path": "verification/discovery/bolton53_admission.py",
+      "sha256": "751f2f3cfd8a0d9784c84608745479ed2a2e27cbd76cf4e7ec3200d3dd816b5d",
+      "git_blob": "999daca582898a64951a4addb520fea065c53ce5"
+    },
+    {
+      "path": "verification/direct_reference/refresh.py",
+      "sha256": "e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2",
+      "git_blob": "08a6e65c8306ae128620b514e313597de8836fcb"
+    },
+    {
+      "path": "app/pipeline/bolton_initial_status.py",
+      "sha256": "b1e0679c50aee896d59578c504a01b41d6ddd9e95b68cb2479c85173641e830d",
+      "git_blob": "3002ab02d97468441e46f8657be56e793c19b6dc"
+    },
+    {
+      "path": "app/pipeline/status_verification.py",
+      "sha256": "6a7f5e9790896ed1ba3d22b491f3670387862dcfacb226e2bbdb95d9ab15e781",
+      "git_blob": "645b265020373963a227a83325bfedb72db6bd4c"
+    }
+  ],
+  "independent_seal": {
+    "sha256": "4a11d2f4bda65f1879b0d9adc0985ff19dac080ea95caa4a3e6c656e64d083fb",
+    "sealed_at": "2026-10-15T21:35:00.031899Z",
+    "primary_new_execution_before_seal": false
+  },
+  "pre_merge_checks": [
+    {
+      "name": "web",
+      "conclusion": "success",
+      "id": 116683340398,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836582/job/116683340398"
+    },
+    {
+      "name": "native",
+      "conclusion": "success",
+      "id": 116683340055,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836691/job/116683340055"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "conclusion": "success",
+      "id": 116683339898,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836582/job/116683339898"
+    },
+    {
+      "name": "offline",
+      "conclusion": "success",
+      "id": 116683339511,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836691/job/116683339511"
+    },
+    {
+      "name": "offline",
+      "conclusion": "success",
+      "id": 116683339003,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836356/job/116683339003"
+    },
+    {
+      "name": "native",
+      "conclusion": "success",
+      "id": 116683338796,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836336/job/116683338796"
+    },
+    {
+      "name": "postgres-admission",
+      "conclusion": "success",
+      "id": 116683338530,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836356/job/116683338530"
+    },
+    {
+      "name": "offline",
+      "conclusion": "success",
+      "id": 116683338214,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810836336/job/116683338214"
+    },
+    {
+      "name": "web",
+      "conclusion": "success",
+      "id": 116683315975,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810829500/job/116683315975"
+    },
+    {
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "conclusion": "success",
+      "id": 116683315539,
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38810829500/job/116683315539"
+    }
+  ],
+  "history": {
+    "total": 31,
+    "returned": 31,
+    "prior_new_scope_runs": 0
+  },
+  "no_retry": true,
+  "prior_consumed_parent_run": "38807635572"
+}
