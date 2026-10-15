@@ -1,0 +1,6 @@
+{
+  "ledger": "ledger.json",
+  "sha256": "ee3b480d9ab78affa3ce17cdfdce06edf2b0fe731ae7f4d05d345b330ebe978d",
+  "sealed_at": "2026-10-15T12:14:05.878397+00:00",
+  "primary_unseen_at_seal": true
+}
