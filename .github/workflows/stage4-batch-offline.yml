@@ -19,6 +19,8 @@ on:
       - 'app/pipeline/status_verification.py'
       - 'app/pipeline/run_weekly.py'
       - '.github/workflows/stage4-batch-offline.yml'
+      - '.github/workflows/stage4-route-preflight-once.yml'
+      - 'tests/test_oldham_production_registration.py'
 permissions:
   contents: read
 jobs:

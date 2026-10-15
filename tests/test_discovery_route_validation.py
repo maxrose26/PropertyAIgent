@@ -120,3 +120,15 @@ def test_post_validation_exception_chain_is_safe(tmp_path,monkeypatch):
     assert audit['phase']=='ENGINE_CONSTRUCTION_STARTED'
     assert audit['execution']=='STOP_UNCERTAIN_OR_FAILED_NO_RETRY'
     assert audit['engine_cleanup']=='NOT_CREATED'
+
+@pytest.mark.parametrize('module,name',[
+    ('tests.test_stage4_batch_registration','test_workflow_scope'),
+    ('tests.test_oldham_production_registration','test_environment_is_exclusive_to_live_job')])
+def test_environment_exception_rejects_changed_preflight(module,name):
+    import importlib
+    original=Path.read_bytes
+    def changed(path):
+        data=original(path)
+        return data+b'\n# unreviewed change\n' if str(path)==WORKFLOW else data
+    with patch.object(Path,'read_bytes',changed),pytest.raises(AssertionError):
+        getattr(importlib.import_module(module),name)()
