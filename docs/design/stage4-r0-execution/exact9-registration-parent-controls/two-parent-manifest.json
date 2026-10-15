@@ -1,0 +1,23 @@
+{
+  "aggregate": {
+    "audit_bytes": 131072,
+    "execution_seconds": 160,
+    "received_bytes": 6000000,
+    "requests": 12,
+    "rss_bytes": 1610612736,
+    "source_seconds": 90
+  },
+  "council": "bolton",
+  "per_parent": {
+    "received_bytes": 3000000,
+    "requests": 6,
+    "source_seconds": 45
+  },
+  "persistence": false,
+  "references": [
+    "00284/26",
+    "20683/25"
+  ],
+  "scope": "BOLTON_TWO_PARENT_METADATA",
+  "search": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application"
+}
