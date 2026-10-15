@@ -1,0 +1,32 @@
+{
+  "checkpoint_at": "2026-10-15T13:24:48.402089+00:00",
+  "sha": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+  "tree": "5bf6f27756b587e7d35d9b2302ad3e3acb6a2d3c",
+  "github_account_verified": "maxrose26",
+  "comparison": {
+    "run_id": 38742149312,
+    "run_number": 1,
+    "attempt": 1,
+    "status": "WAITING_PROTECTED_ENVIRONMENT",
+    "job_id": 116446316994,
+    "steps_started": false,
+    "pre_dispatch_at": "2026-10-15T13:22:23.332Z",
+    "created_at": "2026-10-15T13:22:33Z",
+    "dispatch_count": 1,
+    "reruns": 0,
+    "artifact": "NOT_AVAILABLE_JOB_NOT_STARTED",
+    "comparison_outcomes": "UNKNOWN_NO_QUERY",
+    "workflow_database_connections": 0,
+    "workflow_database_reads": 0,
+    "workflow_database_writes": 0
+  },
+  "recovery": {
+    "dispatch_count": 0,
+    "execution_history_runs": 0,
+    "status": "NOT_DISPATCHED_ACCESS_BLOCKED"
+  },
+  "manual_run_history_total": 23,
+  "primary_recovery_artifact_revealed": false,
+  "browser_block": "CREDENTIAL_OBSERVATION_RESTRICTED_PERSISTED_AFTER_EXPLICIT_NAVIGATION",
+  "bypass_attempted": false
+}

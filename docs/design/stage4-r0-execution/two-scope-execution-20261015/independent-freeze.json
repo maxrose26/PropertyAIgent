@@ -1,0 +1,193 @@
+{
+  "frozen_at": "2026-10-15T13:21:39.877130+00:00",
+  "sha": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+  "tree": "5bf6f27756b587e7d35d9b2302ad3e3acb6a2d3c",
+  "manifest_sha256": "5e4170c781314ba76583682e39ef0072ec932926617f3be169316873485ee9ae",
+  "assessor": "/root/r0_recovery_blind",
+  "independent_session": "r0-independent-recovery-20261015",
+  "primary_session": "github-hosted-recovery-1db78f4-run1-attempt1",
+  "primary_run_id": "NOT_YET_DISPATCHED",
+  "hashes": {
+    "verification/discovery/r0_proposal.py": "1a457edfc4b139efcd561b432b819d7cc72c7496ff0a138acf58df49431b4581",
+    "verification/discovery/r0_recovery_proposal.py": "5695f691ff2d234a84c46c56181ae828ad3f1f85a15d7d4fcb48030e9a6325bb",
+    "verification/discovery/finite_acceptance.py": "6d3dfc3d4697251fa0cbd60912304c9fe5983c8382d337e24e0c957c1da29915",
+    "verification/discovery/arcus_ui_config.py": "e54427a09482cc3749f1b42dd4554ff5a9df281a2279b52bf49bc28ab74341a5",
+    "verification/discovery/arcus_ui_window.py": "8179b57cb79aaa22bcc42656020dd6a08be34908a8a41b38fa1164fbdc636ab6",
+    "verification/discovery/arcus_ui_transport.py": "6fbabb144397e8ce60bb858dcce42d66d26d9eacccc11e68a057490f198f72a5",
+    "verification/discovery/idox_window.py": "d699e772f51cefdecdbe23da30aba325960929fb820bcf4d0bc3ba01489df003",
+    "app/pipeline/discovery_contract.py": "41f8421569e17ff1e04d0c67442f4793b4089037a2926121748fdecc603f7aa4",
+    "app/scrapers/unit_filter.py": "57227e0f3ef6c3d333e8f7a56570626b4065b1f2bde4de231454f0c9bab9102e",
+    "docs/design/stage4-r0-execution/executable-proposals/INDEPENDENT-PLAN.md": "87f0add587ab6066cc9630bbec13cb78e2fd50c37588c2eb7a330c0a5fb8967d"
+  },
+  "rows": [
+    {
+      "council": "manchester",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "manchester",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "oldham",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "oldham",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "oldham",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "oldham",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "rochdale",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "rochdale",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "rochdale",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "rochdale",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "salford",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "salford",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "salford",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "salford",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "stockport",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "stockport",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "stockport",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "stockport",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED"
+    },
+    {
+      "council": "tameside",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "tameside",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "tameside",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "tameside",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED"
+    },
+    {
+      "council": "wigan",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED"
+    }
+  ],
+  "primary_reveal": "NOT_OCCURRED"
+}
