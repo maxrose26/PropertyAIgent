@@ -1,3 +1,5 @@
+> HISTORICAL DATE SCOPE — superseded without execution by CURRENT-CUT.md. Previous manifest and inputs below are retained for audit, not execution.
+
 # R0 registration readiness
 
 Execution HOLD: do not dispatch until separate execution confirmation. Stage 4 OPEN.

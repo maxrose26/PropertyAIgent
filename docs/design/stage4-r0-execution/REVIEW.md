@@ -1,3 +1,5 @@
+> HISTORICAL DATE SCOPE — superseded without execution by CURRENT-CUT.md. Previous manifest and inputs below are retained for audit, not execution.
+
 # TO REVIEW — R0 source-date catch-up execution proposal
 
 Stage 4 OPEN. Preparation only. No merge, workflow registration, live source call, database access, admission or final candidate freeze has occurred in this slice.

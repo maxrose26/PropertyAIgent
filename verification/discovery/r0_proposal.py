@@ -1,13 +1,14 @@
-"""Unregistered R0 caller. No database, registration or scheduling authority."""
+"""Credential-free registered R0 caller. Execution needs exact confirmation."""
 from datetime import date, timedelta, datetime, timezone
 import argparse, hashlib, json, os, re, signal, subprocess, sys, tempfile, time
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from . import finite_acceptance as f
 
 WORKFLOW='.github/workflows/stage4-r0-source-date-once.yml'
 AUTHORITY='AUTHORISE_NINE_COUNCIL_R0_SOURCE_DATE_OBSERVATION_ONCE'
 START='2026-09-29'
-CUT='2026-10-16' # exclusive local calendar cut; proposal, not approved freeze
+CUT='2026-10-15' # exclusive local calendar cut; latest completed day scope
 ROUND_SECONDS=1900
 
 def proposal():
@@ -36,7 +37,7 @@ def admit(env,sha,manifest_hash,*,now=None):
         or env.get('GITHUB_WORKFLOW_REF')!=f'maxrose26/PropertyAIgent/{WORKFLOW}@refs/heads/master'
         or env.get('GITHUB_RUN_NUMBER')!='1' or env.get('GITHUB_RUN_ATTEMPT')!='1'
         or env.get('R0_AUTHORITY')!=AUTHORITY):raise ValueError('R0_ADMISSION_REJECTED')
-    if (now or datetime.now(timezone.utc))<datetime(2026,10,15,23,tzinfo=timezone.utc):raise ValueError('CUT_NOT_REACHED')
+    if (now or datetime.now(timezone.utc))<datetime.combine(date.fromisoformat(CUT),datetime.min.time(),tzinfo=ZoneInfo('Europe/London')).astimezone(timezone.utc):raise ValueError('CUT_NOT_REACHED')
     if any(k in env for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_CONTEXT_REJECTED')
 
