@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile,contextlib,os,sys
 from verification.stage26b_l1.actions_runner import supervise
 from app.pipeline.discovery_contract import COUNCILS
+from app.pipeline.discovery_screening import retain_screening
 from .idox_window import WindowConfig,live
 from .arcus_ui_config import UI_CASES,dated_config
 from .arcus_ui_audit import validate as validate_arcus
@@ -39,7 +40,7 @@ def read(row):
             env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
             code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end'],'--output',str(path)],env=env,deadline=50)
             if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
-            return json.loads(path.read_bytes())
+            return retain_screening(json.loads(path.read_bytes()))
     from verification.direct_reference.instrumented_probe import supervised
     case='discovery_'+row['council']+'_ui_window'
     with tempfile.TemporaryDirectory(prefix='discovery-finite-') as td:
@@ -47,7 +48,7 @@ def read(row):
         with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink):
             supervised(case,path,window=(row['start'],row['end']))
         if not path.is_file() or path.stat().st_size>=65536:raise ValueError('bounded audit')
-        return json.loads(path.read_bytes())
+        return retain_screening(json.loads(path.read_bytes()))
 
 def classify(row,a):
     """Qualify retained count/criteria evidence; never infer success from HTTP/exit."""
