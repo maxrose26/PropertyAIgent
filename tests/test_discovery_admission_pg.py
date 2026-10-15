@@ -88,3 +88,28 @@ def test_qualified_material_three_shared_caller_on_postgres(pg):
     with Session(pg) as session:
         assert session.scalar(select(func.count()).select_from(Application))==3
         assert all(a.site_id is None for a in session.scalars(select(Application)))
+
+
+def test_fixed80_identity_comparison_real_read_only_transaction(pg):
+    """Existing disposable-only fixture, production route never supplied."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+    from verification.discovery.r0_identity_comparison import identities, query
+    identity = identities()[0]
+    assert identity['council_code'] == 'bolton'
+    with Session(pg) as session:
+        session.add(Application(**identity)); session.commit()
+        before = session.scalar(select(func.count()).select_from(Application))
+    with pg.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
+        result = query(connection)
+        assert result['transaction'] == 'READ_ONLY_ROLLED_BACK'
+        assert sum(x['outcome']=='ONE_MATCH' for x in result['comparison']) == 1
+        assert sum(x['outcome']=='ABSENT' for x in result['comparison']) == 79
+        connection.exec_driver_sql('BEGIN READ ONLY')
+        try:
+            with pytest.raises(DBAPIError):
+                connection.execute(text("INSERT INTO public.applications (council_code,reference) VALUES ('bolton','DISPOSABLE_RO_WRITE_DENIED')"))
+        finally:
+            connection.exec_driver_sql('ROLLBACK')
+    with Session(pg) as session:
+        assert session.scalar(select(func.count()).select_from(Application)) == before

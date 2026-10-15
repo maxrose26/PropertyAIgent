@@ -1,0 +1,330 @@
+{
+  "source_run": 38731487848,
+  "source_revision": "388532c640a22ca89f2409686db168c90db57ac9",
+  "source_artifact": 11970371484,
+  "source_zip_sha256": "67d39048af9e2f0048d36173baf0424b881efc313c74247a11a814909c8d8eef",
+  "retained_ledger_sha256": "6875fd44fc20727755ab29066e7d666aa917c03874aaeaa615d36c606e5a0148",
+  "selection": "IN_TARGET, source received date 2026-09-29 through 2026-10-14 inclusive; no substitutions",
+  "identities": [
+    {
+      "council_code": "bolton",
+      "reference": "01780/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01778/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01776/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01775/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01769/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01768/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01821/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01816/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01815/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01813/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01811/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01810/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01809/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01808/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01807/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01806/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01805/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01804/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01801/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01800/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01799/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01797/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01796/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01795/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01794/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01793/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01791/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01790/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01789/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01787/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01786/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01785/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01784/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01783/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01782/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01858/26/PREMIN"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01852/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01851/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01848/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01847/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01845/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01843/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01842/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01841/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01840/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01839/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01838/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01836/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01833/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01832/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01827/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01826/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01825/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01823/26"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73701"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73700"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73699"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73698"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73697"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73736"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73733"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73730"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73729"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73728"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73726"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73725"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73723"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73722"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73721"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73720"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73719"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73718"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73716"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73713"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73708"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73755"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73748"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73743"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73742"
+    },
+    {
+      "council_code": "bury",
+      "reference": "73741"
+    }
+  ]
+}

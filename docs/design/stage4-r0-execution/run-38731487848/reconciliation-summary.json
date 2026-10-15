@@ -1,0 +1,69 @@
+{
+  "accounting_complete": true,
+  "admissions": 0,
+  "attempt": 1,
+  "bytes": 1908263,
+  "candidate_councils": {
+    "bolton": 105,
+    "bury": 58
+  },
+  "candidate_materiality": {
+    "POTENTIALLY_MATERIAL": 163
+  },
+  "candidate_records": 163,
+  "candidate_target_membership": {
+    "IN_TARGET": 80,
+    "OVERLAP_CONTEXT": 83
+  },
+  "database_connections": 0,
+  "database_reads": 0,
+  "database_writes": 0,
+  "independent_resources": {
+    "browser_bytes": "UNKNOWN",
+    "browser_requests": "UNKNOWN",
+    "caps": {
+      "active_minutes": 90,
+      "literal_references": 2160,
+      "result_pages": 216,
+      "top_level_navigation_actions": 360,
+      "windows": 36
+    },
+    "literal_references": 163,
+    "navigation_counter_definition": "Conservative recorded navigation actions, including Search attempts with no transition; not network request count",
+    "result_page_states_observed": 16,
+    "source_observation_elapsed_seconds": 510.353,
+    "top_level_navigation_action_attempts": 29,
+    "windows_attempted": 9,
+    "windows_count_reconciled": 7,
+    "windows_incomplete": 1,
+    "windows_not_attempted": 27,
+    "windows_ui_enumerated_total_unknown": 1
+  },
+  "inner_round_sha256": "7dc5c6a0d3bddd40f9918e3f6987907518c9d8818563a2022fe94289b95e995d",
+  "latency": "UNKNOWN",
+  "manifest_sha256": "01d91aaea90f5ac03fbbc325fe85e66f7cc09539cd917457412c185bc38fa7cb",
+  "outer_supervisor": {
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 111.606,
+    "exit_code": 0,
+    "expired": false,
+    "final_containment": "DISPOSABLE_HOSTED_VM",
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 85446656,
+    "restarted": false
+  },
+  "persistence": false,
+  "primary_attempted": 8,
+  "primary_coverage": "INCOMPLETE",
+  "primary_enumeration": "INCOMPLETE",
+  "primary_not_attempted": 28,
+  "primary_revealed_at": "2026-10-15T12:14:24.538225+00:00",
+  "publication_coverage": "UNKNOWN",
+  "reconciled_complete_windows": 7,
+  "requests": 46,
+  "run_id": 38731487848,
+  "seal_sha256": "ee3b480d9ab78affa3ce17cdfdce06edf2b0fe731ae7f4d05d345b330ebe978d",
+  "sealed_at": "2026-10-15T12:14:05.878397+00:00",
+  "stop_reason": "NON_COMPLETE_CHILD",
+  "watermark_advanced": false
+}

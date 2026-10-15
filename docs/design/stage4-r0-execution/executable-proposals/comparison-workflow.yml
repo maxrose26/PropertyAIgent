@@ -1,0 +1,61 @@
+# UNREGISTERED fixed-80 read-only comparison proposal. No execution authority.
+name: Stage4 R0 fixed-80 identity comparison ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      manifest_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_R0_FIXED_80_IDENTITY_COMPARISON_ONCE]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  comparison:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Single invocation and exact revision
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+        run: |
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WORKFLOW_SHA" && "$PIN" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_R0_FIXED_80_IDENTITY_COMPARISON_ONCE ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Offline dependencies, no production secret
+        run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/comparison-venv"
+      - name: Fixed identities in verified READ ONLY transaction
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          COMPARISON_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir "$RUNNER_TEMP/comparison-audit"
+          [[ "$MANIFEST_SHA" == cf31d3a5dd69da7c65348428473a0bb15cf38071caab41b5db76b6d5ea8845cd ]]
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_SHA="$GITHUB_SHA" GITHUB_REF="$GITHUB_REF" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" GITHUB_WORKFLOW_SHA="$GITHUB_WORKFLOW_SHA" COMPARISON_DATABASE_URL="$COMPARISON_DATABASE_URL" timeout --signal=TERM --kill-after=5s 60s "$RUNNER_TEMP/comparison-venv/bin/python" -m verification.discovery.r0_identity_comparison --reviewed-sha "$PIN" --manifest-sha "$MANIFEST_SHA" --authority "$AUTHORITY" --output "$RUNNER_TEMP/comparison-audit/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r0-identity-comparison-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/comparison-audit/result.json
+          if-no-files-found: error
+          retention-days: 14

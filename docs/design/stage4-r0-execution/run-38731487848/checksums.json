@@ -1,0 +1,12 @@
+{
+  "independent-r0-20261015/ledger.json": "ee3b480d9ab78affa3ce17cdfdce06edf2b0fe731ae7f4d05d345b330ebe978d",
+  "independent-r0-20261015/seal.json": "f04e219ae8172fd5ab1dd3209cd15a0d2d571641681beb111ed4f872df5f878b",
+  "run-38731487848/INDEPENDENT-REVIEW.md": "016d5f33adb4332abfa5a3f3a22a5180deddf6c22db1093c2898c1e4a3ef51f5",
+  "run-38731487848/REVIEW.md": "8d03bacd733a0824c1ab9fff39aa0be767c67c52877ac4f9f326175ef57b48c2",
+  "run-38731487848/candidate-ledger.json": "6875fd44fc20727755ab29066e7d666aa917c03874aaeaa615d36c606e5a0148",
+  "run-38731487848/execution-control.json": "741bb2ed1aa50a4fe547d4ce721fbc7477185adb6bb666beb98baee8981644c5",
+  "run-38731487848/primary-reveal.json": "ca7b400de16e8f31139f6d9064a32df2156261bc09d91179f9251e4e272c75d3",
+  "run-38731487848/reconciliation-summary.json": "e63ff01534f3b299c402eb9423aaab1d3dc2f506ef9dfd82911acb4b2f98b187",
+  "run-38731487848/window-reconciliation.json": "56d39674413518241acd3f0a0cb44d2564fe4e3331265d54de9e5dd037b4d675",
+  "run-38731487848/workflow-summary.jpg": "9a4d714e8af805b85b151d6f068727562fe992d87c25708498d88a96f2b2a2d5"
+}
