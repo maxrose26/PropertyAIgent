@@ -1,0 +1,28 @@
+{
+  "no_substitutions": true,
+  "persistence_authority": "FIXED_MAXIMUM_FIVE_ONLY",
+  "rows": [
+    {
+      "council": "bolton",
+      "reference": "01768/26"
+    },
+    {
+      "council": "bolton",
+      "reference": "01769/26"
+    },
+    {
+      "council": "bolton",
+      "reference": "01827/26"
+    },
+    {
+      "council": "stockport",
+      "disposition": "WITHHELD_FIXED_EXACT_SOURCE_CONTRACT_UNQUALIFIED",
+      "reference": "DC/100094"
+    },
+    {
+      "council": "stockport",
+      "disposition": "WITHHELD_FIXED_EXACT_SOURCE_CONTRACT_UNQUALIFIED",
+      "reference": "DC/100393"
+    }
+  ]
+}

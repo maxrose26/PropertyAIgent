@@ -1,0 +1,160 @@
+{
+  "original_rows": [
+    {
+      "council": "manchester",
+      "end": "2026-09-19",
+      "original_displayed_total": 73,
+      "original_interval": [
+        "2026-09-17",
+        "2026-09-23"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38744118357,
+      "start": "2026-09-17"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "original_displayed_total": 73,
+      "original_interval": [
+        "2026-09-17",
+        "2026-09-23"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38744118357,
+      "start": "2026-09-20"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-26",
+      "original_displayed_total": 69,
+      "original_interval": [
+        "2026-09-24",
+        "2026-09-30"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38758465439,
+      "start": "2026-09-24"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-30",
+      "original_displayed_total": 69,
+      "original_interval": [
+        "2026-09-24",
+        "2026-09-30"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38758465439,
+      "start": "2026-09-27"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-03",
+      "original_displayed_total": 67,
+      "original_interval": [
+        "2026-10-01",
+        "2026-10-07"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38758465439,
+      "start": "2026-10-01"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-07",
+      "original_displayed_total": 67,
+      "original_interval": [
+        "2026-10-01",
+        "2026-10-07"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38758465439,
+      "start": "2026-10-04"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-03",
+      "original_displayed_total": 64,
+      "original_interval": [
+        "2026-10-01",
+        "2026-10-07"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38798433667,
+      "start": "2026-10-01"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-07",
+      "original_displayed_total": 64,
+      "original_interval": [
+        "2026-10-01",
+        "2026-10-07"
+      ],
+      "original_retained_cap": 60,
+      "semantics": "VALIDATED",
+      "source_run": 38798433667,
+      "start": "2026-10-04"
+    }
+  ],
+  "persistence": false,
+  "rows": [
+    {
+      "council": "manchester",
+      "end": "2026-09-19",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-20"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-26",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-27"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-03",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-04"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-03",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-04"
+    }
+  ],
+  "scope": "partitions8"
+}
