@@ -9,6 +9,7 @@ import re
 import subprocess
 import time
 from . import r0_fixed80_qualification as q
+from . import r0_bolton53_qualification as b
 from . import r0_recovery_proposal as recovery
 from . import r0_proposal as original
 from . import finite_acceptance as finite
@@ -30,18 +31,24 @@ PROFILES={
    manifest_sha='7c46a54e91201ba2cff1b392e4d606f592f79a8752827e3536135bfb3912e66c',
    calls=20,requests=760,bytes=203772160,seconds=1220,output_bytes=20_000_000,
    record_output_bytes=1_048_576,job_seconds=1620,setup_seconds=260),
+ 'bolton53':dict(workflow='.github/workflows/stage4-r0-bolton53-qualification-once.yml',
+   authority='AUTHORISE_R0_BOLTON53_INITIAL_LITERAL_QUALIFICATION_ONCE',manifest=b.MANIFEST,
+   manifest_sha=b.MANIFEST_SHA,calls=53,requests=106,bytes=106_000_000,seconds=2915,
+   output_bytes=8_000_000,record_output_bytes=65536,job_seconds=3360,setup_seconds=280),
 }
 RSS_LIMIT=1536*1024*1024
 AUDIT_RESERVE=131072  # metadata, result envelope, not-attempted identities, outer audit
 WORKFLOW_HASHES={'fixed80': 'daf3e452d0a89cd74a725a28aca7c14fb6bdbd63ce3eb0d37176e588dc89f32d', 'untouched27': 'a358223c5707c22d0550c9b966ea3b67f463f856f1624b5196b86d89ebb8583e'}
 
 WORKFLOW_HASHES['untouched20']='0a6a9a647663fa17ef0bd3ada628633f398142003819d53952e1d2db3b3aef66'
+WORKFLOW_HASHES['bolton53']='e7b44f658ebdf408bf467258836b0cd5d13eb748a7237bb371c63a766f73190d'
 
 def plan(scope):
     if scope not in PROFILES:raise ValueError('SCOPE_REJECTED')
     p=PROFILES[scope];raw=p['manifest'].read_bytes()
     if hashlib.sha256(raw).hexdigest()!=p['manifest_sha']:raise ValueError('MANIFEST_REJECTED')
     if scope=='fixed80':q.targets()
+    if scope=='bolton53':b.targets()
     return dict(scope=scope,manifest_sha256=p['manifest_sha'],limits={k:p[k] for k in
         ('calls','requests','bytes','seconds','output_bytes')})
 
@@ -127,6 +134,8 @@ def execute_worker(value,output,audit_dir):
     try:
         if value['scope']=='fixed80':
             result=q.qualify(reader=q.read,checkpoint=store.record)
+        elif value['scope']=='bolton53':
+            result=b.qualify(reader=b.read,checkpoint=store.record)
         else:
             manifest=json.loads(p['manifest'].read_bytes())
             result=recovery._execute_fixed(manifest,p['manifest_sha'],reader=finite.read,
@@ -202,7 +211,7 @@ def main():
         publication_coverage='UNKNOWN',latency='UNKNOWN',
         code_hashes={str(path.relative_to(ROOT)):hashlib.sha256(path.read_bytes()).hexdigest() for path in (
             Path(__file__),Path(original.__file__),Path(recovery.__file__),Path(q.__file__),
-            Path(finite.__file__),ROOT/'verification/direct_reference/instrumented_probe.py',
+            Path(finite.__file__),Path(b.__file__),ROOT/'verification/direct_reference/instrumented_probe.py',
             ROOT/'verification/discovery/arcus_ui_config.py',ROOT/'verification/discovery/idox_window.py',
             ROOT/'app/pipeline/discovery_contract.py')})
     record=args.output/'execution.json';record.write_text(json.dumps(metadata,sort_keys=True))

@@ -13,6 +13,7 @@ from unittest.mock import MagicMock,patch
 import pytest
 import yaml
 from verification.discovery import r0_registered_scopes as s
+from verification.discovery import r0_bolton53_qualification as b
 from verification.discovery import r0_proposal as outer
 from verification.discovery import r0_fixed80_qualification as q
 from verification.discovery import finite_acceptance as finite
@@ -118,7 +119,7 @@ def proc_namespace():
     return patch.object(Path,'read_text',fake)
 
 
-@pytest.mark.parametrize('scope,expected', [('fixed80',80),('untouched27',27),('untouched20',20)])
+@pytest.mark.parametrize('scope,expected', [('fixed80',80),('untouched27',27),('untouched20',20),('bolton53',53)])
 def test_actual_parent_outer_worker_checkpoint_delegation(scope,expected,tmp_path,monkeypatch):
     directory=tmp_path/'audit';p=s.PROFILES[scope];calls=[];launches=[]
     def reader80(i,row):
@@ -141,7 +142,7 @@ def test_actual_parent_outer_worker_checkpoint_delegation(scope,expected,tmp_pat
     for k,v in context(scope).items():monkeypatch.setenv(k,v)
     monkeypatch.setattr(sys,'argv',['r0','--scope',scope,'--reviewed-sha',SHA,'--manifest-sha',p['manifest_sha'],
       '--authority',p['authority'],'--output',str(directory)])
-    with proc_namespace(),patch.object(s,'checkout') as checkout,patch.object(q,'read',reader80),patch.object(finite,'read',reader27),\
+    with proc_namespace(),patch.object(s,'checkout') as checkout,patch.object(q,'read',reader80),patch.object(b,'read',reader80),patch.object(finite,'read',reader27),\
       patch.object(s,'supervise',lambda value,out:real_supervise(value,out,runner=runner)),\
       patch.object(psutil,'Process',return_value=MagicMock()),patch.object(psutil,'wait_procs',return_value=([],[])):
         assert s.main()==0
@@ -152,7 +153,7 @@ def test_actual_parent_outer_worker_checkpoint_delegation(scope,expected,tmp_pat
     assert result['outer_supervisor']['cleanup']=='CLOSED' and not result['outer_supervisor']['expired']
     assert s.verify_export(scope,directory,context(scope))==s.audit_bytes(directory)<=p['output_bytes']
     assert metadata['aggregate_audit_bytes']==s.audit_bytes(directory)
-    if scope!='fixed80':
+    if scope in {'untouched27','untouched20'}:
         assert result['results'][0]['safe_local_gap'] and result['results'][0]['enumeration_completeness']=='INCOMPLETE'
         assert len(result['results'][0]['source']['listing_records'])==60
         assert result['completeness']=='INCOMPLETE' and not result['completed_through_advanced']
@@ -163,7 +164,7 @@ def test_checkpoint_failure_stops_next_source_and_preserves_diagnostic(scope,tmp
     calls=[];value=s.plan(scope)
     def read80(i,row):calls.append(i);return source(row,False)
     def read27(row):calls.append(row);return evidence(row)
-    with patch.object(q,'read',read80),patch.object(finite,'read',read27),patch.object(s.os,'fsync',side_effect=OSError('fixed-test')):
+    with patch.object(q,'read',read80),patch.object(b,'read',read80),patch.object(finite,'read',read27),patch.object(s.os,'fsync',side_effect=OSError('fixed-test')):
         s.execute_worker(value,tmp_path/'result.json',tmp_path)
     assert len(calls)==1
     result=json.loads((tmp_path/'result.json').read_text())
@@ -248,6 +249,7 @@ def test_ci_covers_new_workflows_controller_and_test():
         for target in [p['workflow'] for p in s.PROFILES.values()]+[
           'verification/discovery/r0_registered_scopes.py','verification/discovery/r0_proposal.py',
           'verification/discovery/r0_recovery_proposal.py','verification/discovery/r0_fixed80_qualification.py',
+          'verification/discovery/r0_bolton53_qualification.py',
           'tests/test_discovery_r0_registered_scopes.py']:
             assert any(fnmatch(target,x) for x in patterns),(path,target)
         assert 'tests/test_discovery_r0_registered_scopes.py' in str(w['jobs']['offline']['steps'])

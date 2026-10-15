@@ -83,21 +83,21 @@ def durable_checkpoint(path,result):
         out.write(raw);out.flush();os.fsync(out.fileno())
 
 
-def qualify(*,reader,checkpoint,clock=time.monotonic):
+def _qualify_fixed(rows,manifest_sha,limits,*,reader,checkpoint,clock=time.monotonic):
     """No default/live reader: proposed finite caller, not a dispatch capability.
 
     reader must return existing supervised idox worker schema. Checkpoint each
     bounded result before another call; checkpoint failure stops, never replay.
     """
     from .rejection_audit import observation_audit
-    credential_free(os.environ);rows=targets();start=clock();used_requests=used_bytes=0;results=[];stop=None;attempted=0
+    credential_free(os.environ);start=clock();used_requests=used_bytes=0;results=[];stop=None;attempted=0
     def preserve(value):
         results.append(value)
         try:checkpoint(value);return True
         except Exception:return False
     for i,row in enumerate(rows):
-        if (clock()-start+LIMITS['record_seconds']>LIMITS['seconds']
-            or used_requests+2>LIMITS['requests'] or used_bytes+2_000_000>LIMITS['bytes']):
+        if (clock()-start+limits['record_seconds']>limits['seconds']
+            or used_requests+2>limits['requests'] or used_bytes+2_000_000>limits['bytes']):
             stop='AGGREGATE_RESERVATION';break
         attempted+=1
         try:source=reader(i,row)
@@ -129,13 +129,18 @@ def qualify(*,reader,checkpoint,clock=time.monotonic):
         if not preserve(result):stop='CHECKPOINT_FAILURE_NO_NEXT_CALL';break
         if (failure is not None and failure not in LOCAL) or failure in HARD:
             stop='HARD_OR_UNCLASSIFIED_FAILURE';break
-        if len(json.dumps(results,sort_keys=True).encode())>LIMITS['output_bytes']:
+        if len(json.dumps(results,sort_keys=True).encode())>limits['output_bytes']:
             stop='OUTPUT_LIMIT';break
-    return dict(manifest_sha256=MANIFEST_SHA,results=results,stop_reason=stop,
+    return dict(manifest_sha256=manifest_sha,results=results,stop_reason=stop,
         attempted=attempted,not_attempted=[dict(council=x['council'],reference=x['reference']) for x in rows[attempted:]],
         requests=used_requests,received_bytes=used_bytes,elapsed_seconds=clock()-start,
         accounting_complete=stop not in {'SOURCE_OR_SUPERVISOR_EXCEPTION_ACCOUNTING_UNKNOWN','RESOURCE_OR_CLEANUP'},
         persistence=False,admission_authorised=False)
+
+
+def qualify(*,reader,checkpoint,clock=time.monotonic):
+    # Preserve the historical fixed80 wrapper and its exact manifest/limits.
+    return _qualify_fixed(targets(),MANIFEST_SHA,LIMITS,reader=reader,checkpoint=checkpoint,clock=clock)
 
 
 def main():

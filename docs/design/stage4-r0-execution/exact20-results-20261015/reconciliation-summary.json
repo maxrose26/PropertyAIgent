@@ -1,0 +1,54 @@
+{
+  "aggregate_audit_bytes": 78136,
+  "all_checkpoint_hashes_verified": true,
+  "artifact": 11997283579,
+  "attempt": 1,
+  "authority": "CONSUMED",
+  "bridge_start": "2026-10-15",
+  "candidate_membership": {
+    "IN_TARGET": 23,
+    "OVERLAP_CONTEXT": 23
+  },
+  "candidates": 46,
+  "completed_through_advanced": false,
+  "coverage": "INCOMPLETE",
+  "execution_sha256": "e215019f78d216af5b28d0313a52479b769b5d8c9b6a462bc5d2afcf94f8bad7",
+  "identity_set_matches": 2,
+  "independent_available": 8,
+  "independent_unavailable": 12,
+  "latency": "UNKNOWN",
+  "no_database_access": true,
+  "publication_recall": "UNKNOWN",
+  "resources": {
+    "accounting_complete": true,
+    "bytes": 46026195,
+    "checkpoint_bytes": 36933,
+    "outer_supervisor": {
+      "audit_byte_limit": 20000000,
+      "cleanup": "CLOSED",
+      "deadline_seconds": 1220,
+      "elapsed_seconds": 33.572,
+      "exit_code": 0,
+      "expired": false,
+      "final_containment": "DISPOSABLE_HOSTED_VM",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 996999168,
+      "restarted": false,
+      "rss_limit_bytes": 1610612736
+    },
+    "requests": 147
+  },
+  "result_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+  "revision": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+  "run": 38786550045,
+  "run_number": 1,
+  "stop_reason": "SAFETY_OR_UNCLASSIFIED_FAILURE",
+  "unresolved_differences": 1,
+  "window_states": {
+    "COMPLETE": 3,
+    "FAILED": 1,
+    "NOT_ATTEMPTED": 16
+  },
+  "zip_sha256": "24c6fcf10ef3d6eaafffc29dea6b36043bb604b2242c45ba1c5bd1673f59869c"
+}
