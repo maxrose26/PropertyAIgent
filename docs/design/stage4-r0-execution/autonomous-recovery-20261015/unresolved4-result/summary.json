@@ -1,0 +1,79 @@
+{
+  "run": 38813486644,
+  "artifact": 12008739699,
+  "zip_sha256": "5d341a8f4c103c0315759529547e3165fec42e23bdebe4a4571183e36fe0189d",
+  "stop": "SAFETY_OR_UNCLASSIFIED_FAILURE",
+  "accounting_complete": true,
+  "requests": 7,
+  "bytes": 266621,
+  "outer": {
+    "audit_byte_limit": 20000000,
+    "cleanup": "CLOSED",
+    "deadline_seconds": 220,
+    "elapsed_seconds": 18.129,
+    "exit_code": 0,
+    "expired": false,
+    "final_containment": "DISPOSABLE_HOSTED_VM",
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 113446912,
+    "restarted": false,
+    "rss_limit_bytes": 1610612736
+  },
+  "not_attempted": [
+    {
+      "council": "rochdale",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    }
+  ],
+  "windows": [
+    {
+      "window": {
+        "council": "bury",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      },
+      "enumeration": "UNKNOWN",
+      "count": 7,
+      "failure": null,
+      "diagnostic": null
+    },
+    {
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      },
+      "enumeration": "FAILED",
+      "count": 0,
+      "failure": "ListingError:sort selector",
+      "diagnostic": {
+        "body_bytes": 63259,
+        "body_sha256": "d6710ba4e39239e1e6cfc74bdd2ef8831b5c642430361e8ad260603af97b3def",
+        "code": "SORT_SELECTOR_COUNT",
+        "counts": {
+          "decision_date_labels": 0,
+          "decision_labels": 0,
+          "forms": 1,
+          "order_by_selects": 0,
+          "reference_labels": 0,
+          "status_labels": 0,
+          "summary_tables": 0
+        },
+        "shape_available": true,
+        "stage": "SORT_FORM_PARSE",
+        "version": 1
+      }
+    }
+  ]
+}

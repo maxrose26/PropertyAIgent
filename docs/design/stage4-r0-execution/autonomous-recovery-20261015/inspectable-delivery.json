@@ -1,0 +1,386 @@
+[
+  {
+    "admission_mode": "COMPLETE_WINDOW",
+    "application_id": 1504,
+    "application_role": "UNKNOWN",
+    "council": "bolton",
+    "facts": "INITIAL_FACTS_VERIFIED",
+    "field_states": {
+      "decision": "NOT_PRESENT",
+      "decision_date": "NOT_PRESENT",
+      "reference": "PRESENT_VALUE",
+      "status": "PRESENT_VALUE"
+    },
+    "fresh_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "99182858b972a0fe4849e0ede49f80e8da0899d2a43908aba0f040efce5da8b3",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01768/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01768/26",
+      "retrieved_at": "2026-10-15T21:42:29.023189+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01768/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "identity": "CREATED_PENDING",
+    "observation_kind": "INITIAL_POPULATION_NOT_PROVEN_SOURCE_CHANGE",
+    "readback": {
+      "application_role": "UNKNOWN",
+      "council_code": "bolton",
+      "decision": null,
+      "decision_date": null,
+      "field_verification": {
+        "decision": {
+          "body_sha256": "99182858b972a0fe4849e0ede49f80e8da0899d2a43908aba0f040efce5da8b3",
+          "literal": null,
+          "normalized": null,
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+          "state": "NOT_PRESENT",
+          "verified_at": null
+        },
+        "decision_date": {
+          "body_sha256": "99182858b972a0fe4849e0ede49f80e8da0899d2a43908aba0f040efce5da8b3",
+          "literal": null,
+          "normalized": null,
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+          "state": "NOT_PRESENT",
+          "verified_at": null
+        },
+        "status": {
+          "body_sha256": "99182858b972a0fe4849e0ede49f80e8da0899d2a43908aba0f040efce5da8b3",
+          "literal": "Deposited",
+          "normalized": "Deposited",
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4CENDE02800&activeTab=summary",
+          "state": "PRESENT_VALUE",
+          "verified_at": "2026-10-15T21:42:30.946451+00:00"
+        }
+      },
+      "id": 1504,
+      "reference": "01768/26",
+      "site_id": null,
+      "site_relationship": "UNKNOWN",
+      "status": "Deposited"
+    },
+    "reference": "01768/26",
+    "site_relationship": "UNKNOWN",
+    "source": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 5.807,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73814016,
+      "received_body_bytes": 35324,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T21:42:28.856703+00:00",
+      "source_sha256": "99182858b972a0fe4849e0ede49f80e8da0899d2a43908aba0f040efce5da8b3",
+      "supervisor_seconds": 6.509
+    },
+    "transaction": "COMMIT_READBACK_CONFIRMED",
+    "verification_scope": "INITIAL_STATUS_ONLY",
+    "retained_discovery_description": {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land Between Bank Street And Queen Street Farnworth Bolton BL4 7PA"
+      },
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "DEMOLITION OF 4 NO. BUILDINGS AND ERECTION OF 4 NO. APARTMENT BLOCKS COMPRISING OF NO. 49 SELF CONTAINED APARTMENTS (CLASS C3) TOGETHER WITH ACCESS, LANDSCAPING AND CAR PARKING"
+      },
+      "received_date": {
+        "locator": "p.metaInfo:Received",
+        "state": "PRESENT_VALUE",
+        "value": "Tue 29 Sep 2026"
+      },
+      "validated_date": {
+        "locator": "p.metaInfo:Validated",
+        "state": "PRESENT_VALUE",
+        "value": "Wed 07 Oct 2026"
+      }
+    },
+    "description_persistence": "RETAINED_EVIDENCE_ONLY_NOT_POPULATED_BY_INITIAL_STATUS_ONLY",
+    "verified_database_scope": "EXACT_IDENTITY_AND_LITERAL_STATUS_ONLY"
+  },
+  {
+    "admission_mode": "COMPLETE_WINDOW",
+    "application_id": 1505,
+    "application_role": "UNKNOWN",
+    "council": "bolton",
+    "facts": "INITIAL_FACTS_VERIFIED",
+    "field_states": {
+      "decision": "NOT_PRESENT",
+      "decision_date": "NOT_PRESENT",
+      "reference": "PRESENT_VALUE",
+      "status": "PRESENT_VALUE"
+    },
+    "fresh_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "951493694bef48a7a05544f469995a1c60eb8fcd6563b77604dd67c18c26911c",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01769/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01769/26",
+      "retrieved_at": "2026-10-15T21:42:39.665787+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01769/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "identity": "CREATED_PENDING",
+    "observation_kind": "INITIAL_POPULATION_NOT_PROVEN_SOURCE_CHANGE",
+    "readback": {
+      "application_role": "UNKNOWN",
+      "council_code": "bolton",
+      "decision": null,
+      "decision_date": null,
+      "field_verification": {
+        "decision": {
+          "body_sha256": "951493694bef48a7a05544f469995a1c60eb8fcd6563b77604dd67c18c26911c",
+          "literal": null,
+          "normalized": null,
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+          "state": "NOT_PRESENT",
+          "verified_at": null
+        },
+        "decision_date": {
+          "body_sha256": "951493694bef48a7a05544f469995a1c60eb8fcd6563b77604dd67c18c26911c",
+          "literal": null,
+          "normalized": null,
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+          "state": "NOT_PRESENT",
+          "verified_at": null
+        },
+        "status": {
+          "body_sha256": "951493694bef48a7a05544f469995a1c60eb8fcd6563b77604dd67c18c26911c",
+          "literal": "Deposited",
+          "normalized": "Deposited",
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM4EHVDEKFN00&activeTab=summary",
+          "state": "PRESENT_VALUE",
+          "verified_at": "2026-10-15T21:42:40.385419+00:00"
+        }
+      },
+      "id": 1505,
+      "reference": "01769/26",
+      "site_id": null,
+      "site_relationship": "UNKNOWN",
+      "status": "Deposited"
+    },
+    "reference": "01769/26",
+    "site_relationship": "UNKNOWN",
+    "source": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.837,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73723904,
+      "received_body_bytes": 35541,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T21:42:39.519964+00:00",
+      "source_sha256": "951493694bef48a7a05544f469995a1c60eb8fcd6563b77604dd67c18c26911c",
+      "supervisor_seconds": 3.516
+    },
+    "transaction": "COMMIT_READBACK_CONFIRMED",
+    "verification_scope": "INITIAL_STATUS_ONLY",
+    "retained_discovery_description": {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Horwich Golf Club Victoria Road Bolton BL6 5PH"
+      },
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "NON-MATERIAL AMENDMENT TO APPLICATION 00284/26 TO AMEND FENESTRATION AND REMOVE DORMERS FROM PHASE 1E PLOT NOS. 151, 157, 164-165, 175-176, 177, 188, 192, 193, 198, 204 AND 205 AND PHASE 2 PLOT NOS. 7, 12, 13, 27, 31, 31, 35, 38, 43, 44, 45, 46 AND 47"
+      },
+      "received_date": {
+        "locator": "p.metaInfo:Received",
+        "state": "PRESENT_VALUE",
+        "value": "Tue 29 Sep 2026"
+      },
+      "validated_date": {
+        "locator": "p.metaInfo:Validated",
+        "state": "PRESENT_VALUE",
+        "value": "Wed 30 Sep 2026"
+      }
+    },
+    "description_persistence": "RETAINED_EVIDENCE_ONLY_NOT_POPULATED_BY_INITIAL_STATUS_ONLY",
+    "verified_database_scope": "EXACT_IDENTITY_AND_LITERAL_STATUS_ONLY"
+  },
+  {
+    "admission_mode": "COMPLETE_WINDOW",
+    "application_id": 1506,
+    "application_role": "UNKNOWN",
+    "council": "bolton",
+    "facts": "INITIAL_FACTS_VERIFIED",
+    "field_states": {
+      "decision": "NOT_PRESENT",
+      "decision_date": "NOT_PRESENT",
+      "reference": "PRESENT_VALUE",
+      "status": "PRESENT_VALUE"
+    },
+    "fresh_evidence": {
+      "b2_eligible": true,
+      "body_sha256": "1e1cab3c626124f1ac5b5dd09b41edd3b5f8a602a452854327de5cc96d44e7cf",
+      "diagnostic_conditions": [
+        "DECISION_NOT_PRESENT",
+        "DECISION_DATE_NOT_PRESENT",
+        "SOURCE_SEMANTIC_STATE_UNKNOWN_UNMAPPED"
+      ],
+      "displayed_reference": "01827/26",
+      "field_states": {
+        "decision": "NOT_PRESENT",
+        "decision_date": "NOT_PRESENT",
+        "reference": "PRESENT_VALUE",
+        "status": "PRESENT_VALUE"
+      },
+      "identity_qualification": "EXACT_DISPLAYED_REFERENCE",
+      "rejection_reason": null,
+      "requested_reference": "01827/26",
+      "retrieved_at": "2026-10-15T21:42:48.875076+00:00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+      "supported_literal_facts": {
+        "Reference": "01827/26",
+        "Status": "Deposited"
+      },
+      "verification_scope": "INITIAL_STATUS_ONLY"
+    },
+    "identity": "CREATED_PENDING",
+    "observation_kind": "INITIAL_POPULATION_NOT_PROVEN_SOURCE_CHANGE",
+    "readback": {
+      "application_role": "UNKNOWN",
+      "council_code": "bolton",
+      "decision": null,
+      "decision_date": null,
+      "field_verification": {
+        "decision": {
+          "body_sha256": "1e1cab3c626124f1ac5b5dd09b41edd3b5f8a602a452854327de5cc96d44e7cf",
+          "literal": null,
+          "normalized": null,
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+          "state": "NOT_PRESENT",
+          "verified_at": null
+        },
+        "decision_date": {
+          "body_sha256": "1e1cab3c626124f1ac5b5dd09b41edd3b5f8a602a452854327de5cc96d44e7cf",
+          "literal": null,
+          "normalized": null,
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+          "state": "NOT_PRESENT",
+          "verified_at": null
+        },
+        "status": {
+          "body_sha256": "1e1cab3c626124f1ac5b5dd09b41edd3b5f8a602a452854327de5cc96d44e7cf",
+          "literal": "Deposited",
+          "normalized": "Deposited",
+          "scope": "INITIAL_STATUS_ONLY",
+          "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TMLJ88DEKLK00&activeTab=summary",
+          "state": "PRESENT_VALUE",
+          "verified_at": "2026-10-15T21:42:49.622834+00:00"
+        }
+      },
+      "id": 1506,
+      "reference": "01827/26",
+      "site_id": null,
+      "site_relationship": "UNKNOWN",
+      "status": "Deposited"
+    },
+    "reference": "01827/26",
+    "site_relationship": "UNKNOWN",
+    "source": {
+      "budget_state": "WITHIN_LIMITS",
+      "cleanup_state": "CLOSED",
+      "elapsed_seconds": 2.553,
+      "live_owned_survivors": 0,
+      "owned_processes_seen": 1,
+      "peak_owned_rss": 73752576,
+      "received_body_bytes": 35581,
+      "requests": 1,
+      "retrieved_at": "2026-10-15T21:42:48.736276+00:00",
+      "source_sha256": "1e1cab3c626124f1ac5b5dd09b41edd3b5f8a602a452854327de5cc96d44e7cf",
+      "supervisor_seconds": 3.215
+    },
+    "transaction": "COMMIT_READBACK_CONFIRMED",
+    "verification_scope": "INITIAL_STATUS_ONLY",
+    "retained_discovery_description": {
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land South Of Doris Avenue Colenso Road Bolton BL2 6DB"
+      },
+      "proposal": {
+        "locator": "a.summaryLink",
+        "state": "PRESENT_VALUE",
+        "value": "VARIATION OF CONDITION 2 (APPROVED PLANS CONDITION) ON APPLICATION 20683/25, TO AMEND GROUND LEVELS, THE INTERNAL ROAD LAYOUT, THE SITING OF PLOT NOS. 18-32, THE REAR BOUNDARIES OF PLOT NOS. 2-14, AND THE APPROVED DRAINAGE PLAN"
+      },
+      "received_date": {
+        "locator": "p.metaInfo:Received",
+        "state": "PRESENT_VALUE",
+        "value": "Thu 08 Oct 2026"
+      },
+      "validated_date": {
+        "locator": "p.metaInfo:Validated",
+        "state": "PRESENT_VALUE",
+        "value": "Tue 13 Oct 2026"
+      }
+    },
+    "description_persistence": "RETAINED_EVIDENCE_ONLY_NOT_POPULATED_BY_INITIAL_STATUS_ONLY",
+    "verified_database_scope": "EXACT_IDENTITY_AND_LITERAL_STATUS_ONLY"
+  },
+  {
+    "application_role": "UNKNOWN",
+    "council": "stockport",
+    "facts": "WITHHELD_FIXED_EXACT_SOURCE_CONTRACT_UNQUALIFIED",
+    "identity": "WITHHELD",
+    "reference": "DC/100094",
+    "site_relationship": "UNKNOWN",
+    "transaction": "NOT_STARTED"
+  },
+  {
+    "application_role": "UNKNOWN",
+    "council": "stockport",
+    "facts": "WITHHELD_FIXED_EXACT_SOURCE_CONTRACT_UNQUALIFIED",
+    "identity": "WITHHELD",
+    "reference": "DC/100393",
+    "site_relationship": "UNKNOWN",
+    "transaction": "NOT_STARTED"
+  }
+]

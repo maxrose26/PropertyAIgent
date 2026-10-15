@@ -1,0 +1,22 @@
+{
+  "primary_observations": 1168,
+  "unique_primary_identities": 923,
+  "newly_retained_identities": 114,
+  "by_council": {
+    "bolton": 105,
+    "bury": 60,
+    "manchester": 252,
+    "oldham": 43,
+    "rochdale": 46,
+    "salford": 117,
+    "stockport": 183,
+    "tameside": 56,
+    "wigan": 61
+  },
+  "screen_outcomes": {
+    "POTENTIALLY_MATERIAL": 923
+  },
+  "permanent_exclusions": 0,
+  "production_created": 3,
+  "production_withheld": 2
+}

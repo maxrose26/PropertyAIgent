@@ -1,0 +1,51 @@
+{
+  "review": "Independent implementation and production-artifact review PASS; exact-head and post-merge checks PASS",
+  "master": "f6525edffb514a79343191860056e1bed3e66082",
+  "tree": "2bb275249896ec5e6a7506a2e40ce0ba2b116ffe",
+  "pr": 107,
+  "final_head": "97f8e2406542c79f7e1b8105384a20512f62d311",
+  "offline": "116 affected passed; final focused 13 passed; prior full discovery 481 passed/11 skipped; overlapping counts are not additive",
+  "hosted": "10 final-head PASS; 6 required post-merge PASS including 11 disposable PostgreSQL tests",
+  "primary_actual": {
+    "calls": 15,
+    "requests": 241,
+    "accounted_bytes": 68828393,
+    "active_seconds": 140.259,
+    "peak_owned_rss": 1043042304,
+    "checkpoints": 15,
+    "audit_uncompressed_bytes": {
+      "partitions8": 994381,
+      "untouched5": 344537,
+      "unresolved4": 35946
+    },
+    "cleanup": "CLOSED",
+    "survivors": 0
+  },
+  "production_actual": {
+    "source_calls": 3,
+    "requests": 3,
+    "bytes": 106446,
+    "active_seconds": 33.858861,
+    "peak_owned_rss": 311648256,
+    "commits": "READBACK_CONFIRMED",
+    "engines_disposed": 3,
+    "cleanup": "CLOSED",
+    "survivors": 0
+  },
+  "independent": {
+    "rows": 17,
+    "navigation_actions": 65,
+    "segments": 43,
+    "reference_occurrences": 376,
+    "request_bytes": "UNKNOWN"
+  },
+  "execution_history": {
+    "total_manual_runs": 35,
+    "new_runs": 4,
+    "all_run_number": 1,
+    "all_attempt": 1,
+    "all_completed": true,
+    "all_authorities": "CONSUMED"
+  },
+  "no_further_execution": true
+}

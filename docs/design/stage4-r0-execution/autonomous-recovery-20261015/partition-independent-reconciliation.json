@@ -1,0 +1,211 @@
+{
+  "sealed_at": "2026-10-15T21:35:00.031899Z",
+  "sealed_hash": "4a11d2f4bda65f1879b0d9adc0985ff19dac080ea95caa4a3e6c656e64d083fb",
+  "reference_comparison_at": "2026-10-15T21:51:13.418007+00:00",
+  "primary_output_reveal_exact": "UNKNOWN",
+  "primary_output_reveal_not_before": "2026-10-15T21:48:39.253671+00:00",
+  "primary_output_reveal_not_after": "2026-10-15T21:49:19.453Z",
+  "chronology": "SEAL_PRECEDES_PRIMARY_OBSERVATION_AND_REVEAL",
+  "rows": [
+    {
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-19",
+        "semantics": "VALIDATED",
+        "start": "2026-09-17"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "UNKNOWN_RETAINED_CRITERIA_EVIDENCE_INSUFFICIENT",
+      "primary_count": 27,
+      "independent_count": 27,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:47:18.950883+00:00",
+        "started_at": "2026-10-15T21:47:10.670669+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:27:16.201Z",
+        "2026-10-15T21:28:10.814Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-23",
+        "semantics": "VALIDATED",
+        "start": "2026-09-20"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "SUPPORTED",
+      "primary_count": 46,
+      "independent_count": 46,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:47:24.512210+00:00",
+        "started_at": "2026-10-15T21:47:18.954489+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:28:24.613Z",
+        "2026-10-15T21:28:31.880Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-26",
+        "semantics": "VALIDATED",
+        "start": "2026-09-24"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "SUPPORTED",
+      "primary_count": 25,
+      "independent_count": 25,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:47:30.283945+00:00",
+        "started_at": "2026-10-15T21:47:24.515946+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:28:46.439Z",
+        "2026-10-15T21:28:51.630Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "manchester",
+        "end": "2026-09-30",
+        "semantics": "VALIDATED",
+        "start": "2026-09-27"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "SUPPORTED",
+      "primary_count": 44,
+      "independent_count": 44,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:47:35.863748+00:00",
+        "started_at": "2026-10-15T21:47:30.285516+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:28:59.882Z",
+        "2026-10-15T21:29:06.977Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "SUPPORTED",
+      "primary_count": 14,
+      "independent_count": 14,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:47:40.891256+00:00",
+        "started_at": "2026-10-15T21:47:35.866193+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:29:14.289Z",
+        "2026-10-15T21:29:18.400Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-04"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "SUPPORTED",
+      "primary_count": 53,
+      "independent_count": 53,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:47:47.400283+00:00",
+        "started_at": "2026-10-15T21:47:40.892829+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:29:25.765Z",
+        "2026-10-15T21:29:33.858Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "UNKNOWN_RETAINED_CRITERIA_EVIDENCE_INSUFFICIENT",
+      "primary_count": 26,
+      "independent_count": 26,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:48:01.312822+00:00",
+        "started_at": "2026-10-15T21:47:47.402579+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:30:18.705Z",
+        "2026-10-15T21:30:59.748Z"
+      ],
+      "source_change_uncertainty": true
+    },
+    {
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-07",
+        "semantics": "VALIDATED",
+        "start": "2026-10-04"
+      },
+      "primary_enumeration": "COMPLETE",
+      "independent_reported": "COMPLETE",
+      "independent_acceptance": "UNKNOWN_RETAINED_CRITERIA_EVIDENCE_INSUFFICIENT",
+      "primary_count": 38,
+      "independent_count": 38,
+      "comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "observation_primary": {
+        "ended_at": "2026-10-15T21:48:17.778668+00:00",
+        "started_at": "2026-10-15T21:48:01.314383+00:00"
+      },
+      "observation_independent": [
+        "2026-10-15T21:30:59.749Z",
+        "2026-10-15T21:31:50.034Z"
+      ],
+      "source_change_uncertainty": true
+    }
+  ]
+}

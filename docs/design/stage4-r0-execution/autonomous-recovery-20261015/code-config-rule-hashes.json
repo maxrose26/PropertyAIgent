@@ -1,0 +1,78 @@
+[
+  {
+    "path": "verification/discovery/r0_mandate.py",
+    "sha256": "679c3444e77160f27d7aedfc9beb8fbe6eb6146246f3d94ac7f4ff01de62e979"
+  },
+  {
+    "path": "verification/discovery/r0_recovery_proposal.py",
+    "sha256": "f122475afdd4d41053c3a4b1f37db534e10047687ad29b16a6ecde628350a2d2"
+  },
+  {
+    "path": "verification/discovery/r0_proposal.py",
+    "sha256": "ec3b3f3961df122b83059f83e61a18e9807a21c23e6dbf74cbc057e12e3aa1ac"
+  },
+  {
+    "path": "verification/discovery/finite_acceptance.py",
+    "sha256": "63a6c91654c991f44ca353384c688798543304f98d928cc509e41f5650828d81"
+  },
+  {
+    "path": "verification/discovery/idox_window.py",
+    "sha256": "93d5ca4146f66492cac606a4f1be5bc37445f7797ded7b436eac90fd9f2b88ff"
+  },
+  {
+    "path": "verification/discovery/arcus_ui_config.py",
+    "sha256": "e54427a09482cc3749f1b42dd4554ff5a9df281a2279b52bf49bc28ab74341a5"
+  },
+  {
+    "path": "verification/discovery/arcus_ui_audit.py",
+    "sha256": "300ab33d571a10e3ddc28ca23b75d008492f737a3d7102ee9318c5d2be9fd2ab"
+  },
+  {
+    "path": "verification/discovery/arcus_ui_window.py",
+    "sha256": "ebad5ab5ee1c4cf61748155cc8747408ace9d150a5e006234a65ca3d652a366a"
+  },
+  {
+    "path": "verification/direct_reference/instrumented_probe.py",
+    "sha256": "de950fccefd2cdd4f0a326ea61f8f51de576a4d8f30f786468256d27caab8280"
+  },
+  {
+    "path": "app/pipeline/discovery_contract.py",
+    "sha256": "41f8421569e17ff1e04d0c67442f4793b4089037a2926121748fdecc603f7aa4"
+  },
+  {
+    "path": "app/pipeline/discovery_screening.py",
+    "sha256": "f8ef4037dbd8e2c42ea007e5e90681aff3312106de397f9abccb446e721a4867"
+  },
+  {
+    "path": "app/pipeline/discovery_admission.py",
+    "sha256": "d4d71e94585bb688856072efc2bb9ac787cd30e197ae41c4261bea459d92af05"
+  },
+  {
+    "path": "verification/discovery/selective5.py",
+    "sha256": "e0b49a084beba5c2e154bbed0091d770d5007f23516608d81a4bf73b815f9c11"
+  },
+  {
+    "path": "verification/discovery/selective5_binding.py",
+    "sha256": "4dfc87b6f23f0e899f3d232564f1dd560658fca026bc1c7b8fe1624523352f91"
+  },
+  {
+    "path": "verification/discovery/selective5_supervisor.py",
+    "sha256": "a06b429293cac2ba209cd47218920335b88bf2c235eb59c6c446a54e5ea02747"
+  },
+  {
+    "path": "verification/discovery/bolton53_admission.py",
+    "sha256": "751f2f3cfd8a0d9784c84608745479ed2a2e27cbd76cf4e7ec3200d3dd816b5d"
+  },
+  {
+    "path": "verification/direct_reference/refresh.py",
+    "sha256": "e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2"
+  },
+  {
+    "path": "app/pipeline/bolton_initial_status.py",
+    "sha256": "b1e0679c50aee896d59578c504a01b41d6ddd9e95b68cb2479c85173641e830d"
+  },
+  {
+    "path": "app/pipeline/status_verification.py",
+    "sha256": "6a7f5e9790896ed1ba3d22b491f3670387862dcfacb226e2bbdb95d9ab15e781"
+  }
+]

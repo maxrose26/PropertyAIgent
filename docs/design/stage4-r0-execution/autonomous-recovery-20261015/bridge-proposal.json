@@ -1,0 +1,15 @@
+{
+  "prepared_at": "2026-10-15T21:29:56.091509+00:00",
+  "timezone": "Europe/London",
+  "start_inclusive": "2026-10-15",
+  "latest_completed_day": "2026-10-14",
+  "completed_day_cut_exclusive": "2026-10-15T00:00:00+01:00",
+  "completed_bridge_rows": [],
+  "status": "NO_COMPLETED_BRIDGE_DAY_AT_PREPARATION_NOT_CATCHUP_COMPLETE",
+  "earliest_next_proposed_cut": "2026-10-16T00:00:00+01:00",
+  "earliest_next_target_day": "2026-10-15",
+  "execution_authority": false,
+  "proposal_note": "First nonempty bridge can execute only after its day completes and a reviewed exact manifest/cut is authorised; no live bridge call now. R0 still ends14Oct.",
+  "overlap_days": 28,
+  "later_rule": "Freeze a completed-day cut before observation; use explicit older partitions if total suspension/bridge exceeds28days, never silently truncate."
+}

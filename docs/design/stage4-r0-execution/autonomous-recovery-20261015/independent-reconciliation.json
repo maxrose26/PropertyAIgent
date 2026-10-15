@@ -1,0 +1,389 @@
+{
+  "sealed_sha256": "4a11d2f4bda65f1879b0d9adc0985ff19dac080ea95caa4a3e6c656e64d083fb",
+  "sealed_content_unchanged": true,
+  "rows": [
+    {
+      "council": "tameside",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 18,
+      "independent_retained": 18,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "SUPPORTED",
+      "observation_interval": [
+        "2026-10-15T21:22:53.252Z",
+        "2026-10-15T21:23:09.509Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "wigan",
+      "start": "2026-09-17",
+      "end": "2026-09-23",
+      "independent_reported_status": "INCOMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 17,
+      "independent_retained": 10,
+      "reference_comparison": "UNRESOLVED",
+      "primary_only": [
+        "A/26/101543/LUCP",
+        "A/26/101544/LUCP",
+        "A/26/101545/HH",
+        "A/26/101549/WTTPO",
+        "A/26/101550/HH",
+        "A/26/101554/WTTPO",
+        "A/26/101557/PDMA"
+      ],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:23:54.514Z",
+        "2026-10-15T21:24:07.493Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "wigan",
+      "start": "2026-09-24",
+      "end": "2026-09-30",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 12,
+      "independent_retained": 12,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:24:41.988Z",
+        "2026-10-15T21:25:32.589Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "wigan",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 20,
+      "independent_retained": 20,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:25:32.590Z",
+        "2026-10-15T21:26:23.413Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "wigan",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "independent_reported_status": "INCOMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 12,
+      "independent_retained": 11,
+      "reference_comparison": "UNRESOLVED",
+      "primary_only": [
+        "A/26/101641/CON"
+      ],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:26:23.414Z",
+        "2026-10-15T21:27:16.201Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-17",
+      "end": "2026-09-19",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 27,
+      "independent_retained": 27,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:27:16.201Z",
+        "2026-10-15T21:28:10.814Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-20",
+      "end": "2026-09-23",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 46,
+      "independent_retained": 46,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "SUPPORTED",
+      "observation_interval": [
+        "2026-10-15T21:28:24.613Z",
+        "2026-10-15T21:28:31.880Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-24",
+      "end": "2026-09-26",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 25,
+      "independent_retained": 25,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "SUPPORTED",
+      "observation_interval": [
+        "2026-10-15T21:28:46.439Z",
+        "2026-10-15T21:28:51.630Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "manchester",
+      "start": "2026-09-27",
+      "end": "2026-09-30",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 44,
+      "independent_retained": 44,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "SUPPORTED",
+      "observation_interval": [
+        "2026-10-15T21:28:59.882Z",
+        "2026-10-15T21:29:06.977Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "manchester",
+      "start": "2026-10-01",
+      "end": "2026-10-03",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 14,
+      "independent_retained": 14,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "SUPPORTED",
+      "observation_interval": [
+        "2026-10-15T21:29:14.289Z",
+        "2026-10-15T21:29:18.400Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "manchester",
+      "start": "2026-10-04",
+      "end": "2026-10-07",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "SEALED_CRITERIA_EVIDENCE_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 53,
+      "independent_retained": 53,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "SUPPORTED",
+      "observation_interval": [
+        "2026-10-15T21:29:25.765Z",
+        "2026-10-15T21:29:33.858Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "stockport",
+      "start": "2026-10-01",
+      "end": "2026-10-03",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 26,
+      "independent_retained": 26,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:30:18.705Z",
+        "2026-10-15T21:30:59.748Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "stockport",
+      "start": "2026-10-04",
+      "end": "2026-10-07",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "COMPLETE",
+      "primary_count": 38,
+      "independent_retained": 38,
+      "reference_comparison": "MATCH",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:30:59.749Z",
+        "2026-10-15T21:31:50.034Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "bury",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "independent_reported_status": "INCOMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "UNKNOWN",
+      "primary_count": 7,
+      "independent_retained": 7,
+      "reference_comparison": "UNRESOLVED",
+      "primary_only": [
+        "73741",
+        "73742",
+        "73743",
+        "73748",
+        "73750",
+        "73755",
+        "73757"
+      ],
+      "independent_only": [
+        "73741 | Received: Thu 08 Oct 2026 | Validated: Thu 08 Oct 2026 | Status: Registered",
+        "73742 | Received: Fri 09 Oct 2026 | Validated: Thu 08 Oct 2026 | Status: Registered",
+        "73743 | Received: Fri 09 Oct 2026 | Validated: Wed 14 Oct 2026 | Status: Registered",
+        "73748 | Received: Fri 09 Oct 2026 | Validated: Fri 09 Oct 2026 | Status: Registered",
+        "73750 | Received: Mon 12 Oct 2026 | Validated: Mon 12 Oct 2026 | Status: Registered",
+        "73755 | Received: Fri 09 Oct 2026 | Validated: Fri 09 Oct 2026 | Status: Registered",
+        "73757 | Received: Tue 13 Oct 2026 | Validated: Tue 13 Oct 2026 | Status: Registered"
+      ],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:32:15.826Z",
+        "2026-10-15T21:32:41.320Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "oldham",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "PRIOR_EXPLICIT_LITERAL_TOOL_HISTORY_AND_SEALED_ZERO",
+      "primary_enumeration": "FAILED",
+      "primary_count": 0,
+      "independent_retained": 0,
+      "reference_comparison": "UNRESOLVED",
+      "primary_only": [],
+      "independent_only": [],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T13:39:46.174Z",
+        "2026-10-15T13:40:36.231Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "rochdale",
+      "start": "2026-10-08",
+      "end": "2026-10-14",
+      "independent_reported_status": "INCOMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "NOT_ATTEMPTED",
+      "primary_count": 0,
+      "independent_retained": 8,
+      "reference_comparison": "UNRESOLVED",
+      "primary_only": [],
+      "independent_only": [
+        "OTH/2026/0891",
+        "PL/2026/0652",
+        "PL/2026/0740",
+        "PL/2026/0758",
+        "PL/2026/0822",
+        "PL/2026/0845",
+        "PL/2026/0883",
+        "PL/2026/0919"
+      ],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:32:58.706Z",
+        "2026-10-15T21:33:13.520Z"
+      ],
+      "source_change_caveat": true
+    },
+    {
+      "council": "tameside",
+      "start": "2026-10-01",
+      "end": "2026-10-07",
+      "independent_reported_status": "COMPLETE",
+      "criterion_proof": "UNAVAILABLE_FOR_ACCEPTANCE_AS_LITERAL_DOM_ECHO_NOT_DURABLY_RETAINED",
+      "primary_enumeration": "NOT_ATTEMPTED",
+      "primary_count": 0,
+      "independent_retained": 16,
+      "reference_comparison": "UNRESOLVED",
+      "primary_only": [],
+      "independent_only": [
+        "26/00076/TPO",
+        "26/00104/PLCOND",
+        "26/00105/PLCOND",
+        "26/00106/PLCOND",
+        "26/00756/MATCH",
+        "26/00758/FUL",
+        "26/00759/FUL",
+        "26/00760/CPUD",
+        "26/00761/FUL",
+        "26/00763/FUL",
+        "26/00765/CPUD",
+        "26/00766/HHPD",
+        "26/00768/FUL",
+        "26/00770/CPUD",
+        "26/00772/FUL",
+        "26/00774/FUL"
+      ],
+      "acceptance_denominator": "UNKNOWN",
+      "observation_interval": [
+        "2026-10-15T21:33:41.714Z",
+        "2026-10-15T21:34:31.508Z"
+      ],
+      "source_change_caveat": true
+    }
+  ],
+  "exact_primary_reveal_timestamp": "UNKNOWN; bounded in partition-independent-reconciliation.json",
+  "limitations": [
+    "Count metadata was exposed before enumeration; reference sets remained blinded.",
+    "Missing durable literal criteria are not reconstructed.",
+    "Wigan retention gap is not a proven parser miss.",
+    "Oldham failed primary enumeration cannot establish zero results.",
+    "Historical seals and 283 independent-only references remain immutable."
+  ]
+}
