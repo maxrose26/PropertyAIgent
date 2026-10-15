@@ -1,0 +1,170 @@
+[
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/ACCESS-CHECKPOINT.md",
+    "bytes": 4299,
+    "sha256": "a8d5b39e3da27fbce8b9ec4422178bb5dc8b492c760e1b8e812fbc31eba6c8c2",
+    "git_blob": "faba3cac87a4ba9bf3840e6bb4613e3047955654"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/COMPARISON-INDEPENDENT-REVIEW.md",
+    "bytes": 831,
+    "sha256": "c8dc6d7900f167c8e08ef8067cd2cf585604f51f347268b828d47589f0a5501c",
+    "git_blob": "ec12b0bc66ceb8ab634095d29d04c150e136b57b"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/COMPARISON-RESULT.md",
+    "bytes": 2925,
+    "sha256": "b9b9ed2f0345dfbb267ebfaab0dc39c34f7cbd24ee53b1de0097f94a1563ee57",
+    "git_blob": "e41c6a0647018ec871f9cb2db0bc3738d8868463"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/INDEPENDENT-DEVIATION.md",
+    "bytes": 2001,
+    "sha256": "634f8d6d51a5bd8c79b4aff7e5f16e4232684646901c91a8131d4101226e7e38",
+    "git_blob": "d8d20b9597f742b379745ac09242d52ab32e05b8"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/RECOVERY-INDEPENDENT-REVIEW.md",
+    "bytes": 916,
+    "sha256": "c6a0b626c9416e405441b8e11e57cba12435074c7b7dd7e4eb169ab52cef734e",
+    "git_blob": "bbc11b23ab9d76cb17293de75cbb71b686b71da8"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/REVIEW.md",
+    "bytes": 14771,
+    "sha256": "b0060051678076a24ee45bf8eeb175db275fec379c90a5a550cf9303f0a30d46",
+    "git_blob": "4d3adffe729381a7695e6f80ba6692970d7e5585"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/access-checkpoint.json",
+    "bytes": 1065,
+    "sha256": "d5a4402368bb345ba3fabbf62168f2bf65b6f2caab487afb32d59454c9153359",
+    "git_blob": "0c08ceb0f06a39cadf69bba75ce361675a5e8793"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/comparison/artifact.zip",
+    "bytes": 977,
+    "sha256": "c90795c004afc403736d9b08ec08a26245cdd7bbbbfe01ba21175d00f2df3e3a",
+    "git_blob": "71b0d47bc860395e37cf05d72802bca334f5ece3"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/comparison/qualification-80-reconciled.json",
+    "bytes": 56507,
+    "sha256": "94a3dcc4ff09b96fa5f03edc98d58a8bbf5a596f097528e80e921798b0012505",
+    "git_blob": "896b9193e2f7e7ed0661d2e7b0701121d2e97010"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/comparison/reconciliation.json",
+    "bytes": 931,
+    "sha256": "d07ed9ece5b0ff17e37b71bcc5262427a611dc30eb75c07be3be29cda4361079",
+    "git_blob": "7fc6790b9437c5670f52c01ac249fc7630cc426e"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/comparison/result.json",
+    "bytes": 10141,
+    "sha256": "fe30b13eba33ef6c882b81ecaea8f0afb5256e9d929c51abb39e67a5e668952d",
+    "git_blob": "c0b0b0e0d0a0bd6e42a5b5be9cbe51c5366edfd9"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/append-config.json",
+    "bytes": 15547,
+    "sha256": "8fd4515ca4c035a92b797f0b282c565c4fa3119d192cf0f3088647192fccf266",
+    "git_blob": "2194465995acaa45242241320d26f756d38b1b59"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/append-ledger.json",
+    "bytes": 47389,
+    "sha256": "7a46aa77843e85b226f1f1a0982feff79a2d111a4a93596a37ad953a0c7ceb23",
+    "git_blob": "4425417ebfefc2f7085675716f624d5a4e5e359c"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/append-seal.json",
+    "bytes": 400,
+    "sha256": "20d9bc32c9dcdd876edbf768e2c0d4de8a76150fec96ec4524543cd33124af53",
+    "git_blob": "97e110b1cde975a93c89cd811cbabe74305ad810"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/ledger.json",
+    "bytes": 29300,
+    "sha256": "715da66d96a643800c7a30df9ae88481e7fc2576d89fc55a4ec93484a2049f17",
+    "git_blob": "05e2880f2da56fcb670da69d90bff53773cd11f4"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/observed-checkpoint.json",
+    "bytes": 7030,
+    "sha256": "490083c83fa47a2e3cb570d908f44df600b176d4a347f85a50dc2e14ad6665d5",
+    "git_blob": "ba29442ba7621b00f480fb02f1aa298b56f976a4"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/seal.json",
+    "bytes": 319,
+    "sha256": "1e5d95ee20b3a79f2d6b9e02e9d5ce8e6d8c49dce83f5f9c808509264ecd861a",
+    "git_blob": "692f60e32ada655ec41267ef03eb05b99a622eb5"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent/timeout-current-tab.json",
+    "bytes": 792,
+    "sha256": "a09a5bd3080faeeed8398351582ae691af73adf50be77ef804d3c1548ba76b00",
+    "git_blob": "866a77d735c5e455326d0db719d6801230eae9e2"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/independent-freeze.json",
+    "bytes": 5303,
+    "sha256": "7b901ae8c6b5814213ccfc5b65a5b55dc671275f941537b3c5c84451f46c2041",
+    "git_blob": "1f064aadafdee96c1460e43c26573dbca97979f0"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/artifact.zip",
+    "bytes": 4634,
+    "sha256": "143828a4d725bcdae5f086dfc6c617bcc4d62777f42b0808f01b2304f3a98ea7",
+    "git_blob": "e870f1ff671bb9fd2ec37ba97aca350e3e47e96b"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/audit-validation.json",
+    "bytes": 438,
+    "sha256": "b0dfdfb4c0d5eacb23ab1acf20406cd373b0dcae575008ba0570c01b3ee3bc93",
+    "git_blob": "5303a377517eb854035058fadfe2301101d2a475"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/candidate-ledger.json",
+    "bytes": 92943,
+    "sha256": "ae89d9e0d56d4b7abe285ad0ff8606201929b852bbdaf35bfbf95a91ed8491ce",
+    "git_blob": "0227a8ff6c7c80600aed529aa737e2a1478728f6"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/dispatch-provenance.json",
+    "bytes": 1037,
+    "sha256": "26fc32042578ba0b524cd180f6215daeedb74b8feaac450892f8dda6944279ec",
+    "git_blob": "93b298dc8aba5f49f39b23c17b99c7696cc7a3ee"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/extracted/execution.json",
+    "bytes": 1192,
+    "sha256": "a9dfeed9061d7a3a33f81f8b049f49ffd46ddaeee700760177b3b692a3dec423",
+    "git_blob": "bc69ce75a400fee0c637adeb3f59b538ecefdb01"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/extracted/round.json",
+    "bytes": 31674,
+    "sha256": "bdca7591e6dc48a79bc2d2edd258d6dbb266c71247716c06df6fb978ffd72202",
+    "git_blob": "0ed9e4e5cb3ab9e7888b46a71c1779f5d562e90d"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/reconciliation-summary.json",
+    "bytes": 1270,
+    "sha256": "699aa47498e82abc69a1717e5f24a3fade2aa2d780672ed165e92ef00886aab5",
+    "git_blob": "f3aaf37048706edaaa2b0c6103890ab09fd61f11"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/reveal.json",
+    "bytes": 185,
+    "sha256": "abb19f0408d1a22b66f13370711ff0a0d753e162043aa9725d4be6d30eeff10b",
+    "git_blob": "bffeba3ac8747a27308837a7d0e7fcfbe858bad3"
+  },
+  {
+    "path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/window-reconciliation.json",
+    "bytes": 17971,
+    "sha256": "b98aa72515c69a644ff92d947c54356908679c8f7ffe3bdb3f306e7f5777fdb9",
+    "git_blob": "13f3de3e653279782d4c04cf984e604d898a03bd"
+  }
+]

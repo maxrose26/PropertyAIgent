@@ -1,0 +1,2162 @@
+[
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001748",
+    "source_record_id": "a1DSl00000A95ynMAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A95ynMAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001749",
+    "source_record_id": "a1DSl00000A9AOzMAN",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A9AOzMAN?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001742",
+    "source_record_id": "a1DSl00000A8t1ZMAR",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A8t1ZMAR?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001750",
+    "source_record_id": "a1DSl00000A9DptMAF",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A9DptMAF?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001581",
+    "source_record_id": "a1DSl000009sG0zMAE",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009sG0zMAE?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001589",
+    "source_record_id": "a1DSl000009sJJpMAM",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009sJJpMAM?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001645",
+    "source_record_id": "a1DSl000009yfZNMAY",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009yfZNMAY?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001621",
+    "source_record_id": "a1DSl000009vbSHMAY",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009vbSHMAY?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001683",
+    "source_record_id": "a1DSl00000A1l3xMAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A1l3xMAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001846",
+    "source_record_id": "a1DSl00000AJjlFMAT",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJjlFMAT?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001743",
+    "source_record_id": "a1DSl00000A8x3ZMAR",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A8x3ZMAR?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001737",
+    "source_record_id": "a1DSl00000A8kr7MAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A8kr7MAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001738",
+    "source_record_id": "a1DSl00000A8ojRMAR",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A8ojRMAR?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001237",
+    "source_record_id": "a1DSl000009GUPxMAO",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009GUPxMAO?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001741",
+    "source_record_id": "a1DSl00000A8swjMAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A8swjMAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001747",
+    "source_record_id": "a1DSl00000A91WzMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A91WzMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "23/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001728",
+    "source_record_id": "a1DSl00000A7O1RMAV",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7O1RMAV?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001720",
+    "source_record_id": "a1DSl00000A63FBMAZ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A63FBMAZ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001726",
+    "source_record_id": "a1DSl00000A7KlpMAF",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7KlpMAF?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001730",
+    "source_record_id": "a1DSl00000A7V2vMAF",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7V2vMAF?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001732",
+    "source_record_id": "a1DSl00000A7YtdMAF",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7YtdMAF?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001734",
+    "source_record_id": "a1DSl00000A7kl7MAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7kl7MAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001735",
+    "source_record_id": "a1DSl00000A7kmjMAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A7kmjMAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001784",
+    "source_record_id": "a1DSl00000AEiwHMAT",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AEiwHMAT?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001349",
+    "source_record_id": "a1DSl000009RtmPMAS",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009RtmPMAS?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001439",
+    "source_record_id": "a1DSl000009d5YvMAI",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009d5YvMAI?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "22/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001526",
+    "source_record_id": "a1DSl000009n4oTMAQ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009n4oTMAQ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001517",
+    "source_record_id": "a1DSl000009mAvxMAE",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009mAvxMAE?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001744",
+    "source_record_id": "a1DSl00000A90izMAB",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A90izMAB?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001714",
+    "source_record_id": "a1DSl00000A61OfMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61OfMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001724",
+    "source_record_id": "a1DSl00000A6JYTMA3",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A6JYTMA3?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001722",
+    "source_record_id": "a1DSl00000A6FppMAF",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A6FppMAF?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001723",
+    "source_record_id": "a1DSl00000A6CNeMAN",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A6CNeMAN?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001719",
+    "source_record_id": "a1DSl00000A61WjMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61WjMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001718",
+    "source_record_id": "a1DSl00000A61V7MAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61V7MAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001712",
+    "source_record_id": "a1DSl00000A61JpMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61JpMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001365",
+    "source_record_id": "a1DSl000009VmsnMAC",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009VmsnMAC?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001716",
+    "source_record_id": "a1DSl00000A61RtMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61RtMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001713",
+    "source_record_id": "a1DSl00000A61N3MAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61N3MAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001715",
+    "source_record_id": "a1DSl00000A61QHMAZ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61QHMAZ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001336",
+    "source_record_id": "a1DSl000009QX9xMAG",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009QX9xMAG?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001477",
+    "source_record_id": "a1DSl000009fto9MAA",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009fto9MAA?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001494",
+    "source_record_id": "a1DSl000009ksHxMAI",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009ksHxMAI?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001499",
+    "source_record_id": "a1DSl000009lARlMAM",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009lARlMAM?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001599",
+    "source_record_id": "a1DSl000009tMU9MAM",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009tMU9MAM?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001564",
+    "source_record_id": "a1DSl000009r289MAA",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009r289MAA?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "21/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001693",
+    "source_record_id": "a1DSl00000A2mQzMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A2mQzMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-000968",
+    "source_record_id": "a1DSl000008kC6PMAU",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000008kC6PMAU?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-000977",
+    "source_record_id": "a1DSl000008kzjpMAA",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000008kzjpMAA?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001227",
+    "source_record_id": "a1DSl000009G9tNMAS",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009G9tNMAS?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001445",
+    "source_record_id": "a1DSl000009dI37MAE",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009dI37MAE?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001458",
+    "source_record_id": "a1DSl000009eQWTMA2",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009eQWTMA2?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001692",
+    "source_record_id": "a1DSl00000A2mPNMAZ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A2mPNMAZ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-000026",
+    "source_record_id": "a1DSl000007KgaCMAS",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007KgaCMAS?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001697",
+    "source_record_id": "a1DSl00000A2wTZMAZ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A2wTZMAZ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001699",
+    "source_record_id": "a1DSl00000A30XBMAZ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A30XBMAZ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "NOT-2026-001702",
+    "source_record_id": "a1DSl00000A344XMAR",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A344XMAR?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "PLA-2026-001704",
+    "source_record_id": "a1DSl00000A37YfMAJ",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A37YfMAJ?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001706",
+    "source_record_id": "a1DSl00000A3ArVMAV",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A3ArVMAV?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  },
+  {
+    "council": "manchester",
+    "reference": "OTH-2026-001707",
+    "source_record_id": "a1DSl00000A3DxRMAV",
+    "official_source": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A3DxRMAV?c__r=Arcus_BE_Public_Register",
+    "validated_date": {
+      "literal": "18/9/2026",
+      "state": "PRESENT_VALUE"
+    },
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "discovered_at": "2026-10-15T13:37:42.572417+00:00",
+    "source_run": "38744118357",
+    "source_revision": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+    "materiality": "POTENTIALLY_MATERIAL",
+    "site_relationship": "UNKNOWN",
+    "application_role": "UNKNOWN",
+    "database_comparison": "NOT_AUTHORISED_NOT_PERFORMED",
+    "admission": "NOT_AUTHORISED_NOT_ATTEMPTED",
+    "suspension_target_membership": "OVERLAP_CONTEXT",
+    "window_enumeration": "FAILED",
+    "candidate_identity": "DISPLAYED_LISTING_REFERENCE_AND_SOURCE_RECORD_ID_ONLY",
+    "exact_detail_identity": "NOT_QUALIFIED",
+    "provenance_sha256": [
+      "0ef0e0f1e4d30a2fd333a10d0861dfa11e87c386fbc7d59ebc7c8fd1f7af64e6",
+      "e9db139fb87dc127b88fa6f6b55c60271eea19d9d70ba0e970a259f113ccb342",
+      "017ca687721b9951d680af02cdf4365f8a3f02d1d6e9c877af55722a2427ca7f",
+      "d652c7f9b8b02446e4c77d54b684633ee2c48ba33f9a2a5ff24ff3127e74ab62",
+      "ae46fd2ed01e20f169fcff4b2352712b18710d21acffe0d643602c51515ab40f",
+      "e2c2abbcb02a2445a0f27d5879d6bcd42f527b973aef01a7e9c888341f60bc8b"
+    ]
+  }
+]

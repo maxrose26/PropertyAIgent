@@ -1,0 +1,45 @@
+{
+  "primary_attempted": 1,
+  "primary_failed": 1,
+  "primary_not_attempted": 27,
+  "primary_enumeration_complete": 0,
+  "independent_statuses": {
+    "INCOMPLETE": 9,
+    "NOT_ATTEMPTED": 7,
+    "COMPLETE": 12
+  },
+  "reconciled_complete": 0,
+  "partial_reference_sets_match": true,
+  "primary_retained_records": 60,
+  "in_target_records": 0,
+  "overlap_records": 60,
+  "parent_R0": "INCOMPLETE",
+  "resources": {
+    "requests": 34,
+    "bytes": 11102018,
+    "accounting_complete": true,
+    "outer_supervisor": {
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 7.839,
+      "exit_code": 0,
+      "expired": false,
+      "final_containment": "DISPOSABLE_HOSTED_VM",
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 1041670144,
+      "restarted": false
+    }
+  },
+  "primary_observation": {
+    "ended_at": "2026-10-15T13:37:42.572417+00:00",
+    "started_at": "2026-10-15T13:37:35.027996+00:00"
+  },
+  "independent_sealed_at": "2026-10-15T13:51:40.727344+00:00",
+  "primary_reveal": {
+    "revealed_at": "2026-10-15T13:52:00.570326+00:00",
+    "independent_append_sha256": "7a46aa77843e85b226f1f1a0982feff79a2d111a4a93596a37ad953a0c7ceb23",
+    "seal_before_reveal": true
+  },
+  "database_connections": 0,
+  "database_writes": 0,
+  "admission_calls": 0
+}

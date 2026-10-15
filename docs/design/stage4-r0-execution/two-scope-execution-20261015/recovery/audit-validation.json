@@ -1,0 +1,13 @@
+{
+  "records_unique": 60,
+  "all_overlap_dates_qualified": true,
+  "combined_unique_primary_identities": 223,
+  "code_hashes": {
+    "verification/discovery/arcus_ui_config.py": true,
+    "verification/discovery/finite_acceptance.py": true,
+    "verification/discovery/idox_window.py": true,
+    "verification/discovery/r0_proposal.py": true,
+    "verification/discovery/r0_recovery_proposal.py": true
+  },
+  "seal_before_reveal": true
+}

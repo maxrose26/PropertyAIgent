@@ -1,0 +1,1682 @@
+[
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01780/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01778/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01776/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01775/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01769/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Confirmed - 10+ units",
+      "reason": "QUALIFICATION_REQUIRED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01768/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - non-residential",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01821/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01816/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01815/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01813/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01811/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01810/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01809/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01808/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01807/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01806/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01805/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01804/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01801/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01800/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01799/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore - under 10 units",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01797/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01796/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01795/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01794/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01793/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01791/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01790/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01789/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01787/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01786/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01785/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01784/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01783/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01782/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore - under 10 units",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01858/26/PREMIN",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01852/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01851/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01848/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01847/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01845/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01843/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01842/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01841/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01840/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01839/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01838/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01836/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01833/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01832/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01827/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01826/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01825/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bolton",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "01823/26",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore - under 10 units",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73701",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73700",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73699",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73698",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73697",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-09-24",
+      "2026-09-30"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73736",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73733",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73730",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73729",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73728",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73726",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73725",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73723",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73722",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73721",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73720",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73719",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73718",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73716",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73713",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73708",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-01",
+      "2026-10-07"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore - under 10 units",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73755",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Excluded - secondary/admin",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73748",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73743",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73742",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  },
+  {
+    "admission_authorised": false,
+    "application_role": "UNKNOWN",
+    "comparison_run": "38742149312",
+    "comparison_timestamp": "2026-10-15 13:28:37.830429+00:00",
+    "council_code": "bury",
+    "database_comparison": "ABSENT",
+    "deterministic_materiality": {
+      "outcome": "POTENTIALLY_MATERIAL",
+      "qualification": "Ignore",
+      "reason": "RELATIONSHIP_OR_MATERIALITY_UNRESOLVED",
+      "rule_version": "stage4-discovery-v1"
+    },
+    "proposed_absent_eligibility": "ABSENCE_PROVEN_ONLY_FRESH_EXACT_SOURCE_AND_B2_ELIGIBILITY_PENDING",
+    "reference": "73741",
+    "site_relationship": "UNKNOWN",
+    "source_window": [
+      "2026-10-08",
+      "2026-10-14"
+    ]
+  }
+]

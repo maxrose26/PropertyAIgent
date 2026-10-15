@@ -1,0 +1,29 @@
+{
+  "observed_at": "2026-10-15T13:50:19.182Z",
+  "url": "https://publicaccess.tameside.gov.uk/online-applications/pagedSearchResults.do",
+  "tab_id": "12",
+  "references": [
+    "26/00772/FUL",
+    "26/00774/FUL",
+    "26/00770/CPUD",
+    "26/00076/TPO",
+    "26/00765/CPUD",
+    "26/00763/FUL",
+    "26/00768/FUL",
+    "26/00761/FUL",
+    "26/00106/PLCOND",
+    "26/00766/HHPD",
+    "26/00105/PLCOND",
+    "26/00759/FUL",
+    "26/00760/CPUD",
+    "26/00758/FUL",
+    "26/00104/PLCOND",
+    "26/00756/MATCH"
+  ],
+  "source_count": "UNKNOWN",
+  "criteria": "UNKNOWN",
+  "reference_received_dates_observed": "2026-10-01 through2026-10-07",
+  "network_requests": "UNKNOWN",
+  "network_bytes": "UNKNOWN",
+  "note": "Read-only inspection of existing tab after browser runtime reset; no replay."
+}
