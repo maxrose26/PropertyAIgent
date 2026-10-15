@@ -35,7 +35,7 @@ def qualify_segment(marker,cards,expected_first,previous_total=None,config=MANCH
         if config.row_date:
             if len(dates)!=1: raise ValueError('date evidence')
             d=datetime.strptime(dates[0],'%d/%m/%Y').date().isoformat()
-            if not START<=d<=END: raise ValueError('date outside interval')
+            if not config.start<=d<=config.end: raise ValueError('date outside interval')
         elif dates:raise ValueError('unqualified date projection')
         rows.append({'reference':ref,'source_record_id':u.path.rsplit('/',1)[1],
             'source_url':u.geturl(),'validated_date':{'state':'PRESENT_VALUE','literal':dates[0]} if config.row_date else {'state':'UNKNOWN','literal':None},
@@ -85,7 +85,7 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
         await page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000)
         # An ordinary disclosure toggle exposes the source's retained filters.
         await page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000)
-        expected={'Valid date from':'28/09/2026','Valid date to':'04/10/2026',**{k:'' for k in config.blank_inputs}}
+        expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
         for label,value in expected.items():
             if await page.get_by_label(label,exact=True).input_value(timeout=1500)!=value: raise ValueError('applied filter mismatch')
         for label in config.blank_combos:
@@ -93,7 +93,7 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
                 raise ValueError('hidden filter')
         if (await page.get_by_role('combobox',name='Category',exact=True).inner_text()).strip()!='Planning Applications':
             raise ValueError('category')
-        audit['applied_interval']=[START,END]
+        audit['applied_interval']=[config.start,config.end]
         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'
         expected_first=1; total=None; seen_refs=set();seen_keys=set()
         for ordinal in range(1,MAX_SEGMENTS+1):

@@ -6,8 +6,8 @@ from .arcus_ui_config import UI_CASES
 from .arcus_ui_transport import combined_bytes, MAX_BYTES
 
 
-def validate(a):
-    config=UI_CASES.get(a.get('case'))
+def validate(a,config=None):
+    config=UI_CASES.get(a.get('case')) if config is None else config
     if config is None:raise ValueError('unadmitted case')
     if (a.get('destination')!=config.destination or a.get('persistence') is not False
         or a.get('failure') is not None or a.get('safety_failure') is not False or a.get('safety_events')!=[]
@@ -15,7 +15,7 @@ def validate(a):
         or a.get('live_owned_survivors')!=0 or a.get('supervisor_limit_hit') is not False
         or a.get('enumeration_evidence')!='COUNT_RECONCILED' or a.get('listing_failure') is not None
         or a.get('completeness')!='UNKNOWN'
-        or a.get('applied_interval')!=['2026-09-28','2026-10-04']): raise ValueError('UI window failed')
+        or a.get('applied_interval')!=[config.start,config.end]): raise ValueError('UI window failed')
     if not (1<=a['requests']<=80 and 0<=a['decoded_bytes']<=20*1024*1024 and 0<=a['supervisor_seconds']<=45):
         raise ValueError('UI resource bound')
     if not (0<=a['encoded_bytes']<=20*1024*1024 and a['pages']==1 and 1<=a['navigations']<=2):
