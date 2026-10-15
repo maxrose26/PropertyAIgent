@@ -226,9 +226,14 @@ def exact_guest_record(audit, reference):
             and fields['reference'].get('value') == reference)
 
 
-async def probe(case):
+async def probe(case, window=None):
     from playwright.async_api import async_playwright
     app_id, reference, destination = CASES[case]
+    ui_config=UI_CASES.get(case)
+    if window is not None:
+        if ui_config is None:raise ValueError('listing window only')
+        from verification.discovery.arcus_ui_config import dated_config
+        ui_config=dated_config(ui_config,*window);destination=ui_config.destination
     allowed = origin(destination)
     audit = dict(case=case, application_id=app_id, reference=reference, destination=destination,
                  persistence=False, requests=0, responses=0, redirects=0,
@@ -244,7 +249,7 @@ async def probe(case):
     if case in UI_CASES:
         audit.update(purpose='DISCOVERY_PUBLIC_UI_WINDOW',public_ui_posts=0,measured_public_ui_posts=0,outbound_payload_bytes=0,
             post_body_cdp_reads=0,largest_observed_post_bytes=0,completeness='UNKNOWN',
-                     requested_interval=['2026-09-28','2026-10-04'],date_semantics='VALIDATED')
+                     requested_interval=[ui_config.start,ui_config.end],date_semantics='VALIDATED')
     started = time.monotonic()
     browser = context = None
     stopped = asyncio.Event()
@@ -294,7 +299,7 @@ async def probe(case):
                 return
             if (reason == 'UNREVIEWED_METHOD' and case in UI_CASES
                     and not stopped.is_set() and not audit['safety_failure']):
-                measurement_failure=await measure_post(event,client,audit,UI_CASES[case].aura)
+                measurement_failure=await measure_post(event,client,audit,ui_config.aura)
                 if measurement_failure is not None or stopped.is_set() or combined_bytes(audit)>MAX_BYTES:
                     fail(measurement_failure or 'BYTE_LIMIT')
                     await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
@@ -447,7 +452,7 @@ async def probe(case):
                 else:
                     await nav
                     if case in UI_CASES:
-                        await enumerate_ui(page,audit,stopped,UI_CASES[case])
+                        await enumerate_ui(page,audit,stopped,ui_config)
                         if audit.get('enumeration_evidence') != 'COUNT_RECONCILED':
                             fail('LISTING_NOT_QUALIFIED')
                     else:
@@ -511,7 +516,11 @@ def execution_environment_allowed(case, mode, environ):
             and environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
 
 
-def supervised(case, output, execution_mode="github-hosted"):
+def supervised(case, output, execution_mode="github-hosted", window=None):
+    if window is not None:
+        from verification.discovery.arcus_ui_config import dated_config
+        if case not in UI_CASES:raise ValueError("listing window only")
+        dated_config(UI_CASES[case],*window)
     import psutil
     if not execution_environment_allowed(case, execution_mode, os.environ):
         raise ValueError('DISPOSABLE_HOSTED_RUNNER_ONLY')
@@ -530,7 +539,7 @@ def supervised(case, output, execution_mode="github-hosted"):
         worker_module = ('verification.discovery.material_qualification' if case in IDOX_CASES
                          else 'verification.direct_reference.instrumented_probe')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)], env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -593,15 +602,18 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--worker', action='store_true')
     p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
+    p.add_argument('--window-start');p.add_argument('--window-end')
     a = p.parse_args()
+    if bool(a.window_start)!=bool(a.window_end):raise ValueError('window pair')
+    window=(a.window_start,a.window_end) if a.window_start else None
     if any(name in os.environ for name in ('DATABASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
         raise ValueError('CREDENTIAL_FREE_ONLY')
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        a.output.write_text(json.dumps(asyncio.run(probe(a.case)), indent=2) + '\n')
+        a.output.write_text(json.dumps(asyncio.run(probe(a.case,window)), indent=2) + '\n')
         return 0
-    return supervised(a.case, a.output, a.execution_mode)
+    return supervised(a.case, a.output, a.execution_mode,window)
 
 
 if __name__ == '__main__':
