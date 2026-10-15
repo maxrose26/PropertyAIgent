@@ -32,6 +32,7 @@ jobs:
           REVIEWED_SHA: ${{ inputs.reviewed_sha }}
           MANIFEST_SHA: ${{ inputs.manifest_sha }}
           R0_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
           "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
           import os
@@ -44,6 +45,7 @@ jobs:
           REVIEWED_SHA: ${{ inputs.reviewed_sha }}
           MANIFEST_SHA: ${{ inputs.manifest_sha }}
           R0_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: |
           timeout --signal=TERM --kill-after=10s 1930s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.r0_proposal --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --output "$RUNNER_TEMP/r0-audit"
       - uses: actions/upload-artifact@v4

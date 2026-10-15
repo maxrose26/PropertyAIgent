@@ -107,3 +107,27 @@ def test_supervisor_deadline_preserves_unknown_and_terminates(monkeypatch,tmp_pa
     assert killed and result['outer_supervisor']['expired']
     assert result['completeness']=='UNKNOWN' and result['accounting_complete'] is False
     assert result['outer_supervisor']['cleanup']=='CLOSED'
+
+
+def test_actual_workflow_parent_environment_mapping(monkeypatch):
+    import yaml
+    root=Path(__file__).resolve().parents[1]
+    workflow=yaml.safe_load((root/'docs/design/stage4-r0-execution/workflow-proposal.yml').read_text())
+    checks=[step for step in workflow['jobs']['observation']['steps'] if 'env' in step]
+    assert len(checks)==2
+    expressions={'${{ inputs.reviewed_sha }}':'a'*40, '${{ inputs.manifest_sha }}':r.PLAN_HASH,
+        '${{ inputs.authority }}':r.AUTHORITY, '${{ github.workflow_sha }}':'a'*40}
+    defaults=context();defaults.pop('GITHUB_WORKFLOW_SHA');defaults.pop('R0_AUTHORITY')
+    for step in checks:
+        assert step['env']['GITHUB_WORKFLOW_SHA']=='${{ github.workflow_sha }}'
+        resolved={k:expressions[v] for k,v in step['env'].items()}
+        env=dict(defaults,**resolved)
+        with patch.object(r.f,'read',side_effect=AssertionError('no source')) as source:
+            r.admit(env,env['REVIEWED_SHA'],env['MANIFEST_SHA'],now=datetime(2026,10,16,tzinfo=timezone.utc))
+            for bad in (None,'b'*40):
+                broken=dict(env)
+                if bad is None:broken.pop('GITHUB_WORKFLOW_SHA')
+                else:broken['GITHUB_WORKFLOW_SHA']=bad
+                with pytest.raises(ValueError,match='R0_ADMISSION_REJECTED'):
+                    r.admit(broken,broken['REVIEWED_SHA'],broken['MANIFEST_SHA'],now=datetime(2026,10,16,tzinfo=timezone.utc))
+            source.assert_not_called()
