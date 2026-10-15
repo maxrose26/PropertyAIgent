@@ -1,0 +1,79 @@
+{
+  "bridge_start": "2026-10-15",
+  "exclusive_cut": "2026-10-15T00:00:00+01:00",
+  "latency": "UNKNOWN",
+  "limits": {
+    "bytes": 27000000,
+    "calls": 9,
+    "cleanup_upload_reserve_seconds": 180,
+    "job_seconds": 960,
+    "output_bytes": 20000000,
+    "requests": 90,
+    "rss_bytes": 1610612736,
+    "seconds": 495,
+    "setup_seconds": 260
+  },
+  "persistence": false,
+  "publication_recall": "UNKNOWN",
+  "rows": [
+    {
+      "council": "stockport",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    }
+  ],
+  "scope": "EXACT9_UNTOUCHED",
+  "source_artifact_sha256": "de435e9ca672172e609304ac56a764932084f3fb17f1001b9b3a1c9d7828c1e7",
+  "source_manifest_sha256": "aaabab2f0757ba8c373c7588322618ee6d9bbeff3f21fdd08638b147d8be6283",
+  "source_revision": "0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4",
+  "source_run": 38798433667
+}

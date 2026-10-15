@@ -1,0 +1,51 @@
+# TO REVIEW — IDOX CAPPED CRITERIA, EXACT-9 AND SELECTIVE PARENT PREPARATION
+
+Master Stage4 OPEN. Current gate cron-suspension source-date catch-up; next gate corrected discovery/selective metadata readiness. This is offline implementation/preparation only. No merge, registration, dispatch, source observation, production access, admission or stage advancement.
+
+## Baseline and immutable evidence
+
+Base master0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4/tree9a089d3ce66098f1ec7b2a55ca4c097d4144b925. Consumed run38798433667 and original evidence pack593c4a77f266f99580c9589d0b227ff0ae9981e8 remain unchanged, including263 candidates. The exact original result.json is copied byte-for-byte as source-exact16-result.json (SHA2567168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca) to make untouched-scope tests self-contained; no historical outcome is reclassified. Original ZIP SHA256de435e9ca672172e609304ac56a764932084f3fb17f1001b9b3a1c9d7828c1e7.
+
+## Correction and result-set linkage
+
+idox_window.run now reads the current same-session refine view after the final retained segment even on PAGE_CAP/missing-total. It never resubmits criteria, navigates back to a replacement result set or substitutes new records. Strict form parsing independently verifies returned date controls; submitted payload is not proof. The audit binds all enumerated page body hashes, criteria response hash, request ordinal and the explicit no-reenumeration method. This is the existing accepted refine-evidence method extended to caps, not independent proof of publication time or an immutable server snapshot. Missing/wrong echo fails closed and retains original candidates/INCOMPLETE; no safety flags cleared. Capped worker emits PAGE_CAP, parent still requires its existing positive interval/fingerprint, identity, safety, accounting and cleanup predicates.
+
+Request arithmetic: formGET+searchPOST+sortPOST+five nextGET+refineGET=9 on six-page cap (previously8). Existing per-window10 requests/3,000,000 bytes/45s and outer worker50s reservation55s remain unchanged. One extra physical request compared with the formerly skipped capped echo uses existing capacity, not increased ceilings. Time/byte exhaustion while obtaining echo stops truthfully; no implicit increase or retry authority.
+
+## Worker-to-parent evidence
+
+New synthetic HTTP-response tests exercise actual finite.read→private finite.main worker→Idox live/run→strict transport/parser→recovery._execute_fixed, with only OS supervisor launch and HTTP responses replaced offline. They are not council observations or a second caller-only result mock. Valid cap retains60 candidates, ninth-request criteria/page binding and reaches next source call; missing/wrong criteria, identity/security/accounting/cleanup/hard-failure mutations and checkpoint failure stop. Complete and missing-total cases also exercise returned echo. Existing network-denied discovery regression suite passes444, skips10 disposable-PostgreSQL tests without a configured disposable database; no production DB used. Applicable hosted CI and independent review are reported in the final handoff, not inferred from offline success.
+
+## Exact-9 — unregistered proposal
+
+Manifest untouched9-manifest.json SHA256c90d75ea1d5863976e1a176c3a484a3866069ea8f7eb2b3034deaf2315619262. Exactly original run's nine NOT_ATTEMPTED rows, unaltered order/dates/cut: Stockport8–14Oct; Tameside17–23Sep,24–30Sep,1–7Oct,8–14Oct; same four Wigan weeks. Exclusive cut15Oct00:00 Europe/London;15October onward bridge remains unresolved. No capped/failed window included.
+
+New inert r0_exact9 binding and .yml.txt template reuse existing outer supervisor, AuditStore fsync/hash checkpoint-before-next-call, typed containment and global stops. No actual .github/workflows/stage4-r0-untouched9-once.yml is registered. Existing consumed workflows unchanged. Outer adds only an explicitly named module→exact plan validator branch; no arbitrary worker dispatch.
+
+Derived ceilings:9×10=90 requests;9×3MB=27MB;9×55s=495 execution seconds;9 calls;20MB audit;1.5GiB owned-process RSS. Setup260s plus execution495 plus cleanup/upload180=935s within16-minute960s job. Redundant shell TERM525s/kill10s, hard owned-process supervisor495s; output/checkpoint uncertainty prevents another call. Proposed authority AUTHORISE_R0_9_UNTOUCHED_PRIMARY_WINDOWS_ONCE, master-bound reviewed_sha (not frozen yet), manifest as above; run1/attempt1/history zero required at future registration/execution review. No execution authority here.
+
+## Selective metadata — fixed-two offline caller/procedure
+
+Priorities preserved: Bolton01768/26 explicit49C3apartments;01769/26 cites00284/26;01827/26 cites20683/25; StockportDC/100094 up to141 residential dwellings. These are processing signals, not acquisition opportunities/database absence/admission authority. No child refetch needed to repeat screening; no child fetch included in this metadata proposal.
+
+bolton_parent_metadata.metadata accepts ONLY00284/26 or20683/25, with injected physical dispatch; no CLI/default network dispatcher, production secret, writer, documents or automatic expansion. Starts exact official advanced form https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application. Existing bounded exact-reference status lookup is reused, NOT legacy fetch_application_by_reference (first-match/force-qualification/upsert). Search submits only fixed reference, blank other criteria and supported public form state under strict POST/route checks. Only exact firstPage result redirect and canonical same-origin summary can follow. All plausible detail keys must collapse to one; pagination/foreign links/multiple keys/unmatched or duplicate displayed references withhold. No loose address search or arbitrary identity.
+
+Independently recheck exact displayed Reference in simpleDetailsTable. Whitelist Reference/Proposal/Address/Application Type/Status/Decision/Decision Issued Date with literal PRESENT_VALUE/PRESENT_BLANK/NOT_PRESENT/CONFLICTING states and locators. No applicant/contact, rawHTML, nonce/cookie or arbitrary exception exported. Proposal scale remains literal, not fabricated dwelling facts; optional missing type doesn't invalidate supported proposal priority. Output retains sourceURL, fingerprint, retrieval timestamp and counters. This is metadata-only; no B2 eligibility/admission assertion.
+
+Per parent6requests/3MB/500KBresponse/45source-seconds; two parents12requests/6MB/90source-seconds,128KiB aggregate audit; proposed1.5GiB outer RSS/160-second outer allowance. Existing transport's bounded single retry is included in physical ceilings, not new run retry authority. Injection-only caller enforces per-record request/byte/time/output bounds and closes its boundary; it does not claim owned HTTP-session/process cleanup or aggregate RSS enforcement. Before any live registration, wire the two calls into existing owned-process supervisor with explicit clean session lifecycle, fixed aggregate accounting and durable checkpoint between parents; prove ambiguous/error/checkpoint/cleanup stops. That is a concrete remaining preparation requirement, not a live-ready claim. Ordinary source form/redirect compatibility remains unproven until separately authorised qualification; no broad route fallback.
+
+Only two necessary parents proposed; seven other linked records retained unresolved and all53 ledger rows preserved. No documents initially. Any later child refresh or document acquisition must name the specific qualification/admission dependency separately; no permanent three-record limit.
+
+## Early screening integration and policy
+
+New pure retained-evidence annotation reuses accepted unit_filter.qualify and discovery_contract.candidate_materiality, at finite.read after bounded listing output and BEFORE downstream expensive exact-record qualification/enrichment/cohort preparation. It retains every reference/field/coverage state, records rule version/reasons/source and segment/criteria provenance. Related literal references are preserved; legacy short numeric prefixes are explicitly unqualified rather than silently matched to full references or sites. Sparse/conflicting/unparseable evidence remains retained with no derived citation/scale. Generic counts are diagnostic only, count_metricUNKNOWN and residential_dwelling_count unset; no bedspace/plant/parking/plot number becomes dwelling count.
+
+This annotates processing decisions; it does not silently skip an existing fixed authorised cohort or change accepted exclusions. A later cohort builder may prioritise evidence-backed positives and related schemes using these reasons; automatic deeper-processing exclusion requires its accepted policy and preserved ledger. No new model, replacement taxonomy or broad refactor. Existing qualification/COUPLED/known-record protection unchanged. No site/link/opportunity creation.
+
+## Residuals and precise next decisions
+
+1. Review this candidate/independent review/exact-head hosted checks for guarded integration; no merge authorised now.
+2. Separately approve byte-equivalent exact9 registration and final execution identities only after readiness is confirmed; no dispatch now.
+3. Approve the remaining bounded parent supervisor/session/checkpoint preparation before any two-parent source execution. Bolton admission remains HOLD.
+4. Capped Stockport1–7Oct remains separate: correction does not complete64-result enumeration. Propose separately reviewed finite smaller date partitions (not larger page caps), preserving historical partial records and later recovery distinction; do not execute or silently add to exact9.
+5. Failed Bolton01842/26, Bury qualification/window, failed Oldham/Rochdale and three capped Manchester windows each retain their existing evidence/requirements; no retries/assessment/contract expansion here. Retained denominator gaps/source-change differences remain unresolved; seals/283 independent-only refs,147-identity/Rochdale comparison proposals preserved. Publication recall, unsupported latency and15October onward bridge remain UNKNOWN/open. Prospective W1/W2/backfill audit not begun. Trafford deferred; Stockport committee limitation not reopened.

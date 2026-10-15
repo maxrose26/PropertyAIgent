@@ -152,16 +152,26 @@ def run(dispatch, config=WindowConfig()):
             diagnostic_stage='PAGE_REQUEST';diagnostic_body=b''
             html=b.retrieve('GET',p.next_url)
         out['unique_references']=len(refs)
-        if not out['capped']:
-            b.phase='REFINE'
-            diagnostic_stage='REFINE_REQUEST';diagnostic_body=b''
-            echoed=b.retrieve('GET',b.policy.base_url+'/refineSearch.do?action=refine')
-            diagnostic_stage='CRITERIA_ECHO';diagnostic_body=echoed
-            _,echo_payload=config.payload(echoed,echo=True)
-            echo_payload.clear()
-            out['applied_interval']=out['requested_interval']
-            out['applied_evidence']='STRICT_REFINE_FORM_ECHO'
-            out['applied_evidence_sha256']=hashlib.sha256(echoed).hexdigest()
+        # Read the current session's refine view after the LAST retained segment,
+        # including caps/missing totals. No search is resubmitted and no results
+        # are replaced. Submitted payload alone is never applied-date evidence.
+        b.phase='REFINE'
+        diagnostic_stage='REFINE_REQUEST';diagnostic_body=b''
+        echoed=b.retrieve('GET',b.policy.base_url+'/refineSearch.do?action=refine')
+        diagnostic_stage='CRITERIA_ECHO';diagnostic_body=echoed
+        _,echo_payload=config.payload(echoed,echo=True)
+        echo_payload.clear()
+        out['applied_interval']=out['requested_interval']
+        out['applied_evidence']='STRICT_REFINE_FORM_ECHO'
+        out['applied_evidence_sha256']=hashlib.sha256(echoed).hexdigest()
+        out['criteria_result_binding']={
+            'method':'SAME_SESSION_POST_ENUMERATION_REFINE_NO_RESUBMIT',
+            'segment_sha256':[p['body_sha256'] for p in out['pages']],
+            'criteria_sha256':out['applied_evidence_sha256'],
+            'request_ordinal':b.requests,
+            'result_set_reenumerated':False,
+            'publication_semantics':'UNKNOWN'}
+        if out['capped']:out['enumeration_evidence']='PAGE_CAP'
     except (ListingError,BoundaryFailure,Failure) as e:
         from .source_diagnostics import shape
         # Only these fixed known messages retain their legacy spelling. Other
