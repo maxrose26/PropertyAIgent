@@ -1,0 +1,57 @@
+# Canonical registered R0 workflow; execution requires separate confirmation.
+name: Stage4 R0 source-date observation ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      manifest_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: stage4-r0-source-date-once
+  cancel-in-progress: false
+jobs:
+  observation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 38
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          R0_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.r0_proposal import admit
+          admit(os.environ,os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'])
+          PY
+      - run: "$RUNNER_TEMP/r0-venv/bin/python -m playwright install --with-deps chromium"
+      - name: One supervised source-date round, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          R0_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 1930s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.r0_proposal --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --output "$RUNNER_TEMP/r0-audit"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r0-source-date-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/r0-audit
+          if-no-files-found: error
+          retention-days: 14

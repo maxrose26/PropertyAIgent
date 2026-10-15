@@ -51,15 +51,19 @@ def test_new_window_qualification_needs_independent_seal():
     assert r.qualify(row,dict(source,capped=True),independent)=='UNKNOWN'
 
 
-def test_proposal_unregistered_credential_free_and_ci_included():
+def test_registered_equivalence_credential_free_and_ci_included():
     root=Path(__file__).resolve().parents[1]
-    assert not (root/r.WORKFLOW).exists()
+    assert (root/r.WORKFLOW).read_bytes()==(root/'docs/design/stage4-r0-execution/workflow-proposal.yml').read_bytes()
+    assert_registered_workflow((root/r.WORKFLOW).read_text())
     template=(root/'docs/design/stage4-r0-execution/workflow-proposal.yml').read_text()
     for forbidden in ('secrets.','environment:','schedule:','DATABASE_URL:','workflow_run:'):assert forbidden not in template
     assert '1930s' in template and 'timeout-minutes: 38' in template and 'persist-credentials: false' in template
     ci=(root/'.github/workflows/stage4-discovery-offline.yml').read_text()
     assert "'docs/design/stage4-r0-execution/**'" in ci
     assert 'tests/test_discovery_r0_proposal.py' in ci and 'tests/test_discovery_finite_acceptance.py' in ci
+    assert r.WORKFLOW in ci
+    batch=(root/'.github/workflows/stage4-batch-offline.yml').read_text()
+    assert r.WORKFLOW in batch and 'tests/test_discovery_r0_proposal.py' in batch
 
 
 def test_hard_supervisor_offline_child_cleanup(tmp_path,monkeypatch):
@@ -138,3 +142,28 @@ def test_actual_workflow_parent_environment_mapping(monkeypatch):
 def test_reference_difference_is_unresolved_not_parser_failure():
     out=r.reference_difference(['A/26'],['B/26'])
     assert out==dict(outcome='UNRESOLVED_REFERENCE_DIFFERENCE',primary_only=['A/26'],independent_only=['B/26'],cause='UNKNOWN_SOURCE_CHANGE_OR_ENUMERATION')
+
+
+def assert_registered_workflow(text):
+    import hashlib,yaml
+    assert hashlib.sha256(text.encode()).hexdigest()==WORKFLOW_SHA256
+    w=yaml.load(text,Loader=yaml.BaseLoader)
+    assert set(w['on'])=={'workflow_dispatch'} and set(w['jobs'])=={'observation'}
+    assert set(w['on']['workflow_dispatch']['inputs'])=={'reviewed_sha','manifest_sha','authority'}
+    assert w['permissions']=={'contents':'read'}
+    job=w['jobs']['observation']
+    assert job['runs-on']=='ubuntu-24.04' and job['timeout-minutes']=='38'
+    assert 'environment' not in job and 'env' not in job and 'env' not in w
+    assert 'secrets.' not in text and 'DATABASE_URL:' not in text
+    for step in job['steps']:
+        if 'env' in step:assert step['env']['GITHUB_WORKFLOW_SHA']=='${{ github.workflow_sha }}'
+
+
+@pytest.mark.parametrize('old,new',[('1930s','3930s'),('timeout-minutes: 38','timeout-minutes: 99'),
+    ('${{ github.workflow_sha }}','${{ github.sha }}'),('persist-credentials: false','persist-credentials: true')])
+def test_registration_mutations_rejected(old,new):
+    root=Path(__file__).resolve().parents[1]
+    text=(root/r.WORKFLOW).read_text();assert old in text
+    with pytest.raises(AssertionError):assert_registered_workflow(text.replace(old,new))
+
+WORKFLOW_SHA256='5766acc2a137d50c4072d3153b6a0c52e7966580a66298c602d4d68484e4d893'

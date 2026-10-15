@@ -16,6 +16,7 @@ on:
       - 'verification/direct_reference/instrumented_probe.py'
       - '.github/workflows/stage4-discovery-offline.yml'
       - '.github/workflows/stage4-route-qualified-material-admission-once.yml'
+      - '.github/workflows/stage4-r0-source-date-once.yml'
       - '.github/workflows/stage4-batch-offline.yml'
       - 'tests/test_stage4_batch_registration.py'
       - 'tests/test_oldham_production_registration.py'
