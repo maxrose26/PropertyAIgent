@@ -1,0 +1,589 @@
+[
+  {
+    "window": {
+      "council": "bolton",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 32,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bolton",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 25,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bolton",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 29,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bolton",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 19,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bury",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 19,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bury",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 18,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bury",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    "run": "38731487848",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 16,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "bury",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    "run": "38731487848",
+    "enumeration": "UNKNOWN",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 5,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/run-38731487848/extracted/round-1.json",
+    "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+    "residual_category": "UNKNOWN"
+  },
+  {
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "run": "38744118357",
+    "enumeration": "FAILED",
+    "coverage": "FAILED",
+    "capped": null,
+    "count": 0,
+    "failure": "LISTING_NOT_QUALIFIED",
+    "evidence_path": "docs/design/stage4-r0-execution/two-scope-execution-20261015/recovery/extracted/round.json",
+    "evidence_sha256": "bdca7591e6dc48a79bc2d2edd258d6dbb266c71247716c06df6fb978ffd72202",
+    "residual_category": "CAPPED"
+  },
+  {
+    "window": {
+      "council": "manchester",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    "run": "38758465439",
+    "enumeration": "INCOMPLETE",
+    "coverage": "INCOMPLETE",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "CAPPED"
+  },
+  {
+    "window": {
+      "council": "manchester",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    "run": "38758465439",
+    "enumeration": "INCOMPLETE",
+    "coverage": "INCOMPLETE",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "CAPPED"
+  },
+  {
+    "window": {
+      "council": "manchester",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    "run": "38758465439",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "oldham",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    "run": "38758465439",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 19,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "oldham",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    "run": "38758465439",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 13,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "oldham",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    "run": "38758465439",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 11,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "oldham",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    "run": "38758465439",
+    "enumeration": "FAILED",
+    "coverage": "FAILED",
+    "capped": false,
+    "count": 0,
+    "failure": "ListingError:sort selector",
+    "evidence_path": "docs/design/stage4-r0-execution/fixed80-27-results-20261015/untouched27/extracted/result.json",
+    "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+    "residual_category": "FAILED"
+  },
+  {
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "run": "38786550045",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+    "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    "run": "38786550045",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+    "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    "run": "38786550045",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+    "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "rochdale",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    "run": "38786550045",
+    "enumeration": "FAILED",
+    "coverage": "FAILED",
+    "capped": null,
+    "count": 0,
+    "failure": "LISTING_NOT_QUALIFIED",
+    "evidence_path": "docs/design/stage4-r0-execution/exact20-results-20261015/artifact/result.json",
+    "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+    "residual_category": "FAILED"
+  },
+  {
+    "window": {
+      "council": "salford",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "run": "38798433667",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "salford",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    "run": "38798433667",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "salford",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    "run": "38798433667",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "salford",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    "run": "38798433667",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": null,
+    "count": 0,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "stockport",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    "run": "38798433667",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 47,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "stockport",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    "run": "38798433667",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 39,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "stockport",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    "run": "38798433667",
+    "enumeration": "INCOMPLETE",
+    "coverage": "INCOMPLETE",
+    "capped": true,
+    "count": 60,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact16-result-20261015/artifact/result.json",
+    "evidence_sha256": "7168048f944529b9b1e1a5455e2c9204b8380894b32d3b89d8aeeda459152cca",
+    "residual_category": "CAPPED"
+  },
+  {
+    "window": {
+      "council": "stockport",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    "run": "38805348801",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 33,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+    "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "tameside",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    "run": "38805348801",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 23,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+    "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "tameside",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    "run": "38805348801",
+    "enumeration": "COMPLETE",
+    "coverage": "UNKNOWN",
+    "capped": false,
+    "count": 15,
+    "failure": null,
+    "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+    "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+    "residual_category": "COMPLETE"
+  },
+  {
+    "window": {
+      "council": "tameside",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    "run": "38805348801",
+    "enumeration": "FAILED",
+    "coverage": "FAILED",
+    "capped": false,
+    "count": 0,
+    "failure": "BoundaryFailure:SOURCE_CONTRACT_REJECTED",
+    "evidence_path": "docs/design/stage4-r0-execution/exact9-result-parent-registration-20261015/artifact/result.json",
+    "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+    "residual_category": "FAILED"
+  },
+  {
+    "window": {
+      "council": "tameside",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    "run": null,
+    "enumeration": "NOT_ATTEMPTED",
+    "coverage": "NOT_ATTEMPTED",
+    "residual_category": "NOT_ATTEMPTED"
+  },
+  {
+    "window": {
+      "council": "wigan",
+      "end": "2026-09-23",
+      "semantics": "RECEIVED",
+      "start": "2026-09-17"
+    },
+    "run": null,
+    "enumeration": "NOT_ATTEMPTED",
+    "coverage": "NOT_ATTEMPTED",
+    "residual_category": "NOT_ATTEMPTED"
+  },
+  {
+    "window": {
+      "council": "wigan",
+      "end": "2026-09-30",
+      "semantics": "RECEIVED",
+      "start": "2026-09-24"
+    },
+    "run": null,
+    "enumeration": "NOT_ATTEMPTED",
+    "coverage": "NOT_ATTEMPTED",
+    "residual_category": "NOT_ATTEMPTED"
+  },
+  {
+    "window": {
+      "council": "wigan",
+      "end": "2026-10-07",
+      "semantics": "RECEIVED",
+      "start": "2026-10-01"
+    },
+    "run": null,
+    "enumeration": "NOT_ATTEMPTED",
+    "coverage": "NOT_ATTEMPTED",
+    "residual_category": "NOT_ATTEMPTED"
+  },
+  {
+    "window": {
+      "council": "wigan",
+      "end": "2026-10-14",
+      "semantics": "RECEIVED",
+      "start": "2026-10-08"
+    },
+    "run": null,
+    "enumeration": "NOT_ATTEMPTED",
+    "coverage": "NOT_ATTEMPTED",
+    "residual_category": "NOT_ATTEMPTED"
+  }
+]

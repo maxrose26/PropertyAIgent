@@ -1,0 +1,47 @@
+[
+  {
+    "path": "run-proof.jpg",
+    "bytes": 72166,
+    "sha256": "6357269c470b97e0ba80595c5c3aabd26febd71b1d5e0347dab3dff266ff687a"
+  },
+  {
+    "path": "REVIEW.md",
+    "bytes": 21123,
+    "sha256": "7373174d7204088acb47bfab98d1fd8d11923f740b2e4c2261238e6bca65970a"
+  },
+  {
+    "path": "proposed-untouched5.json",
+    "bytes": 876,
+    "sha256": "e046d8630b382561b475e9d8230b013e57fa35ff1db8b4737bdeeee225213633"
+  },
+  {
+    "path": "cumulative-36-windows.json",
+    "bytes": 17635,
+    "sha256": "338a4eb191a6fa4212dc2ba8c54436bf917ef9bb4f13b67fef6836a4c935c76f"
+  },
+  {
+    "path": "validation.json",
+    "bytes": 1829,
+    "sha256": "d11612dc39e349059ff38b3ee06396cdfd10d46a6e05cdacf403f024106d3344"
+  },
+  {
+    "path": "artifact.zip",
+    "bytes": 1742,
+    "sha256": "f7bfc4eb958d542e6d36a0ddcb6a67adb9cf17fde705c092d217be20fb4087d7"
+  },
+  {
+    "path": "artifact/result.json",
+    "bytes": 1711,
+    "sha256": "a22d197d95254b10d952cb2d90b96f8fff839c85c55cd6c35343a59499b76a38"
+  },
+  {
+    "path": "artifact/execution.json",
+    "bytes": 216,
+    "sha256": "3b94264b19f4a488d2ad11326f3d7a41bacd9138893df77549b5bfe584068df7"
+  },
+  {
+    "path": "artifact/checkpoints/000.json",
+    "bytes": 856,
+    "sha256": "49229739f7646e3d18a4800a40b86868ad4af187cb02c302a8759ca1c45f4a04"
+  }
+]

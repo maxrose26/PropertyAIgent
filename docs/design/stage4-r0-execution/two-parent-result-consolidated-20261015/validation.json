@@ -1,0 +1,57 @@
+{
+  "verified_at": "2026-10-15T21:13:17.067Z",
+  "predispatch": {
+    "at": "2026-10-15T21:08:55.938Z",
+    "master": "ebae8fb63d8a4945f603a5492d3b20df42500cb9",
+    "history": 30,
+    "parent": 0
+  },
+  "run": {
+    "id": 38807635572,
+    "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38807635572",
+    "status": "completed",
+    "conclusion": "failure",
+    "number": 1,
+    "attempt": 1,
+    "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9",
+    "started": "2026-10-15T21:09:03Z",
+    "updated": "2026-10-15T21:09:56Z"
+  },
+  "history": {
+    "total": 31,
+    "returned": 31,
+    "parents": [
+      {
+        "id": 38807635572,
+        "number": 1,
+        "attempt": 1,
+        "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9",
+        "conclusion": "failure"
+      }
+    ]
+  },
+  "master": "ebae8fb63d8a4945f603a5492d3b20df42500cb9",
+  "artifact": {
+    "id": 12006169901,
+    "node_id": "MDg6QXJ0aWZhY3QxMjAwNjE2OTkwMQ==",
+    "name": "r0-two-parent-metadata-ebae8fb63d8a4945f603a5492d3b20df42500cb9-38807635572",
+    "size_in_bytes": 1742,
+    "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12006169901",
+    "archive_download_url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12006169901/zip",
+    "expired": false,
+    "digest": "sha256:f7bfc4eb958d542e6d36a0ddcb6a67adb9cf17fde705c092d217be20fb4087d7",
+    "created_at": "2026-10-15T21:09:52Z",
+    "updated_at": "2026-10-15T21:09:52Z",
+    "expires_at": "2026-10-29T21:09:51Z",
+    "workflow_run": {
+      "id": 38807635572,
+      "repository_id": 1317423499,
+      "head_repository_id": 1317423499,
+      "head_branch": "master",
+      "head_sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9"
+    }
+  },
+  "production_access": false,
+  "code_changed": false,
+  "registrations": false
+}
