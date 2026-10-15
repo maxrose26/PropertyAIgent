@@ -1,0 +1,420 @@
+diff --git a/tests/test_discovery_finite_acceptance.py b/tests/test_discovery_finite_acceptance.py
+new file mode 100644
+index 0000000..41f7101
+--- /dev/null
++++ b/tests/test_discovery_finite_acceptance.py
+@@ -0,0 +1,102 @@
++from copy import deepcopy
++from datetime import date
++from unittest.mock import patch
++import pytest
++from verification.discovery import finite_acceptance as f
++from verification.discovery.arcus_ui_config import UI_CASES,dated_config
++from verification.discovery.arcus_ui_window import qualify_segment
++from tests.test_discovery_arcus_ui import card
++
++@pytest.fixture(autouse=True)
++def credential_free_test_context(monkeypatch):
++    # Wrapper already installed seccomp; remove only synthetic test DB context.
++    monkeypatch.delenv('DATABASE_URL',raising=False)
++
++def evidence(row):
++    if row['council'] not in f.ARCUS:
++        return dict(council=row['council'],requested_interval=[row['start'],row['end']],date_semantics=row['semantics'],persistence=False,failure=None,cleanup='SESSION_BOUNDARY_CLOSED',enumeration_evidence='COUNT_RECONCILED',
++            applied_interval=[row['start'],row['end']],applied_evidence_sha256='a'*64,records=[],
++            explicit_zero_evidence='NO_RESULTS_FOUND_AND_RETAINED_DATE_CRITERIA',pages=[dict(first=0,last=0,total=0,terminal=True)],
++            resource=dict(requests_attempted=2,received_bytes=100))
++    c=dated_config(UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end'])
++    return dict(requested_interval=[row['start'],row['end']],date_semantics=row['semantics'],case='discovery_'+row['council']+'_ui_window',destination=c.destination,persistence=False,failure=None,
++        safety_failure=False,safety_events=[],cleanup='CONTEXT_BROWSER_CLOSED',process_cleanup='CLOSED',live_owned_survivors=0,
++        supervisor_limit_hit=False,enumeration_evidence='COUNT_RECONCILED',applied_interval=[row['start'],row['end']],completeness='UNKNOWN',
++        requests=20,decoded_bytes=1000,encoded_bytes=800,outbound_payload_bytes=100,public_ui_posts=1,measured_public_ui_posts=1,
++        supervisor_seconds=5,pages=1,navigations=1,listing_records=[dict(reference='TEST/26',source_record_id='X')],listing_segments=[dict(first=1,last=1,total=1)])
++
++def test_finite_nine_council_partition_and_hash():
++    p=f.manifest('2026-09-18','2026-10-15','SUSPENSION_CATCHUP')
++    assert len(p['rows'])==36 and {r['council'] for r in p['rows']}==f.COUNCILS
++    for c in f.COUNCILS:
++        rs=[r for r in p['rows'] if r['council']==c]
++        assert rs[0]['start']=='2026-09-18' and rs[-1]['end']=='2026-10-15'
++        assert all((date.fromisoformat(b['start'])-date.fromisoformat(a['end'])).days==1 for a,b in zip(rs,rs[1:]))
++    r=f.execute(p,f.digest(p),reader=evidence,clock=lambda:0)
++    assert r['enumeration_completeness']=='COMPLETE' and r['completeness']=='UNKNOWN'
++    assert r['source_contract_qualified'] is False
++    with pytest.raises(ValueError):f.execute(p,'0'*64,reader=lambda r:pytest.fail('no call'))
++    with pytest.raises(ValueError):f.manifest('2026-09-01','2026-10-15','PROSPECTIVE')
++
++@pytest.mark.parametrize('change,state',[
++    ({'failure':'TIMEOUT'},'FAILED'),({'capped':True},'INCOMPLETE'),({'applied_interval':None},'UNKNOWN'),
++    ({'enumeration_evidence':'TOTAL_UNKNOWN'},'UNKNOWN'),({'explicit_zero_evidence':None},'UNKNOWN'),({'cleanup':'FAILED'},'UNKNOWN')])
++def test_partial_never_complete_and_no_continuation(change,state):
++    p=f.manifest('2026-10-15','2026-10-15','PROSPECTIVE');calls=[]
++    def read(row):calls.append(row);return dict(evidence(row),**change)
++    r=f.execute(p,f.digest(p),reader=read,clock=lambda:0)
++    assert len(calls)==1 and r['results'][0]['completeness']==state and r['completeness']!='COMPLETE'
++    assert len(r['not_attempted'])==8 and not r['completed_through_advanced']
++
++def test_exception_budget_and_missing_accounting_stop():
++    p=f.manifest('2026-10-15','2026-10-15','BACKFILL_AUDIT')
++    r=f.execute(p,f.digest(p),reader=lambda r:(_ for _ in ()).throw(RuntimeError('unsafe payload')),clock=lambda:0)
++    assert r['stop_reason']=='SOURCE_EXCEPTION' and 'unsafe payload' not in str(r)
++    values=iter([0,1900]);r=f.execute(p,f.digest(p),reader=lambda r:pytest.fail('no dispatch'),clock=lambda:next(values))
++    assert r['stop_reason']=='ROUND_BUDGET' and len(r['not_attempted'])==9
++    r=f.execute(p,f.digest(p),reader=lambda r:dict(evidence(r),resource={}),clock=lambda:0)
++    assert r['stop_reason']=='RESOURCE_ACCOUNTING'
++
++@pytest.mark.parametrize('key',list(UI_CASES))
++def test_arcus_window_changes_only_date_filters(key):
++    import base64,json
++    from urllib.parse import urlsplit,parse_qs
++    old=UI_CASES[key];new=dated_config(old,'2026-10-15','2026-10-21')
++    def payload(c):return json.loads(base64.b64decode(parse_qs(urlsplit(c.destination).query)['c__q'][0]))
++    a,b=payload(old),payload(new)
++    for x,y in zip(a['requests'][0]['searchFilters'],b['requests'][0]['searchFilters']):
++        if x['fieldDeveloperName'] in ('PA_ADV_DateValidFrom','PA_ADV_DateValidTo'):
++            assert y['fieldValue'] in ('2026-10-15','2026-10-21')
++        else:assert x==y
++    assert old.start=='2026-09-28' and old.end=='2026-10-04' and new.host==old.host
++
++def test_dynamic_row_date_preserves_exact_identity():
++    c=dated_config(UI_CASES['discovery_manchester_ui_window'],'2026-10-15','2026-10-21')
++    assert qualify_segment('Showing 1 to 1 of 1 results',[card(valid='16/10/2026')],1,config=c)[2]==1
++    with pytest.raises(ValueError):qualify_segment('Showing 1 to 1 of 1 results',[card(valid='02/10/2026')],1,config=c)
++
++def test_no_secret_context(monkeypatch):
++    p=f.manifest('2026-10-15','2026-10-15','PROSPECTIVE');monkeypatch.setenv('COMMITTEE_DATABASE_URL','synthetic')
++    with pytest.raises(ValueError):f.execute(p,f.digest(p),reader=lambda r:pytest.fail('no source'))
++
++
++def test_read_reuses_supervision_without_secret_inheritance(tmp_path):
++    import json
++    row=dict(council='bolton',semantics='RECEIVED',start='2026-10-15',end='2026-10-21')
++    def supervisor(command,env,deadline):
++        assert deadline==50 and set(env)=={'PATH','HOME','TMPDIR','PYTHONDONTWRITEBYTECODE'}
++        assert command[2]=='verification.discovery.finite_acceptance'
++        from pathlib import Path
++        Path(command[-1]).write_text(json.dumps(evidence(row)))
++        return 0,False
++    with patch.object(f,'supervise',supervisor):assert f.read(row)['persistence'] is False
++
++
++@pytest.mark.parametrize('council',['bolton','manchester'])
++def test_wrong_audit_context_never_qualifies(council):
++    row=dict(council=council,semantics=f.SEMANTICS[council],start='2026-10-15',end='2026-10-21')
++    a=evidence(row)
++    assert f.classify(row,a)=='COMPLETE' # count/criteria reconciliation only
++    assert f.classify(row,dict(a,requested_interval=['2026-09-28','2026-10-04']))=='UNKNOWN'
++    wrong={'case':'discovery_salford_ui_window'} if council in f.ARCUS else {'council':'bury'}
++    assert f.classify(row,dict(a,**wrong))=='UNKNOWN'
+diff --git a/verification/direct_reference/instrumented_probe.py b/verification/direct_reference/instrumented_probe.py
+index 70cf2ec..389e599 100644
+--- a/verification/direct_reference/instrumented_probe.py
++++ b/verification/direct_reference/instrumented_probe.py
+@@ -226,9 +226,14 @@ def exact_guest_record(audit, reference):
+             and fields['reference'].get('value') == reference)
+ 
+ 
+-async def probe(case):
++async def probe(case, window=None):
+     from playwright.async_api import async_playwright
+     app_id, reference, destination = CASES[case]
++    ui_config=UI_CASES.get(case)
++    if window is not None:
++        if ui_config is None:raise ValueError('listing window only')
++        from verification.discovery.arcus_ui_config import dated_config
++        ui_config=dated_config(ui_config,*window);destination=ui_config.destination
+     allowed = origin(destination)
+     audit = dict(case=case, application_id=app_id, reference=reference, destination=destination,
+                  persistence=False, requests=0, responses=0, redirects=0,
+@@ -244,7 +249,7 @@ async def probe(case):
+     if case in UI_CASES:
+         audit.update(purpose='DISCOVERY_PUBLIC_UI_WINDOW',public_ui_posts=0,measured_public_ui_posts=0,outbound_payload_bytes=0,
+             post_body_cdp_reads=0,largest_observed_post_bytes=0,completeness='UNKNOWN',
+-                     requested_interval=['2026-09-28','2026-10-04'],date_semantics='VALIDATED')
++                     requested_interval=[ui_config.start,ui_config.end],date_semantics='VALIDATED')
+     started = time.monotonic()
+     browser = context = None
+     stopped = asyncio.Event()
+@@ -294,7 +299,7 @@ async def probe(case):
+                 return
+             if (reason == 'UNREVIEWED_METHOD' and case in UI_CASES
+                     and not stopped.is_set() and not audit['safety_failure']):
+-                measurement_failure=await measure_post(event,client,audit,UI_CASES[case].aura)
++                measurement_failure=await measure_post(event,client,audit,ui_config.aura)
+                 if measurement_failure is not None or stopped.is_set() or combined_bytes(audit)>MAX_BYTES:
+                     fail(measurement_failure or 'BYTE_LIMIT')
+                     await client.send('Fetch.failRequest', {'requestId':event['requestId'], 'errorReason':'BlockedByClient'})
+@@ -447,7 +452,7 @@ async def probe(case):
+                 else:
+                     await nav
+                     if case in UI_CASES:
+-                        await enumerate_ui(page,audit,stopped,UI_CASES[case])
++                        await enumerate_ui(page,audit,stopped,ui_config)
+                         if audit.get('enumeration_evidence') != 'COUNT_RECONCILED':
+                             fail('LISTING_NOT_QUALIFIED')
+                     else:
+@@ -511,7 +516,11 @@ def execution_environment_allowed(case, mode, environ):
+             and environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
+ 
+ 
+-def supervised(case, output, execution_mode="github-hosted"):
++def supervised(case, output, execution_mode="github-hosted", window=None):
++    if window is not None:
++        from verification.discovery.arcus_ui_config import dated_config
++        if case not in UI_CASES:raise ValueError("listing window only")
++        dated_config(UI_CASES[case],*window)
+     import psutil
+     if not execution_environment_allowed(case, execution_mode, os.environ):
+         raise ValueError('DISPOSABLE_HOSTED_RUNNER_ONLY')
+@@ -530,7 +539,7 @@ def supervised(case, output, execution_mode="github-hosted"):
+         worker_module = ('verification.discovery.material_qualification' if case in IDOX_CASES
+                          else 'verification.direct_reference.instrumented_probe')
+         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
+-                                  '--output', str(child_output)], env=env, start_new_session=True,
++                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else []), env=env, start_new_session=True,
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+         parent = psutil.Process(child.pid)
+         try:
+@@ -593,15 +602,18 @@ def main():
+     p.add_argument('--output', type=Path, required=True)
+     p.add_argument('--worker', action='store_true')
+     p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
++    p.add_argument('--window-start');p.add_argument('--window-end')
+     a = p.parse_args()
++    if bool(a.window_start)!=bool(a.window_end):raise ValueError('window pair')
++    window=(a.window_start,a.window_end) if a.window_start else None
+     if any(name in os.environ for name in ('DATABASE_URL', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY')):
+         raise ValueError('CREDENTIAL_FREE_ONLY')
+     if a.output.exists():
+         raise ValueError('EXISTING_OUTPUT')
+     if a.worker:
+-        a.output.write_text(json.dumps(asyncio.run(probe(a.case)), indent=2) + '\n')
++        a.output.write_text(json.dumps(asyncio.run(probe(a.case,window)), indent=2) + '\n')
+         return 0
+-    return supervised(a.case, a.output, a.execution_mode)
++    return supervised(a.case, a.output, a.execution_mode,window)
+ 
+ 
+ if __name__ == '__main__':
+diff --git a/verification/discovery/arcus_ui_audit.py b/verification/discovery/arcus_ui_audit.py
+index 6be7e67..2e9032f 100644
+--- a/verification/discovery/arcus_ui_audit.py
++++ b/verification/discovery/arcus_ui_audit.py
+@@ -6,8 +6,8 @@ from .arcus_ui_config import UI_CASES
+ from .arcus_ui_transport import combined_bytes, MAX_BYTES
+ 
+ 
+-def validate(a):
+-    config=UI_CASES.get(a.get('case'))
++def validate(a,config=None):
++    config=UI_CASES.get(a.get('case')) if config is None else config
+     if config is None:raise ValueError('unadmitted case')
+     if (a.get('destination')!=config.destination or a.get('persistence') is not False
+         or a.get('failure') is not None or a.get('safety_failure') is not False or a.get('safety_events')!=[]
+@@ -15,7 +15,7 @@ def validate(a):
+         or a.get('live_owned_survivors')!=0 or a.get('supervisor_limit_hit') is not False
+         or a.get('enumeration_evidence')!='COUNT_RECONCILED' or a.get('listing_failure') is not None
+         or a.get('completeness')!='UNKNOWN'
+-        or a.get('applied_interval')!=['2026-09-28','2026-10-04']): raise ValueError('UI window failed')
++        or a.get('applied_interval')!=[config.start,config.end]): raise ValueError('UI window failed')
+     if not (1<=a['requests']<=80 and 0<=a['decoded_bytes']<=20*1024*1024 and 0<=a['supervisor_seconds']<=45):
+         raise ValueError('UI resource bound')
+     if not (0<=a['encoded_bytes']<=20*1024*1024 and a['pages']==1 and 1<=a['navigations']<=2):
+diff --git a/verification/discovery/arcus_ui_config.py b/verification/discovery/arcus_ui_config.py
+index f9badf7..7ede939 100644
+--- a/verification/discovery/arcus_ui_config.py
++++ b/verification/discovery/arcus_ui_config.py
+@@ -2,7 +2,7 @@
+ 
+ Only frozen public listing URLs; no RPC construction or arbitrary input.
+ """
+-from dataclasses import dataclass
++from dataclasses import dataclass, replace
+ import base64,json
+ from urllib.parse import urlencode
+ from .manchester_shape import DESTINATION, START, END
+@@ -14,6 +14,8 @@ class UIConfig:
+     blank_inputs: tuple
+     blank_combos: tuple
+     row_date: bool=True
++    start: str=START
++    end: str=END
+ 
+     @property
+     def host(self):return self.destination.split('/')[2]
+@@ -43,3 +45,22 @@ SALFORD=UIConfig('salford',observed_url('salfordcitycouncil.my.site.com',(('Salf
+ ROCHDALE=UIConfig('rochdale',observed_url('account.rochdale.gov.uk',(('arcusbuiltenv__Site_Address__c','','PA_ADV_SiteAddress'),)+COMMON+(TYPE,)+DATES+(WARD,('arcusbuiltenv__Parishes__c','','PA_ADV_Parish'))),
+     ('Location of works','Description','Decision notice was sent date from','Decision notice was sent date to'),('Ward','Application Status','Application type','Parish'))
+ UI_CASES={'discovery_'+c.council+'_ui_window':c for c in (MANCHESTER,SALFORD,ROCHDALE)}
++
++
++def dated_config(config,start,end):
++    """Only substitute the two qualified visible valid-date filters."""
++    from datetime import date
++    from urllib.parse import urlsplit,parse_qsl,urlunsplit
++    a,b=date.fromisoformat(start),date.fromisoformat(end)
++    if a>b or (b-a).days>27:raise ValueError('bounded date interval')
++    u=urlsplit(config.destination);pairs=parse_qsl(u.query)
++    encoded=dict(pairs)['c__q'];payload=json.loads(base64.b64decode(encoded))
++    filters=payload['requests'][0]['searchFilters'];seen=[]
++    for f in filters:
++        name=f['fieldDeveloperName']
++        if name in ('PA_ADV_DateValidFrom','PA_ADV_DateValidTo'):
++            f['fieldValue']=start if name.endswith('From') else end;seen.append(name)
++    if sorted(seen)!=['PA_ADV_DateValidFrom','PA_ADV_DateValidTo']:raise ValueError('date controls')
++    value=base64.b64encode(json.dumps(payload,separators=(',',':')).encode()).decode()
++    destination=urlunsplit((u.scheme,u.netloc,u.path,urlencode([(k,value if k=='c__q' else v) for k,v in pairs]),''))
++    return replace(config,destination=destination,start=start,end=end)
+diff --git a/verification/discovery/arcus_ui_window.py b/verification/discovery/arcus_ui_window.py
+index 23f239a..7cf48f6 100644
+--- a/verification/discovery/arcus_ui_window.py
++++ b/verification/discovery/arcus_ui_window.py
+@@ -35,7 +35,7 @@ def qualify_segment(marker,cards,expected_first,previous_total=None,config=MANCH
+         if config.row_date:
+             if len(dates)!=1: raise ValueError('date evidence')
+             d=datetime.strptime(dates[0],'%d/%m/%Y').date().isoformat()
+-            if not START<=d<=END: raise ValueError('date outside interval')
++            if not config.start<=d<=config.end: raise ValueError('date outside interval')
+         elif dates:raise ValueError('unqualified date projection')
+         rows.append({'reference':ref,'source_record_id':u.path.rsplit('/',1)[1],
+             'source_url':u.geturl(),'validated_date':{'state':'PRESENT_VALUE','literal':dates[0]} if config.row_date else {'state':'UNKNOWN','literal':None},
+@@ -85,7 +85,7 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
+         await page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000)
+         # An ordinary disclosure toggle exposes the source's retained filters.
+         await page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000)
+-        expected={'Valid date from':'28/09/2026','Valid date to':'04/10/2026',**{k:'' for k in config.blank_inputs}}
++        expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
+         for label,value in expected.items():
+             if await page.get_by_label(label,exact=True).input_value(timeout=1500)!=value: raise ValueError('applied filter mismatch')
+         for label in config.blank_combos:
+@@ -93,7 +93,7 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
+                 raise ValueError('hidden filter')
+         if (await page.get_by_role('combobox',name='Category',exact=True).inner_text()).strip()!='Planning Applications':
+             raise ValueError('category')
+-        audit['applied_interval']=[START,END]
++        audit['applied_interval']=[config.start,config.end]
+         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'
+         expected_first=1; total=None; seen_refs=set();seen_keys=set()
+         for ordinal in range(1,MAX_SEGMENTS+1):
+diff --git a/verification/discovery/finite_acceptance.py b/verification/discovery/finite_acceptance.py
+new file mode 100644
+index 0000000..d03670a
+--- /dev/null
++++ b/verification/discovery/finite_acceptance.py
+@@ -0,0 +1,116 @@
++"""Finite credential-free discovery caller. No workflow, persistence or scheduling.
++
++Registration must pin the reviewed manifest/hash/revision and supervise this
++caller with the declared hard outer deadline before any live execution.
++"""
++from datetime import date,timedelta
++import hashlib,json,time
++from pathlib import Path
++import tempfile,contextlib,os,sys
++from verification.stage26b_l1.actions_runner import supervise
++from app.pipeline.discovery_contract import COUNCILS
++from .idox_window import WindowConfig,live
++from .arcus_ui_config import UI_CASES,dated_config
++from .arcus_ui_audit import validate as validate_arcus
++
++ARCUS=frozenset({'manchester','rochdale','salford'})
++SEMANTICS={c:'VALIDATED' if c in ARCUS|{'stockport'} else 'RECEIVED' for c in COUNCILS}
++RULE='stage4-discovery-v1'
++LIMITS={'calls':36,'requests':1200,'bytes':72_000_000+240*1024*1024,'seconds':1900,'output_bytes':20_000_000}
++
++def digest(value):return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
++
++def manifest(start,end,purpose):
++    a,b=date.fromisoformat(start),date.fromisoformat(end)
++    if a>b or (b-a).days>27 or purpose not in {'SUSPENSION_CATCHUP','PROSPECTIVE','BACKFILL_AUDIT'}:raise ValueError('finite interval')
++    rows=[]
++    for council in sorted(COUNCILS):
++        cursor=a
++        while cursor<=b:
++            stop=min(cursor+timedelta(days=6),b)
++            rows.append(dict(council=council,start=cursor.isoformat(),end=stop.isoformat(),semantics=SEMANTICS[council]))
++            cursor=stop+timedelta(days=1)
++    return dict(purpose=purpose,start=start,end=end,rule=RULE,limits=LIMITS.copy(),rows=rows)
++
++def read(row):
++    if row['council'] not in ARCUS:
++        with tempfile.TemporaryDirectory(prefix='discovery-finite-idox-') as td:
++            path=Path(td)/'source.json'
++            env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
++            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end'],'--output',str(path)],env=env,deadline=50)
++            if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
++            return json.loads(path.read_bytes())
++    from verification.direct_reference.instrumented_probe import supervised
++    case='discovery_'+row['council']+'_ui_window'
++    with tempfile.TemporaryDirectory(prefix='discovery-finite-') as td:
++        path=Path(td)/'source.json'
++        with open(os.devnull,'w') as sink,contextlib.redirect_stdout(sink):
++            supervised(case,path,window=(row['start'],row['end']))
++        if not path.is_file() or path.stat().st_size>=65536:raise ValueError('bounded audit')
++        return json.loads(path.read_bytes())
++
++def classify(row,a):
++    """Qualify retained count/criteria evidence; never infer success from HTTP/exit."""
++    if a.get('requested_interval')!=[row['start'],row['end']]:return 'UNKNOWN'
++    if row['council'] in ARCUS:
++        if a.get('case')!='discovery_'+row['council']+'_ui_window':return 'UNKNOWN'
++    elif a.get('council')!=row['council']:return 'UNKNOWN'
++    if a.get('failure'):return 'FAILED'
++    if a.get('date_semantics')!=row['semantics']:return 'UNKNOWN'
++    if a.get('capped') or a.get('completeness')=='INCOMPLETE' or a.get('enumeration_evidence')=='PAGE_CAP':return 'INCOMPLETE'
++    if a.get('applied_interval')!=[row['start'],row['end']]:return 'UNKNOWN'
++    if row['council'] in ARCUS:
++        try:validate_arcus(a,dated_config(UI_CASES['discovery_'+row['council']+'_ui_window'],row['start'],row['end']))
++        except (ValueError,KeyError,TypeError):return 'UNKNOWN'
++        return 'COMPLETE'
++    if (a.get('cleanup')!='SESSION_BOUNDARY_CLOSED' or a.get('enumeration_evidence')!='COUNT_RECONCILED'
++        or not a.get('applied_evidence_sha256') or a.get('persistence') is not False):return 'UNKNOWN'
++    pages=a.get('pages',[]);records=a.get('records',[])
++    if not pages or len(pages)>6:return 'UNKNOWN'
++    if not records:return 'COMPLETE' if a.get('explicit_zero_evidence') and pages[-1].get('total')==0 else 'UNKNOWN'
++    refs=[r.get('reference') for r in records]
++    if None in refs or len(set(refs))!=len(refs) or pages[-1].get('total')!=len(refs) or not pages[-1].get('terminal'):return 'UNKNOWN'
++    return 'COMPLETE'
++
++def execute(plan,expected_hash,reader=read,clock=time.monotonic):
++    canonical=manifest(plan['start'],plan['end'],plan['purpose'])
++    if plan!=canonical or digest(plan)!=expected_hash:raise ValueError('unreviewed manifest')
++    if any(k in os.environ for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
++    started=clock();results=[];requests=body_bytes=0;stop=None
++    for row in plan['rows']:
++        # Reserve worst-case cost before each child, never increase a cap.
++        arc=row['council'] in ARCUS;rq=80 if arc else 10;by=20*1024*1024 if arc else 3_000_000
++        if requests+rq>LIMITS['requests'] or body_bytes+by>LIMITS['bytes'] or clock()-started+55>LIMITS['seconds']:
++            stop='ROUND_BUDGET';break
++        try:a=reader(row)
++        except Exception:
++            results.append(dict(window=row,enumeration_completeness='FAILED',completeness='FAILED',reason='SOURCE_EXCEPTION'));stop='SOURCE_EXCEPTION';break
++        resource=a if arc else a.get('resource',{})
++        count=resource.get('requests',resource.get('requests_attempted'));size=(max(a.get('decoded_bytes',0),a.get('encoded_bytes',0))+a.get('outbound_payload_bytes',0)) if arc else resource.get('received_bytes')
++        if type(count) is not int or type(size) is not int or not 0<=count<=rq or not 0<=size<=by:
++            results.append(dict(window=row,enumeration_completeness='UNKNOWN',completeness='UNKNOWN',reason='RESOURCE_ACCOUNTING'));stop='RESOURCE_ACCOUNTING';break
++        requests+=count;body_bytes+=size
++        state=classify(row,a);results.append(dict(window=row,enumeration_completeness=state,completeness='UNKNOWN' if state=='COMPLETE' else state,source=a))
++        if state!='COMPLETE':stop='NON_COMPLETE_CHILD';break
++    if stop is None and clock()-started>LIMITS['seconds']:stop='ROUND_DEADLINE'
++    complete=stop is None and len(results)==len(plan['rows']) and all(r['enumeration_completeness']=='COMPLETE' for r in results)
++    state='COMPLETE' if complete else ('FAILED' if any(r['enumeration_completeness']=='FAILED' for r in results) else 'INCOMPLETE')
++    out=dict(manifest_sha256=expected_hash,enumeration_completeness=state,completeness='UNKNOWN' if state=='COMPLETE' else state,source_contract_qualified=False,results=results,not_attempted=plan['rows'][len(results):],
++        stop_reason=stop,requests=requests,bytes=body_bytes,persistence=False,completed_through_advanced=False)
++    if len(json.dumps(out,default=str).encode())>LIMITS['output_bytes']:raise ValueError('bounded output exceeded')
++    return out
++
++
++def main():
++    """Private child entry only; no registered round/acceptance authority."""
++    import argparse
++    p=argparse.ArgumentParser();p.add_argument('--idox-worker',nargs=3,required=True);p.add_argument('--output',type=Path,required=True)
++    a=p.parse_args();c,start,end=a.idox_worker
++    if c not in COUNCILS-ARCUS or a.output.exists():raise ValueError('bounded child')
++    if any(k in os.environ for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
++    result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end)))
++    raw=json.dumps(result,sort_keys=True).encode()
++    if len(raw)>512000:raise ValueError('bounded child audit')
++    a.output.write_bytes(raw)
++
++if __name__=='__main__':main()

@@ -1,0 +1,14 @@
+{
+  "assessment_date": "2026-10-15",
+  "status": "RECORDED_BEFORE_SOURCE_ACCESS_NOT_ACCEPTANCE_FREEZE",
+  "selected_week": {"start_inclusive": "2026-10-05", "end_exclusive": "2026-10-12", "rule": "Most recent fully completed Monday-Sunday week before assessment date; same week for both councils"},
+  "surfaces": [
+    {"council": "bury", "entry_url": "https://planning.bury.gov.uk/online-applications/search.do?action=advanced&searchType=Application", "route": "Ordinary official Weekly/Monthly Lists control if exposed"},
+    {"council": "manchester", "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register", "route": "Ordinary official weekly/monthly/public-listing controls if exposed"}
+  ],
+  "per_council_limits": {"listing_pages_or_segments": 2, "listed_reference_detail_checks": 3, "top_level_navigations": 7, "ui_actions": 12, "active_browsing_seconds": 180, "concurrency": 1, "automatic_retries": 0, "documents": 0},
+  "request_byte_controls": {"existing_instrumented_family_reference_max_requests": 80, "existing_instrumented_family_reference_max_bytes": 20971520, "applicability": "Cloud-browser surface does not expose network interception/accounting or enforce these instrumented-worker caps. Network requests/bytes remain UNKNOWN, never asserted WITHIN_LIMITS. Bound ordinary interaction by explicit navigation/action/time limits; stop without transport escalation."},
+  "stop": ["two listing pages reached", "three listed-reference checks reached", "time/navigation/action cap", "authentication/CAPTCHA/access restriction", "missing or ambiguous ordinary route", "selected week unavailable", "no supported availability semantics"],
+  "no_scope_expansion": true,
+  "database_or_admission": false
+}
