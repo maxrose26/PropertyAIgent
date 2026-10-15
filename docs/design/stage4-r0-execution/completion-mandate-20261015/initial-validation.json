@@ -1,0 +1,16 @@
+{
+  "scope": "APPROVED_INITIAL_FOUR_WORKFLOWS",
+  "reviewer": "/root/review_cap_screen",
+  "review": "PASS_OFFLINE_SUBJECT_HOSTED_GATES",
+  "local_full": "516 passed /13 skipped before last focused additions",
+  "local_focused": "11 passed /1 expected PID namespace skip",
+  "reviewer_focused": "19 passed /1 expected PID namespace skip",
+  "head": "b4f3508e3d85c89b2b6198f0bb0eddbfac2ccdf0",
+  "tree": "c24de41feb6245c9a3579acefb6ca4f82515bb61",
+  "residuals_not_repeated": [
+    "bury",
+    "oldham",
+    "tameside"
+  ],
+  "status": "CI_PENDING_NO_EXECUTION"
+}
