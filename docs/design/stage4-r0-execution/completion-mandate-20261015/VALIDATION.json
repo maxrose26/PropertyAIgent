@@ -1,0 +1,13 @@
+{
+  "offline_manifest_invariants": "PASS",
+  "assertions": 9,
+  "live_calls": 0,
+  "database_connections": 0,
+  "database_reads": 0,
+  "database_writes": 0,
+  "runtime_code_changes": 0,
+  "merge_registration_dispatch": 0,
+  "independent_review": "NOT_PERFORMED_THIS_PREPARATION; required for executable candidate after approval",
+  "hosted_checks": "NOT_RUN; no runtime/CI code changed",
+  "scope": "proposal/retained-evidence analysis only"
+}

@@ -1,0 +1,102 @@
+{
+  "bytes": 293601280,
+  "covered_sparse_primary_identities": 415,
+  "fields": [
+    "reference",
+    "proposal",
+    "address",
+    "application_type",
+    "validated_date"
+  ],
+  "missing_visible_fields": "UNKNOWN_NO_DETAIL_EXPANSION",
+  "overlap_with_residual": "Rochdale8\u201314October projection performed in residual row, never repeated",
+  "purpose": "Bounded listing-level proposal/address/type projection, NOT415exact-recordqualifications",
+  "requests": 1120,
+  "rows": [
+    {
+      "council": "manchester",
+      "end": "2026-09-19",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-20"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-26",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-27"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-03",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-04"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "salford",
+      "end": "2026-09-23",
+      "semantics": "VALIDATED",
+      "start": "2026-09-17"
+    },
+    {
+      "council": "salford",
+      "end": "2026-09-30",
+      "semantics": "VALIDATED",
+      "start": "2026-09-24"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-07",
+      "semantics": "VALIDATED",
+      "start": "2026-10-01"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-14",
+      "semantics": "VALIDATED",
+      "start": "2026-10-08"
+    }
+  ],
+  "worker_seconds": 770
+}

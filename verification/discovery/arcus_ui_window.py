@@ -41,6 +41,16 @@ def qualify_segment(marker,cards,expected_first,previous_total=None,config=MANCH
             'source_url':u.geturl(),'validated_date':{'state':'PRESENT_VALUE','literal':dates[0]} if config.row_date else {'state':'UNKNOWN','literal':None},
             'materiality':'POTENTIALLY_MATERIAL','relationship':'UNKNOWN',
             'field_capture_scope':['reference','validated_date'] if config.row_date else ['reference']})
+        if config.capture_metadata:
+            metadata={}
+            for key,names,limit in [('proposal',{'proposal','description'},1024),('address',{'site address','location of works'},600),('application_type',{'application type'},160)]:
+                values=[x for x in fields if x['label'].casefold() in names]
+                if len(values)>1:raise ValueError('metadata alias conflict')
+                item=values[0] if values else None
+                if item and (not isinstance(item.get('value'),str) or len(item['value'])>limit):raise ValueError('metadata value bound')
+                metadata[key]=dict(state='PRESENT_VALUE' if item and item['value'] else 'PRESENT_BLANK' if item else 'UNKNOWN',value=item['value'] if item else None,locator='visible listing field:'+item['label'] if item else 'NOT_CAPTURED',truncated=bool(item and item.get('truncated')))
+            rows[-1]['fields']=metadata
+            rows[-1]['field_capture_scope']+=['proposal','address','application_type']
     if len({r['reference'] for r in rows})!=len(rows) or len({r['source_record_id'] for r in rows})!=len(rows):
         raise ValueError('duplicate page identity')
     return first,last,total,rows
@@ -74,6 +84,17 @@ async def read_cards(page,config=MANCHESTER):
             value=parts[1].strip()
             if len(value)>160: raise ValueError('field value bound')
             fields.append({'label':name,'value':value})
+        if config.capture_metadata:
+            # Exact visible labels only; never read applicant/contact fields or raw HTML.
+            for name,limit in [('Proposal',1024),('Description',1024),('Site Address',600),('Location of works',600),('Application type',160)]:
+                field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name)+r'\s*\n',re.I))
+                n=await field.count()
+                if n>1:raise ValueError('metadata label conflict')
+                if n==1:
+                    text=await field.inner_text(timeout=1500);parts=text.strip().split('\n',1)
+                    if len(parts)!=2 or parts[0].strip().casefold()!=name.casefold():raise ValueError('metadata label shape')
+                    value=parts[1].strip()
+                    fields.append({'label':name,'value':value[:limit],'truncated':len(value)>limit})
         out.append({'links':[{'text':ref,'href':href}],'fields':fields})
     return out
 

@@ -14,6 +14,7 @@ class UIConfig:
     blank_inputs: tuple
     blank_combos: tuple
     row_date: bool=True
+    capture_metadata: bool=False
     start: str=START
     end: str=END
 
@@ -41,7 +42,7 @@ DATES=(('arcusbuiltenv__Valid_Date__c',START,'PA_ADV_DateValidFrom'),('arcusbuil
 WARD=('arcusbuiltenv__Wards__c','','PA_ADV_Ward')
 MANCHESTER=UIConfig('manchester',DESTINATION,('Location of works','Description','Decision notice sent from','Decision notice sent to'),('Ward','Application Status','Record type','Application type'))
 SALFORD=UIConfig('salford',observed_url('salfordcitycouncil.my.site.com',(('Salf_Site_Address__c','','PA_ADV_SiteAddress'),)+COMMON+(WARD,('arcusbuiltenv__PS_Scale__c','','PA_ADV_Application_Group'),TYPE)+DATES,False),
-    ('Site Address','Description','Decision date from','Decision date to'),('Ward','Application Status','Application Category','Application type'),False)
+    ('Site Address','Description','Decision date from','Decision date to'),('Ward','Application Status','Application Category','Application type'),row_date=False)
 ROCHDALE=UIConfig('rochdale',observed_url('account.rochdale.gov.uk',(('arcusbuiltenv__Site_Address__c','','PA_ADV_SiteAddress'),)+COMMON+(TYPE,)+DATES+(WARD,('arcusbuiltenv__Parishes__c','','PA_ADV_Parish'))),
     ('Location of works','Description','Decision notice was sent date from','Decision notice was sent date to'),('Ward','Application Status','Application type','Parish'))
 UI_CASES={'discovery_'+c.council+'_ui_window':c for c in (MANCHESTER,SALFORD,ROCHDALE)}

@@ -1,0 +1,177 @@
+{
+  "excluded_accepted_ids": [
+    1504,
+    1505,
+    1506
+  ],
+  "no_parent_retrieval": true,
+  "purpose": "SUPPORTED_PRIORITIES_NOT_AUTHORISED_NOW",
+  "rows": [
+    {
+      "accepted_production_id": null,
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Rigby Taylor House Crown Lane Bolton BL6 5HP"
+      },
+      "all_observation_provenance": [
+        {
+          "run": "38731487848",
+          "source_record_sha256": "3fefea6a605c2f95b5a37eb50d8de689756d5ee5b70ccb96f709873aa9c4a3a4",
+          "window": {
+            "council": "bolton",
+            "end": "2026-09-23",
+            "semantics": "RECEIVED",
+            "start": "2026-09-17"
+          }
+        }
+      ],
+      "council_code": "bolton",
+      "date_membership": "OVERLAP_CONTEXT",
+      "legacy_category": "primary_residential",
+      "legacy_rule": "Confirmed - 10+ units",
+      "processing": "SUPPORTED_PROCESSING_PRIORITY",
+      "proposal": "DEMOLITION OF EXISTING BUILDINGS AND ERECTION OF 35 NO. DWELLINGS TOGETHER WITH ASSOCIATED WORKS.",
+      "proposal_observation_run": "38731487848",
+      "proposal_truncated": false,
+      "reason": "Proposal states35dwellings; overlap context, not suspension-target recovery.",
+      "reference": "01702/26",
+      "source_date": "2026-09-17",
+      "source_record_id": "TLIQ5MDEK9A00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TLIQ5MDEK9A00&activeTab=summary"
+    },
+    {
+      "accepted_production_id": null,
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Former Shaw Distribution Centre Linney Lane Shaw Oldham OL2 8HF"
+      },
+      "all_observation_provenance": [
+        {
+          "run": "38758465439",
+          "source_record_sha256": "07902678850e4c515049fd4047d052241cec2d531b21ee8540b49e8b50c3f1ba",
+          "window": {
+            "council": "oldham",
+            "end": "2026-09-30",
+            "semantics": "RECEIVED",
+            "start": "2026-09-24"
+          }
+        }
+      ],
+      "council_code": "oldham",
+      "date_membership": "IN_TARGET",
+      "legacy_category": "variation_or_amendment",
+      "legacy_rule": "Excluded - secondary/admin",
+      "processing": "SUPPORTED_PROCESSING_PRIORITY",
+      "proposal": "Non material amendment to the approved scheme for RES/353501/24 for increase in number of dwellings from 192 to 200 with associated changes to tenure from market to affordable and associated revisions to layout.",
+      "proposal_observation_run": "38758465439",
+      "proposal_truncated": false,
+      "reason": "Amendment explicitly increases192to200dwellings and changes tenure to affordable.",
+      "reference": "NMA/356901/26",
+      "source_date": "2026-09-29",
+      "source_record_id": "TM2IIQMCN4000",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2IIQMCN4000&activeTab=summary"
+    },
+    {
+      "accepted_production_id": null,
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Land At Prince's Gate Prince Street Oldham OL1 3TL"
+      },
+      "all_observation_provenance": [
+        {
+          "run": "38758465439",
+          "source_record_sha256": "0550e2dbc0cef7814f7f959bf2ecd3c575b971113a663266313f569e34bc18ba",
+          "window": {
+            "council": "oldham",
+            "end": "2026-10-07",
+            "semantics": "RECEIVED",
+            "start": "2026-10-01"
+          }
+        }
+      ],
+      "council_code": "oldham",
+      "date_membership": "IN_TARGET",
+      "legacy_category": "unknown",
+      "legacy_rule": "Ignore - under 10 units",
+      "processing": "SUPPORTED_PROCESSING_PRIORITY",
+      "proposal": "Variation to Conditions associated with planning permission FUL/354326/25 to allow for amendments to Blocks A and B, including removal of link building, alterations to building facade details and layout of internal facilities, introduction of 4 additional residential units, changes to landscaping and public realm, and amendments to the sustainable energy strategy.",
+      "proposal_observation_run": "38758465439",
+      "proposal_truncated": false,
+      "reason": "Four additional residential units modify larger BlocksA/B; four is not whole-scheme scale.",
+      "reference": "VAR/356938/26",
+      "source_date": "2026-10-06",
+      "source_record_id": "TMFZ5RMCFKJ00",
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TMFZ5RMCFKJ00&activeTab=summary"
+    },
+    {
+      "accepted_production_id": null,
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "Compstall Mills Andrew Street Compstall Stockport SK6 5HW"
+      },
+      "all_observation_provenance": [
+        {
+          "run": "38798433667",
+          "source_record_sha256": "883ebc2b9aff11a25e86ea299c478f7bbe6039080a697569b8db35a2185ba2fd",
+          "window": {
+            "council": "stockport",
+            "end": "2026-09-30",
+            "semantics": "VALIDATED",
+            "start": "2026-09-24"
+          }
+        }
+      ],
+      "council_code": "stockport",
+      "date_membership": "OVERLAP_CONTEXT",
+      "legacy_category": "outline_application",
+      "legacy_rule": "Confirmed - 10+ units",
+      "processing": "SUPPORTED_PROCESSING_PRIORITY",
+      "proposal": "Outline planning application with all matters reserved for the partial demolition, refurbishment and redevelopment of Compstall Mills for up to 141 residential dwellings (Use Class C3), with associated public open spaces, landscaping, highways and other infrastructure",
+      "proposal_observation_run": "38798433667",
+      "proposal_truncated": false,
+      "reason": "Proposal states up to141residential dwellings.",
+      "reference": "DC/100094",
+      "source_date": "2026-09-28",
+      "source_record_id": "TKQ2J5PJFS100",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TKQ2J5PJFS100&activeTab=summary"
+    },
+    {
+      "accepted_production_id": null,
+      "address": {
+        "locator": "p.address",
+        "state": "PRESENT_VALUE",
+        "value": "LOSTOCK HALL FARM Lostock Hall Road, Poynton, Stockport, Cheshire East, SK12 1D"
+      },
+      "all_observation_provenance": [
+        {
+          "run": "38805348801",
+          "source_record_sha256": "d674f8b902700ec9aa3a48b7ac5a6d63fec41fc609b811acfe17e2038260eef7",
+          "window": {
+            "council": "stockport",
+            "end": "2026-10-14",
+            "semantics": "VALIDATED",
+            "start": "2026-10-08"
+          }
+        }
+      ],
+      "council_code": "stockport",
+      "date_membership": "IN_TARGET",
+      "legacy_category": "outline_application",
+      "legacy_rule": "Confirmed - 10+ units",
+      "processing": "SUPPORTED_PROCESSING_PRIORITY",
+      "proposal": "Outline planning application for the development of up to 450 dwellings, with all matters reserved except for access (CE Ref 26/3496/OUT)",
+      "proposal_observation_run": "38805348801",
+      "proposal_truncated": false,
+      "reason": "Proposal states up to450dwellings.",
+      "reference": "DC/100393",
+      "source_date": "2026-10-08",
+      "source_record_id": "TMLDK2PJ0DB00",
+      "source_url": "https://planning.stockport.gov.uk/PlanningData-live/applicationDetails.do?keyVal=TMLDK2PJ0DB00&activeTab=summary"
+    }
+  ],
+  "stockport": "CONDITIONAL_REVIEWED_EXACT_CONTRACT_OR_WITHHELD"
+}

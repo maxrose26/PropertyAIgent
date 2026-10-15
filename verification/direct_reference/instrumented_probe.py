@@ -264,7 +264,7 @@ def exact_guest_record(audit, reference):
             and fields['reference'].get('value') == reference)
 
 
-async def probe(case, window=None):
+async def probe(case, window=None, metadata=False):
     from playwright.async_api import async_playwright
     app_id, reference, destination = CASES[case]
     ui_config=UI_CASES.get(case)
@@ -272,6 +272,10 @@ async def probe(case, window=None):
         if ui_config is None:raise ValueError('listing window only')
         from verification.discovery.arcus_ui_config import dated_config
         ui_config=dated_config(ui_config,*window);destination=ui_config.destination
+    if metadata:
+        if ui_config is None or window is None:raise ValueError('METADATA_LISTING_ONLY')
+        from dataclasses import replace
+        ui_config=replace(ui_config,capture_metadata=True)
     allowed = origin(destination)
     audit = dict(case=case, application_id=app_id, reference=reference, destination=destination,
                  persistence=False, requests=0, responses=0, redirects=0,
@@ -553,7 +557,14 @@ def execution_environment_allowed(case, mode, environ):
             and environ.get("RUNNER_ENVIRONMENT") == "github-hosted")
 
 
-def supervised(case, output, execution_mode="github-hosted", window=None):
+def bounded_worker_audit(path,case,metadata=False):
+    bound=512000 if metadata else 65536
+    return (json.loads(path.read_text()) if path.exists() and path.stat().st_size<bound
+            else {'case':case,'failure':'NO_WORKER_AUDIT','persistence':False})
+
+
+def supervised(case, output, execution_mode="github-hosted", window=None, metadata=False):
+    if metadata and (window is None or case not in UI_CASES):raise ValueError('METADATA_LISTING_ONLY')
     if window is not None:
         from verification.discovery.arcus_ui_config import dated_config
         if case not in UI_CASES:raise ValueError("listing window only")
@@ -578,7 +589,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None):
                          else 'verification.discovery.material_qualification' if case in IDOX_CASES
                          else 'verification.direct_reference.instrumented_probe')
         child = subprocess.Popen([sys.executable, '-m', worker_module, '--worker', '--case', case,
-                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else []), env=env, start_new_session=True,
+                                  '--output', str(child_output)]+(['--window-start',window[0],'--window-end',window[1]] if window else [])+(['--metadata'] if metadata else []), env=env, start_new_session=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         parent = psutil.Process(child.pid)
         try:
@@ -623,8 +634,7 @@ def supervised(case, output, execution_mode="github-hosted", window=None):
                     survivors.append(pid)
             except psutil.NoSuchProcess:
                 pass
-        result = (json.loads(child_output.read_text()) if child_output.exists() and child_output.stat().st_size < 65536
-                  else {'case': case, 'failure': 'NO_WORKER_AUDIT', 'persistence': False})
+        result = bounded_worker_audit(child_output,case,metadata)
         result.update(supervisor_seconds=round(time.monotonic()-start, 3), peak_owned_rss=peak,
                       owned_processes_seen=len(seen), live_owned_survivors=len(survivors),
                       supervisor_limit_hit=expired, process_cleanup='CLOSED' if not survivors else 'FAILED')
@@ -644,7 +654,7 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--worker', action='store_true')
     p.add_argument('--execution-mode', choices=('github-hosted', 'render-disposable'), default='github-hosted')
-    p.add_argument('--window-start');p.add_argument('--window-end')
+    p.add_argument('--window-start');p.add_argument('--window-end');p.add_argument('--metadata',action='store_true')
     a = p.parse_args()
     if bool(a.window_start)!=bool(a.window_end):raise ValueError('window pair')
     window=(a.window_start,a.window_end) if a.window_start else None
@@ -653,9 +663,11 @@ def main():
     if a.output.exists():
         raise ValueError('EXISTING_OUTPUT')
     if a.worker:
-        a.output.write_text(json.dumps(asyncio.run(probe(a.case,window)), indent=2) + '\n')
+        raw=json.dumps(asyncio.run(probe(a.case,window,a.metadata)),indent=2)+'\n'
+        if len(raw.encode())>=(512000 if a.metadata else 65536):raise ValueError('WORKER_AUDIT_BOUND')
+        a.output.write_text(raw)
         return 0
-    return supervised(a.case, a.output, a.execution_mode,window)
+    return supervised(a.case, a.output, a.execution_mode,window,a.metadata)
 
 
 if __name__ == '__main__':
