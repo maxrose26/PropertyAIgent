@@ -1,0 +1,357 @@
+{
+  "status": "INTEGRATED_REGISTERED_DISPATCH_DELIVERY_UNCERTAIN_NO_SUCCESSOR_RUN_OBSERVED",
+  "master_stage": "4_OPEN",
+  "accepted_candidate": "256863357c78eb56b2ddbff99a620d5b95480670",
+  "accepted_tree": "67740ba24b1a09e02baaaa0f545073b114d1f28c",
+  "integration": {
+    "pr115": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+    "pr116": "0a0fb5b30c41822e3a0fcba9cc08a9690ee64994",
+    "pr117": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+    "runtime_revision": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+    "runtime_tree": "697fd47af7c7fd5ced97e055f7aaed00e4fe7896",
+    "deployment_suppression": "[skip render] on all master merge commits; no deploy action"
+  },
+  "workflow": {
+    "path": ".github/workflows/stage4-ingestion-storage-catalogue-tls-once.yml",
+    "blob": "4a4eb608e6a69eef2e1e2096859568d4647b6a78",
+    "sha256": "618b2f2723b7381772a27e3af75a7ff098166b22f0d7dbaafc2a1f98e3f08684",
+    "authority": "AUTHORISE_STORAGE_TLS_CATALOGUE_ONCE_20261016",
+    "permitted_run_number": 1,
+    "permitted_attempt": 1
+  },
+  "ca": {
+    "pem_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "der_sha256": "807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa",
+    "sslmode": "verify-full"
+  },
+  "migration_sha256": "f790550778172adbfe1db792d20b4c4fb58298e5829f4033f269c8670dc47033",
+  "manifest_sha256": "7883c1a8f99ce3e498fb73911713c3b531d4c73d20fd2524e3c9901e822e7b04",
+  "limits": {
+    "connections": 2,
+    "driver_statements": 40,
+    "active_seconds": 30,
+    "job_seconds": 120,
+    "setup_seconds": 75,
+    "pre_connection_elapsed_gate": 85,
+    "worker_memory_bytes": 268435456,
+    "result_bytes": 32768,
+    "file_bytes": 2097152,
+    "same_selected_address": true,
+    "retry": false
+  },
+  "checks": {
+    "accepted_head": [
+      {
+        "id": 116975232928,
+        "name": "offline",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975232668,
+        "name": "postgres-admission",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975232403,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975232022,
+        "name": "web",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975230951,
+        "name": "native",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975230706,
+        "name": "offline",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975211909,
+        "name": "web",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116975211742,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "256863357c78eb56b2ddbff99a620d5b95480670",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "pr115_postmerge": [
+      {
+        "id": 116978882445,
+        "name": "web",
+        "head_sha": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116978882192,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116978881863,
+        "name": "native",
+        "head_sha": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116978881704,
+        "name": "postgres-admission",
+        "head_sha": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116978881538,
+        "name": "offline",
+        "head_sha": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116978881404,
+        "name": "offline",
+        "head_sha": "e2cfb101959ff3d0178a395fbbf7579878bbdb1a",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "registration_head": [
+      {
+        "id": 116979255972,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "fd901d247d9f30068d77b265bd0371627f0a6878",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116979255549,
+        "name": "web",
+        "head_sha": "fd901d247d9f30068d77b265bd0371627f0a6878",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116979252064,
+        "name": "postgres-admission",
+        "head_sha": "fd901d247d9f30068d77b265bd0371627f0a6878",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116979251747,
+        "name": "offline",
+        "head_sha": "fd901d247d9f30068d77b265bd0371627f0a6878",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116979226490,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "fd901d247d9f30068d77b265bd0371627f0a6878",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116979226114,
+        "name": "web",
+        "head_sha": "fd901d247d9f30068d77b265bd0371627f0a6878",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "guard_correction_head": [
+      {
+        "id": 116981815529,
+        "name": "offline",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981815172,
+        "name": "native",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981813925,
+        "name": "native",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981813634,
+        "name": "offline",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981813356,
+        "name": "offline",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981813235,
+        "name": "postgres-admission",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981813226,
+        "name": "web",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981812797,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981799972,
+        "name": "web",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116981799582,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "653d52ba21374427a46333facd0230050497ffe2",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "final_postmerge": [
+      {
+        "id": 116983235667,
+        "name": "offline",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116983235558,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116983235555,
+        "name": "offline",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116983235427,
+        "name": "native",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116983235328,
+        "name": "web",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 116983235262,
+        "name": "postgres-admission",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "registration_failure": {
+    "revision": "0a0fb5b30c41822e3a0fcba9cc08a9690ee64994",
+    "job": 116980603381,
+    "failed": 2,
+    "passed": 825,
+    "cause": "existing exact-hash environment exclusivity guards omitted the separately approved successor; PR triggers omitted the affected batch suite",
+    "correction": "PR117 adds exact workflow digest to two guards and path to two existing CI triggers; no runtime changes; 3 focused tests PASS; 10 exact-head checks PASS; final6 PASS"
+  },
+  "dispatch": {
+    "browser_submission_calls": 1,
+    "browser_submission_outcome": "tool timeout after300s; no confirmation",
+    "subsequent_read_only_browser_inspection": "also timed out after300s",
+    "subsequent_dispatch_calls": 0,
+    "complete_api_history_count": 45,
+    "complete_api_history_returned": 45,
+    "successor_runs_observed": 0,
+    "active_dispatches_observed": 0,
+    "run_id": null,
+    "run_number": null,
+    "attempt": null,
+    "artifact_id": null,
+    "cleanup": "NO_RUNTIME_RECEIPT; NOT_EXECUTED_IN_OBSERVED_HISTORY",
+    "remaining_blocker": "browser control is unresponsive; outstanding UI submission must be reconciled before any further dispatch action",
+    "protected_approval": "not yet applicable: no successor run observed"
+  },
+  "storage": {
+    "migration_executed": false,
+    "seeding_executed": false,
+    "storage_acceptance": "INCOMPLETE",
+    "restricted_role_access": "UNTESTED",
+    "catalogue": "UNTESTED",
+    "operational_pipeline_acceptance": "INCOMPLETE"
+  },
+  "preserved": {
+    "original_run": 38894230179,
+    "original_number": 1,
+    "original_attempt": 1,
+    "evidence": "d1bd2dd03deae268e49b3d4274c725f3b25fdf05",
+    "original_cleanup": "UNCERTAIN",
+    "original_tls_cause": "UNDETERMINED",
+    "salford_stop": "CONSUMED; UNCHANGED",
+    "application_ids": [
+      1504,
+      1505,
+      1506,
+      1507,
+      1508
+    ]
+  },
+  "publication_ownership": "only /root active; evidence worktree clean before append; remote evidence head verified d1bd2dd03deae268e49b3d4274c725f3b25fdf05; expected-head update required",
+  "checkpoint_written_at_utc": "2026-10-16T13:12:27.675222+00:00"
+}
