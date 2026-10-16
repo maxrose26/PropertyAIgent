@@ -4,6 +4,7 @@ on:
     branches: [master]
   pull_request:
     paths:
+      - '.github/workflows/stage4-ingestion-storage-catalogue-tls-once.yml'
       - 'verification/direct_reference/**'
       - 'verification/b20_native/**'
       - 'tests/test_stage4*persistence*'
