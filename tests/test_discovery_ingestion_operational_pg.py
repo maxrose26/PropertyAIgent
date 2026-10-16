@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 import psycopg,pytest
 from psycopg import sql
-from sqlalchemy import create_engine,select,text
+from sqlalchemy import create_engine,select,text,event
 from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import Session
 from app.ingestion.ledger import Ledger,Denied,UncertainPersistence,DEFAULT_LIMITS
@@ -26,12 +26,22 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
  assert (info.get('host'),info.get('port'),info.get('dbname'),info.get('user'))==('127.0.0.1','5432','ingestion_provisioning_test','provisioning_bootstrap')
  extra=['ingestion_application_writer','ingestion_effect_broker','ingestion_recovery_operator','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']
  passwords={r:secrets.token_urlsafe(48) for r in ['provisioning_migrator','ingestion_worker_login','ingestion_storage_login','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']}
- def connect(role):return psycopg.connect(**{**info,'user':role,'password':passwords[role]},autocommit=True,prepare_threshold=None,connect_timeout=3)
+ fixture_costs={'connection_attempts':1,'cursor_calls':0}
+ class FixtureCursor(psycopg.Cursor):
+  def execute(self,*args,**kwargs):fixture_costs['cursor_calls']+=1;return super().execute(*args,**kwargs)
+ def connect(role):
+  fixture_costs['connection_attempts']+=1
+  return psycopg.connect(**{**info,'user':role,'password':passwords[role]},autocommit=True,prepare_threshold=None,connect_timeout=3,cursor_factory=FixtureCursor)
  def engine(role):
   from sqlalchemy.engine import URL
-  return create_engine(URL.create('postgresql+psycopg',username=role,password=passwords.get(role,info['password']),host='127.0.0.1',port=5432,database=info['dbname']),poolclass=NullPool,connect_args={'connect_timeout':3,'prepare_threshold':None})
+  e=create_engine(URL.create('postgresql+psycopg',username=role,password=passwords.get(role,info['password']),host='127.0.0.1',port=5432,database=info['dbname']),poolclass=NullPool,connect_args={'connect_timeout':3,'prepare_threshold':None})
+  @event.listens_for(e,'before_cursor_execute')
+  def cursor_call(*args):fixture_costs['cursor_calls']+=1
+  @event.listens_for(e,'do_connect')
+  def physical_attempt(*args):fixture_costs['connection_attempts']+=1
+  return e
  engines=[]
- with psycopg.connect(raw,autocommit=True,connect_timeout=3) as boot:
+ with psycopg.connect(raw,autocommit=True,connect_timeout=3,cursor_factory=FixtureCursor) as boot:
   try:
    boot.execute(sql.SQL('CREATE ROLE provisioning_migrator LOGIN NOSUPERUSER NOCREATEDB CREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Literal(passwords['provisioning_migrator'])))
    boot.execute('GRANT USAGE,CREATE ON SCHEMA public TO provisioning_migrator WITH GRANT OPTION')
@@ -250,6 +260,8 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    from tests.test_discovery_ingestion_batching import sixty_rows
    from app.ingestion.batching import batch_plans
    import hashlib,subprocess
+   fixture_baseline=dict(fixture_costs);practical_started=time.monotonic()
+   application_count_before=boot.execute('SELECT count(*) FROM public.applications').fetchone()[0]
    cfg60,audit60=sixty_rows();root60=seed('PRACTICAL_CAPTURE','DISCOVERY')
    scope60={'kind':'DISCOVERY_SCOPE','council':'bolton','start':'2026-10-16','end':'2026-10-16','semantics':'RECEIVED'}
    with app.begin() as c:
@@ -281,22 +293,37 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     return payload
    scoped([root60],'INGESTION_TEST_capture_once',source_calls=1)
    fixed60=replace(fixed,discovery_key=root60,retained_capture_sha256=None,prior_accounting_sha256=None)
-   measured=[];source_callback_total=0;supervisions=[]
-   def run60(label,mode,authority,batch_key=None,prior=None,interrupt=None):
+   from verification.ingestion_storage.operational_controller import batch_allocation
+   measured=[];source_callback_total=0;supervisions=[];allocation_receipts={};allocated_slots=[root60]
+   def run60(label,mode,authority,batch_key=None,prior=None,interrupt=None,recovery_fence=None):
     nonlocal source_callback_total
     path=tmp_path/('practical-'+label+'.json');root=tmp_path/('practical-worker-'+label);output=root/'worker-result.json'
+    slot=batch_key or root60
+    if prior is not None and slot in allocation_receipts:
+     old=allocation_receipts[slot]['database']
+     assert all(prior[k]>=old[k] for k in ('driver_statements','connection_attempts','returned_data_value_bytes','elapsed_seconds'))
+     allocation_receipts[slot]['database']=prior
+    allocation=batch_allocation(allocated_slots,allocation_receipts,sealed_sha256=digest(allocation_receipts),slot_key=slot)
+    remaining=allocation['remaining'];ceilings=dict(connections=min(16,remaining['connection_attempts']),statements=min(120,remaining['driver_statements']),returned_bytes=min(4*1024**2,remaining['returned_data_value_bytes']))
     slot_binding=replace(fixed60,prior_accounting_sha256=digest(prior) if prior else None)
-    path.write_text(json.dumps(dict(mode=mode,authority=authority,binding=asdict(slot_binding),bindings=bindings,listing=audit60,detail=raw_source,target=target,envelope=asdict(env),outer=outer(),batch_key=batch_key,prior_database_accounting=prior,interrupt_batch_after=interrupt),default=str))
-    supervision=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(path),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=root)
+    path.write_text(json.dumps(dict(mode=mode,authority=authority,binding=asdict(slot_binding),bindings=bindings,listing=audit60,detail=raw_source,target=target,envelope=asdict(env),outer=outer(),batch_key=batch_key,prior_database_accounting=prior,interrupt_batch_after=interrupt,database_ceilings=ceilings,recovery_fence=recovery_fence),default=str))
+    phase_urls=urls+[recovery_url] if mode=='recover_batch' else urls
+    supervision=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(path),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(phase_urls)},root=root,seconds=min(165,300-allocation['totals']['supervised_seconds']))
     result=json.loads(output.read_bytes());account=result['database_accounting'];source_callback_total+=result['synthetic_reader_callbacks']['listing']
     assert supervision['cleanup']=='CLOSED' and supervision['live_owned_survivors']==0 and supervision['limit_hit'] is None
     assert account['cleanup']=='CLOSED' and account['driver_statements']<=120 and account['connection_attempts']<=16
     if interrupt is None:assert supervision['exit_code']==0,(label,result,supervision)
     else:assert supervision['exit_code']!=0 and result['error_class']=='SystemExit'
-    supervisions.append(dict(label=label,**supervision));return result,account
+    exported_bytes=sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
+    assert exported_bytes<=2*1024**2
+    cumulative=allocation_receipts.get(slot,{}).get('supervised_seconds',0)+supervision['elapsed_seconds']
+    allocation_receipts[slot]=dict(database=account,supervised_seconds=cumulative,cleanup=supervision['cleanup'])
+    batch_allocation(allocated_slots,allocation_receipts,sealed_sha256=digest(allocation_receipts),slot_key=slot)
+    supervisions.append(dict(label=label,exported_bytes=exported_bytes,worker_audit_bytes=output.stat().st_size,**supervision));return result,account
    captured,account60=run60('capture','capture_once','INGESTION_TEST_capture_once');measured.append(dict(slot='capture',**account60))
    capture60=captured['receipt'];assert len(capture60['records'])==60 and capture60['durable_archive']['readback_verified']
    plans60=batch_plans(root60,capture60);assert len(plans60)==12
+   allocated_slots.extend(r['key'] for r in plans60)
    prepared60={}
    with app.begin() as c:
     prototype=dict(c.execute(select(W).where(W.c.key==root60)).mappings().one())
@@ -322,11 +349,8 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
      interrupted,prior=run60('batch-interrupted','process_batch','INGESTION_TEST_queue60',item['key'],interrupt=item['checkpoint']['plan']['first'])
      current=queue_client.get(item['key']);assert current['checkpoint']['next']==item['checkpoint']['plan']['first']+1
      boot.execute('UPDATE public.ingestion_work_items SET lease_until=0 WHERE key=%s',(item['key'],))
-     recovery_budget=DatabaseBudget(previous=prior,slot_key=item['key']);recovery_engine=recovery_budget.engine(recovery_url)
-     try:
-      with recovery_engine.begin() as recovery:recovered=recovery.execute(text('SELECT public.ingestion_recover_abandoned(:key,:fence,true)'),dict(key=item['key'],fence=current['fence'])).scalar_one()
-     finally:prior=recovery_budget.close([recovery_engine])
-     assert recovered['state']=='DEFERRED' and prior['cleanup']=='CLOSED'
+     recovered,prior=run60('batch-recovery','recover_batch','INGESTION_TEST_queue60',item['key'],prior=prior,recovery_fence=current['fence'])
+     assert recovered['recovered']['state']=='DEFERRED' and prior['cleanup']=='CLOSED'
      result,account=run60('batch-resumed','process_batch','INGESTION_TEST_queue60',item['key'],prior=prior)
     else:result,account=run60('batch-'+str(ordinal),'process_batch','INGESTION_TEST_queue60',item['key'])
     assert result['outcome']=='BATCH_SCREENED'
@@ -343,8 +367,11 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    assert source_callback_total==1 and digest(queue_client.get(root60)['checkpoint'])==digest(capture60)
    record_property('practical_accounts',json.dumps(measured,sort_keys=True));record_property('practical_supervisions',json.dumps(supervisions,sort_keys=True));record_property('practical_dispositions',json.dumps(dispositions,sort_keys=True));record_property('practical_citations',json.dumps(citations,sort_keys=True))
    aggregate={k:sum(x[k] for x in measured) for k in ['connection_attempts','driver_statements','returned_data_value_bytes','elapsed_seconds']}
-   assert aggregate['driver_statements']<=1560 and aggregate['connection_attempts']<=208
+   aggregate.update(supervised_seconds=sum(x['elapsed_seconds'] for x in supervisions),peak_owned_rss=max(x['peak_owned_rss'] for x in supervisions),exported_bytes=sum(x['exported_bytes'] for x in supervisions),worker_audit_bytes=sum(x['worker_audit_bytes'] for x in supervisions))
+   assert aggregate['driver_statements']<=1040 and aggregate['connection_attempts']<=40 and aggregate['returned_data_value_bytes']<=4*1024**2
+   assert aggregate['supervised_seconds']<=300 and aggregate['exported_bytes']<=2*1024**2
    record_property('practical_aggregate',json.dumps(aggregate,sort_keys=True));record_property('practical_capture_sha256',digest(capture60))
+   record_property('practical_allocation_receipts',json.dumps(allocation_receipts,sort_keys=True))
    # Exact grant mutation/expiry/other council denial, registration cannot extend.
    with connect(policy_role) as owner:
     with pytest.raises(psycopg.Error):owner.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(queue_payload),))
@@ -366,10 +393,12 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     control['grants']['INGESTION_TEST_queue60']['execution_binding']['revision']='f'*40
     c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
    sentinel_claim('GLOBAL_STOP')
+   assert boot.execute('SELECT count(*) FROM public.applications').fetchone()[0]==application_count_before
    boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(pristine),))
    expired=json.loads(json.dumps(pristine));expired['bolton_exceptions']['INGESTION_TEST_queue60']['expires_at']=0
    boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(expired),))
    sentinel_claim('GLOBAL_STOP')
+   record_property('practical_fixture_harness',json.dumps({**{k:fixture_costs[k]-fixture_baseline[k] for k in fixture_costs},'elapsed_seconds':round(time.monotonic()-practical_started,3),'metric':'setup_and_assertion_cursor_calls_excludes_driver_internal_and_controller_calls'},sort_keys=True))
    boot.execute("UPDATE public.ingestion_work_items SET outcome=%s::json WHERE key=repeat('0',64)",(json.dumps(pristine),))
    boot.execute("UPDATE public.ingestion_work_items SET subject=jsonb_set(subject::jsonb,'{council}','\"salford\"')::json WHERE key=%s",(sentinel,))
    sentinel_claim('GLOBAL_STOP')

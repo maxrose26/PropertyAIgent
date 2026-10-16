@@ -13,15 +13,45 @@ from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.listing_screening import screen_row
 
 
+def batch_allocation(slot_keys,receipts,*,sealed_sha256,slot_key):
+    """Finite manual acceptance allocation, not a scheduler or authority issuer.
+
+    Durable receipt collection and its expected digest belong to the trusted
+    controller's reviewed evidence handoff. Replacing a logical slot must carry
+    its previous CLOSED counters; never sum both versions or reset a slot.
+    """
+    if (not 1<=len(slot_keys)<=13 or len(set(slot_keys))!=len(slot_keys)
+        or slot_key not in slot_keys or digest(receipts)!=sealed_sha256
+        or not isinstance(receipts,dict) or set(receipts)-set(slot_keys)):raise Denied('SEALED_ALLOCATION_REQUIRED')
+    bounded(receipts,128*1024)
+    totals=dict(driver_statements=0,connection_attempts=0,returned_data_value_bytes=0,supervised_seconds=0)
+    for key,r in receipts.items():
+        a=r['database']
+        if a.get('slot_key')!=key or a.get('cleanup')!='CLOSED' or a.get('connections_closed') is not True or r.get('cleanup')!='CLOSED':raise Denied('ALLOCATION_CLOSURE_REQUIRED')
+        for name in ('driver_statements','connection_attempts','returned_data_value_bytes'):
+            if type(a.get(name)) is not int or a[name]<0:raise Denied('ALLOCATION_ACCOUNTING')
+            totals[name]+=a[name]
+        if type(r.get('supervised_seconds')) not in (int,float) or not 0<=r['supervised_seconds']<=300:raise Denied('ALLOCATION_ACCOUNTING')
+        totals['supervised_seconds']+=r['supervised_seconds']
+    caps=dict(driver_statements=1040,connection_attempts=40,returned_data_value_bytes=4*1024**2,supervised_seconds=300)
+    if any(totals[k]>caps[k] for k in caps):raise Denied('AGGREGATE_ALLOCATION_EXHAUSTED')
+    # Return the total logical-slot allowance, including that slot's prior use.
+    current=receipts.get(slot_key,{});a=current.get('database',{})
+    remaining={k:caps[k]-totals[k]+(current.get(k,0) if k=='supervised_seconds' else a.get(k,0)) for k in caps}
+    return dict(totals=totals,remaining=remaining)
+
+
 class DatabaseBudget:
     """Counts attempts before connect and every cursor/internal driver command.
 
     Includes SQLAlchemy initialization, BEGIN/COMMIT/ROLLBACK. Records operation
     kinds only, never SQL parameters, URLs, credentials or row values.
     """
-    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None):
+    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None,returned_bytes=4*1024**2):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
+        if type(returned_bytes) is not int or not 0<returned_bytes<=4*1024**2:raise Denied('DATABASE_BYTE_CEILING')
+        self.returned_cap=returned_bytes
         previous=bounded(previous or {},16384)
         self.slot_key=slot_key or previous.get('slot_key')
         if previous.get('slot_key') not in (None,self.slot_key):raise Denied('LOGICAL_SLOT_BINDING')
@@ -30,7 +60,7 @@ class DatabaseBudget:
         if type(attempts) is not int or not 0<=attempts<=connections or type(statements) is not int or not 0<=statements<=self.statement_cap or type(elapsed) not in (int,float) or not 0<=elapsed<seconds:raise Denied('PRIOR_ACCOUNTING_BOUND')
         if previous and (previous.get('cleanup')!='CLOSED' or previous.get('connections_closed') is not True):raise Denied('PRIOR_CLOSURE_REQUIRED')
         self.returned_bytes=previous.get("returned_data_value_bytes",0)
-        if type(self.returned_bytes) is not int or not 0<=self.returned_bytes<=4*1024**2:raise Denied("PRIOR_BYTES_BOUND")
+        if type(self.returned_bytes) is not int or not 0<=self.returned_bytes<=self.returned_cap:raise Denied("PRIOR_BYTES_BOUND")
         self.previous_elapsed=elapsed
         self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.stop_file=Path(stop_file) if stop_file else None
     def check(self):
@@ -56,7 +86,7 @@ class DatabaseBudget:
                 budget.tick('cursor',cleanup=str(query).strip().startswith('SELECT public.ingestion_raise_stop('));result=super().execute(query,params,**kwargs)
                 if self.pgresult is not None:
                     budget.returned_bytes+=sum(len(self.pgresult.get_value(r,c) or b'') for r in range(self.pgresult.ntuples) for c in range(self.pgresult.nfields))
-                    if budget.returned_bytes>4*1024**2:raise Denied('DATABASE_RETURNED_VALUE_BOUND')
+                    if budget.returned_bytes>budget.returned_cap:raise Denied('DATABASE_RETURNED_VALUE_BOUND')
                 return result
             def executemany(self,*a,**kw):raise Denied('BULK_FORBIDDEN')
         class Connection(psycopg.Connection):

@@ -25,12 +25,15 @@ def batch_plans(capture_key,capture):
     return plans
 
 
-def capture_once(coordinator,key,reader,archive,check=lambda:None):
+def capture_once(coordinator,key,reader,archive,check=lambda:None,*,prior_accounting_sha256=None):
     l=coordinator.ledger;check();row=l.get(key)
     if row['checkpoint'] is not None:
         if row['state']=='COMPLETE':return row['checkpoint']
         if row['checkpoint'].get('kind')!='LISTING_RECEIPT_V1':raise Denied('CAPTURE_BLOCKED_NO_REFETCH')
-        if not getattr(l,'budget',None) or not l.budget.previous or l.budget.previous.get('capture_checkpoint_sha256')!=digest(row['checkpoint']):raise Denied('SEALED_RECOVERY_ACCOUNTING_REQUIRED')
+        budget=getattr(l,'budget',None)
+        if (not budget or budget.slot_key!=key or not budget.previous or budget.previous.get('slot_key')!=key
+            or not prior_accounting_sha256 or digest(budget.previous)!=prior_accounting_sha256
+            or budget.previous.get('capture_checkpoint_sha256')!=digest(row['checkpoint'])):raise Denied('SEALED_RECOVERY_ACCOUNTING_REQUIRED')
         claim=l.claim(key,lease_seconds=165);l.checkpoint(claim,row['checkpoint'])
         l.finish(claim,dict(outcome='ENUMERATED_METADATA_RETAINED',children=[],source_sha256=row['checkpoint']['source_sha256']))
     else:coordinator.idox_source(l.claim(key,lease_seconds=165),reader,materialize=False,archive=archive)
