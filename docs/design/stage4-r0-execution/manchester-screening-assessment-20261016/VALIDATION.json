@@ -2,7 +2,7 @@
   "base": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
   "accepted_evidence": "12f6fec8a05ef7988217594b8132889fbabf2c39",
   "focused": {
-    "passed": 92,
+    "passed": 109,
     "failed": 0,
     "scope": "new assessment plus Arcus UI/transport, metadata, narrow continuation and instrumented probe regressions",
     "network": "denied by ah-offline-pytest.py"
@@ -30,5 +30,12 @@
     ".github/workflows/stage4-manchester-screening-assessment-once.yml": "4005e2b5915a36614ece774fcb48ca1dd57da0dcab8dd786f9f1d1e0c4fd194b",
     "tests/test_discovery_screening_assessment.py": "e420333c49dfe1932227cf93eba3fc29d766060bebba6ba382cd24eaa04ecda9"
   },
-  "no_live_execution_yet": true
+  "no_live_execution_yet": true,
+  "hosted_first_head": {
+    "head": "85b456f110d6fe9d3e231d49eeac9bba30a51932",
+    "discovery_run": 38879711209,
+    "result": "1FAILED_650PASSED",
+    "failure": "Legacy parametrised test assumed all Arcus source profiles use original dates. Fixed expectation to include approved assessment dates; production capture unchanged.",
+    "postgres_admission": "PASS"
+  }
 }

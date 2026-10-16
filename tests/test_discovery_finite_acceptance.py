@@ -69,7 +69,8 @@ def test_arcus_window_changes_only_date_filters(key):
         if x['fieldDeveloperName'] in ('PA_ADV_DateValidFrom','PA_ADV_DateValidTo'):
             assert y['fieldValue'] in ('2026-10-15','2026-10-21')
         else:assert x==y
-    assert old.start=='2026-09-28' and old.end=='2026-10-04' and new.host==old.host
+    assert (old.start,old.end)==(('2026-10-01','2026-10-03') if old.assessment_metadata else ('2026-09-28','2026-10-04'))
+    assert new.host==old.host
 
 def test_dynamic_row_date_preserves_exact_identity():
     c=dated_config(UI_CASES['discovery_manchester_ui_window'],'2026-10-15','2026-10-21')
