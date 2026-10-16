@@ -1,0 +1,24 @@
+{
+  "probe_invocation": "PYTHONPATH=. /workspace/scratch/bfed03f1aa09/assessment-venv/bin/python /tmp/practical_probe.py",
+  "cwd": "/workspace/scratch/bfed03f1aa09/ingestion-operational",
+  "post_probe_verification": {
+    "local_head": "39e2aff63b3722c8150df6dcd59f358fa4f012ce",
+    "tree": "39f1dc85628223d62767507f3a4e0ad148f0be18",
+    "status_porcelain": ""
+  },
+  "imports_at_post_probe_verification": {
+    "app.ingestion.coordinator": {
+      "path": "/workspace/scratch/bfed03f1aa09/ingestion-operational/app/ingestion/coordinator.py",
+      "sha256": "29ccfbd420981aae54fc07bd72f2960ffe39e2cca4f8bb93366ea46cfd337069"
+    },
+    "app.ingestion.idox_adapter": {
+      "path": "/workspace/scratch/bfed03f1aa09/ingestion-operational/app/ingestion/idox_adapter.py",
+      "sha256": "586746cb67a389c7ebc43a21c651861988c09ddfdc2a2e541c86048d4e9ca4ec"
+    },
+    "verification.discovery.idox_window": {
+      "path": "/workspace/scratch/bfed03f1aa09/ingestion-operational/verification/discovery/idox_window.py",
+      "sha256": "5ea89823b65f063ce74ea2f1b376c4b8fbbedb1b64156da6f235e70be55a65ac"
+    }
+  },
+  "limitation": "No in-process tree seal was recorded by original probe. Baseline reference only; invocation plus post-probe verification does not confer a sealed execution identity."
+}

@@ -1,0 +1,3098 @@
+{
+  "kind": "LISTING_RECEIPT_V1",
+  "contract": "practical-bolton-fixture",
+  "council": "bolton",
+  "interval": [
+    "2026-10-16",
+    "2026-10-16"
+  ],
+  "records": [
+    {
+      "reference": "02000/26",
+      "source_record_id": "K0",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K0&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 1
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02001/26",
+      "source_record_id": "K1",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K1&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 2
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02002/26",
+      "source_record_id": "K2",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K2&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 3
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02003/26",
+      "source_record_id": "K3",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K3&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 4
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02004/26",
+      "source_record_id": "K4",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K4&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 5
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02005/26",
+      "source_record_id": "K5",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K5&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 6
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02006/26",
+      "source_record_id": "K6",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K6&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 7
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02007/26",
+      "source_record_id": "K7",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K7&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 8
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02008/26",
+      "source_record_id": "K8",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K8&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 9
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02009/26",
+      "source_record_id": "K9",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K9&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+        "row_ordinal": 10
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02010/26",
+      "source_record_id": "K10",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K10&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 11
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02011/26",
+      "source_record_id": "K11",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K11&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 12
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02012/26",
+      "source_record_id": "K12",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K12&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 13
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02013/26",
+      "source_record_id": "K13",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K13&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 14
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02014/26",
+      "source_record_id": "K14",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K14&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 15
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02015/26",
+      "source_record_id": "K15",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K15&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 16
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02016/26",
+      "source_record_id": "K16",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K16&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 17
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02017/26",
+      "source_record_id": "K17",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K17&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 18
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02018/26",
+      "source_record_id": "K18",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K18&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 19
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02019/26",
+      "source_record_id": "K19",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K19&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+        "row_ordinal": 20
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02020/26",
+      "source_record_id": "K20",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K20&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 21
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02021/26",
+      "source_record_id": "K21",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K21&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 22
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02022/26",
+      "source_record_id": "K22",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K22&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 23
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02023/26",
+      "source_record_id": "K23",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K23&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 24
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02024/26",
+      "source_record_id": "K24",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K24&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 25
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02025/26",
+      "source_record_id": "K25",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K25&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 26
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02026/26",
+      "source_record_id": "K26",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K26&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 27
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02027/26",
+      "source_record_id": "K27",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K27&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 28
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02028/26",
+      "source_record_id": "K28",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K28&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 29
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02029/26",
+      "source_record_id": "K29",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K29&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+        "row_ordinal": 30
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02030/26",
+      "source_record_id": "K30",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K30&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 31
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02031/26",
+      "source_record_id": "K31",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K31&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 32
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02032/26",
+      "source_record_id": "K32",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K32&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 33
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02033/26",
+      "source_record_id": "K33",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K33&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 34
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02034/26",
+      "source_record_id": "K34",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K34&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 35
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02035/26",
+      "source_record_id": "K35",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K35&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 36
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02036/26",
+      "source_record_id": "K36",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K36&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 37
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02037/26",
+      "source_record_id": "K37",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K37&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 38
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02038/26",
+      "source_record_id": "K38",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K38&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 39
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02039/26",
+      "source_record_id": "K39",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K39&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+        "row_ordinal": 40
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02040/26",
+      "source_record_id": "K40",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K40&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 41
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02041/26",
+      "source_record_id": "K41",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K41&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 42
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02042/26",
+      "source_record_id": "K42",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K42&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 43
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02043/26",
+      "source_record_id": "K43",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K43&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 44
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02044/26",
+      "source_record_id": "K44",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K44&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 45
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02045/26",
+      "source_record_id": "K45",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K45&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 46
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02046/26",
+      "source_record_id": "K46",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K46&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 47
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02047/26",
+      "source_record_id": "K47",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K47&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 48
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02048/26",
+      "source_record_id": "K48",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K48&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 49
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02049/26",
+      "source_record_id": "K49",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K49&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+        "row_ordinal": 50
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02050/26",
+      "source_record_id": "K50",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K50&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 51
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02051/26",
+      "source_record_id": "K51",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K51&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 52
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02052/26",
+      "source_record_id": "K52",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K52&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 53
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02053/26",
+      "source_record_id": "K53",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K53&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 54
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02054/26",
+      "source_record_id": "K54",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K54&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 55
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02055/26",
+      "source_record_id": "K55",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K55&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 56
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02056/26",
+      "source_record_id": "K56",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K56&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 57
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02057/26",
+      "source_record_id": "K57",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K57&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 58
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02058/26",
+      "source_record_id": "K58",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K58&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 59
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    },
+    {
+      "reference": "02059/26",
+      "source_record_id": "K59",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K59&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink",
+          "truncated": false
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address",
+          "truncated": false
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Received",
+          "truncated": false
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Fri 16 Oct 2026",
+          "locator": "p.metaInfo:Validated",
+          "truncated": false
+        },
+        "application_type": {
+          "state": "UNKNOWN",
+          "value": null,
+          "locator": "NOT_CAPTURED",
+          "truncated": false
+        }
+      },
+      "provenance": {
+        "parser": "app.scrapers.discovery_idox.parse_page",
+        "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+        "row_ordinal": 60
+      },
+      "field_capture_scope": [
+        "reference",
+        "proposal",
+        "address",
+        "received_date",
+        "validated_date",
+        "application_type"
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "ordinal": 1,
+      "first": 1,
+      "last": 10,
+      "total": 60,
+      "rows": 10,
+      "body_sha256": "6fd3b623692e58ad6531b959ced79103f85fb4e096a2593cf604d14b6bc723f6",
+      "terminal": null
+    },
+    {
+      "ordinal": 2,
+      "first": 11,
+      "last": 20,
+      "total": 60,
+      "rows": 10,
+      "body_sha256": "65f5941784ca54256ceddf173795e04b1126500f640b8001298c38d63976d7b3",
+      "terminal": null
+    },
+    {
+      "ordinal": 3,
+      "first": 21,
+      "last": 30,
+      "total": 60,
+      "rows": 10,
+      "body_sha256": "41b9c3b6a2d2be6c29a619f69f7aeab3e95be14c759016ca098812b1866c7df1",
+      "terminal": null
+    },
+    {
+      "ordinal": 4,
+      "first": 31,
+      "last": 40,
+      "total": 60,
+      "rows": 10,
+      "body_sha256": "24d53b4cbb3d2018d512b8191eaf1069a98c452c59c83bed39dfa101d320af03",
+      "terminal": null
+    },
+    {
+      "ordinal": 5,
+      "first": 41,
+      "last": 50,
+      "total": 60,
+      "rows": 10,
+      "body_sha256": "ba07200c272d3b6d38c3341c6e0087ebd42dcdf8b517c5b441da6b1f709329d1",
+      "terminal": null
+    },
+    {
+      "ordinal": 6,
+      "first": 51,
+      "last": 60,
+      "total": 60,
+      "rows": 10,
+      "body_sha256": "300376168edd2a2f4c6cb96a7451bbcc21fc65835a40f8bf8c8ba8bf70316139",
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL"
+    }
+  ],
+  "source_sha256": "2c061c38f438e36596ddc97fa6048f0ecded2dab9261ddf1c44bcc8b826ff43b",
+  "qualification_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "applied_interval": [
+    "2026-10-16",
+    "2026-10-16"
+  ],
+  "cleanup": "CLOSED",
+  "accounting_complete": true,
+  "outer_supervisor": {
+    "exit_code": 0,
+    "cleanup": "CLOSED",
+    "live_owned_survivors": 0,
+    "expired": false,
+    "limit_hit": null,
+    "peak_owned_rss": 1000,
+    "elapsed_seconds": 1
+  },
+  "resources": {
+    "metric": "EXISTING_IDOX_RECEIVED_BODY_BYTES",
+    "council": "bolton",
+    "reference": "RECEIVED:2026-10-16:2026-10-16",
+    "adapter": "idox",
+    "outcome": "UNKNOWN",
+    "requests_attempted": 9,
+    "redirects": 0,
+    "retries": 0,
+    "received_bytes": 26204,
+    "elapsed_seconds": 0.065,
+    "budget_exhaustion": false,
+    "retry_policy": "NO_INTERNAL_RETRY"
+  }
+}

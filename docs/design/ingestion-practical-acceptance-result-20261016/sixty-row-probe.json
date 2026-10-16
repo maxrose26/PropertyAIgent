@@ -1,0 +1,96 @@
+{
+  "kind": "OFFLINE_SYNTHETIC_NOT_PRODUCTION",
+  "source_requests_via_fake_dispatch": 9,
+  "source_actual_network_calls": 0,
+  "qualified_records": 60,
+  "pages": 6,
+  "canonical_receipt_bytes": 61799,
+  "receipt_ceiling": 131072,
+  "receipt_sha256": "82a64d8905d0b5e386363d5d1905bc6a1178b46b91f29bc6e231ef038a42f81b",
+  "source_received_body_bytes": 26204,
+  "coordinator_materialised_children": 60,
+  "screening_batches": [
+    {
+      "ordinal": 1,
+      "screened": 5,
+      "completed_total": 5,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 2,
+      "screened": 5,
+      "completed_total": 10,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 3,
+      "screened": 5,
+      "completed_total": 15,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 4,
+      "screened": 5,
+      "completed_total": 20,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 5,
+      "screened": 5,
+      "completed_total": 25,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 6,
+      "screened": 5,
+      "completed_total": 30,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 7,
+      "screened": 5,
+      "completed_total": 35,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 8,
+      "screened": 5,
+      "completed_total": 40,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 9,
+      "screened": 5,
+      "completed_total": 45,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 10,
+      "screened": 5,
+      "completed_total": 50,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 11,
+      "screened": 5,
+      "completed_total": 55,
+      "source_callbacks_total": 1
+    },
+    {
+      "ordinal": 12,
+      "screened": 5,
+      "completed_total": 60,
+      "source_callbacks_total": 1
+    }
+  ],
+  "source_callbacks_total": 1,
+  "work_items_including_control_and_root": 62,
+  "limitations": [
+    "SQLite functional probe; not PostgreSQL command/RSS/deadline proof",
+    "Materialisation still unbatched in current code; cannot dispatch at120 commands",
+    "Queued screening batches use exact new disposable allowances; membership is not source/write authority",
+    "Short synthetic descriptions; not worst-case128KiB payload certification"
+  ],
+  "baseline_reference_candidate": "5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+  "execution_identity_limit": "Baseline reference only; imported code tree was not hashed inside the probe process. Invocation and subsequent clean checkout verification are recorded separately."
+}
