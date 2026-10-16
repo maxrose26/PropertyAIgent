@@ -1,0 +1,96 @@
+{
+  "run": {
+    "id": 38907801607,
+    "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+    "path": ".github/workflows/stage4-ingestion-storage-catalogue-tls-once.yml",
+    "status": "completed",
+    "conclusion": "success",
+    "run_number": 1,
+    "run_attempt": 1,
+    "workflow_id": 386684095,
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38907801607"
+  },
+  "job": {
+    "id": 116995709201,
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-16T13:31:44Z",
+    "completed_at": "2026-10-16T13:32:29Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Exact single-use access authority",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Pinned dependencies without production credentials",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verified TLS and catalogue read-only, never migration",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "id": 12048972871,
+      "name": "ingestion-storage-catalogue-38907801607-eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+      "digest": "sha256:3fb077f81a0cca9aa8bcb39d8d925ad7677ac1535df7059637e4e2eb5eb42b97",
+      "size_in_bytes": 1793,
+      "expires_at": "2026-10-30T13:32:26Z",
+      "workflow_run": {
+        "id": 38907801607,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "master",
+        "head_sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec"
+      }
+    }
+  ],
+  "history": {
+    "total": 46,
+    "returned": 46,
+    "successor_runs": [
+      {
+        "id": 38907801607,
+        "sha": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+        "number": 1,
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "publication": {
+    "expected_head": "6f42d399bc68be9e79c1328786148b2b8df55b45",
+    "ownership": "only root agent active; local evidence worktree clean before append; no active prior publisher; CAS required"
+  }
+}
