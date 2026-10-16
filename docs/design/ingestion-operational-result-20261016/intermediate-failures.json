@@ -1,0 +1,49 @@
+[
+  {
+    "job_id": 117049030574,
+    "failures": [
+      "2026-10-16T15:24:26.6052304Z >       assert result['status']=='PREFLIGHT_FAILED_STOP' and result['error_class']=='ValueError'",
+      "2026-10-16T15:24:26.6052730Z E       AssertionError: assert ('RESOURCE_STOP' == 'PREFLIGHT_FAILED_STOP'",
+      "2026-10-16T15:24:26.6053190Z E         - PREFLIGHT_FAILED_STOP",
+      "2026-10-16T15:24:26.6053396Z E         + RESOURCE_STOP)",
+      "2026-10-16T15:24:26.6054217Z tests/test_discovery_ingestion_pg.py:250: AssertionError",
+      "2026-10-16T15:24:26.6061037Z FAILED tests/test_discovery_ingestion_pg.py::test_pg_catalogue_cursor_accounts_initialization_and_fails_without_tls"
+    ]
+  },
+  {
+    "job_id": 117049030806,
+    "failures": [
+      "2026-10-16T15:24:26.6174333Z E               AssertionError: assert '81bd18694293...a5f511a06e378' == 'e59301682bdb...01267f5fc88d2'",
+      "2026-10-16T15:24:26.6177064Z tests/test_stage4_direct_registration.py:39: AssertionError",
+      "2026-10-16T15:24:26.6184032Z FAILED tests/test_stage4_direct_registration.py::test_exact_cohort_and_shared_bytes",
+      "2026-10-16T15:24:26.6184789Z 1 failed, 826 passed in 37.41s"
+    ]
+  },
+  {
+    "job_id": 117049031353,
+    "failures": [
+      "2026-10-16T15:24:02.3757207Z E               AssertionError: assert '81bd18694293...a5f511a06e378' == 'e59301682bdb...01267f5fc88d2'",
+      "2026-10-16T15:24:02.3760131Z tests/test_stage4_direct_registration.py:39: AssertionError",
+      "2026-10-16T15:24:02.3767962Z FAILED tests/test_stage4_direct_registration.py::test_exact_cohort_and_shared_bytes",
+      "2026-10-16T15:24:02.3768686Z 1 failed, 384 passed in 12.51s"
+    ]
+  },
+  {
+    "job_id": 117049031983,
+    "failures": [
+      "2026-10-16T15:23:55.0140866Z E               AssertionError: assert '81bd18694293...a5f511a06e378' == 'e59301682bdb...01267f5fc88d2'",
+      "2026-10-16T15:23:55.0144939Z tests/test_stage4_direct_registration.py:39: AssertionError",
+      "2026-10-16T15:23:55.0153880Z FAILED tests/test_stage4_direct_registration.py::test_exact_cohort_and_shared_bytes",
+      "2026-10-16T15:23:55.0154991Z 1 failed, 493 passed in 9.29s"
+    ]
+  },
+  {
+    "job_id": 117049032616,
+    "failures": [
+      "2026-10-16T15:24:03.5761871Z E               AssertionError: assert '81bd18694293...a5f511a06e378' == 'e59301682bdb...01267f5fc88d2'",
+      "2026-10-16T15:24:03.5763934Z tests/test_stage4_direct_registration.py:39: AssertionError",
+      "2026-10-16T15:24:03.5768689Z FAILED tests/test_stage4_direct_registration.py::test_exact_cohort_and_shared_bytes",
+      "2026-10-16T15:24:03.5769146Z 1 failed, 504 passed in 13.12s"
+    ]
+  }
+]

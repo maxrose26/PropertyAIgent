@@ -1,0 +1,65 @@
+{
+  "total_count": 3,
+  "artifacts": [
+    {
+      "id": 12056320184,
+      "node_id": "MDg6QXJ0aWZhY3QxMjA1NjMyMDE4NA==",
+      "name": "discovery-pg-dd808f3b3e635932043d71dd6c457fef4290fc1a",
+      "size_in_bytes": 1189,
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12056320184",
+      "archive_download_url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12056320184/zip",
+      "expired": false,
+      "digest": "sha256:e2341ed5494b9b9c3cbbd110a95acdd3ce195f54343d3b331330637f7e4a1a68",
+      "created_at": "2026-10-16T15:26:32Z",
+      "updated_at": "2026-10-16T15:26:32Z",
+      "expires_at": "2027-01-14T15:25:23Z",
+      "workflow_run": {
+        "id": 38923805471,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "development/ingestion-operational-20261016",
+        "head_sha": "dd808f3b3e635932043d71dd6c457fef4290fc1a"
+      }
+    },
+    {
+      "id": 12056011756,
+      "node_id": "MDg6QXJ0aWZhY3QxMjA1NjAxMTc1Ng==",
+      "name": "discovery-offline-dd808f3b3e635932043d71dd6c457fef4290fc1a",
+      "size_in_bytes": 14074,
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12056011756",
+      "archive_download_url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12056011756/zip",
+      "expired": false,
+      "digest": "sha256:41741fab3b49a791b90faca6e97b9e2865b2f6019b50b4d97c7b38d8ab01fed3",
+      "created_at": "2026-10-16T15:26:24Z",
+      "updated_at": "2026-10-16T15:26:24Z",
+      "expires_at": "2027-01-14T15:25:23Z",
+      "workflow_run": {
+        "id": 38923805471,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "development/ingestion-operational-20261016",
+        "head_sha": "dd808f3b3e635932043d71dd6c457fef4290fc1a"
+      }
+    },
+    {
+      "id": 12054808748,
+      "node_id": "MDg6QXJ0aWZhY3QxMjA1NDgwODc0OA==",
+      "name": "ingestion-provisioning-disposable-dd808f3b3e635932043d71dd6c457fef4290fc1a",
+      "size_in_bytes": 679,
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12054808748",
+      "archive_download_url": "https://api.github.com/repos/maxrose26/PropertyAIgent/actions/artifacts/12054808748/zip",
+      "expired": false,
+      "digest": "sha256:a98656b240e9bcf4ddd2913bd99c871d5f8593dea65ac84dd26dd86a57994ac8",
+      "created_at": "2026-10-16T15:26:24Z",
+      "updated_at": "2026-10-16T15:26:24Z",
+      "expires_at": "2026-10-30T15:26:23Z",
+      "workflow_run": {
+        "id": 38923805471,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "development/ingestion-operational-20261016",
+        "head_sha": "dd808f3b3e635932043d71dd6c457fef4290fc1a"
+      }
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "candidate": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+  "tree": "fb13619f472dab5f2b2fd5a17814fc7840f3951c",
+  "checks": [
+    {
+      "id": 117051878325,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319714/job/117051878325",
+      "started_at": "2026-10-16T15:29:16Z",
+      "completed_at": "2026-10-16T15:31:22Z"
+    },
+    {
+      "id": 117051877929,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319714/job/117051877929",
+      "started_at": "2026-10-16T15:29:15Z",
+      "completed_at": "2026-10-16T15:30:12Z"
+    },
+    {
+      "id": 117051877785,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319531/job/117051877785",
+      "started_at": "2026-10-16T15:29:15Z",
+      "completed_at": "2026-10-16T15:30:04Z"
+    },
+    {
+      "id": 117051877302,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319531/job/117051877302",
+      "started_at": "2026-10-16T15:29:15Z",
+      "completed_at": "2026-10-16T15:31:22Z"
+    },
+    {
+      "id": 117051877287,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319532/job/117051877287",
+      "started_at": "2026-10-16T15:29:15Z",
+      "completed_at": "2026-10-16T15:30:23Z"
+    },
+    {
+      "id": 117051877279,
+      "name": "restricted-provisioning",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319532/job/117051877279",
+      "started_at": "2026-10-16T15:29:16Z",
+      "completed_at": "2026-10-16T15:30:23Z"
+    },
+    {
+      "id": 117051876965,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319532/job/117051876965",
+      "started_at": "2026-10-16T15:29:15Z",
+      "completed_at": "2026-10-16T15:30:25Z"
+    },
+    {
+      "id": 117051846242,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924310385/job/117051846242",
+      "started_at": "2026-10-16T15:29:12Z",
+      "completed_at": "2026-10-16T15:30:09Z"
+    },
+    {
+      "id": 117051845889,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924310385/job/117051845889",
+      "started_at": "2026-10-16T15:29:11Z",
+      "completed_at": "2026-10-16T15:31:14Z"
+    }
+  ],
+  "runs": [
+    {
+      "id": 38924319532,
+      "name": "Stage4 discovery contract OFFLINE",
+      "run_number": 133,
+      "run_attempt": 1,
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319532"
+    },
+    {
+      "id": 38924319714,
+      "name": "Stage4 reusable batch OFFLINE disposable",
+      "run_number": 166,
+      "run_attempt": 1,
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319714"
+    },
+    {
+      "id": 38924319531,
+      "name": "AH web-only acceptance",
+      "run_number": 796,
+      "run_attempt": 1,
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924319531"
+    },
+    {
+      "id": 38924310385,
+      "name": "AH web-only acceptance",
+      "run_number": 795,
+      "run_attempt": 1,
+      "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38924310385"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12056007557,
+      "name": "discovery-pg-37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "digest": "sha256:532b85f1a170ba28f8eb776954e21e2c8bc9c0efa6ba9c4c40743ebe9b9d12fb",
+      "size_in_bytes": 1200,
+      "workflow_run": {
+        "id": 38924319532,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "development/ingestion-operational-20261016",
+        "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234"
+      }
+    },
+    {
+      "id": 12054979512,
+      "name": "discovery-offline-37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "digest": "sha256:5b8205e60781b2a12799e2d86b00f6450c2b8dd26ec4c300e51720db15f34ffe",
+      "size_in_bytes": 14090,
+      "workflow_run": {
+        "id": 38924319532,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "development/ingestion-operational-20261016",
+        "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234"
+      }
+    },
+    {
+      "id": 12054909371,
+      "name": "ingestion-provisioning-disposable-37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+      "digest": "sha256:14f65533235e9d8d93250d3f4d66e321580fdbe0f4eb3af5384f02a1656e9c41",
+      "size_in_bytes": 679,
+      "workflow_run": {
+        "id": 38924319532,
+        "repository_id": 1317423499,
+        "head_repository_id": 1317423499,
+        "head_branch": "development/ingestion-operational-20261016",
+        "head_sha": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234"
+      }
+    }
+  ],
+  "production_actions": 0
+}
