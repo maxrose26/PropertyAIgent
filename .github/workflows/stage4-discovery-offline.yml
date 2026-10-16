@@ -2,6 +2,7 @@ name: Stage4 discovery contract OFFLINE
 on:
   pull_request:
     paths:
+      - 'docs/design/ingestion-provisioning-20261016/**'
       - 'app/ingestion/**'
       - 'verification/ingestion_storage/**'
       - '.github/workflows/stage4-ingestion-storage-catalogue-once.yml'
@@ -110,3 +111,33 @@ jobs:
         with:
           name: discovery-pg-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/discovery-pg.xml
+
+  restricted-provisioning:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: provisioning_bootstrap
+          POSTGRES_PASSWORD: disposable_fixture_only
+          POSTGRES_DB: ingestion_provisioning_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U provisioning_bootstrap -d ingestion_provisioning_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/provisioning-venv"
+      - name: Non-superuser exact provisioning and real login denials, disposable only
+        run: |
+          timeout --kill-after=2s 60s env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_provisioning_pg.py -q --junitxml="$RUNNER_TEMP/provisioning.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ingestion-provisioning-disposable-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/provisioning.xml
+          retention-days: 14
