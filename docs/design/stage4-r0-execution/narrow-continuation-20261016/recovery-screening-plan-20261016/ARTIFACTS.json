@@ -1,0 +1,79 @@
+{
+  "archives": [
+    {
+      "artifact_id": 12033620096,
+      "attempt": 1,
+      "checkpoints": [
+        {
+          "path": "artifacts/manchester/checkpoints/000.json",
+          "sha256": "ff6a4c2f67288601a1a99193f5ae7b88aad2f606b6bd8849904ff418a014bee0"
+        }
+      ],
+      "execution": {
+        "attempt": 1,
+        "manifest_sha256": "74dd936a8f3fd02ef0d4e9d8e7ed6b2fabd48d0958fc3cc031fe379817fb20d1",
+        "persistence": false,
+        "run_id": "38870228310",
+        "run_number": 1,
+        "sha": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8"
+      },
+      "hosted_expiry": "2026-10-30",
+      "manifest_sha256": "74dd936a8f3fd02ef0d4e9d8e7ed6b2fabd48d0958fc3cc031fe379817fb20d1",
+      "path": "artifacts/manchester.zip",
+      "run_id": 38870228310,
+      "run_number": 1,
+      "scope": "manchester",
+      "zip_sha256": "99b75246fc679ee53a8f5c8baac97eed40470b79b29c4233cb7ce94ba0dacd9e"
+    },
+    {
+      "artifact_id": 12033690060,
+      "attempt": 1,
+      "checkpoints": [],
+      "execution": {
+        "attempt": 1,
+        "capability": "IDENTITY_READ_ONLY",
+        "manifest_sha256": "51d0cc9d8745687231c326007b2e588ae53d4d1a0f99ee355b632c495b01ef8d",
+        "run_id": "38870585057",
+        "run_number": 1,
+        "sha": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8"
+      },
+      "hosted_expiry": "2026-10-30",
+      "manifest_sha256": "51d0cc9d8745687231c326007b2e588ae53d4d1a0f99ee355b632c495b01ef8d",
+      "path": "artifacts/comparison.zip",
+      "run_id": 38870585057,
+      "run_number": 1,
+      "scope": "comparison",
+      "zip_sha256": "e48adb070bee7af8eded5daf1cbfb93303ed11ccd0ac77eba671f9a4d5420ea4"
+    },
+    {
+      "artifact_id": 12034054550,
+      "attempt": 1,
+      "checkpoints": [
+        {
+          "path": "artifacts/oldham/checkpoints/000.json",
+          "sha256": "bf909d799d7f97fd5250ab26a78f65309a1d869e4a9faf231b16a77e404763d0"
+        },
+        {
+          "path": "artifacts/oldham/checkpoints/001.json",
+          "sha256": "681944cd5c4d2e2c581275510d843e9ad3380489ca8a30815a3388332482af75"
+        }
+      ],
+      "execution": {
+        "attempt": 1,
+        "cohort_sha256": "808eb9a77c85e07da331cf6ca4f3a94f73d1a6e2fe74d8c1e0e6d1c0f695759b",
+        "run_id": "38871588708",
+        "run_number": 1,
+        "sha": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8"
+      },
+      "hosted_expiry": "2026-10-30",
+      "manifest_sha256": "808eb9a77c85e07da331cf6ca4f3a94f73d1a6e2fe74d8c1e0e6d1c0f695759b",
+      "path": "artifacts/oldham.zip",
+      "run_id": 38871588708,
+      "run_number": 1,
+      "scope": "oldham",
+      "zip_sha256": "e0c79cabe00a6d8079dcb73f1b87c63e645694f047b71820904184a59af0af41"
+    }
+  ],
+  "verification": "SHA256 original ZIP bytes; execution bindings; checkpoint hashes and contents; supervisor/worker equality where applicable",
+  "verified": true
+}

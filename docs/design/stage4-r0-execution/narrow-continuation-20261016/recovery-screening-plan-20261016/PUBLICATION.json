@@ -1,0 +1,13 @@
+{
+  "artifact_archive_verification": true,
+  "branch": "stage4/narrow-continuation-evidence-20261016",
+  "concurrent_head_movement": "STOP_RECONCILE_NO_OVERWRITE",
+  "expected_head": "49221d6ef1c7fdfc895e93f8dc212f51247d2d65",
+  "mode": "APPEND_ONLY_EXPECTED_HEAD_COMPARE_AND_SWAP",
+  "new_directory_only": true,
+  "owner": "current DEVELOPMENT recovery under user instruction CONSOLIDATE EVIDENCE AND PREPARE CHEAP SCREENING WITH A BACKLOG-PREVENTION PLAN",
+  "previous_checkpoint_last_commit_utc": "2026-10-16T08:10:03Z",
+  "prior_uncommitted_workspace": "NOT_AVAILABLE_NOT_RESET",
+  "remote_conversation_liveness": "NOT_OBSERVABLE_NOT_CLAIMED",
+  "runtime_or_master_changes": false
+}
