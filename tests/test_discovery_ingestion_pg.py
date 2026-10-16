@@ -224,3 +224,18 @@ def test_pg_storage_acceptance_intended_restricted_role(pg,record_property):
             for role in roles:
                 if c.scalar(text('SELECT 1 FROM pg_roles WHERE rolname=:role'),{'role':role}):c.exec_driver_sql('DROP OWNED BY '+role)
             for role in roles:c.exec_driver_sql('DROP ROLE IF EXISTS '+role)
+
+
+def test_pg_catalogue_cursor_accounts_initialization_and_fails_without_tls(pg,tmp_path):
+    """Exercise new driver accounting against fixed disposable PG, never production."""
+    from verification.ingestion_storage.preflight import run
+    from sqlalchemy.pool import NullPool
+    assert (pg.url.host,pg.url.port,pg.url.database,pg.url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
+    def disposable_factory(unused_production_shape,**kw):
+        args=dict(kw['connect_args']);args.pop('sslrootcert');args['sslmode']='disable'
+        return create_engine(pg.url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args=args)
+    result=run('postgresql://postgres.zcikcfgpblzuzpanpdqd:unused@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',tmp_path/'catalogue',engine_factory=disposable_factory)
+    assert result['status']=='PREFLIGHT_FAILED_STOP' and result['error_class']=='ValueError'
+    assert result['connections']==1 and result['connection_attempts']==1
+    assert result['driver_statements']>=result['explicit_statements']>=7
+    assert result['pool_disposed'] and result['production_writes']==0

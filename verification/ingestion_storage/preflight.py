@@ -34,7 +34,7 @@ def verdict(sessions):
  blocks.extend(['DEDICATED_RESTRICTED_LOGIN_SECRET_MAPPING_NOT_ESTABLISHED','NEW_OWNER_TRANSFER_AND_RESTRICTED_MEMBERSHIP_REQUIRE_REVIEW'])
  return {'compatibility':'BLOCKED','blockers':blocks,'pooler_mode':'REGISTERED_SESSION_ROUTE_5432; NOT_INFERRED_FROM_BACKEND_PID','migration_executed':False}
 def run(raw,out,engine_factory=create_engine,clock=time.monotonic):
- started=clock();out=Path(out);out.mkdir(exist_ok=False);engine=None;connections=0;attempts=0;statements=0;sessions=[];closed=True;disposed=False;phase='ROUTE'
+ started=clock();out=Path(out);out.mkdir(exist_ok=False);engine=None;connections=0;attempts=0;statements=0;driver_statements=0;sessions=[];closed=True;disposed=False;phase='ROUTE'
  result={'revision':os.environ.get('GITHUB_SHA'),'run_id':os.environ.get('GITHUB_RUN_ID'),'workflow':WORKFLOW,'workflow_sha256':hashlib.sha256(Path(WORKFLOW).read_bytes()).hexdigest(),'package_hashes':HASHES,'registered_route':{'host':'aws-0-eu-west-2.pooler.supabase.com','port':5432,'database':'postgres','login':'postgres.zcikcfgpblzuzpanpdqd'},'sslmode':'verify-full','prepare_threshold':None,'status':'INTENT_BEFORE_CONNECTION','sessions':sessions,'production_writes':0,'source_calls':0,'application_reads':0,'application_writes':0,'migration_executed':False,'seeding_executed':False}
  def save():
   data=json.dumps(result,sort_keys=True,allow_nan=False).encode();assert len(data)<=32768
@@ -46,7 +46,15 @@ def run(raw,out,engine_factory=create_engine,clock=time.monotonic):
   url=validate_route(raw)
   ca=Path('/etc/ssl/certs/ca-certificates.crt')
   if not ca.is_file():raise ValueError('SYSTEM_CA_UNAVAILABLE')
-  phase='ENGINE_WITH_VERIFY_FULL';engine=engine_factory(url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args={'connect_timeout':3,'prepare_threshold':None,'sslmode':'verify-full','sslrootcert':str(ca)})
+  import psycopg
+  class AccountedCursor(psycopg.Cursor):
+   def execute(self,query,params=None,*,prepare=None,binary=None):
+    nonlocal driver_statements
+    if driver_statements>=40 or clock()-started>27:raise TimeoutError('DRIVER_STATEMENT_OR_TIME_BOUND')
+    driver_statements+=1
+    return super().execute(query,params,prepare=prepare,binary=binary)
+   def executemany(self,*args,**kwargs):raise ValueError('BULK_EXECUTION_FORBIDDEN')
+  phase='ENGINE_WITH_VERIFY_FULL';engine=engine_factory(url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args={'autocommit':True,'connect_timeout':3,'prepare_threshold':None,'sslmode':'verify-full','sslrootcert':str(ca),'cursor_factory':AccountedCursor})
   for index in range(2):
    if clock()-started>20:raise TimeoutError('ACTIVE_DEADLINE')
    attempts+=1;phase='CONNECT_VERIFY_FULL';closed=False
@@ -80,7 +88,7 @@ def run(raw,out,engine_factory=create_engine,clock=time.monotonic):
   try:
    if engine is not None:engine.dispose();disposed=True
   except Exception:closed=False
-  result.update(connection_attempts=attempts,connections=connections,statements=statements,elapsed_seconds=round(clock()-started,3),peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,cleanup='CLOSED' if closed else 'UNCERTAIN',pool_disposed=disposed)
+  result.update(connection_attempts=attempts,connections=connections,explicit_statements=statements,driver_statements=driver_statements,elapsed_seconds=round(clock()-started,3),peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,cleanup='CLOSED' if closed else 'UNCERTAIN',pool_disposed=disposed)
   if result['peak_rss_bytes']>256*1024**2 or clock()-started>30:result['status']='RESOURCE_STOP'
   save()
  return result
