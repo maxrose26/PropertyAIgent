@@ -71,7 +71,7 @@ class DatabaseBudget:
                     if q.fetchone()!=('10s','3s','20s'):raise Denied('SERVER_TIMEOUT_PROFILE')
                 c.rollback();return c
             except BaseException:c.close();raise
-        e=create_engine('postgresql+psycopg://',creator=creator,poolclass=QueuePool,pool_size=1,max_overflow=0,pool_timeout=3,hide_parameters=True,isolation_level='AUTOCOMMIT' if u.username=='ingestion_worker_login' else 'READ COMMITTED')
+        e=create_engine('postgresql+psycopg://',creator=creator,poolclass=QueuePool,pool_size=1,max_overflow=0,pool_timeout=3,hide_parameters=True,skip_autocommit_rollback=u.username=='ingestion_worker_login',isolation_level='AUTOCOMMIT' if u.username=='ingestion_worker_login' else 'READ COMMITTED')
         self.engines.append(e);return e
     def close(self,engines):
         errors=[]
