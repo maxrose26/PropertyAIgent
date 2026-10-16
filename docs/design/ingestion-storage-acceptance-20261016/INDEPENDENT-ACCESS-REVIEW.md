@@ -1,0 +1,7 @@
+# Independent catalogue preflight review
+
+Final reviewed local9f53b19c786bcf302d204ca50a56a38df1a4df57, treed30de19c781a19711f8d66763ce21aefad917b99; remotePR114 headde6e37a0accabca1be2e88492d76a853d929c7ac. PASS.
+
+Initial review found premature CLOSED before connection close, misleading disposal success and a stale first-connection CLOSED checkpoint before second connection. Fixed: mark CLOSED only after context exit; disposal success separate; fsynced atomic UNKNOWN intent before each attempt. Added failed-close, failed-dispose and second-intent tests.8 pure focused tests PASS. Later hard address-space/file ceilings and accounting of all cursor executions, including SQLAlchemy dialect initialization, reviewed PASS. Explicit autocommit avoids implicit initialization transactions; explicit BEGIN READ ONLY remains verified. Added actual disposable PG cursor accounting test with fixed test endpoint and disabled test TLS; production TLS contract remains verify-full and unchanged. Reviewer performed no source/production calls, edits or suites.
+
+Final test-only delta review PASS: localed1f50995e82a099f13ed96ba4080825ea802fc1/treebe322adc5f274346dffbd938f90c65f52c4c5ea0; remotePR114be67b245cb70f6434603ae8ed2109def53db8977. Two existing exclusivity guards now pin exact catalogue workflow SHA2560ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c; Oldham guard additionally pins catalogue job. No blanket access exception/runtime change.10focused checks pass. No live call or suite by reviewer.

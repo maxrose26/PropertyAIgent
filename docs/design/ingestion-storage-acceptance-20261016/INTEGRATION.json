@@ -1,0 +1,87 @@
+{
+  "candidate": "7682c33b874920d1114611cbbb04ba598689057a",
+  "evidence": "fd3d51a5e66cb889dd7d7603da2e237d8be2d5d8",
+  "merge": {
+    "sha": "e2f199bc2ec86a14389554fe5bbc4864774a6d0f",
+    "node_id": "C_kwDOToZJi9oAKGUyZjE5OWJjMmVjODZhMTQzODk1NTRmZTViYmM0ODY0Nzc0YTZkMGY",
+    "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/e2f199bc2ec86a14389554fe5bbc4864774a6d0f",
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/e2f199bc2ec86a14389554fe5bbc4864774a6d0f",
+    "author": {
+      "name": "maxrose26",
+      "email": "maxrose26@gmail.com",
+      "date": "2026-10-16T11:15:26Z"
+    },
+    "committer": {
+      "name": "GitHub",
+      "email": "noreply@github.com",
+      "date": "2026-10-16T11:15:26Z"
+    },
+    "tree": {
+      "sha": "892cf6ff1704a857f19d383f49ab83da109483d6",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/trees/892cf6ff1704a857f19d383f49ab83da109483d6"
+    },
+    "message": "Merge reviewed shared ingestion coordinator and storage readiness (#113) [skip render]\n\nApproved exact candidate 7682c33b874920d1114611cbbb04ba598689057a; preserved evidence fd3d51a5e66cb889dd7d7603da2e237d8be2d5d8. All8 exact-head checks and independent review PASS. Deployment suppressed via [skip render]. No live ingestion, scheduling or barrier release. Production storage acceptance remains conditional on approved route preflight.",
+    "parents": [
+      {
+        "sha": "f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+        "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+        "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf"
+      },
+      {
+        "sha": "7682c33b874920d1114611cbbb04ba598689057a",
+        "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/7682c33b874920d1114611cbbb04ba598689057a",
+        "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/7682c33b874920d1114611cbbb04ba598689057a"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq0gdOCRC1aQ7uu5UhlAAA0DoQAFSkIhffZTPNWDP2Nmhdio9T\neazDecV12A2ShjuueXtlJ7HJ/UgP2o0OMB0ZuBuiKxKM+n7d4wVqoJYN5qnaV5yV\ndW+F/DjR++haF1PQiOEkfXE/Kgui5MrYZGrd3g5p17yiJhY49A50I2LRGt/PttIc\nyHcgj6lwBTGPh73U/X66WYOBKIiSt4g8hJm1BqHfOyAikQ2Hj6blmcoT3aaDrScs\ni3hIUf8KhtqaSkaAVUeAXibq+qyGnmrdhyLcRHYt7GCT5ifVwaZGtYnxaSvlm7TZ\noLSu5rlQEt5yFJndtpTB3V+L+/gyd+v0YPeQHosX4sfB9d3ULz9o5D26O52rbhN/\nGQAGyWTQm4DwHYShNGSt7OyPQuxxPDar1R0WCg7ETy9qjOVTUGMIONGttX2I0HrF\n5xXVwOljXWyfGSYOL84SSaMLQFQgVeGsruDb++PhQ5l8wE0PaFcEnU3TIEOksuwf\np9r8vqbvLJiG6ZDot2wLTQI053tg82QV2e9eg7D7KWdcsmnaapKCREBztIagDsSK\nCfori5htk6WHxCD9Grv3NVDtYS03b3AxdlzbMNI8r5e9Vr410D290b03QIyCZ6li\nnBfiirt1FvLKHch/JKPfQrj0ETfLM6PaZ95zbbzfKXqI5IAGPzakxGayVPAwozAs\ntJ5kUsz6ZEBLGAJvhJzH\n=y9PZ\n-----END PGP SIGNATURE-----\n",
+      "payload": "tree 892cf6ff1704a857f19d383f49ab83da109483d6\nparent f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf\nparent 7682c33b874920d1114611cbbb04ba598689057a\nauthor maxrose26 <maxrose26@gmail.com> 1792149326 +0100\ncommitter GitHub <noreply@github.com> 1792149326 +0100\n\nMerge reviewed shared ingestion coordinator and storage readiness (#113) [skip render]\n\nApproved exact candidate 7682c33b874920d1114611cbbb04ba598689057a; preserved evidence fd3d51a5e66cb889dd7d7603da2e237d8be2d5d8. All8 exact-head checks and independent review PASS. Deployment suppressed via [skip render]. No live ingestion, scheduling or barrier release. Production storage acceptance remains conditional on approved route preflight.",
+      "verified_at": "2026-10-16T11:15:26Z"
+    }
+  },
+  "post_merge_checks": [
+    {
+      "id": 116945357809,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 116945357621,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 116945357359,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 116945357299,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 116945357149,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 116945356983,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "preflight_head": "be67b245cb70f6434603ae8ed2109def53db8977",
+  "preflight_tree": "be322adc5f274346dffbd938f90c65f52c4c5ea0",
+  "preflight_workflow_sha256": "0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c",
+  "migration_sha256": "f790550778172adbfe1db792d20b4c4fb58298e5829f4033f269c8670dc47033",
+  "manifest_sha256": "7883c1a8f99ce3e498fb73911713c3b531d4c73d20fd2524e3c9901e822e7b04"
+}
