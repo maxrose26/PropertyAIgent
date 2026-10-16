@@ -115,6 +115,6 @@ def main():
   raw=json.dumps(result,sort_keys=True,allow_nan=False).encode()
   if len(raw)>512*1024:raise ValueError('WORKER_AUDIT_BOUND')
   with a.output.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
- return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY','CAPTURE_COMPLETE','CAPTURED_PROCESSING_BLOCKED','BATCH_SCREENED','BATCH_ALREADY_COMPLETE','CLAIM_RECOVERED'} and account['cleanup']=='CLOSED' else 1
+ return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY','DISCOVERY_SCREENING_ONLY_ALREADY_KNOWN','ALREADY_KNOWN','CAPTURE_COMPLETE','CAPTURED_PROCESSING_BLOCKED','BATCH_SCREENED','BATCH_ALREADY_COMPLETE','CLAIM_RECOVERED'} and account['cleanup']=='CLOSED' else 1
 
 if __name__=='__main__':raise SystemExit(main())
