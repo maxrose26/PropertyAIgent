@@ -81,7 +81,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $fn$
 DECLARE n integer; expected jsonb; actual jsonb;
 BEGIN
  PERFORM 1 FROM public.ingestion_work_items WHERE key=repeat('0',64) FOR UPDATE;
- IF (SELECT outcome::jsonb->'grants' FROM public.ingestion_work_items WHERE key=repeat('0',64)) <> '{}'::jsonb
+ IF (SELECT outcome::jsonb->'grants' FROM public.ingestion_work_items WHERE key=repeat('0',64)) IS DISTINCT FROM '{}'::jsonb
  OR (SELECT outcome::jsonb->'global_stop'->>'reason' FROM public.ingestion_work_items WHERE key=repeat('0',64)) IS DISTINCT FROM 'CONSUMED_SALFORD_GLOBAL_STOP'
  OR EXISTS(SELECT 1 FROM public.ingestion_work_attempts) THEN RAISE EXCEPTION 'STORAGE_PRECONDITION'; END IF;
  expected := '{"attempt_count":0,"authority":null,"checkpoint":{"evidence_commit":"e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c","live_allowance":{"source_calls":0,"writes":0},"retained_evidence":{"checkpoint_sha256":"a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e","durable_reference":{"bytes":4298,"commit":"e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c","path":"docs/design/stage4-r0-execution/metadata-rollout-result-20261016/scopes/00/artifact/checkpoints/000.json","sha256":"a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"},"run":"38884069913"}},"contract":"storage-acceptance-blocked-v1","dependencies":[],"eligible_at":0,"fence":0,"key":"c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3","lease_until":null,"limits":{"aggregate_rss":1610612736,"audit_bytes":2097152,"bytes":20971520,"outer_seconds":60,"pages":6,"requests":80,"rows":60,"source_rss":1073741824,"worker_seconds":45},"max_attempts":1,"next_action":"REVIEW_ONLY","outcome":null,"owner":null,"phase":"IDLE","priority":0,"reason":"CONSUMED_SALFORD_GLOBAL_STOP","revision":"20261016","state":"SAFETY_BLOCKED","subject":{"council":"salford","end":"2026-10-14","kind":"DISCOVERY_SCOPE","semantics":"VALIDATED","start":"2026-10-08"},"task":"LISTING_METADATA"}'::jsonb;
@@ -107,11 +107,11 @@ DO $acl$ DECLARE r record; BEGIN
  FOR r IN SELECT DISTINCT p.rolname FROM pg_proc f CROSS JOIN LATERAL aclexplode(f.proacl) a JOIN pg_roles p ON p.oid=a.grantee WHERE f.oid='public.ingestion_seed_storage_test()'::regprocedure AND p.rolname<>'ingestion_storage_owner' LOOP
  EXECUTE format('REVOKE ALL ON FUNCTION public.ingestion_seed_storage_test() FROM %I',r.rolname); END LOOP; END $acl$;
 GRANT EXECUTE ON FUNCTION public.ingestion_seed_storage_test() TO ingestion_storage_operator;
-CREATE FUNCTION public.ingestion_raise_stop(reason text) RETURNS void
+CREATE FUNCTION public.ingestion_raise_stop(p_reason text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $fn$
 BEGIN
- IF reason IS NULL OR octet_length(reason)>512 OR length(reason)=0 THEN RAISE EXCEPTION 'STOP_REASON_BOUND'; END IF;
- UPDATE public.ingestion_work_items SET outcome=(outcome::jsonb || jsonb_build_object('manual_stop',reason,'global_stop',coalesce(nullif(outcome::jsonb->'global_stop','null'::jsonb),jsonb_build_object('reason',reason))))::json
+ IF p_reason IS NULL OR octet_length(p_reason)>512 OR length(p_reason)=0 THEN RAISE EXCEPTION 'STOP_REASON_BOUND'; END IF;
+ UPDATE public.ingestion_work_items SET outcome=(outcome::jsonb || jsonb_build_object('manual_stop',p_reason,'global_stop',coalesce(nullif(outcome::jsonb->'global_stop','null'::jsonb),jsonb_build_object('reason',p_reason))))::json
  WHERE key=repeat('0',64);
  IF NOT FOUND THEN RAISE EXCEPTION 'CONTROL_MISSING'; END IF;
 END $fn$;
