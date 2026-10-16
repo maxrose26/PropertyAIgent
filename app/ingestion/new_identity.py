@@ -43,19 +43,24 @@ def execute(coordinator,claim,*,envelope,council,source):
             if a is None:return None
             return dict(application_id=a.id,protected={k:(getattr(a,k).isoformat() if hasattr(getattr(a,k),'isoformat') else getattr(a,k)) for k in PROTECTED_FIELDS})
     prior=row['checkpoint']
+    if prior and prior.get('kind')=='DETAIL_RECEIPT_V1':
+        from .ledger import digest
+        if digest(source)!=prior['source_sha256']:raise Denied('DETAIL_CHECKPOINT_BINDING')
     if prior and prior.get('outcome')=='SUPPORTED_FACTS_VERIFIED':
         if lookup()!=prior['readback']:ledger.stop('COMMITTED_READBACK_CHANGED');raise Denied('RECONCILIATION_REQUIRED')
         ledger.finish(claim,prior);return prior
     known=lookup()
     if known:
         result=dict(outcome='ALREADY_KNOWN',identity='EXISTING_IDENTITY_PRESERVED',facts='EXISTING_NOT_WRITTEN',application_id=known['application_id'])
-        ledger.checkpoint(claim,result);ledger.finish(claim,result);return result
+        if not (prior and prior.get('kind')=='DETAIL_RECEIPT_V1'):ledger.checkpoint(claim,result)
+        ledger.finish(claim,result);return result
     # SAME projector as the accepted Idox qualification, including identity,
     # field states, owned-process bounds, cleanup and exact factual scope.
     packet=contract.projector(target,source);obs=packet['observation']
     if packet['failure'] or obs is None or not obs.b2_eligible or obs.verification_scope!=contract.verification_scope or (obs.verification_scope=='COUPLED' and not contract.coupled_gate(obs,target)):
         result=dict(outcome='FACTS_WITHHELD',identity='NOT_CREATED',reason=packet['failure'] or 'UNSUPPORTED_FACTUAL_SCOPE')
-        ledger.checkpoint(claim,result);ledger.finish(claim,result,state='UNSUPPORTED_CONTRACT',reason='SUPPORTED_FACTS_REQUIRED');return result
+        if not (prior and prior.get('kind')=='DETAIL_RECEIPT_V1'):ledger.checkpoint(claim,result)
+        ledger.finish(claim,result,state='UNSUPPORTED_CONTRACT',reason='SUPPORTED_FACTS_REQUIRED');return result
     if obs.application_id is not None:raise Denied('NEW_IDENTITY_OBSERVATION')
     if screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SCREENING_SOURCE_BINDING')
     def writer(_):

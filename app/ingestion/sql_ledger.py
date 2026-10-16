@@ -34,7 +34,7 @@ class SQLLedger:
         statement=text('SELECT public.ingestion_worker_step(:op,:key,:fence,:owner,:authority,CAST(:binding AS jsonb),CAST(:payload AS jsonb))')
         if connection is not None:return connection.execute(statement,params).scalar_one()
         with self.worker_engine.begin() as c:
-            c.execute(text("SET LOCAL statement_timeout='10s'"));c.execute(text("SET LOCAL lock_timeout='3s'"))
+            self._limits(c)
             result=c.execute(statement,params).scalar_one()
         return result
 
@@ -94,7 +94,7 @@ class SQLLedger:
         entered=False
         try:
             with self.broker_engine.begin() as c:
-                c.execute(text("SET LOCAL statement_timeout='10s'"));c.execute(text("SET LOCAL lock_timeout='3s'"))
+                self._limits(c)
                 row=self._step('fence_effect',claim.key,claim.fence,connection=c);entered=True
                 result=bounded(writer(row))
                 # DB-only callback has returned after committed shared readback.

@@ -70,13 +70,14 @@ class Ledger:
 
     def _control(self,c,control):c.execute(update(W).where(W.c.key==CONTROL).values(outcome=bounded(control['outcome'])))
 
-    def grant(self,authority,keys,*,source_calls=0,writes=0,expires_at,contracts):
+    def grant(self,authority,keys,*,source_calls=0,writes=0,expires_at,contracts,detail_source_keys=()):
         """Explicit disposable allowance. Historical authority strings rejected."""
         if not re.fullmatch(r'INGESTION_TEST_[A-Za-z0-9_-]{1,70}',authority):raise Denied('NO_HISTORICAL_OR_LIVE_AUTHORITY')
         keys=sorted(set(keys));contracts=sorted(set(contracts))
         if not keys or len(keys)>1000 or any(not re.fullmatch('[0-9a-f]{64}',k) or k==CONTROL for k in keys):raise Denied('GRANT_KEYS')
         if any(type(x) is not int or not 0<=x<=1000 for x in (source_calls,writes)) or not math.isfinite(expires_at) or expires_at<=self.clock():raise Denied('GRANT_BOUNDS')
-        value=bounded(dict(keys=keys,contracts=contracts,source_calls=source_calls,writes=writes,expires_at=expires_at))
+        if not set(detail_source_keys)<=set(keys):raise Denied('DETAIL_SOURCE_KEYS')
+        value=bounded(dict(keys=keys,contracts=contracts,source_calls=source_calls,writes=writes,expires_at=expires_at,detail_source_keys=list(detail_source_keys)))
         with self.tx() as (c,control):
             grants=control['outcome']['grants']
             if authority in grants:raise Denied('AUTHORITY_ALREADY_REGISTERED')
@@ -173,7 +174,8 @@ class Ledger:
             row=self._owned(c,control,claim)
             if row['phase'] not in {'CLAIMED','CHECKPOINTED'}:raise Denied('UNRESOLVED_INTENT')
             if operation=='writes' and row['task']!='FACTUAL_REFRESH':raise Denied('TASK_OPERATION')
-            if operation=='source_calls' and (row['task'] not in {'DISCOVERY','LISTING_METADATA'} or row['subject']['kind']!='DISCOVERY_SCOPE'):raise Denied('TASK_OPERATION')
+            if operation=='source_calls' and not ((row['task'] in {'DISCOVERY','LISTING_METADATA'} and row['subject']['kind']=='DISCOVERY_SCOPE') or (row['task']=='FACTUAL_REFRESH' and row['subject']['kind']=='APPLICATION' and claim.key in control['outcome']['grants'][row['authority']].get('detail_source_keys',[]))):raise Denied('TASK_OPERATION')
+            if operation=='source_calls' and row['checkpoint'] is not None:raise Denied('SOURCE_REPLAY')
             g=self._permit(control,row,row['authority'],operation,c=c);
             if g[operation]<cost:raise Denied('AUTHORITY_EXHAUSTED')
             g[operation]-=cost;self._control(c,control)

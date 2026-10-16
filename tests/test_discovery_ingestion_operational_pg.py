@@ -19,7 +19,7 @@ from tests.test_discovery_ingestion_provisioning_pg import ROLES,PACKAGE
 from tests.test_discovery_ingestion_operational import setup_new
 
 
-def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_identity(record_property):
+def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_identity(record_property,tmp_path):
  raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
  if not raw:pytest.skip('fixed disposable PG17 service required')
  info=psycopg.conninfo.conninfo_to_dict(raw)
@@ -63,7 +63,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
      for key in keys:
       row=c.execute(select(W).where(W.c.key==key)).mappings().one();bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
-     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
+     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
    bind([k,blocked,other]);l=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
    with pytest.raises(Exception):l.claim(k) # original consumed Salford stop
@@ -135,6 +135,44 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    for child in children:
     out=screening.screening(screener.claim(child));assert out['residential_dwelling_count'] is None
    assert all(screener.get(k)['state']=='COMPLETE' for k in children)
+   # One concrete controller rehearsal. Only disposable bootstrap prepares the
+   # exact three task bindings and allowance before the accounted controller.
+   from tests.test_discovery_ingestion_acceptance import listing_audit
+   from verification.ingestion_storage.operational_controller import DatabaseBudget,ControllerLedger,AcceptanceBinding,execute
+   from app.ingestion.ledger import digest
+   boot.execute("TRUNCATE public.applications CASCADE")
+   source_audit=listing_audit(target);contract=IdoxListingContract('controller-idox',cfg,'a'*64)
+   retained=contract.project(source_audit,outer(),DEFAULT_LIMITS);record=retained['records'][0]
+   scope=seed('CONTROLLER_SCOPE','DISCOVERY')
+   child=digest(dict(subject={'kind':'APPLICATION','council':'bolton','reference':target['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(record)))
+   fact=seed('CONTROLLER_FACT','FACTUAL_REFRESH')
+   with app.begin() as c:
+    c.execute(W.update().where(W.c.key==scope).values(subject={'kind':'DISCOVERY_SCOPE','council':'bolton','start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':'RECEIVED'},contract=contract.name))
+    prototype=dict(c.execute(select(W).where(W.c.key==scope)).mappings().one());prototype.update(key=child,subject={'kind':'APPLICATION','council':'bolton','reference':target['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(record),dependencies=[scope],max_attempts=2)
+    c.execute(W.insert().values(**prototype))
+    c.execute(W.update().where(W.c.key==fact).values(subject=prototype['subject'],dependencies=[child]))
+   bind([scope,child,fact],source_calls=2,writes=2)
+   from sqlalchemy.engine import URL
+   from dataclasses import asdict
+   import sys
+   from verification.ingestion_storage.operational_supervisor import supervise
+   urls=[URL.create('postgresql+psycopg',username=r,password=passwords.get(r,info['password']),host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False) for r in ['ingestion_worker_login','operational_broker_login','provisioning_bootstrap']]
+   fixed=AcceptanceBinding(scope,child,fact,target['reference'],target['source_url'],target['source_identifier'],digest(record))
+   plan=tmp_path/'plan.json';root=tmp_path/'controller';output=root/'worker-result.json'
+   plan.write_text(json.dumps(dict(binding=asdict(fixed),bindings=bindings,listing=source_audit,detail=raw_source,target=target,envelope=asdict(env),outer=outer()),default=str))
+   supervised=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(plan),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=root)
+   result=json.loads(output.read_bytes()) if output.exists() else {}
+   account=result.get('database_accounting',{})
+   record_property('controller_accounting',json.dumps(account,sort_keys=True));record_property('controller_supervisor',json.dumps(supervised,sort_keys=True))
+   assert supervised['cleanup']=='CLOSED' and supervised['exit_code']==0 and supervised['limit_hit'] is None, (supervised,result)
+   assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
+   assert account['cleanup']=='CLOSED' and account['connection_attempts']<=16 and account['driver_statements']<=120
+   # The restricted worker cannot forge a detail receipt or bypass source intent.
+   bypass=seed('BYPASS','FACTUAL_REFRESH');bind([bypass],source_calls=1,writes=2)
+   neg=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,broker_engine=broker)
+   nc=neg.claim(bypass)
+   with pytest.raises(Exception):neg.intent(nc,'writes',cost=2)
+   with pytest.raises(Exception):neg.checkpoint(nc,{'kind':'DETAIL_RECEIPT_V1'})
    # Abandoned write intent is recovered as uncertain, globally stops next work.
    uncertain=seed('UNCERTAIN','FACTUAL_REFRESH');bind([uncertain,other],writes=1)
    x=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings);cl=x.claim(uncertain);x.intent(cl,'writes')

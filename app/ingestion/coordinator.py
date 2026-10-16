@@ -93,7 +93,8 @@ class Coordinator:
             segments=source['listing_segments'],applied_interval=source['applied_interval'],cleanup='CLOSED',accounting_complete=True,
             outer_supervisor=outer,resources={k:source[k] for k in ('requests','decoded_bytes','encoded_bytes','outbound_payload_bytes','supervisor_seconds','peak_owned_rss')})
         # Both task checkpoint and attempt copy are bounded; no expiring URL needed.
-        self.ledger.checkpoint(claim,receipt)
+        if row["phase"]=="SOURCE_INTENT" and hasattr(self.ledger,"resolve_source"):self.ledger.resolve_source(claim,receipt)
+        else:self.ledger.checkpoint(claim,receipt)
         return receipt
 
     def listing(self,claim,source):
@@ -255,3 +256,33 @@ class Coordinator:
     def new_identity(self,claim,*,envelope,council,source):
         from .new_identity import execute
         return execute(self,claim,envelope=envelope,council=council,source=source)
+
+    def new_identity_source(self,claim,*,envelope,council,supervised_reader):
+        from .new_identity import NewIdentityContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,NewIdentityContract) or row['subject']!={'kind':'APPLICATION','council':envelope.council,'reference':envelope.reference}:raise Denied('EXACT_DETAIL_BINDING')
+        from app.pipeline.discovery_contract import Completeness
+        if row['task']!='FACTUAL_REFRESH' or (contract.row['council'],contract.row['reference'],contract.row['source_url'])!=(envelope.council,envelope.reference,envelope.source_url) or council.code!=envelope.council or envelope.window.outcome!=Completeness.COMPLETE:raise Denied('EXACT_DETAIL_CONTRACT_BEFORE_SOURCE')
+        if len(row['dependencies'])!=1:raise Denied('SELECTIVE_SCREENING_REQUIRED')
+        parent=self.ledger.get(row['dependencies'][0]);screen=parent['checkpoint'] or {}
+        if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or screen.get('disposition') not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'} or screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SELECTIVE_SCREENING_REQUIRED')
+        prior=row['checkpoint']
+        if prior is not None:
+            if prior.get('kind')=='DETAIL_RECEIPT_V1':return self.new_identity(claim,envelope=envelope,council=council,source=prior['source'])
+            if prior.get('outcome')=='SUPPORTED_FACTS_VERIFIED':return self.new_identity(claim,envelope=envelope,council=council,source={})
+            raise Denied('DETAIL_NO_REPLAY')
+        self.ledger.intent(claim,'source_calls')
+        try:
+            source,outer=supervised_reader(row)
+            validate_outer(outer,row['limits'])
+            packet=contract.projector(contract.row,source)
+            # Retain failed/unsupported observations truthfully; execute withholds
+            # admission, preserving the consumed source call and original evidence.
+            receipt=dict(kind='DETAIL_RECEIPT_V1',source=source,source_sha256=digest(source),cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer)
+            if packet['audit'].get('cleanup_state')!='CLOSED' or packet['audit'].get('budget_state')!='WITHIN_LIMITS' or packet['failure'] in {'CLEANUP_FAILURE','SCOPE_ESCAPE','ACCOUNTING_FAILURE','INVALID_ARTIFACT','UNSUPPORTED_ROUTE'}:raise Denied('DETAIL_RESOURCE_OR_CONTRACT')
+            if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,receipt)
+            else:self.ledger.checkpoint(claim,receipt)
+            return self.new_identity(claim,envelope=envelope,council=council,source=source)
+        except Exception:
+            self.ledger.stop('DETAIL_OR_WRITE_RECONCILIATION_REQUIRED')
+            raise

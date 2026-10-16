@@ -67,8 +67,9 @@ BEGIN
    INSERT INTO public.ingestion_work_items(key,subject,task,contract,revision,dependencies,priority,eligible_at,state,reason,next_action,limits,authority,attempt_count,max_attempts,fence,owner,lease_until,phase,checkpoint,outcome)
    VALUES(child->>'key',(child->'subject')::json,'SCREENING','listing-screen-v1',child->>'revision',json_build_array(p_key),w.priority,0,'QUEUED',NULL,'CLAIM_WHEN_AUTHORISED',w.limits,NULL,0,2,0,NULL,NULL,'IDLE',NULL,NULL) RETURNING * INTO w;
   ELSIF p_op IN ('begin_source','begin_write') THEN
-   IF nullif(w.checkpoint::jsonb,'null'::jsonb) IS NOT NULL THEN RAISE EXCEPTION 'CHECKPOINT_RESUME_NO_EFFECT_REPLAY'; END IF;
-   IF p_payload<>jsonb_build_object('cost',(p_payload->>'cost')::integer) OR coalesce((p_payload->>'cost')::integer,0) NOT BETWEEN 1 AND 2 OR (p_op='begin_source' AND ((p_payload->>'cost')::integer<>1 OR w.task NOT IN ('DISCOVERY','LISTING_METADATA') OR w.subject->>'kind'<>'DISCOVERY_SCOPE')) OR (p_op='begin_write' AND w.task<>'FACTUAL_REFRESH') THEN RAISE EXCEPTION 'TASK_EFFECT'; END IF;
+   IF nullif(w.checkpoint::jsonb,'null'::jsonb) IS NOT NULL AND NOT (p_op='begin_write' AND w.checkpoint::jsonb->>'kind'='DETAIL_RECEIPT_V1' AND (g->'detail_source_keys' ? p_key) IS TRUE) THEN RAISE EXCEPTION 'CHECKPOINT_RESUME_NO_EFFECT_REPLAY'; END IF;
+   IF p_payload<>jsonb_build_object('cost',(p_payload->>'cost')::integer) OR coalesce((p_payload->>'cost')::integer,0) NOT BETWEEN 1 AND 2 OR (p_op='begin_source' AND ((p_payload->>'cost')::integer<>1 OR NOT ((w.task IN ('DISCOVERY','LISTING_METADATA') AND w.subject->>'kind'='DISCOVERY_SCOPE') OR (w.task='FACTUAL_REFRESH' AND w.subject->>'kind'='APPLICATION' AND (g->'detail_source_keys' ? p_key) IS TRUE)))) OR (p_op='begin_write' AND w.task<>'FACTUAL_REFRESH') THEN RAISE EXCEPTION 'TASK_EFFECT'; END IF;
+   IF p_op='begin_write' AND (g->'detail_source_keys' ? p_key) IS TRUE AND w.checkpoint::jsonb->>'kind' IS DISTINCT FROM 'DETAIL_RECEIPT_V1' THEN RAISE EXCEPTION 'QUALIFIED_DETAIL_RECEIPT_REQUIRED'; END IF;
    dep:=CASE WHEN p_op='begin_source' THEN 'source_calls' ELSE 'writes' END;
    IF coalesce((g->>dep)::integer,0)<(p_payload->>'cost')::integer THEN RAISE EXCEPTION 'EFFECT_ALLOWANCE_EXHAUSTED' USING ERRCODE='42501'; END IF;
    g:=jsonb_set(g,ARRAY[dep],to_jsonb((g->>dep)::integer-(p_payload->>'cost')::integer));
@@ -91,7 +92,7 @@ BEGIN
    UPDATE public.ingestion_work_items SET state=p_payload->>'state',reason=p_payload->>'reason',outcome=(p_payload->'outcome')::json,owner=NULL,lease_until=NULL,phase='FINISHED',next_action='REVIEW' WHERE key=p_key RETURNING * INTO w;
    UPDATE public.ingestion_work_attempts SET finished_at=t,phase='FINISHED',outcome=w.outcome WHERE work_key=p_key AND fence=p_fence;
   ELSIF p_op='checkpoint' THEN
-   IF w.checkpoint::jsonb->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') OR p_payload->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') THEN RAISE EXCEPTION 'BROKER_FACT_RECEIPT_REQUIRED' USING ERRCODE='42501'; END IF;
+   IF w.checkpoint::jsonb->>'kind'='DETAIL_RECEIPT_V1' OR p_payload->>'kind'='DETAIL_RECEIPT_V1' OR w.checkpoint::jsonb->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') OR p_payload->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') THEN RAISE EXCEPTION 'BROKER_FACT_RECEIPT_REQUIRED' USING ERRCODE='42501'; END IF;
    IF octet_length(p_payload::text)>least(131072,(w.limits->>'audit_bytes')::integer) OR jsonb_typeof(p_payload)<>'object' THEN RAISE EXCEPTION 'CHECKPOINT_BOUND'; END IF;
    -- SQL records a worker receipt, never promotes its contents to factual truth.
    UPDATE public.ingestion_work_items SET checkpoint=p_payload::json,phase='CHECKPOINTED' WHERE key=p_key RETURNING * INTO w;
