@@ -1,0 +1,90 @@
+{
+  "stage": "4_OPEN",
+  "status": "PREPARATION_COMPLETE_CREDENTIAL_METHOD_NO_GO_PENDING_TARGETED_PROVIDER_ANSWER",
+  "production_master": "a3a698beb0542579042bbcc48e8cf7a66f13514f",
+  "preserved_evidence": "fc89a21646d64bd89f47e1e8f60513078e88e1a8",
+  "candidate": "c74b029e66b28509c8dfb9625fd7c2a73875c0c8",
+  "tree": "16e07b300a3eee591b34aa76191803f6b21dd008",
+  "draft_pr": 119,
+  "integrated": false,
+  "credential_method": {
+    "recommendation": "Conditional existing client-generated SCRAM + direct protected-secret mapping; no qualified interface replacement found",
+    "cli": "CANDIDATE_HARD_STOP_BEFORE_INPUT",
+    "primitive": "CANDIDATE_EXACT_LOOPBACK_DISPOSABLE_ONLY",
+    "provider_question": "docs/design/ingestion-credential-decision-20261016/SUPPORT-QUESTION.txt",
+    "support_message_sent": false,
+    "upstream_pgaudit_redaction": "CONFIRMED_SOURCE_NOT_INSTALLED_VERSION_EVIDENCE",
+    "remaining_mechanism": "Actual core statement/error/duration or enabled utility-query capture for the verifier-bearing ALTER ROLE command; relevant provider redaction only",
+    "blanket_attestation_requested": false
+  },
+  "offline_interface": {
+    "existing_ledger_reused": true,
+    "bound_subject_task_contract_revision": true,
+    "fixed_owner_authority": true,
+    "methods": [
+      "claim",
+      "checkpoint"
+    ],
+    "production_sql_security_boundary": false,
+    "production_role_grants_changed": false,
+    "effects_or_consumers": false,
+    "limitation": "Trusted in-process API rehearsal; future production SQL must atomically validate bindings/claims and enforce restricted access. No production-ready claim."
+  },
+  "validation": {
+    "local_network_denied": {
+      "passed": 48,
+      "worker_interface": 10,
+      "mapping": 7,
+      "existing_ledger": 31
+    },
+    "hosted": {
+      "run": 38918338558,
+      "number": 128,
+      "attempt": 1,
+      "offline_job": 117031501496,
+      "offline_cases": 752,
+      "failures": 0,
+      "pg_provisioning_job": 117031501549,
+      "pg_cases": 1,
+      "pg_conclusion": "success",
+      "pg_admission_job": 117031501058,
+      "pg_admission_conclusion": "success"
+    }
+  },
+  "artifacts": [
+    {
+      "id": 12053836837,
+      "sha256": "9fe843c98183efa36e2053684594a8e8c96cfeefe38f35fc7e44efec9f3309d8",
+      "file": "offline-original-artifact.zip"
+    },
+    {
+      "id": 12052903178,
+      "sha256": "17a0625519324083e3ac03110ffad11d0e098a8cbd22bf3fc1feb5872fe8fabe",
+      "file": "postgres17-original-artifact.zip"
+    }
+  ],
+  "production": {
+    "connections": 0,
+    "statements": 0,
+    "credential_generations": 0,
+    "secret_operations": 0,
+    "migrations": 0,
+    "seed_operations": 0,
+    "source_calls": 0,
+    "application_writes": 0,
+    "factual_writes": 0
+  },
+  "authority_consumed": false,
+  "protected_ids": [
+    1504,
+    1505,
+    1506,
+    1507,
+    1508
+  ],
+  "salford_stop": "PRESERVED",
+  "exact_head_checks": {
+    "success": 9,
+    "total": 9
+  }
+}
