@@ -25,6 +25,8 @@ def test_secret_only_stdin_and_roles_remain_disabled():
   assert call.kwargs['env']['GH_HOST']=='github.com' and call.kwargs['env']['GH_PROMPT_DISABLED']=='1'
   assert call.kwargs['env']['GH_DEBUG']==''
  assert c.pgconn.encrypt_password.call_count==2
+ assert c.execute.call_args_list[0].args==("SET statement_timeout='10s'",)
+ assert c.execute.call_args_list[1].args==("SET lock_timeout='3s'",)
 
 
 def test_failed_secret_upload_stops_without_second_password_or_activation():

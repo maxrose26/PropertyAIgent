@@ -25,6 +25,8 @@ def put_secret(name,value,runner=subprocess.run):
 
 def install_mapping(connection,*,attested,runner=subprocess.run,password_factory=lambda:secrets.token_urlsafe(48)):
  if not attested:raise ValueError('PROVIDER_PASSWORD_REDACTION_ATTESTATION_REQUIRED')
+ connection.execute("SET statement_timeout='10s'")
+ connection.execute("SET lock_timeout='3s'")
  receipts=[]
  for role,name in MAPPINGS.items():
   flags=connection.execute('SELECT rolcanlogin,rolsuper,rolcreaterole,rolbypassrls,rolcreatedb,rolreplication FROM pg_roles WHERE rolname=%s',(role,)).fetchone()
