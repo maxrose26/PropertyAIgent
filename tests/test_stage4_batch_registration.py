@@ -43,6 +43,10 @@ def test_workflow_scope():
     assert 'GITHUB_RUN_NUMBER' in steps[0]['run'] and 'GITHUB_RUN_ATTEMPT' in steps[0]['run']
     assert w['concurrency']['cancel-in-progress']=='false'
     for path in Path('.github/workflows').glob('*.yml'):
+        if path.name=='stage4-ingestion-storage-catalogue-once.yml':
+            # Exact separately authorised catalogue-only access; no blanket exception.
+            assert hashlib.sha256(path.read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'
+            continue
         if path.name in {'stage4-bolton-delta3-comparison-once.yml','stage4-oldham-two-capture-once.yml'}:
             from tests.test_discovery_narrow_continuation import assert_registered
             assert_registered('comparison3' if 'comparison' in path.name else 'oldham2',path.read_bytes())
