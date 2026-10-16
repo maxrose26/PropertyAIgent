@@ -10,7 +10,7 @@ GRANT SELECT ON public.applications TO ingestion_application_writer;
 GRANT INSERT (council_code,reference,unit_confirmation_status,first_seen_at,last_seen_at,
  extraction_attempt_count,documents_legacy_unverified,evidence_refresh_required)
  ON public.applications TO ingestion_application_writer;
-GRANT UPDATE (status,decision,decision_issued_date,status_verified_at,planning_field_verification,
+GRANT UPDATE (status,decision,decision_issued_date,status_verified_at,planning_field_verification,last_seen_at,
  evidence_refresh_required,evidence_refresh_reason,evidence_refresh_trigger,evidence_refresh_requested_at)
  ON public.applications TO ingestion_application_writer;
 GRANT SELECT (id) ON public.application_lifecycle_events TO ingestion_application_writer;

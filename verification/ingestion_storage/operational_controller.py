@@ -19,12 +19,17 @@ class DatabaseBudget:
     Includes SQLAlchemy initialization, BEGIN/COMMIT/ROLLBACK. Records operation
     kinds only, never SQL parameters, URLs, credentials or row values.
     """
-    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None):
+    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
-        self.started=time.monotonic();self.attempts=0;self.statements=0;self.kinds={};self.opened=[];self.engines=[];self.stop_file=Path(stop_file) if stop_file else None
+        previous=previous or {}
+        attempts=previous.get('connection_attempts',0);statements=previous.get('driver_statements',0);elapsed=previous.get('elapsed_seconds',0)
+        if type(attempts) is not int or not 0<=attempts<=connections or type(statements) is not int or not 0<=statements<=self.statement_cap or type(elapsed) not in (int,float) or not 0<=elapsed<seconds:raise Denied('PRIOR_ACCOUNTING_BOUND')
+        if previous and (previous.get('cleanup')!='CLOSED' or previous.get('connections_closed') is not True):raise Denied('PRIOR_CLOSURE_REQUIRED')
+        self.previous_elapsed=elapsed
+        self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.stop_file=Path(stop_file) if stop_file else None
     def check(self):
-        if time.monotonic()-self.started>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
+        if time.monotonic()-self.started+self.previous_elapsed>=self.seconds or (self.stop_file and self.stop_file.exists()):raise Denied('MANUAL_STOP_OR_CONTROLLER_DEADLINE')
     def tick(self,kind,*,cleanup=False):
         if not cleanup:self.check()
         # Reserve eight slots for finite rollback/closure; no commit after stop.
@@ -77,7 +82,7 @@ class DatabaseBudget:
             except Exception:errors.append('CLOSE')
         return dict(connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
             connections_closed=all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and all(c.closed for c in self.opened) else 'UNCERTAIN',
-            errors=errors,elapsed_seconds=round(time.monotonic()-self.started,3))
+            errors=errors,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 
 
 class ControllerLedger(SQLLedger):
@@ -116,13 +121,18 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     root=l.get(binding.discovery_key)
     if root['state']=='COMPLETE':
         receipt=root['checkpoint']
-        if not binding.retained_capture_sha256 or receipt.get('source_sha256')!=binding.retained_capture_sha256:raise Denied('CONSUMED_OBSERVATION_NO_REPLAY')
+        if not binding.retained_capture_sha256 or digest(receipt)!=binding.retained_capture_sha256:raise Denied('CONSUMED_OBSERVATION_NO_REPLAY')
         children=root['outcome']['children']
     else:
         if binding.retained_capture_sha256:raise Denied('RETAINED_CAPTURE_NOT_COMPLETE')
         def listing(row):check();return listing_reader(row)
         children=coordinator.idox_source(l.claim(binding.discovery_key,lease_seconds=165),listing)
         check();receipt=l.get(binding.discovery_key)['checkpoint']
+    contract=coordinator.contracts.get(root['contract'])
+    from app.ingestion.idox_adapter import IdoxListingContract
+    if not isinstance(contract,IdoxListingContract):raise Denied('BOUND_IDOX_CONTRACT')
+    cfg=contract.config;scope={'kind':'DISCOVERY_SCOPE','council':cfg.council,'start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':cfg.semantics}
+    if root['subject']!=scope or receipt['contract']!=root['contract'] or receipt['interval']!=[scope['start'],scope['end']] or receipt['applied_interval']!=receipt['interval']:raise Denied('RETAINED_SCOPE_BINDING')
     # Recompute every disposition in trusted controller memory. A worker's
     # assertion is not used as evidence for selecting expensive effects.
     screens=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']]
@@ -174,5 +184,5 @@ def capture(coordinator,key,*,listing_reader,check=lambda:None):
     check();children=coordinator.idox_source(coordinator.ledger.claim(key,lease_seconds=165),listing_reader)
     check();receipt=coordinator.ledger.get(key)['checkpoint']
     return dict(outcome='DISCOVERY_SCREENING_ONLY',admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',
-        source_sha256=receipt['source_sha256'],children=children,
+        source_sha256=receipt['source_sha256'],checkpoint_sha256=digest(receipt),children=children,
         screening=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']])

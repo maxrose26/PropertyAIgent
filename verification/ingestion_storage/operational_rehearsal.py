@@ -33,12 +33,16 @@ def main():
  for k in ('requested_start','requested_end','applied_start','applied_end'):w[k]=date.fromisoformat(w[k]) if w[k] else None
  e=dict(plan['envelope']);e['window']=WindowEvidence(**w);e['discovered_at']=datetime.fromisoformat(e['discovered_at']);e['displayed_references']=tuple(e['displayed_references']);e['fields']=()
  envelope=DiscoveryEnvelope(**e)
- budget=DatabaseBudget();engines=[];result={'outcome':'UNCONFIRMED_NO_RETRY'}
+ if binding.retained_capture_sha256 and not plan.get('prior_database_accounting'):raise ValueError('PRIOR_ACCOUNTING_REQUIRED')
+ budget=DatabaseBudget(previous=plan.get('prior_database_accounting'));engines=[];result={'outcome':'UNCONFIRMED_NO_RETRY'}
  try:
   engines=[budget.engine(u) for u in urls]
   l=ControllerLedger(engines[0],budget=budget,owner='one',authority='INGESTION_TEST_sql',bindings=plan['bindings'],broker_engine=engines[1],application_engine=engines[2])
   co=Coordinator(l,{contract.name:contract,'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
   result=execute(co,binding,listing_reader=lambda _: (audit,plan['outer']),detail_reader=lambda _: (plan['detail'],plan['outer']),envelope=envelope,council=get_council(target['council']),check=budget.check)
+ except BaseException as exc:
+  result['error_class']=type(exc).__name__
+  raise
  finally:
   account=budget.close(engines);result['database_accounting']=account
   raw=json.dumps(result,sort_keys=True,allow_nan=False).encode()

@@ -113,6 +113,17 @@ def test_retained_capture_continues_with_exact_nominee_without_second_observatio
  l,co,b,a,raw,e=prepared(engine)
  first=capture(co,b.discovery_key,listing_reader=lambda _: (a,outer()))
  assert first['outcome']=='DISCOVERY_SCREENING_ONLY' and first['admission']=='NOT_ATTEMPTED'
- frozen=replace(b,retained_capture_sha256=first['source_sha256'])
+ frozen=replace(b,retained_capture_sha256=first['checkpoint_sha256'])
  result=execute(co,frozen,listing_reader=lambda _:pytest.fail('completed discovery must never repeat'),detail_reader=lambda _: (raw,outer()),envelope=e,council=get_council('bolton'))
  assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
+
+
+def test_aggregate_database_allowance_survives_manual_nomination_pause():
+ previous=dict(connection_attempts=3,driver_statements=90,elapsed_seconds=4.5,connections_closed=True,cleanup='CLOSED',statement_kinds={'cursor':90})
+ b=DatabaseBudget(previous=previous)
+ assert b.attempts==3 and b.statements==90
+ for _ in range(22):b.tick('cursor')
+ with pytest.raises(Denied):b.tick('cursor')
+ for _ in range(8):b.tick('rollback',cleanup=True)
+ with pytest.raises(Denied):b.tick('rollback',cleanup=True)
+ with pytest.raises(Denied):DatabaseBudget(previous=dict(previous,cleanup='UNCERTAIN'))

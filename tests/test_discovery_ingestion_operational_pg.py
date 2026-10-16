@@ -40,16 +40,23 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     m.execute((PACKAGE/'install.sql').read_text())
     m.execute(Path('docs/design/ingestion-operational-20261016/worker.sql').read_text())
     assert m.execute("SELECT pg_has_role(current_user,'ingestion_storage_owner','SET'),has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()==(False,False)
-   # Fixture-only credential activation. Production helper remains BLOCKED.
+   # Exact package installation with comparable non-superuser grant options.
+   app=engine('provisioning_bootstrap');engines.append(app);Base.metadata.create_all(app)
+   writer_sql=Path('docs/design/ingestion-operational-acceptance-20261016/application-writer.sql').read_text()
+   grants='\n'.join(line for line in writer_sql.splitlines() if not line.startswith('CREATE ROLE '))
+   grants=grants.replace(' TO ingestion_application_writer',' TO provisioning_migrator WITH GRANT OPTION')
+   boot.execute(grants)
+   with connect('provisioning_migrator') as migration:
+    migration.execute(writer_sql)
+    migration.execute(Path('docs/design/ingestion-operational-acceptance-20261016/runtime-mappings.sql').read_text())
+   # Fixture-only secret setup. All five tested logins have NOLOGIN first.
    for role in ['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']:
-    if role not in ROLES:boot.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
-    else:boot.execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
-   boot.execute('GRANT ingestion_effect_broker TO ingestion_effect_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
-   boot.execute('GRANT ingestion_recovery_operator TO ingestion_recovery_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
-   worker=engine('ingestion_worker_login');broker=engine('ingestion_effect_login');app=engine('provisioning_bootstrap');engines.extend([worker,broker,app])
-   Base.metadata.create_all(app)
-   boot.execute(Path('docs/design/ingestion-operational-acceptance-20261016/application-writer.sql').read_text())
-   boot.execute('GRANT ingestion_application_writer TO ingestion_application_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
+    if role=='operational_untrusted':boot.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
+    else:boot.execute(sql.SQL('ALTER ROLE {} PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
+   with connect('provisioning_migrator') as migration:migration.execute(Path('docs/design/ingestion-operational-acceptance-20261016/activate.sql').read_text())
+   # Storage and recovery login activation are fixture tests only, not runtime.
+   boot.execute('ALTER ROLE ingestion_storage_login LOGIN');boot.execute('ALTER ROLE ingestion_recovery_login LOGIN')
+   worker=engine('ingestion_worker_login');broker=engine('ingestion_effect_login');engines.extend([worker,broker])
    with Session(app) as s:s.add(Council(code='bolton',name='Bolton',base_url='https://paplanning.bolton.gov.uk',date_field_mode='received',doc_system='idox'));s.commit()
    # Bootstrap constructs fixtures/allowances only; no worker release API exists.
    def seed(reference,task='SCREENING',state='QUEUED',checkpoint=None):
@@ -204,6 +211,8 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    with connect('ingestion_recovery_login') as recovery:r=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(uncertain,cl.fence)).fetchone()[0]
    assert r['state']=='PERSISTENCE_UNCERTAIN'
    with pytest.raises(Exception):x.claim(other)
+   with connect('provisioning_migrator') as migration:migration.execute(Path('docs/design/ingestion-operational-acceptance-20261016/revoke.sql').read_text())
+   assert boot.execute("SELECT count(*) FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_storage_login','ingestion_effect_login','ingestion_application_login','ingestion_recovery_login') AND rolcanlogin").fetchone()[0]==0
    record_property('real_restricted_sql_claims',True);record_property('shared_admission_b2_readback',True);record_property('production_connections',0)
   finally:
    for e in engines:e.dispose()
