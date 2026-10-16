@@ -1,0 +1,99 @@
+{
+  "run": {
+    "id": 38894230179,
+    "number": 1,
+    "attempt": 1,
+    "event": "workflow_dispatch",
+    "revision": "5485ab74a236232a6acf3409383364ad9a5517f6",
+    "status": "completed",
+    "conclusion": "failure",
+    "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38894230179"
+  },
+  "job": [
+    {
+      "id": 116950746714,
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-10-16T11:43:58Z",
+      "completed_at": "2026-10-16T11:44:45Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:43:59Z",
+          "completed_at": "2026-10-16T11:44:00Z"
+        },
+        {
+          "name": "Exact single-use access authority",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:44:00Z",
+          "completed_at": "2026-10-16T11:44:00Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:44:00Z",
+          "completed_at": "2026-10-16T11:44:02Z"
+        },
+        {
+          "name": "Pinned dependencies without production credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:44:02Z",
+          "completed_at": "2026-10-16T11:44:40Z"
+        },
+        {
+          "name": "Verified TLS and catalogue read-only, never migration",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-16T11:44:40Z",
+          "completed_at": "2026-10-16T11:44:41Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:44:41Z",
+          "completed_at": "2026-10-16T11:44:42Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:44:42Z",
+          "completed_at": "2026-10-16T11:44:43Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-16T11:44:43Z",
+          "completed_at": "2026-10-16T11:44:43Z"
+        }
+      ]
+    }
+  ],
+  "master": "5485ab74a236232a6acf3409383364ad9a5517f6",
+  "tree": "be322adc5f274346dffbd938f90c65f52c4c5ea0",
+  "workflow_blob": "071a8d1e5f199fc2b9be50526933fc61f8c6a3ac",
+  "workflow_sha256": "0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c",
+  "artifact": {
+    "id": 12043313332,
+    "bytes": 866,
+    "zip_sha256": "23f8e0808f63bf74621556537d60112970535de33d363ca4ce274673b5ff56b5",
+    "result_bytes": 1222,
+    "result_sha256": "7b761613d39412ef77d692a8be3fae06892dce446718ae8d3e1e98a4315acb76"
+  },
+  "evidence_parent": "d503a2b7faa7ac6c29afa9f7672584d60edc5497",
+  "migration": "NOT_STARTED",
+  "seeding": "NOT_STARTED",
+  "new_production_work_items": 0,
+  "work_attempts_created": 0,
+  "executable_grants_created": 0,
+  "source_calls": 0,
+  "application_writes": 0,
+  "retries": 0
+}
