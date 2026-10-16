@@ -73,3 +73,11 @@ SCREENING_CASE='discovery_manchester_screening_20261001_03'
 SCREENING_CONFIG=replace(dated_config(MANCHESTER,'2026-10-01','2026-10-03'),
     capture_metadata=True,assessment_metadata=True)
 UI_CASES[SCREENING_CASE]=SCREENING_CONFIG
+
+# Explicit finite successor profiles; no new arbitrary-window metadata route.
+METADATA_ROLLOUT_WINDOWS=[('salford', '2026-10-08', '2026-10-14', 'QUALIFICATION'), ('rochdale', '2026-09-17', '2026-09-23', 'QUALIFICATION'), ('manchester', '2026-09-17', '2026-09-19', 'ROLLOUT'), ('manchester', '2026-09-20', '2026-09-23', 'ROLLOUT'), ('manchester', '2026-09-24', '2026-09-26', 'ROLLOUT'), ('manchester', '2026-09-27', '2026-09-30', 'ROLLOUT'), ('manchester', '2026-10-04', '2026-10-07', 'ROLLOUT'), ('manchester', '2026-10-08', '2026-10-14', 'ROLLOUT'), ('salford', '2026-09-17', '2026-09-23', 'ROLLOUT'), ('salford', '2026-09-24', '2026-09-30', 'ROLLOUT'), ('salford', '2026-10-01', '2026-10-07', 'ROLLOUT'), ('rochdale', '2026-09-24', '2026-09-30', 'ROLLOUT'), ('rochdale', '2026-10-01', '2026-10-07', 'ROLLOUT')]
+METADATA_ROLLOUT_CONFIGS={}
+for _i,(_c,_a,_b,_purpose) in enumerate(METADATA_ROLLOUT_WINDOWS):
+    _case=f"discovery_metadata_rollout_{_i:02d}"
+    METADATA_ROLLOUT_CONFIGS[_case]=replace(dated_config({"manchester":MANCHESTER,"salford":SALFORD,"rochdale":ROCHDALE}[_c],_a,_b),capture_metadata=True,assessment_metadata=True)
+UI_CASES.update(METADATA_ROLLOUT_CONFIGS)
