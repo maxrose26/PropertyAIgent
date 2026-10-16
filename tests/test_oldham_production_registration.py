@@ -55,6 +55,10 @@ def test_environment_is_exclusive_to_live_job():
     assert live['jobs']['audit']['environment']=='stage4-production-canary'
     for path,workflow in workflows.items():
         for job_id,job in workflow.get('jobs',{}).items():
+            if (path,job_id)==('.github/workflows/stage4-ingestion-storage-catalogue-once.yml','catalogue'):
+                import hashlib
+                assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='0ad0e1931253639e883947b996147181c23b8a0fee1845d614fa99c7b632989c'
+                continue
             if (path,job_id) in {('.github/workflows/stage4-bolton-delta3-comparison-once.yml','comparison'),('.github/workflows/stage4-oldham-two-capture-once.yml','source')}:
                 from tests.test_discovery_narrow_continuation import assert_registered
                 assert_registered('comparison3' if job_id=='comparison' else 'oldham2',Path(path).read_bytes())
