@@ -1,0 +1,229 @@
+{
+  "authority": "CONSUMED_RUN1_ATTEMPT1_NO_RESUME",
+  "bridge": [
+    {
+      "live_calls_proposed": 0,
+      "successor": "BLOCKED_TOTAL_TERMINAL_PROOF",
+      "window": {
+        "council": "bolton",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "PRESERVE_COMPLETE_NO_REPLAY",
+      "window": {
+        "council": "bury",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "independent_coverage": "UNKNOWN",
+      "live_calls_proposed": 0,
+      "publication_recall": "UNKNOWN",
+      "references": 0,
+      "run": "38870228310",
+      "successor": "OBSERVED_ENUMERATION_COMPLETE_EXPLICIT_ZERO",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "BLOCKED_SORT_SHAPE_PROOF",
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "HELD_NO_LIVE_AUTHORITY",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "HELD_NO_LIVE_AUTHORITY",
+      "window": {
+        "council": "salford",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "HELD_NO_LIVE_AUTHORITY",
+      "window": {
+        "council": "stockport",
+        "end": "2026-10-15",
+        "semantics": "VALIDATED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "HELD_NO_LIVE_AUTHORITY",
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    },
+    {
+      "live_calls_proposed": 0,
+      "successor": "HELD_NO_LIVE_AUTHORITY",
+      "window": {
+        "council": "wigan",
+        "end": "2026-10-15",
+        "semantics": "RECEIVED",
+        "start": "2026-10-15"
+      }
+    }
+  ],
+  "cross_observation_changes": "UNASSESSABLE_NO_SALFORD_ENUMERATION",
+  "database_catchup": "INCOMPLETE",
+  "factual_capture": "ZERO_NEW_PRODUCTION_OPERATIONS; Oldham1507\u20131508 FACTS_WITHHELD preserved",
+  "historical_unresolved": [
+    {
+      "evidence_sha256": "4bc2661fe6544d8af0b5b312078857a2a2616187380db94477eb81e6dfbc3257",
+      "latest_enumeration": "UNKNOWN",
+      "residual_category": "UNKNOWN",
+      "run": "38731487848",
+      "window": {
+        "council": "bury",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "evidence_sha256": "ec10aef055b16a9dde50ffb92578780cc4160bd2314bb8467698bdded5abeb57",
+      "latest_enumeration": "FAILED",
+      "residual_category": "FAILED",
+      "run": "38758465439",
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-14",
+        "semantics": "RECEIVED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "evidence_sha256": "67779e58373c68b5a67df2d1204828ef2c9a83972d3a4acd69ce947f96d449b5",
+      "latest_enumeration": "FAILED",
+      "residual_category": "FAILED",
+      "run": "38786550045",
+      "window": {
+        "council": "rochdale",
+        "end": "2026-10-14",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      }
+    },
+    {
+      "evidence_sha256": "0968d39896037ee10651a2fe8309362f6a40c28945404a6a2de154d3e5d18bba",
+      "latest_enumeration": "FAILED",
+      "residual_category": "FAILED",
+      "run": "38805348801",
+      "window": {
+        "council": "tameside",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      }
+    }
+  ],
+  "independent_only": {
+    "rochdale": 8,
+    "tameside": 16
+  },
+  "maintenance": {
+    "daily_weekly_cadence_and_budgets": "PROPOSALS_ONLY",
+    "direction": "AGREED_IN_PRINCIPLE_ONLY",
+    "first_closed_cut_local": "2026-10-17T00:00:00+01:00",
+    "first_closed_cut_utc": "2026-10-16T23:00:00Z",
+    "open_local_day": "2026-10-16",
+    "qualified_councils": "May operate only after explicit operational approval;blocked councils retain named gaps,never silent reducedcoverage",
+    "roadmap": "Shared discovery/metadata/screening/citation/dedup/retention can be considered duringStages5\u20138 afterStage4 acceptance and explicit operational acceptance;Stage9 gates recurring buyer-specific acquisition interpretation, not all shared ingestion.",
+    "start": "2026-10-16",
+    "validation_required": [
+      "multi-day pagination",
+      "late-publication limitations",
+      "overlap costs",
+      "failure recovery",
+      "per-source operational acceptance",
+      "bounded prospective acceptance test"
+    ],
+    "watermarks_advanced": false
+  },
+  "metadata_accepted_before_this_run": 14,
+  "metadata_capture": {
+    "manchester": {
+      "captured": 14,
+      "original": 252,
+      "remaining": 238
+    },
+    "rochdale": {
+      "captured": 0,
+      "original": 46,
+      "remaining": 46
+    },
+    "salford": {
+      "captured": 0,
+      "original": 117,
+      "remaining": 117
+    }
+  },
+  "metadata_remaining_before_this_run": 401,
+  "metadata_remaining_total": 401,
+  "metadata_verified_total": 14,
+  "parents": "HELD",
+  "pending_fact_dispositions": {
+    "ALREADY_KNOWN": 0,
+    "COMMITTED_PENDING_IDENTITY": 2,
+    "FACTS_WITHHELD": 2,
+    "INITIAL_FACTS_VERIFIED": 0,
+    "ROLLBACK_IDENTITY_OUTCOMES": 0,
+    "UNCERTAIN_COMMIT_OR_READBACK": 0
+  },
+  "preserved_production_ids": [
+    1504,
+    1505,
+    1506,
+    1507,
+    1508
+  ],
+  "prior_evidence_commit": "6ed051d6d8e70855ecee58bfa2cc2b2d5e1e3ff0",
+  "priorities": [
+    "REVIEW globalstop disposition and retained failure evidence; no retry/replacement or separate-workflow bypass",
+    "Grouped screening product decision; no live calls required",
+    "Four historicalwindows and seven unresolved15October bridge rows remain separate held sourcecoverage work",
+    "Operational acceptance and bounded prospective validation before maintenance"
+  ],
+  "qualification": {
+    "rochdale": "NOT_EXECUTED_GLOBAL_STOP",
+    "salford": "EXHAUSTED_NO_GO_CRITERIA_TARGET_CLOSED"
+  },
+  "rollout": "11WINDOWS_NOT_EXECUTED_GLOBAL_STOP",
+  "scheduling": "NOT_AUTHORISED",
+  "screening_cohort_total": 415,
+  "stage4": "OPEN",
+  "stockport_factual_contract_expansion": "HELD",
+  "trafford": "OUT_OF_SCOPE"
+}

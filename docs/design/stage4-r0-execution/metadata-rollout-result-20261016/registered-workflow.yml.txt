@@ -1,0 +1,1032 @@
+#13 fixed observations; sequential; every non-GO stops all successors.
+name: Stage4 finite metadata qualification and rollout ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      manifest_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: stage4-catchup-completion-sequential
+  cancel-in-progress: false
+jobs:
+  scope_00:
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "0"
+      PREVIOUS_GO: GENESIS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-00-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_01:
+    needs: scope_00
+    if: ${{ success() && needs.scope_00.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "1"
+      PREVIOUS_GO: ${{ needs.scope_00.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-01-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_02:
+    needs: scope_01
+    if: ${{ success() && needs.scope_01.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "2"
+      PREVIOUS_GO: ${{ needs.scope_01.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-02-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_03:
+    needs: scope_02
+    if: ${{ success() && needs.scope_02.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "3"
+      PREVIOUS_GO: ${{ needs.scope_02.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-03-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_04:
+    needs: scope_03
+    if: ${{ success() && needs.scope_03.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "4"
+      PREVIOUS_GO: ${{ needs.scope_03.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-04-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_05:
+    needs: scope_04
+    if: ${{ success() && needs.scope_04.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "5"
+      PREVIOUS_GO: ${{ needs.scope_04.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-05-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_06:
+    needs: scope_05
+    if: ${{ success() && needs.scope_05.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "6"
+      PREVIOUS_GO: ${{ needs.scope_05.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-06-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_07:
+    needs: scope_06
+    if: ${{ success() && needs.scope_06.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "7"
+      PREVIOUS_GO: ${{ needs.scope_06.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-07-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_08:
+    needs: scope_07
+    if: ${{ success() && needs.scope_07.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "8"
+      PREVIOUS_GO: ${{ needs.scope_07.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-08-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_09:
+    needs: scope_08
+    if: ${{ success() && needs.scope_08.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "9"
+      PREVIOUS_GO: ${{ needs.scope_08.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-09-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_10:
+    needs: scope_09
+    if: ${{ success() && needs.scope_09.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "10"
+      PREVIOUS_GO: ${{ needs.scope_09.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-10-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_11:
+    needs: scope_10
+    if: ${{ success() && needs.scope_10.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "11"
+      PREVIOUS_GO: ${{ needs.scope_10.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-11-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14
+  scope_12:
+    needs: scope_11
+    if: ${{ success() && needs.scope_11.outputs.go == 'GO' }}
+    outputs:
+      go: ${{ steps.qualification.outputs.go }}
+    env:
+      SCOPE_INDEX: "12"
+      PREVIOUS_GO: ${{ needs.scope_11.outputs.go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-metadata-rollout-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_METADATA_13_SEQUENTIAL_20261016_ONCE'
+          test "$MANIFEST_SHA" = 'db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Existing bounded browser runtime, no council access
+        run: '"$RUNNER_TEMP/r0-venv/bin/python" -m playwright install --with-deps chromium --only-shell'
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.metadata_rollout import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ,int(os.environ['SCOPE_INDEX']))
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised fixed scope, no database
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 70s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Verify aggregate audit and identity before upload
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --verify-audit --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+      - name: Require GO and CLOSED cleanup before any successor
+        id: qualification
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.metadata_rollout --require-go --scope "$SCOPE_INDEX" --output "$RUNNER_TEMP/metadata-audit"
+          echo 'go=GO' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: metadata-scope-12-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/metadata-audit
+          if-no-files-found: error
+          retention-days: 14

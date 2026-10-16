@@ -1,0 +1,1874 @@
+{
+  "citation_literal_candidates_with_retained_matches": 0,
+  "citation_occurrences": 5,
+  "commercial_qualification": false,
+  "coverage_by_council": {
+    "manchester": {
+      "captured": 14,
+      "original": 252,
+      "remaining": 238
+    },
+    "rochdale": {
+      "captured": 0,
+      "original": 46,
+      "remaining": 46
+    },
+    "salford": {
+      "captured": 0,
+      "original": 117,
+      "remaining": 117
+    }
+  },
+  "current_only_captured": 0,
+  "current_only_identities": [],
+  "database_operations": 0,
+  "field_states_all_observed": {
+    "address": {
+      "PRESENT_VALUE": 14
+    },
+    "application_type": {
+      "PRESENT_VALUE": 14
+    },
+    "proposal": {
+      "PRESENT_VALUE": 14
+    },
+    "received_date": {
+      "UNKNOWN": 14
+    },
+    "validated_date": {
+      "PRESENT_VALUE": 14
+    }
+  },
+  "global_stop": "LISTING_NOT_QUALIFIED",
+  "missing_identities": [
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001487"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001685"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001697"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001699"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001702"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001708"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001715"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001716"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001719"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001754"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001755"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001783"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001785"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001791"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001792"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001814"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001846"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001856"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001871"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001897"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001906"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001924"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001930"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001945"
+    },
+    {
+      "council": "manchester",
+      "reference": "NOT-2026-001949"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001336"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001373"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001387"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001511"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001672"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001673"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001686"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001687"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001690"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001692"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001706"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001707"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001712"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001713"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001722"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001723"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001724"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001726"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001730"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001734"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001735"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001737"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001738"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001741"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001742"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001743"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001747"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001748"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001749"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001750"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001756"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001757"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001758"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001759"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001761"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001762"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001764"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001766"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001768"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001769"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001771"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001772"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001773"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001776"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001777"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001787"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001793"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001794"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001795"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001799"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001801"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001802"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001808"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001809"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001811"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001821"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001824"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001840"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001849"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001863"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001865"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001866"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001873"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001874"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001876"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001879"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001880"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001883"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001885"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001886"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001890"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001893"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001896"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001899"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001904"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001909"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001913"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001914"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001920"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001925"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001926"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001932"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001933"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001946"
+    },
+    {
+      "council": "manchester",
+      "reference": "OTH-2026-001947"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000026"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000098"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000568"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000583"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000806"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000968"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-000977"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001074"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001216"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001218"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001219"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001227"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001237"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001249"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001256"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001287"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001349"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001365"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001366"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001374"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001422"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001439"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001445"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001450"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001458"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001464"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001477"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001486"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001489"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001494"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001499"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001510"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001512"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001517"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001526"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001564"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001566"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001569"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001570"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001580"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001581"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001589"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001592"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001594"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001599"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001617"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001621"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001636"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001644"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001645"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001648"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001650"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001653"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001657"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001658"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001669"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001670"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001674"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001677"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001678"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001681"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001683"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001684"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001693"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001703"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001704"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001705"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001714"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001718"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001720"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001727"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001728"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001731"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001732"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001744"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001760"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001767"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001775"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001779"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001780"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001784"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001788"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001789"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001790"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001798"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001800"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001807"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001810"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001812"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001813"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001815"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001816"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001817"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001819"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001822"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001825"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001841"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001842"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001843"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001848"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001851"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001852"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001853"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001855"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001857"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001858"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001861"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001867"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001870"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001872"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001877"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001888"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001891"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001901"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001902"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001903"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001905"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001907"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001908"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001910"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001916"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001922"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001927"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001928"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001929"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001931"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001942"
+    },
+    {
+      "council": "manchester",
+      "reference": "PLA-2026-001961"
+    },
+    {
+      "council": "rochdale",
+      "reference": "25/00943/HOUS"
+    },
+    {
+      "council": "rochdale",
+      "reference": "NOT/2026/0884"
+    },
+    {
+      "council": "rochdale",
+      "reference": "NOT/2026/0912"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0851"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0852"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0866"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0876"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0880"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0881"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0886"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0888"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0892"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0901"
+    },
+    {
+      "council": "rochdale",
+      "reference": "OTH/2026/0902"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0166"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0503"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0556"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0585"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0631"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0655"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0713"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0724"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0752"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0768"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0777"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0780"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0785"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0796"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0813"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0814"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0861"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0864"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0878"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0879"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0882"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0889"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0894"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0906"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0911"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0913"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0915"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0917"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0918"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0922"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0924"
+    },
+    {
+      "council": "rochdale",
+      "reference": "PL/2026/0928"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1218"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1266"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1304"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1307"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1308"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1323"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1328"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1329"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1385"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1405"
+    },
+    {
+      "council": "salford",
+      "reference": "NOT/2026/1412"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1302"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1306"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1309"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1310"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1317"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1318"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1320"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1325"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1326"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1332"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1335"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1336"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1338"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1341"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1342"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1347"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1356"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1360"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1361"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1362"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1364"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1370"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1373"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1374"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1376"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1377"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1379"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1382"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1387"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1388"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1395"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1396"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1397"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1414"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1425"
+    },
+    {
+      "council": "salford",
+      "reference": "OTH/2026/1426"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/0121"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/0478"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/0980"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1007"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1030"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1033"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1047"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1063"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1098"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1125"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1127"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1132"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1144"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1147"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1151"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1191"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1192"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1203"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1207"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1210"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1211"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1214"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1217"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1224"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1225"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1226"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1228"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1229"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1230"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1243"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1244"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1248"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1254"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1264"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1275"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1280"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1281"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1288"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1299"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1301"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1303"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1311"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1313"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1314"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1315"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1316"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1319"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1321"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1322"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1324"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1330"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1331"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1333"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1334"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1337"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1344"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1348"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1349"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1350"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1353"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1355"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1357"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1359"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1365"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1368"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1369"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1371"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1378"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1380"
+    },
+    {
+      "council": "salford",
+      "reference": "PA/2026/1381"
+    }
+  ],
+  "missingness_interpretation": "NewSalford fields not assessed because no rows qualified. Empty field counters do not establish field absence. AcceptedManchester14 remain untruncated/unambiguous;received dates14UNKNOWN.",
+  "observations": [
+    {
+      "audit_bytes": 6111,
+      "council": "salford",
+      "cross_observation_difference_assessable": false,
+      "current_source_record_ids_changed": [],
+      "difference_interpretation": "NO_ENUMERATION_OBSERVED; historical_only list in original result is context set subtraction, NOT current source absence or observed changed identities.",
+      "end": "2026-10-14",
+      "hashes": {
+        "checkpoints/000.json": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+        "execution.json": "4c639be248c1231ec7d649e6d487c8af20d07808280dc6aa34f8955a4cf97951",
+        "result.json": "bd3f2bc2976c190e457c7f5270b75f7ed5a2763a1d5098bcce132a19d3a44531"
+      },
+      "historical_context_count": 12,
+      "index": 0,
+      "result": {
+        "accounting_complete": true,
+        "bytes": 10850227,
+        "checkpoint_bytes": 4298,
+        "checkpoint_sha256": [
+          "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"
+        ],
+        "citation_complete": false,
+        "completed_through_advanced": false,
+        "council": "salford",
+        "enumeration_outcome": "FAILED",
+        "field_states": {
+          "address": {},
+          "application_type": {},
+          "proposal": {},
+          "received_date": {},
+          "validated_date": {}
+        },
+        "independent_publication_coverage": "UNKNOWN",
+        "observation_difference": {
+          "current_only": [],
+          "historical_only": [
+            "NOT/2026/1266",
+            "NOT/2026/1405",
+            "NOT/2026/1412",
+            "OTH/2026/1373",
+            "OTH/2026/1414",
+            "OTH/2026/1425",
+            "OTH/2026/1426",
+            "PA/2026/0980",
+            "PA/2026/1047",
+            "PA/2026/1288",
+            "PA/2026/1349",
+            "PA/2026/1353"
+          ],
+          "meaning": "CROSS_OBSERVATION_DIFFERENCE_NOT_RETROSPECTIVE_MISS_OR_ABSENCE"
+        },
+        "outcome": "NO_GO",
+        "outer_supervisor": {
+          "audit_byte_limit": 2097152,
+          "cleanup": "CLOSED",
+          "deadline_seconds": 60,
+          "elapsed_seconds": 4.375,
+          "exit_code": 0,
+          "expired": false,
+          "final_containment": "DISPOSABLE_HOSTED_VM",
+          "limit_hit": null,
+          "live_owned_survivors": 0,
+          "peak_owned_rss": 881168384,
+          "restarted": false,
+          "rss_limit_bytes": 1610612736
+        },
+        "persistence": false,
+        "proposal_capture": {
+          "full_mechanism_success": false,
+          "rows": 0,
+          "usable": 0
+        },
+        "purpose": "QUALIFICATION",
+        "requests": 20,
+        "row_evidence_revalidated": true,
+        "rows": [],
+        "scope_index": 0,
+        "screening_dispositions": {},
+        "stop_reason": "SOURCE_OR_ACCOUNTING_NOT_COMPLETE",
+        "truncated": {
+          "address": 0,
+          "application_type": 0,
+          "proposal": 0,
+          "received_date": 0,
+          "validated_date": 0
+        },
+        "window": [
+          "2026-10-08",
+          "2026-10-14"
+        ]
+      },
+      "segments": [],
+      "source_resources": {
+        "cleanup": "CONTEXT_BROWSER_CLOSED",
+        "decoded_bytes": 10845097,
+        "elapsed_seconds": 2.844,
+        "encoded_bytes": 2650524,
+        "failure": "LISTING_NOT_QUALIFIED",
+        "listing_failure": "TargetClosedError",
+        "live_owned_survivors": 0,
+        "outbound_payload_bytes": 5130,
+        "peak_owned_rss": 809578496,
+        "process_cleanup": "CLOSED",
+        "requests": 20,
+        "safety_events": [
+          "LISTING_NOT_QUALIFIED"
+        ],
+        "safety_failure": true,
+        "supervisor_limit_hit": false,
+        "supervisor_seconds": 3.624
+      },
+      "start": "2026-10-08",
+      "status": "NO_GO"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-09-23",
+      "historical_context_count": 13,
+      "index": 1,
+      "start": "2026-09-17",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-19",
+      "historical_context_count": 27,
+      "index": 2,
+      "start": "2026-09-17",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-23",
+      "historical_context_count": 46,
+      "index": 3,
+      "start": "2026-09-20",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-26",
+      "historical_context_count": 25,
+      "index": 4,
+      "start": "2026-09-24",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-09-30",
+      "historical_context_count": 44,
+      "index": 5,
+      "start": "2026-09-27",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-07",
+      "historical_context_count": 53,
+      "index": 6,
+      "start": "2026-10-04",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "manchester",
+      "end": "2026-10-14",
+      "historical_context_count": 43,
+      "index": 7,
+      "start": "2026-10-08",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "salford",
+      "end": "2026-09-23",
+      "historical_context_count": 39,
+      "index": 8,
+      "start": "2026-09-17",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "salford",
+      "end": "2026-09-30",
+      "historical_context_count": 37,
+      "index": 9,
+      "start": "2026-09-24",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-07",
+      "historical_context_count": 29,
+      "index": 10,
+      "start": "2026-10-01",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-09-30",
+      "historical_context_count": 15,
+      "index": 11,
+      "start": "2026-09-24",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-10-07",
+      "historical_context_count": 18,
+      "index": 12,
+      "start": "2026-10-01",
+      "status": "NOT_EXECUTED_HELD_BY_CHAIN"
+    }
+  ],
+  "original_cohort": 415,
+  "remaining_original_cohort": 401,
+  "retained_citation_matching_identity_union_count": 947,
+  "retry_or_replacement_executed": false,
+  "screening_dispositions_by_observation": {
+    "INSUFFICIENT_EVIDENCE": 9,
+    "RELATED_APPLICATION_FOLLOW_THROUGH": 5
+  },
+  "source_date_coverage_advanced": false,
+  "stage4": "OPEN",
+  "unique_qualified_proposal_coverage": 14,
+  "verified_relationships": 0
+}

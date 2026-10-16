@@ -1,0 +1,561 @@
+{
+  "integration": {
+    "sha": "f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+    "node_id": "C_kwDOToZJi9oAKGY1YTVkOTJjNDJjNjcwOGMyNGM5ZjZjNmNmMTBkNjMxMGIxYmJlZGY",
+    "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+    "author": {
+      "name": "maxrose26",
+      "email": "maxrose26@gmail.com",
+      "date": "2026-10-16T09:54:40Z"
+    },
+    "committer": {
+      "name": "GitHub",
+      "email": "noreply@github.com",
+      "date": "2026-10-16T09:54:40Z"
+    },
+    "tree": {
+      "sha": "5b35da2516f1a97490bc044ff504c0d64f6bb7d9",
+      "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/trees/5b35da2516f1a97490bc044ff504c0d64f6bb7d9"
+    },
+    "message": "Integrate bounded metadata qualification and conditional rollout [skip render]\n\n13 exact sequential observations, run1/attempt1 only. No retry, replacement, details, documents, models, database, parents, schedule or deployment. Stage4 remains OPEN.",
+    "parents": [
+      {
+        "sha": "a32e2d1a0cd532ab3b209530ce76f1e5de4695c2",
+        "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/a32e2d1a0cd532ab3b209530ce76f1e5de4695c2",
+        "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/a32e2d1a0cd532ab3b209530ce76f1e5de4695c2"
+      },
+      {
+        "sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+        "url": "https://api.github.com/repos/maxrose26/PropertyAIgent/git/commits/f42238641e96280d35e2705ff95acc6cc55395ec",
+        "html_url": "https://github.com/maxrose26/PropertyAIgent/commit/f42238641e96280d35e2705ff95acc6cc55395ec"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq0fRgCRC1aQ7uu5UhlAAAIRsQAGgCNBTntJtNYPn+rcVRer4W\nRJatK8Js8w1E57hPP4HEVy3dtiJDRyf7yxXmTTZoCgvf3//6dGUffu/pQCNNv9Xy\naOxXoeyHguSSmipmOVZ+IXBBSJo8ZUz6nUqeG/CERLWjF1bovrGgeIWrmxEQKkKw\nN5zc5IS45a7DrkrGGkbLleS3gZ+pOS2sOLIPfIwmxBz96Q9tK1YpaeGoNGnbwouB\nWV9GMI6OEuZitWiTjwkwJn3AusWZfgyG6POlwdfBEWjZ6mb8FpBOhTUmjzXe32Wg\nEhWkD8Lg2FhCAKXzeQ1cN6bbCpyFfmjVGcyoc4k43RYbe7LUqtMdTmZCJxdJOHVd\nSB8s4FCOCSF5/0mkFc8A99IYhAbCfq1Yh2L3bCBVmHctKDwxIzxtEVWegGIQ9Rgc\nLBd1xS5W7zRMKmUQoBHuZgv9SAR9L2Dmd63jhw+SIZbRGbSkWieiqQSrODnMI4C7\n71PR3qBSCc2ybJEvBtkYIqjWazrzhEn+wfuG/EkUvjnbPPIGmeyE2SFsEBS73aa8\nWDCao8hsf0navODgHJSewV5IEUiG/i/yhb/sM+kejZ+042BUs9ZFjBRPk8wWeKbV\nwVcXuDUyrPA/WXeVm5YwyClApz6Pp4EnUf5ANUCx8vtd5Ddv+z837Dw/kcAUxuzu\nGQahYY0cIDYw9ejoM7i6\n=O/WP\n-----END PGP SIGNATURE-----\n",
+      "payload": "tree 5b35da2516f1a97490bc044ff504c0d64f6bb7d9\nparent a32e2d1a0cd532ab3b209530ce76f1e5de4695c2\nparent f42238641e96280d35e2705ff95acc6cc55395ec\nauthor maxrose26 <maxrose26@gmail.com> 1792144480 +0100\ncommitter GitHub <noreply@github.com> 1792144480 +0100\n\nIntegrate bounded metadata qualification and conditional rollout [skip render]\n\n13 exact sequential observations, run1/attempt1 only. No retry, replacement, details, documents, models, database, parents, schedule or deployment. Stage4 remains OPEN.",
+      "verified_at": "2026-10-16T09:54:41Z"
+    }
+  },
+  "reviewed_head": "f42238641e96280d35e2705ff95acc6cc55395ec",
+  "implementation_tree": "5b35da2516f1a97490bc044ff504c0d64f6bb7d9",
+  "workflow_blob": "8dfae81a9bfa499d5ca4012849221b07d07b75f6",
+  "workflow_sha256": "6d87bfd048a28e0866d192008c2e60c5c50a5e8330b73e217a192c833176845b",
+  "manifest_blob": "9da6736e075ce9f54c94474b6c8c12c7d6e7b4bc",
+  "manifest_sha256": "db867ad45e1425c603edd9729efe1127f2eb6a38998baf0cbdcf8631b79bd5d1",
+  "head_checks": [
+    {
+      "id": 116914914932,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264800/job/116914914932"
+    },
+    {
+      "id": 116914914627,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264800/job/116914914627"
+    },
+    {
+      "id": 116914855863,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883256223/job/116914855863"
+    },
+    {
+      "id": 116914855216,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883256223/job/116914855216"
+    },
+    {
+      "id": 116914821900,
+      "name": "probe",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264847/job/116914821900"
+    },
+    {
+      "id": 116914820557,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883265248/job/116914820557"
+    },
+    {
+      "id": 116914820172,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883265248/job/116914820172"
+    },
+    {
+      "id": 116914819179,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264893/job/116914819179"
+    },
+    {
+      "id": 116914819127,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264901/job/116914819127"
+    },
+    {
+      "id": 116914818911,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264817/job/116914818911"
+    },
+    {
+      "id": 116914818745,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264829/job/116914818745"
+    },
+    {
+      "id": 116914818737,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264893/job/116914818737"
+    },
+    {
+      "id": 116914818667,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264817/job/116914818667"
+    },
+    {
+      "id": 116914818631,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f42238641e96280d35e2705ff95acc6cc55395ec",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38883264829/job/116914818631"
+    }
+  ],
+  "manual_history": {
+    "total": 43,
+    "listed": 43,
+    "runs": [
+      {
+        "id": 38880753411,
+        "path": ".github/workflows/stage4-manchester-screening-assessment-once.yml",
+        "sha": "a32e2d1a0cd532ab3b209530ce76f1e5de4695c2",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38871588708,
+        "path": ".github/workflows/stage4-oldham-two-capture-once.yml",
+        "sha": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38870585057,
+        "path": ".github/workflows/stage4-bolton-delta3-comparison-once.yml",
+        "sha": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38870228310,
+        "path": ".github/workflows/stage4-manchester-20261015-once.yml",
+        "sha": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38824329688,
+        "path": ".github/workflows/stage4-catchup-completion-bridge9-once.yml",
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38824069251,
+        "path": ".github/workflows/stage4-catchup-completion-residual4-once.yml",
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38823673985,
+        "path": ".github/workflows/stage4-catchup-completion-screen14-once.yml",
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38821962637,
+        "path": ".github/workflows/stage4-catchup-completion-comparison944-once.yml",
+        "sha": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38813486644,
+        "path": ".github/workflows/stage4-r0-mandate-unresolved4-once.yml",
+        "sha": "f6525edffb514a79343191860056e1bed3e66082",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38812885933,
+        "path": ".github/workflows/stage4-r0-mandate-untouched5-once.yml",
+        "sha": "f6525edffb514a79343191860056e1bed3e66082",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38812359777,
+        "path": ".github/workflows/stage4-r0-mandate-partitions8-once.yml",
+        "sha": "f6525edffb514a79343191860056e1bed3e66082",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38811609389,
+        "path": ".github/workflows/stage4-r0-selective5-admission-once.yml",
+        "sha": "f6525edffb514a79343191860056e1bed3e66082",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38807635572,
+        "path": ".github/workflows/stage4-bolton-two-parent-metadata-once.yml",
+        "sha": "ebae8fb63d8a4945f603a5492d3b20df42500cb9",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38805348801,
+        "path": ".github/workflows/stage4-r0-untouched9-once.yml",
+        "sha": "fd3b00e23c82533df1abd4c9f0d00506abc7fe6e",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38798433667,
+        "path": ".github/workflows/stage4-r0-untouched16-once.yml",
+        "sha": "0cfbf5ded5eaef46d0fb754e0e5c057f59554ff4",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38789547636,
+        "path": ".github/workflows/stage4-r0-bolton53-qualification-once.yml",
+        "sha": "88ae288abf6e0e233502059cf3d74e1c9f6c929d",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38786550045,
+        "path": ".github/workflows/stage4-r0-untouched20-once.yml",
+        "sha": "0eec734da0cc1a7580385003a7dc9ed797f74bd2",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38758465439,
+        "path": ".github/workflows/stage4-r0-untouched27-once.yml",
+        "sha": "77356e04ef855f7373b96b9210f593e9b96c897c",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38758282951,
+        "path": ".github/workflows/stage4-r0-fixed80-qualification-once.yml",
+        "sha": "77356e04ef855f7373b96b9210f593e9b96c897c",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38744118357,
+        "path": ".github/workflows/stage4-r0-untouched-recovery-once.yml",
+        "sha": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38742149312,
+        "path": ".github/workflows/stage4-r0-identity-comparison-once.yml",
+        "sha": "1db78f4f44dd8ff9f28140a98ad15116ca1d5ee0",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38731487848,
+        "path": ".github/workflows/stage4-r0-source-date-once.yml",
+        "sha": "388532c640a22ca89f2409686db168c90db57ac9",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38712922112,
+        "path": ".github/workflows/stage4-route-qualified-material-admission-once.yml",
+        "sha": "db8779467017d3973c00dc6b34eefba3e94a767e",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38709724423,
+        "path": ".github/workflows/stage4-route-preflight-once.yml",
+        "sha": "1b3b4005e34acc1be574932b2c681ed81cb16760",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38655110927,
+        "path": ".github/workflows/stage4-material-cohort-admission-once.yml",
+        "sha": "e1e98704913b572e46822f1fbe2b5a273f47bbd9",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38652271830,
+        "path": ".github/workflows/stage4-material-cohort-qualification-once.yml",
+        "sha": "a5ba90bde99a86810e10e3710925d89598b9e7b9",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38646294680,
+        "path": ".github/workflows/stage4-salford-1506-diagnostic-once.yml",
+        "sha": "25a21bf1ed5bb97d8c09b28fce234542884c1f59",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38642693250,
+        "path": ".github/workflows/stage4-committee-admission-once.yml",
+        "sha": "80ebff159f8d891e854eae77310eb51bc1a60a10",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38520243500,
+        "path": ".github/workflows/stage4-salford15-production-once.yml",
+        "sha": "4bed88c75da616b18246630dc73c1acf725b1a08",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38475718624,
+        "path": ".github/workflows/stage4-arcus-production-once.yml",
+        "sha": "898c0c93889aa9df8fa5454818cf45de0a920d25",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38413852586,
+        "path": ".github/workflows/stage4-closure-expanded-production-once.yml",
+        "sha": "0faf21507ddfe09a41ecf77049e131e63e5a2e58",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38412970362,
+        "path": ".github/workflows/stage4-closure-pending-production-once.yml",
+        "sha": "0faf21507ddfe09a41ecf77049e131e63e5a2e58",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38389318329,
+        "path": ".github/workflows/stage4-catchup-a-production-once.yml",
+        "sha": "5cc3a4914678b2fe52b106496fdd0a48a178f362",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38383222682,
+        "path": ".github/workflows/stage4-batch-production-once.yml",
+        "sha": "07ecc78676375c2a92fc138382a35b055547bd4f",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38370055696,
+        "path": ".github/workflows/stage4-oldham-production-once.yml",
+        "sha": "ffadc8c5df5ce3df68ea552582c228bd47e7a371",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38310507094,
+        "path": ".github/workflows/stage4-direct-live-once.yml",
+        "sha": "a0feeb7c1cd39c979e2a9018b82d764d1edcd76b",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38261103485,
+        "path": ".github/workflows/bolton-discovery-recon.yml",
+        "sha": "d253773a09690f27b150adb701c95f9aa3ee210f",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38181977284,
+        "path": ".github/workflows/bolton-literal-canary.yml",
+        "sha": "bfc158838a5c1e7869b946aa1a1cd30d5ba53053",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38125085437,
+        "path": ".github/workflows/oldham-form-metadata.yml",
+        "sha": "f876b50a925cb8485750aef7a3815872ade6e7c2",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 38121984420,
+        "path": ".github/workflows/l1-oldham-canary.yml",
+        "sha": "1e1159fa85058d71da8a9b9c555c8071a5055fc2",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 1,
+        "attempt": 1
+      },
+      {
+        "id": 36846625500,
+        "path": ".github/workflows/ah-native-postgres.yml",
+        "sha": "5f1c41027ee1052c131faaeac83d9e04b3a8cf2d",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 5,
+        "attempt": 1
+      },
+      {
+        "id": 36840164825,
+        "path": ".github/workflows/ah-native-postgres.yml",
+        "sha": "f0be8a2b297c9d756340a6922b4b1962536c570e",
+        "status": "completed",
+        "conclusion": "success",
+        "run_number": 4,
+        "attempt": 1
+      },
+      {
+        "id": 36837575801,
+        "path": ".github/workflows/ah-native-postgres.yml",
+        "sha": "a446fd833fe9259ff1fdb0ddef782e8d2c6f68d4",
+        "status": "completed",
+        "conclusion": "failure",
+        "run_number": 3,
+        "attempt": 1
+      }
+    ]
+  },
+  "ownership": {
+    "evidence_expected_head": "6ed051d6d8e70855ecee58bfa2cc2b2d5e1e3ff0",
+    "previous_publisher": "NO_ACTIVE_EXECUTION_OR_PUBLISHER_OBSERVED",
+    "isolated_worktree": true,
+    "no_existing_work_overwritten": true
+  }
+}

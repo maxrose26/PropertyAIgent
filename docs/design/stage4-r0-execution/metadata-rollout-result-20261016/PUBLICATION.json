@@ -1,0 +1,23 @@
+{
+  "accepted_predecessor_preserved": true,
+  "artifact_id": 12038766451,
+  "artifact_sha256": "5f57cc450619db261f009df903690cb7d83e1eade016db1a879c9a9daea955d3",
+  "attempt": 1,
+  "branch": "stage4/narrow-continuation-evidence-20261016",
+  "disposition": "NO_GO_GLOBAL_STOP_12SUCCESSORS_SKIPPED_NO_RETRY",
+  "expected_evidence_parent": "6ed051d6d8e70855ecee58bfa2cc2b2d5e1e3ff0",
+  "production_ids_preserved": [
+    1504,
+    1505,
+    1506,
+    1507,
+    1508
+  ],
+  "publication_scope": "AUDIT_ONLY_NO_RUNTIME_OR_MASTER_MOVEMENT",
+  "run_id": 38884069913,
+  "run_number": 1,
+  "runtime_revision": "f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+  "runtime_tree": "5b35da2516f1a97490bc044ff504c0d64f6bb7d9",
+  "stage4": "OPEN",
+  "writer": "CURRENT_DEVELOPMENT_ONLY; PREVIOUS_SESSION_NO_ACTIVE_EXECUTION_OR_PUBLICATION_OBSERVED"
+}
