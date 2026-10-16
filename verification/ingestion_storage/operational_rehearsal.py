@@ -34,7 +34,7 @@ def main():
  e=dict(plan['envelope']);e['window']=WindowEvidence(**w);e['discovered_at']=datetime.fromisoformat(e['discovered_at']);e['displayed_references']=tuple(e['displayed_references']);e['fields']=()
  envelope=DiscoveryEnvelope(**e)
  if binding.retained_capture_sha256 and not plan.get('prior_database_accounting'):raise ValueError('PRIOR_ACCOUNTING_REQUIRED')
- budget=DatabaseBudget(previous=plan.get('prior_database_accounting'));engines=[];result={'outcome':'UNCONFIRMED_NO_RETRY'}
+ budget=DatabaseBudget(previous=plan.get('prior_database_accounting'),slot_key=plan.get('batch_key') if plan.get('mode')=='process_batch' else None);engines=[];result={'outcome':'UNCONFIRMED_NO_RETRY'}
  try:
   engines=[budget.engine(u) for u in urls]
   costs={'enqueue':[],'screening_body':[]}
@@ -56,7 +56,20 @@ def main():
   counts={'listing':0,'detail':0}
   def listing(_):counts['listing']+=1;return audit,plan['outer']
   def detail(_):counts['detail']+=1;return plan['detail'],plan['outer']
-  if plan.get('mode')=='resume_capture':result=resume_capture(co,binding.discovery_key,checkpoint_sha256=binding.retained_capture_sha256,prior_accounting_sha256=binding.prior_accounting_sha256,screening_keys=plan['screening_keys'],check=budget.check)
+  from app.ingestion.batching import capture_once,process_batch
+  def archive(raw):
+   import hashlib
+   dest=a.output.parent/'retained-capture.json'
+   with dest.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+   assert dest.read_bytes()==raw
+   return dict(commit='a'*40,path='docs/design/disposable-capture.json',sha256=hashlib.sha256(raw).hexdigest(),bytes=len(raw),readback_verified=True)
+  def interrupt(i):
+   if plan.get('interrupt_batch_after')==i:raise SystemExit('FIXTURE_INTERRUPTION_AFTER_ATOMIC_ROW')
+  if plan.get('mode')=='capture_once':
+   receipt=capture_once(co,binding.discovery_key,listing,archive,budget.check)
+   result=dict(outcome='CAPTURE_COMPLETE' if receipt['kind']=='LISTING_RECEIPT_V1' else 'CAPTURED_PROCESSING_BLOCKED',receipt=receipt)
+  elif plan.get('mode')=='process_batch':result=process_batch(co,plan['batch_key'],check=budget.check,after_row=interrupt,prior_accounting_sha256=binding.prior_accounting_sha256)
+  elif plan.get('mode')=='resume_capture':result=resume_capture(co,binding.discovery_key,checkpoint_sha256=binding.retained_capture_sha256,prior_accounting_sha256=binding.prior_accounting_sha256,screening_keys=plan['screening_keys'],check=budget.check)
   elif plan.get('mode')=='capture':result=capture(co,binding.discovery_key,listing_reader=listing,check=budget.check)
   else:result=execute(co,binding,listing_reader=listing,detail_reader=detail,envelope=envelope,council=get_council(target['council']),check=budget.check)
   result['synthetic_reader_callbacks']=counts
@@ -70,6 +83,6 @@ def main():
   raw=json.dumps(result,sort_keys=True,allow_nan=False).encode()
   if len(raw)>512*1024:raise ValueError('WORKER_AUDIT_BOUND')
   with a.output.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
- return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY'} and account['cleanup']=='CLOSED' else 1
+ return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY','CAPTURE_COMPLETE','CAPTURED_PROCESSING_BLOCKED','BATCH_SCREENED','BATCH_ALREADY_COMPLETE'} and account['cleanup']=='CLOSED' else 1
 
 if __name__=='__main__':raise SystemExit(main())

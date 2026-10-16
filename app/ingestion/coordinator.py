@@ -134,7 +134,7 @@ class Coordinator:
         self.ledger.checkpoint(claim,receipt)
         return self._materialize(claim,receipt)
 
-    def idox_source(self,claim,supervised_reader):
+    def idox_source(self,claim,supervised_reader,*,materialize=True,archive=None):
         from .idox_adapter import IdoxListingContract
         row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
         if not isinstance(contract,IdoxListingContract):raise Denied('UNSUPPORTED_IDOX_CONTRACT')
@@ -144,10 +144,27 @@ class Coordinator:
         self.ledger.intent(claim,'source_calls')
         try:
             source,outer=supervised_reader(row)
-            receipt=contract.project(source,outer,row['limits']);receipt.pop('window')
+            if not materialize and archive is None:raise Denied('DURABLE_ARCHIVE_REQUIRED')
+            saved=None
+            if archive is not None:
+                from .batching import archive_capture
+                saved=archive_capture(source,archive)
+            receipt=contract.project(source,outer,row['limits'],source_bytes_limit=512*1024) if not materialize else contract.project(source,outer,row['limits'])
+            receipt.pop('window')
+            if saved is not None:receipt['durable_archive']=saved
+            try:bounded(receipt)
+            except Denied:
+                if materialize:raise
+                blocked=dict(kind='CAPTURE_BLOCKED_V1',durable_archive=saved,reason='INLINE_PAYLOAD_BOUND',qualified_rows=len(receipt['records']),cleanup='CLOSED',accounting_complete=True)
+                if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,blocked)
+                else:self.ledger.checkpoint(claim,blocked)
+                self.ledger.finish(claim,{'outcome':'CAPTURED_PROCESSING_BLOCKED'},state='UNSUPPORTED_CONTRACT',reason='INLINE_PAYLOAD_BOUND_NO_REFETCH')
+                return []
             if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,receipt)
             else:self.ledger.checkpoint(claim,receipt)
-            return self._materialize(claim,receipt)
+            if materialize:return self._materialize(claim,receipt)
+            self.ledger.finish(claim,dict(outcome='ENUMERATED_METADATA_RETAINED',children=[],source_sha256=receipt['source_sha256']))
+            return []
         except Exception:
             self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
             raise

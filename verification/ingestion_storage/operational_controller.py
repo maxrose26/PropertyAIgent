@@ -19,14 +19,18 @@ class DatabaseBudget:
     Includes SQLAlchemy initialization, BEGIN/COMMIT/ROLLBACK. Records operation
     kinds only, never SQL parameters, URLs, credentials or row values.
     """
-    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None):
+    def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None,slot_key=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
         previous=bounded(previous or {},16384)
+        self.slot_key=slot_key or previous.get('slot_key')
+        if previous.get('slot_key') not in (None,self.slot_key):raise Denied('LOGICAL_SLOT_BINDING')
         self.previous=previous;self.capture_checkpoint_sha256=previous.get('capture_checkpoint_sha256')
         attempts=previous.get('connection_attempts',0);statements=previous.get('driver_statements',0);elapsed=previous.get('elapsed_seconds',0)
         if type(attempts) is not int or not 0<=attempts<=connections or type(statements) is not int or not 0<=statements<=self.statement_cap or type(elapsed) not in (int,float) or not 0<=elapsed<seconds:raise Denied('PRIOR_ACCOUNTING_BOUND')
         if previous and (previous.get('cleanup')!='CLOSED' or previous.get('connections_closed') is not True):raise Denied('PRIOR_CLOSURE_REQUIRED')
+        self.returned_bytes=previous.get("returned_data_value_bytes",0)
+        if type(self.returned_bytes) is not int or not 0<=self.returned_bytes<=4*1024**2:raise Denied("PRIOR_BYTES_BOUND")
         self.previous_elapsed=elapsed
         self.started=time.monotonic();self.attempts=attempts;self.statements=statements;self.kinds=dict(previous.get('statement_kinds',{}));self.opened=[];self.engines=[];self.stop_file=Path(stop_file) if stop_file else None
     def check(self):
@@ -49,7 +53,11 @@ class DatabaseBudget:
         budget=self
         class Cursor(psycopg.Cursor):
             def execute(self,query,params=None,**kwargs):
-                budget.tick('cursor');return super().execute(query,params,**kwargs)
+                budget.tick('cursor',cleanup=str(query).strip().startswith('SELECT public.ingestion_raise_stop('));result=super().execute(query,params,**kwargs)
+                if self.pgresult is not None:
+                    budget.returned_bytes+=sum(len(self.pgresult.get_value(r,c) or b'') for r in range(self.pgresult.ntuples) for c in range(self.pgresult.nfields))
+                    if budget.returned_bytes>4*1024**2:raise Denied('DATABASE_RETURNED_VALUE_BOUND')
+                return result
             def executemany(self,*a,**kw):raise Denied('BULK_FORBIDDEN')
         class Connection(psycopg.Connection):
             def _exec_command(self,command,*a,**kw):
@@ -84,7 +92,7 @@ class DatabaseBudget:
         for c in self.opened:
             try:c.close()
             except Exception:errors.append('CLOSE')
-        return dict(connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
+        return dict(slot_key=self.slot_key,returned_data_value_bytes=self.returned_bytes,connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
             connections_closed=all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and all(c.closed for c in self.opened) else 'UNCERTAIN',
             errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 

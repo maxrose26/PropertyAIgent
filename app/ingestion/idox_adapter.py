@@ -22,8 +22,9 @@ class IdoxListingContract:
         if not re.fullmatch('[a-f0-9]{64}',self.qualification_sha256) or self.config.max_transport_retries!=0:
             raise Denied('EXACT_IDOX_QUALIFICATION_AND_ZERO_RETRY_REQUIRED')
 
-    def project(self, source, outer, limits):
-        validate_outer(outer,limits);bounded(source)
+    def project(self, source, outer, limits,*,source_bytes_limit=128*1024):
+        if type(source_bytes_limit) is not int or not 0<source_bytes_limit<=512*1024:raise Denied("SOURCE_AUDIT_BOUND")
+        validate_outer(outer,limits);bounded(source,source_bytes_limit)
         c=self.config;interval=[c.start.isoformat(),c.end.isoformat()]
         if (source.get('council')!=c.council or source.get('date_semantics')!=c.semantics
             or source.get('requested_interval')!=interval or source.get('applied_interval')!=interval

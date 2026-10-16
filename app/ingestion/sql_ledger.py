@@ -57,6 +57,19 @@ class SQLLedger:
         self.bindings[result['key']]={k:result[k] for k in ('subject','task','contract','revision')}
         return result['key']
 
+    def batch_row(self,claim,plan,capture,record,*,reseal=False):
+        from .ledger import digest
+        import json
+        identity=dict(subject={'kind':'APPLICATION','council':capture['council'],'reference':record['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(record))
+        row=self.get(claim.key)
+        child=dict(identity,key=digest(identity),dependencies=[plan['capture_key']],priority=row['priority'],max_attempts=2,limits=row['limits'])
+        canonical=lambda x:json.dumps(x,sort_keys=True,separators=(',',':'),allow_nan=False)
+        with self.broker_engine.begin() as c:
+            self._limits(c)
+            result=self._step('batch_reseal' if reseal else 'batch_row',claim.key,claim.fence,dict(child=child,plan_json=canonical(plan),capture_json=canonical(capture),record_json=canonical(record),identity_json=canonical(identity)),connection=c)
+        self.bindings[child['key']]={k:identity[k] for k in ('subject','task','contract','revision')}
+        return child['key'],result['checkpoint']
+
     def _claim(self,claim):
         if claim.owner!=self.owner:raise Denied('WORKER_IDENTITY')
 
