@@ -149,3 +149,72 @@ def test_pg_unsupported_facts_withheld_before_write(pg):
     co.factual_refresh(l.claim(k,'facts','INGESTION_TEST_pg'),council=council,observation=obs,accepted_row=row)
     assert l.get(k)['state']=='UNSUPPORTED_CONTRACT' and l.get(k)['outcome']['outcome']=='FACTS_WITHHELD'
     with Session(pg) as s:assert s.get(Application,row['application_id']).status=='Awaiting decision'
+
+
+def test_pg_storage_acceptance_intended_restricted_role(pg):
+    """New package only: authenticate as real non-owner login, never SET ROLE admin."""
+    from pathlib import Path
+    from sqlalchemy.exc import DBAPIError
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy.engine import make_url
+    metadata.drop_all(pg)
+    package=Path(__file__).resolve().parents[1]/'docs/design/ingestion-readiness-20261016'
+    script=(package/'migration.sql').read_text()
+    roles=['ingestion_untrusted_login','ingestion_worker_login','ingestion_storage_login','ingestion_storage_owner','ingestion_worker','ingestion_storage_operator','ingestion_authority_issuer','ingestion_barrier_releaser']
+    engines=[]
+    try:
+        with pg.connect().execution_options(isolation_level='AUTOCOMMIT') as c:
+            c.exec_driver_sql("CREATE ROLE ingestion_untrusted_login LOGIN NOSUPERUSER BYPASSRLS PASSWORD 'disposable_only'; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ingestion_untrusted_login; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO ingestion_untrusted_login;")
+            c.exec_driver_sql("CREATE FUNCTION public.json_populate_record(anyelement,json) RETURNS anyelement LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'PUBLIC_SHADOW_FUNCTION'; END $$;")
+            c.exec_driver_sql(script)
+            c.exec_driver_sql("CREATE ROLE ingestion_worker_login LOGIN INHERIT NOSUPERUSER NOBYPASSRLS PASSWORD 'disposable_only'; GRANT ingestion_worker TO ingestion_worker_login;")
+            c.exec_driver_sql("CREATE ROLE ingestion_storage_login LOGIN INHERIT NOSUPERUSER NOBYPASSRLS PASSWORD 'disposable_only'; GRANT ingestion_storage_operator TO ingestion_storage_login;")
+        def restricted(login):
+            u=make_url(os.environ['DISCOVERY_TEST_POSTGRES_URL']).set(username=login,password='disposable_only')
+            e=create_engine(u,poolclass=NullPool,connect_args={'connect_timeout':3,'prepare_threshold':None,'options':'-c statement_timeout=10000 -c lock_timeout=3000'})
+            engines.append(e);return e
+        worker=restricted('ingestion_worker_login');operator=restricted('ingestion_storage_login');untrusted=restricted('ingestion_untrusted_login')
+        for sql in ['SELECT * FROM public.ingestion_work_items', "UPDATE public.ingestion_work_items SET outcome='{}'", 'SELECT public.ingestion_seed_storage_test()', "SELECT public.ingestion_raise_stop('untrusted')"]:
+            with pytest.raises(DBAPIError),untrusted.begin() as c:c.execute(text(sql))
+        def denied(sql):
+            with pytest.raises(DBAPIError),worker.begin() as c:c.execute(text(sql))
+        with worker.connect() as c:
+            assert c.scalar(text('SELECT current_user'))=='ingestion_worker_login'
+            assert c.execute(text('SELECT rolsuper,rolbypassrls,rolcreaterole FROM pg_roles WHERE rolname=current_user')).one()==(False,False,False)
+            assert c.scalar(text('SELECT count(*) FROM public.ingestion_work_items'))==1
+        denied('SELECT public.ingestion_seed_storage_test()')
+        for _ in range(2):
+            with operator.begin() as c:assert c.scalar(text('SELECT public.ingestion_seed_storage_test()'))==3
+        manifest=json.loads((package/'three-items.json').read_text())
+        with worker.connect() as c:
+            actual=c.execute(text("SELECT to_jsonb(w) FROM public.ingestion_work_items w WHERE key<>repeat('0',64) ORDER BY key")).scalars().all()
+            assert actual==sorted(manifest['items'],key=lambda x:x['key'])
+            assert c.scalar(text('SELECT count(*) FROM public.ingestion_work_attempts'))==0
+        for sql in [
+            "UPDATE public.ingestion_work_items SET state='CLAIMED' WHERE key<>repeat('0',64)",
+            "UPDATE public.ingestion_work_items SET outcome='{}' WHERE key=repeat('0',64)",
+            "INSERT INTO public.ingestion_work_items SELECT * FROM public.ingestion_work_items LIMIT 0",
+            "INSERT INTO public.ingestion_work_attempts(work_key) VALUES ('x')",
+            "DELETE FROM public.ingestion_work_items", "TRUNCATE public.ingestion_work_attempts",
+            "ALTER TABLE public.ingestion_work_items DISABLE ROW LEVEL SECURITY",
+            "SET ROLE ingestion_storage_owner", "SET ROLE ingestion_authority_issuer", "SET ROLE ingestion_barrier_releaser",
+            "UPDATE public.applications SET address='forbidden' WHERE false",
+        ]:denied(sql)
+        with worker.begin() as c:c.execute(text("SELECT public.ingestion_raise_stop('STORAGE_TEST_STOP')"))
+        # New connection/transaction: no session state or session lock dependency.
+        with worker.connect() as c:
+            control=c.scalar(text("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)"))
+            assert control['global_stop']=={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'}
+            assert control['manual_stop']=='STORAGE_TEST_STOP' and control['grants']=={}
+            assert c.scalar(text("SELECT sum(octet_length(to_jsonb(w)::text)) FROM public.ingestion_work_items w"))<=32768
+            assert c.scalar(text("SELECT pg_total_relation_size('public.ingestion_work_items')+pg_total_relation_size('public.ingestion_work_attempts')"))<=1048576
+        with pytest.raises(ValueError,match='PRESERVE'):uninstall_empty(pg)
+    finally:
+        for e in engines:e.dispose()
+        with pg.begin() as c:
+            c.exec_driver_sql('ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM ingestion_untrusted_login; ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM ingestion_untrusted_login;')
+            c.exec_driver_sql('DROP FUNCTION IF EXISTS public.json_populate_record(anyelement,json);')
+            c.exec_driver_sql('DROP FUNCTION IF EXISTS public.ingestion_seed_storage_test(); DROP FUNCTION IF EXISTS public.ingestion_raise_stop(text);')
+            metadata.drop_all(c)
+            for role in roles:c.exec_driver_sql('DROP OWNED BY '+role)
+            for role in roles:c.exec_driver_sql('DROP ROLE IF EXISTS '+role)

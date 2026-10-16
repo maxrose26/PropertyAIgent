@@ -1,0 +1,151 @@
+{
+  "candidate": "1d3bc6162aa8d58907f7a2d7de00496239a4e593",
+  "items": [
+    {
+      "attempt_count": 0,
+      "authority": null,
+      "checkpoint": {
+        "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+        "live_allowance": {
+          "source_calls": 0,
+          "writes": 0
+        },
+        "retained_evidence": {
+          "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+          "run": "38884069913"
+        }
+      },
+      "contract": "storage-acceptance-blocked-v1",
+      "dependencies": [],
+      "eligible_at": 0,
+      "fence": 0,
+      "key": "c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3",
+      "lease_until": null,
+      "limits": {
+        "aggregate_rss": 1610612736,
+        "audit_bytes": 2097152,
+        "bytes": 20971520,
+        "outer_seconds": 60,
+        "pages": 6,
+        "requests": 80,
+        "rows": 60,
+        "source_rss": 1073741824,
+        "worker_seconds": 45
+      },
+      "max_attempts": 1,
+      "next_action": "REVIEW_ONLY",
+      "outcome": null,
+      "owner": null,
+      "phase": "IDLE",
+      "priority": 0,
+      "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+      "revision": "20261016",
+      "state": "SAFETY_BLOCKED",
+      "subject": {
+        "council": "salford",
+        "end": "2026-10-14",
+        "kind": "DISCOVERY_SCOPE",
+        "semantics": "VALIDATED",
+        "start": "2026-10-08"
+      },
+      "task": "LISTING_METADATA"
+    },
+    {
+      "attempt_count": 0,
+      "authority": null,
+      "checkpoint": {
+        "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+        "live_allowance": {
+          "source_calls": 0,
+          "writes": 0
+        },
+        "retained_evidence": {
+          "checkpoint_sha256": "d2d7349ea85710aadb804c8a547934d4d034f0a9984a9f19c1a58586117f6da1",
+          "record_id": "a0rSl00000tnpbVIAQ"
+        }
+      },
+      "contract": "storage-acceptance-blocked-v1",
+      "dependencies": [],
+      "eligible_at": 0,
+      "fence": 0,
+      "key": "0eff5d22b28ee79039d151382ac0321e26350b9ccb10c58f46b82050dab82bf9",
+      "lease_until": null,
+      "limits": {
+        "aggregate_rss": 1610612736,
+        "audit_bytes": 2097152,
+        "bytes": 20971520,
+        "outer_seconds": 60,
+        "pages": 6,
+        "requests": 80,
+        "rows": 60,
+        "source_rss": 1073741824,
+        "worker_seconds": 45
+      },
+      "max_attempts": 1,
+      "next_action": "REVIEW_ONLY",
+      "outcome": null,
+      "owner": null,
+      "phase": "IDLE",
+      "priority": 0,
+      "reason": "ROCHDALE_SOURCE_QUALIFICATION_NOT_EXECUTED",
+      "revision": "20261016",
+      "state": "UNSUPPORTED_CONTRACT",
+      "subject": {
+        "council": "rochdale",
+        "kind": "APPLICATION",
+        "reference": "PL/2026/0882"
+      },
+      "task": "LISTING_METADATA"
+    },
+    {
+      "attempt_count": 0,
+      "authority": null,
+      "checkpoint": {
+        "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+        "live_allowance": {
+          "source_calls": 0,
+          "writes": 0
+        },
+        "retained_evidence": {
+          "application_id_context": 1507,
+          "outcome": "COMMITTED_PENDING_IDENTITY; FACTS_WITHHELD",
+          "run": "38871588708"
+        }
+      },
+      "contract": "storage-acceptance-blocked-v1",
+      "dependencies": [],
+      "eligible_at": 0,
+      "fence": 0,
+      "key": "16c9c4d1fb67d844ddb29b092217c3b5a7c42eb8ba63e296611ce2f617779f6d",
+      "lease_until": null,
+      "limits": {
+        "aggregate_rss": 1610612736,
+        "audit_bytes": 2097152,
+        "bytes": 20971520,
+        "outer_seconds": 60,
+        "pages": 6,
+        "requests": 80,
+        "rows": 60,
+        "source_rss": 1073741824,
+        "worker_seconds": 45
+      },
+      "max_attempts": 1,
+      "next_action": "REVIEW_ONLY",
+      "outcome": null,
+      "owner": null,
+      "phase": "IDLE",
+      "priority": 0,
+      "reason": "COUPLED_FACTS_WITHHELD_NO_SUPPORTED_DECISION",
+      "revision": "20261016",
+      "state": "UNSUPPORTED_CONTRACT",
+      "subject": {
+        "council": "oldham",
+        "kind": "APPLICATION",
+        "reference": "NMA/356901/26"
+      },
+      "task": "FACTUAL_REFRESH"
+    }
+  ],
+  "purpose": "STORAGE_ONLY_NOT_EXECUTION_AUTHORITY",
+  "version": 1
+}

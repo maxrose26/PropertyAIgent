@@ -1,0 +1,11 @@
+BEGIN READ ONLY;
+SET LOCAL statement_timeout='10s';
+SET LOCAL lock_timeout='3s';
+SET LOCAL idle_in_transaction_session_timeout='10s';
+SELECT current_user, session_user;
+SELECT rolname,rolsuper,rolbypassrls,rolcreaterole,rolcanlogin FROM pg_roles WHERE rolname=current_user;
+SELECT key,to_jsonb(w) AS retained_row FROM public.ingestion_work_items w ORDER BY key;
+SELECT count(*) AS attempts FROM public.ingestion_work_attempts;
+SELECT sum(octet_length(to_jsonb(w)::text)) AS serialized_bytes FROM public.ingestion_work_items w;
+SELECT pg_total_relation_size('public.ingestion_work_items')+pg_total_relation_size('public.ingestion_work_attempts') AS physical_bytes;
+ROLLBACK;
