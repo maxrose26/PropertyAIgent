@@ -151,7 +151,7 @@ def test_pg_unsupported_facts_withheld_before_write(pg):
     with Session(pg) as s:assert s.get(Application,row['application_id']).status=='Awaiting decision'
 
 
-def test_pg_storage_acceptance_intended_restricted_role(pg):
+def test_pg_storage_acceptance_intended_restricted_role(pg,record_property):
     """New package only: authenticate as real non-owner login, never SET ROLE admin."""
     from pathlib import Path
     from sqlalchemy.exc import DBAPIError
@@ -175,9 +175,11 @@ def test_pg_storage_acceptance_intended_restricted_role(pg):
             engines.append(e);return e
         worker=restricted('ingestion_worker_login');operator=restricted('ingestion_storage_login');untrusted=restricted('ingestion_untrusted_login')
         for sql in ['SELECT * FROM public.ingestion_work_items', "UPDATE public.ingestion_work_items SET outcome='{}'", 'SELECT public.ingestion_seed_storage_test()', "SELECT public.ingestion_raise_stop('untrusted')"]:
-            with pytest.raises(DBAPIError),untrusted.begin() as c:c.execute(text(sql))
+            with pytest.raises(DBAPIError) as error,untrusted.begin() as c:c.execute(text(sql))
+            assert error.value.orig.sqlstate=='42501'
         def denied(sql):
-            with pytest.raises(DBAPIError),worker.begin() as c:c.execute(text(sql))
+            with pytest.raises(DBAPIError) as error,worker.begin() as c:c.execute(text(sql))
+            assert error.value.orig.sqlstate=='42501'
         with worker.connect() as c:
             assert c.scalar(text('SELECT current_user'))=='ingestion_worker_login'
             assert c.execute(text('SELECT rolsuper,rolbypassrls,rolcreaterole FROM pg_roles WHERE rolname=current_user')).one()==(False,False,False)
@@ -206,8 +208,11 @@ def test_pg_storage_acceptance_intended_restricted_role(pg):
             control=c.scalar(text("SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)"))
             assert control['global_stop']=={'reason':'CONSUMED_SALFORD_GLOBAL_STOP','run':'38884069913'}
             assert control['manual_stop']=='STORAGE_TEST_STOP' and control['grants']=={}
-            assert c.scalar(text("SELECT sum(octet_length(to_jsonb(w)::text)) FROM public.ingestion_work_items w"))<=32768
-            assert c.scalar(text("SELECT pg_total_relation_size('public.ingestion_work_items')+pg_total_relation_size('public.ingestion_work_attempts')"))<=1048576
+            serialized=c.scalar(text("SELECT sum(octet_length(to_jsonb(w)::text)) FROM public.ingestion_work_items w"));assert serialized<=32768
+            physical=c.scalar(text("SELECT pg_total_relation_size('public.ingestion_work_items')+pg_total_relation_size('public.ingestion_work_attempts')"));assert physical<=1048576
+            record_property('serialized_bytes',serialized);record_property('physical_bytes',physical)
+            record_property('restricted_login','ingestion_worker_login');record_property('permission_denials_sqlstate_42501',16)
+            record_property('work_items_excluding_control',3);record_property('attempts',0);record_property('source_calls',0);record_property('application_writes',0)
         with pytest.raises(ValueError,match='PRESERVE'):uninstall_empty(pg)
     finally:
         for e in engines:e.dispose()
