@@ -69,7 +69,12 @@ def test_arcus_window_changes_only_date_filters(key):
         if x['fieldDeveloperName'] in ('PA_ADV_DateValidFrom','PA_ADV_DateValidTo'):
             assert y['fieldValue'] in ('2026-10-15','2026-10-21')
         else:assert x==y
-    assert (old.start,old.end)==(('2026-10-01','2026-10-03') if old.assessment_metadata else ('2026-09-28','2026-10-04'))
+    if key.startswith('discovery_metadata_rollout_'):
+        from verification.discovery.metadata_rollout import scope
+        frozen=scope(int(key.rsplit('_',1)[1]))
+        assert (old.start,old.end)==(frozen['start'],frozen['end'])
+    else:
+        assert (old.start,old.end)==(('2026-10-01','2026-10-03') if old.assessment_metadata else ('2026-09-28','2026-10-04'))
     assert new.host==old.host
 
 def test_dynamic_row_date_preserves_exact_identity():
