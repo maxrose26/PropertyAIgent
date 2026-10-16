@@ -19,6 +19,12 @@ def source(rows):
     return a
 
 
+def qualified_listing_contract(name,config,case):
+    from verification.discovery.arcus_ui_audit import validate
+    from verification.discovery.arcus_ui_window import qualify_segment
+    return ListingContract(name,config,case,validate,qualify_segment)
+
+
 @pytest.fixture
 def ledger():
     e=create_engine('sqlite:///:memory:');install(e);clock=[1000.0];l=Ledger(e,clock=lambda:clock[0])
@@ -135,7 +141,7 @@ def listing_task(l,cfg=SCREENING_CONFIG):
 
 
 def test_listing_to_screening_crash_dedup_citations_and_no_details(ledger):
-    l,_=ledger;k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    l,_=ledger;k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     c=claim(l,k);audit=source([row('Discharge of condition attached to planning permission 144426/FO/2025')]);children=co.listing(c,audit)
     assert len(children)==1 and l.get(k)['checkpoint']['records']==audit['listing_records']
     # Completion does not grant execution permission to the newly retained child.
@@ -149,7 +155,7 @@ def test_listing_to_screening_crash_dedup_citations_and_no_details(ledger):
 
 
 def test_interruption_after_listing_checkpoint_materializes_once(ledger):
-    l,clock=ledger;k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)});old=claim(l,k)
+    l,clock=ledger;k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)});old=claim(l,k)
     co._listing(old,source([row()]));clock[0]+=121;l.recover(old,cleanup_closed=True);new=claim(l,k)
     children=co.resume_listing(new);assert len(children)==1
     with l.engine.connect() as c:assert c.scalar(select(func.count()).select_from(W))==3 # control,parent,child
@@ -169,7 +175,7 @@ def test_historical_and_current_windows_share_exact_components(ledger):
             a['listing_records']=qualify_segment('Showing 1 to 1 of 1 results',[card],1,config=cfg)[3];a.update(destination=cfg.destination,applied_interval=[cfg.start,cfg.end],requested_interval=[cfg.start,cfg.end])
         import hashlib
         a['listing_segments'][0]['evidence_sha256']=hashlib.sha256(json.dumps(a['listing_records'],sort_keys=True).encode()).hexdigest()
-        co=Coordinator(l,{'window'+str(i):ListingContract('window'+str(i),cfg,SCREENING_CASE)})
+        co=Coordinator(l,{'window'+str(i):qualified_listing_contract('window'+str(i),cfg,SCREENING_CASE)})
         assert len(co.listing(c,a))==1
 
 
@@ -183,7 +189,7 @@ def test_reviewed_local_failure_allows_unrelated_work_global_does_not(ledger):
 
 
 def test_source_receipt_requires_closed_outer_and_no_checkpoint_replay(ledger):
-    l,_=ledger;k=listing_task(l);grant(l,[k],source_calls=1);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    l,_=ledger;k=listing_task(l);grant(l,[k],source_calls=1);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     c=claim(l,k)
     with pytest.raises(Denied):co.source(c,lambda _: (source([row()]),{'cleanup':'UNKNOWN'}))
     with pytest.raises(Denied):claim(l,k)
@@ -192,7 +198,7 @@ def test_source_receipt_requires_closed_outer_and_no_checkpoint_replay(ledger):
 def test_evidence_bound_and_unqualified_identity(ledger):
     l,_=ledger;k=listing_task(l);grant(l,[k]);c=claim(l,k)
     with pytest.raises(Denied):l.checkpoint(c,{'large':'x'*(128*1024)})
-    co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     a=source([row()]);a['listing_records'][0]['source_url']=a['listing_records'][0]['source_url'].replace('arcusbe.manchester.gov.uk','wrong.invalid')
     with pytest.raises(ValueError):co.listing(c,a)
 
@@ -208,14 +214,14 @@ def test_priority_dispatch_and_bound_retry_permission(ledger):
 
 @pytest.mark.parametrize('change',[{'peak_owned_rss':-1},{'peak_owned_rss':True},{'supervisor_seconds':float('nan')},{'requests':True}])
 def test_typed_source_resource_rejection(ledger,change):
-    l,_=ledger;k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    l,_=ledger;k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     with pytest.raises(ValueError):co.listing(claim(l,k),dict(source([row()]),**change))
 
 
 def test_attempt_outcome_and_resource_limits_are_not_borrowed(ledger):
     l,_=ledger;limits=dict(DEFAULT_LIMITS,requests=1);k=listing_task(l)
     k2=l.enqueue(dict(kind='DISCOVERY_SCOPE',council='manchester',start=SCREENING_CONFIG.start,end=SCREENING_CONFIG.end,semantics='VALIDATED'),'DISCOVERY',contract='fixture-listing',limits=limits)
-    grant(l,[k,k2]);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    grant(l,[k,k2]);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     with pytest.raises(Denied,match='RESOURCE'):co.listing(claim(l,k2),source([row()]))
 
 
@@ -226,13 +232,13 @@ def test_retained_manchester14_enters_same_coordinator_without_source(ledger):
     raw=archive.read_bytes()
     import hashlib
     assert hashlib.sha256(raw).hexdigest()=='b486cea799886fd4317e18241a4ea6615969a27012b7de3af98be9ab395b2210'
-    k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    k=listing_task(l);grant(l,[k]);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     children=co.listing(claim(l,k),json.loads(raw));assert len(children)==14
     assert l.get(k)['checkpoint']['records']==json.loads(raw)['listing_records']
 
 
 def test_application_metadata_from_scope_reuses_capture_without_refetch(ledger):
-    l,_=ledger;scope=listing_task(l);grant(l,[scope]);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    l,_=ledger;scope=listing_task(l);grant(l,[scope]);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     first=co.listing(claim(l,scope),source([row()]))
     app=l.enqueue(dict(kind='APPLICATION',council='manchester',reference='TEST/26'),'LISTING_METADATA',contract='retained-scope-match-v1',dependencies=[scope])
     l.grant('INGESTION_TEST_match',[app],expires_at=2000,contracts=['retained-scope-match-v1'])
@@ -242,14 +248,14 @@ def test_application_metadata_from_scope_reuses_capture_without_refetch(ledger):
 
 @pytest.mark.parametrize('outer',[dict(exit_code=1,cleanup='CLOSED',live_owned_survivors=0,expired=False,limit_hit=None,peak_owned_rss=1,elapsed_seconds=1),dict(exit_code=0,cleanup='CLOSED',live_owned_survivors=0,expired=False,limit_hit=None,peak_owned_rss=-1,elapsed_seconds=1)])
 def test_failed_or_negative_outer_receipt_never_reusable(ledger,outer):
-    l,_=ledger;k=listing_task(l);grant(l,[k],source_calls=1);co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    l,_=ledger;k=listing_task(l);grant(l,[k],source_calls=1);co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     with pytest.raises(Denied):co.source(claim(l,k),lambda _: (source([row()]),outer))
     assert l.get(k)['checkpoint'] is None
 
 
 def test_source_preflight_and_retained_path_cannot_bypass_intent(ledger):
     l,_=ledger;wrong=task(l);k=listing_task(l);grant(l,[wrong,k],source_calls=1)
-    co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)});called=[]
+    co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)});called=[]
     with pytest.raises(Denied):co.source(claim(l,wrong),lambda _:called.append('called'))
     assert not called
     c=claim(l,k);l.intent(c,'source_calls')
@@ -259,7 +265,7 @@ def test_source_preflight_and_retained_path_cannot_bypass_intent(ledger):
 
 def test_source_stage_reserves_once_and_persists_closed_receipt(ledger):
     l,_=ledger;k=listing_task(l);grant(l,[k],source_calls=1)
-    co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
+    co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE)})
     calls=[]
     def reader(_):calls.append(1);return source([row()]),outer()
     c=claim(l,k);children=co.source(c,reader)
@@ -267,3 +273,14 @@ def test_source_stage_reserves_once_and_persists_closed_receipt(ledger):
     assert l.get(k)['checkpoint']['outer_supervisor']['cleanup']=='CLOSED'
     with pytest.raises(Denied):co.source(c,reader)
     assert len(calls)==1
+
+
+def test_council_cooldown_prevents_other_source_tasks_but_not_other_council(ledger):
+    l,_=ledger;a=listing_task(l)
+    b=l.enqueue(dict(kind='DISCOVERY_SCOPE',council='manchester',start='2026-10-04',end='2026-10-07',semantics='VALIDATED'),'DISCOVERY',contract='fixture-listing')
+    c=l.enqueue(dict(kind='DISCOVERY_SCOPE',council='salford',start='2026-10-08',end='2026-10-14',semantics='VALIDATED'),'DISCOVERY',contract='salford-fixture')
+    grant(l,[a,b,c]);claim_a=claim(l,a)
+    co=Coordinator(l,{},isolated_contracts={'fixture-listing'})
+    co.fail(claim_a,'RATE_LIMIT',cleanup_closed=True,accounting_complete=True,council_isolated=True)
+    with pytest.raises(Denied,match='COUNCIL_DEFERRED'):claim(l,b)
+    assert claim(l,c).key==c

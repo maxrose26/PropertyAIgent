@@ -120,6 +120,7 @@ class Ledger:
 
     def _permit(self,control,row,authority,operation=None,c=None):
         if control['outcome']['global_stop']:raise Denied('GLOBAL_STOP')
+        if row['task'] in {'DISCOVERY','LISTING_METADATA'} and row['subject']['kind']=='DISCOVERY_SCOPE' and control['outcome'].get('council_deferred_until',{}).get(row['subject']['council'],0)>self.clock():raise Denied('COUNCIL_DEFERRED')
         if c is not None and c.execute(select(W.c.key).where(W.c.key!=row['key'],W.c.phase=='WRITE_INTENT')).first():raise Denied('UNRESOLVED_WRITE_BARRIER')
         g=control['outcome']['grants'].get(authority)
         if not g or row['key'] not in g['keys'] or row['contract'] not in g['contracts'] or self.clock()>=g['expires_at']:raise Denied('NO_APPLICABLE_AUTHORITY')
@@ -178,20 +179,46 @@ class Ledger:
             c.execute(update(W).where(W.c.key==claim.key).values(phase=phase))
             c.execute(update(A).where(A.c.work_key==claim.key,A.c.fence==claim.fence).values(phase=phase))
 
-    def finish(self,claim,outcome,*,state='COMPLETE',reason=None,delay=0):
+    def finish(self,claim,outcome,*,state='COMPLETE',reason=None,delay=0,resolved_receipt=None,council_defer_seconds=0):
         outcome=bounded(outcome)
-        if state not in {'COMPLETE','DEFERRED',*BLOCKED} or not 0<=delay<=86400:raise Denied('OUTCOME_STATE')
+        if state not in {'COMPLETE','DEFERRED',*BLOCKED} or not 0<=delay<=86400 or not 0<=council_defer_seconds<=86400:raise Denied('OUTCOME_STATE')
         if state!='COMPLETE' and not reason:raise Denied('OUTCOME_REASON')
         with self.tx() as (c,control):
             row=self._owned(c,control,claim)
+            if resolved_receipt is not None:
+                receipt=bounded(resolved_receipt)
+                if row['phase']=='WRITE_INTENT':raise Denied('WRITE_READBACK_REQUIRED')
+                if row['phase']=='SOURCE_INTENT':
+                    from .coordinator import validate_outer
+                    if receipt.get('cleanup')!='CLOSED' or receipt.get('accounting_complete') is not True:raise Denied('SOURCE_CLOSURE_REQUIRED')
+                    validate_outer(receipt.get('outer_supervisor',{}),row['limits'])
+                c.execute(update(W).where(W.c.key==claim.key).values(checkpoint=receipt))
+                c.execute(update(A).where(A.c.work_key==claim.key,A.c.fence==claim.fence).values(checkpoint=receipt))
+                row['phase']='CHECKPOINTED'
             if row['phase'] in {'SOURCE_INTENT','WRITE_INTENT'}:raise Denied('UNRESOLVED_INTENT')
+            if council_defer_seconds:
+                deferred=control['outcome'].setdefault('council_deferred_until',{})
+                council=row['subject']['council'];deferred[council]=max(deferred.get(council,0),self.clock()+council_defer_seconds);self._control(c,control)
             if state=='PERSISTENCE_UNCERTAIN':
                 control['outcome']['global_stop']={'reason':'UNCERTAIN_PERSISTENCE'};self._control(c,control)
             c.execute(update(W).where(W.c.key==claim.key).values(state=state,reason=reason,outcome=outcome,eligible_at=self.clock()+delay,owner=None,lease_until=None,phase='FINISHED',next_action='NONE' if state=='COMPLETE' else 'REVIEW' if state in BLOCKED else 'WAIT_THEN_RECHECK_AUTHORITY'))
             c.execute(update(A).where(A.c.work_key==claim.key,A.c.fence==claim.fence).values(finished_at=self.clock(),phase='FINISHED',outcome=outcome))
 
-    def stop(self,reason):
-        with self.tx() as (c,control):control['outcome']['global_stop']=bounded({'reason':reason},4096);self._control(c,control)
+    def defer_council(self,council,until):
+        if not self.clock()<until<=self.clock()+86400:raise Denied('COUNCIL_DEFER_BOUND')
+        with self.tx() as (c,control):
+            deferred=control['outcome'].setdefault('council_deferred_until',{})
+            deferred[council]=max(deferred.get(council,0),until);self._control(c,control)
+
+    def stop(self,reason,*,claim=None,persistence_uncertain=False):
+        with self.tx() as (c,control):
+            control['outcome']['global_stop']=bounded({'reason':reason},4096);self._control(c,control)
+            if claim is not None:
+                row=c.execute(select(W).where(W.c.key==claim.key)).mappings().one()
+                if row['state']=='CLAIMED' and row['fence']==claim.fence and row['owner']==claim.owner:
+                    outcome={'outcome':'PERSISTENCE_UNCERTAIN' if persistence_uncertain else 'SAFETY_BLOCKED','reason':reason}
+                    c.execute(update(W).where(W.c.key==claim.key).values(state=outcome['outcome'],reason=reason,outcome=outcome,owner=None,lease_until=None,fence=row['fence']+1,next_action='RECONCILE'))
+                    c.execute(update(A).where(A.c.work_key==claim.key,A.c.fence==claim.fence).values(finished_at=self.clock(),outcome=outcome))
 
     def recover(self,claim,*,cleanup_closed):
         """Expiry never grants replay permission. No automatic unblock interface."""
@@ -224,6 +251,6 @@ class Ledger:
             return value
         except Exception as exc:
             if not entered:raise
-            try:self.stop('UNCERTAIN_COMMIT_OR_READBACK')
+            try:self.stop('UNCERTAIN_COMMIT_OR_READBACK',claim=claim,persistence_uncertain=True)
             except Exception:pass # durable WRITE_INTENT still requires recovery reconciliation
             raise UncertainPersistence('RECONCILE_BEFORE_ANY_WRITE') from exc

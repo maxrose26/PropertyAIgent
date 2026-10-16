@@ -9,7 +9,12 @@ from app.ingestion.schema import install,uninstall_empty,metadata,WorkItem as W,
 from app.ingestion.ledger import Ledger,Denied,StaleClaim,UncertainPersistence
 from app.ingestion.coordinator import Coordinator,FactualContract
 from app.db.models import Base,Council,Application
-from tests.test_discovery_ingestion_ledger import task
+from tests.test_discovery_ingestion_ledger import task,qualified_listing_contract
+
+
+def factual_contract(name,row):
+    from verification.direct_reference.refresh import _refresh_row
+    return FactualContract(name,row,_refresh_row)
 
 
 @pytest.fixture
@@ -70,7 +75,7 @@ def fixture_app(engine):
 def test_real_b2_write_readback_and_resume_without_repeated_effect(pg,monkeypatch):
     row,obs,council=fixture_app(pg);clock=[1000.0];l=Ledger(pg,clock=lambda:clock[0])
     k=task(l,ref=row['reference'],task='FACTUAL_REFRESH',contract='B2_EXISTING_COUPLED_V1');allowance(l,[k],writes=1)
-    co=Coordinator(l,{'B2_EXISTING_COUPLED_V1':FactualContract('B2_EXISTING_COUPLED_V1',row)});claim=l.claim(k,'worker','INGESTION_TEST_pg')
+    co=Coordinator(l,{'B2_EXISTING_COUPLED_V1':factual_contract('B2_EXISTING_COUPLED_V1',row)});claim=l.claim(k,'worker','INGESTION_TEST_pg')
     original=l.finish
     def crash(*a,**kw):raise RuntimeError('crash after writer+readback checkpoint before acknowledgement')
     monkeypatch.setattr(l,'finish',crash)
@@ -122,7 +127,7 @@ def test_pg_shared_listing_screening_selective_b2_path(pg):
     raw=listing_row('Erection of 49 dwellings')
     card=dict(fields=[dict(label='Reference',value=row['reference']),dict(label='Valid Date',value='02/10/2026')],links=[dict(text=row['reference'],href=row['source_url'])],assessment_capture=raw['assessment_capture'])
     record=qualify_segment('Showing 1 to 1 of 1 results',[card],1,config=SCREENING_CONFIG)[3][0]
-    co=Coordinator(l,{'fixture-listing':ListingContract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE),'B2_EXISTING_COUPLED_V1':FactualContract('B2_EXISTING_COUPLED_V1',row)})
+    co=Coordinator(l,{'fixture-listing':qualified_listing_contract('fixture-listing',SCREENING_CONFIG,SCREENING_CASE),'B2_EXISTING_COUPLED_V1':factual_contract('B2_EXISTING_COUPLED_V1',row)})
     screen_key=co.listing(l.claim(parent,'discover','INGESTION_TEST_pg'),source([record]))[0]
     l.grant('INGESTION_TEST_screen',[screen_key],contracts=['listing-screen-v1'],expires_at=time.time()+600)
     screen=co.screening(l.claim(screen_key,'screen','INGESTION_TEST_screen'))
@@ -140,7 +145,7 @@ def test_pg_unsupported_facts_withheld_before_write(pg):
     from verification.direct_reference.arcus_adapter import from_response
     row,_,council=fixture_app(pg);obs=from_response('manchester',encode(payload(decision=None)))
     l=Ledger(pg);k=task(l,ref=row['reference'],task='FACTUAL_REFRESH',contract='B2_EXISTING_COUPLED_V1');allowance(l,[k],writes=0)
-    co=Coordinator(l,{'B2_EXISTING_COUPLED_V1':FactualContract('B2_EXISTING_COUPLED_V1',row)})
+    co=Coordinator(l,{'B2_EXISTING_COUPLED_V1':factual_contract('B2_EXISTING_COUPLED_V1',row)})
     co.factual_refresh(l.claim(k,'facts','INGESTION_TEST_pg'),council=council,observation=obs,accepted_row=row)
     assert l.get(k)['state']=='UNSUPPORTED_CONTRACT' and l.get(k)['outcome']['outcome']=='FACTS_WITHHELD'
     with Session(pg) as s:assert s.get(Application,row['application_id']).status=='Awaiting decision'
