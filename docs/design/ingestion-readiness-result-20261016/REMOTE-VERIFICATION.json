@@ -1,0 +1,97 @@
+{
+  "repository": "maxrose26/PropertyAIgent",
+  "candidate": "7682c33b874920d1114611cbbb04ba598689057a",
+  "tree": "892cf6ff1704a857f19d383f49ab83da109483d6",
+  "accepted_candidate": "1d3bc6162aa8d58907f7a2d7de00496239a4e593",
+  "preserved_evidence": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+  "master": "f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+  "pr": {
+    "number": 113,
+    "draft": true,
+    "state": "open",
+    "merged": false,
+    "head": "7682c33b874920d1114611cbbb04ba598689057a",
+    "base": "f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf"
+  },
+  "checks": [
+    {
+      "id": 116941374935,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891272939/job/116941374935"
+    },
+    {
+      "id": 116941374534,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891272939/job/116941374534"
+    },
+    {
+      "id": 116941355467,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891264815/job/116941355467"
+    },
+    {
+      "id": 116941355096,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891264815/job/116941355096"
+    },
+    {
+      "id": 116941092720,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891273068/job/116941092720"
+    },
+    {
+      "id": 116941092461,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891273068/job/116941092461"
+    },
+    {
+      "id": 116941092360,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891272957/job/116941092360"
+    },
+    {
+      "id": 116941092187,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38891272957/job/116941092187"
+    }
+  ],
+  "pg": {
+    "run": 38891273068,
+    "run_number": 108,
+    "attempt": 1,
+    "event": "pull_request",
+    "job": 116941092461,
+    "tests": 24,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "seconds": 8.334,
+    "artifact": 12041891894,
+    "zip_sha256": "72399dad53e8332b27b69331ffcf36db7138a9f1d511a2b13d3ed18c89906b99",
+    "serialized_bytes": 4595,
+    "physical_bytes": 49152,
+    "permission_denials_sqlstate_42501": 16,
+    "work_items": 3,
+    "attempts": 0,
+    "source_calls": 0,
+    "application_writes": 0
+  },
+  "publication_owner": "current Development session only; independent reviewer read-only and idle; local evidence clean before new archive; expected-head compare required",
+  "production_actions": 0
+}
