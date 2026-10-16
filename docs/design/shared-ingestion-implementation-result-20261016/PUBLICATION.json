@@ -1,0 +1,14 @@
+{
+  "backlog": "INCOMPLETE",
+  "draft_pr": 113,
+  "evidence_expected_parent": "6af97bb13e211da6431aebb4c00bef1707a3dfb5",
+  "live_source_calls": 0,
+  "master_unchanged": "f5a5d92c42c6708c24c9f6c6cf10d6310b1bbedf",
+  "operational_activation": "NOT_APPROVED",
+  "pipeline": "OFFLINE_DISPOSABLE_PASS",
+  "production_operations": 0,
+  "scope": "AUDIT_PUBLICATION_ONLY",
+  "source_head": "1d3bc6162aa8d58907f7a2d7de00496239a4e593",
+  "source_tree": "b38dc743db09cc577b40bfd2c5d8387c8f46ef8e",
+  "stage4": "OPEN"
+}
