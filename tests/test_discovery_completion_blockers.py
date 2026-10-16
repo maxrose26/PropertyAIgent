@@ -154,3 +154,26 @@ def test_metadata_diagnostic_is_strict_bounded_and_cannot_export_payload():
     assert ui.metadata_capture_evidence(safe)==safe
     for mutation in [dict(safe,raw_html='PRIVATE'),dict(safe,row_item_count=21),dict(safe,label_counts={'Applicant':1}),dict(safe,label_counts=dict(safe['label_counts'],Description=True))]:
         with pytest.raises(ValueError,match='metadata evidence shape'):ui.metadata_capture_evidence(mutation)
+
+
+@pytest.mark.parametrize('council',['rochdale','salford'])
+def test_unobserved_councils_do_not_acquire_manchester_zero_shape(council):
+    from verification.discovery.arcus_ui_config import UI_CASES
+    from playwright.async_api import TimeoutError as LocatorTimeout
+    cfg=dated_config(UI_CASES['discovery_'+council+'_ui_window'],'2026-10-15','2026-10-15');seen=[];a={}
+    class P:
+        def locator(self,selector):
+            seen.append(selector)
+            class L:
+                async def wait_for(self,**kw):raise LocatorTimeout('synthetic')
+            return L()
+    sync_await(ui.enumerate_ui(P(),a,asyncio.Event(),cfg))
+    assert seen==['p.pr-pagination__results'] and a['enumeration_evidence'] is None
+    assert a['applied_interval'] is None
+
+
+def test_zero_consumer_rejects_other_council_even_with_copied_proof():
+    from verification.discovery.arcus_ui_config import ROCHDALE
+    _,_,a=zero_source();cfg=dated_config(ROCHDALE,'2026-10-15','2026-10-15')
+    a.update(case='discovery_rochdale_ui_window',destination=cfg.destination)
+    with pytest.raises(ValueError,match='zero evidence'):validate(a,cfg)

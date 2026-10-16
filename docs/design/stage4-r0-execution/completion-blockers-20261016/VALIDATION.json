@@ -1,4 +1,10 @@
 {
+  "actual_discovery_ci_command_network_denied": {
+    "failed": 0,
+    "passed": 607,
+    "report": "discovery-tests.xml",
+    "skipped": 1
+  },
   "base_tree": "c24de41feb6245c9a3579acefb6ca4f82515bb61",
   "changed_execution_test_ci_paths": [
     "verification/discovery/arcus_ui_window.py",
@@ -7,21 +13,30 @@
     "verification/discovery/finite_acceptance.py",
     "verification/stage26b_l1/request_boundary.py",
     "tests/test_discovery_page_cap_transport.py",
-    "tests/test_discovery_completion_blockers.py",
     ".github/workflows/stage4-discovery-offline.yml",
-    ".github/workflows/stage4-batch-offline.yml"
+    ".github/workflows/stage4-batch-offline.yml",
+    "tests/test_discovery_completion_blockers.py",
+    "tests/test_stage4_direct_registration.py",
+    "verification/direct_reference/history/request-boundary-pre-no-retry.py.txt"
   ],
   "evidence_checkpoint": "0c6a9c8d39813741bcceba60622d19f3b8d87fe2",
   "file_sha256": {
     ".github/workflows/stage4-batch-offline.yml": "7c2ea6564b330aa42353a5c33ca62b29b0040e962ad916e3a76f5df7028c8521",
     ".github/workflows/stage4-discovery-offline.yml": "1826ee8c4f93d2d55f548726d3bcbb6a18617c4807a1e28b5746f93ff92eea1c",
-    "tests/test_discovery_completion_blockers.py": "fcb0fe550c545f0bb91dd5e8d19af1845eae2216f3eb070745dd40876446f6f0",
+    "tests/test_discovery_completion_blockers.py": "329e2b4e953868ff4c5f3ddd850dca5d8662e58933294ed5961fb7d49b7f093c",
     "tests/test_discovery_page_cap_transport.py": "186338bf771ce0739935d250afb8462938eb21aff9d40f11cee6199d728c62db",
-    "verification/discovery/arcus_ui_audit.py": "cdb71c0c7c168a738a5b674c69c290155da8d2d87bd46a4fb0aad684318522b7",
-    "verification/discovery/arcus_ui_window.py": "96922ca2bfeb78a5b9b1a0ad4f55bbd2794b252d144c5243f41da23c003731d7",
+    "tests/test_stage4_direct_registration.py": "419d912bcd367d80fe580f0694c8072e9292317084005de8327d852290fcd116",
+    "verification/direct_reference/history/request-boundary-pre-no-retry.py.txt": "ad243bd5148a90147fa5f04047e316355909cabf263d53d0f1827a6ba0660c76",
+    "verification/discovery/arcus_ui_audit.py": "ab4dfc15e21d6ac70461a46af23d20e3f311623114d12724600808ca2f70ac86",
+    "verification/discovery/arcus_ui_window.py": "3255725d33bc4633c035bc217fbabbb3342cdb7022472c9be7239df4745adb36",
     "verification/discovery/finite_acceptance.py": "e3ebfabffd7d91afcfcc7cb2eefee023a4237cd8a9389ac0cb83ea8ba79d231e",
     "verification/discovery/idox_window.py": "5ea89823b65f063ce74ea2f1b376c4b8fbbedb1b64156da6f235e70be55a65ac",
     "verification/stage26b_l1/request_boundary.py": "188198827c2192dec97f75a373fa3f3bbd066cd5f245ebad43e576a7b6e90057"
+  },
+  "final_blocker_tests": {
+    "failed": 0,
+    "passed": 18,
+    "skipped": 0
   },
   "focused_network_denied": {
     "failed": 0,
@@ -30,9 +45,16 @@
     "skip": "local owned-process PID namespace mismatch; no production implications",
     "skipped": 1
   },
-  "hosted_checks": "PENDING_DRAFT_CANDIDATE_PUBLICATION",
+  "focused_pin_registration": {
+    "failed": 0,
+    "passed": 83,
+    "skipped": 0
+  },
+  "hosted_checks": "FINAL_HEAD_PENDING; preliminary head batch immutable-pin failure corrected without altering accepted digests",
   "independent_review": {
     "agent": "/root/completion_blocker_review",
+    "final_pin_registration_tests_passed": 53,
+    "final_scope": "Manchester-only zero and exact immutable boundary successor reviewed",
     "no_live_or_production": true,
     "passed": 43,
     "result": "PASS_OFFLINE_PROPOSAL_NOT_EXECUTION",
@@ -40,7 +62,7 @@
   },
   "new_execution_authorities": 0,
   "no_merge_registration_dispatch": true,
-  "patch_sha256": "be3353eae8472a1b5782b178c40e2e4faf0d9f81810b9a8ab3ef66fcd5240018",
+  "patch_sha256": "e4caa1bb8f42a099b9e0147e5a744ccf04d1dc3b928fde1c7d2125cf84edd4c9",
   "production_access": 0,
   "runtime_preserved": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
   "scope": "OFFLINE_CORRECTION_AND_PROPOSAL_ONLY",

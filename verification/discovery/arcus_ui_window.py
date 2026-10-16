@@ -144,7 +144,10 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
         # The sealed Manchester zero observation has a paragraph "No results
         # found" and no pagination marker. Absence of pagination alone is NEVER
         # zero evidence. Applied criteria and contradictory rows are checked below.
-        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator('p.pr-pagination__results, p:text-is("No results found")').wait_for(state='visible',timeout=10000),audit)
+        # Only Manchester has retained source evidence for this zero shape.
+        zero_supported=config.council=='manchester'
+        result_selector='p.pr-pagination__results, p:text-is("No results found")' if zero_supported else 'p.pr-pagination__results'
+        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator(result_selector).wait_for(state='visible',timeout=10000),audit)
         # An ordinary disclosure toggle exposes the source's retained filters.
         await criteria_control('CRITERIA_DISCLOSURE',lambda:page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000),audit)
         expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
@@ -159,7 +162,7 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
         audit['applied_interval']=[config.start,config.end]
         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'
         zero=page.locator('p:text-is("No results found")')
-        if await zero.count():
+        if zero_supported and await zero.count():
             if (await zero.count()!=1 or await zero.inner_text(timeout=1500)!='No results found'
                 or await page.locator('div[role="list"].slds-box').count()!=0
                 or await page.locator('p.pr-pagination__results').count()!=0

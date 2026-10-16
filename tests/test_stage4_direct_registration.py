@@ -37,6 +37,12 @@ def test_exact_cohort_and_shared_bytes():
             archive=root/'history/refresh-pre-diagnostics.py.txt'
             assert hashlib.sha256(archive.read_bytes()).hexdigest()==digest
             assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2'
+        elif path=='verification/stage26b_l1/request_boundary.py':
+            # The accepted/consumed boundary bytes remain immutable. Only this
+            # exact opt-in retry-policy successor may differ in the current tree.
+            assert digest=='ad243bd5148a90147fa5f04047e316355909cabf263d53d0f1827a6ba0660c76'
+            assert hashlib.sha256((root/'history/request-boundary-pre-no-retry.py.txt').read_bytes()).hexdigest()==digest
+            assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='188198827c2192dec97f75a373fa3f3bbd066cd5f245ebad43e576a7b6e90057'
         else:
             assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
     assert len(load_manifest())==202
@@ -46,7 +52,8 @@ def test_exact_cohort_and_shared_bytes():
     for path,digest in historical.items():
         source=(root/'history/refresh-v1.py.txt' if path=='verification/direct_reference/refresh.py'
                 else root/'history/models-v1.py.txt' if path=='app/db/models.py'
-                else root/'history/idox-v1.py.txt' if path=='app/scrapers/idox_portal.py' else Path(path))
+                else root/'history/idox-v1.py.txt' if path=='app/scrapers/idox_portal.py'
+                else root/'history/request-boundary-pre-no-retry.py.txt' if path=='verification/stage26b_l1/request_boundary.py' else Path(path))
         assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
     provenance=json.loads((root/'history/provenance.json').read_text())
     assert provenance['original_live_sha']=='a0feeb7c1cd39c979e2a9018b82d764d1edcd76b'
