@@ -1,0 +1,15 @@
+{
+  "candidate": "5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+  "tree": "39f1dc85628223d62767507f3a4e0ad148f0be18",
+  "accepted_predecessor": "2de9b2cde482d20aacb2a37f63ccc6cd9041e723",
+  "accepted_evidence": "48d57bb9d27590e0e73e93956b4678c54a31fa83",
+  "run": 38935264680,
+  "run_number": 144,
+  "attempt": 1,
+  "production_access": 0,
+  "live_source_calls": 0,
+  "credential_changes": 0,
+  "stage": 4,
+  "stage_status": "OPEN",
+  "all_exact_head_checks": "9PASS"
+}

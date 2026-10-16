@@ -1,0 +1,165 @@
+{
+  "council": "bolton",
+  "requested_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "date_semantics": "RECEIVED",
+  "applied_interval": [
+    "2026-09-28",
+    "2026-10-04"
+  ],
+  "completeness": "UNKNOWN",
+  "source_qualification": "CANDIDATE_CONTRACT",
+  "persistence": false,
+  "pages": [
+    {
+      "ordinal": 1,
+      "first": 1,
+      "last": 3,
+      "total": 3,
+      "rows": 3,
+      "body_sha256": "50fd0a7f8d89b9a41d1c2af7832000bb99d59285016a67519b289c05a8cf2e56",
+      "terminal": "EXPLICIT_LAST_EQUALS_TOTAL"
+    }
+  ],
+  "records": [
+    {
+      "reference": "01780/26",
+      "identity_state": "PRESENT_VALUE",
+      "source_key": "TM6SO1DEKGU00",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=TM6SO1DEKGU00&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink"
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address"
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026",
+          "locator": "p.metaInfo:Received"
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026",
+          "locator": "p.metaInfo:Validated"
+        }
+      }
+    },
+    {
+      "reference": "01781/26",
+      "identity_state": "PRESENT_VALUE",
+      "source_key": "K1",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K1&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink"
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address"
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026",
+          "locator": "p.metaInfo:Received"
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026",
+          "locator": "p.metaInfo:Validated"
+        }
+      }
+    },
+    {
+      "reference": "01782/26",
+      "identity_state": "PRESENT_VALUE",
+      "source_key": "K2",
+      "source_url": "https://paplanning.bolton.gov.uk/online-applications/applicationDetails.do?keyVal=K2&activeTab=summary",
+      "fields": {
+        "proposal": {
+          "state": "PRESENT_VALUE",
+          "value": "Erection of 20 residential dwellings",
+          "locator": "a.summaryLink"
+        },
+        "address": {
+          "state": "PRESENT_BLANK",
+          "value": "",
+          "locator": "p.address"
+        },
+        "received_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026",
+          "locator": "p.metaInfo:Received"
+        },
+        "validated_date": {
+          "state": "PRESENT_VALUE",
+          "value": "Mon 28 Sep 2026",
+          "locator": "p.metaInfo:Validated"
+        }
+      }
+    }
+  ],
+  "failure": null,
+  "cleanup": "BOUNDARY_CLOSED",
+  "capped": false,
+  "sort": "REFERENCE_DESCENDING",
+  "enumeration_evidence": "COUNT_RECONCILED",
+  "unique_references": 3,
+  "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+  "applied_evidence_sha256": "721e0041c3497b50f3ce210e6861a1d156f9cb96d7460d71543e1e7ccc2dd361",
+  "criteria_result_binding": {
+    "method": "SAME_SESSION_POST_ENUMERATION_REFINE_NO_RESUBMIT",
+    "segment_sha256": [
+      "50fd0a7f8d89b9a41d1c2af7832000bb99d59285016a67519b289c05a8cf2e56"
+    ],
+    "criteria_sha256": "721e0041c3497b50f3ce210e6861a1d156f9cb96d7460d71543e1e7ccc2dd361",
+    "request_ordinal": 4,
+    "result_set_reenumerated": false,
+    "publication_semantics": "UNKNOWN"
+  },
+  "resource": {
+    "council": "bolton",
+    "reference": "RECEIVED:2026-09-28:2026-10-04",
+    "adapter": "idox",
+    "outcome": "UNKNOWN",
+    "requests_attempted": 4,
+    "redirects": 0,
+    "retries": 0,
+    "received_bytes": 4148,
+    "elapsed_seconds": 0.011,
+    "budget_exhaustion": false,
+    "retry_policy": "NO_INTERNAL_RETRY"
+  },
+  "response_provenance": [
+    {
+      "source_encoding": "UTF-8",
+      "body_sha256": "0415c3aee2c44441d8e988e7ab0b169925cde4d48960eb427075cb228355f6bd",
+      "parser_body_sha256": "0415c3aee2c44441d8e988e7ab0b169925cde4d48960eb427075cb228355f6bd"
+    },
+    {
+      "source_encoding": "UTF-8",
+      "body_sha256": "50fd0a7f8d89b9a41d1c2af7832000bb99d59285016a67519b289c05a8cf2e56",
+      "parser_body_sha256": "50fd0a7f8d89b9a41d1c2af7832000bb99d59285016a67519b289c05a8cf2e56"
+    },
+    {
+      "source_encoding": "UTF-8",
+      "body_sha256": "50fd0a7f8d89b9a41d1c2af7832000bb99d59285016a67519b289c05a8cf2e56",
+      "parser_body_sha256": "50fd0a7f8d89b9a41d1c2af7832000bb99d59285016a67519b289c05a8cf2e56"
+    },
+    {
+      "source_encoding": "UTF-8",
+      "body_sha256": "721e0041c3497b50f3ce210e6861a1d156f9cb96d7460d71543e1e7ccc2dd361",
+      "parser_body_sha256": "721e0041c3497b50f3ce210e6861a1d156f9cb96d7460d71543e1e7ccc2dd361"
+    }
+  ]
+}

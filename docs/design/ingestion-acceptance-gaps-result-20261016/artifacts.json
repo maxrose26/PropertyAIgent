@@ -1,0 +1,27 @@
+[
+  {
+    "id": 12061395293,
+    "name": "ingestion-provisioning-disposable-5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+    "digest": "sha256:529ce6621c5b8f8fb0edf2604e6c27a63050de25c75c01b6f16abf2076413ebf"
+  },
+  {
+    "id": 12060397519,
+    "name": "discovery-pg-5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+    "digest": "sha256:17e67ef3b542c406b66c10a6e8a9b8ba4f86dc5cf0e325fd2f5dbb61f3f6e5ac"
+  },
+  {
+    "id": 12060327898,
+    "name": "discovery-offline-5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+    "digest": "sha256:8828b0f676b48c6e9d89e5767ca9710605619d24d2e4b2528dc8c73ba2f39222"
+  },
+  {
+    "id": 12061305712,
+    "name": "stage2-security-5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+    "digest": "sha256:e021c9e30142a8f1391f345b81aedaf0a2969fae43d0079c896491762cc2f92a"
+  },
+  {
+    "id": 12060487381,
+    "name": "ah-web-5f36a886e685fb4e705ee7c58fbbb81bbd41736f",
+    "digest": "sha256:b665b1179ea5e5879b0527b6c52ca646839d6bd18ef961b6da30bb0fd80c68eb"
+  }
+]
