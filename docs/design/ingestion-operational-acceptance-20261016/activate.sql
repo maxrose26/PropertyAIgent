@@ -27,7 +27,7 @@ BEGIN
    AND NOT (login='ingestion_worker_login' AND c.oid IN ('public.ingestion_work_items'::regclass,'public.ingestion_work_attempts'::regclass))
    AND NOT (login='ingestion_application_login' AND c.oid IN ('public.applications'::regclass,'public.application_lifecycle_events'::regclass)))
   THEN RAISE EXCEPTION 'AMBIENT_UNRELATED_TABLE_ACCESS'; END IF;
-  IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='S' AND n.nspname NOT IN ('pg_catalog','information_schema') AND has_sequence_privilege(login,c.oid,'USAGE,SELECT,UPDATE') AND NOT (login='ingestion_application_login' AND c.oid IN (pg_get_serial_sequence('public.applications','id')::regclass,pg_get_serial_sequence('public.application_lifecycle_events','id')::regclass))) THEN RAISE EXCEPTION 'AMBIENT_UNRELATED_SEQUENCE'; END IF;
+  IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='S' AND n.nspname NOT IN ('pg_catalog','information_schema') AND CASE WHEN c.relkind='S' THEN has_sequence_privilege(login,c.oid,'USAGE,SELECT,UPDATE') ELSE false END AND NOT (login='ingestion_application_login' AND c.oid IN (pg_get_serial_sequence('public.applications','id')::regclass,pg_get_serial_sequence('public.application_lifecycle_events','id')::regclass))) THEN RAISE EXCEPTION 'AMBIENT_UNRELATED_SEQUENCE'; END IF;
   IF EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
    WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog','information_schema') AND has_function_privilege(login,p.oid,'EXECUTE')
    AND NOT (login='ingestion_worker_login' AND p.oid IN ('public.ingestion_raise_stop(text)'::regprocedure,'public.ingestion_worker_step(text,text,integer,text,text,jsonb,jsonb)'::regprocedure))
