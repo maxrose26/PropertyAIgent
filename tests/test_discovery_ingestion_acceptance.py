@@ -127,3 +127,18 @@ def test_aggregate_database_allowance_survives_manual_nomination_pause():
  for _ in range(8):b.tick('rollback',cleanup=True)
  with pytest.raises(Denied):b.tick('rollback',cleanup=True)
  with pytest.raises(Denied):DatabaseBudget(previous=dict(previous,cleanup='UNCERTAIN'))
+
+
+def test_retained_sql_continuation_cannot_reset_or_misbind_budget():
+ from verification.ingestion_storage.operational_controller import ControllerLedger
+ def reject(previous,binding):
+  budget=DatabaseBudget(previous=previous)
+  engine=budget.engine('postgresql+psycopg://ingestion_worker_login:unused@127.0.0.1:5432/ingestion_provisioning_test')
+  ledger=ControllerLedger(engine,budget=budget,owner='one',authority='unused',bindings={})
+  with pytest.raises(Denied,match='SEALED_PRIOR_ACCOUNTING_REQUIRED'):execute(Coordinator(ledger,{}),binding,listing_reader=None,detail_reader=None,envelope=None,council=None)
+  assert budget.attempts==(previous or {}).get('connection_attempts',0) and budget.opened==[]
+  budget.close([engine])
+ binding=AcceptanceBinding('a'*64,'b'*64,'c'*64,'X','https://example.invalid','K','d'*64,retained_capture_sha256='e'*64)
+ reject(None,binding)
+ prior=dict(connection_attempts=2,driver_statements=30,elapsed_seconds=1,connections_closed=True,cleanup='CLOSED',capture_checkpoint_sha256='f'*64)
+ reject(prior,replace(binding,prior_accounting_sha256=digest(prior)))

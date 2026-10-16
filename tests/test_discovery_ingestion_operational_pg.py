@@ -53,7 +53,14 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    for role in ['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']:
     if role=='operational_untrusted':boot.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
     else:boot.execute(sql.SQL('ALTER ROLE {} PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
-   with connect('provisioning_migrator') as migration:migration.execute(Path('docs/design/ingestion-operational-acceptance-20261016/activate.sql').read_text())
+   activation=Path('docs/design/ingestion-operational-acceptance-20261016/activate.sql').read_text()
+   for permission in ['UPDATE (event_type) ON public.application_lifecycle_events','REFERENCES (reference) ON public.applications','USAGE ON SEQUENCE public.sites_id_seq']:
+    boot.execute('GRANT '+permission+' TO PUBLIC')
+    with connect('provisioning_migrator') as migration:
+     with pytest.raises(psycopg.Error):migration.execute(activation)
+    boot.execute('REVOKE '+permission+' FROM PUBLIC')
+    assert boot.execute("SELECT count(*) FROM pg_roles WHERE rolname IN ('ingestion_worker_login','ingestion_effect_login','ingestion_application_login') AND rolcanlogin").fetchone()[0]==0
+   with connect('provisioning_migrator') as migration:migration.execute(activation)
    # Storage and recovery login activation are fixture tests only, not runtime.
    boot.execute('ALTER ROLE ingestion_storage_login LOGIN');boot.execute('ALTER ROLE ingestion_recovery_login LOGIN')
    worker=engine('ingestion_worker_login');broker=engine('ingestion_effect_login');engines.extend([worker,broker])
@@ -66,13 +73,13 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     return key
    k=seed('ONE');blocked=seed('BLOCKED',state='SAFETY_BLOCKED');other=seed('OTHER')
    bindings={}
-   def bind(keys,*,writes=0,source_calls=0):
+   def bind(keys,*,writes=0,source_calls=0,authority='INGESTION_TEST_sql'):
     nonlocal bindings
     with app.begin() as c:
      for key in keys:
       row=c.execute(select(W).where(W.c.key==key)).mappings().one();bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
-     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'ingestion_effect_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
+     control['grants'][authority]={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'ingestion_effect_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
    bind([k,blocked,other]);l=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
    with pytest.raises(Exception):l.claim(k) # original consumed Salford stop
@@ -160,22 +167,31 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     prototype=dict(c.execute(select(W).where(W.c.key==scope)).mappings().one());prototype.update(key=child,subject={'kind':'APPLICATION','council':'bolton','reference':target['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(record),dependencies=[scope],max_attempts=2)
     c.execute(W.insert().values(**prototype))
     c.execute(W.update().where(W.c.key==fact).values(subject=prototype['subject'],dependencies=[child]))
-   bind([scope,child,fact],source_calls=2,writes=2)
    from sqlalchemy.engine import URL
    from dataclasses import asdict
    import sys
    from verification.ingestion_storage.operational_supervisor import supervise
    urls=[URL.create('postgresql+psycopg',username=r,password=passwords.get(r,info['password']),host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False) for r in ['ingestion_worker_login','ingestion_effect_login','ingestion_application_login']]
    fixed=AcceptanceBinding(scope,child,fact,target['reference'],target['source_url'],target['source_identifier'],digest(record))
-   plan=tmp_path/'plan.json';root=tmp_path/'controller';output=root/'worker-result.json'
-   plan.write_text(json.dumps(dict(binding=asdict(fixed),bindings=bindings,listing=source_audit,detail=raw_source,target=target,envelope=asdict(env),outer=outer()),default=str))
-   supervised=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(plan),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=root)
-   result=json.loads(output.read_bytes()) if output.exists() else {}
-   account=result.get('database_accounting',{})
-   record_property('controller_accounting',json.dumps(account,sort_keys=True));record_property('controller_supervisor',json.dumps(supervised,sort_keys=True))
-   assert supervised['cleanup']=='CLOSED' and supervised['exit_code']==0 and supervised['limit_hit'] is None, (supervised,result)
-   assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
-   assert account['cleanup']=='CLOSED' and account['connection_attempts']<=16 and account['driver_statements']<=120
+   prior=None
+   for phase in ['capture','execute']:
+    authority='INGESTION_TEST_sql_'+phase
+    bind([scope] if phase=='capture' else [scope,child,fact],source_calls=1,writes=0 if phase=='capture' else 2,authority=authority)
+    plan=tmp_path/('plan-'+phase+'.json');root=tmp_path/('controller-'+phase);output=root/'worker-result.json'
+    value=dict(mode=phase,authority=authority,binding=asdict(fixed),bindings=bindings,listing=source_audit,detail=raw_source,target=target,envelope=asdict(env),outer=outer(),prior_database_accounting=prior)
+    plan.write_text(json.dumps(value,default=str))
+    supervised=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(plan),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=root)
+    result=json.loads(output.read_bytes()) if output.exists() else {};account=result.get('database_accounting',{})
+    record_property('controller_accounting_'+phase,json.dumps(account,sort_keys=True));record_property('controller_supervisor_'+phase,json.dumps(supervised,sort_keys=True))
+    assert supervised['cleanup']=='CLOSED' and supervised['exit_code']==0 and supervised['limit_hit'] is None, (supervised,result)
+    assert account['cleanup']=='CLOSED' and account['connection_attempts']<=16 and account['driver_statements']<=120
+    if phase=='capture':
+     assert result['outcome']=='DISCOVERY_SCREENING_ONLY' and result['synthetic_reader_callbacks']=={'listing':1,'detail':0}
+     assert boot.execute('SELECT count(*) FROM public.applications').fetchone()[0]==0
+     prior=account;fixed=replace(fixed,retained_capture_sha256=result['checkpoint_sha256'],prior_accounting_sha256=digest(account))
+    else:
+     assert result['outcome']=='SUPPORTED_FACTS_VERIFIED' and result['synthetic_reader_callbacks']=={'listing':0,'detail':1}
+     assert account['driver_statements']>prior['driver_statements'] and account['connection_attempts']>prior['connection_attempts']
    with connect('ingestion_application_login') as aw:
     for statement in ["UPDATE public.applications SET estimated_unit_count=999","UPDATE public.applications SET site_id=NULL","DELETE FROM public.applications","SELECT * FROM public.ingestion_work_items","SET ROLE ingestion_storage_owner","SELECT public.ingestion_worker_step('claim','x',0,'x','x','{}','{}')"]:
      with pytest.raises(psycopg.Error) as denied:aw.execute(statement)

@@ -8,7 +8,7 @@ import json,time
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.pool import QueuePool
-from app.ingestion.ledger import Denied,digest
+from app.ingestion.ledger import Denied,digest,bounded,Ledger
 from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.listing_screening import screen_row
 
@@ -22,7 +22,8 @@ class DatabaseBudget:
     def __init__(self,*,connections=16,statements=120,seconds=165,stop_file=None,previous=None):
         if not (1<=connections<=16 and 20<=statements<=120 and 0<seconds<=165):raise Denied('CONTROLLER_CEILING')
         self.connection_cap=connections;self.statement_cap=statements;self.seconds=seconds
-        previous=previous or {}
+        previous=bounded(previous or {},16384)
+        self.previous=previous;self.capture_checkpoint_sha256=previous.get('capture_checkpoint_sha256')
         attempts=previous.get('connection_attempts',0);statements=previous.get('driver_statements',0);elapsed=previous.get('elapsed_seconds',0)
         if type(attempts) is not int or not 0<=attempts<=connections or type(statements) is not int or not 0<=statements<=self.statement_cap or type(elapsed) not in (int,float) or not 0<=elapsed<seconds:raise Denied('PRIOR_ACCOUNTING_BOUND')
         if previous and (previous.get('cleanup')!='CLOSED' or previous.get('connections_closed') is not True):raise Denied('PRIOR_CLOSURE_REQUIRED')
@@ -82,7 +83,7 @@ class DatabaseBudget:
             except Exception:errors.append('CLOSE')
         return dict(connection_attempts=self.attempts,driver_statements=self.statements,statement_kinds=self.kinds,
             connections_closed=all(c.closed for c in self.opened),cleanup='CLOSED' if not errors and all(c.closed for c in self.opened) else 'UNCERTAIN',
-            errors=errors,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
+            errors=errors,capture_checkpoint_sha256=self.capture_checkpoint_sha256,elapsed_seconds=round(time.monotonic()-self.started+self.previous_elapsed,3))
 
 
 class ControllerLedger(SQLLedger):
@@ -94,6 +95,7 @@ class ControllerLedger(SQLLedger):
     def __init__(self,*args,budget,**kwargs):
         for e in (args[0],kwargs.get('broker_engine'),kwargs.get('application_engine')):
             if e is not None and e not in getattr(budget,'engines',[]):raise Denied('ACCOUNTED_ENGINE_REQUIRED')
+        self.budget=budget
         super().__init__(*args,**kwargs)
 
 
@@ -108,6 +110,7 @@ class AcceptanceBinding:
     # Binds the nominated retained row; changed row = HOLD, never forced match.
     listing_revision:str
     retained_capture_sha256:str|None=None
+    prior_accounting_sha256:str|None=None
 
 
 def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None):
@@ -116,7 +119,12 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     All task bindings/allowances must already exist. No issue/grant/barrier API.
     Other rows are retained and cheaply screened offline; they receive no effects.
     """
-    l=coordinator.ledger;check()
+    l=coordinator.ledger
+    if not isinstance(l,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
+    if binding.retained_capture_sha256 and isinstance(l,ControllerLedger):
+        prior=l.budget.previous
+        if not prior or not binding.prior_accounting_sha256 or digest(prior)!=binding.prior_accounting_sha256 or prior.get('capture_checkpoint_sha256')!=binding.retained_capture_sha256:raise Denied('SEALED_PRIOR_ACCOUNTING_REQUIRED')
+    check()
     if (binding.reference,binding.source_url,binding.source_record_id)!=(envelope.reference,envelope.source_url,envelope.source_record_id):raise Denied('NOMINATED_IDENTITY_BINDING')
     root=l.get(binding.discovery_key)
     if root['state']=='COMPLETE':
@@ -133,6 +141,7 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     if not isinstance(contract,IdoxListingContract):raise Denied('BOUND_IDOX_CONTRACT')
     cfg=contract.config;scope={'kind':'DISCOVERY_SCOPE','council':cfg.council,'start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':cfg.semantics}
     if root['subject']!=scope or receipt['contract']!=root['contract'] or receipt['interval']!=[scope['start'],scope['end']] or receipt['applied_interval']!=receipt['interval']:raise Denied('RETAINED_SCOPE_BINDING')
+    if isinstance(l,ControllerLedger):l.budget.capture_checkpoint_sha256=digest(receipt)
     # Recompute every disposition in trusted controller memory. A worker's
     # assertion is not used as evidence for selecting expensive effects.
     screens=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']]
@@ -181,8 +190,10 @@ def capture(coordinator,key,*,listing_reader,check=lambda:None):
     A subsequent manifest may bind one retained record and its exact hash.
     Completed discovery is then consumed as evidence, never re-observed.
     """
+    if not isinstance(coordinator.ledger,(ControllerLedger,Ledger)):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
     check();children=coordinator.idox_source(coordinator.ledger.claim(key,lease_seconds=165),listing_reader)
     check();receipt=coordinator.ledger.get(key)['checkpoint']
+    if isinstance(coordinator.ledger,ControllerLedger):coordinator.ledger.budget.capture_checkpoint_sha256=digest(receipt)
     return dict(outcome='DISCOVERY_SCREENING_ONLY',admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',
         source_sha256=receipt['source_sha256'],checkpoint_sha256=digest(receipt),children=children,
         screening=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']])

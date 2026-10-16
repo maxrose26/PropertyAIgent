@@ -13,7 +13,7 @@ from app.ingestion.idox_adapter import IdoxListingContract
 from app.pipeline.discovery_contract import DiscoveryEnvelope,WindowEvidence
 from verification.discovery.idox_window import WindowConfig
 from verification.ingestion_storage.new_identity_contract import accepted_idox_new_identity
-from verification.ingestion_storage.operational_controller import DatabaseBudget,ControllerLedger,AcceptanceBinding,execute
+from verification.ingestion_storage.operational_controller import DatabaseBudget,ControllerLedger,AcceptanceBinding,execute,capture
 from app.config import get_council
 
 
@@ -37,9 +37,15 @@ def main():
  budget=DatabaseBudget(previous=plan.get('prior_database_accounting'));engines=[];result={'outcome':'UNCONFIRMED_NO_RETRY'}
  try:
   engines=[budget.engine(u) for u in urls]
-  l=ControllerLedger(engines[0],budget=budget,owner='one',authority='INGESTION_TEST_sql',bindings=plan['bindings'],broker_engine=engines[1],application_engine=engines[2])
+  l=ControllerLedger(engines[0],budget=budget,owner='one',authority=plan.get('authority','INGESTION_TEST_sql'),bindings=plan['bindings'],broker_engine=engines[1],application_engine=engines[2])
   co=Coordinator(l,{contract.name:contract,'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
-  result=execute(co,binding,listing_reader=lambda _: (audit,plan['outer']),detail_reader=lambda _: (plan['detail'],plan['outer']),envelope=envelope,council=get_council(target['council']),check=budget.check)
+  if not l.authority.startswith('INGESTION_TEST_'):raise ValueError('FIXTURE_AUTHORITY_ONLY')
+  counts={'listing':0,'detail':0}
+  def listing(_):counts['listing']+=1;return audit,plan['outer']
+  def detail(_):counts['detail']+=1;return plan['detail'],plan['outer']
+  if plan.get('mode')=='capture':result=capture(co,binding.discovery_key,listing_reader=listing,check=budget.check)
+  else:result=execute(co,binding,listing_reader=listing,detail_reader=detail,envelope=envelope,council=get_council(target['council']),check=budget.check)
+  result['synthetic_reader_callbacks']=counts
  except BaseException as exc:
   result['error_class']=type(exc).__name__
   raise
@@ -48,6 +54,6 @@ def main():
   raw=json.dumps(result,sort_keys=True,allow_nan=False).encode()
   if len(raw)>512*1024:raise ValueError('WORKER_AUDIT_BOUND')
   with a.output.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
- return 0 if result['outcome']=='SUPPORTED_FACTS_VERIFIED' and account['cleanup']=='CLOSED' else 1
+ return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY'} and account['cleanup']=='CLOSED' else 1
 
 if __name__=='__main__':raise SystemExit(main())
