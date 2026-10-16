@@ -104,3 +104,41 @@ def test_new_identity_commit_uncertainty_stops_following_work(engine,monkeypatch
  with pytest.raises(UncertainPersistence):co.new_identity(claim,envelope=e,council=get_council('bolton'),source=raw)
  assert l.get(k)['phase']=='WRITE_INTENT'
  with Session(engine) as s:assert s.scalar(select(func.count()).select_from(Application))==1
+
+
+def test_idox_source_intent_supervised_receipt_and_no_replay(engine):
+ install(engine);l=Ledger(engine);config=WindowConfig(max_transport_retries=0);contract=IdoxListingContract('idox-source-fixture',config,'a'*64)
+ key=l.enqueue(dict(kind='DISCOVERY_SCOPE',council='bolton',start=config.start.isoformat(),end=config.end.isoformat(),semantics='RECEIVED'),'DISCOVERY',contract=contract.name)
+ l.grant('INGESTION_TEST_source',[key],contracts=[contract.name],source_calls=1,expires_at=l.clock()+600)
+ co=Coordinator(l,{contract.name:contract});claim=l.claim(key,'worker','INGESTION_TEST_source');calls=[]
+ def reader(row):calls.append(row['key']);return audit(config),outer()
+ assert len(co.idox_source(claim,reader))==2 and calls==[key]
+ with pytest.raises(Denied):co.idox_source(claim,reader)
+ assert calls==[key]
+
+
+def test_new_identity_recovery_uses_committed_receipt_without_admission_or_source_replay(engine,monkeypatch):
+ l,co,k,e,raw=setup_new(engine);clock=[l.clock()];l.clock=lambda:clock[0];claim=l.claim(k,'worker','INGESTION_TEST_new');finish=l.finish
+ def crash(*a,**kw):raise RuntimeError('after durable fact checkpoint')
+ monkeypatch.setattr(l,'finish',crash)
+ with pytest.raises(RuntimeError,match='durable'):co.new_identity(claim,envelope=e,council=get_council('bolton'),source=raw)
+ receipt=l.get(k)['checkpoint'];assert receipt['outcome']=='SUPPORTED_FACTS_VERIFIED'
+ clock[0]+=121;l.recover(claim,cleanup_closed=True);new=l.claim(k,'replacement','INGESTION_TEST_new');monkeypatch.setattr(l,'finish',finish)
+ def no_commit(*a):pytest.fail('recovery must not repeat admission/B2')
+ monkeypatch.setattr(Session,'commit',no_commit)
+ result=co.new_identity(new,envelope=e,council=get_council('bolton'),source={})
+ assert result==receipt and l.get(k)['state']=='COMPLETE'
+
+
+def test_claimed_eligibility_cannot_bypass_existing_b2_gate_before_admission(engine,monkeypatch):
+ l,co,k,e,raw=setup_new(engine)
+ from verification.discovery import material_qualification
+ original=material_qualification.project_idox
+ def tampered(*args):
+  packet=original(*args);packet['observation'].field_states['decision']='NOT_PRESENT'
+  packet['observation'].b2_eligible=True
+  return packet
+ monkeypatch.setattr(material_qualification,'project_idox',tampered)
+ result=co.new_identity(l.claim(k,'worker','INGESTION_TEST_new'),envelope=e,council=get_council('bolton'),source=raw)
+ assert result['identity']=='NOT_CREATED'
+ with Session(engine) as s:assert s.scalar(select(func.count()).select_from(Application))==0

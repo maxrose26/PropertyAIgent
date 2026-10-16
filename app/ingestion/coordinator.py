@@ -130,6 +130,24 @@ class Coordinator:
         self.ledger.checkpoint(claim,receipt)
         return self._materialize(claim,receipt)
 
+    def idox_source(self,claim,supervised_reader):
+        from .idox_adapter import IdoxListingContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,IdoxListingContract):raise Denied('UNSUPPORTED_IDOX_CONTRACT')
+        c=contract.config
+        if row['subject']!={'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}:raise Denied('IDOX_TASK_SCOPE')
+        if row['checkpoint'] is not None:raise Denied('RESUME_CHECKPOINT_NO_SOURCE_REPLAY')
+        self.ledger.intent(claim,'source_calls')
+        try:
+            source,outer=supervised_reader(row)
+            receipt=contract.project(source,outer,row['limits']);receipt.pop('window')
+            if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,receipt)
+            else:self.ledger.checkpoint(claim,receipt)
+            return self._materialize(claim,receipt)
+        except Exception:
+            self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
+            raise
+
     def metadata_from_scope(self,claim):
         row=self.ledger.get(claim.key)
         if row['task']!='LISTING_METADATA' or row['subject']['kind']!='APPLICATION' or len(row['dependencies'])!=1:raise Denied('METADATA_TASK')

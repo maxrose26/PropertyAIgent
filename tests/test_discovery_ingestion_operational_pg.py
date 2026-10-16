@@ -57,13 +57,13 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     return key
    k=seed('ONE');blocked=seed('BLOCKED',state='SAFETY_BLOCKED');other=seed('OTHER')
    bindings={}
-   def bind(keys,*,writes=0):
+   def bind(keys,*,writes=0,source_calls=0):
     nonlocal bindings
     with app.begin() as c:
      for key in keys:
       row=c.execute(select(W).where(W.c.key==key)).mappings().one();bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
-     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':0,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
+     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
    bind([k,blocked,other]);l=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
    with pytest.raises(Exception):l.claim(k) # original consumed Salford stop
@@ -78,12 +78,15 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    # Clear only the DISPOSABLE control fixture, never a production barrier.
    boot.execute("UPDATE public.ingestion_work_items SET outcome=jsonb_set(outcome::jsonb,'{global_stop}','null')::json WHERE key=repeat('0',64)")
    with pytest.raises(Exception):l.claim(blocked)
+   boot.execute('ALTER ROLE ingestion_worker_login CONNECTION LIMIT 2') # disposable concurrent-lock stress only
    barrier=Barrier(2)
    def claim(owner):
     x=SQLLedger(worker,owner=owner,authority='INGESTION_TEST_sql',bindings=bindings);barrier.wait()
     try:return x.claim(k)
-    except Exception:return None
+    except __import__('sqlalchemy').exc.DBAPIError as e:
+     assert e.orig.sqlstate=='42501';return None
    with ThreadPoolExecutor(max_workers=2) as pool:claims=list(pool.map(claim,['one','two']))
+   boot.execute('ALTER ROLE ingestion_worker_login CONNECTION LIMIT 1')
    old=next(x for x in claims if x);assert sum(x is not None for x in claims)==1
    l.owner=old.owner;l.checkpoint(old,{'kind':'fixture','retained_sha256':'a'*64})
    with connect('ingestion_worker_login') as c:
@@ -122,9 +125,10 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    from tests.test_discovery_ingestion_ledger import outer
    cfg=WindowConfig(max_transport_retries=0);scope=seed('SCOPE','DISCOVERY')
    with app.begin() as c:c.execute(W.update().where(W.c.key==scope).values(subject={'kind':'DISCOVERY_SCOPE','council':'bolton','start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':'RECEIVED'},contract='bolton-idox-fixture'))
-   bind([scope]);reader=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,broker_engine=broker)
+   bind([scope],source_calls=1);reader=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,broker_engine=broker)
    discovery=Coordinator(reader,{'bolton-idox-fixture':IdoxListingContract('bolton-idox-fixture',cfg,'a'*64)})
-   children=discovery.idox_listing(reader.claim(scope),audit(cfg),outer());assert len(children)==2
+   children=discovery.idox_source(reader.claim(scope),lambda _: (audit(cfg),outer()));assert len(children)==2
+   with pytest.raises(Exception):reader.claim(children[0])
    bind([scope,*children])
    screener=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings)
    screening=Coordinator(screener,{})

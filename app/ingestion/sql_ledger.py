@@ -15,9 +15,16 @@ class SQLLedger:
         self.bindings=bounded(bindings);self.engine=application_engine;self.broker_engine=broker_engine
         if worker_engine.dialect.name!='postgresql':raise Denied('POSTGRES_SQL_CAPABILITIES_REQUIRED')
 
+    @staticmethod
+    def _limits(c):
+        c.execute(text("SET LOCAL statement_timeout='10s'"))
+        c.execute(text("SET LOCAL lock_timeout='3s'"))
+
     def get(self,key):
         if key not in self.bindings:raise Denied('TASK_NOT_BOUND')
-        with self.worker_engine.connect() as c:return dict(c.execute(select(W).where(W.c.key==key)).mappings().one())
+        with self.worker_engine.begin() as c:
+            self._limits(c)
+            return dict(c.execute(select(W).where(W.c.key==key)).mappings().one())
 
     def _step(self,op,key,fence=0,payload=None,connection=None):
         if key not in self.bindings:raise Denied('TASK_NOT_BOUND')
@@ -45,6 +52,7 @@ class SQLLedger:
         child=dict(identity,key=key,dependencies=dependencies,priority=priority,max_attempts=max_attempts,limits=parent['limits'])
         canonical=lambda x:json.dumps(x,sort_keys=True,separators=(',',':'),allow_nan=False)
         with self.broker_engine.begin() as c:
+            self._limits(c)
             result=self._step('enqueue_child',parent_claim.key,parent_claim.fence,dict(child=child,record_json=canonical(record),identity_json=canonical(identity)),connection=c)
         self.bindings[result['key']]={k:result[k] for k in ('subject','task','contract','revision')}
         return result['key']
@@ -68,7 +76,17 @@ class SQLLedger:
         return self._step('block',claim.key,claim.fence,dict(state=state,reason=reason,outcome=outcome))
 
     def stop(self,reason,**kwargs):
-        with self.worker_engine.begin() as c:c.execute(text('SELECT public.ingestion_raise_stop(:reason)'),{'reason':reason[:512]})
+        with self.worker_engine.begin() as c:
+            self._limits(c)
+            c.execute(text('SELECT public.ingestion_raise_stop(:reason)'),{'reason':reason[:512]})
+
+    def resolve_source(self,claim,receipt):
+        self._claim(claim)
+        if self.broker_engine is None:raise Denied('TRUSTED_SOURCE_BROKER_REQUIRED')
+        with self.broker_engine.begin() as c:
+            self._limits(c)
+            self._step('fence_effect',claim.key,claim.fence,connection=c)
+            self._step('resolve_effect',claim.key,claim.fence,receipt,connection=c)
 
     def fenced_effect(self,claim,writer):
         self._claim(claim)

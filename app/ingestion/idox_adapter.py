@@ -28,7 +28,7 @@ class IdoxListingContract:
         if (source.get('council')!=c.council or source.get('date_semantics')!=c.semantics
             or source.get('requested_interval')!=interval or source.get('applied_interval')!=interval
             or source.get('failure') is not None or source.get('capped') is not False
-            or source.get('enumeration_evidence')!='COUNT_RECONCILED' or source.get('cleanup')!='BOUNDARY_CLOSED'):
+            or source.get('enumeration_evidence')!='COUNT_RECONCILED' or source.get('cleanup') not in {'BOUNDARY_CLOSED','SESSION_BOUNDARY_CLOSED'}):
             raise Denied('IDOX_WINDOW_BINDING_OR_COMPLETENESS')
         pages=source['pages'];records=source['records'];r=source['resource']
         if not 1<=len(pages)<=limits['pages'] or len(records)>limits['rows'] or r.get('budget_exhaustion') is not False:
@@ -39,11 +39,17 @@ class IdoxListingContract:
         if type(r.get('elapsed_seconds')) not in (int,float) or not 0<=r['elapsed_seconds']<=min(45,limits['worker_seconds']):raise Denied('IDOX_CLOCK')
         zero=not records and source.get('explicit_zero_evidence')=='NO_RESULTS_FOUND_AND_RETAINED_DATE_CRITERIA'
         if not re.fullmatch('[a-f0-9]{64}',source.get('applied_evidence_sha256','')):raise Denied('IDOX_CRITERIA_HASH')
+        provenance=source.get('response_provenance',[])
+        if r.get('redirects')!=0 or len(provenance)!=r['requests_attempted']:
+            raise Denied('IDOX_RESPONSE_ACCOUNTING')
+        if (not provenance or provenance[-1].get('parser_body_sha256')!=source['applied_evidence_sha256']
+            or any(p['body_sha256'] not in [x.get('parser_body_sha256') for x in provenance] for p in pages)):
+            raise Denied('IDOX_RESPONSE_PROVENANCE')
         if not zero:
             binding=source.get('criteria_result_binding',{})
             if (binding.get('method')!='SAME_SESSION_POST_ENUMERATION_REFINE_NO_RESUBMIT'
                 or binding.get('segment_sha256')!=[p['body_sha256'] for p in pages]
-                or binding.get('criteria_sha256')!=source['applied_evidence_sha256'] or binding.get('result_set_reenumerated') is not False):raise Denied('IDOX_CRITERIA_BINDING')
+                or binding.get('criteria_sha256')!=source['applied_evidence_sha256'] or binding.get('result_set_reenumerated') is not False or binding.get('request_ordinal')!=r['requests_attempted']):raise Denied('IDOX_CRITERIA_BINDING')
         seen=0
         for i,p in enumerate(pages,1):
             if p['ordinal']!=i or not re.fullmatch('[a-f0-9]{64}',p['body_sha256']):raise Denied('IDOX_SEGMENT')

@@ -91,7 +91,7 @@ BEGIN
    UPDATE public.ingestion_work_items SET state=p_payload->>'state',reason=p_payload->>'reason',outcome=(p_payload->'outcome')::json,owner=NULL,lease_until=NULL,phase='FINISHED',next_action='REVIEW' WHERE key=p_key RETURNING * INTO w;
    UPDATE public.ingestion_work_attempts SET finished_at=t,phase='FINISHED',outcome=w.outcome WHERE work_key=p_key AND fence=p_fence;
   ELSIF p_op='checkpoint' THEN
-   IF p_payload->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') THEN RAISE EXCEPTION 'BROKER_FACT_RECEIPT_REQUIRED' USING ERRCODE='42501'; END IF;
+   IF w.checkpoint::jsonb->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') OR p_payload->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') THEN RAISE EXCEPTION 'BROKER_FACT_RECEIPT_REQUIRED' USING ERRCODE='42501'; END IF;
    IF octet_length(p_payload::text)>least(131072,(w.limits->>'audit_bytes')::integer) OR jsonb_typeof(p_payload)<>'object' THEN RAISE EXCEPTION 'CHECKPOINT_BOUND'; END IF;
    -- SQL records a worker receipt, never promotes its contents to factual truth.
    UPDATE public.ingestion_work_items SET checkpoint=p_payload::json,phase='CHECKPOINTED' WHERE key=p_key RETURNING * INTO w;

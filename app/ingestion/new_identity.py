@@ -25,7 +25,7 @@ def execute(coordinator,claim,*,envelope,council,source):
     from app.pipeline.discovery_admission import admit_identity,PROTECTED_FIELDS
     from app.pipeline.discovery_contract import Completeness
     from verification.discovery.material_qualification import project_idox
-    from verification.direct_reference.refresh import _refresh_row
+    from verification.direct_reference.refresh import _refresh_row,qualified_coupled_observation
     ledger=coordinator.ledger;row=ledger.get(claim.key);contract=coordinator.contracts.get(row['contract'])
     if not isinstance(contract,NewIdentityContract) or row['task']!='FACTUAL_REFRESH' or len(row['dependencies'])!=1:raise Denied('NEW_IDENTITY_TASK')
     target=contract.row
@@ -51,7 +51,7 @@ def execute(coordinator,claim,*,envelope,council,source):
     # SAME projector as the accepted Idox qualification, including identity,
     # field states, owned-process bounds, cleanup and exact factual scope.
     packet=project_idox(target,source);obs=packet['observation']
-    if packet['failure'] or obs is None or not obs.b2_eligible or obs.verification_scope!=contract.verification_scope:
+    if packet['failure'] or obs is None or not obs.b2_eligible or obs.verification_scope!=contract.verification_scope or (obs.verification_scope=='COUPLED' and not qualified_coupled_observation(obs,target)):
         result=dict(outcome='FACTS_WITHHELD',identity='NOT_CREATED',reason=packet['failure'] or 'UNSUPPORTED_FACTUAL_SCOPE')
         ledger.checkpoint(claim,result);ledger.finish(claim,result,state='UNSUPPORTED_CONTRACT',reason='SUPPORTED_FACTS_REQUIRED');return result
     if obs.application_id is not None:raise Denied('NEW_IDENTITY_OBSERVATION')
