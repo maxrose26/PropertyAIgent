@@ -1,0 +1,16 @@
+def _contain_count_assessment(assessment, rows):
+    from dataclasses import replace
+    from app.reporting.residential_count_eligibility import residential_count_eligibility
+    rejected = []
+    for row in rows:
+        raw = row.scheme.total_units_final if row.scheme is not None else None
+        reason = residential_count_eligibility(row.application, raw).reason
+        if reason:
+            rejected.append(reason)
+    if rejected and not assessment.sources:
+        # Preserve rejected raw evidence on its ORM source; no fabricated
+        # corrected total, bounds, or confidence. Other scopes remain independent.
+        return replace(assessment, precision="UNKNOWN", value=None, lower=None,
+                       upper=None, resolution="material_conflict",
+                       confidence="none")
+    return assessment
