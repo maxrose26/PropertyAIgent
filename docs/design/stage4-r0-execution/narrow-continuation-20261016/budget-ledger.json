@@ -1,0 +1,51 @@
+{
+  "authority": "APPROVED_NARROW_CONTINUATION_AFTER_PR109",
+  "base": "b98d1aca03562595d551681ea85232215387d61d",
+  "capture": {
+    "active_seconds": 480,
+    "audit_bytes": 8000000,
+    "bytes": 4000000,
+    "cleanup_upload_seconds": 200,
+    "identities": 2,
+    "job_seconds": 960,
+    "record_seconds": 180,
+    "requests": 4,
+    "rss_bytes": 1610612736,
+    "setup_seconds": 280,
+    "source_allocation_seconds": 110,
+    "source_calls": 2
+  },
+  "comparison": {
+    "active_seconds": 60,
+    "audit_bytes": 2000000,
+    "cleanup_upload_seconds": 120,
+    "data_queries": 1,
+    "identities": 3,
+    "job_seconds": 360,
+    "rss_bytes": 1610612736,
+    "setup_seconds": 180,
+    "source_calls": 0,
+    "writes": 0
+  },
+  "global_stop_prevents_later_live_operations": true,
+  "no_budget_borrowing": true,
+  "no_retry_resume_replacement": true,
+  "sequential_order": [
+    "manchester1",
+    "comparison3",
+    "oldham2"
+  ],
+  "source": {
+    "active_seconds": 60,
+    "audit_bytes": 20000000,
+    "bytes": 20971520,
+    "calls": 1,
+    "cleanup_upload_seconds": 160,
+    "job_seconds": 480,
+    "requests": 80,
+    "rss_bytes": 1610612736,
+    "setup_seconds": 260,
+    "supervision_checkpoint_reserve_seconds": 5,
+    "worker_allocation_seconds": 55
+  }
+}

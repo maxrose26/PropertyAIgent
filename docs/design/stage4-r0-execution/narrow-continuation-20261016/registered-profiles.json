@@ -1,0 +1,19 @@
+{
+  "manchester1": {
+    "authority": "AUTHORISE_MANCHESTER_VALIDATED_20261015_ONCE",
+    "bytes": 20971520,
+    "calls": 1,
+    "cleanup_upload_seconds": 160,
+    "job_seconds": 480,
+    "manifest": "manchester-one.json",
+    "manifest_sha": "74dd936a8f3fd02ef0d4e9d8e7ed6b2fabd48d0958fc3cc031fe379817fb20d1",
+    "output_bytes": 20000000,
+    "record_output_bytes": 1048576,
+    "requests": 80,
+    "seconds": 60,
+    "setup_seconds": 260,
+    "supervision_checkpoint_seconds": 5,
+    "worker_allocation_seconds": 55,
+    "workflow": ".github/workflows/stage4-manchester-20261015-once.yml"
+  }
+}

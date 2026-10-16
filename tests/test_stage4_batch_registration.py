@@ -43,6 +43,10 @@ def test_workflow_scope():
     assert 'GITHUB_RUN_NUMBER' in steps[0]['run'] and 'GITHUB_RUN_ATTEMPT' in steps[0]['run']
     assert w['concurrency']['cancel-in-progress']=='false'
     for path in Path('.github/workflows').glob('*.yml'):
+        if path.name in {'stage4-bolton-delta3-comparison-once.yml','stage4-oldham-two-capture-once.yml'}:
+            from tests.test_discovery_narrow_continuation import assert_registered
+            assert_registered('comparison3' if 'comparison' in path.name else 'oldham2',path.read_bytes())
+            continue
         if path.name=='stage4-catchup-completion-comparison944-once.yml':
             from tests.test_discovery_completion import assert_comparison_registered
             assert_comparison_registered(path.read_bytes())
