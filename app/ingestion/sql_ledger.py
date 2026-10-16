@@ -35,6 +35,20 @@ class SQLLedger:
         if owner not in (None,self.owner) or authority not in (None,self.authority):raise Denied('CONTROLLER_BINDING')
         row=self._step('claim',key,payload={'lease_seconds':lease_seconds});return Claim(key,row['fence'],self.owner)
 
+    def enqueue(self,subject,task,*,contract,revision,dependencies,priority,max_attempts,parent_claim):
+        import json
+        from .ledger import digest
+        if self.broker_engine is None or task!='SCREENING' or contract!='listing-screen-v1' or dependencies!=[parent_claim.key] or max_attempts!=2:raise Denied('QUALIFIED_CHILD_ONLY')
+        parent=self.get(parent_claim.key)
+        record=next(r for r in parent['checkpoint']['records'] if r['reference']==subject['reference'])
+        identity=dict(subject=subject,task=task,contract=contract,revision=revision);key=digest(identity)
+        child=dict(identity,key=key,dependencies=dependencies,priority=priority,max_attempts=max_attempts,limits=parent['limits'])
+        canonical=lambda x:json.dumps(x,sort_keys=True,separators=(',',':'),allow_nan=False)
+        with self.broker_engine.begin() as c:
+            result=self._step('enqueue_child',parent_claim.key,parent_claim.fence,dict(child=child,record_json=canonical(record),identity_json=canonical(identity)),connection=c)
+        self.bindings[result['key']]={k:result[k] for k in ('subject','task','contract','revision')}
+        return result['key']
+
     def _claim(self,claim):
         if claim.owner!=self.owner:raise Denied('WORKER_IDENTITY')
 

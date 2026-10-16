@@ -8,7 +8,7 @@ from psycopg import sql
 from sqlalchemy import create_engine,select,text
 from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import Session
-from app.ingestion.ledger import Ledger,Denied,UncertainPersistence
+from app.ingestion.ledger import Ledger,Denied,UncertainPersistence,DEFAULT_LIMITS
 from app.ingestion.schema import WorkItem as W,WorkAttempt as A
 from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.coordinator import Coordinator
@@ -52,7 +52,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    # Bootstrap constructs fixtures/allowances only; no worker release API exists.
    def seed(reference,task='SCREENING',state='QUEUED',checkpoint=None):
     key=__import__('hashlib').sha256((reference+task).encode()).hexdigest()
-    row=dict(key=key,subject={'kind':'APPLICATION','council':'bolton','reference':reference},task=task,contract='operational-fixture',revision='v1',dependencies=[],priority=50,eligible_at=0,state=state,reason='FIXTURE' if state!='QUEUED' else None,next_action='FIXTURE',limits={'audit_bytes':131072},authority=None,attempt_count=0,max_attempts=3,fence=0,owner=None,lease_until=None,phase='IDLE',checkpoint=checkpoint,outcome=None)
+    row=dict(key=key,subject={'kind':'APPLICATION','council':'bolton','reference':reference},task=task,contract='operational-fixture',revision='v1',dependencies=[],priority=50,eligible_at=0,state=state,reason='FIXTURE' if state!='QUEUED' else None,next_action='FIXTURE',limits=DEFAULT_LIMITS,authority=None,attempt_count=0,max_attempts=3,fence=0,owner=None,lease_until=None,phase='IDLE',checkpoint=checkpoint,outcome=None)
     with app.begin() as c:c.execute(W.insert().values(**row))
     return key
    k=seed('ONE');blocked=seed('BLOCKED',state='SAFETY_BLOCKED');other=seed('OTHER')
@@ -63,7 +63,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
      for key in keys:
       row=c.execute(select(W).where(W.c.key==key)).mappings().one();bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
-     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':0,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'completion_outcomes':{'SCREENING':['SCREENED','ALREADY_KNOWN'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
+     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':0,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
    bind([k,blocked,other]);l=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
    with pytest.raises(Exception):l.claim(k) # original consumed Salford stop
@@ -115,6 +115,22 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    assert result['outcome']=='SUPPORTED_FACTS_VERIFIED' and client.get(fact)['state']=='COMPLETE'
    with Session(app) as s:
     rows=list(s.scalars(select(Application)));assert len(rows)==1 and rows[0].estimated_unit_count is None
+   # Full existing Idox -> durable metadata -> child -> screening on SQL ledger.
+   from app.ingestion.idox_adapter import IdoxListingContract
+   from verification.discovery.idox_window import WindowConfig
+   from tests.test_discovery_ingestion_operational import audit
+   from tests.test_discovery_ingestion_ledger import outer
+   cfg=WindowConfig(max_transport_retries=0);scope=seed('SCOPE','DISCOVERY')
+   with app.begin() as c:c.execute(W.update().where(W.c.key==scope).values(subject={'kind':'DISCOVERY_SCOPE','council':'bolton','start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':'RECEIVED'},contract='bolton-idox-fixture'))
+   bind([scope]);reader=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,broker_engine=broker)
+   discovery=Coordinator(reader,{'bolton-idox-fixture':IdoxListingContract('bolton-idox-fixture',cfg,'a'*64)})
+   children=discovery.idox_listing(reader.claim(scope),audit(cfg),outer());assert len(children)==2
+   bind([scope,*children])
+   screener=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings)
+   screening=Coordinator(screener,{})
+   for child in children:
+    out=screening.screening(screener.claim(child));assert out['residential_dwelling_count'] is None
+   assert all(screener.get(k)['state']=='COMPLETE' for k in children)
    # Abandoned write intent is recovered as uncertain, globally stops next work.
    uncertain=seed('UNCERTAIN','FACTUAL_REFRESH');bind([uncertain,other],writes=1)
    x=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings);cl=x.claim(uncertain);x.intent(cl,'writes')

@@ -10,14 +10,14 @@ CREATE ROLE ingestion_effect_broker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE 
 CREATE ROLE ingestion_recovery_operator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
 CREATE FUNCTION public.ingestion_worker_step(p_op text,p_key text,p_fence integer,p_owner text,p_authority text,p_binding jsonb,p_payload jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $fn$
-DECLARE w public.ingestion_work_items%ROWTYPE; ctl jsonb; g jsonb; t double precision; dep text; answer jsonb; n bigint;
+DECLARE w public.ingestion_work_items%ROWTYPE; ctl jsonb; g jsonb; t double precision; dep text; answer jsonb; n bigint; child jsonb; rec jsonb; old_child jsonb;
 BEGIN
- IF p_op IN ('fence_effect','resolve_effect') THEN
+ IF p_op IN ('fence_effect','resolve_effect','enqueue_child') THEN
   IF NOT pg_has_role(session_user,'ingestion_effect_broker','USAGE') THEN RAISE EXCEPTION 'BROKER_REQUIRED' USING ERRCODE='42501'; END IF;
  ELSE
   IF session_user<>'ingestion_worker_login' OR NOT pg_has_role(session_user,'ingestion_worker','USAGE') THEN RAISE EXCEPTION 'WORKER_LOGIN_REQUIRED' USING ERRCODE='42501'; END IF;
  END IF;
- IF p_fence IS NULL OR jsonb_typeof(p_binding) IS DISTINCT FROM 'object' OR jsonb_typeof(p_payload) IS DISTINCT FROM 'object' OR p_op IS NULL OR p_op NOT IN ('claim','checkpoint','complete','begin_source','begin_write','fence_effect','resolve_effect','block') OR p_key IS NULL OR p_key !~ '^[a-f0-9]{64}$' OR p_key=repeat('0',64)
+ IF p_fence IS NULL OR jsonb_typeof(p_binding) IS DISTINCT FROM 'object' OR jsonb_typeof(p_payload) IS DISTINCT FROM 'object' OR p_op IS NULL OR p_op NOT IN ('claim','checkpoint','complete','begin_source','begin_write','fence_effect','resolve_effect','block','enqueue_child') OR p_key IS NULL OR p_key !~ '^[a-f0-9]{64}$' OR p_key=repeat('0',64)
  OR p_owner IS NULL OR p_owner !~ '^[A-Za-z0-9_-]{1,100}$' OR p_authority IS NULL OR length(p_authority)>100
  OR p_binding IS NULL OR p_payload IS NULL OR octet_length(p_binding::text)>8192 OR octet_length(p_payload::text)>131072
  THEN RAISE EXCEPTION 'BOUNDED_ARGUMENTS' USING ERRCODE='22023'; END IF;
@@ -25,12 +25,12 @@ BEGIN
  SELECT * INTO STRICT w FROM public.ingestion_work_items WHERE key=p_key FOR UPDATE;
  t:=extract(epoch FROM clock_timestamp());
  IF ctl->'global_stop' IS DISTINCT FROM 'null'::jsonb THEN RAISE EXCEPTION 'GLOBAL_STOP' USING ERRCODE='42501'; END IF;
- IF EXISTS(SELECT 1 FROM public.ingestion_work_items WHERE phase='WRITE_INTENT' AND (key<>p_key OR p_op NOT IN ('fence_effect','resolve_effect'))) THEN RAISE EXCEPTION 'UNRESOLVED_WRITE_BARRIER' USING ERRCODE='42501'; END IF;
+ IF EXISTS(SELECT 1 FROM public.ingestion_work_items WHERE phase='WRITE_INTENT' AND (key<>p_key OR p_op NOT IN ('fence_effect','resolve_effect','enqueue_child'))) THEN RAISE EXCEPTION 'UNRESOLVED_WRITE_BARRIER' USING ERRCODE='42501'; END IF;
  IF (ctl->'council_deferred_until'->>(w.subject->>'council'))::double precision>t THEN RAISE EXCEPTION 'COUNCIL_DEFERRED' USING ERRCODE='42501'; END IF;
  g:=ctl->'grants'->p_authority;
  IF g IS NULL OR (g->'keys' ? p_key) IS DISTINCT FROM true OR (g->'contracts' ? w.contract) IS DISTINCT FROM true
  OR jsonb_typeof(g->'expires_at') IS DISTINCT FROM 'number' OR coalesce((g->>'expires_at')::double precision,0)<=t OR (g->>'expires_at')::double precision>t+86400
- OR (CASE WHEN p_op IN ('fence_effect','resolve_effect') THEN g->>'effect_login' ELSE g->>'login' END) IS DISTINCT FROM session_user OR (g->'workers' ? p_owner) IS DISTINCT FROM true
+ OR (CASE WHEN p_op IN ('fence_effect','resolve_effect','enqueue_child') THEN g->>'effect_login' ELSE g->>'login' END) IS DISTINCT FROM session_user OR (g->'workers' ? p_owner) IS DISTINCT FROM true
  OR g->'bindings'->p_key IS DISTINCT FROM p_binding
  OR p_binding IS DISTINCT FROM jsonb_build_object('task',w.task,'contract',w.contract,'revision',w.revision,'subject',w.subject::jsonb)
  THEN RAISE EXCEPTION 'EXACT_AUTHORITY_BINDING_REQUIRED' USING ERRCODE='42501'; END IF;
@@ -47,9 +47,27 @@ BEGIN
   INSERT INTO public.ingestion_work_attempts(work_key,fence,owner,authority,started_at,phase,checkpoint) VALUES(p_key,w.fence,p_owner,p_authority,t,'CLAIMED',w.checkpoint);
  ELSE
   IF w.state<>'CLAIMED' OR w.fence IS DISTINCT FROM p_fence OR w.owner IS DISTINCT FROM p_owner OR w.authority IS DISTINCT FROM p_authority OR w.lease_until IS NULL OR w.lease_until<=t THEN RAISE EXCEPTION 'STALE_WORKER' USING ERRCODE='42501'; END IF;
-  IF p_op NOT IN ('fence_effect','resolve_effect') AND w.phase NOT IN ('CLAIMED','CHECKPOINTED') THEN RAISE EXCEPTION 'EFFECT_RESOLUTION_REQUIRES_TRUSTED_WRITER' USING ERRCODE='42501'; END IF;
-  IF p_op IN ('begin_source','begin_write') THEN
-   IF w.checkpoint IS NOT NULL THEN RAISE EXCEPTION 'CHECKPOINT_RESUME_NO_EFFECT_REPLAY'; END IF;
+  IF p_op NOT IN ('fence_effect','resolve_effect','enqueue_child') AND w.phase NOT IN ('CLAIMED','CHECKPOINTED') THEN RAISE EXCEPTION 'EFFECT_RESOLUTION_REQUIRES_TRUSTED_WRITER' USING ERRCODE='42501'; END IF;
+  IF p_op='enqueue_child' THEN
+   IF w.phase<>'CHECKPOINTED' OR w.checkpoint::jsonb->>'kind' IS DISTINCT FROM 'LISTING_RECEIPT_V1' THEN RAISE EXCEPTION 'QUALIFIED_LISTING_CHECKPOINT_REQUIRED'; END IF;
+   child:=p_payload->'child';
+   IF child->>'task' IS DISTINCT FROM 'SCREENING' OR child->>'contract' IS DISTINCT FROM 'listing-screen-v1'
+   OR child->'subject'->>'kind' IS DISTINCT FROM 'APPLICATION' OR child->'subject'->>'council' IS DISTINCT FROM w.subject->>'council'
+   OR child->'dependencies' IS DISTINCT FROM jsonb_build_array(p_key) OR child->>'key' !~ '^[a-f0-9]{64}$'
+   OR (child->>'priority')::integer IS DISTINCT FROM w.priority OR child->'limits' IS DISTINCT FROM w.limits::jsonb
+   OR (child->>'max_attempts')::integer IS DISTINCT FROM 2 THEN RAISE EXCEPTION 'CHILD_SCOPE'; END IF;
+   SELECT x INTO STRICT rec FROM jsonb_array_elements(w.checkpoint::jsonb->'records') x WHERE x->>'reference'=child->'subject'->>'reference';
+   IF (p_payload->>'record_json')::jsonb IS DISTINCT FROM rec
+   OR encode(sha256(convert_to(p_payload->>'record_json','UTF8')),'hex') IS DISTINCT FROM child->>'revision'
+   OR (p_payload->>'identity_json')::jsonb IS DISTINCT FROM jsonb_build_object('subject',child->'subject','task','SCREENING','contract','listing-screen-v1','revision',child->>'revision')
+   OR encode(sha256(convert_to(p_payload->>'identity_json','UTF8')),'hex') IS DISTINCT FROM child->>'key' THEN RAISE EXCEPTION 'CHILD_HASH_BINDING'; END IF;
+   SELECT to_jsonb(x) INTO old_child FROM public.ingestion_work_items x WHERE subject::jsonb=child->'subject' AND task='SCREENING' AND contract='listing-screen-v1' AND revision=child->>'revision';
+   IF old_child IS NOT NULL THEN RETURN old_child; END IF;
+   IF (SELECT count(*) FROM public.ingestion_work_items)>=4096 THEN RAISE EXCEPTION 'ITEM_BOUND'; END IF;
+   INSERT INTO public.ingestion_work_items(key,subject,task,contract,revision,dependencies,priority,eligible_at,state,reason,next_action,limits,authority,attempt_count,max_attempts,fence,owner,lease_until,phase,checkpoint,outcome)
+   VALUES(child->>'key',(child->'subject')::json,'SCREENING','listing-screen-v1',child->>'revision',json_build_array(p_key),w.priority,0,'QUEUED',NULL,'CLAIM_WHEN_AUTHORISED',w.limits,NULL,0,2,0,NULL,NULL,'IDLE',NULL,NULL) RETURNING * INTO w;
+  ELSIF p_op IN ('begin_source','begin_write') THEN
+   IF nullif(w.checkpoint::jsonb,'null'::jsonb) IS NOT NULL THEN RAISE EXCEPTION 'CHECKPOINT_RESUME_NO_EFFECT_REPLAY'; END IF;
    IF p_payload<>jsonb_build_object('cost',(p_payload->>'cost')::integer) OR coalesce((p_payload->>'cost')::integer,0) NOT BETWEEN 1 AND 2 OR (p_op='begin_source' AND ((p_payload->>'cost')::integer<>1 OR w.task NOT IN ('DISCOVERY','LISTING_METADATA') OR w.subject->>'kind'<>'DISCOVERY_SCOPE')) OR (p_op='begin_write' AND w.task<>'FACTUAL_REFRESH') THEN RAISE EXCEPTION 'TASK_EFFECT'; END IF;
    dep:=CASE WHEN p_op='begin_source' THEN 'source_calls' ELSE 'writes' END;
    IF coalesce((g->>dep)::integer,0)<(p_payload->>'cost')::integer THEN RAISE EXCEPTION 'EFFECT_ALLOWANCE_EXHAUSTED' USING ERRCODE='42501'; END IF;
@@ -58,7 +76,7 @@ BEGIN
    UPDATE public.ingestion_work_items SET outcome=ctl::json WHERE key=repeat('0',64);
    UPDATE public.ingestion_work_items SET phase=CASE WHEN p_op='begin_source' THEN 'SOURCE_INTENT' ELSE 'WRITE_INTENT' END WHERE key=p_key RETURNING * INTO w;
    UPDATE public.ingestion_work_attempts SET phase=w.phase WHERE work_key=p_key AND fence=p_fence;
-  ELSIF p_op IN ('fence_effect','resolve_effect') THEN
+  ELSIF p_op IN ('fence_effect','resolve_effect','enqueue_child') THEN
    IF w.phase NOT IN ('SOURCE_INTENT','WRITE_INTENT') THEN RAISE EXCEPTION 'DURABLE_INTENT_REQUIRED'; END IF;
    -- fence_effect is held open by the trusted broker transaction across the
    -- existing shared writer; workers cannot resolve an intent or clear a stop.
@@ -79,7 +97,7 @@ BEGIN
    UPDATE public.ingestion_work_items SET checkpoint=p_payload::json,phase='CHECKPOINTED' WHERE key=p_key RETURNING * INTO w;
    UPDATE public.ingestion_work_attempts SET checkpoint=p_payload::json,phase='CHECKPOINTED' WHERE work_key=p_key AND fence=p_fence;
   ELSE
-   IF w.phase<>'CHECKPOINTED' OR w.checkpoint IS NULL OR jsonb_typeof(p_payload)<>'object'
+   IF w.phase<>'CHECKPOINTED' OR nullif(w.checkpoint::jsonb,'null'::jsonb) IS NULL OR jsonb_typeof(p_payload)<>'object'
    OR (g->'completion_outcomes'->w.task ? (p_payload->>'outcome')) IS DISTINCT FROM true
    OR (p_payload->>'outcome' IN ('SUPPORTED_FACTS_VERIFIED','INITIAL_FACTS_VERIFIED') AND w.checkpoint::jsonb->>'outcome' IS DISTINCT FROM p_payload->>'outcome')
    OR p_payload ?| ARRAY['global_stop','grants','authority','verified_facts'] THEN RAISE EXCEPTION 'TASK_COMPLETION_CONTRACT' USING ERRCODE='42501'; END IF;

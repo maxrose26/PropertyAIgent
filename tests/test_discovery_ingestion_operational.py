@@ -19,19 +19,21 @@ from app.db.models import Application
 from app.config import get_council
 
 
-def audit():
+def audit(config=None):
+ config=config or WindowConfig(max_transport_retries=0)
  echo=FORM.replace(b'name="date(applicationReceivedStart)" value=""',b'name="date(applicationReceivedStart)" value="28/09/2026"').replace(b'name="date(applicationReceivedEnd)" value=""',b'name="date(applicationReceivedEnd)" value="04/10/2026"')
- return perform([FORM,page(),page(),echo])[0]
+ echo=echo.replace(b'28/09/2026',config.start.strftime('%d/%m/%Y').encode()).replace(b'04/10/2026',config.end.strftime('%d/%m/%Y').encode())
+ body=page().replace(b'Mon 28 Sep 2026',config.start.strftime('%a %d %b %Y').encode())
+ from tests.test_discovery_idox_window import Response
+ from verification.discovery.idox_window import run
+ bodies=iter([FORM,body,body,echo])
+ return run(lambda *a,**k:Response(next(bodies)),config)
 
 
 def test_idox_contract_projection_screening_and_current_historical_same_path(engine):
  install(engine);l=Ledger(engine)
  for start,end in [(date(2026,9,28),date(2026,10,4)),(date(2026,10,12),date(2026,10,18))]:
-  config=WindowConfig('bolton','RECEIVED',start,end,0);a=audit()
-  if start.month==10:
-   a['requested_interval']=a['applied_interval']=[start.isoformat(),end.isoformat()]
-   for r in a['records']:
-    for k in ('received_date','validated_date'):r['fields'][k]['value']='Mon 12 Oct 2026'
+  config=WindowConfig('bolton','RECEIVED',start,end,0);a=audit(config)
   contract=IdoxListingContract('bolton-idox-qualified-v1',config,'a'*64)
   # Different configured windows, exactly the same parser projection/coordinator.
   key=l.enqueue(dict(kind='DISCOVERY_SCOPE',council='bolton',start=start.isoformat(),end=end.isoformat(),semantics='RECEIVED'),'DISCOVERY',contract=contract.name)
