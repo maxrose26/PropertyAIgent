@@ -2,6 +2,15 @@
 from unittest.mock import MagicMock
 import pytest
 from verification.ingestion_storage.credential_mapping import install_mapping,put_secret
+from verification.ingestion_storage import credential_mapping
+
+
+def test_noninteractive_owner_input_is_rejected_before_password_prompt(monkeypatch):
+ monkeypatch.setattr('sys.argv',['credential_mapping','--authority',credential_mapping.AUTHORITY,'--provider-password-redaction-attested'])
+ monkeypatch.setattr('sys.stdin.isatty',lambda:False)
+ prompt=MagicMock();monkeypatch.setattr(credential_mapping.getpass,'getpass',prompt)
+ with pytest.raises(SystemExit,match='SECURE_TTY'):credential_mapping.main()
+ prompt.assert_not_called()
 
 
 def connection():

@@ -53,6 +53,7 @@ def main():
  if a.authority!=AUTHORITY or not a.provider_password_redaction_attested:raise SystemExit('OWNER_MAPPING_NOT_ADMITTED')
  # This preparation file grants no authority. Only run after concrete approval.
  if sys.platform!='linux':raise SystemExit('REVIEWED_OWNER_LINUX_OR_WSL_REQUIRED')
+ if not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('OWNER_SECURE_TTY_REQUIRED')
  import resource,signal
  resource.setrlimit(resource.RLIMIT_CORE,(0,0))
  def deadline(signum,frame):raise TimeoutError('OWNER_MAPPING_DEADLINE')
