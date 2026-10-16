@@ -1,0 +1,141 @@
+{
+  "integrated_revision": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+  "proof_candidate": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+  "proof_tree": "11053423c9faa912e3a5e7aef63f46f4d96ac083",
+  "proof_pr": 121,
+  "proof_only_changes": [
+    {
+      "filename": "tests/test_discovery_ingestion_operational_pg.py",
+      "status": "modified",
+      "sha": "ba7677ace47082cceaea3a9d63fd6279c4645e36",
+      "additions": 82,
+      "deletions": 1
+    },
+    {
+      "filename": "verification/ingestion_storage/operational_rehearsal.py",
+      "status": "modified",
+      "sha": "fb89129b634d074eb468236defcd7667d198d008",
+      "additions": 25,
+      "deletions": 1
+    }
+  ],
+  "checks": [
+    {
+      "id": 117119125347,
+      "name": "restricted-provisioning",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216282/job/117119125347"
+    },
+    {
+      "id": 117119125123,
+      "name": "offline",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216282/job/117119125123"
+    },
+    {
+      "id": 117119124945,
+      "name": "postgres-admission",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216282/job/117119124945"
+    },
+    {
+      "id": 117119124393,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216290/job/117119124393"
+    },
+    {
+      "id": 117119124073,
+      "name": "web",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216290/job/117119124073"
+    },
+    {
+      "id": 117119092579,
+      "name": "web",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944207161/job/117119092579"
+    },
+    {
+      "id": 117119092055,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944207161/job/117119092055"
+    }
+  ],
+  "runs": [
+    {
+      "id": 38944216282,
+      "name": "Stage4 discovery contract OFFLINE",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "run_number": 150,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216282"
+    },
+    {
+      "id": 38944216290,
+      "name": "AH web-only acceptance",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "run_number": 835,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944216290"
+    },
+    {
+      "id": 38944207161,
+      "name": "AH web-only acceptance",
+      "head_sha": "a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "run_number": 834,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38944207161"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12064731575,
+      "name": "discovery-pg-a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "digest": "sha256:72689b3c473e4b51f58344ca31f427353f5117aa39184c4e3d8968f0d154a79c",
+      "size_in_bytes": 1187
+    },
+    {
+      "id": 12064089085,
+      "name": "ingestion-provisioning-disposable-a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "digest": "sha256:ee9553a8da20f21436020ada8254788e85e981addb1299e9627f21c0f0ead442",
+      "size_in_bytes": 77730
+    },
+    {
+      "id": 12063864983,
+      "name": "discovery-offline-a9cfe591d3e10a795d2a97cc32c9cd6eae69a4e8",
+      "digest": "sha256:48fb465ada918b49aea9af4a523f7d164657aa76f6f302bc3edbc025125e9566",
+      "size_in_bytes": 15467
+    }
+  ],
+  "preserved_failed_rehearsal": {
+    "candidate": "4aab69d29d931ef455ee7c5ab298968ea1e0775c",
+    "run_id": 38943846827,
+    "run_number": 149,
+    "attempt": 1,
+    "artifact_id": 12064745608,
+    "sha256": "67753d07a30f28076ffc1ac3fe7500ba81f064be61c8832db8c1f7ab66905f49",
+    "reason": "Correct already-known duplicate result was omitted from disposable CLI successful exit whitelist; corrected only that whitelist. No production or runtime correction."
+  }
+}

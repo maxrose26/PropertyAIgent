@@ -1,0 +1,121 @@
+{
+  "identity": {
+    "sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+    "tree": "20a48f9e864f1eaab34686bc23957fa7db85f4ab",
+    "parents": [
+      "a3a698beb0542579042bbcc48e8cf7a66f13514f",
+      "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4"
+    ],
+    "message": "Integrate reviewed shared ingestion coordinator [skip render]\n\nExact reviewed candidate 6f1b81b2851ecdc9f9902c3a0111b7d305827ff4 / tree20a48f9e864f1eaab34686bc23957fa7db85f4ab. Production credentials/storage/source/exception/scheduling remain held. No deployment."
+  },
+  "checks": [
+    {
+      "id": 117116326217,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943382931/job/117116326217"
+    },
+    {
+      "id": 117116325698,
+      "name": "native",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383004/job/117116325698"
+    },
+    {
+      "id": 117116325641,
+      "name": "web",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943382931/job/117116325641"
+    },
+    {
+      "id": 117116325448,
+      "name": "offline",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383004/job/117116325448"
+    },
+    {
+      "id": 117116325316,
+      "name": "offline",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383030/job/117116325316"
+    },
+    {
+      "id": 117116325177,
+      "name": "restricted-provisioning",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383030/job/117116325177"
+    },
+    {
+      "id": 117116324801,
+      "name": "postgres-admission",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383030/job/117116324801"
+    }
+  ],
+  "runs": [
+    {
+      "id": 38943383030,
+      "name": "Stage4 discovery contract OFFLINE",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "run_number": 148,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383030"
+    },
+    {
+      "id": 38943383004,
+      "name": "Stage4 reusable batch OFFLINE disposable",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "run_number": 181,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943383004"
+    },
+    {
+      "id": 38943382931,
+      "name": "AH web-only acceptance",
+      "head_sha": "44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "run_number": 831,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38943382931"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 12064635329,
+      "name": "discovery-offline-44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "digest": "sha256:727ff560145ba0aae41cd00dde1bcc9f56846e88fa79fde8c450dcf3d2db5e9a",
+      "size_in_bytes": 15580
+    },
+    {
+      "id": 12063778555,
+      "name": "ingestion-provisioning-disposable-44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "digest": "sha256:a49a9849e8ff2b607365f06ac496026cba3b009424da05579c254ec41f748b63",
+      "size_in_bytes": 63584
+    },
+    {
+      "id": 12063764288,
+      "name": "discovery-pg-44135bb406ea4cab1b053cef90ee34020ac1d35f",
+      "digest": "sha256:9611096da09c01ea3a949567afbef1942323485cab5dd5e6f1a287e316ff1c9f",
+      "size_in_bytes": 1191
+    }
+  ]
+}

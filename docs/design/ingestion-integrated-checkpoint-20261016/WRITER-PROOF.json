@@ -1,0 +1,406 @@
+{
+  "capture_sha256": "e1888d60b220179cefb6a4c9a8837c9b330daa385f8c76c39b3f2b4d957d52f3",
+  "cases": [
+    {
+      "case": "success",
+      "committed_rows": 1,
+      "deliveries": [
+        {
+          "result": {
+            "admission": "COMMITTED_PENDING_IDENTITY",
+            "b2": "COUPLED",
+            "database_accounting": {
+              "capture_checkpoint_sha256": "e1888d60b220179cefb6a4c9a8837c9b330daa385f8c76c39b3f2b4d957d52f3",
+              "cleanup": "CLOSED",
+              "connection_attempts": 3,
+              "connections_closed": true,
+              "driver_statements": 74,
+              "elapsed_seconds": 1.494,
+              "errors": [],
+              "returned_data_value_bytes": 26151,
+              "slot_key": "f9a105f285721e3e5ccf87cba53b2c47250efc235a1be7e9d6fdbec00a161a16",
+              "statement_kinds": {
+                "cursor": 48,
+                "driver_internal": 26
+              }
+            },
+            "enumeration": "COMPLETE_METADATA_RETAINED",
+            "factual": {
+              "accounting_complete": true,
+              "application_id": 1,
+              "cleanup": "CLOSED",
+              "identity": "COMMITTED_PENDING_IDENTITY",
+              "outcome": "SUPPORTED_FACTS_VERIFIED",
+              "readback": {
+                "application_id": 1,
+                "protected": {
+                  "address": null,
+                  "application_received": null,
+                  "application_type": null,
+                  "application_validated": null,
+                  "decision": "Approve",
+                  "decision_issued_date": "2026-09-28",
+                  "estimated_unit_count": null,
+                  "opportunity_classification": null,
+                  "planning_field_verification": null,
+                  "proposal": null,
+                  "status": "Decided",
+                  "status_verified_at": "2026-10-16T18:03:27.154261+00:00"
+                }
+              },
+              "unit_facts": "NOT_WRITTEN",
+              "verification_scope": "COUPLED"
+            },
+            "operation_command_costs": {
+              "enqueue": [],
+              "screening_body": []
+            },
+            "other_candidates_retrieved": 0,
+            "outcome": "SUPPORTED_FACTS_VERIFIED",
+            "screening": [
+              {
+                "citations": {
+                  "complete": true,
+                  "coverage": "OBSERVED_ALLOWLISTED_TEXT_ONLY",
+                  "occurrences": [],
+                  "overflow": false
+                },
+                "commercial_relevance": "UNKNOWN",
+                "disposition": "SUPPORTED_PROCESSING_PRIORITY",
+                "existing_category": "primary_residential",
+                "existing_classification": "Confirmed - 10+ units",
+                "permanent_exclusion": false,
+                "progress": "UNKNOWN",
+                "proposal_usable": true,
+                "raw_generic_count": 20,
+                "reference": "01780/26",
+                "residential_dwelling_count": null,
+                "retained": true,
+                "rule_version": "manchester-listing-screen-assessment-v1",
+                "site_relationship": "UNKNOWN"
+              }
+            ],
+            "synthetic_reader_callbacks": {
+              "detail": 1,
+              "listing": 0
+            }
+          },
+          "supervisor": {
+            "accounting_complete": true,
+            "cleanup": "CLOSED",
+            "elapsed_seconds": 2.395771597999996,
+            "exit_code": 0,
+            "expired": false,
+            "limit_hit": null,
+            "live_owned_survivors": 0,
+            "peak_owned_rss": 233938944,
+            "persistence": "READBACK_REQUIRED",
+            "processes_seen": 1,
+            "retry": false
+          }
+        },
+        {
+          "result": {
+            "admission": "NOT_ATTEMPTED",
+            "application_id": 1,
+            "b2": "NOT_ATTEMPTED",
+            "database_accounting": {
+              "capture_checkpoint_sha256": "e1888d60b220179cefb6a4c9a8837c9b330daa385f8c76c39b3f2b4d957d52f3",
+              "cleanup": "CLOSED",
+              "connection_attempts": 5,
+              "connections_closed": true,
+              "driver_statements": 96,
+              "elapsed_seconds": 1.736,
+              "errors": [],
+              "returned_data_value_bytes": 31752,
+              "slot_key": "f9a105f285721e3e5ccf87cba53b2c47250efc235a1be7e9d6fdbec00a161a16",
+              "statement_kinds": {
+                "cursor": 62,
+                "driver_internal": 34
+              }
+            },
+            "enumeration": "COMPLETE_METADATA_RETAINED",
+            "operation_command_costs": {
+              "enqueue": [],
+              "screening_body": []
+            },
+            "other_candidates_retrieved": 0,
+            "outcome": "DISCOVERY_SCREENING_ONLY_ALREADY_KNOWN",
+            "screening": [
+              {
+                "citations": {
+                  "complete": true,
+                  "coverage": "OBSERVED_ALLOWLISTED_TEXT_ONLY",
+                  "occurrences": [],
+                  "overflow": false
+                },
+                "commercial_relevance": "UNKNOWN",
+                "disposition": "SUPPORTED_PROCESSING_PRIORITY",
+                "existing_category": "primary_residential",
+                "existing_classification": "Confirmed - 10+ units",
+                "permanent_exclusion": false,
+                "progress": "UNKNOWN",
+                "proposal_usable": true,
+                "raw_generic_count": 20,
+                "reference": "01780/26",
+                "residential_dwelling_count": null,
+                "retained": true,
+                "rule_version": "manchester-listing-screen-assessment-v1",
+                "site_relationship": "UNKNOWN"
+              }
+            ],
+            "synthetic_reader_callbacks": {
+              "detail": 0,
+              "listing": 0
+            }
+          },
+          "supervisor": {
+            "accounting_complete": true,
+            "cleanup": "CLOSED",
+            "elapsed_seconds": 0.8984414219999906,
+            "exit_code": 0,
+            "expired": false,
+            "limit_hit": null,
+            "live_owned_survivors": 0,
+            "peak_owned_rss": 90849280,
+            "persistence": "READBACK_REQUIRED",
+            "processes_seen": 1,
+            "retry": false
+          }
+        }
+      ],
+      "setup": "owner_prepared_completed_retained_fixture_not_runtime_source_work",
+      "unit_facts": "UNKNOWN"
+    },
+    {
+      "case": "race",
+      "committed_rows": 1,
+      "deliveries": [
+        {
+          "result": {
+            "admission": "EXISTING_IDENTITY_PRESERVED",
+            "b2": "WITHHELD",
+            "database_accounting": {
+              "capture_checkpoint_sha256": "e1888d60b220179cefb6a4c9a8837c9b330daa385f8c76c39b3f2b4d957d52f3",
+              "cleanup": "CLOSED",
+              "connection_attempts": 3,
+              "connections_closed": true,
+              "driver_statements": 73,
+              "elapsed_seconds": 0.301,
+              "errors": [],
+              "returned_data_value_bytes": 24324,
+              "slot_key": "5d248ac5c3137a524e691fefd83690270a5b02273b6633b11a8411fffd6bb0f0",
+              "statement_kinds": {
+                "cursor": 47,
+                "driver_internal": 26
+              }
+            },
+            "enumeration": "COMPLETE_METADATA_RETAINED",
+            "factual": {
+              "accounting_complete": true,
+              "application_id": 2,
+              "cleanup": "CLOSED",
+              "facts": "EXISTING_NOT_WRITTEN",
+              "identity": "EXISTING_IDENTITY_PRESERVED",
+              "outcome": "ALREADY_KNOWN"
+            },
+            "operation_command_costs": {
+              "enqueue": [],
+              "screening_body": []
+            },
+            "other_candidates_retrieved": 0,
+            "outcome": "ALREADY_KNOWN",
+            "screening": [
+              {
+                "citations": {
+                  "complete": true,
+                  "coverage": "OBSERVED_ALLOWLISTED_TEXT_ONLY",
+                  "occurrences": [],
+                  "overflow": false
+                },
+                "commercial_relevance": "UNKNOWN",
+                "disposition": "SUPPORTED_PROCESSING_PRIORITY",
+                "existing_category": "primary_residential",
+                "existing_classification": "Confirmed - 10+ units",
+                "permanent_exclusion": false,
+                "progress": "UNKNOWN",
+                "proposal_usable": true,
+                "raw_generic_count": 20,
+                "reference": "01780/26",
+                "residential_dwelling_count": null,
+                "retained": true,
+                "rule_version": "manchester-listing-screen-assessment-v1",
+                "site_relationship": "UNKNOWN"
+              }
+            ],
+            "synthetic_reader_callbacks": {
+              "detail": 1,
+              "listing": 0
+            }
+          },
+          "supervisor": {
+            "accounting_complete": true,
+            "cleanup": "CLOSED",
+            "elapsed_seconds": 0.9698773340000031,
+            "exit_code": 0,
+            "expired": false,
+            "limit_hit": null,
+            "live_owned_survivors": 0,
+            "peak_owned_rss": 91340800,
+            "persistence": "READBACK_REQUIRED",
+            "processes_seen": 1,
+            "retry": false
+          }
+        }
+      ],
+      "setup": "owner_prepared_completed_retained_fixture_not_runtime_source_work",
+      "unit_facts": "UNKNOWN"
+    },
+    {
+      "case": "uncertain",
+      "committed_rows": 1,
+      "deliveries": [
+        {
+          "result": {
+            "database_accounting": {
+              "capture_checkpoint_sha256": "e1888d60b220179cefb6a4c9a8837c9b330daa385f8c76c39b3f2b4d957d52f3",
+              "cleanup": "CLOSED",
+              "connection_attempts": 3,
+              "connections_closed": true,
+              "driver_statements": 59,
+              "elapsed_seconds": 0.288,
+              "errors": [],
+              "returned_data_value_bytes": 22088,
+              "slot_key": "574f822d69e5dc42539ab836e410306e5507edc049fdfd4bf47d975c895d897f",
+              "statement_kinds": {
+                "cursor": 39,
+                "driver_internal": 20
+              }
+            },
+            "error_class": "UncertainPersistence",
+            "operation_command_costs": {
+              "enqueue": [],
+              "screening_body": []
+            },
+            "outcome": "UNCONFIRMED_NO_RETRY",
+            "subsequent_claim_denied": true,
+            "synthetic_reader_callbacks": {
+              "detail": 1,
+              "listing": 0
+            }
+          },
+          "supervisor": {
+            "accounting_complete": true,
+            "cleanup": "CLOSED",
+            "elapsed_seconds": 0.9884090169999951,
+            "exit_code": 1,
+            "expired": false,
+            "limit_hit": null,
+            "live_owned_survivors": 0,
+            "peak_owned_rss": 91381760,
+            "persistence": "RECONCILE_IF_EFFECT_INTENT",
+            "processes_seen": 1,
+            "retry": false
+          }
+        }
+      ],
+      "setup": "owner_prepared_completed_retained_fixture_not_runtime_source_work",
+      "unit_facts": "UNKNOWN"
+    }
+  ],
+  "junit": {
+    "errors": "0",
+    "failures": "0",
+    "hostname": "runnervm8k3b6",
+    "name": "pytest",
+    "skipped": "0",
+    "tests": "5",
+    "time": "31.662",
+    "timestamp": "2026-10-16T18:02:59.216132+00:00"
+  },
+  "members": {
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-0/supervisor.json": "fa0ae1ff8a870bcbe4d63c6896a4e330d61bd2408417dc71782d4ca18995ad46",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-0/worker-result.json": "23b2b090579731fa7ab24bdd5ff4e0673aed104866768f137c8620f732f212fe",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-10/supervisor.json": "ca1757ff4c65649b04ef13a604820f5af7bccec025ca6488a4e7adf965bf7a47",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-10/worker-result.json": "13a9a16571d8a274c6632d83aab126b9def5f2df00433d26ff9694d65075f0aa",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-11/supervisor.json": "deeeef659c3ea1822f434fa8b1d32ff45d2bbeae69464d75564a673109a4f8ca",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-11/worker-result.json": "b9a021a60d3748b1cd9555b825163cc61206a45bcbfa1b50005c44892631c96e",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-2/supervisor.json": "d938f999a2ee6a8f8a1766f0fe2b3f7d496da0447db90ed2b9c5cab89c0029d4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-2/worker-result.json": "0b083505c644d077ba50491b238d170dc97e3c8be6c9796ccefcada5c8fef220",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-3/supervisor.json": "71548785bc2e16e66d86aa87eae3d667ea02dd636144ae6fdf30eca7117770ed",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-3/worker-result.json": "8be5a235ac3dd70d1b479c8af659cb85fda84abef4ce0b15832423489b8481cc",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-4/supervisor.json": "500fdeb218ac4838deda328635fff89d96728b9163c2b5b79b25e84eb4fbe8d1",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-4/worker-result.json": "06d02a03965ca4c47157f0ab375b94571c9325769c491c68ca58f0dd53de9dcc",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-5/supervisor.json": "822d532d84f0f99702afbe62512d1e205ab325916d29d885e002b76057fdcca7",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-5/worker-result.json": "a6ab3a7eba76382e617a28e53dd7374ddf49cf65b69b83a72b6253237de49be4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-6/supervisor.json": "9ca9ce55208736666a99eeb8788982c628fe7e840ba5a8e4725237cce6c09acb",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-6/worker-result.json": "944d77d94a3b871d04b2b89b118a418a5a1814271e76cb4006d412d4d7d9d3f9",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-7/supervisor.json": "f5920110760d3c0c2a2198c4152a5841140219e01a31833844bdca9c0ac0dcda",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-7/worker-result.json": "a02ffcd7b67f879202dd19033edf981d5dba737e7341281050b033021f3c8e61",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-8/supervisor.json": "139b19b5d70f39ca4a496e32e39bdb634d83cd98e2ddd2fdc3d5a57d5ad864b6",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-8/worker-result.json": "6da0cf791b775b7d1b1a8339ecc4a1d4e5ca8ab463675c95e5a56d540661e7e3",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-9/supervisor.json": "58e73d52adb811e0757d7b05f419d272830f88bf0d5a359112718f134019608f",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-9/worker-result.json": "036fc8ef6d20327dbc04275952b3f8ae1034c3db0c8a9607faf50590f68c0aa8",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-duplicate/supervisor.json": "85cb6950713855545a51a300c8288f1e8605188d894d0c4c9182d1ab4c8f4de6",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-duplicate/worker-result.json": "70011cb09f55bc31a5ea50467b42c9d5d159de67b8909c708807f3f1fa4fbc48",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-interrupted/supervisor.json": "e8add3acf376c10a9d6b2c808813af42b9f32b2e6d6f9796aa304f1b671dece4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-interrupted/worker-result.json": "e4537dc6c777b1329094d8f309b32cdfc1e07d84eae1478a1d3ba7b856fa021b",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-recovery/supervisor.json": "ab30ec052e60a138b2880b1c210e3f6c0f25da22cb69f66c355553203bfadb3c",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-recovery/worker-result.json": "012de983c7881b0afd60cceed74d74888a9bac085c4a6debe047c0d0b90afc1c",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-resumed/supervisor.json": "486af4955fa4024f967e95fa8431ce550860b90e980b6f8023917c7cae405560",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-batch-resumed/worker-result.json": "c4e58d14d1edab54f62c633d5009eb810956dca45c918692cd3c0cdf9bc29901",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-capture/retained-capture.json": "932dfcc3e2e09fa9e1f5fc332c8e254df07e8d00f326305f199be076fdb3b593",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-capture/supervisor.json": "d6dfd5b469b98fba5610de0358a2c14dcc9021cfe799213c3067d35486ac7cf4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fen0/practical-worker-capture/worker-result.json": "1809898ee380f12d85a326d5c78eb25f8d79799540468fb2168e9cf0ca48d001",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-0/supervisor.json": "fa0ae1ff8a870bcbe4d63c6896a4e330d61bd2408417dc71782d4ca18995ad46",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-0/worker-result.json": "23b2b090579731fa7ab24bdd5ff4e0673aed104866768f137c8620f732f212fe",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-10/supervisor.json": "ca1757ff4c65649b04ef13a604820f5af7bccec025ca6488a4e7adf965bf7a47",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-10/worker-result.json": "13a9a16571d8a274c6632d83aab126b9def5f2df00433d26ff9694d65075f0aa",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-11/supervisor.json": "deeeef659c3ea1822f434fa8b1d32ff45d2bbeae69464d75564a673109a4f8ca",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-11/worker-result.json": "b9a021a60d3748b1cd9555b825163cc61206a45bcbfa1b50005c44892631c96e",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-2/supervisor.json": "d938f999a2ee6a8f8a1766f0fe2b3f7d496da0447db90ed2b9c5cab89c0029d4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-2/worker-result.json": "0b083505c644d077ba50491b238d170dc97e3c8be6c9796ccefcada5c8fef220",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-3/supervisor.json": "71548785bc2e16e66d86aa87eae3d667ea02dd636144ae6fdf30eca7117770ed",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-3/worker-result.json": "8be5a235ac3dd70d1b479c8af659cb85fda84abef4ce0b15832423489b8481cc",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-4/supervisor.json": "500fdeb218ac4838deda328635fff89d96728b9163c2b5b79b25e84eb4fbe8d1",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-4/worker-result.json": "06d02a03965ca4c47157f0ab375b94571c9325769c491c68ca58f0dd53de9dcc",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-5/supervisor.json": "822d532d84f0f99702afbe62512d1e205ab325916d29d885e002b76057fdcca7",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-5/worker-result.json": "a6ab3a7eba76382e617a28e53dd7374ddf49cf65b69b83a72b6253237de49be4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-6/supervisor.json": "9ca9ce55208736666a99eeb8788982c628fe7e840ba5a8e4725237cce6c09acb",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-6/worker-result.json": "944d77d94a3b871d04b2b89b118a418a5a1814271e76cb4006d412d4d7d9d3f9",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-7/supervisor.json": "f5920110760d3c0c2a2198c4152a5841140219e01a31833844bdca9c0ac0dcda",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-7/worker-result.json": "a02ffcd7b67f879202dd19033edf981d5dba737e7341281050b033021f3c8e61",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-8/supervisor.json": "139b19b5d70f39ca4a496e32e39bdb634d83cd98e2ddd2fdc3d5a57d5ad864b6",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-8/worker-result.json": "6da0cf791b775b7d1b1a8339ecc4a1d4e5ca8ab463675c95e5a56d540661e7e3",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-9/supervisor.json": "58e73d52adb811e0757d7b05f419d272830f88bf0d5a359112718f134019608f",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-9/worker-result.json": "036fc8ef6d20327dbc04275952b3f8ae1034c3db0c8a9607faf50590f68c0aa8",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-duplicate/supervisor.json": "85cb6950713855545a51a300c8288f1e8605188d894d0c4c9182d1ab4c8f4de6",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-duplicate/worker-result.json": "70011cb09f55bc31a5ea50467b42c9d5d159de67b8909c708807f3f1fa4fbc48",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-interrupted/supervisor.json": "e8add3acf376c10a9d6b2c808813af42b9f32b2e6d6f9796aa304f1b671dece4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-interrupted/worker-result.json": "e4537dc6c777b1329094d8f309b32cdfc1e07d84eae1478a1d3ba7b856fa021b",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-recovery/supervisor.json": "ab30ec052e60a138b2880b1c210e3f6c0f25da22cb69f66c355553203bfadb3c",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-recovery/worker-result.json": "012de983c7881b0afd60cceed74d74888a9bac085c4a6debe047c0d0b90afc1c",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-resumed/supervisor.json": "486af4955fa4024f967e95fa8431ce550860b90e980b6f8023917c7cae405560",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-batch-resumed/worker-result.json": "c4e58d14d1edab54f62c633d5009eb810956dca45c918692cd3c0cdf9bc29901",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-capture/retained-capture.json": "932dfcc3e2e09fa9e1f5fc332c8e254df07e8d00f326305f199be076fdb3b593",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-capture/supervisor.json": "d6dfd5b469b98fba5610de0358a2c14dcc9021cfe799213c3067d35486ac7cf4",
+    "provisioning-rehearsal/test_restricted_sql_claims_fencurrent/practical-worker-capture/worker-result.json": "1809898ee380f12d85a326d5c78eb25f8d79799540468fb2168e9cf0ca48d001",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-race0/supervisor.json": "c171e281047d4c2c3ce86b4610f0af2897bf7ea4342d7f9d58e1e8f14e341895",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-race0/worker-result.json": "42b955fe8761a60456a4ea7a0d6aed4faee4a8a54c0f1fa9da20e37a906dea34",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-success0/supervisor.json": "6a9587d549041ed3a13157b9c915f2a7b4075bb1b997a273485ba5b02343e995",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-success0/worker-result.json": "cf232d994faa2fa3a4fb1768d5af58b44735fffe02150eba5646073c56a7931f",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-success1/supervisor.json": "7d9713a669aa2e63cebd058f6c450b77bfb31f734bbb2e5b70bd732aa2555cac",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-success1/worker-result.json": "d63b0c40026b6ce13194ba762e122f1e5faed8547393f88a491cc502d4e2d9f7",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-uncertain0/supervisor.json": "94692b5562df89685eb59d75076cd9ede5a126f1bd517db3fce892bcb4c6ca03",
+    "provisioning-rehearsal/test_retained_batch_nominee_wr0/practical-worker-writer-uncertain0/worker-result.json": "c9e5c53e1fcd715d91acf959a042ac0e2790ee38f10bf82f9d2e747d379f649c",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-race0/supervisor.json": "c171e281047d4c2c3ce86b4610f0af2897bf7ea4342d7f9d58e1e8f14e341895",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-race0/worker-result.json": "42b955fe8761a60456a4ea7a0d6aed4faee4a8a54c0f1fa9da20e37a906dea34",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-success0/supervisor.json": "6a9587d549041ed3a13157b9c915f2a7b4075bb1b997a273485ba5b02343e995",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-success0/worker-result.json": "cf232d994faa2fa3a4fb1768d5af58b44735fffe02150eba5646073c56a7931f",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-success1/supervisor.json": "7d9713a669aa2e63cebd058f6c450b77bfb31f734bbb2e5b70bd732aa2555cac",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-success1/worker-result.json": "d63b0c40026b6ce13194ba762e122f1e5faed8547393f88a491cc502d4e2d9f7",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-uncertain0/supervisor.json": "94692b5562df89685eb59d75076cd9ede5a126f1bd517db3fce892bcb4c6ca03",
+    "provisioning-rehearsal/test_retained_batch_nominee_wrcurrent/practical-worker-writer-uncertain0/worker-result.json": "c9e5c53e1fcd715d91acf959a042ac0e2790ee38f10bf82f9d2e747d379f649c",
+    "provisioning.xml": "6bb0d52e81545063fd8222e629de17f03789fd0bc6fabb08a4650a3481b7a52a"
+  }
+}
