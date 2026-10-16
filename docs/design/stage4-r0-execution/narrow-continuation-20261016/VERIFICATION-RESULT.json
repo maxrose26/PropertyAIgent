@@ -1,0 +1,149 @@
+{
+  "head": "2b8ea6d9c2f0fbb093bf18e11ee71ff61c28bc12",
+  "tree": "ff94af368f48133402e78df6db9ed4c52774a79a",
+  "merge": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
+  "exact_head_checks": [
+    {
+      "id": 116870004202,
+      "name": "probe",
+      "status": "completed",
+      "result": "skipped",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487255/job/116870004202"
+    },
+    {
+      "id": 116869955819,
+      "name": "postgres-admission",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487551/job/116869955819"
+    },
+    {
+      "id": 116869955688,
+      "name": "offline",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487551/job/116869955688"
+    },
+    {
+      "id": 116869954975,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487246/job/116869954975"
+    },
+    {
+      "id": 116869954913,
+      "name": "native",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487308/job/116869954913"
+    },
+    {
+      "id": 116869954616,
+      "name": "web",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487246/job/116869954616"
+    },
+    {
+      "id": 116869954501,
+      "name": "offline",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487263/job/116869954501"
+    },
+    {
+      "id": 116869954464,
+      "name": "offline",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487308/job/116869954464"
+    },
+    {
+      "id": 116869954452,
+      "name": "offline",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487205/job/116869954452"
+    },
+    {
+      "id": 116869954179,
+      "name": "native",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487263/job/116869954179"
+    },
+    {
+      "id": 116869953641,
+      "name": "native",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487112/job/116869953641"
+    },
+    {
+      "id": 116869953374,
+      "name": "offline",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869487112/job/116869953374"
+    },
+    {
+      "id": 116869940706,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869482930/job/116869940706"
+    },
+    {
+      "id": 116869940298,
+      "name": "web",
+      "status": "completed",
+      "result": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38869482930/job/116869940298"
+    }
+  ],
+  "post_merge_runs": [
+    {
+      "id": 38869846425,
+      "result": "success",
+      "checks": [
+        "offline",
+        "native"
+      ]
+    },
+    {
+      "id": 38869846427,
+      "result": "success",
+      "checks": [
+        "offline",
+        "postgres-admission"
+      ]
+    },
+    {
+      "id": 38869846430,
+      "result": "success",
+      "checks": [
+        "web",
+        "Stage 2 commercial evidence and Stage 1 security (offline)"
+      ]
+    }
+  ],
+  "local_focused_tests": 17,
+  "hosted_postgresql_tests": 16,
+  "independent_review": "PASS",
+  "independent_review_condition": "exact-head hosted and disposable PostgreSQL checks satisfied",
+  "artifact": {
+    "id": 12033620096,
+    "run": 38870228310,
+    "sha256": "99b75246fc679ee53a8f5c8baac97eed40470b79b29c4233cb7ce94ba0dacd9e"
+  },
+  "comparison": {
+    "run": 38870585057,
+    "job": 116873471287,
+    "state": "WAITING_PROTECTED_ENVIRONMENT",
+    "data_outcomes": "UNKNOWN_NOT_EXECUTED",
+    "environment": "stage4-production-canary",
+    "reviewer": "maxrose26"
+  },
+  "oldham_capture": "REGISTERED_NOT_DISPATCHED"
+}

@@ -1,0 +1,25 @@
+{
+  "authority_source": "PRODUCT_OWNER_APPROVED_NARROW_CONTINUATION_AFTER_PR109",
+  "full_relevant_dispatch_history_count": 39,
+  "matching_new_runs_at_preparation": 0,
+  "revision": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
+  "scope_order": [
+    "manchester1",
+    "comparison3",
+    "oldham2"
+  ],
+  "source_budget_ledger": "budget-ledger.json",
+  "source_rule_contract_sha256": {
+    "app/pipeline/discovery_admission.py": "d4d71e94585bb688856072efc2bb9ac787cd30e197ae41c4261bea459d92af05",
+    "app/pipeline/discovery_contract.py": "41f8421569e17ff1e04d0c67442f4793b4089037a2926121748fdecc603f7aa4",
+    "app/pipeline/status_verification.py": "6a7f5e9790896ed1ba3d22b491f3670387862dcfacb226e2bbdb95d9ab15e781",
+    "verification/direct_reference/refresh.py": "e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2",
+    "verification/discovery/arcus_ui_audit.py": "ab4dfc15e21d6ac70461a46af23d20e3f311623114d12724600808ca2f70ac86",
+    "verification/discovery/arcus_ui_config.py": "963cfbc10b53f5b7a212fbb9e459ce400af7de4237bb8614f835381a18795548",
+    "verification/discovery/arcus_ui_window.py": "3255725d33bc4633c035bc217fbabbb3342cdb7022472c9be7239df4745adb36",
+    "verification/discovery/finite_acceptance.py": "e3ebfabffd7d91afcfcc7cb2eefee023a4237cd8a9389ac0cb83ea8ba79d231e",
+    "verification/discovery/idox_window.py": "5ea89823b65f063ce74ea2f1b376c4b8fbbedb1b64156da6f235e70be55a65ac",
+    "verification/stage26b_l1/request_boundary.py": "188198827c2192dec97f75a373fa3f3bbd066cd5f245ebad43e576a7b6e90057"
+  },
+  "tree": "ff94af368f48133402e78df6db9ed4c52774a79a"
+}
