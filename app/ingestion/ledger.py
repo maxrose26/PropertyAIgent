@@ -167,14 +167,16 @@ class Ledger:
             c.execute(update(W).where(W.c.key==claim.key).values(checkpoint=evidence,phase='CHECKPOINTED'))
             c.execute(update(A).where(A.c.work_key==claim.key,A.c.fence==claim.fence).values(checkpoint=evidence,phase='CHECKPOINTED'))
 
-    def intent(self,claim,operation):
-        if operation not in {'source_calls','writes'}:raise Denied('OPERATION')
+    def intent(self,claim,operation,*,cost=1):
+        if operation not in {'source_calls','writes'} or type(cost) is not int or not 1<=cost<=2 or (cost==2 and operation!='writes'):raise Denied('OPERATION')
         with self.tx() as (c,control):
             row=self._owned(c,control,claim)
             if row['phase'] not in {'CLAIMED','CHECKPOINTED'}:raise Denied('UNRESOLVED_INTENT')
             if operation=='writes' and row['task']!='FACTUAL_REFRESH':raise Denied('TASK_OPERATION')
             if operation=='source_calls' and (row['task'] not in {'DISCOVERY','LISTING_METADATA'} or row['subject']['kind']!='DISCOVERY_SCOPE'):raise Denied('TASK_OPERATION')
-            g=self._permit(control,row,row['authority'],operation,c=c);g[operation]-=1;self._control(c,control)
+            g=self._permit(control,row,row['authority'],operation,c=c);
+            if g[operation]<cost:raise Denied('AUTHORITY_EXHAUSTED')
+            g[operation]-=cost;self._control(c,control)
             phase='SOURCE_INTENT' if operation=='source_calls' else 'WRITE_INTENT'
             c.execute(update(W).where(W.c.key==claim.key).values(phase=phase))
             c.execute(update(A).where(A.c.work_key==claim.key,A.c.fence==claim.fence).values(phase=phase))

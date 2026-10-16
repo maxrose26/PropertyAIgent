@@ -117,6 +117,19 @@ class Coordinator:
         if not receipt or receipt.get('kind')!='LISTING_RECEIPT_V1' or receipt.get('cleanup')!='CLOSED':raise Denied('NO_DURABLE_CHECKPOINT')
         return self._materialize(claim,receipt)
 
+    def idox_listing(self,claim,source,outer):
+        from .idox_adapter import IdoxListingContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,IdoxListingContract):raise Denied('UNSUPPORTED_IDOX_CONTRACT')
+        c=contract.config
+        if row['task'] not in {'DISCOVERY','LISTING_METADATA'} or row['subject']!={'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}:raise Denied('IDOX_TASK_SCOPE')
+        if row['phase'] not in {'CLAIMED','CHECKPOINTED'}:raise Denied('IDOX_RETAINED_ONLY')
+        receipt=contract.project(source,outer,row['limits'])
+        # Store only JSON-safe data; dates in WindowEvidence stay string literals.
+        receipt.pop('window')
+        self.ledger.checkpoint(claim,receipt)
+        return self._materialize(claim,receipt)
+
     def metadata_from_scope(self,claim):
         row=self.ledger.get(claim.key)
         if row['task']!='LISTING_METADATA' or row['subject']['kind']!='APPLICATION' or len(row['dependencies'])!=1:raise Denied('METADATA_TASK')
@@ -220,3 +233,7 @@ class Coordinator:
             return dict(outcome='SUPPORTED_FACTS_VERIFIED',identity='EXISTING_IDENTITY_PRESERVED',application_id=app_id,readback={k:(v.isoformat() if hasattr(v,'isoformat') else v) for k,v in after.items()})
         self.ledger.intent(claim,'writes');result=self.ledger.fenced_effect(claim,writer)
         self.ledger.finish(claim,result);return result
+
+    def new_identity(self,claim,*,envelope,council,source):
+        from .new_identity import execute
+        return execute(self,claim,envelope=envelope,council=council,source=source)
