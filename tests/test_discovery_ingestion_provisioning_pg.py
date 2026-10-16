@@ -28,6 +28,7 @@ def test_non_superuser_provisioning_recovery_and_real_login_denials(record_prope
   boot.execute('INSERT INTO public.applications VALUES(1504,\'PRESERVED\'),(1505,\'PRESERVED\'),(1506,\'PRESERVED\'),(1507,\'PENDING\'),(1508,\'PENDING\')')
   boot.execute(sql.SQL('CREATE ROLE provisioning_migrator LOGIN NOSUPERUSER NOCREATEDB CREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Literal(secrets_by_role['provisioning_migrator'])))
   boot.execute('GRANT USAGE,CREATE ON SCHEMA public TO provisioning_migrator WITH GRANT OPTION')
+  boot.execute('GRANT CONNECT ON DATABASE ingestion_provisioning_test TO provisioning_migrator WITH GRANT OPTION')
   boot.execute('CREATE ROLE provisioning_untrusted NOLOGIN')
   try:
    with connect('provisioning_migrator') as m:
@@ -57,14 +58,22 @@ def test_non_superuser_provisioning_recovery_and_real_login_denials(record_prope
     with pytest.raises(psycopg.Error) as e:m.execute(installation)
     assert e.value.sqlstate=='42710';m.execute('ROLLBACK')
     for name in ROLES[-2:]:
-     m.execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {} VALID UNTIL {}').format(sql.Identifier(name),sql.Literal(secrets_by_role[name]),sql.Literal('2026-10-17T23:59:59Z')))
+     m.execute(sql.SQL('ALTER ROLE {} PASSWORD {} VALID UNTIL {}').format(sql.Identifier(name),sql.Literal(secrets_by_role[name]),sql.Literal('2026-10-17T23:59:59Z')))
+    # New login activation fails closed on inherited PUBLIC write access.
+    boot.execute('GRANT UPDATE ON public.applications TO PUBLIC')
+    with pytest.raises(psycopg.Error,match='AMBIENT_NON_LEDGER_ACCESS'):m.execute((PACKAGE/'activate.sql').read_text())
+    m.execute('ROLLBACK');boot.execute('REVOKE UPDATE ON public.applications FROM PUBLIC')
+    boot.execute("CREATE FUNCTION public.unreviewed_privileged() RETURNS void LANGUAGE sql SECURITY DEFINER AS 'SELECT NULL::void'")
+    with pytest.raises(psycopg.Error,match='UNREVIEWED_SECURITY_DEFINER'):m.execute((PACKAGE/'activate.sql').read_text())
+    m.execute('ROLLBACK');boot.execute('DROP FUNCTION public.unreviewed_privileged()')
+    m.execute((PACKAGE/'activate.sql').read_text())
    denied=0
    with connect('ingestion_worker_login') as worker,connect('ingestion_storage_login') as operator:
     for name,c in [('ingestion_worker_login',worker),('ingestion_storage_login',operator)]:
      assert c.execute('SELECT current_user,session_user').fetchone()==(name,name)
      assert c.execute('SELECT rolsuper,rolbypassrls,rolcreaterole,rolcreatedb,rolreplication FROM pg_roles WHERE rolname=current_user').fetchone()==(False,False,False,False,False)
      assert c.execute("SELECT count(*) FROM public.ingestion_work_items").fetchone()==(1,)
-     for statement in ["UPDATE public.ingestion_work_items SET outcome='{}'",'INSERT INTO public.ingestion_work_items SELECT * FROM public.ingestion_work_items LIMIT 0',"INSERT INTO public.ingestion_work_attempts(work_key) VALUES('x')",'DELETE FROM public.ingestion_work_items','TRUNCATE public.ingestion_work_attempts','ALTER TABLE public.ingestion_work_items DISABLE ROW LEVEL SECURITY',"UPDATE public.applications SET address='FORBIDDEN'",'SET ROLE ingestion_storage_owner','SET ROLE ingestion_authority_issuer','SET ROLE ingestion_barrier_releaser','CREATE ROLE forbidden_role',"GRANT ingestion_storage_owner TO "+name,'CREATE TABLE public.forbidden_table(id int)']:
+     for statement in ["UPDATE public.ingestion_work_items SET outcome='{}'",'INSERT INTO public.ingestion_work_items SELECT * FROM public.ingestion_work_items LIMIT 0',"INSERT INTO public.ingestion_work_attempts(work_key) VALUES('x')",'DELETE FROM public.ingestion_work_items','TRUNCATE public.ingestion_work_attempts','ALTER TABLE public.ingestion_work_items DISABLE ROW LEVEL SECURITY',"UPDATE public.applications SET address='FORBIDDEN'",'SET ROLE ingestion_storage_owner','SET ROLE ingestion_authority_issuer','SET ROLE ingestion_barrier_releaser','SET ROLE '+('ingestion_worker' if name=='ingestion_worker_login' else 'ingestion_storage_operator'),'CREATE ROLE forbidden_role',"GRANT ingestion_storage_owner TO "+name,'CREATE TABLE public.forbidden_table(id int)']:
       deny(c,statement);denied+=1
     deny(worker,'SELECT public.ingestion_seed_storage_test()');denied+=1
     deny(operator,"SELECT public.ingestion_raise_stop('UNAUTHORISED')");denied+=1

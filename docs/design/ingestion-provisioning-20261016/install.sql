@@ -9,6 +9,7 @@ DO $pre$ BEGIN
  OR current_setting('server_version_num')::integer<170000
  OR NOT has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION')
  OR NOT has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION')
+ OR NOT has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION')
  THEN RAISE EXCEPTION 'MIGRATION_PRINCIPAL_PRECONDITION'; END IF;
 END $pre$;
 CREATE ROLE ingestion_storage_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
@@ -23,6 +24,7 @@ GRANT CREATE ON SCHEMA public TO ingestion_storage_owner;
 ALTER DEFAULT PRIVILEGES FOR ROLE ingestion_storage_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 CREATE ROLE ingestion_worker_login NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 1 PASSWORD NULL;
 CREATE ROLE ingestion_storage_login NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 1 PASSWORD NULL;
+DO $connect$ BEGIN EXECUTE format('GRANT CONNECT ON DATABASE %I TO ingestion_worker_login,ingestion_storage_login',current_database()); END $connect$;
 GRANT ingestion_worker TO ingestion_worker_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE;
 GRANT ingestion_storage_operator TO ingestion_storage_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE;
 GRANT USAGE ON SCHEMA public TO ingestion_storage_owner, ingestion_storage_operator, ingestion_worker;
