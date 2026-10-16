@@ -1,0 +1,59 @@
+# PROPOSAL ONLY: no registered workflow; requires explicit live review.
+# Approved access preflight only. Cannot migrate, seed or run ingestion.
+name: Stage4 ingestion storage TLS catalogue ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: choice
+        default: NOT_AUTHORISED
+        options: [NOT_AUTHORISED, AUTHORISE_STORAGE_TLS_CATALOGUE_ONCE_20261016]
+permissions:
+  contents: read
+concurrency:
+  group: stage4-knownref-closure-production
+  cancel-in-progress: false
+jobs:
+  catalogue:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Exact single-use access authority
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          WF: ${{ github.workflow_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+        run: |
+          set -euo pipefail
+          [[ "$PIN" =~ ^[0-9a-f]{40}$ && "$PIN" == "$WF" && "$PIN" == "$GITHUB_SHA" ]]
+          [[ "$GITHUB_REF" == refs/heads/master && "$GITHUB_RUN_NUMBER" == 1 && "$GITHUB_RUN_ATTEMPT" == 1 ]]
+          [[ "$AUTHORITY" == AUTHORISE_STORAGE_TLS_CATALOGUE_ONCE_20261016 ]]
+          echo "STORAGE_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - name: Pinned dependencies without production credentials
+        run: timeout --kill-after=2s 75s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/storage-venv"
+      - name: Verified TLS and catalogue read-only, never migration
+        env:
+          PIN: ${{ inputs.reviewed_sha }}
+          AUTHORITY: ${{ inputs.authority }}
+          WF: ${{ github.workflow_sha }}
+          STORAGE_PREFLIGHT_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          test "$(( $(date +%s) - STORAGE_STARTED ))" -le 85
+          env -i PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_SHA="$GITHUB_SHA" GITHUB_WORKFLOW_SHA="$WF" GITHUB_REF="$GITHUB_REF" GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" GITHUB_RUN_ID="$GITHUB_RUN_ID" STORAGE_PREFLIGHT_DATABASE_URL="$STORAGE_PREFLIGHT_DATABASE_URL" timeout --signal=TERM --kill-after=2s 30s "$RUNNER_TEMP/storage-venv/bin/python" -m verification.ingestion_storage.tls_successor --sha "$PIN" --authority "$AUTHORITY" --output "$RUNNER_TEMP/storage-preflight"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ingestion-storage-catalogue-${{ github.run_id }}-${{ inputs.reviewed_sha }}
+          path: ${{ runner.temp }}/storage-preflight
+          if-no-files-found: error
+          retention-days: 14

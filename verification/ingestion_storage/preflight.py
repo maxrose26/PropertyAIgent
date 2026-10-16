@@ -33,9 +33,10 @@ def verdict(sessions):
  # Catalogue cannot prove new-owner transfer or a least-privilege authentication mapping.
  blocks.extend(['DEDICATED_RESTRICTED_LOGIN_SECRET_MAPPING_NOT_ESTABLISHED','NEW_OWNER_TRANSFER_AND_RESTRICTED_MEMBERSHIP_REQUIRE_REVIEW'])
  return {'compatibility':'BLOCKED','blockers':blocks,'pooler_mode':'REGISTERED_SESSION_ROUTE_5432; NOT_INFERRED_FROM_BACKEND_PID','migration_executed':False}
-def run(raw,out,engine_factory=create_engine,clock=time.monotonic):
- started=clock();out=Path(out);out.mkdir(exist_ok=False);engine=None;connections=0;attempts=0;statements=0;driver_statements=0;sessions=[];closed=True;disposed=False;phase='ROUTE'
+def run(raw,out,engine_factory=create_engine,clock=time.monotonic,execution=None):
+ started=clock();out=Path(out);out.mkdir(exist_ok=False);engine=None;connections=0;attempts=0;statements=0;driver_statements=0;sessions=[];closed=True;disposed=False;phase='ROUTE';baseline=None
  result={'revision':os.environ.get('GITHUB_SHA'),'run_id':os.environ.get('GITHUB_RUN_ID'),'workflow':WORKFLOW,'workflow_sha256':hashlib.sha256(Path(WORKFLOW).read_bytes()).hexdigest(),'package_hashes':HASHES,'registered_route':{'host':'aws-0-eu-west-2.pooler.supabase.com','port':5432,'database':'postgres','login':'postgres.zcikcfgpblzuzpanpdqd'},'sslmode':'verify-full','prepare_threshold':None,'status':'INTENT_BEFORE_CONNECTION','sessions':sessions,'production_writes':0,'source_calls':0,'application_reads':0,'application_writes':0,'migration_executed':False,'seeding_executed':False}
+ result.update(execution or {})
  def save():
   data=json.dumps(result,sort_keys=True,allow_nan=False).encode();assert len(data)<=32768
   target=out/'result.json.tmp'
@@ -43,10 +44,14 @@ def run(raw,out,engine_factory=create_engine,clock=time.monotonic):
   os.replace(target,out/'result.json')
  save()
  try:
+  from .tls_trust import owned_resources
+  baseline=owned_resources()
+  if baseline['children']:raise ValueError('UNEXPECTED_OWNED_CHILD_PROCESS')
   url=validate_route(raw)
-  ca=Path('/etc/ssl/certs/ca-certificates.crt')
-  if not ca.is_file():raise ValueError('SYSTEM_CA_UNAVAILABLE')
-  import psycopg
+  from .tls_trust import verified_trust
+  ca,trust=verified_trust();result['trust']=trust
+  import psycopg,ssl
+  result['runtime_trust']={'psycopg':psycopg.__version__,'pq_implementation':psycopg.pq.__impl__,'libpq_version':psycopg.pq.version(),'python_openssl':ssl.OPENSSL_VERSION,'python_openssl_is_not_libpq_version':True}
   class AccountedCursor(psycopg.Cursor):
    def execute(self,query,params=None,*,prepare=None,binary=None):
     nonlocal driver_statements
@@ -82,12 +87,22 @@ def run(raw,out,engine_factory=create_engine,clock=time.monotonic):
    result.update(status='CATALOGUE_CHECKPOINT',connections=connections,statements=statements,cleanup='CLOSED' if closed else 'UNKNOWN');save()
   result.update(verdict(sessions));result['status']='READ_ONLY_CATALOGUE_COMPLETE_BLOCKED'
  except Exception as exc:
-  reason='TLS_CERTIFICATE_VERIFICATION_FAILED' if 'certificate verify failed' in str(exc).lower() else 'AUTHENTICATION_FAILED' if 'password authentication failed' in str(exc).lower() else 'CONNECTION_TIMEOUT' if 'timeout' in str(exc).lower() else 'REDACTED_FAILURE'
-  result.update(status='PREFLIGHT_FAILED_STOP',phase=phase,reason_code=reason,error_class=type(exc).__name__,sqlstate=getattr(getattr(exc,'orig',exc),'sqlstate',None))
+  from .tls_trust import failure_evidence
+  evidence=failure_evidence(exc)
+  # A failed connect returning a FinishedPGconn has no live native connection.
+  # Missing receipts and close/disposal failures remain uncertain.
+  if phase=='CONNECT_VERIFY_FULL' and evidence['failed_native_connection_finished']:closed=True
+  result.update(status='PREFLIGHT_FAILED_STOP',phase=phase,**evidence,error_class=type(exc).__name__,sqlstate=getattr(getattr(exc,'orig',exc),'sqlstate',None))
  finally:
   try:
    if engine is not None:engine.dispose();disposed=True
   except Exception:closed=False
+  try:
+   from .tls_trust import owned_resources
+   after=owned_resources();new_sockets=after['socket_fds']-(baseline['socket_fds'] if baseline else set());children=after['children']
+   result['owned_socket_cleanup']={'accounting_certain':baseline is not None,'new_owned_socket_fds':len(new_sockets),'live_owned_children':len(children)}
+   if baseline is None or new_sockets or children:closed=False
+  except Exception:result['owned_socket_cleanup']={'accounting_certain':False};closed=False
   result.update(connection_attempts=attempts,connections=connections,explicit_statements=statements,driver_statements=driver_statements,elapsed_seconds=round(clock()-started,3),peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,cleanup='CLOSED' if closed else 'UNCERTAIN',pool_disposed=disposed)
   if result['peak_rss_bytes']>256*1024**2 or clock()-started>30:result['status']='RESOURCE_STOP'
   save()
