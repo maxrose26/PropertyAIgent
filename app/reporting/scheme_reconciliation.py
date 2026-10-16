@@ -778,11 +778,11 @@ def _contain_count_assessment(assessment, rows):
         reason = residential_count_eligibility(row.application, raw).reason
         if reason:
             rejected.append(reason)
-    if rejected and not assessment.sources:
+    if rejected and (not assessment.sources or "qualified_quantity_withheld" in rejected):
         # Preserve rejected raw evidence on its ORM source; no fabricated
         # corrected total, bounds, or confidence. Other scopes remain independent.
         return replace(assessment, precision="UNKNOWN", value=None, lower=None,
-                       upper=None, resolution="material_conflict",
+                       upper=None, resolution="qualified_quantity_withheld" if set(rejected)=={"qualified_quantity_withheld"} else "material_conflict",
                        confidence="none")
     return assessment
 

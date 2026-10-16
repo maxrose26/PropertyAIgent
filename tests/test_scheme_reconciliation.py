@@ -23,6 +23,8 @@ In-memory-SQLite `session` fixture (tests/conftest.py). No OpenAI call.
 """
 from __future__ import annotations
 
+import pytest
+
 from app.db.models import Application, SchemeIntelligence, Site
 from app.pipeline.material_change import DECIDED_GRANTED, DECIDED_RECOMMENDATION_ONLY, DECIDED_UNDETERMINED
 from app.reporting.scheme_reconciliation import (
@@ -324,18 +326,24 @@ def test_condition_discharge_never_overwrites_the_underlying_unit_count(session)
 # --- 5. residential-only safeguard, S73 safeguard (unchanged from 2B-1) ---
 
 
-def test_stockport_rugby_club_declines_residential_only_where_specialist_component(session):
+@pytest.mark.parametrize("qualified",[False,True])
+def test_stockport_rugby_club_declines_residential_only_where_specialist_component(session,qualified):
     site = _site(session)
     app = _app(session, site.id, "HYB/1",
-               proposal="Hybrid application: up to 60 dwellings plus a 70-bed extra care facility and associated works",
+               proposal="Hybrid application: "+("up to " if qualified else "")+"60 dwellings plus a 70-bed extra care facility and associated works",
                status="Awaiting decision", application_received="Mon 01 Jan 2025")
     _intel(session, app, total_units_final=130, specialist_housing_type="Extra care (Use Class C2)",
            core_intelligence_complete=True)
     facts = build_operative_planning_facts([app])
     active = facts.active_positions[0]
     assert active.residential_only_units.state == FACT_NOT_DETERMINED
-    assert "specialist" in active.residential_only_units.reason.lower()
-    assert active.all_use_total_units.value == 130
+    if qualified:
+        assert active.all_use_total_units.value is None
+        assert active.proposed_units.count_assessment.precision=="UNKNOWN"
+        assert active.proposed_units.count_assessment.resolution=="qualified_quantity_withheld"
+    else:
+        assert "specialist" in active.residential_only_units.reason.lower()
+        assert active.all_use_total_units.value == 130
 
 
 def test_s73_without_ah_evidence_does_not_control_affordable_housing(session):

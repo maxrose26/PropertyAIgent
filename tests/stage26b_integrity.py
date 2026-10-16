@@ -8,6 +8,9 @@ RECONCILIATION = 'app/reporting/scheme_reconciliation.py'
 MANIFEST = 'tests/fixtures/stage26b/integrity/b11-successor.json'
 MANIFEST_SHA256 = 'e399c85982853d54f13db4102fa44af2a402d296a522652a5a1cb2de94eeb109'
 
+QUALIFIER_MANIFEST = 'tests/fixtures/stage26b/integrity/unit-qualifier-successor.json'
+QUALIFIER_SHA256 = '35d054b5e0228e7a56d2b64c38e4ea3d3ae2c6e33762187b15b1785ea2d6de22'
+
 
 def digest(text):
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
@@ -39,6 +42,17 @@ def assert_historical_and_successor(root, historical_pin):
     assert prior['version'] == predecessor['version'] == 'stage26b-b1-reconciliation-v1'
     for key in ('historical', 'definition_pins', 'binding_envelopes', 'decorator_pins', 'intentional_reconciliation_delta'):
         assert contract[key] == prior[key], f'B1.1 changed unrelated integrity contract: {key}'
+    overlay_text=(root/QUALIFIER_MANIFEST).read_text()
+    assert digest(overlay_text)==QUALIFIER_SHA256, 'qualifier successor requires explicit review'
+    overlay=json.loads(overlay_text)
+    assert overlay['version']=='stage4-unit-qualifier-containment-v1'
+    assert overlay['predecessor']=={'fixture':MANIFEST,'sha256':MANIFEST_SHA256}
+    assert set(overlay['changes'])=={'app/reporting/residential_count_eligibility.py', RECONCILIATION+':_contain_count_assessment'}
+    for surface,change in overlay['changes'].items():
+        assert digest((root/change['archive']).read_text())==change['previous_sha256']
+        if ':' in surface:
+            path,name=surface.split(':');assert contract['definition_pins'][path][name]==change['previous_sha256']
+        else:assert contract['module_pins'][surface]==change['previous_sha256']
     historical = contract['historical']
     source = (root / historical['fixture']).read_text(encoding='utf-8')
     assert digest(source) == historical_pin == historical['sha256'], 'historical source altered'
@@ -66,6 +80,8 @@ def assert_historical_and_successor(root, historical_pin):
     for path, pins in contract['definition_pins'].items():
         current = definitions((root / path).read_text(encoding='utf-8'))
         for name, pin in pins.items():
-            assert name in current and digest(current[name]) == pin, f'B1 dependency changed: {path}:{name}'
+            live_pin=overlay['changes'].get(path+':'+name,{}).get('current_sha256',pin)
+            assert name in current and digest(current[name]) == live_pin, f'B1 dependency changed: {path}:{name}'
     for path, pin in contract['module_pins'].items():
-        assert digest((root / path).read_text(encoding='utf-8')) == pin, f'B1 eligibility changed: {path}'
+        live_pin=overlay['changes'].get(path,{}).get('current_sha256',pin)
+        assert digest((root / path).read_text(encoding='utf-8')) == live_pin, f'B1 eligibility changed: {path}'

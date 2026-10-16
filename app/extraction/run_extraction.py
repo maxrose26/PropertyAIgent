@@ -157,5 +157,6 @@ def run_extraction_for_application(client: OpenAI, application: Application) -> 
         portal_estimated_units=application.estimated_unit_count,
         application_category=application.application_category,
         proposal=proposal,
+        retained_unit_evidence=combined_text,
         applicant_name_raw=applicant_name or None,
     )

@@ -19,6 +19,16 @@ class CountEligibility:
         return self.reason is None
 
 
+def qualified_residential_quantity(text):
+    """Contain explicit upper-limit wording; never infer a count or lower bound."""
+    import re
+    return bool(re.search(
+        r"\b(?:up\s+to|not\s+exceeding|no\s+more\s+than|maximum\s+of)\s+"
+        r"[0-9][0-9,]*\s*(?:no\.?\s*)?(?:[a-z]+(?:-[a-z]+)*\s+){0,4}?"
+        r"(?:dwellings?|homes?|houses?|apartments?|flats?|bungalows?|residential\s+units?)\b",
+        text or "", re.I))
+
+
 def residential_count_eligibility(application, value=None):
     """Reject affirmative metric/scope contradictions in the application proposal.
 
@@ -28,6 +38,8 @@ def residential_count_eligibility(application, value=None):
     """
     import re
     text = (getattr(application, "proposal", None) or "").lower()
+    if qualified_residential_quantity(text):
+        return CountEligibility("qualified_quantity_withheld")
     # Explicit dwelling-creation clauses counter incidental bridges/commercial
     # space/works. 'Erection of replacement porches' is not dwelling creation.
     noun = r"(?:dwellings?|homes?|houses?|apartments?|flats?|bungalows?)\b"

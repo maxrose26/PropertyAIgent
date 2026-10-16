@@ -1,4 +1,4 @@
-"""Owner-local, future-approved credential handoff. No production execution in CI.
+"""BLOCKED production CLI; retain low-level mapping only for disposable tests.
 
 Never print raw exceptions, connection strings, passwords, SCRAM verifiers or
 GitHub CLI output. The CLI handles encryption to the existing environment key.
@@ -25,6 +25,11 @@ def put_secret(name,value,runner=subprocess.run):
 
 def install_mapping(connection,*,attested,runner=subprocess.run,password_factory=lambda:secrets.token_urlsafe(48)):
  if not attested:raise ValueError('PROVIDER_PASSWORD_REDACTION_ATTESTATION_REQUIRED')
+ # The low-level primitive is retained solely for the existing disposable PG
+ # rehearsal. No owner flag or direct import admits a production connection.
+ info=connection.info
+ if (info.host,info.port,info.dbname,info.user)!=('127.0.0.1',5432,'ingestion_provisioning_test','provisioning_migrator'):
+  raise ValueError('DISPOSABLE_CREDENTIAL_MAPPING_ONLY')
  connection.execute("SET statement_timeout='10s'")
  connection.execute("SET lock_timeout='3s'")
  receipts=[]
@@ -54,30 +59,6 @@ def main():
  # This preparation file grants no authority. Only run after concrete approval.
  if sys.platform!='linux':raise SystemExit('REVIEWED_OWNER_LINUX_OR_WSL_REQUIRED')
  if not sys.stdin.isatty() or not sys.stderr.isatty():raise SystemExit('OWNER_SECURE_TTY_REQUIRED')
- import resource,signal
- resource.setrlimit(resource.RLIMIT_CORE,(0,0))
- def deadline(signum,frame):raise TimeoutError('OWNER_MAPPING_DEADLINE')
- baseline=None
- try:
-  raw=getpass.getpass('Existing migration credential URL (hidden; never paste into chat): ')
-  # Owner interactive time ends here; source-free credential phase is bounded.
-  resource.setrlimit(resource.RLIMIT_AS,(256*1024**2,256*1024**2))
-  resource.setrlimit(resource.RLIMIT_FSIZE,(0,0))
-  baseline=owned_resources()
-  if baseline['children']:raise ValueError('UNEXPECTED_OWNED_CHILD')
-  signal.signal(signal.SIGALRM,deadline);signal.alarm(90)
-  u=validate_route(raw);root,_=verified_trust()
-  addresses=socket.getaddrinfo(u.host,u.port,family=socket.AF_INET,type=socket.SOCK_STREAM)
-  if not addresses or len(addresses)>32:raise ValueError('DNS_BOUND')
-  import psycopg
-  with psycopg.connect(host=u.host,hostaddr=sorted({x[4][0] for x in addresses})[0],port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(root),connect_timeout=3,prepare_threshold=None,autocommit=True) as c:
-   receipts=install_mapping(c,attested=True)
-  after=owned_resources()
-  if after['socket_fds']-baseline['socket_fds'] or after['children']:raise ValueError('OWNED_CLEANUP_UNCERTAIN')
-  print(json.dumps({'status':'MAPPED_NOLOGIN','cleanup':'CLOSED','receipts':receipts}))
- except BaseException:
-  # Suppress stderr/tracebacks even on interruption; outcome may be uncertain.
-  print('CREDENTIAL_MAPPING_STOP_RECONCILE_BEFORE_ANY_FURTHER_MUTATION',file=sys.stderr)
-  raise SystemExit(1) from None
- finally:signal.alarm(0)
+ # Explicit stop: reviewed owner authority does not establish log protection.
+ raise SystemExit('SCRAM_SQL_PROVISIONING_BLOCKED_PENDING_METHOD_ACCEPTANCE')
 if __name__=='__main__':main()

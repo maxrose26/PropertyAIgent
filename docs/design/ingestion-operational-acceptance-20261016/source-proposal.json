@@ -1,0 +1,39 @@
+{
+  "status": "PROPOSED_NOT_AUTHORISED_NOT_REGISTERED",
+  "scope": {
+    "council": "bolton",
+    "semantics": "RECEIVED",
+    "start": "2026-10-16",
+    "end": "2026-10-16",
+    "earliest_eligibility_utc": "2026-10-17T00:00:00Z"
+  },
+  "route": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+  "observations": 1,
+  "nominee": null,
+  "qualification_sha256": "1833eb7349dda9b1dceb0924abd7380b2f24e591e13ad34ec37dd8e4763df3f2",
+  "execution_authority": null,
+  "detail_candidates_max": 1,
+  "retries": 0,
+  "documents": 0,
+  "models": 0,
+  "parents": 0,
+  "application_writes_before_supported_detail": 0,
+  "source_requests_max": 12,
+  "received_body_bytes_max": 5000000,
+  "controller_seconds": 165,
+  "db_attempts_max": 16,
+  "driver_commands_max": 120,
+  "output_bytes_max": 2097152,
+  "job_seconds_max": 480,
+  "prerequisites": [
+    "ACCEPTED_SECURE_CREDENTIAL_METHOD",
+    "BASE_STORAGE_ACCEPTED",
+    "EXACT_OPERATIONAL_ROLES_ACLS_CONTROLLER_ACCEPTED",
+    "GLOBAL_STOP_RESOLUTION_SEPARATELY_ACCEPTED",
+    "RETAINED_CAPTURE_NOMINATION_HASH_AND_FINITE_AUTHORITY"
+  ],
+  "qualification_path": "docs/design/stage4-discovery/evidence/bolton-window3-38545477089.json",
+  "qualification_scope": "INDEPENDENTLY_REVIEWED_HISTORICAL_COUNT_DATE_IDENTITY_RESOURCE_CLEANUP_NOT_PROSPECTIVE_RECALL",
+  "listing_contract": "bolton-received-idox-coordinator-v1",
+  "factual_contract": "EXISTING_COUPLED_EXACT_IDOX_NO_UNIT_FACTS"
+}

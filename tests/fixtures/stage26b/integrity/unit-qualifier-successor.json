@@ -1,0 +1,21 @@
+{
+  "version": "stage4-unit-qualifier-containment-v1",
+  "authority": "Product Owner 2026-10-16 minimal qualifier-safe correction; offline only",
+  "predecessor": {
+    "fixture": "tests/fixtures/stage26b/integrity/b11-successor.json",
+    "sha256": "e399c85982853d54f13db4102fa44af2a402d296a522652a5a1cb2de94eeb109"
+  },
+  "changes": {
+    "app/reporting/residential_count_eligibility.py": {
+      "archive": "tests/fixtures/stage26b/integrity/residential_count_eligibility.pre-qualifier.py.txt",
+      "previous_sha256": "be5b189ddbc928799590aa585fa1db95e05a701a8d587e366ec1ccf1602312dc",
+      "current_sha256": "8bc20d229b8d164973284f18763f92170034c96b7d2fbf93365bcc458682b4e7"
+    },
+    "app/reporting/scheme_reconciliation.py:_contain_count_assessment": {
+      "archive": "tests/fixtures/stage26b/integrity/contain_count_assessment.pre-qualifier.py.txt",
+      "previous_sha256": "417dcfe64e9ed64a9a52c8a5df0ac0b60d077fd02a57e8b792456caab2dd6692",
+      "current_sha256": "0c095b025b543d711b9d0b9f00707b672b802f1d94759afdce435a51c22106ba"
+    }
+  },
+  "scope": "Withhold qualified point claims; no matching policy, schema, source authority or count bounds changed"
+}

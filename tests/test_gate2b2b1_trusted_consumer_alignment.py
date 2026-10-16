@@ -752,7 +752,7 @@ def test_dashboard_site_level_facts_come_from_operative_facts_not_the_triggering
     facts = build_operative_planning_facts([app])
     card = _scheme_card(app, why="New application scraped", when=None, operative_facts=facts)
     assert card["decision_status"] is None  # never "Granted" for a pending application
-    assert card["total_units"] == 63
+    assert card["total_units"] is None  # upper limit is not an exact total
 
 
 # --- 22-23: AI Summary -------------------------------------------------------

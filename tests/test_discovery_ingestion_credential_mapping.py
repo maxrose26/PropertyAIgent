@@ -14,7 +14,14 @@ def test_noninteractive_owner_input_is_rejected_before_password_prompt(monkeypat
 
 
 def connection():
- c=MagicMock();c.execute.return_value.fetchone.return_value=(False,False,False,False,False,False);c.pgconn.encrypt_password.return_value=b'SCRAM-SHA-256$DISPOSABLE_VERIFIER';return c
+ c=MagicMock();c.info.host='127.0.0.1';c.info.port=5432;c.info.dbname='ingestion_provisioning_test';c.info.user='provisioning_migrator'
+ c.execute.return_value.fetchone.return_value=(False,False,False,False,False,False);c.pgconn.encrypt_password.return_value=b'SCRAM-SHA-256$DISPOSABLE_VERIFIER';return c
+
+
+def test_direct_mapping_primitive_rejects_non_disposable_connection():
+ c=connection();c.info.host='aws-0-eu-west-2.pooler.supabase.com';runner=MagicMock()
+ with pytest.raises(ValueError,match='DISPOSABLE_CREDENTIAL'):install_mapping(c,attested=True,runner=runner)
+ c.execute.assert_not_called();c.pgconn.encrypt_password.assert_not_called();runner.assert_not_called()
 
 
 def test_no_mutation_without_provider_redaction_attestation():
@@ -48,3 +55,12 @@ def test_uncertain_database_commit_stops_before_secret_upload():
  c=connection();c.transaction.return_value.__exit__.side_effect=RuntimeError('LOST_ACK');runner=MagicMock()
  with pytest.raises(RuntimeError,match='LOST_ACK'):install_mapping(c,attested=True,runner=runner,password_factory=lambda:'DISPOSABLE_PRIVATE_VALUE_'*3)
  runner.assert_not_called();assert c.pgconn.encrypt_password.call_count==1
+
+
+def test_even_valid_owner_authority_and_tty_cannot_start_blocked_method(monkeypatch):
+ monkeypatch.setattr('sys.argv',['credential_mapping','--authority',credential_mapping.AUTHORITY,'--provider-password-redaction-attested'])
+ monkeypatch.setattr('sys.stdin.isatty',lambda:True)
+ monkeypatch.setattr('sys.stderr.isatty',lambda:True)
+ prompt=MagicMock();monkeypatch.setattr(credential_mapping.getpass,'getpass',prompt)
+ with pytest.raises(SystemExit,match='SCRAM_SQL_PROVISIONING_BLOCKED'):credential_mapping.main()
+ prompt.assert_not_called()

@@ -93,7 +93,8 @@ class Coordinator:
             segments=source['listing_segments'],applied_interval=source['applied_interval'],cleanup='CLOSED',accounting_complete=True,
             outer_supervisor=outer,resources={k:source[k] for k in ('requests','decoded_bytes','encoded_bytes','outbound_payload_bytes','supervisor_seconds','peak_owned_rss')})
         # Both task checkpoint and attempt copy are bounded; no expiring URL needed.
-        self.ledger.checkpoint(claim,receipt)
+        if row["phase"]=="SOURCE_INTENT" and hasattr(self.ledger,"resolve_source"):self.ledger.resolve_source(claim,receipt)
+        else:self.ledger.checkpoint(claim,receipt)
         return receipt
 
     def listing(self,claim,source):
@@ -115,7 +116,58 @@ class Coordinator:
     def resume_listing(self,claim):
         row=self.ledger.get(claim.key);receipt=row['checkpoint']
         if not receipt or receipt.get('kind')!='LISTING_RECEIPT_V1' or receipt.get('cleanup')!='CLOSED':raise Denied('NO_DURABLE_CHECKPOINT')
+        # Reclaim rotates the fence and returns CLAIMED. Re-seal the unchanged
+        # retained receipt under that fence before broker child materialisation.
+        self.ledger.checkpoint(claim,receipt)
         return self._materialize(claim,receipt)
+
+    def idox_listing(self,claim,source,outer):
+        from .idox_adapter import IdoxListingContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,IdoxListingContract):raise Denied('UNSUPPORTED_IDOX_CONTRACT')
+        c=contract.config
+        if row['task'] not in {'DISCOVERY','LISTING_METADATA'} or row['subject']!={'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}:raise Denied('IDOX_TASK_SCOPE')
+        if row['phase'] not in {'CLAIMED','CHECKPOINTED'}:raise Denied('IDOX_RETAINED_ONLY')
+        receipt=contract.project(source,outer,row['limits'])
+        # Store only JSON-safe data; dates in WindowEvidence stay string literals.
+        receipt.pop('window')
+        self.ledger.checkpoint(claim,receipt)
+        return self._materialize(claim,receipt)
+
+    def idox_source(self,claim,supervised_reader,*,materialize=True,archive=None):
+        from .idox_adapter import IdoxListingContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,IdoxListingContract):raise Denied('UNSUPPORTED_IDOX_CONTRACT')
+        c=contract.config
+        if row['subject']!={'kind':'DISCOVERY_SCOPE','council':c.council,'start':c.start.isoformat(),'end':c.end.isoformat(),'semantics':c.semantics}:raise Denied('IDOX_TASK_SCOPE')
+        if row['checkpoint'] is not None:raise Denied('RESUME_CHECKPOINT_NO_SOURCE_REPLAY')
+        self.ledger.intent(claim,'source_calls')
+        try:
+            source,outer=supervised_reader(row)
+            if not materialize and archive is None:raise Denied('DURABLE_ARCHIVE_REQUIRED')
+            saved=None
+            if archive is not None:
+                from .batching import archive_capture
+                saved=archive_capture(source,archive)
+            receipt=contract.project(source,outer,row['limits'],source_bytes_limit=512*1024) if not materialize else contract.project(source,outer,row['limits'])
+            receipt.pop('window')
+            if saved is not None:receipt['durable_archive']=saved
+            try:bounded(receipt)
+            except Denied:
+                if materialize:raise
+                blocked=dict(kind='CAPTURE_BLOCKED_V1',durable_archive=saved,reason='INLINE_PAYLOAD_BOUND',qualified_rows=len(receipt['records']),cleanup='CLOSED',accounting_complete=True)
+                if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,blocked)
+                else:self.ledger.checkpoint(claim,blocked)
+                self.ledger.finish(claim,{'outcome':'CAPTURED_PROCESSING_BLOCKED'},state='UNSUPPORTED_CONTRACT',reason='INLINE_PAYLOAD_BOUND_NO_REFETCH')
+                return []
+            if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,receipt)
+            else:self.ledger.checkpoint(claim,receipt)
+            if materialize:return self._materialize(claim,receipt)
+            self.ledger.finish(claim,dict(outcome='ENUMERATED_METADATA_RETAINED',children=[],source_sha256=receipt['source_sha256']))
+            return []
+        except Exception:
+            self.ledger.stop('IDOX_CONTRACT_ACCOUNTING_OR_CLEANUP_FAILURE',claim=claim)
+            raise
 
     def metadata_from_scope(self,claim):
         row=self.ledger.get(claim.key)
@@ -220,3 +272,37 @@ class Coordinator:
             return dict(outcome='SUPPORTED_FACTS_VERIFIED',identity='EXISTING_IDENTITY_PRESERVED',application_id=app_id,readback={k:(v.isoformat() if hasattr(v,'isoformat') else v) for k,v in after.items()})
         self.ledger.intent(claim,'writes');result=self.ledger.fenced_effect(claim,writer)
         self.ledger.finish(claim,result);return result
+
+    def new_identity(self,claim,*,envelope,council,source):
+        from .new_identity import execute
+        return execute(self,claim,envelope=envelope,council=council,source=source)
+
+    def new_identity_source(self,claim,*,envelope,council,supervised_reader):
+        from .new_identity import NewIdentityContract
+        row=self.ledger.get(claim.key);contract=self.contracts.get(row['contract'])
+        if not isinstance(contract,NewIdentityContract) or row['subject']!={'kind':'APPLICATION','council':envelope.council,'reference':envelope.reference}:raise Denied('EXACT_DETAIL_BINDING')
+        from app.pipeline.discovery_contract import Completeness
+        if row['task']!='FACTUAL_REFRESH' or (contract.row['council'],contract.row['reference'],contract.row['source_url'])!=(envelope.council,envelope.reference,envelope.source_url) or council.code!=envelope.council or envelope.window.outcome!=Completeness.COMPLETE:raise Denied('EXACT_DETAIL_CONTRACT_BEFORE_SOURCE')
+        if len(row['dependencies'])!=1:raise Denied('SELECTIVE_SCREENING_REQUIRED')
+        parent=self.ledger.get(row['dependencies'][0]);screen=parent['checkpoint'] or {}
+        if parent['state']!='COMPLETE' or parent['task']!='SCREENING' or parent['subject']!=row['subject'] or screen.get('disposition') not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'} or screen.get('source_url')!=envelope.source_url or screen.get('source_record_id')!=envelope.source_record_id:raise Denied('SELECTIVE_SCREENING_REQUIRED')
+        prior=row['checkpoint']
+        if prior is not None:
+            if prior.get('kind')=='DETAIL_RECEIPT_V1':return self.new_identity(claim,envelope=envelope,council=council,source=prior['source'])
+            if prior.get('outcome')=='SUPPORTED_FACTS_VERIFIED':return self.new_identity(claim,envelope=envelope,council=council,source={})
+            raise Denied('DETAIL_NO_REPLAY')
+        self.ledger.intent(claim,'source_calls')
+        try:
+            source,outer=supervised_reader(row)
+            validate_outer(outer,row['limits'])
+            packet=contract.projector(contract.row,source)
+            # Retain failed/unsupported observations truthfully; execute withholds
+            # admission, preserving the consumed source call and original evidence.
+            receipt=dict(kind='DETAIL_RECEIPT_V1',source=source,source_sha256=digest(source),cleanup='CLOSED',accounting_complete=True,outer_supervisor=outer)
+            if packet['audit'].get('cleanup_state')!='CLOSED' or packet['audit'].get('budget_state')!='WITHIN_LIMITS' or packet['failure'] in {'CLEANUP_FAILURE','SCOPE_ESCAPE','ACCOUNTING_FAILURE','INVALID_ARTIFACT','UNSUPPORTED_ROUTE'}:raise Denied('DETAIL_RESOURCE_OR_CONTRACT')
+            if hasattr(self.ledger,'resolve_source'):self.ledger.resolve_source(claim,receipt)
+            else:self.ledger.checkpoint(claim,receipt)
+            return self.new_identity(claim,envelope=envelope,council=council,source=source)
+        except Exception:
+            self.ledger.stop('DETAIL_OR_WRITE_RECONCILIATION_REQUIRED')
+            raise

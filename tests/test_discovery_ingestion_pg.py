@@ -35,6 +35,36 @@ def allowance(l,keys,*,writes=0):
     l.grant('INGESTION_TEST_pg',keys,contracts=[l.get(k)['contract'] for k in keys],expires_at=l.clock()+3600,writes=writes)
 
 
+# Run this focused subprocess before tests import the full B2/legacy runtime.
+# Linux fork/exec can carry the launching process RSS high-water mark; isolation
+# preserves the unchanged real256MiB preflight ceiling and exact failure assert.
+def test_pg_catalogue_cursor_accounts_initialization_and_fails_without_tls(pg,tmp_path):
+    """Exercise new driver accounting against fixed disposable PG, never production."""
+    import subprocess,sys
+    assert (pg.url.host,pg.url.port,pg.url.database,pg.url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
+    # The preflight's lifetime RSS ceiling must measure a fresh worker, not
+    # the accumulated high-water mark of the entire coordinator test suite.
+    worker="""
+import os,sys
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
+from sqlalchemy.pool import NullPool
+from verification.ingestion_storage.preflight import run
+url=make_url(os.environ['DISCOVERY_TEST_POSTGRES_URL'])
+assert (url.host,url.port,url.database,url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
+def disposable_factory(unused_production_shape,**kw):
+    args=dict(kw['connect_args']);args.pop('sslrootcert');args['sslmode']='disable'
+    return create_engine(url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args=args)
+run('postgresql://postgres.zcikcfgpblzuzpanpdqd:unused@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',sys.argv[1],engine_factory=disposable_factory)
+"""
+    subprocess.run([sys.executable,'-c',worker,str(tmp_path/'catalogue')],env={'PATH':'/usr/bin:/bin','DISCOVERY_TEST_POSTGRES_URL':pg.url.render_as_string(hide_password=False)},check=True,timeout=15,capture_output=True,text=True)
+    result=json.loads((tmp_path/'catalogue/result.json').read_text())
+    assert result['status']=='PREFLIGHT_FAILED_STOP' and result['error_class']=='ValueError'
+    assert result['connections']==1 and result['connection_attempts']==1
+    assert result['driver_statements']>=result['explicit_statements']>=7
+    assert result['pool_disposed'] and result['production_writes']==0
+
+
 def test_pg_migration_idempotent_constraints_rls_and_rollback(pg):
     install(pg)
     with pg.connect() as c:
@@ -224,30 +254,3 @@ def test_pg_storage_acceptance_intended_restricted_role(pg,record_property):
             for role in roles:
                 if c.scalar(text('SELECT 1 FROM pg_roles WHERE rolname=:role'),{'role':role}):c.exec_driver_sql('DROP OWNED BY '+role)
             for role in roles:c.exec_driver_sql('DROP ROLE IF EXISTS '+role)
-
-
-def test_pg_catalogue_cursor_accounts_initialization_and_fails_without_tls(pg,tmp_path):
-    """Exercise new driver accounting against fixed disposable PG, never production."""
-    import subprocess,sys
-    assert (pg.url.host,pg.url.port,pg.url.database,pg.url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
-    # The preflight's lifetime RSS ceiling must measure a fresh worker, not
-    # the accumulated high-water mark of the entire coordinator test suite.
-    worker="""
-import os,sys
-from sqlalchemy import create_engine
-from sqlalchemy.engine import make_url
-from sqlalchemy.pool import NullPool
-from verification.ingestion_storage.preflight import run
-url=make_url(os.environ['DISCOVERY_TEST_POSTGRES_URL'])
-assert (url.host,url.port,url.database,url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
-def disposable_factory(unused_production_shape,**kw):
-    args=dict(kw['connect_args']);args.pop('sslrootcert');args['sslmode']='disable'
-    return create_engine(url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args=args)
-run('postgresql://postgres.zcikcfgpblzuzpanpdqd:unused@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',sys.argv[1],engine_factory=disposable_factory)
-"""
-    subprocess.run([sys.executable,'-c',worker,str(tmp_path/'catalogue')],env={'PATH':'/usr/bin:/bin','DISCOVERY_TEST_POSTGRES_URL':pg.url.render_as_string(hide_password=False)},check=True,timeout=15,capture_output=True,text=True)
-    result=json.loads((tmp_path/'catalogue/result.json').read_text())
-    assert result['status']=='PREFLIGHT_FAILED_STOP' and result['error_class']=='ValueError'
-    assert result['connections']==1 and result['connection_attempts']==1
-    assert result['driver_statements']>=result['explicit_statements']>=7
-    assert result['pool_disposed'] and result['production_writes']==0

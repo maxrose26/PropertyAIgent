@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import shutil
 import pytest
-from tests.stage26b_integrity import assert_historical_and_successor,MANIFEST,digest,definitions
+from tests.stage26b_integrity import assert_historical_and_successor,MANIFEST,QUALIFIER_MANIFEST,digest,definitions
 
 ROOT=Path(__file__).resolve().parents[1]
 HISTORICAL='9eaafa1d502acc12be56a19a4b0d701c9ada132f778a842df547905eb5af62d1'
@@ -14,13 +14,18 @@ def test_historical_and_current_successor_integrity():
     assert_historical_and_successor(ROOT,HISTORICAL)
 
 
-@pytest.mark.parametrize('surface',['historical','manifest','eligibility','approved','proposed','portal','legacy','constant','binding','position','decorator','predecessor','creation','ancillary'])
+@pytest.mark.parametrize('surface',['historical','manifest','eligibility','approved','proposed','portal','legacy','constant','binding','position','decorator','predecessor','creation','ancillary','qualifier_manifest','qualifier_runtime','qualifier_archive'])
 def test_corrupted_contract_or_runtime_dependency_fails(tmp_path,surface):
     contract=json.loads((ROOT/MANIFEST).read_text())
     files={MANIFEST,contract['predecessor']['fixture'],contract['historical']['fixture'],*contract['definition_pins'],*contract['module_pins']}
+    overlay=json.loads((ROOT/QUALIFIER_MANIFEST).read_text());files.add(QUALIFIER_MANIFEST)
+    files.update(change['archive'] for change in overlay['changes'].values())
     for name in files:
         target=tmp_path/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,target)
     choices={
+      'qualifier_manifest':(QUALIFIER_MANIFEST,'stage4-unit-qualifier-containment-v1','changed'),
+      'qualifier_runtime':('app/reporting/residential_count_eligibility.py','if qualified_residential_quantity(text):','if False:'),
+      'qualifier_archive':(overlay['changes']['app/reporting/residential_count_eligibility.py']['archive'],'class CountEligibility:','class ChangedEligibility:'),
       'predecessor':(contract['predecessor']['fixture'],'stage26b-b1-reconciliation-v1','stage26b-b1-reconciliation-v2'),
       'creation':('app/reporting/residential_count_eligibility.py','creation_matches = list(re.finditer(building_creation, text))','creation_matches = []'),
       'ancillary':('app/reporting/residential_count_eligibility.py','if ancillary_action:', 'if False:'),
