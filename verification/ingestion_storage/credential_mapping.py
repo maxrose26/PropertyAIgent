@@ -25,6 +25,11 @@ def put_secret(name,value,runner=subprocess.run):
 
 def install_mapping(connection,*,attested,runner=subprocess.run,password_factory=lambda:secrets.token_urlsafe(48)):
  if not attested:raise ValueError('PROVIDER_PASSWORD_REDACTION_ATTESTATION_REQUIRED')
+ # The low-level primitive is retained solely for the existing disposable PG
+ # rehearsal. No owner flag or direct import admits a production connection.
+ info=connection.info
+ if (info.host,info.port,info.dbname,info.user)!=('127.0.0.1',5432,'ingestion_provisioning_test','provisioning_migrator'):
+  raise ValueError('DISPOSABLE_CREDENTIAL_MAPPING_ONLY')
  connection.execute("SET statement_timeout='10s'")
  connection.execute("SET lock_timeout='3s'")
  receipts=[]

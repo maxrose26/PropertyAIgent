@@ -14,7 +14,14 @@ def test_noninteractive_owner_input_is_rejected_before_password_prompt(monkeypat
 
 
 def connection():
- c=MagicMock();c.execute.return_value.fetchone.return_value=(False,False,False,False,False,False);c.pgconn.encrypt_password.return_value=b'SCRAM-SHA-256$DISPOSABLE_VERIFIER';return c
+ c=MagicMock();c.info.host='127.0.0.1';c.info.port=5432;c.info.dbname='ingestion_provisioning_test';c.info.user='provisioning_migrator'
+ c.execute.return_value.fetchone.return_value=(False,False,False,False,False,False);c.pgconn.encrypt_password.return_value=b'SCRAM-SHA-256$DISPOSABLE_VERIFIER';return c
+
+
+def test_direct_mapping_primitive_rejects_non_disposable_connection():
+ c=connection();c.info.host='aws-0-eu-west-2.pooler.supabase.com';runner=MagicMock()
+ with pytest.raises(ValueError,match='DISPOSABLE_CREDENTIAL'):install_mapping(c,attested=True,runner=runner)
+ c.execute.assert_not_called();c.pgconn.encrypt_password.assert_not_called();runner.assert_not_called()
 
 
 def test_no_mutation_without_provider_redaction_attestation():
