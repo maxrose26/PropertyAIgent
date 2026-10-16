@@ -159,11 +159,14 @@ def reconcile_scheme(
     application_category: str | None = None,
     proposal: str | None = None,
     applicant_name_raw: str | None = None,
+    retained_unit_evidence: str | None = None,
 ) -> dict:
     """Priority order for the *_final fields: LLM classifier > regex housing
     mix > portal-listing estimate. Mirrors build_planning_intelligence_master.py's
     build_council_rows()."""
 
+    from app.reporting.residential_count_eligibility import qualified_residential_quantity
+    qualified_count = qualified_residential_quantity(proposal) or qualified_residential_quantity(retained_unit_evidence)
     classified_affordable_units = affordable_classification.get("affordable_units")
     classified_affordable_pct = affordable_classification.get("affordable_percentage")
     affordable_data_status = (affordable_classification.get("affordable_data_status") or "").strip().lower()
@@ -385,6 +388,15 @@ def reconcile_scheme(
         "external_consultation_source": external_consultation_source,
     }
 
+    if qualified_count:
+        # Existing scalar representation cannot preserve an upper-limit qualifier.
+        # Raw documents/classifier evidence are retained; no exact total/split
+        # or total-derived percentage is persisted from this ambiguous scope.
+        total_units_final = affordable_units_final = private_units_final = None
+        affordable_percentage_final = None
+        result.update(total_units_final=None, affordable_units_final=None,
+                      private_units_final=None, affordable_percentage_final=None,
+                      affordable_tenure_split_final=None)
     result.update(
         calculate_unit_reconciliation(
             to_float_or_none(total_units_final),
@@ -394,12 +406,16 @@ def reconcile_scheme(
             affordable_data_status,
         )
     )
+    if qualified_count:
+        result['unit_reconciliation_status'] = 'Needs manual review: qualified_quantity_withheld; literal evidence retained'
     if application_category == "external_consultation":
         # No real cross-check is possible without the actual application's
         # documents - an unresolved split here is expected, not a data
         # quality problem with OUR extraction.
         result["unit_reconciliation_status"] = "OK"
 
+    if qualified_count:
+        result['unit_reconciliation_status'] = 'Needs manual review: qualified_quantity_withheld; literal evidence retained'
     units_float = to_float_or_none(total_units_final)
     result["large_scheme_50_plus_units"] = bool(units_float is not None and units_float >= 50)
     result["major_scheme_25_plus_units"] = bool(units_float is not None and units_float >= 25)

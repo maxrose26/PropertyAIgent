@@ -22,10 +22,11 @@ from verification.direct_reference.fixtures import summary
 from app.config import get_council
 
 
-def listing_audit(target):
+def listing_audit(target,refs=None):
  cfg=WindowConfig(max_transport_retries=0)
  echo=FORM.replace(b'name="date(applicationReceivedStart)" value=""',b'name="date(applicationReceivedStart)" value="28/09/2026"').replace(b'name="date(applicationReceivedEnd)" value=""',b'name="date(applicationReceivedEnd)" value="04/10/2026"')
- body=page(first=1,last=1,total=1,refs=(target['reference'],)).replace(b'keyVal=K0',('keyVal='+target['source_identifier']).encode()).replace(b'Outline residential development, scale unknown',b'Erection of 20 residential dwellings')
+ refs=refs or (target['reference'],)
+ body=page(first=1,last=len(refs),total=len(refs),refs=refs).replace(b'keyVal=K0',('keyVal='+target['source_identifier']).encode()).replace(b'Outline residential development, scale unknown',b'Erection of 20 residential dwellings')
  bodies=iter([FORM,body,body,echo]);return run(lambda *a,**k:Response(next(bodies)),cfg)
 
 

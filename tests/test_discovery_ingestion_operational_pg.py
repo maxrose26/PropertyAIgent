@@ -73,11 +73,13 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     return key
    k=seed('ONE');blocked=seed('BLOCKED',state='SAFETY_BLOCKED');other=seed('OTHER')
    bindings={}
-   def bind(keys,*,writes=0,source_calls=0,authority='INGESTION_TEST_sql'):
+   def bind(keys,*,writes=0,source_calls=0,authority='INGESTION_TEST_sql',prepared=None):
     nonlocal bindings
     with app.begin() as c:
      for key in keys:
-      row=c.execute(select(W).where(W.c.key==key)).mappings().one();bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
+      row=c.execute(select(W).where(W.c.key==key)).mappings().one_or_none()
+      if row is None:row=(prepared or {})[key]
+      bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
      control['grants'][authority]={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'ingestion_effect_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
@@ -182,7 +184,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     plan.write_text(json.dumps(value,default=str))
     supervised=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(plan),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=root)
     result=json.loads(output.read_bytes()) if output.exists() else {};account=result.get('database_accounting',{})
-    record_property('controller_accounting_'+phase,json.dumps(account,sort_keys=True));record_property('controller_supervisor_'+phase,json.dumps(supervised,sort_keys=True))
+    record_property('controller_accounting_'+phase,json.dumps(account,sort_keys=True));record_property('controller_supervisor_'+phase,json.dumps(supervised,sort_keys=True));record_property('controller_operation_costs_'+phase,json.dumps(result.get('operation_command_costs',{}),sort_keys=True))
     assert supervised['cleanup']=='CLOSED' and supervised['exit_code']==0 and supervised['limit_hit'] is None, (supervised,result)
     assert account['cleanup']=='CLOSED' and account['connection_attempts']<=16 and account['driver_statements']<=120
     if phase=='capture':
@@ -192,6 +194,50 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     else:
      assert result['outcome']=='SUPPORTED_FACTS_VERIFIED' and result['synthetic_reader_callbacks']=={'listing':0,'detail':1}
      assert account['driver_statements']>prior['driver_statements'] and account['connection_attempts']>prior['connection_attempts']
+   # Complete three-row capture survives an owned-process interruption after
+   # the first committed child. Subsequent bounded phases have source_calls=0.
+   multi=listing_audit(target,refs=('01780/26','01781/26','01782/26'))
+   projected_multi=contract.project(multi,outer(),DEFAULT_LIMITS)
+   scope_multi=seed('MULTI_SCOPE','DISCOVERY');keys=[];prepared_multi={}
+   with app.begin() as c:
+    c.execute(W.update().where(W.c.key==scope_multi).values(subject={'kind':'DISCOVERY_SCOPE','council':'bolton','start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':'RECEIVED'},contract=contract.name))
+   # Only root is queued initially; children are created by actual coordinator.
+   for r in projected_multi['records']:
+    identity=dict(subject={'kind':'APPLICATION','council':'bolton','reference':r['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(r))
+    keys.append(digest(identity));prepared_multi[keys[-1]]=identity
+   fixed_multi=replace(fixed,discovery_key=scope_multi,retained_capture_sha256=None,prior_accounting_sha256=None)
+   prior_multi=None;before_apps=boot.execute('SELECT count(*) FROM public.applications').fetchone()[0]
+   for phase in ['interrupted_capture','resume','duplicate_delivery']:
+    if phase=='interrupted_capture':bind([scope_multi],source_calls=1,authority='INGESTION_TEST_multi_capture')
+    else:bind([scope_multi,*keys],source_calls=0,authority='INGESTION_TEST_multi_resume',prepared=prepared_multi)
+    reader.bindings=bindings
+    plan=tmp_path/('multi-'+phase+'.json');root=tmp_path/('multi-worker-'+phase);output=root/'worker-result.json'
+    value=dict(mode='capture' if phase=='interrupted_capture' else 'resume_capture',authority='INGESTION_TEST_multi_capture' if phase=='interrupted_capture' else 'INGESTION_TEST_multi_resume',binding=asdict(fixed_multi),bindings=bindings,listing=multi,detail=raw_source,target=target,envelope=asdict(env),outer=outer(),prior_database_accounting=prior_multi,screening_keys=keys,interrupt_after_children=1 if phase=='interrupted_capture' else None)
+    plan.write_text(json.dumps(value,default=str))
+    supervised=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(plan),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=root)
+    result=json.loads(output.read_bytes());account=result['database_accounting']
+    record_property('multi_accounting_'+phase,json.dumps(account,sort_keys=True));record_property('multi_supervisor_'+phase,json.dumps(supervised,sort_keys=True));record_property('multi_operation_costs_'+phase,json.dumps(result.get('operation_command_costs',{}),sort_keys=True))
+    assert supervised['cleanup']=='CLOSED' and supervised['live_owned_survivors']==0 and account['cleanup']=='CLOSED'
+    assert account['driver_statements']<=120 and account['connection_attempts']<=16
+    if phase=='interrupted_capture':
+     assert supervised['exit_code']!=0 and result['error_class']=='SystemExit'
+     assert result['synthetic_reader_callbacks']=={'listing':1,'detail':0}
+     retained_row=reader.get(scope_multi);assert len(retained_row['checkpoint']['records'])==3
+     assert account['capture_checkpoint_sha256']==digest(retained_row['checkpoint'])
+     # Reconciliation sees the closed owned process and certain checkpoint;
+     # only disposable owner expires/reconciles the original claim.
+     boot.execute('UPDATE public.ingestion_work_items SET lease_until=0 WHERE key=%s',(scope_multi,))
+     with connect('ingestion_recovery_login') as recovery:recovered=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(scope_multi,retained_row['fence'])).fetchone()[0]
+     assert recovered['state']=='DEFERRED' and recovered['checkpoint']==retained_row['checkpoint']
+    else:
+     assert supervised['exit_code']==0 and result['outcome']=='DISCOVERY_SCREENING_ONLY'
+     assert result['synthetic_reader_callbacks']=={'listing':0,'detail':0} and len(result['screening'])==3
+     if phase=='resume':completed_attempts=boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()[0]
+     else:assert boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()[0]==completed_attempts
+     assert all(reader.get(k)['state']=='COMPLETE' for k in keys)
+    prior_multi=account;fixed_multi=replace(fixed_multi,retained_capture_sha256=account['capture_checkpoint_sha256'],prior_accounting_sha256=digest(account))
+   assert boot.execute('SELECT count(*) FROM public.applications').fetchone()[0]==before_apps
+   assert boot.execute('SELECT count(*) FROM public.ingestion_work_items WHERE key=ANY(%s)',(keys,)).fetchone()[0]==3
    with connect('ingestion_application_login') as aw:
     for statement in ["UPDATE public.applications SET estimated_unit_count=999","UPDATE public.applications SET site_id=NULL","DELETE FROM public.applications","SELECT * FROM public.ingestion_work_items","SET ROLE ingestion_storage_owner","SELECT public.ingestion_worker_step('claim','x',0,'x','x','{}','{}')"]:
      with pytest.raises(psycopg.Error) as denied:aw.execute(statement)

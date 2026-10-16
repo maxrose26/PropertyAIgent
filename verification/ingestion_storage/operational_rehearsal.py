@@ -13,7 +13,7 @@ from app.ingestion.idox_adapter import IdoxListingContract
 from app.pipeline.discovery_contract import DiscoveryEnvelope,WindowEvidence
 from verification.discovery.idox_window import WindowConfig
 from verification.ingestion_storage.new_identity_contract import accepted_idox_new_identity
-from verification.ingestion_storage.operational_controller import DatabaseBudget,ControllerLedger,AcceptanceBinding,execute,capture
+from verification.ingestion_storage.operational_controller import DatabaseBudget,ControllerLedger,AcceptanceBinding,execute,capture,resume_capture
 from app.config import get_council
 
 
@@ -37,19 +37,35 @@ def main():
  budget=DatabaseBudget(previous=plan.get('prior_database_accounting'));engines=[];result={'outcome':'UNCONFIRMED_NO_RETRY'}
  try:
   engines=[budget.engine(u) for u in urls]
-  l=ControllerLedger(engines[0],budget=budget,owner='one',authority=plan.get('authority','INGESTION_TEST_sql'),bindings=plan['bindings'],broker_engine=engines[1],application_engine=engines[2])
-  co=Coordinator(l,{contract.name:contract,'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
+  costs={'enqueue':[],'screening_body':[]}
+  class RehearsalLedger(ControllerLedger):
+   emitted=0
+   def enqueue(self,*args,**kwargs):
+    before=budget.statements
+    key=super().enqueue(*args,**kwargs);costs['enqueue'].append(budget.statements-before);self.emitted+=1
+    if plan.get('interrupt_after_children')==self.emitted:raise SystemExit('FIXTURE_INTERRUPTION_AFTER_COMMITTED_CHILD')
+    return key
+  l=RehearsalLedger(engines[0],budget=budget,owner='one',authority=plan.get('authority','INGESTION_TEST_sql'),bindings=plan['bindings'],broker_engine=engines[1],application_engine=engines[2])
+  class RehearsalCoordinator(Coordinator):
+   def screening(self,*args,**kwargs):
+    before=budget.statements
+    result=super().screening(*args,**kwargs);costs['screening_body'].append(budget.statements-before)
+    return result
+  co=RehearsalCoordinator(l,{contract.name:contract,'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
   if not l.authority.startswith('INGESTION_TEST_'):raise ValueError('FIXTURE_AUTHORITY_ONLY')
   counts={'listing':0,'detail':0}
   def listing(_):counts['listing']+=1;return audit,plan['outer']
   def detail(_):counts['detail']+=1;return plan['detail'],plan['outer']
-  if plan.get('mode')=='capture':result=capture(co,binding.discovery_key,listing_reader=listing,check=budget.check)
+  if plan.get('mode')=='resume_capture':result=resume_capture(co,binding.discovery_key,checkpoint_sha256=binding.retained_capture_sha256,prior_accounting_sha256=binding.prior_accounting_sha256,screening_keys=plan['screening_keys'],check=budget.check)
+  elif plan.get('mode')=='capture':result=capture(co,binding.discovery_key,listing_reader=listing,check=budget.check)
   else:result=execute(co,binding,listing_reader=listing,detail_reader=detail,envelope=envelope,council=get_council(target['council']),check=budget.check)
   result['synthetic_reader_callbacks']=counts
  except BaseException as exc:
   result['error_class']=type(exc).__name__
   raise
  finally:
+  if 'counts' in locals():result['synthetic_reader_callbacks']=counts
+  if 'costs' in locals():result['operation_command_costs']=costs
   account=budget.close(engines);result['database_accounting']=account
   raw=json.dumps(result,sort_keys=True,allow_nan=False).encode()
   if len(raw)>512*1024:raise ValueError('WORKER_AUDIT_BOUND')

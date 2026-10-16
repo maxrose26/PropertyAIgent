@@ -90,6 +90,11 @@ class DatabaseBudget:
 
 
 class ControllerLedger(SQLLedger):
+    def resolve_source(self,claim,receipt):
+        super().resolve_source(claim,receipt)
+        if receipt.get('kind')=='LISTING_RECEIPT_V1':
+            self.budget.capture_checkpoint_sha256=digest(receipt)
+
     @staticmethod
     def _limits(c):
         # Every physical connection was verified by DatabaseBudget.creator.
@@ -200,3 +205,29 @@ def capture(coordinator,key,*,listing_reader,check=lambda:None):
     return dict(outcome='DISCOVERY_SCREENING_ONLY',admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',
         source_sha256=receipt['source_sha256'],checkpoint_sha256=digest(receipt),children=children,
         screening=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']])
+
+
+def resume_capture(coordinator,key,*,checkpoint_sha256,prior_accounting_sha256,screening_keys,check=lambda:None):
+    """Source-free retained materialisation/screening under new exact authority.
+
+    Recovery of the old fence is a separate owner action; this cannot recover,
+    issue authority or release a barrier. Completed children are never replayed.
+    """
+    l=coordinator.ledger
+    if not isinstance(l,ControllerLedger):raise Denied('REVIEWED_ACCOUNTED_CONTROLLER_REQUIRED')
+    prior=l.budget.previous
+    if (not prior or digest(prior)!=prior_accounting_sha256
+        or prior.get('capture_checkpoint_sha256')!=checkpoint_sha256):raise Denied('SEALED_PRIOR_ACCOUNTING_REQUIRED')
+    check();root=l.get(key);receipt=root['checkpoint']
+    if not receipt or digest(receipt)!=checkpoint_sha256 or receipt.get('kind')!='LISTING_RECEIPT_V1':raise Denied('RETAINED_CAPTURE_BINDING')
+    expected=[digest(dict(subject={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']},task='SCREENING',contract='listing-screen-v1',revision=digest(r))) for r in receipt['records']]
+    if set(expected)!=set(screening_keys) or len(expected)!=len(screening_keys):raise Denied('EXACT_SCREENING_BATCH')
+    if root['state']=='COMPLETE':children=root['outcome']['children']
+    else:children=coordinator.resume_listing(l.claim(key,lease_seconds=165))
+    if set(children)!=set(screening_keys) or len(children)!=len(screening_keys):raise Denied('EXACT_SCREENING_BATCH')
+    results=[]
+    for child in screening_keys:
+        check();row=l.get(child)
+        if row['state']=='COMPLETE':results.append(row['checkpoint'])
+        else:results.append(coordinator.screening(l.claim(child,lease_seconds=165)))
+    return dict(outcome='DISCOVERY_SCREENING_ONLY',checkpoint_sha256=checkpoint_sha256,children=children,screening=results,admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED')
