@@ -105,7 +105,8 @@
     "eligible_count": "UNPROVEN_UNTIL_FRESH_CONTRACT",
     "exact_proposed_count": 2,
     "excess_eligible": "UNKNOWN_METADATA_SCREENING_INCOMPLETE",
-    "manifest_sha256": "dd2f305ec0f9e2f33addcc5dd465b1ca4fa975c4d7fa31c4e384f158681ed5d5",
+    "manifest_sha256": "808eb9a77c85e07da331cf6ca4f3a94f73d1a6e2fe74d8c1e0e6d1c0f695759b",
+    "prior_proposal_manifest_sha256": "dd2f305ec0f9e2f33addcc5dd465b1ca4fa975c4d7fa31c4e384f158681ed5d5",
     "references": [
       "NMA/356901/26",
       "VAR/356938/26"
