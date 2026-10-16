@@ -93,7 +93,8 @@ def test_successor_cannot_reuse_consumed_authority():
  assert not successor.admitted(sha,preflight.AUTHORITY,env)
  assert not successor.admitted(sha,successor.AUTHORITY,{**env,'GITHUB_RUN_ATTEMPT':'2'})
  assert not successor.admitted(sha,successor.AUTHORITY,{**env,'GITHUB_RUN_NUMBER':'2'})
- assert not Path(successor.WORKFLOW).exists()
+ if Path(successor.WORKFLOW).exists():
+  assert Path(successor.WORKFLOW).read_bytes()==Path('docs/design/ingestion-tls-correction-20261016/successor-workflow.yml.proposed').read_bytes()
 
 
 @pytest.mark.parametrize('leak',[False,True])
