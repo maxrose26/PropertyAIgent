@@ -22,6 +22,8 @@ def test_secret_only_stdin_and_roles_remain_disabled():
  for call in runner.call_args_list:
   assert 'PRIVATE' not in str(call.args) and b'PRIVATE' in call.kwargs['input']
   assert call.kwargs['timeout']==20
+  assert call.kwargs['env']['GH_HOST']=='github.com' and call.kwargs['env']['GH_PROMPT_DISABLED']=='1'
+  assert call.kwargs['env']['GH_DEBUG']==''
  assert c.pgconn.encrypt_password.call_count==2
 
 

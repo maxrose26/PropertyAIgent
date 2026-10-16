@@ -16,7 +16,7 @@ def test_non_superuser_provisioning_recovery_and_real_login_denials(record_prope
  if not raw:pytest.skip('fixed disposable PostgreSQL17 required')
  info=psycopg.conninfo.conninfo_to_dict(raw)
  assert (info.get('host'),info.get('port'),info.get('dbname'),info.get('user'))==('127.0.0.1','5432','ingestion_provisioning_test','provisioning_bootstrap')
- secrets_by_role={name:secrets.token_urlsafe(32) for name in ['provisioning_migrator',*ROLES[-2:]]}
+ secrets_by_role={name:secrets.token_urlsafe(48) for name in ['provisioning_migrator',*ROLES[-2:]]}
  def connect(name):
   return psycopg.connect(**{**info,'user':name,'password':secrets_by_role[name]},autocommit=True,connect_timeout=3,prepare_threshold=None)
  def deny(c,statement):
@@ -57,8 +57,17 @@ def test_non_superuser_provisioning_recovery_and_real_login_denials(record_prope
     # First-install rerun refuses existing names, preserves committed control.
     with pytest.raises(psycopg.Error) as e:m.execute(installation)
     assert e.value.sqlstate=='42710';m.execute('ROLLBACK')
-    for name in ROLES[-2:]:
-     m.execute(sql.SQL('ALTER ROLE {} PASSWORD {} VALID UNTIL {}').format(sql.Identifier(name),sql.Literal(secrets_by_role[name]),sql.Literal('2026-10-17T23:59:59Z')))
+    # Exercise real libpq client-side SCRAM and ALTER ROLE with the exact helper;
+    # intercept ONLY the GitHub CLI boundary, so no secret leaves loopback tests.
+    from verification.ingestion_storage.credential_mapping import install_mapping
+    from types import SimpleNamespace
+    password_values=iter([secrets_by_role[name] for name in ROLES[-2:]])
+    def fake_secret_cli(command,**kwargs):
+     assert command[:3]==['gh','secret','set'] and command[-1]=='stage4-production-canary'
+     assert b'aws-0-eu-west-2.pooler.supabase.com:5432/postgres' in kwargs['input']
+     return SimpleNamespace(returncode=0)
+    mapped=install_mapping(m,attested=True,runner=fake_secret_cli,password_factory=lambda:next(password_values))
+    assert len(mapped)==2 and all(not row['login_enabled'] for row in mapped)
     # New login activation fails closed on inherited PUBLIC write access.
     boot.execute('GRANT UPDATE ON public.applications TO PUBLIC')
     with pytest.raises(psycopg.Error,match='AMBIENT_NON_LEDGER_ACCESS'):m.execute((PACKAGE/'activate.sql').read_text())
@@ -96,7 +105,7 @@ def test_non_superuser_provisioning_recovery_and_real_login_denials(record_prope
    for name in ROLES[-2:]:
     with pytest.raises(psycopg.OperationalError):connect(name)
    assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()==(4,)
-   record_property('denials_sqlstate_42501',denied);record_property('migration_superuser',False);record_property('migration_bypassrls',False);record_property('real_restricted_logins',2);record_property('owner_creator_admin_only_retained',True);record_property('source_calls',0);record_property('production_connections',0)
+   record_property('server_version',boot.info.server_version);record_property('real_scram_mapping_helper',True);record_property('denials_sqlstate_42501',denied);record_property('migration_superuser',False);record_property('migration_bypassrls',False);record_property('real_restricted_logins',2);record_property('owner_creator_admin_only_retained',True);record_property('source_calls',0);record_property('production_connections',0)
   finally:
    # Test-only disposable teardown. Production rollback never drops retained data.
    boot.execute('DROP TABLE IF EXISTS public.ingestion_work_attempts,public.ingestion_work_items CASCADE')

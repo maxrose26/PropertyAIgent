@@ -2,7 +2,7 @@ name: Stage4 discovery contract OFFLINE
 on:
   pull_request:
     paths:
-      - 'docs/design/ingestion-provisioning-20261016/**'
+      - 'docs/design/ingestion-provisioning-20261016/*.sql'
       - 'app/ingestion/**'
       - 'verification/ingestion_storage/**'
       - '.github/workflows/stage4-ingestion-storage-catalogue-once.yml'
