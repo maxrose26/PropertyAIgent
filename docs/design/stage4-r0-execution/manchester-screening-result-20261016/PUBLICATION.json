@@ -1,0 +1,23 @@
+{
+  "publication_parent": "12f6fec8a05ef7988217594b8132889fbabf2c39",
+  "branch": "stage4/narrow-continuation-evidence-20261016",
+  "append_only": true,
+  "expected_head_guard_required": true,
+  "stage4": "OPEN",
+  "run": 38880753411,
+  "artifact": 12037845540,
+  "artifact_sha256": "1b16636771c623345b12676d008c39ba0a2b76db6d42cc21f172b203eee562f6",
+  "checkpoint_sha256": [
+    "b486cea799886fd4317e18241a4ea6615969a27012b7de3af98be9ab395b2210"
+  ],
+  "verified_proposals": 14,
+  "missing_received_dates": 14,
+  "screening": {
+    "INSUFFICIENT_EVIDENCE": 9,
+    "RELATED_APPLICATION_FOLLOW_THROUGH": 5
+  },
+  "model_calls": 0,
+  "db_operations": 0,
+  "additional_council_observations": 0,
+  "remaining_missing_metadata_evidence": 401
+}
