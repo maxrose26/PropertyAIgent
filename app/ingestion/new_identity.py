@@ -8,28 +8,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.models import Application
 from .ledger import Denied,UncertainPersistence
-from verification.stage26b_l1.bolton_literal import semantic_state
-
-
-def qualified_coupled_observation(observation, row):
-    """Existing B2 completeness/semantic predicate, reused before admission."""
-    return observation.verification_scope == 'COUPLED' and not (set(observation.fields) != {'Reference','Status','Decision','Decision Issued Date'}
-                or observation.fields['Reference'] != row['reference']
-                or set(observation.field_states) != {'reference','status','decision','decision_date'}
-                or any(v not in {'PRESENT_VALUE','PRESENT_BLANK'} for v in observation.field_states.values())
-                or observation.field_states['reference'] != 'PRESENT_VALUE'
-                or observation.field_states['status'] != 'PRESENT_VALUE'
-                or semantic_state(observation.fields) == 'UNKNOWN_UNMAPPED'
-                or not observation.b2_eligible)
 
 
 @dataclass(frozen=True)
 class NewIdentityContract:
     name: str
     row: dict
+    projector: object
+    handoff: object
+    coupled_gate: object
     verification_scope: str='COUPLED'
 
     def __post_init__(self):
+        if not all(callable(x) for x in (self.projector,self.handoff,self.coupled_gate)):raise Denied('QUALIFIED_FACTUAL_COMPONENTS_REQUIRED')
         if self.verification_scope not in {'COUPLED','INITIAL_STATUS_ONLY'} or self.row.get('application_id') is not None:
             raise Denied('NEW_IDENTITY_ACCEPTED_CONTRACT')
 
@@ -37,8 +28,6 @@ class NewIdentityContract:
 def execute(coordinator,claim,*,envelope,council,source):
     from app.pipeline.discovery_admission import admit_identity,PROTECTED_FIELDS
     from app.pipeline.discovery_contract import Completeness
-    from verification.discovery.material_qualification import project_idox
-    from verification.direct_reference.refresh import _refresh_row
     ledger=coordinator.ledger;row=ledger.get(claim.key);contract=coordinator.contracts.get(row['contract'])
     if not isinstance(contract,NewIdentityContract) or row['task']!='FACTUAL_REFRESH' or len(row['dependencies'])!=1:raise Denied('NEW_IDENTITY_TASK')
     target=contract.row
@@ -63,8 +52,8 @@ def execute(coordinator,claim,*,envelope,council,source):
         ledger.checkpoint(claim,result);ledger.finish(claim,result);return result
     # SAME projector as the accepted Idox qualification, including identity,
     # field states, owned-process bounds, cleanup and exact factual scope.
-    packet=project_idox(target,source);obs=packet['observation']
-    if packet['failure'] or obs is None or not obs.b2_eligible or obs.verification_scope!=contract.verification_scope or (obs.verification_scope=='COUPLED' and not qualified_coupled_observation(obs,target)):
+    packet=contract.projector(target,source);obs=packet['observation']
+    if packet['failure'] or obs is None or not obs.b2_eligible or obs.verification_scope!=contract.verification_scope or (obs.verification_scope=='COUPLED' and not contract.coupled_gate(obs,target)):
         result=dict(outcome='FACTS_WITHHELD',identity='NOT_CREATED',reason=packet['failure'] or 'UNSUPPORTED_FACTUAL_SCOPE')
         ledger.checkpoint(claim,result);ledger.finish(claim,result,state='UNSUPPORTED_CONTRACT',reason='SUPPORTED_FACTS_REQUIRED');return result
     if obs.application_id is not None:raise Denied('NEW_IDENTITY_OBSERVATION')
@@ -76,7 +65,7 @@ def execute(coordinator,claim,*,envelope,council,source):
         app_id=admitted['application_id'];bound_obs=replace(obs,application_id=app_id)
         with Session(ledger.engine) as s:
             a=s.get(Application,app_id)
-            handoff=_refresh_row(s,a,council,dict(target,application_id=app_id),retrieve_evidence=lambda:bound_obs)
+            handoff=contract.handoff(s,a,council,dict(target,application_id=app_id),retrieve_evidence=lambda:bound_obs)
         if not handoff['accepted']:raise RuntimeError('ADMISSION_COMMITTED_B2_NOT_ACCEPTED_RECONCILE')
         after=lookup()
         if after is None or after['application_id']!=app_id:raise RuntimeError('COMMITTED_READBACK_MISSING')

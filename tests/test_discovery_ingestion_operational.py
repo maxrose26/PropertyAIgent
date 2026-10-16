@@ -8,7 +8,7 @@ from app.ingestion.ledger import Ledger,Denied,UncertainPersistence,DEFAULT_LIMI
 from app.ingestion.schema import install,WorkItem as W
 from app.ingestion.coordinator import Coordinator
 from app.ingestion.idox_adapter import IdoxListingContract
-from app.ingestion.new_identity import NewIdentityContract
+from verification.ingestion_storage.new_identity_contract import accepted_idox_new_identity
 from tests.test_discovery_admission import engine,envelope
 from tests.test_discovery_idox_window import perform,page,FORM
 from verification.discovery.idox_window import WindowConfig
@@ -66,7 +66,7 @@ def setup_new(engine,*,supported=True):
  l.grant('INGESTION_TEST_screen',[parent],contracts=['fixture-screen'],expires_at=l.clock()+600)
  claim=l.claim(parent,'screen','INGESTION_TEST_screen')
  l.checkpoint(claim,dict(disposition='SUPPORTED_PROCESSING_PRIORITY',source_url=e.source_url,source_record_id=e.source_record_id));l.finish(claim,{'outcome':'SCREENED'})
- contract=NewIdentityContract('bolton-existing-coupled-new',target)
+ contract=accepted_idox_new_identity('bolton-existing-coupled-new',target)
  key=l.enqueue(dict(kind='APPLICATION',council='bolton',reference=e.reference),'FACTUAL_REFRESH',contract=contract.name,dependencies=[parent])
  l.grant('INGESTION_TEST_new',[key],contracts=[contract.name],expires_at=l.clock()+600,writes=2)
  return l,Coordinator(l,{contract.name:contract}),key,e,raw
@@ -138,7 +138,7 @@ def test_claimed_eligibility_cannot_bypass_existing_b2_gate_before_admission(eng
   packet=original(*args);packet['observation'].field_states['decision']='NOT_PRESENT'
   packet['observation'].b2_eligible=True
   return packet
- monkeypatch.setattr(material_qualification,'project_idox',tampered)
+ name=l.get(k)['contract'];co.contracts[name]=replace(co.contracts[name],projector=tampered)
  result=co.new_identity(l.claim(k,'worker','INGESTION_TEST_new'),envelope=e,council=get_council('bolton'),source=raw)
  assert result['identity']=='NOT_CREATED'
  with Session(engine) as s:assert s.scalar(select(func.count()).select_from(Application))==0

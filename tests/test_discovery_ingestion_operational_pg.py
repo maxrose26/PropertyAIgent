@@ -12,7 +12,7 @@ from app.ingestion.ledger import Ledger,Denied,UncertainPersistence,DEFAULT_LIMI
 from app.ingestion.schema import WorkItem as W,WorkAttempt as A
 from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.coordinator import Coordinator
-from app.ingestion.new_identity import NewIdentityContract
+from verification.ingestion_storage.new_identity_contract import accepted_idox_new_identity
 from app.db.models import Base,Council,Application
 from app.config import get_council
 from tests.test_discovery_ingestion_provisioning_pg import ROLES,PACKAGE
@@ -113,7 +113,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     c.execute(W.update().where(W.c.key==fact).values(dependencies=[parent]))
    bind([parent,fact,other],writes=2)
    client=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
-   co=Coordinator(client,{'operational-fixture':NewIdentityContract('operational-fixture',target)})
+   co=Coordinator(client,{'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
    result=co.new_identity(client.claim(fact),envelope=env,council=get_council('bolton'),source=raw_source)
    assert result['outcome']=='SUPPORTED_FACTS_VERIFIED' and client.get(fact)['state']=='COMPLETE'
    with Session(app) as s:
