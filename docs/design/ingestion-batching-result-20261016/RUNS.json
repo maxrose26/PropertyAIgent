@@ -1,0 +1,46 @@
+[
+  {
+    "id": 38942073107,
+    "name": "Stage4 discovery contract OFFLINE",
+    "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "run_number": 147,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38942073107"
+  },
+  {
+    "id": 38942073240,
+    "name": "Stage4 reusable batch OFFLINE disposable",
+    "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "run_number": 180,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38942073240"
+  },
+  {
+    "id": 38942073153,
+    "name": "AH web-only acceptance",
+    "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "run_number": 829,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38942073153"
+  },
+  {
+    "id": 38942064867,
+    "name": "AH web-only acceptance",
+    "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "run_number": 828,
+    "run_attempt": 1,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38942064867"
+  }
+]

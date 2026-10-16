@@ -1,0 +1,41 @@
+[
+  {
+    "id": 12063467605,
+    "name": "discovery-pg-6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "digest": "sha256:18fafd59e9ef8e683a326ff52931d732c518e160c06cccba74c63a604bb15bf2",
+    "size_in_bytes": 1193,
+    "workflow_run": {
+      "id": 38942073107,
+      "repository_id": 1317423499,
+      "head_repository_id": 1317423499,
+      "head_branch": "development/ingestion-operational-20261016",
+      "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4"
+    }
+  },
+  {
+    "id": 12063043953,
+    "name": "discovery-offline-6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "digest": "sha256:f1542bde73969580718a8d18a540c2c5944bdbb7139ef409b297317e1cc08c5c",
+    "size_in_bytes": 15626,
+    "workflow_run": {
+      "id": 38942073107,
+      "repository_id": 1317423499,
+      "head_repository_id": 1317423499,
+      "head_branch": "development/ingestion-operational-20261016",
+      "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4"
+    }
+  },
+  {
+    "id": 12062853676,
+    "name": "ingestion-provisioning-disposable-6f1b81b2851ecdc9f9902c3a0111b7d305827ff4",
+    "digest": "sha256:befafd45d5ad7bdd4e7f8ed4bf7022354dd004e4b9c4c0bcdb45e674c2630b92",
+    "size_in_bytes": 63610,
+    "workflow_run": {
+      "id": 38942073107,
+      "repository_id": 1317423499,
+      "head_repository_id": 1317423499,
+      "head_branch": "development/ingestion-operational-20261016",
+      "head_sha": "6f1b81b2851ecdc9f9902c3a0111b7d305827ff4"
+    }
+  }
+]

@@ -1,0 +1,1233 @@
+{
+  "controller_accounting_capture": {
+    "capture_checkpoint_sha256": "802818043071e2368f84b46cd67c863663eb2e6401759403925c7d44f82716b2",
+    "cleanup": "CLOSED",
+    "connection_attempts": 2,
+    "connections_closed": true,
+    "driver_statements": 30,
+    "elapsed_seconds": 0.099,
+    "errors": [],
+    "returned_data_value_bytes": 18457,
+    "slot_key": null,
+    "statement_kinds": {
+      "cursor": 20,
+      "driver_internal": 10
+    }
+  },
+  "controller_accounting_execute": {
+    "capture_checkpoint_sha256": "802818043071e2368f84b46cd67c863663eb2e6401759403925c7d44f82716b2",
+    "cleanup": "CLOSED",
+    "connection_attempts": 5,
+    "connections_closed": true,
+    "driver_statements": 108,
+    "elapsed_seconds": 1.268,
+    "errors": [],
+    "returned_data_value_bytes": 50948,
+    "slot_key": null,
+    "statement_kinds": {
+      "cursor": 72,
+      "driver_internal": 36
+    }
+  },
+  "controller_operation_costs_capture": {
+    "enqueue": [
+      4
+    ],
+    "screening_body": []
+  },
+  "controller_operation_costs_execute": {
+    "enqueue": [],
+    "screening_body": [
+      4
+    ]
+  },
+  "controller_supervisor_capture": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 0.6663418310000111,
+    "exit_code": 0,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 86007808,
+    "persistence": "READBACK_REQUIRED",
+    "processes_seen": 1,
+    "retry": false
+  },
+  "controller_supervisor_execute": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 2.201369041999996,
+    "exit_code": 0,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 234168320,
+    "persistence": "READBACK_REQUIRED",
+    "processes_seen": 1,
+    "retry": false
+  },
+  "denials_sqlstate_42501": "30",
+  "migration_bypassrls": "False",
+  "migration_superuser": "False",
+  "multi_accounting_duplicate_delivery": {
+    "capture_checkpoint_sha256": "5f75e9a3e9dba788103cc98b7f58930ed4de41426b9a0c4142f3c5c13def97d8",
+    "cleanup": "CLOSED",
+    "connection_attempts": 6,
+    "connections_closed": true,
+    "driver_statements": 103,
+    "elapsed_seconds": 0.315,
+    "errors": [],
+    "returned_data_value_bytes": 115136,
+    "slot_key": null,
+    "statement_kinds": {
+      "cursor": 73,
+      "driver_internal": 30
+    }
+  },
+  "multi_accounting_interrupted_capture": {
+    "capture_checkpoint_sha256": "5f75e9a3e9dba788103cc98b7f58930ed4de41426b9a0c4142f3c5c13def97d8",
+    "cleanup": "CLOSED",
+    "connection_attempts": 2,
+    "connections_closed": true,
+    "driver_statements": 28,
+    "elapsed_seconds": 0.1,
+    "errors": [],
+    "returned_data_value_bytes": 18826,
+    "slot_key": null,
+    "statement_kinds": {
+      "cursor": 18,
+      "driver_internal": 10
+    }
+  },
+  "multi_accounting_recovery": {
+    "capture_checkpoint_sha256": "5f75e9a3e9dba788103cc98b7f58930ed4de41426b9a0c4142f3c5c13def97d8",
+    "cleanup": "CLOSED",
+    "connection_attempts": 3,
+    "connections_closed": true,
+    "driver_statements": 40,
+    "elapsed_seconds": 0.111,
+    "errors": [],
+    "returned_data_value_bytes": 24199,
+    "slot_key": null,
+    "statement_kinds": {
+      "cursor": 24,
+      "driver_internal": 16
+    }
+  },
+  "multi_accounting_resume": {
+    "capture_checkpoint_sha256": "5f75e9a3e9dba788103cc98b7f58930ed4de41426b9a0c4142f3c5c13def97d8",
+    "cleanup": "CLOSED",
+    "connection_attempts": 5,
+    "connections_closed": true,
+    "driver_statements": 92,
+    "elapsed_seconds": 0.244,
+    "errors": [],
+    "returned_data_value_bytes": 105034,
+    "slot_key": null,
+    "statement_kinds": {
+      "cursor": 64,
+      "driver_internal": 28
+    }
+  },
+  "multi_operation_costs_duplicate_delivery": {
+    "enqueue": [],
+    "screening_body": []
+  },
+  "multi_operation_costs_interrupted_capture": {
+    "enqueue": [
+      4
+    ],
+    "screening_body": []
+  },
+  "multi_operation_costs_resume": {
+    "enqueue": [
+      13,
+      4,
+      4
+    ],
+    "screening_body": [
+      4,
+      4,
+      4
+    ]
+  },
+  "multi_supervisor_duplicate_delivery": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 0.6231602889999976,
+    "exit_code": 0,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 86196224,
+    "persistence": "READBACK_REQUIRED",
+    "processes_seen": 1,
+    "retry": false
+  },
+  "multi_supervisor_interrupted_capture": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 0.6889713340000014,
+    "exit_code": 1,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 86044672,
+    "persistence": "RECONCILE_IF_EFFECT_INTENT",
+    "processes_seen": 1,
+    "retry": false
+  },
+  "multi_supervisor_resume": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 0.6855128739999969,
+    "exit_code": 0,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 86073344,
+    "persistence": "READBACK_REQUIRED",
+    "processes_seen": 1,
+    "retry": false
+  },
+  "owner_creator_admin_only_retained": "True",
+  "physical_bytes": "49152",
+  "practical_accounts": [
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 26,
+      "elapsed_seconds": 0.109,
+      "errors": [],
+      "returned_data_value_bytes": 205160,
+      "slot": "capture",
+      "slot_key": "710fb34e32ab4f1692e1aa81e28958b57d47147e57c0ab5ac1c1dd58184f7911",
+      "statement_kinds": {
+        "cursor": 18,
+        "driver_internal": 8
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 3,
+      "connections_closed": true,
+      "driver_statements": 73,
+      "elapsed_seconds": 0.275,
+      "errors": [],
+      "returned_data_value_bytes": 115155,
+      "slot": "439a70ce39c1ac939a751605910a8fec314af2039e0988be1013d8b61f8e6f64",
+      "slot_key": "439a70ce39c1ac939a751605910a8fec314af2039e0988be1013d8b61f8e6f64",
+      "statement_kinds": {
+        "cursor": 55,
+        "driver_internal": 18
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 5,
+      "connections_closed": true,
+      "driver_statements": 96,
+      "elapsed_seconds": 0.669,
+      "errors": [],
+      "returned_data_value_bytes": 185410,
+      "slot": "eb413b6611fb62dc793869d9e02994d068e1dc24d266b25c785af5c47790c0c8",
+      "slot_key": "eb413b6611fb62dc793869d9e02994d068e1dc24d266b25c785af5c47790c0c8",
+      "statement_kinds": {
+        "cursor": 68,
+        "driver_internal": 28
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.211,
+      "errors": [],
+      "returned_data_value_bytes": 114291,
+      "slot": "c513be55d53a71184b15d29886999b9b18d27b5476e467ab09a48bfab627e5ba",
+      "slot_key": "c513be55d53a71184b15d29886999b9b18d27b5476e467ab09a48bfab627e5ba",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.222,
+      "errors": [],
+      "returned_data_value_bytes": 114356,
+      "slot": "9d40a5c3ebed1fc984025c0b4c194d1ca7c3823a5c46ef7bdfaeec1c10866138",
+      "slot_key": "9d40a5c3ebed1fc984025c0b4c194d1ca7c3823a5c46ef7bdfaeec1c10866138",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.213,
+      "errors": [],
+      "returned_data_value_bytes": 113486,
+      "slot": "a7fddb81b4c39ca440e6105b8ab5cf4b79c494f4198c59a1e55c11e31560481e",
+      "slot_key": "a7fddb81b4c39ca440e6105b8ab5cf4b79c494f4198c59a1e55c11e31560481e",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.207,
+      "errors": [],
+      "returned_data_value_bytes": 114291,
+      "slot": "f63d8f350b57fca62476184e4f9ccb098ee3c6b37411b4cc81a70908fa78e54e",
+      "slot_key": "f63d8f350b57fca62476184e4f9ccb098ee3c6b37411b4cc81a70908fa78e54e",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.222,
+      "errors": [],
+      "returned_data_value_bytes": 114353,
+      "slot": "c0e857f7bf2d36b41739f6360a9fde5727643de6257bdb3df01443cad5251c48",
+      "slot_key": "c0e857f7bf2d36b41739f6360a9fde5727643de6257bdb3df01443cad5251c48",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.215,
+      "errors": [],
+      "returned_data_value_bytes": 113486,
+      "slot": "afab1b6fdedd9b9dc1015fc290f1833713fa29a47cb0fff79b2f3954178e8241",
+      "slot_key": "afab1b6fdedd9b9dc1015fc290f1833713fa29a47cb0fff79b2f3954178e8241",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.212,
+      "errors": [],
+      "returned_data_value_bytes": 114288,
+      "slot": "d9f3614ed532e7b58c7514ab5c02f1e95dd57e1fd82a2927780faad57d1d0250",
+      "slot_key": "d9f3614ed532e7b58c7514ab5c02f1e95dd57e1fd82a2927780faad57d1d0250",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.238,
+      "errors": [],
+      "returned_data_value_bytes": 114356,
+      "slot": "193f13dc3ebdc03774482295466938792048617a1e5d9cbe70e3d082e34de056",
+      "slot_key": "193f13dc3ebdc03774482295466938792048617a1e5d9cbe70e3d082e34de056",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.234,
+      "errors": [],
+      "returned_data_value_bytes": 113478,
+      "slot": "3de3d885fc5c3306e279208b58ee461c00e5b29e6eb782dc0d09490ba0552b40",
+      "slot_key": "3de3d885fc5c3306e279208b58ee461c00e5b29e6eb782dc0d09490ba0552b40",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    },
+    {
+      "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+      "cleanup": "CLOSED",
+      "connection_attempts": 2,
+      "connections_closed": true,
+      "driver_statements": 65,
+      "elapsed_seconds": 0.234,
+      "errors": [],
+      "returned_data_value_bytes": 114294,
+      "slot": "81946627f09c06a831b19d340f6cbf875f7e528243f5bc062964ec907e765291",
+      "slot_key": "81946627f09c06a831b19d340f6cbf875f7e528243f5bc062964ec907e765291",
+      "statement_kinds": {
+        "cursor": 49,
+        "driver_internal": 16
+      }
+    }
+  ],
+  "practical_aggregate": {
+    "connection_attempts": 30,
+    "driver_statements": 845,
+    "elapsed_seconds": 3.261,
+    "exported_bytes": 133853,
+    "peak_owned_rss": 87044096,
+    "returned_data_value_bytes": 1646404,
+    "supervised_seconds": 12.376864278999975,
+    "worker_audit_bytes": 89749
+  },
+  "practical_allocation_receipts": {
+    "193f13dc3ebdc03774482295466938792048617a1e5d9cbe70e3d082e34de056": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.238,
+        "errors": [],
+        "returned_data_value_bytes": 114356,
+        "slot_key": "193f13dc3ebdc03774482295466938792048617a1e5d9cbe70e3d082e34de056",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.8513903019999987
+    },
+    "3de3d885fc5c3306e279208b58ee461c00e5b29e6eb782dc0d09490ba0552b40": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.234,
+        "errors": [],
+        "returned_data_value_bytes": 113478,
+        "slot_key": "3de3d885fc5c3306e279208b58ee461c00e5b29e6eb782dc0d09490ba0552b40",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7711986110000026
+    },
+    "439a70ce39c1ac939a751605910a8fec314af2039e0988be1013d8b61f8e6f64": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 3,
+        "connections_closed": true,
+        "driver_statements": 73,
+        "elapsed_seconds": 0.275,
+        "errors": [],
+        "returned_data_value_bytes": 115155,
+        "slot_key": "439a70ce39c1ac939a751605910a8fec314af2039e0988be1013d8b61f8e6f64",
+        "statement_kinds": {
+          "cursor": 55,
+          "driver_internal": 18
+        }
+      },
+      "supervised_seconds": 1.4720612339999946
+    },
+    "710fb34e32ab4f1692e1aa81e28958b57d47147e57c0ab5ac1c1dd58184f7911": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 26,
+        "elapsed_seconds": 0.109,
+        "errors": [],
+        "returned_data_value_bytes": 205160,
+        "slot_key": "710fb34e32ab4f1692e1aa81e28958b57d47147e57c0ab5ac1c1dd58184f7911",
+        "statement_kinds": {
+          "cursor": 18,
+          "driver_internal": 8
+        }
+      },
+      "supervised_seconds": 0.6539062159999958
+    },
+    "81946627f09c06a831b19d340f6cbf875f7e528243f5bc062964ec907e765291": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.234,
+        "errors": [],
+        "returned_data_value_bytes": 114294,
+        "slot_key": "81946627f09c06a831b19d340f6cbf875f7e528243f5bc062964ec907e765291",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7333076740000024
+    },
+    "9d40a5c3ebed1fc984025c0b4c194d1ca7c3823a5c46ef7bdfaeec1c10866138": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.222,
+        "errors": [],
+        "returned_data_value_bytes": 114356,
+        "slot_key": "9d40a5c3ebed1fc984025c0b4c194d1ca7c3823a5c46ef7bdfaeec1c10866138",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.8821886540000037
+    },
+    "a7fddb81b4c39ca440e6105b8ab5cf4b79c494f4198c59a1e55c11e31560481e": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.213,
+        "errors": [],
+        "returned_data_value_bytes": 113486,
+        "slot_key": "a7fddb81b4c39ca440e6105b8ab5cf4b79c494f4198c59a1e55c11e31560481e",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7626821399999955
+    },
+    "afab1b6fdedd9b9dc1015fc290f1833713fa29a47cb0fff79b2f3954178e8241": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.215,
+        "errors": [],
+        "returned_data_value_bytes": 113486,
+        "slot_key": "afab1b6fdedd9b9dc1015fc290f1833713fa29a47cb0fff79b2f3954178e8241",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7645028759999946
+    },
+    "c0e857f7bf2d36b41739f6360a9fde5727643de6257bdb3df01443cad5251c48": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.222,
+        "errors": [],
+        "returned_data_value_bytes": 114353,
+        "slot_key": "c0e857f7bf2d36b41739f6360a9fde5727643de6257bdb3df01443cad5251c48",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7909136829999994
+    },
+    "c513be55d53a71184b15d29886999b9b18d27b5476e467ab09a48bfab627e5ba": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.211,
+        "errors": [],
+        "returned_data_value_bytes": 114291,
+        "slot_key": "c513be55d53a71184b15d29886999b9b18d27b5476e467ab09a48bfab627e5ba",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7933365789999982
+    },
+    "d9f3614ed532e7b58c7514ab5c02f1e95dd57e1fd82a2927780faad57d1d0250": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.212,
+        "errors": [],
+        "returned_data_value_bytes": 114288,
+        "slot_key": "d9f3614ed532e7b58c7514ab5c02f1e95dd57e1fd82a2927780faad57d1d0250",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7645724839999986
+    },
+    "eb413b6611fb62dc793869d9e02994d068e1dc24d266b25c785af5c47790c0c8": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 5,
+        "connections_closed": true,
+        "driver_statements": 96,
+        "elapsed_seconds": 0.669,
+        "errors": [],
+        "returned_data_value_bytes": 185410,
+        "slot_key": "eb413b6611fb62dc793869d9e02994d068e1dc24d266b25c785af5c47790c0c8",
+        "statement_kinds": {
+          "cursor": 68,
+          "driver_internal": 28
+        }
+      },
+      "supervised_seconds": 2.4036595139999974
+    },
+    "f63d8f350b57fca62476184e4f9ccb098ee3c6b37411b4cc81a70908fa78e54e": {
+      "cleanup": "CLOSED",
+      "database": {
+        "capture_checkpoint_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+        "cleanup": "CLOSED",
+        "connection_attempts": 2,
+        "connections_closed": true,
+        "driver_statements": 65,
+        "elapsed_seconds": 0.207,
+        "errors": [],
+        "returned_data_value_bytes": 114291,
+        "slot_key": "f63d8f350b57fca62476184e4f9ccb098ee3c6b37411b4cc81a70908fa78e54e",
+        "statement_kinds": {
+          "cursor": 49,
+          "driver_internal": 16
+        }
+      },
+      "supervised_seconds": 0.7331443119999932
+    }
+  },
+  "practical_capacity": {
+    "note": "74includes_unexecuted_policy_sentinel;physical_includes_preceding_fixture_work",
+    "scope_attempt_serialized_bytes": 170450,
+    "scope_attempts": 74,
+    "scope_item_serialized_bytes": 213867,
+    "scope_items": 74,
+    "whole_fixture_physical_bytes": 712704
+  },
+  "practical_capture_sha256": "dfa825c681e9f70e9d3e9f04906c02812ab623447e2e0cc8db1b74762bfd4e5c",
+  "practical_citations": [
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    },
+    {
+      "confirmed_relationship": false,
+      "end": 44,
+      "literal": "02000/26",
+      "locator": "a.summaryLink",
+      "relation": "EXPLICIT_WORDING_UNVERIFIED_LEAD",
+      "relation_wording": "Discharge of",
+      "source_field": "proposal",
+      "start": 36,
+      "supporting_wording": "Discharge of conditions pursuant to 02000/26",
+      "target_council": null,
+      "target_council_state": "UNKNOWN",
+      "wording_start": 0
+    }
+  ],
+  "practical_dispositions": {
+    "INSUFFICIENT_EVIDENCE": 20,
+    "RELATED_APPLICATION_FOLLOW_THROUGH": 20,
+    "SUPPORTED_PROCESSING_PRIORITY": 20
+  },
+  "practical_fixture_harness": {
+    "connection_attempts": 94,
+    "cursor_calls": 334,
+    "elapsed_seconds": 13.163,
+    "metric": "setup_and_assertion_cursor_calls_excludes_driver_internal_and_controller_calls"
+  },
+  "practical_supervisions": [
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.6539062159999958,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 107068,
+      "label": "capture",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86736896,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 67023
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7647671320000029,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1840,
+      "label": "batch-0",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86802432,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1570
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7072941019999917,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1481,
+      "label": "batch-duplicate",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 85954560,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1211
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7417876299999904,
+      "exit_code": 1,
+      "expired": false,
+      "exported_bytes": 902,
+      "label": "batch-interrupted",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86491136,
+      "persistence": "RECONCILE_IF_EFFECT_INTENT",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 623
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.6103044100000119,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 2290,
+      "label": "batch-recovery",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 85839872,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 2020
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 1.0515674739999952,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1842,
+      "label": "batch-resumed",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 87007232,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1572
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7933365789999982,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-2",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 87044096,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.8821886540000037,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-3",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86835200,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7626821399999955,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-4",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86847488,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7331443119999932,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-5",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86851584,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7909136829999994,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-6",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86949888,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7645028759999946,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-7",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86859776,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7645724839999986,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-8",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86953984,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.8513903019999987,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-9",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86855680,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7711986110000026,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-10",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 86925312,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    },
+    {
+      "accounting_complete": true,
+      "cleanup": "CLOSED",
+      "elapsed_seconds": 0.7333076740000024,
+      "exit_code": 0,
+      "expired": false,
+      "exported_bytes": 1843,
+      "label": "batch-11",
+      "limit_hit": null,
+      "live_owned_survivors": 0,
+      "peak_owned_rss": 87044096,
+      "persistence": "READBACK_REQUIRED",
+      "processes_seen": 1,
+      "retry": false,
+      "worker_audit_bytes": 1573
+    }
+  ],
+  "production_connections": "0",
+  "real_restricted_logins": "2",
+  "real_restricted_sql_claims": "True",
+  "real_scram_mapping_helper": "True",
+  "serialized_bytes": "4595",
+  "server_version": "170011",
+  "shared_admission_b2_readback": "True",
+  "source_calls": "0"
+}
