@@ -227,7 +227,14 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
      # Reconciliation sees the closed owned process and certain checkpoint;
      # only disposable owner expires/reconciles the original claim.
      boot.execute('UPDATE public.ingestion_work_items SET lease_until=0 WHERE key=%s',(scope_multi,))
-     with connect('ingestion_recovery_login') as recovery:recovered=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(scope_multi,retained_row['fence'])).fetchone()[0]
+     recovery_budget=DatabaseBudget(previous=account)
+     recovery_url=URL.create('postgresql+psycopg',username='ingestion_recovery_login',password=passwords['ingestion_recovery_login'],host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False)
+     recovery_engine=recovery_budget.engine(recovery_url)
+     try:
+      with recovery_engine.begin() as recovery:recovered=recovery.execute(text('SELECT public.ingestion_recover_abandoned(:key,:fence,true)'),{'key':scope_multi,'fence':retained_row['fence']}).scalar_one()
+     finally:account=recovery_budget.close([recovery_engine])
+     record_property('multi_accounting_recovery',json.dumps(account,sort_keys=True))
+     assert account['cleanup']=='CLOSED' and account['driver_statements']<=120
      assert recovered['state']=='DEFERRED' and recovered['checkpoint']==retained_row['checkpoint']
     else:
      assert supervised['exit_code']==0 and result['outcome']=='DISCOVERY_SCREENING_ONLY'

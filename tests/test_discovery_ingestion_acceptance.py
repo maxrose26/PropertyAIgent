@@ -143,3 +143,13 @@ def test_retained_sql_continuation_cannot_reset_or_misbind_budget():
  reject(None,binding)
  prior=dict(connection_attempts=2,driver_statements=30,elapsed_seconds=1,connections_closed=True,cleanup='CLOSED',capture_checkpoint_sha256='f'*64)
  reject(prior,replace(binding,prior_accounting_sha256=digest(prior)))
+
+
+@pytest.mark.parametrize('prior',[{},dict(cleanup='CLOSED',connections_closed=True,connection_attempts=0,driver_statements=0,elapsed_seconds=0,capture_checkpoint_sha256='a'*64)])
+def test_source_free_resume_rejects_unsealed_accounting_before_database(prior):
+ from types import SimpleNamespace
+ from verification.ingestion_storage.operational_controller import ControllerLedger,resume_capture
+ ledger=object.__new__(ControllerLedger);ledger.budget=DatabaseBudget(previous=prior)
+ def forbidden(_):raise AssertionError('database read before sealed accounting')
+ ledger.get=forbidden
+ with pytest.raises(Denied):resume_capture(SimpleNamespace(ledger=ledger),'scope',checkpoint_sha256='b'*64,prior_accounting_sha256=digest(prior),screening_keys=[])
