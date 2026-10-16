@@ -228,13 +228,25 @@ def test_pg_storage_acceptance_intended_restricted_role(pg,record_property):
 
 def test_pg_catalogue_cursor_accounts_initialization_and_fails_without_tls(pg,tmp_path):
     """Exercise new driver accounting against fixed disposable PG, never production."""
-    from verification.ingestion_storage.preflight import run
-    from sqlalchemy.pool import NullPool
+    import subprocess,sys
     assert (pg.url.host,pg.url.port,pg.url.database,pg.url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
-    def disposable_factory(unused_production_shape,**kw):
-        args=dict(kw['connect_args']);args.pop('sslrootcert');args['sslmode']='disable'
-        return create_engine(pg.url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args=args)
-    result=run('postgresql://postgres.zcikcfgpblzuzpanpdqd:unused@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',tmp_path/'catalogue',engine_factory=disposable_factory)
+    # The preflight's lifetime RSS ceiling must measure a fresh worker, not
+    # the accumulated high-water mark of the entire coordinator test suite.
+    worker="""
+import os,sys
+from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
+from sqlalchemy.pool import NullPool
+from verification.ingestion_storage.preflight import run
+url=make_url(os.environ['DISCOVERY_TEST_POSTGRES_URL'])
+assert (url.host,url.port,url.database,url.username)==('127.0.0.1',5432,'stage4_discovery_test','discovery_test')
+def disposable_factory(unused_production_shape,**kw):
+    args=dict(kw['connect_args']);args.pop('sslrootcert');args['sslmode']='disable'
+    return create_engine(url,poolclass=NullPool,isolation_level='AUTOCOMMIT',connect_args=args)
+run('postgresql://postgres.zcikcfgpblzuzpanpdqd:unused@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',sys.argv[1],engine_factory=disposable_factory)
+"""
+    subprocess.run([sys.executable,'-c',worker,str(tmp_path/'catalogue')],env={'PATH':'/usr/bin:/bin','DISCOVERY_TEST_POSTGRES_URL':pg.url.render_as_string(hide_password=False)},check=True,timeout=15,capture_output=True,text=True)
+    result=json.loads((tmp_path/'catalogue/result.json').read_text())
     assert result['status']=='PREFLIGHT_FAILED_STOP' and result['error_class']=='ValueError'
     assert result['connections']==1 and result['connection_attempts']==1
     assert result['driver_statements']>=result['explicit_statements']>=7

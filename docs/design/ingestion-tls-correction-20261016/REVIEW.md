@@ -57,6 +57,10 @@ Disposable loopback PostgreSQL TLS emulator, hostaddr fixed 127.0.0.1 and epheme
 
 Additional tests cover CA tampering and expiry review; one DNS resolution/one selected address with original hostname retained; consumed authority and attempts/run numbers >1 rejected; missing finish receipt redacted; finished receipt plus simulated leaked FD remains UNCERTAIN; disposal/close failures remain UNCERTAIN; original access bounds and sanitisation. The existing offline CI job gains only this disposable loopback test step, no production credentials.
 
+## Hosted validation reconciliation
+
+Initial candidate fbd664b194a3a85ddf1bfca9f775572f9b2d964a: run38901330187/114, offline job116974041582 PASS including real loopback TLS negatives. Disposable PG job116974041869: 24 PASS / 1 FAIL because the catalogue test ran inside the larger suite process and its lifetime RSS triggered RESOURCE_STOP. Production ceilings are unchanged. The catalogue-only disposable test is now isolated into a fresh subprocess (15-second test timeout) so the 256MiB lifetime ceiling measures the worker rather than accumulated suite memory. This is a test-harness correction, not a production budget exemption. Hosted follow-up required; initial failure retained in Actions and this audit.
+
 ## Bounded successor proposal — requires concrete REVIEW and live authority
 
 Executable entry: verification.ingestion_storage.tls_successor. Proposed workflow is successor-workflow.yml.proposed, deliberately outside .github/workflows. No workflow registered, dispatch or rerun. New proposed authority AUTHORISE_STORAGE_TLS_CATALOGUE_ONCE_20261016 is unused and not granted by this package. Old authority/run remain consumed.
