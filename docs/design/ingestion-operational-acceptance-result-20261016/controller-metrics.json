@@ -1,0 +1,54 @@
+{
+  "controller_accounting_capture": {
+    "capture_checkpoint_sha256": "802818043071e2368f84b46cd67c863663eb2e6401759403925c7d44f82716b2",
+    "cleanup": "CLOSED",
+    "connection_attempts": 2,
+    "connections_closed": true,
+    "driver_statements": 30,
+    "elapsed_seconds": 0.102,
+    "errors": [],
+    "statement_kinds": {
+      "cursor": 20,
+      "driver_internal": 10
+    }
+  },
+  "controller_supervisor_capture": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 0.7195636300000103,
+    "exit_code": 0,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 85671936,
+    "persistence": "READBACK_REQUIRED",
+    "processes_seen": 1,
+    "retry": false
+  },
+  "controller_accounting_execute": {
+    "capture_checkpoint_sha256": "802818043071e2368f84b46cd67c863663eb2e6401759403925c7d44f82716b2",
+    "cleanup": "CLOSED",
+    "connection_attempts": 5,
+    "connections_closed": true,
+    "driver_statements": 108,
+    "elapsed_seconds": 1.328,
+    "errors": [],
+    "statement_kinds": {
+      "cursor": 72,
+      "driver_internal": 36
+    }
+  },
+  "controller_supervisor_execute": {
+    "accounting_complete": true,
+    "cleanup": "CLOSED",
+    "elapsed_seconds": 2.07853800700002,
+    "exit_code": 0,
+    "expired": false,
+    "limit_hit": null,
+    "live_owned_survivors": 0,
+    "peak_owned_rss": 234188800,
+    "persistence": "READBACK_REQUIRED",
+    "processes_seen": 1,
+    "retry": false
+  }
+}

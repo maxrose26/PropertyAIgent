@@ -1,0 +1,17 @@
+[
+  {
+    "id": 12059980527,
+    "name": "discovery-pg-2de9b2cde482d20aacb2a37f63ccc6cd9041e723",
+    "digest": "sha256:784eef35e5a62f1f868d3d8b7ba258ab851fd6dcfb80423be3c8fa50a5948bce"
+  },
+  {
+    "id": 12059846290,
+    "name": "discovery-offline-2de9b2cde482d20aacb2a37f63ccc6cd9041e723",
+    "digest": "sha256:77dae807c0fbb593831a25f20b234ccfa79b21e456aa805b8ef5fccc6a1f5087"
+  },
+  {
+    "id": 12058623227,
+    "name": "ingestion-provisioning-disposable-2de9b2cde482d20aacb2a37f63ccc6cd9041e723",
+    "digest": "sha256:2ab22a8a30220241aacedcdca88c21e6467f190e7effb4a3e4357db69a16deb6"
+  }
+]

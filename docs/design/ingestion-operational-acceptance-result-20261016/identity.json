@@ -1,0 +1,30 @@
+{
+  "candidate": "2de9b2cde482d20aacb2a37f63ccc6cd9041e723",
+  "tree": "c5fbd4e1ed74cd3580f6262b9c0dd8ae80861066",
+  "accepted_implementation": "37e5eb1d6424cb5e646315a92c0ccb3ebb837234",
+  "accepted_evidence": "0a6688c6619b0d95f81bfdf09e0cc7d737f092b3",
+  "master_unchanged": "a3a698beb0542579042bbcc48e8cf7a66f13514f",
+  "package_manifest_sha256": "9eeb154322c49e7d81a9d3bcfedf6b41e07c9b28b9dbe17d547ba5b3da11009a",
+  "production_access": 0,
+  "live_source_calls": 0,
+  "credential_operations": 0,
+  "migrations": 0,
+  "source_proposal": "Bolton RECEIVED 2026-10-16 only; eligibility 2026-10-17T00:00:00Z; not registered/authorised",
+  "nominee": null,
+  "stage": 4,
+  "stage_status": "OPEN",
+  "units": "NO-GO: up-to qualifier assessed EXACT by existing Stage2; status-only leaves UNKNOWN",
+  "readiness": "Disposable operational controller rehearsal PASS; production storage/operational acceptance outstanding",
+  "local_delta_tests": "13 passed in5.89s",
+  "credential_dependency": "PARKED pending targeted Supabase answer; no repeated research",
+  "holds": [
+    "consumed Salford GLOBAL stop",
+    "IDs1504-1508",
+    "PR119",
+    "historical authorities",
+    "no scheduling/deployment"
+  ],
+  "validation_run": 38931911219,
+  "run_number": 140,
+  "attempt": 1
+}
