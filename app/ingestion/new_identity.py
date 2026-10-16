@@ -8,6 +8,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.models import Application
 from .ledger import Denied,UncertainPersistence
+from verification.stage26b_l1.bolton_literal import semantic_state
+
+
+def qualified_coupled_observation(observation, row):
+    """Existing B2 completeness/semantic predicate, reused before admission."""
+    return observation.verification_scope == 'COUPLED' and not (set(observation.fields) != {'Reference','Status','Decision','Decision Issued Date'}
+                or observation.fields['Reference'] != row['reference']
+                or set(observation.field_states) != {'reference','status','decision','decision_date'}
+                or any(v not in {'PRESENT_VALUE','PRESENT_BLANK'} for v in observation.field_states.values())
+                or observation.field_states['reference'] != 'PRESENT_VALUE'
+                or observation.field_states['status'] != 'PRESENT_VALUE'
+                or semantic_state(observation.fields) == 'UNKNOWN_UNMAPPED'
+                or not observation.b2_eligible)
 
 
 @dataclass(frozen=True)
@@ -25,7 +38,7 @@ def execute(coordinator,claim,*,envelope,council,source):
     from app.pipeline.discovery_admission import admit_identity,PROTECTED_FIELDS
     from app.pipeline.discovery_contract import Completeness
     from verification.discovery.material_qualification import project_idox
-    from verification.direct_reference.refresh import _refresh_row,qualified_coupled_observation
+    from verification.direct_reference.refresh import _refresh_row
     ledger=coordinator.ledger;row=ledger.get(claim.key);contract=coordinator.contracts.get(row['contract'])
     if not isinstance(contract,NewIdentityContract) or row['task']!='FACTUAL_REFRESH' or len(row['dependencies'])!=1:raise Denied('NEW_IDENTITY_TASK')
     target=contract.row

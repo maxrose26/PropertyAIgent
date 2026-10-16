@@ -146,18 +146,6 @@ class Observation:
     verification_scope: str = 'COUPLED'
     field_evidence: dict | None = None
 
-def qualified_coupled_observation(observation, row):
-    """Existing B2 completeness/semantic predicate, reused before admission."""
-    return observation.verification_scope == 'COUPLED' and not (set(observation.fields) != {'Reference','Status','Decision','Decision Issued Date'}
-                or observation.fields['Reference'] != row['reference']
-                or set(observation.field_states) != {'reference','status','decision','decision_date'}
-                or any(v not in {'PRESENT_VALUE','PRESENT_BLANK'} for v in observation.field_states.values())
-                or observation.field_states['reference'] != 'PRESENT_VALUE'
-                or observation.field_states['status'] != 'PRESENT_VALUE'
-                or semantic_state(observation.fields) == 'UNKNOWN_UNMAPPED'
-                or not observation.b2_eligible)
-
-
 def pending_status_evidence(observation):
     """Positive literal status proof; omission never proves absent decisions."""
     return (observation.literal_verified
@@ -368,7 +356,14 @@ def _refresh_row(session, application, council, row, *, retrieve_evidence):
                 result.verification_scope='UNCHANGED_PENDING_STATUS_ONLY'
                 return result
             if observation.verification_scope != 'COUPLED':fail('PARTIAL_RETRIEVAL','Unknown verification scope')
-            if not qualified_coupled_observation(observation, row):
+            if (set(observation.fields) != {'Reference','Status','Decision','Decision Issued Date'}
+                or observation.fields['Reference'] != row['reference']
+                or set(observation.field_states) != {'reference','status','decision','decision_date'}
+                or any(v not in {'PRESENT_VALUE','PRESENT_BLANK'} for v in observation.field_states.values())
+                or observation.field_states['reference'] != 'PRESENT_VALUE'
+                or observation.field_states['status'] != 'PRESENT_VALUE'
+                or semantic_state(observation.fields) == 'UNKNOWN_UNMAPPED'
+                or not observation.b2_eligible):
                 fail('PARTIAL_RETRIEVAL', 'Literal-only observation; B2 completeness/semantic gate not met')
             for field_name, retained in [('Decision',prior[1]),('Decision Issued Date',prior[2])]:
                 if not observation.fields.get(field_name) and retained:
