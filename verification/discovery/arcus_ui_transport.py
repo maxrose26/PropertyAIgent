@@ -4,8 +4,7 @@ from .arcus_ui_window import AURA
 MAX_BYTES=20*1024*1024
 
 
-def combined_bytes(audit):
-    return max(audit.get('decoded_bytes',0),audit.get('encoded_bytes',0))+audit.get('outbound_payload_bytes',0)
+from app.ingestion.resource_accounting import combined_bytes
 
 
 async def measure_post(event,client,audit,expected_aura=AURA):
