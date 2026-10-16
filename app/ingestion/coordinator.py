@@ -116,6 +116,9 @@ class Coordinator:
     def resume_listing(self,claim):
         row=self.ledger.get(claim.key);receipt=row['checkpoint']
         if not receipt or receipt.get('kind')!='LISTING_RECEIPT_V1' or receipt.get('cleanup')!='CLOSED':raise Denied('NO_DURABLE_CHECKPOINT')
+        # Reclaim rotates the fence and returns CLAIMED. Re-seal the unchanged
+        # retained receipt under that fence before broker child materialisation.
+        self.ledger.checkpoint(claim,receipt)
         return self._materialize(claim,receipt)
 
     def idox_listing(self,claim,source,outer):
