@@ -1,0 +1,47 @@
+{
+  "active_seconds": 60,
+  "arbitrary_sql": false,
+  "audit_bytes": 2000000,
+  "cleanup_upload_seconds": 120,
+  "connect_seconds": 5,
+  "connections_max": 1,
+  "controls": [
+    "route validation without outputting secret",
+    "driver bootstrap session metadata",
+    "BEGIN READ ONLY",
+    "SHOW transaction_read_only",
+    "SET LOCAL statement_timeout",
+    "SET LOCAL lock_timeout",
+    "SET LOCAL idle_in_transaction_session_timeout",
+    "one parameterised council/reference identity SELECT with LIMIT 2 each",
+    "ROLLBACK",
+    "dispose"
+  ],
+  "data_queries": 1,
+  "historical_manifest_sha256": "f8fc81d35bb2bcb7c16f8770a67d1ed2df097d62c9a51bebb6034955e6a23e66",
+  "identities": [
+    {
+      "council_code": "bolton",
+      "reference": "01859/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01860/26"
+    },
+    {
+      "council_code": "bolton",
+      "reference": "01861/26"
+    }
+  ],
+  "identity_limit": 3,
+  "idle_transaction_seconds": 20,
+  "job_seconds": 360,
+  "lock_seconds": 2,
+  "per_identity_limit": 2,
+  "production_writes": 0,
+  "query_capability": "IDENTITY_ONLY_READ_ONLY",
+  "setup_seconds": 180,
+  "source_calls": 0,
+  "statement_seconds": 15,
+  "status": "PROPOSED_ONLY_NOT_QUERIED"
+}

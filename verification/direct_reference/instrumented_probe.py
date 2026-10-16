@@ -30,6 +30,9 @@ from verification.discovery.r0_fixed80_qualification import case_definitions as 
 from verification.discovery.r0_bolton53_qualification import case_definitions as bolton53_case_definitions
 BOLTON53_CASES = bolton53_case_definitions()
 CASES.update(BOLTON53_CASES)
+from verification.discovery.narrow_oldham_source import case_definitions as oldham_two_case_definitions
+OLDHAM_TWO_CASES=oldham_two_case_definitions()
+CASES.update(OLDHAM_TWO_CASES)
 FIXED80_CASES = fixed80_case_definitions()
 CASES.update(FIXED80_CASES)
 from verification.discovery.manchester_shape import CASE as DISCOVERY_CASE, DESTINATION as DISCOVERY_DESTINATION
@@ -584,7 +587,8 @@ def supervised(case, output, execution_mode="github-hosted", window=None, metada
                    PYTHONNOUSERSITE='1', PYTHONDONTWRITEBYTECODE='1')
         # Browser package cache only; no inherited database, model or GitHub credentials.
         env['PLAYWRIGHT_BROWSERS_PATH'] = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', str(Path.home()/'.cache/ms-playwright'))
-        worker_module = ('verification.discovery.r0_bolton53_qualification' if case in BOLTON53_CASES
+        worker_module = ('verification.discovery.narrow_oldham_source' if case in OLDHAM_TWO_CASES
+                         else 'verification.discovery.r0_bolton53_qualification' if case in BOLTON53_CASES
                          else 'verification.discovery.r0_fixed80_qualification' if case in FIXED80_CASES
                          else 'verification.discovery.material_qualification' if case in IDOX_CASES
                          else 'verification.direct_reference.instrumented_probe')

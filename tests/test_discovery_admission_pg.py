@@ -195,3 +195,43 @@ def test_completion944_exact_readonly_query_and_rollback(pg):
         assert result['production_writes']==0 and audit['transaction']=='READ_ONLY_ROLLED_BACK'
         assert sum(x['matching_rows_up_to_two'] for x in result['comparison'])==1
     with Session(pg) as session:assert session.scalar(select(func.count()).select_from(Application))==1
+
+
+def test_narrow_oldham_actual_shared_coupled_readback(pg):
+    from tests.test_discovery_narrow_continuation import exercise
+    exercise(pg)
+
+
+def test_narrow_oldham_concurrent_exact_identity(pg):
+    from tests.test_discovery_narrow_continuation import seed
+    from verification.discovery.narrow_oldham_record import envelope as original,rows
+    seed(pg);barrier=Barrier(2,timeout=3);row=next(rows())
+    def one():barrier.wait();return admit_identity(pg,original(row))
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        results=[f.result(timeout=15) for f in [workers.submit(one),workers.submit(one)]]
+    assert sorted(r['outcome'] for r in results)==['ALREADY_KNOWN','CREATED_PENDING']
+    assert len({r['application_id'] for r in results})==1
+
+
+def test_narrow_oldham_uncertain_readback_stops_following_record(pg):
+    from tests.test_discovery_narrow_continuation import seed,synthetic
+    from verification.discovery import narrow_oldham as o,narrow_oldham_record as record
+    seed(pg);calls=[]
+    def factory():calls.append(1);return pg
+    with patch.object(record,'readback',side_effect=RuntimeError('simulated readback loss')):
+        out=o.run(engine_factory=factory,reader=synthetic,checkpoint=lambda _:None,journal=lambda *_:None)
+    assert len(calls)==1 and out['stop']
+    assert out['results'][0]['facts']=='UNCERTAIN_COMMIT_OR_READBACK'
+    with Session(pg) as session:
+        apps=session.scalars(select(Application).where(Application.council_code=='oldham')).all()
+        assert len(apps)==1 and apps[0].status is not None  # actual commit despite failed readback
+
+
+def test_narrow_delta3_verified_read_only_query(pg):
+    from verification.discovery.narrow_comparison import identities
+    from verification.discovery.r0_identity_comparison import query
+    rows=identities()
+    with pg.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
+        result=query(connection,exact_rows=rows)
+    assert result['transaction']=='READ_ONLY_ROLLED_BACK' and len(result['comparison'])==3
+    assert all(r['outcome']=='ABSENT' for r in result['comparison'])

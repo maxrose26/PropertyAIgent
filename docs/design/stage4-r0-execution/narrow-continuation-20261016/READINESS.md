@@ -1,0 +1,11 @@
+# Narrow continuation after PR #109
+
+PR109 integrated at b98d1aca03562595d551681ea85232215387d61d, exact approved tree97a84a85fc0d5867ae6820834b6b3722cb9a3c1a. Post-merge six checks passed and two live/manual shapes skipped.
+
+Only three new scopes, executed sequentially with complete history/identity checks before each. Manchester VALIDATED15October2026; exact Bolton01859/26,01860/26,01861/26 identity-only read; conditional OldhamNMA/356901/26 andVAR/356938/26 COUPLED factual capture. No historical workflow or consumed manifest changed.
+
+Machine budget ledger separates worker allocation from parent overhead. Manchester55worker seconds plus5supervision/checkpoint seconds fits60active+260setup+160cleanup/upload=480job. Source supervisor remains45seconds; calls/requests/bytes unchanged. Comparison reuses reviewed exact-route/read-only query and rollback. Oldham source110allocation within480active+280setup+200cleanup/upload=960job; per-record180includes identity50/source55/B2-readback60/closure15.
+
+Oldham original primary window evidence retained byte-derived from run38758465439 checkpoints004/005. Independently missing denominator remainsUNKNOWN; COMPLETE_WINDOW identity admission does not establish independent coverage or publication recall. Frozen original source records and applied/count/terminal/resource evidence are embedded in oldham-two.json; no committee trigger. No source/factual evidence is replayed: each newly created pending identity receives fresh credential-free exact-record retrieval, then COUPLED-only shared_refresh_row/B2. Existing identities skip initial facts and source retrieval. Source rejection can leave a committed pending identity; report separately from factual success. Unsupported Oldham initial evidence remains withheld. No sites/relationships/opportunities created.
+
+17 focused narrow tests pass; relevant prior regressions passed except one frozen-case expectation corrected and rerun. Four new disposable PostgreSQL tests require hosted validation. Independent review passes subject to hosted exact-head/disposable checks. No source or production access has occurred during preparation. Historical/publication/latency/metadata/parent holds remain unchanged.

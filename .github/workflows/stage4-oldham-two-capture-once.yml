@@ -1,0 +1,86 @@
+# Authorised selected cohort; sole shared primary identity/B2 writers.
+name: Stage4 R0 oldham-two-capture ONCE
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        required: true
+        type: string
+      manifest_sha:
+        required: true
+        type: string
+      authority:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: stage4-oldham-two-capture-once
+  cancel-in-progress: false
+jobs:
+  source:
+    environment: stage4-production-canary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - name: Single-use binding before checkout or dependencies
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -eu
+          test "$GITHUB_REPOSITORY" = 'maxrose26/PropertyAIgent'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/master'
+          test "$GITHUB_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$REVIEWED_SHA"
+          test "$GITHUB_WORKFLOW_REF" = 'maxrose26/PropertyAIgent/.github/workflows/stage4-oldham-two-capture-once.yml@refs/heads/master'
+          test "$GITHUB_RUN_NUMBER" = '1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$SOURCE_AUTHORITY" = 'AUTHORISE_OLDHAM_TWO_COUPLED_CAPTURE_ONCE'
+          test "$MANIFEST_SHA" = '808eb9a77c85e07da331cf6ca4f3a94f73d1a6e2fe74d8c1e0e6d1c0f695759b'
+          echo "SOURCE_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/r0-venv"
+      - name: Exact content and setup-budget guard before source access
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" - <<'PY'
+          import os
+          from verification.discovery.narrow_oldham_binding import admit
+          from verification.discovery.r0_registered_scopes import checkout
+          admit(os.environ['REVIEWED_SHA'],os.environ['MANIFEST_SHA'],os.environ['SOURCE_AUTHORITY'],os.environ)
+          checkout(os.environ['REVIEWED_SHA'])
+          PY
+      - name: One owned-process supervised selective5 admission
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          MANIFEST_SHA: ${{ inputs.manifest_sha }}
+          SOURCE_AUTHORITY: ${{ inputs.authority }}
+          GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          JOB_STARTED_EPOCH: ${{ env.SOURCE_JOB_STARTED_EPOCH }}
+          BOLTON_ADMISSION_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          timeout --signal=TERM --kill-after=10s 490s "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.narrow_oldham_binding --reviewed-sha "$REVIEWED_SHA" --manifest-sha "$MANIFEST_SHA" --authority "$SOURCE_AUTHORITY" --output "$RUNNER_TEMP/oldham-two-capture-audit"
+      - name: Bounded audit gate
+        id: audit_gate
+        if: always()
+        run: |
+          "$RUNNER_TEMP/r0-venv/bin/python" -m verification.discovery.narrow_oldham_binding --verify-audit --output "$RUNNER_TEMP/oldham-two-capture-audit"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.audit_gate.outcome == 'success'
+        with:
+          name: r0-oldham-two-capture-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/oldham-two-capture-audit
+          if-no-files-found: error
+          retention-days: 14

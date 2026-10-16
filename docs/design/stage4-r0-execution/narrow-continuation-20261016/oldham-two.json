@@ -1,0 +1,947 @@
+{
+  "accepted_scope": "COUPLED_ONLY",
+  "no_sites": true,
+  "original_run": "38758465439",
+  "rows": [
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "application_id": null,
+      "case": "narrow_oldham_0",
+      "council": "oldham",
+      "discovered_at": "2026-10-15T15:15:18.761448+00:00",
+      "platform_family": "IDOX",
+      "reference": "NMA/356901/26",
+      "source_identifier": "TM2IIQMCN4000",
+      "source_record": {
+        "fields": {
+          "address": {
+            "locator": "p.address",
+            "state": "PRESENT_VALUE",
+            "value": "Former Shaw Distribution Centre Linney Lane Shaw Oldham OL2 8HF"
+          },
+          "proposal": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE",
+            "value": "Non material amendment to the approved scheme for RES/353501/24 for increase in number of dwellings from 192 to 200 with associated changes to tenure from market to affordable and associated revisions to layout."
+          },
+          "received_date": {
+            "locator": "p.metaInfo:Received",
+            "state": "PRESENT_VALUE",
+            "value": "Tue 29 Sep 2026"
+          },
+          "validated_date": {
+            "locator": "p.metaInfo:Validated",
+            "state": "PRESENT_VALUE",
+            "value": "Tue 29 Sep 2026"
+          }
+        },
+        "identity_state": "PRESENT_VALUE",
+        "reference": "NMA/356901/26",
+        "source_key": "TM2IIQMCN4000",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2IIQMCN4000&activeTab=summary"
+      },
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2IIQMCN4000&activeTab=summary",
+      "window": {
+        "council": "oldham",
+        "end": "2026-09-30",
+        "semantics": "RECEIVED",
+        "start": "2026-09-24"
+      },
+      "window_evidence": {
+        "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+        "applied_evidence_sha256": "3c3063ea695d974aec3441f136cba29a5669bd0d75090c6cfc30f1703d7c6460",
+        "applied_interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "capped": false,
+        "cleanup": "SESSION_BOUNDARY_CLOSED",
+        "completeness": "UNKNOWN",
+        "council": "oldham",
+        "date_semantics": "RECEIVED",
+        "enumeration_evidence": "COUNT_RECONCILED",
+        "failure": null,
+        "pages": [
+          {
+            "body_sha256": "3a74c9f08c26a241ba9940083c27f7b8b554b0c21ca71ad6c5b4e25d1c2c1e8e",
+            "first": 1,
+            "last": 10,
+            "ordinal": 1,
+            "rows": 10,
+            "terminal": null,
+            "total": 13
+          },
+          {
+            "body_sha256": "34c692e752cb53ec622a7fe89418c22dc3d437e830fe30e109e42da3a97059a7",
+            "first": 11,
+            "last": 13,
+            "ordinal": 2,
+            "rows": 3,
+            "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+            "total": 13
+          }
+        ],
+        "persistence": false,
+        "primary_observation": {
+          "ended_at": "2026-10-15T15:15:28.197572+00:00",
+          "started_at": "2026-10-15T15:15:18.761448+00:00"
+        },
+        "records": [
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "41 Ralstone Avenue Oldham OL8 1LY"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Variation of condition 4 (Number of Users) associated with application FUL/353931/25 for the allowance of up to two families to inhabit the house at one time."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 24 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Mon 05 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "VAR/356891/26",
+            "source_key": "TLWSX6MCN2S00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TLWSX6MCN2S00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Former Shaw Distribution Centre Linney Lane Shaw Oldham OL2 8HF"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Non material amendment to the approved scheme for RES/353501/24 for increase in number of dwellings from 192 to 200 with associated changes to tenure from market to affordable and associated revisions to layout."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "NMA/356901/26",
+            "source_key": "TM2IIQMCN4000",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2IIQMCN4000&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "10 Beech Hill Road Grasscroft Oldham OL4 4DR"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Non Material Amendment application for 1) Alterations to roof design including the removal of previously approved flat roof to the first floor rear elevation to form 1 uniformed main dual pitched roof. 2) Reduction in roof pitches whilst retaining previously approved overall ridge height. Slight raising of eaves level to suit. 3) Minor alterations to elevational treatment including location of ashlar stone stringer course relating to app no. HOU/356664/26."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "NMA/356895/26",
+            "source_key": "TM2CX5MCN3Q00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2CX5MCN3Q00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "21 Petworth Road Chadderton Oldham OL9 9BG"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Single storey rear extension."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Wed 30 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356914/26",
+            "source_key": "TM4V4PMCFG000",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM4V4PMCFG000&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "39 Kensington Avenue Royton Oldham OL2 5YF"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Single storey side extension."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Wed 30 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Wed 30 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356912/26",
+            "source_key": "TM4FVZMCN5B00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM4FVZMCN5B00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "331 Abbey Hills Road Oldham OL4 5LX"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Single storey side and rear extension. 2) Hip to gable roof conversion with front and rear dormers. 3) Alterations to existing patio."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Wed 30 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 08 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356908/26",
+            "source_key": "TM47IPMCN4X00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM47IPMCN4X00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "9 Willows Drive Failsworth Oldham M35 0PZ"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Erction of front and side dormers."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 24 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 24 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356907/26",
+            "source_key": "TM2ZPBMC00K00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2ZPBMC00K00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "20 Amberwood Chadderton Oldham OL9 9SG"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Demolition of existing conservatory and single storey side extension 2) Erection of a single-storey rear extension and two-storey side extension."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356905/26",
+            "source_key": "TM2TJOMCN4I00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2TJOMCN4I00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "81 Church Road Uppermill Oldham OL3 6DY"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Garage conversion and amendment of roof to a pitched roof."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356897/26",
+            "source_key": "TM2D04MCN3U00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2D04MCN3U00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "425 Burnley Lane Chadderton Oldham OL9 0BP"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Two-storey side extension 2) Single storey rear extension."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 29 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356894/26",
+            "source_key": "TM2CWIMCN3N00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM2CWIMCN3N00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Nodgate Farm Cragg Road Chadderton Oldham OL1 2RX"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Two storey side and rear extension, raise existing roof ridge, installation of new cladding to front elevation, and loft conversion."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 24 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 24 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356881/26",
+            "source_key": "TLTK7QMCN1900",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TLTK7QMCN1900&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Moorlands Caravan Park Ripponden Road Denshaw Oldham OL3 5UN"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Installation of a a low profile solar panel array on an unused paddock at the trop of the site, to generate low carbon electricity for the site / residential owners"
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 24 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 09 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "FUL/356879/26",
+            "source_key": "TLT6BRMCN0T00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TLT6BRMCN0T00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Greengate Industrial Estate, Dow Chemicals Greenside Way Chadderton Oldham M24 1SW"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Discharge of Condition no's 6 (Site Report/Photo Evidence) and 7 (Landfill Gas Investigation) relating to app no. FUL/354129/25."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 25 Sep 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 25 Sep 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "CND/356886/26",
+            "source_key": "TLVAQQMCN2300",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TLVAQQMCN2300&activeTab=summary"
+          }
+        ],
+        "requested_interval": [
+          "2026-09-24",
+          "2026-09-30"
+        ],
+        "resource": {
+          "adapter": "idox",
+          "budget_exhaustion": false,
+          "council": "oldham",
+          "elapsed_seconds": 9.208,
+          "outcome": "UNKNOWN",
+          "received_bytes": 276367,
+          "redirects": 0,
+          "reference": "RECEIVED:2026-09-24:2026-09-30",
+          "requests_attempted": 5,
+          "retries": 0
+        },
+        "response_provenance": [
+          {
+            "body_sha256": "130fe966f768e7e21012192f76f9255692450f5088c6024c3c6b9656dbd2f67f",
+            "parser_body_sha256": "130fe966f768e7e21012192f76f9255692450f5088c6024c3c6b9656dbd2f67f",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "27a865ea9ee424b575d3d6450d083f0ba18c4077d3776fb9b5a5c435af48f73f",
+            "parser_body_sha256": "27a865ea9ee424b575d3d6450d083f0ba18c4077d3776fb9b5a5c435af48f73f",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "3a74c9f08c26a241ba9940083c27f7b8b554b0c21ca71ad6c5b4e25d1c2c1e8e",
+            "parser_body_sha256": "3a74c9f08c26a241ba9940083c27f7b8b554b0c21ca71ad6c5b4e25d1c2c1e8e",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "34c692e752cb53ec622a7fe89418c22dc3d437e830fe30e109e42da3a97059a7",
+            "parser_body_sha256": "34c692e752cb53ec622a7fe89418c22dc3d437e830fe30e109e42da3a97059a7",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "3c3063ea695d974aec3441f136cba29a5669bd0d75090c6cfc30f1703d7c6460",
+            "parser_body_sha256": "3c3063ea695d974aec3441f136cba29a5669bd0d75090c6cfc30f1703d7c6460",
+            "source_encoding": "UTF-8"
+          }
+        ],
+        "sort": "REFERENCE_DESCENDING",
+        "source_qualification": "CANDIDATE_CONTRACT",
+        "unique_references": 13
+      },
+      "window_run": "38758465439"
+    },
+    {
+      "admission": "ADMITTED_DIRECT_ROUTE",
+      "application_id": null,
+      "case": "narrow_oldham_1",
+      "council": "oldham",
+      "discovered_at": "2026-10-15T15:15:28.198885+00:00",
+      "platform_family": "IDOX",
+      "reference": "VAR/356938/26",
+      "source_identifier": "TMFZ5RMCFKJ00",
+      "source_record": {
+        "fields": {
+          "address": {
+            "locator": "p.address",
+            "state": "PRESENT_VALUE",
+            "value": "Land At Prince's Gate Prince Street Oldham OL1 3TL"
+          },
+          "proposal": {
+            "locator": "a.summaryLink",
+            "state": "PRESENT_VALUE",
+            "value": "Variation to Conditions associated with planning permission FUL/354326/25 to allow for amendments to Blocks A and B, including removal of link building, alterations to building facade details and layout of internal facilities, introduction of 4 additional residential units, changes to landscaping and public realm, and amendments to the sustainable energy strategy."
+          },
+          "received_date": {
+            "locator": "p.metaInfo:Received",
+            "state": "PRESENT_VALUE",
+            "value": "Tue 06 Oct 2026"
+          },
+          "validated_date": {
+            "locator": "p.metaInfo:Validated",
+            "state": "PRESENT_VALUE",
+            "value": "Tue 06 Oct 2026"
+          }
+        },
+        "identity_state": "PRESENT_VALUE",
+        "reference": "VAR/356938/26",
+        "source_key": "TMFZ5RMCFKJ00",
+        "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TMFZ5RMCFKJ00&activeTab=summary"
+      },
+      "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TMFZ5RMCFKJ00&activeTab=summary",
+      "window": {
+        "council": "oldham",
+        "end": "2026-10-07",
+        "semantics": "RECEIVED",
+        "start": "2026-10-01"
+      },
+      "window_evidence": {
+        "applied_evidence": "STRICT_REFINE_FORM_ECHO",
+        "applied_evidence_sha256": "e34b0ce85b61c412811a8b1c902a97f8bf1ebc7fb5c54b94fd781ee7dcc33628",
+        "applied_interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "capped": false,
+        "cleanup": "SESSION_BOUNDARY_CLOSED",
+        "completeness": "UNKNOWN",
+        "council": "oldham",
+        "date_semantics": "RECEIVED",
+        "enumeration_evidence": "COUNT_RECONCILED",
+        "failure": null,
+        "pages": [
+          {
+            "body_sha256": "b795b2e64f93c8f9c55e34c528ae6cef4795e3eceab1eeec42931b4e2b996863",
+            "first": 1,
+            "last": 10,
+            "ordinal": 1,
+            "rows": 10,
+            "terminal": null,
+            "total": 11
+          },
+          {
+            "body_sha256": "1c07a111cc388e3501d6b2541ba14152b947d8903103bf05a50e320516ca6f18",
+            "first": 11,
+            "last": 11,
+            "ordinal": 2,
+            "rows": 1,
+            "terminal": "EXPLICIT_LAST_EQUALS_TOTAL",
+            "total": 11
+          }
+        ],
+        "persistence": false,
+        "primary_observation": {
+          "ended_at": "2026-10-15T15:15:38.789227+00:00",
+          "started_at": "2026-10-15T15:15:28.198885+00:00"
+        },
+        "records": [
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Land At Prince's Gate Prince Street Oldham OL1 3TL"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Variation to Conditions associated with planning permission FUL/354326/25 to allow for amendments to Blocks A and B, including removal of link building, alterations to building facade details and layout of internal facilities, introduction of 4 additional residential units, changes to landscaping and public realm, and amendments to the sustainable energy strategy."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 06 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 06 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "VAR/356938/26",
+            "source_key": "TMFZ5RMCFKJ00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TMFZ5RMCFKJ00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "66 Merton Avenue Oldham OL8 4JF"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Non Material Amendment application - The dormer has been constructed slightly larger than shown on the previously approved drawings, with its width aligned to the existing ground-floor and first-floor window openings below relating to app no. HOU/355872/26."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Mon 05 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Mon 05 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "NMA/356927/26",
+            "source_key": "TM9RK6MCFIP00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM9RK6MCFIP00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "184 Windsor Road Oldham OL8 1RG"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Two storey side extension to form annex, including lower ground floor level and attic"
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 06 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 06 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356933/26",
+            "source_key": "TMFS6ZMCFK600",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TMFS6ZMCFK600&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "9 Alan Avenue Failsworth Oldham M35 0PR"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Single storey side extension."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Tue 06 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 08 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356930/26",
+            "source_key": "TMFFQSMCFJN00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TMFFQSMCFJN00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "8 Carrbrook Drive Royton Oldham OL2 6DD"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Single storey rear extension replacing existing conservatory."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Mon 05 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 08 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356926/26",
+            "source_key": "TM9RILMCFIM00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM9RILMCFIM00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Greave Head Greave Park Uppermill Oldham OL3 6LB"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Single storey side extension 2) Alterations to garage roof to provide new storage in the attic space."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 08 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356921/26",
+            "source_key": "TM8807MCFHN00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM8807MCFHN00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "23 Brierley Avenue Failsworth Oldham M35 0RG"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Demolition of rear conservatory 2) Part single, part two storey rear extension"
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356919/26",
+            "source_key": "TM7WV3MCFH100",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM7WV3MCFH100&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "9 Cathedral Road Chadderton Oldham OL9 0AT"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Two storey side extension 2) Alterations to the front elevation."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 01 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356916/26",
+            "source_key": "TM627TMCFG800",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM627TMCFG800&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "31 Saint Marys Drive Greenfield Oldham OL3 7DT"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "1) Single storey side and rear extension 2) Front porch."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 01 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Thu 01 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "HOU/356915/26",
+            "source_key": "TM6277MCFG500",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM6277MCFG500&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "Land East Of Albert Street Hollinwood Oldham OL8 3QR"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Discharge of condition 4 (Coal sign off) relating to application FUL/351218/23"
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "CND/356925/26",
+            "source_key": "TM8KH1MCFID00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM8KH1MCFID00&activeTab=summary"
+          },
+          {
+            "fields": {
+              "address": {
+                "locator": "p.address",
+                "state": "PRESENT_VALUE",
+                "value": "National Grid Substation Land Off Broadgate Oldham"
+              },
+              "proposal": {
+                "locator": "a.summaryLink",
+                "state": "PRESENT_VALUE",
+                "value": "Discharge of condition 3 (Noise) associated with application VAR/353062/24."
+              },
+              "received_date": {
+                "locator": "p.metaInfo:Received",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              },
+              "validated_date": {
+                "locator": "p.metaInfo:Validated",
+                "state": "PRESENT_VALUE",
+                "value": "Fri 02 Oct 2026"
+              }
+            },
+            "identity_state": "PRESENT_VALUE",
+            "reference": "CND/356920/26",
+            "source_key": "TM82F2MCFHG00",
+            "source_url": "https://planningpa.oldham.gov.uk/online-applications/applicationDetails.do?keyVal=TM82F2MCFHG00&activeTab=summary"
+          }
+        ],
+        "requested_interval": [
+          "2026-10-01",
+          "2026-10-07"
+        ],
+        "resource": {
+          "adapter": "idox",
+          "budget_exhaustion": false,
+          "council": "oldham",
+          "elapsed_seconds": 10.392,
+          "outcome": "UNKNOWN",
+          "received_bytes": 268611,
+          "redirects": 0,
+          "reference": "RECEIVED:2026-10-01:2026-10-07",
+          "requests_attempted": 5,
+          "retries": 0
+        },
+        "response_provenance": [
+          {
+            "body_sha256": "5db4212e29a1f60dec6dd6fa07566ece29559444a345668090e49884da9db214",
+            "parser_body_sha256": "5db4212e29a1f60dec6dd6fa07566ece29559444a345668090e49884da9db214",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "95ddbdd7120ef26d0fa3052c438401885ed78535d3a455535fbc98f91585fb98",
+            "parser_body_sha256": "95ddbdd7120ef26d0fa3052c438401885ed78535d3a455535fbc98f91585fb98",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "b795b2e64f93c8f9c55e34c528ae6cef4795e3eceab1eeec42931b4e2b996863",
+            "parser_body_sha256": "b795b2e64f93c8f9c55e34c528ae6cef4795e3eceab1eeec42931b4e2b996863",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "1c07a111cc388e3501d6b2541ba14152b947d8903103bf05a50e320516ca6f18",
+            "parser_body_sha256": "1c07a111cc388e3501d6b2541ba14152b947d8903103bf05a50e320516ca6f18",
+            "source_encoding": "UTF-8"
+          },
+          {
+            "body_sha256": "e34b0ce85b61c412811a8b1c902a97f8bf1ebc7fb5c54b94fd781ee7dcc33628",
+            "parser_body_sha256": "e34b0ce85b61c412811a8b1c902a97f8bf1ebc7fb5c54b94fd781ee7dcc33628",
+            "source_encoding": "UTF-8"
+          }
+        ],
+        "sort": "REFERENCE_DESCENDING",
+        "source_qualification": "CANDIDATE_CONTRACT",
+        "unique_references": 11
+      },
+      "window_run": "38758465439"
+    }
+  ]
+}
