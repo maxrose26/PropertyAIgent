@@ -74,7 +74,7 @@ def test_locator_reader_uses_only_reference_and_valid_date():
 
 def test_council_configuration_preserves_missing_optional_date():
     from verification.discovery.arcus_ui_config import SALFORD,ROCHDALE,UI_CASES
-    assert set(UI_CASES)=={'discovery_manchester_ui_window','discovery_salford_ui_window','discovery_rochdale_ui_window'}
+    assert set(UI_CASES)=={'discovery_manchester_ui_window','discovery_salford_ui_window','discovery_rochdale_ui_window','discovery_manchester_screening_20261001_03'}
     c=card();c['links'][0]['href']=c['links'][0]['href'].replace('arcusbe.manchester.gov.uk',SALFORD.host)
     c['fields']=c['fields'][:1]
     _,_,_,rows=qualify_segment('Showing 1 to 1 of 1 results',[c],1,config=SALFORD)

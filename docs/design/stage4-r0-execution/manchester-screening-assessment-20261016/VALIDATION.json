@@ -1,0 +1,41 @@
+{
+  "base": "3e7e017611f35e7e170ce7e4f7da80bdd8a43cd8",
+  "accepted_evidence": "12f6fec8a05ef7988217594b8132889fbabf2c39",
+  "focused": {
+    "passed": 109,
+    "failed": 0,
+    "scope": "new assessment plus Arcus UI/transport, metadata, narrow continuation and instrumented probe regressions",
+    "network": "denied by ah-offline-pytest.py"
+  },
+  "independent_review": {
+    "agent": "screening_review",
+    "result": "PASS after corrections",
+    "findings_resolved": [
+      "full literal citations",
+      "exact date labels",
+      "optional locator timeout",
+      "missing proposal/citation completeness",
+      "row/aggregate truncation flags"
+    ],
+    "limitation": "implementation review is not source or Stage4 acceptance"
+  },
+  "initial_local_validation": "Incomplete temporary dependencies caused an existing Oldham B2 failure; resolved using unchanged repository requirements.lock. Frozen-route expectation updated for the explicitly authorised new case; final92pass.",
+  "source_file_sha256": {
+    "verification/discovery/screening_capture.py": "4e8e255af6d798829640cf3e2e26141930647a5335bc1312bec1b41e1e526d46",
+    "verification/discovery/screening_assessment.py": "354257c481367219c2879dce967d4890fb82aa21706535be3a9be58b47cfee16",
+    "verification/discovery/arcus_ui_config.py": "439d99ce43c3168eb6f68117cf071d52f840d5fb66d16ac8b57a0cd138f22d4d",
+    "verification/discovery/arcus_ui_window.py": "7f9f393c0f265a0c980df8edfb3c27c860c6e41272c08417dc65c29820fc3afe",
+    "verification/discovery/r0_proposal.py": "9020e73c4824adbc0f792607638e55dba2157fd0f08e1442216e9e6683017405",
+    "verification/direct_reference/instrumented_probe.py": "b203dbe44060695f6ef68033021de8bce12382608fd7e7a39c450e6e8577d2f2",
+    ".github/workflows/stage4-manchester-screening-assessment-once.yml": "4005e2b5915a36614ece774fcb48ca1dd57da0dcab8dd786f9f1d1e0c4fd194b",
+    "tests/test_discovery_screening_assessment.py": "e420333c49dfe1932227cf93eba3fc29d766060bebba6ba382cd24eaa04ecda9"
+  },
+  "no_live_execution_yet": true,
+  "hosted_first_head": {
+    "head": "85b456f110d6fe9d3e231d49eeac9bba30a51932",
+    "discovery_run": 38879711209,
+    "result": "1FAILED_650PASSED",
+    "failure": "Legacy parametrised test assumed all Arcus source profiles use original dates. Fixed expectation to include approved assessment dates; production capture unchanged.",
+    "postgres_admission": "PASS"
+  }
+}

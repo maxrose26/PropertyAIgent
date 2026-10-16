@@ -271,6 +271,8 @@ async def probe(case, window=None, metadata=False):
     from playwright.async_api import async_playwright
     app_id, reference, destination = CASES[case]
     ui_config=UI_CASES.get(case)
+    if ui_config is not None and ui_config.assessment_metadata and window!=('2026-10-01','2026-10-03'):
+        raise ValueError('ASSESSMENT_FIXED_WINDOW')
     if window is not None:
         if ui_config is None:raise ValueError('listing window only')
         from verification.discovery.arcus_ui_config import dated_config

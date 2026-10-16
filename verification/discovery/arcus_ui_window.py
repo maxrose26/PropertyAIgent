@@ -53,7 +53,10 @@ def qualify_segment(marker,cards,expected_first,previous_total=None,config=MANCH
             'source_url':u.geturl(),'validated_date':{'state':'PRESENT_VALUE','literal':dates[0]} if config.row_date else {'state':'UNKNOWN','literal':None},
             'materiality':'POTENTIALLY_MATERIAL','relationship':'UNKNOWN',
             'field_capture_scope':['reference','validated_date'] if config.row_date else ['reference']})
-        if config.capture_metadata:
+        if config.assessment_metadata:
+            from .screening_capture import project_fields
+            rows[-1].update(project_fields(c))
+        elif config.capture_metadata:
             metadata={}
             for key,names,limit in [('proposal',{'proposal','description'},1024),('address',{'site address','location of works'},600),('application_type',{'application type'},160)]:
                 values=[x for x in fields if x['label'].casefold() in names]
@@ -98,6 +101,12 @@ async def read_cards(page,config=MANCHESTER):
             value=parts[1].strip()
             if len(value)>160: raise ValueError('field value bound')
             fields.append({'label':name,'value':value})
+        if config.assessment_metadata:
+            from .screening_capture import capture_fields
+            captured=await capture_fields(items)
+            out.append({'links':[{'text':ref,'href':href}],'fields':fields,
+                        'assessment_capture':captured})
+            continue
         if config.capture_metadata:
             label_counts={}
             # Exact visible labels only; never read applicant/contact fields or raw HTML.
