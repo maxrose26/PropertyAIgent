@@ -1,0 +1,246 @@
+{
+  "authority": "AUTHORISE_MANCHESTER_METADATA_20261001_03_ONCE",
+  "case": "discovery_manchester_screening_20261001_03",
+  "db_operations": 0,
+  "expected_current_count": null,
+  "historical_context": [
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-000264",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl000007WJ1tMAG",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000007WJ1tMAG?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "OTH-2026-001837",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AJduLMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJduLMAT?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "OTH-2026-001838",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AJdvxMAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJdvxMAD?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "OTH-2026-001839",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AJdxZMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJdxZMAT?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001845",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AJh0HMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJh0HMAT?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001847",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AJk6DMAT",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AJk6DMAT?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "OTH-2026-001828",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AINurMAH",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AINurMAH?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "OTH-2026-001832",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AIdGTMA1",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIdGTMA1?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001833",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AIjs9MAD",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIjs9MAD?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001382",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl000009WpBtMAK",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl000009WpBtMAK?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001711",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000A61IDMAZ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61IDMAZ?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001717",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000A61TVMAZ",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000A61TVMAZ?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "PLA-2026-001826",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AIDM1MAP",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIDM1MAP?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    },
+    {
+      "council": "manchester",
+      "disposition": "BLOCKED_METADATA_SOURCE_SHAPE_UNPROVEN",
+      "reference": "OTH-2026-001827",
+      "source_checkpoint_sha256": "130c32a0030333e0b8f53f0755a663d87901bb187da659fd64707d4cae6c69e5",
+      "source_fields_absent": false,
+      "source_record_id": "a1DSl00000AIJeLMAX",
+      "source_url": "https://arcusbe.manchester.gov.uk/pr/s/detail/a1DSl00000AIJeLMAX?c__r=Arcus_BE_Public_Register",
+      "window": {
+        "council": "manchester",
+        "end": "2026-10-03",
+        "semantics": "VALIDATED",
+        "start": "2026-10-01"
+      }
+    }
+  ],
+  "limits": {
+    "accounted_bytes": 20971520,
+    "cleanup_upload_seconds": 160,
+    "db_operations": 0,
+    "detail_calls": 0,
+    "document_calls": 0,
+    "job_seconds": 480,
+    "model_calls": 0,
+    "observations": 1,
+    "output_bytes": 2097152,
+    "owned_rss_bytes": 1610612736,
+    "pages": 6,
+    "requests": 80,
+    "rows": 60,
+    "setup_seconds": 260,
+    "source_retries": 0,
+    "source_rss_bytes": 1073741824,
+    "source_worker_seconds": 45,
+    "supervised_active_seconds": 60,
+    "worker_audit_bytes": 512000
+  },
+  "retries": 0,
+  "window": {
+    "council": "manchester",
+    "end": "2026-10-03",
+    "semantics": "VALIDATED",
+    "start": "2026-10-01"
+  }
+}

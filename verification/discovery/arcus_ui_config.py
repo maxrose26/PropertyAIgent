@@ -17,6 +17,7 @@ class UIConfig:
     capture_metadata: bool=False
     start: str=START
     end: str=END
+    assessment_metadata: bool=False
 
     @property
     def host(self):return self.destination.split('/')[2]
@@ -65,3 +66,10 @@ def dated_config(config,start,end):
     value=base64.b64encode(json.dumps(payload,separators=(',',':')).encode()).decode()
     destination=urlunsplit((u.scheme,u.netloc,u.path,urlencode([(k,value if k=='c__q' else v) for k,v in pairs]),''))
     return replace(config,destination=destination,start=start,end=end)
+
+# New single-use source profile; existing consumed profiles retain their bytes
+# and default projection. Registration separately binds authority and date.
+SCREENING_CASE='discovery_manchester_screening_20261001_03'
+SCREENING_CONFIG=replace(dated_config(MANCHESTER,'2026-10-01','2026-10-03'),
+    capture_metadata=True,assessment_metadata=True)
+UI_CASES[SCREENING_CASE]=SCREENING_CONFIG
