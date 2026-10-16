@@ -166,7 +166,7 @@ def test_pg_storage_acceptance_intended_restricted_role(pg):
         with pg.connect().execution_options(isolation_level='AUTOCOMMIT') as c:
             c.exec_driver_sql("CREATE ROLE ingestion_untrusted_login LOGIN NOSUPERUSER BYPASSRLS PASSWORD 'disposable_only'; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ingestion_untrusted_login; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO ingestion_untrusted_login;")
             c.exec_driver_sql("CREATE FUNCTION public.json_populate_record(anyelement,json) RETURNS anyelement LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'PUBLIC_SHADOW_FUNCTION'; END $$;")
-            c.exec_driver_sql(script)
+            c.connection.driver_connection.execute(script,prepare=False)
             c.exec_driver_sql("CREATE ROLE ingestion_worker_login LOGIN INHERIT NOSUPERUSER NOBYPASSRLS PASSWORD 'disposable_only'; GRANT ingestion_worker TO ingestion_worker_login;")
             c.exec_driver_sql("CREATE ROLE ingestion_storage_login LOGIN INHERIT NOSUPERUSER NOBYPASSRLS PASSWORD 'disposable_only'; GRANT ingestion_storage_operator TO ingestion_storage_login;")
         def restricted(login):
@@ -216,5 +216,6 @@ def test_pg_storage_acceptance_intended_restricted_role(pg):
             c.exec_driver_sql('DROP FUNCTION IF EXISTS public.json_populate_record(anyelement,json);')
             c.exec_driver_sql('DROP FUNCTION IF EXISTS public.ingestion_seed_storage_test(); DROP FUNCTION IF EXISTS public.ingestion_raise_stop(text);')
             metadata.drop_all(c)
-            for role in roles:c.exec_driver_sql('DROP OWNED BY '+role)
+            for role in roles:
+                if c.scalar(text('SELECT 1 FROM pg_roles WHERE rolname=:role'),{'role':role}):c.exec_driver_sql('DROP OWNED BY '+role)
             for role in roles:c.exec_driver_sql('DROP ROLE IF EXISTS '+role)
