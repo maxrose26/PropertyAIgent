@@ -19,7 +19,7 @@ from tests.test_discovery_ingestion_provisioning_pg import ROLES,PACKAGE
 from tests.test_discovery_ingestion_operational import setup_new
 
 
-def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_identity(record_property,tmp_path):
+def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_identity(record_property,tmp_path,_writer_only=False):
  raw=os.environ.get('INGESTION_PROVISIONING_TEST_URL')
  if not raw:pytest.skip('fixed disposable PG17 service required')
  info=psycopg.conninfo.conninfo_to_dict(raw)
@@ -93,6 +93,9 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
      control['grants'][authority]={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'ingestion_effect_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
+   if _writer_only:
+    _retained_batch_writer(boot,app,seed,bind,lambda:bindings,info,passwords,record_property,tmp_path)
+    return
    bind([k,blocked,other]);l=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
    with pytest.raises(Exception):l.claim(k) # original consumed Salford stop
    assert l.get(k)['attempt_count']==0
@@ -464,3 +467,81 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     if boot.execute('SELECT 1 FROM pg_roles WHERE rolname=%s',(role,)).fetchone():boot.execute(sql.SQL('DROP OWNED BY {} CASCADE').format(sql.Identifier(role)))
    for role in [*extra,*ROLES,'provisioning_migrator']:
     boot.execute(sql.SQL('DROP ROLE IF EXISTS {}').format(sql.Identifier(role)))
+
+
+def test_retained_batch_nominee_writer_budget(record_property,tmp_path):
+ """One focused restricted PG rehearsal; listing fixtures are already complete."""
+ test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_identity(record_property,tmp_path,_writer_only=True)
+
+
+def _retained_batch_writer(boot,app,seed,bind,get_bindings,info,passwords,record_property,tmp_path):
+ from dataclasses import replace,asdict
+ from sqlalchemy.engine import URL
+ from app.ingestion.ledger import digest
+ from app.ingestion.listing_screening import screen_row
+ from verification.discovery.idox_window import WindowConfig
+ from app.ingestion.idox_adapter import IdoxListingContract
+ from tests.test_discovery_ingestion_acceptance import listing_audit
+ from tests.test_discovery_ingestion_ledger import outer
+ from tests.test_discovery_initial_application_contract import projected
+ from tests.test_discovery_admission import envelope
+ from verification.direct_reference.fixtures import summary
+ from verification.ingestion_storage.operational_controller import AcceptanceBinding
+ from verification.ingestion_storage.operational_supervisor import supervise
+ import sys
+ target,detail,_=projected(summary('01780/26',status='Decided',decision='Approve',date='Mon 28 Sep 2026'))
+ cfg=WindowConfig(max_transport_retries=0);audit=listing_audit(target)
+ receipt=IdoxListingContract('controller-idox',cfg,'a'*64).project(audit,outer(),DEFAULT_LIMITS);receipt.pop('window')
+ receipt['durable_archive']=dict(commit='a'*40,path='docs/design/disposable-retained.json',sha256=digest(audit),readback_verified=True)
+ record=receipt['records'][0]
+ subject={'kind':'APPLICATION','council':'bolton','reference':record['reference']}
+ scope={'kind':'DISCOVERY_SCOPE','council':'bolton','start':cfg.start.isoformat(),'end':cfg.end.isoformat(),'semantics':'RECEIVED'}
+ urls=[URL.create('postgresql+psycopg',username=r,password=passwords[r],host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False) for r in ['ingestion_worker_login','ingestion_effect_login','ingestion_application_login']]
+ env=replace(envelope(),reference=record['reference'],displayed_references=(record['reference'],),source_url=record['source_url'],source_record_id=record['source_record_id'])
+ cases=[]
+ for case in ['success','race','uncertain']:
+  # Owner-only retained fixture construction. No source or production access.
+  boot.execute('TRUNCATE public.applications CASCADE')
+  with app.begin() as c:
+   control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one();control.update(global_stop=None,manual_stop=None,hard_stop_generation=0,bolton_exceptions={})
+   c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
+  root=seed('RETAINED_'+case,'DISCOVERY',state='COMPLETE',checkpoint=receipt)
+  child=seed('SCREENED_'+case,'SCREENING',state='COMPLETE',checkpoint=dict(screen_row(record),source_url=record['source_url'],source_record_id=record['source_record_id'],source_sha256=receipt['source_sha256'],proposal=record['fields']['proposal'],application_type=record['fields']['application_type']))
+  plan=dict(capture_key=root,capture_sha256=digest(receipt),first=0,last=1)
+  batch=seed('BATCH_'+case,'LISTING_METADATA',state='COMPLETE',checkpoint=dict(kind='BATCH_PROGRESS_V1',plan=plan,next=1,children=[child]))
+  fact=seed('NOMINEE_'+case,'FACTUAL_REFRESH');next_key=seed('NEXT_'+case,'FACTUAL_REFRESH')
+  with app.begin() as c:
+   c.execute(W.update().where(W.c.key==root).values(subject=scope,contract='controller-idox',outcome={'children':[]}))
+   c.execute(W.update().where(W.c.key==batch).values(subject=scope,contract='listing-batch-v1',revision=digest(plan),dependencies=[root]))
+   c.execute(W.update().where(W.c.key==child).values(subject=subject,contract='listing-screen-v1',revision=digest(record),dependencies=[root]))
+   c.execute(W.update().where(W.c.key==fact).values(subject=subject,dependencies=[child]))
+  authority='INGESTION_TEST_retained_'+case
+  bind([root,batch,child,fact,next_key],authority=authority,source_calls=1,writes=2)
+  prior=dict(slot_key=fact,capture_checkpoint_sha256=digest(receipt),connection_attempts=0,driver_statements=0,returned_data_value_bytes=0,elapsed_seconds=0,connections_closed=True,cleanup='CLOSED',statement_kinds={})
+  binding=AcceptanceBinding(root,child,fact,record['reference'],record['source_url'],record['source_record_id'],digest(record),retained_capture_sha256=digest(receipt),prior_accounting_sha256=digest(prior),screening_batch_key=batch)
+  results=[]
+  for delivery in range(2 if case=='success' else 1):
+   path=tmp_path/('retained-plan-'+case+str(delivery)+'.json');directory=tmp_path/('practical-worker-writer-'+case+str(delivery));output=directory/'worker-result.json'
+   binding=replace(binding,prior_accounting_sha256=digest(prior))
+   path.write_text(json.dumps(dict(mode='execute',authority=authority,binding=asdict(binding),bindings=get_bindings(),listing=audit,detail=detail,target=target,envelope=asdict(env),outer=outer(),prior_database_accounting=prior,writer_case=case,blocked_next_key=next_key),default=str))
+   supervision=supervise([sys.executable,'-m','verification.ingestion_storage.operational_rehearsal','--plan',str(path),'--output',str(output)],environment={'INGESTION_ACCEPTANCE_DISPOSABLE':'PG17_ONLY','INGESTION_ACCEPTANCE_FIXTURE_URLS':json.dumps(urls)},root=directory)
+   result=json.loads(output.read_bytes());prior=result['database_accounting']
+   assert supervision['cleanup']=='CLOSED' and supervision['live_owned_survivors']==0 and supervision['limit_hit'] is None
+   assert prior['cleanup']=='CLOSED' and prior['connections_closed'] and prior['driver_statements']<=120 and prior['connection_attempts']<=16
+   assert result['synthetic_reader_callbacks']['listing']==0
+   if case=='uncertain':assert supervision['exit_code']!=0 and result['error_class']=='UncertainPersistence' and result['subsequent_claim_denied'] is True
+   else:
+    assert supervision['exit_code']==0,(result,supervision)
+    assert result['outcome']==('SUPPORTED_FACTS_VERIFIED' if case=='success' and delivery==0 else 'DISCOVERY_SCREENING_ONLY_ALREADY_KNOWN' if delivery else 'ALREADY_KNOWN')
+   results.append(dict(result=result,supervisor=supervision))
+  stored=boot.execute('SELECT id,status,decision,estimated_unit_count FROM public.applications WHERE council_code=%s AND reference=%s',('bolton',record['reference'])).fetchall()
+  assert len(stored)==1 and stored[0][3] is None
+  assert stored[0][1]==('Decided' if case=='success' else None)
+  if case=='success':assert boot.execute('SELECT attempt_count FROM public.ingestion_work_items WHERE key=%s',(fact,)).fetchone()[0]==1
+  if case=='uncertain':
+   assert boot.execute('SELECT phase FROM public.ingestion_work_items WHERE key=%s',(fact,)).fetchone()[0]=='WRITE_INTENT'
+   assert boot.execute('SELECT attempt_count FROM public.ingestion_work_items WHERE key=%s',(next_key,)).fetchone()[0]==0
+  cases.append(dict(case=case,deliveries=results,committed_rows=len(stored),unit_facts='UNKNOWN',setup='owner_prepared_completed_retained_fixture_not_runtime_source_work'))
+ record_property('retained_writer_cases',json.dumps(cases,sort_keys=True))
+ record_property('retained_writer_capture_sha256',digest(receipt))
+ record_property('production_connections',0)

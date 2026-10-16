@@ -56,6 +56,24 @@ def main():
   co=RehearsalCoordinator(l,{contract.name:contract,'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
   if not l.authority.startswith('INGESTION_TEST_'):raise ValueError('FIXTURE_AUTHORITY_ONLY')
   counts={'listing':0,'detail':0}
+  # Faults exist only in this fixed-loopback disposable command. No production
+  # controller or source path consumes these private fixture selectors.
+  if plan.get('writer_case')=='race':
+   import app.pipeline.discovery_admission as admission
+   real_admit=admission.admit_identity
+   def competing_admission(engine,envelope):
+    winner=real_admit(engine,envelope)
+    assert winner['outcome']=='CREATED_PENDING'
+    admission.admit_identity=real_admit
+    return real_admit(engine,envelope)
+   admission.admit_identity=competing_admission
+  if plan.get('writer_case')=='uncertain':
+   from sqlalchemy.orm import Session
+   real_commit=Session.commit;lost=[False]
+   def lost_acknowledgement(session):
+    real_commit(session)
+    if session.bind is engines[2] and not lost[0]:lost[0]=True;raise RuntimeError('DISPOSABLE_COMMIT_ACK_LOST')
+   Session.commit=lost_acknowledgement
   def listing(_):counts['listing']+=1;return audit,plan['outer']
   def detail(_):counts['detail']+=1;return plan['detail'],plan['outer']
   from app.ingestion.batching import capture_once,process_batch
@@ -83,6 +101,12 @@ def main():
   result['synthetic_reader_callbacks']=counts
  except BaseException as exc:
   result['error_class']=type(exc).__name__
+  if plan.get('writer_case')=='uncertain' and type(exc).__name__=='UncertainPersistence':
+   try:l.claim(plan['blocked_next_key'])
+   except Exception as denied:
+    if 'GLOBAL_STOP' not in str(denied):raise
+    result['subsequent_claim_denied']=True
+   else:raise AssertionError('UNCERTAIN_WRITE_DID_NOT_STOP_NEXT_CLAIM')
   raise
  finally:
   if 'counts' in locals():result['synthetic_reader_callbacks']=counts
@@ -91,6 +115,6 @@ def main():
   raw=json.dumps(result,sort_keys=True,allow_nan=False).encode()
   if len(raw)>512*1024:raise ValueError('WORKER_AUDIT_BOUND')
   with a.output.open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
- return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY','CAPTURE_COMPLETE','CAPTURED_PROCESSING_BLOCKED','BATCH_SCREENED','BATCH_ALREADY_COMPLETE','CLAIM_RECOVERED'} and account['cleanup']=='CLOSED' else 1
+ return 0 if result['outcome'] in {'SUPPORTED_FACTS_VERIFIED','DISCOVERY_SCREENING_ONLY','DISCOVERY_SCREENING_ONLY_ALREADY_KNOWN','ALREADY_KNOWN','CAPTURE_COMPLETE','CAPTURED_PROCESSING_BLOCKED','BATCH_SCREENED','BATCH_ALREADY_COMPLETE','CLAIM_RECOVERED'} and account['cleanup']=='CLOSED' else 1
 
 if __name__=='__main__':raise SystemExit(main())
