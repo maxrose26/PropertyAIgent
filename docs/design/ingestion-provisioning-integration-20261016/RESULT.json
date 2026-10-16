@@ -1,0 +1,105 @@
+{
+  "stage": "4_OPEN",
+  "status": "INTEGRATED_SECURE_PROVISIONING_BLOCKED",
+  "accepted_candidate": "b8eba1cb5a4f33cda82970fbe997c699c491338b",
+  "accepted_tree": "66844ee85ca97d74f13b5b17aec034d67a040a3c",
+  "accepted_evidence": "0077420973af056e9c92d75845d11bcd17a6132c",
+  "merge_commit": "a3a698beb0542579042bbcc48e8cf7a66f13514f",
+  "merge_tree": "66844ee85ca97d74f13b5b17aec034d67a040a3c",
+  "parents": [
+    "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+    "b8eba1cb5a4f33cda82970fbe997c699c491338b"
+  ],
+  "skip_render_in_merge_message": true,
+  "candidate_checks": {
+    "success": 9,
+    "total": 9
+  },
+  "branch_protection_read": "403 Resource not accessible by integration; normal GitHub guarded merge succeeded without bypass",
+  "registration": "NOT_STARTED_PREREQUISITE_BLOCK",
+  "production": {
+    "connection_attempts": 0,
+    "statements": 0,
+    "role_changes": 0,
+    "migration": false,
+    "credential_generation": false,
+    "secret_operations": 0,
+    "activation": false,
+    "seed": false,
+    "revocation": "NOT_REQUIRED_NO_NEW_ACCESS_PROVISIONED",
+    "source_calls": 0,
+    "application_reads": 0,
+    "application_writes": 0,
+    "factual_writes": 0,
+    "new_owned_production_resources": false,
+    "cleanup": "NOT_APPLICABLE_NOT_STARTED"
+  },
+  "authority": {
+    "mapping": "AUTHORISE_RESTRICTED_INGESTION_CREDENTIAL_MAPPING_ONCE_20261016",
+    "consumed": false,
+    "connection_allowance_used": 0,
+    "supervised_production_seconds_used": 0
+  },
+  "prerequisites": {
+    "required_grant_options": "UNESTABLISHED_PREVIOUS_CAPTURE_DID_NOT_CHECK_WITH_GRANT_OPTION",
+    "ownership_transfer": "DISPOSABLE_VALIDATED_PRODUCTION_CONDITIONAL",
+    "effective_ambient_permissions": "UNESTABLISHED_PRODUCTION_NEW_LOGINS_ABSENT_AT_ACCEPTED_CAPTURE",
+    "provider_password_scram_log_protection": "UNESTABLISHED_BLOCKER",
+    "protected_mapping_owner_access": "UNESTABLISHED_CONNECTOR_ENVIRONMENT_SECRET_METADATA_ROUTE_UNAVAILABLE"
+  },
+  "blocker": {
+    "code": "SECURE_PROVISIONING_PROVIDER_LOG_PROTECTION_UNESTABLISHED",
+    "mechanism": "Reviewed client constructs ALTER ROLE with client-generated SCRAM verifier as a SQL literal. Client encryption/TLS do not establish server/audit/pooler/drain redaction.",
+    "missing": "Project-specific effective statement/error/duration/audit/extension settings and provider-backed protection for verifier-bearing SQL across relevant capture, including failures. Owner acknowledgement flag alone rejected.",
+    "forbidden_workarounds": [
+      "No logging disable",
+      "No stronger access",
+      "No different endpoint",
+      "No unsupported attestation",
+      "No password experiment in production",
+      "No unsupported replacement password operation"
+    ],
+    "owner_action": "Use existing authorised Supabase owner/support access to obtain non-secret project-specific logging/audit configuration and provider documentation or support confirmation covering the exact SQL operation and capture layers. Do not provide credentials, verifier values or raw log exports."
+  },
+  "accepted_preflight": {
+    "run": 38907801607,
+    "number": 1,
+    "attempt": 1,
+    "repeated": false,
+    "evidence": "b48769539effa9e209f79cd392120e7919c5bc07"
+  },
+  "positions": {
+    "provisioning": "NOT_STARTED",
+    "production_storage": "NOT_ACCEPTED",
+    "access_disabled_after_test": "NOT_APPLICABLE_TEST_NOT_RUN",
+    "operational_pipeline": "OUTSTANDING"
+  },
+  "preserved": [
+    "IDs1504-1508",
+    "Consumed Salford global stop",
+    "Historical authorities and accepted preflight",
+    "Existing DATABASE_URL"
+  ],
+  "references": [
+    {
+      "url": "https://www.postgresql.org/docs/17/runtime-config-logging.html",
+      "finding": "Statement and error logging can include SQL text; sensitive information may be exposed. Bind-parameter controls do not establish redaction of an embedded SQL literal."
+    },
+    {
+      "url": "https://supabase.com/docs/guides/database/postgres/postgres-log-config",
+      "finding": "Documents ddl statement logging and role/project configuration inspection; published defaults do not prove this project's effective settings or redaction."
+    },
+    {
+      "url": "https://supabase.com/docs/guides/database/extensions/pgaudit",
+      "finding": "Documents statement and parameter fields in audit output; no project-specific verifier-protection evidence obtained."
+    },
+    {
+      "url": "https://render.com/docs/deploys",
+      "finding": "Skip phrase in merge commit suppresses commit-triggered auto-deploy. No deploy API invoked; live Render workspace state not inspected because connector has no selected workspace."
+    }
+  ],
+  "post_merge_checks": {
+    "success": 7,
+    "total": 7
+  }
+}
