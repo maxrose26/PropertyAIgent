@@ -48,3 +48,12 @@ def test_uncertain_database_commit_stops_before_secret_upload():
  c=connection();c.transaction.return_value.__exit__.side_effect=RuntimeError('LOST_ACK');runner=MagicMock()
  with pytest.raises(RuntimeError,match='LOST_ACK'):install_mapping(c,attested=True,runner=runner,password_factory=lambda:'DISPOSABLE_PRIVATE_VALUE_'*3)
  runner.assert_not_called();assert c.pgconn.encrypt_password.call_count==1
+
+
+def test_even_valid_owner_authority_and_tty_cannot_start_blocked_method(monkeypatch):
+ monkeypatch.setattr('sys.argv',['credential_mapping','--authority',credential_mapping.AUTHORITY,'--provider-password-redaction-attested'])
+ monkeypatch.setattr('sys.stdin.isatty',lambda:True)
+ monkeypatch.setattr('sys.stderr.isatty',lambda:True)
+ prompt=MagicMock();monkeypatch.setattr(credential_mapping.getpass,'getpass',prompt)
+ with pytest.raises(SystemExit,match='SCRAM_SQL_PROVISIONING_BLOCKED'):credential_mapping.main()
+ prompt.assert_not_called()
