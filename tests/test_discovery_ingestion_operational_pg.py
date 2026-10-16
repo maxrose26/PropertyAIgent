@@ -24,8 +24,8 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
  if not raw:pytest.skip('fixed disposable PG17 service required')
  info=psycopg.conninfo.conninfo_to_dict(raw)
  assert (info.get('host'),info.get('port'),info.get('dbname'),info.get('user'))==('127.0.0.1','5432','ingestion_provisioning_test','provisioning_bootstrap')
- extra=['ingestion_effect_broker','ingestion_recovery_operator','operational_broker_login','operational_recovery_login','operational_untrusted']
- passwords={r:secrets.token_urlsafe(48) for r in ['provisioning_migrator','ingestion_worker_login','ingestion_storage_login',*extra[-3:]]}
+ extra=['ingestion_application_writer','ingestion_effect_broker','ingestion_recovery_operator','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']
+ passwords={r:secrets.token_urlsafe(48) for r in ['provisioning_migrator','ingestion_worker_login','ingestion_storage_login','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']}
  def connect(role):return psycopg.connect(**{**info,'user':role,'password':passwords[role]},autocommit=True,prepare_threshold=None,connect_timeout=3)
  def engine(role):
   from sqlalchemy.engine import URL
@@ -41,13 +41,15 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
     m.execute(Path('docs/design/ingestion-operational-20261016/worker.sql').read_text())
     assert m.execute("SELECT pg_has_role(current_user,'ingestion_storage_owner','SET'),has_schema_privilege('ingestion_storage_owner','public','CREATE')").fetchone()==(False,False)
    # Fixture-only credential activation. Production helper remains BLOCKED.
-   for role in ['ingestion_worker_login','ingestion_storage_login',*extra[-3:]]:
+   for role in ['ingestion_worker_login','ingestion_storage_login','ingestion_effect_login','ingestion_recovery_login','operational_untrusted','ingestion_application_login']:
     if role not in ROLES:boot.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
     else:boot.execute(sql.SQL('ALTER ROLE {} LOGIN PASSWORD {}').format(sql.Identifier(role),sql.Literal(passwords[role])))
-   boot.execute('GRANT ingestion_effect_broker TO operational_broker_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
-   boot.execute('GRANT ingestion_recovery_operator TO operational_recovery_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
-   worker=engine('ingestion_worker_login');broker=engine('operational_broker_login');app=engine('provisioning_bootstrap');engines.extend([worker,broker,app])
+   boot.execute('GRANT ingestion_effect_broker TO ingestion_effect_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
+   boot.execute('GRANT ingestion_recovery_operator TO ingestion_recovery_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
+   worker=engine('ingestion_worker_login');broker=engine('ingestion_effect_login');app=engine('provisioning_bootstrap');engines.extend([worker,broker,app])
    Base.metadata.create_all(app)
+   boot.execute(Path('docs/design/ingestion-operational-acceptance-20261016/application-writer.sql').read_text())
+   boot.execute('GRANT ingestion_application_writer TO ingestion_application_login WITH ADMIN FALSE, INHERIT TRUE, SET FALSE')
    with Session(app) as s:s.add(Council(code='bolton',name='Bolton',base_url='https://paplanning.bolton.gov.uk',date_field_mode='received',doc_system='idox'));s.commit()
    # Bootstrap constructs fixtures/allowances only; no worker release API exists.
    def seed(reference,task='SCREENING',state='QUEUED',checkpoint=None):
@@ -63,7 +65,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
      for key in keys:
       row=c.execute(select(W).where(W.c.key==key)).mappings().one();bindings[key]={x:row[x] for x in ('task','contract','revision','subject')}
      control=c.execute(select(W.c.outcome).where(W.c.key=='0'*64)).scalar_one()
-     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'operational_broker_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
+     control['grants']['INGESTION_TEST_sql']={'keys':keys,'contracts':sorted({bindings[x]['contract'] for x in keys}),'expires_at':time.time()+600,'source_calls':source_calls,'writes':writes,'login':'ingestion_worker_login','effect_login':'ingestion_effect_login','workers':['one','two'],'bindings':{key:bindings[key] for key in keys},'detail_source_keys':[key for key in keys if source_calls and bindings[key]['task']=='FACTUAL_REFRESH'],'completion_outcomes':{'DISCOVERY':['ENUMERATED_METADATA_RETAINED'],'SCREENING':['SCREENED','ALREADY_KNOWN','INSUFFICIENT_EVIDENCE','SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH','DEEPER_PROCESSING_EXCLUDED_FOR_THIS_SLICE'],'FACTUAL_REFRESH':['SUPPORTED_FACTS_VERIFIED','ALREADY_KNOWN']}}
      c.execute(W.update().where(W.c.key=='0'*64).values(outcome=control))
    bind([k,blocked,other]);l=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
    with pytest.raises(Exception):l.claim(k) # original consumed Salford stop
@@ -92,7 +94,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    with connect('ingestion_worker_login') as c:
     with pytest.raises(psycopg.Error):c.execute("SELECT public.ingestion_worker_step('resolve_effect',%s,%s,%s,'INGESTION_TEST_sql',%s,%s)",(k,old.fence,old.owner,json.dumps(bindings[k]),json.dumps({'outcome':'SUPPORTED_FACTS_VERIFIED','cleanup':'CLOSED','accounting_complete':True})))
    boot.execute('UPDATE public.ingestion_work_items SET lease_until=0 WHERE key=%s',(k,))
-   with connect('operational_recovery_login') as recovery:result=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(k,old.fence)).fetchone()[0]
+   with connect('ingestion_recovery_login') as recovery:result=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(k,old.fence)).fetchone()[0]
    assert result['state']=='DEFERRED' and result['checkpoint']['retained_sha256']=='a'*64
    fresh=l.claim(k)
    with pytest.raises(Exception):l.checkpoint(old,{'old':'stale'})
@@ -156,7 +158,7 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    from dataclasses import asdict
    import sys
    from verification.ingestion_storage.operational_supervisor import supervise
-   urls=[URL.create('postgresql+psycopg',username=r,password=passwords.get(r,info['password']),host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False) for r in ['ingestion_worker_login','operational_broker_login','provisioning_bootstrap']]
+   urls=[URL.create('postgresql+psycopg',username=r,password=passwords.get(r,info['password']),host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False) for r in ['ingestion_worker_login','ingestion_effect_login','ingestion_application_login']]
    fixed=AcceptanceBinding(scope,child,fact,target['reference'],target['source_url'],target['source_identifier'],digest(record))
    plan=tmp_path/'plan.json';root=tmp_path/'controller';output=root/'worker-result.json'
    plan.write_text(json.dumps(dict(binding=asdict(fixed),bindings=bindings,listing=source_audit,detail=raw_source,target=target,envelope=asdict(env),outer=outer()),default=str))
@@ -167,17 +169,39 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    assert supervised['cleanup']=='CLOSED' and supervised['exit_code']==0 and supervised['limit_hit'] is None, (supervised,result)
    assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
    assert account['cleanup']=='CLOSED' and account['connection_attempts']<=16 and account['driver_statements']<=120
+   with connect('ingestion_application_login') as aw:
+    for statement in ["UPDATE public.applications SET estimated_unit_count=999","UPDATE public.applications SET site_id=NULL","DELETE FROM public.applications","SELECT * FROM public.ingestion_work_items","SET ROLE ingestion_storage_owner","SELECT public.ingestion_worker_step('claim','x',0,'x','x','{}','{}')"]:
+     with pytest.raises(psycopg.Error) as denied:aw.execute(statement)
+     assert denied.value.sqlstate=='42501'
    # The restricted worker cannot forge a detail receipt or bypass source intent.
    bypass=seed('BYPASS','FACTUAL_REFRESH');bind([bypass],source_calls=1,writes=2)
    neg=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,broker_engine=broker)
    nc=neg.claim(bypass)
    with pytest.raises(Exception):neg.intent(nc,'writes',cost=2)
    with pytest.raises(Exception):neg.checkpoint(nc,{'kind':'DETAIL_RECEIPT_V1'})
+   for mode in ['unsupported','known_race']:
+    boot.execute('TRUNCATE public.applications CASCADE')
+    check_fact=seed('DETAIL_'+mode,'FACTUAL_REFRESH')
+    boot.execute('UPDATE public.ingestion_work_items SET subject=%s,dependencies=%s WHERE key=%s',(json.dumps({'kind':'APPLICATION','council':'bolton','reference':target['reference']}),json.dumps([child]),check_fact))
+    bind([scope,child,check_fact],source_calls=1,writes=2)
+    checker=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings,application_engine=app,broker_engine=broker)
+    check_co=Coordinator(checker,{'operational-fixture':accepted_idox_new_identity('operational-fixture',target)})
+    if mode=='unsupported':
+     _,detail,_=projected(summary('01780/26',status='Awaiting decision',omit=('Decision','Decision Issued Date')))
+    else:detail=raw_source
+    def callback(_):
+     if mode=='known_race':
+      with Session(app) as fixture:fixture.add(Application(council_code='bolton',reference=target['reference'],status='PRESERVED'));fixture.commit()
+     return detail,outer()
+    honest=check_co.new_identity_source(checker.claim(check_fact),envelope=env,council=get_council('bolton'),supervised_reader=callback)
+    assert honest['outcome']==('FACTS_WITHHELD' if mode=='unsupported' else 'ALREADY_KNOWN')
+    assert checker.get(check_fact)['checkpoint']['kind']=='DETAIL_RECEIPT_V1'
+    assert checker.get(check_fact)['state']==('UNSUPPORTED_CONTRACT' if mode=='unsupported' else 'COMPLETE')
    # Abandoned write intent is recovered as uncertain, globally stops next work.
    uncertain=seed('UNCERTAIN','FACTUAL_REFRESH');bind([uncertain,other],writes=1)
    x=SQLLedger(worker,owner='one',authority='INGESTION_TEST_sql',bindings=bindings);cl=x.claim(uncertain);x.intent(cl,'writes')
    boot.execute('UPDATE public.ingestion_work_items SET lease_until=0 WHERE key=%s',(uncertain,))
-   with connect('operational_recovery_login') as recovery:r=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(uncertain,cl.fence)).fetchone()[0]
+   with connect('ingestion_recovery_login') as recovery:r=recovery.execute('SELECT public.ingestion_recover_abandoned(%s,%s,true)',(uncertain,cl.fence)).fetchone()[0]
    assert r['state']=='PERSISTENCE_UNCERTAIN'
    with pytest.raises(Exception):x.claim(other)
    record_property('real_restricted_sql_claims',True);record_property('shared_admission_b2_readback',True);record_property('production_connections',0)

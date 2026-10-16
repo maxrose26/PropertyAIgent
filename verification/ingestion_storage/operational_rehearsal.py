@@ -21,7 +21,7 @@ def main():
  p=argparse.ArgumentParser();p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
  if os.environ.get('INGESTION_ACCEPTANCE_DISPOSABLE')!='PG17_ONLY' or a.output.exists():raise ValueError('DISPOSABLE_PRIVATE_ONLY')
  urls=json.loads(os.environ.pop('INGESTION_ACCEPTANCE_FIXTURE_URLS'))
- expected=['ingestion_worker_login','operational_broker_login','provisioning_bootstrap']
+ expected=['ingestion_worker_login','ingestion_effect_login','ingestion_application_login']
  if len(urls)!=3:raise ValueError('EXACT_FIXTURE_PRINCIPALS')
  for raw,role in zip(urls,expected):
   u=make_url(raw)

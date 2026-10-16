@@ -36,6 +36,7 @@ class DatabaseBudget:
         u=make_url(url)
         disposable=(u.host=='127.0.0.1' and u.port==5432 and u.database=='ingestion_provisioning_test')
         if not disposable:
+            if u.username not in {'ingestion_worker_login','ingestion_effect_login','ingestion_application_login'}:raise Denied('NO_MIGRATION_OR_STRONGER_RUNTIME_PRINCIPAL')
             from .tls_trust import verified_trust
             ca,_=verified_trust()
             if (u.host,u.port,u.database)!=('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres') or ssl!={'sslmode':'verify-full','sslrootcert':str(ca)}:raise Denied('REVIEWED_TLS_ENDPOINT_REQUIRED')
@@ -101,6 +102,7 @@ class AcceptanceBinding:
     source_record_id:str
     # Binds the nominated retained row; changed row = HOLD, never forced match.
     listing_revision:str
+    retained_capture_sha256:str|None=None
 
 
 def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None):
@@ -112,12 +114,15 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     l=coordinator.ledger;check()
     if (binding.reference,binding.source_url,binding.source_record_id)!=(envelope.reference,envelope.source_url,envelope.source_record_id):raise Denied('NOMINATED_IDENTITY_BINDING')
     root=l.get(binding.discovery_key)
-    if root['state']=='COMPLETE':raise Denied('CONSUMED_OBSERVATION_NO_REPLAY')
-    capture=[]
-    def listing(row):
-        check();value=listing_reader(row);capture.append(value);return value
-    children=coordinator.idox_source(l.claim(binding.discovery_key,lease_seconds=165),listing)
-    check();receipt=l.get(binding.discovery_key)['checkpoint']
+    if root['state']=='COMPLETE':
+        receipt=root['checkpoint']
+        if not binding.retained_capture_sha256 or receipt.get('source_sha256')!=binding.retained_capture_sha256:raise Denied('CONSUMED_OBSERVATION_NO_REPLAY')
+        children=root['outcome']['children']
+    else:
+        if binding.retained_capture_sha256:raise Denied('RETAINED_CAPTURE_NOT_COMPLETE')
+        def listing(row):check();return listing_reader(row)
+        children=coordinator.idox_source(l.claim(binding.discovery_key,lease_seconds=165),listing)
+        check();receipt=l.get(binding.discovery_key)['checkpoint']
     # Recompute every disposition in trusted controller memory. A worker's
     # assertion is not used as evidence for selecting expensive effects.
     screens=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']]
@@ -129,7 +134,8 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     if (r['source_url'],r['source_record_id'])!=(binding.source_url,binding.source_record_id):raise Denied('ROW_IDENTITY')
     expected=screen_row(r)
     if expected['disposition'] not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'}:return dict(result,outcome='DISCOVERY_SCREENING_ONLY_INSUFFICIENT_OR_EXCLUDED')
-    check();sc=coordinator.screening(l.claim(binding.screening_key,lease_seconds=165))
+    check();screen_task=l.get(binding.screening_key)
+    sc=screen_task['checkpoint'] if screen_task['state']=='COMPLETE' else coordinator.screening(l.claim(binding.screening_key,lease_seconds=165))
     if any(sc[k]!=v for k,v in expected.items()):raise Denied('FORGED_SCREENING_RECEIPT')
     from sqlalchemy import select
     from sqlalchemy.orm import Session
@@ -137,6 +143,17 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     with Session(l.engine) as s:
         known=s.scalar(select(Application.id).where(Application.council_code==envelope.council,Application.reference==binding.reference).limit(1))
     if known:return dict(result,outcome='DISCOVERY_SCREENING_ONLY_ALREADY_KNOWN',application_id=known)
+    # Admission proof is rebuilt from the exact retained qualified listing,
+    # never borrowed from a caller's different date window.
+    from dataclasses import replace
+    from datetime import date
+    from app.pipeline.discovery_contract import WindowEvidence
+    cfg=coordinator.contracts[receipt['contract']].config
+    resources=receipt['resources']
+    w=WindowEvidence(envelope.council,'manual-ingestion-controller',cfg.start,cfg.end,cfg.start,cfg.end,cfg.semantics,
+        receipt['contract'],receipt['source_sha256'],receipt['segments'][-1]['terminal'],len(receipt['segments']),len(receipt['records']),
+        resources['requests_attempted'],resources['received_bytes'],resources['elapsed_seconds'])
+    envelope=replace(envelope,window=w,body_sha256=r['provenance']['body_sha256'])
     # Exact task dependency was prepared before execution, never created by
     # the controller as a side effect of queue membership.
     fact=l.get(binding.factual_key)
@@ -146,3 +163,16 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     outcome=coordinator.new_identity_source(l.claim(binding.factual_key,lease_seconds=165),envelope=envelope,council=council,supervised_reader=detail)
     check()
     return dict(result,outcome=outcome['outcome'],admission=outcome['identity'],b2=outcome.get('verification_scope','WITHHELD'),factual=outcome)
+
+
+def capture(coordinator,key,*,listing_reader,check=lambda:None):
+    """Discovery-only first phase; nominate nothing and issue no authority.
+
+    A subsequent manifest may bind one retained record and its exact hash.
+    Completed discovery is then consumed as evidence, never re-observed.
+    """
+    check();children=coordinator.idox_source(coordinator.ledger.claim(key,lease_seconds=165),listing_reader)
+    check();receipt=coordinator.ledger.get(key)['checkpoint']
+    return dict(outcome='DISCOVERY_SCREENING_ONLY',admission='NOT_ATTEMPTED',b2='NOT_ATTEMPTED',
+        source_sha256=receipt['source_sha256'],children=children,
+        screening=[dict(reference=r['reference'],**screen_row(r)) for r in receipt['records']])

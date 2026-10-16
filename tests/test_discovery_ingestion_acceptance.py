@@ -106,3 +106,13 @@ def test_unsupported_detail_preserves_receipt_and_creates_no_application(engine)
  assert result['outcome']=='FACTS_WITHHELD' and l.get(b.factual_key)['state']=='UNSUPPORTED_CONTRACT'
  assert l.get(b.factual_key)['checkpoint']['kind']=='DETAIL_RECEIPT_V1'
  with Session(engine) as s:assert s.scalar(select(func.count()).select_from(Application))==0
+
+
+def test_retained_capture_continues_with_exact_nominee_without_second_observation(engine):
+ from verification.ingestion_storage.operational_controller import capture
+ l,co,b,a,raw,e=prepared(engine)
+ first=capture(co,b.discovery_key,listing_reader=lambda _: (a,outer()))
+ assert first['outcome']=='DISCOVERY_SCREENING_ONLY' and first['admission']=='NOT_ATTEMPTED'
+ frozen=replace(b,retained_capture_sha256=first['source_sha256'])
+ result=execute(co,frozen,listing_reader=lambda _:pytest.fail('completed discovery must never repeat'),detail_reader=lambda _: (raw,outer()),envelope=e,council=get_council('bolton'))
+ assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'

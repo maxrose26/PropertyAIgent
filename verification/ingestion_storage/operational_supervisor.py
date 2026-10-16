@@ -13,6 +13,7 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
  if not 0<seconds<=(45 if source else 165):raise ValueError('FIXED_DEADLINE')
  root=Path(root);root.mkdir(exist_ok=False)
  if any(k in environment for k in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GITHUB_TOKEN')):raise ValueError('UNNEEDED_CREDENTIAL')
+ if source and not set(environment)<={'INGESTION_SOURCE_PRIVATE'}:raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
  if source and any('DATABASE' in k or 'PASSWORD' in k or 'TOKEN' in k or 'SECRET' in k for k in environment):raise ValueError('SOURCE_CREDENTIAL_FREE')
  env=dict(PATH='/usr/bin:/bin',HOME=str(root),TMPDIR=str(root),LANG='C.UTF-8',PYTHONNOUSERSITE='1',PYTHONDONTWRITEBYTECODE='1',OPENBLAS_NUM_THREADS='1')
  env.update(environment);started=time.monotonic();seen={};peak=0;reason=None;certain=True;survivors=[];child=None;identity=None
