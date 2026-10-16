@@ -6,7 +6,7 @@ qualified parsers, screening and broker; an arbitrary future worker is excluded.
 from dataclasses import dataclass
 import json,time
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine,event
 from sqlalchemy.pool import QueuePool
 from app.ingestion.ledger import Denied,digest,bounded,Ledger
 from app.ingestion.sql_ledger import SQLLedger
@@ -62,7 +62,7 @@ class DatabaseBudget:
             if budget.attempts>=budget.connection_cap:raise Denied('CONNECTION_BOUND')
             budget.attempts+=1
             c=Connection.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,
-                connect_timeout=3,prepare_threshold=None,cursor_factory=Cursor,
+                connect_timeout=3,prepare_threshold=None,cursor_factory=Cursor,autocommit=True,
                 options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**(ssl or {}))
             budget.opened.append(c)
             try:
@@ -72,6 +72,9 @@ class DatabaseBudget:
                 c.rollback();return c
             except BaseException:c.close();raise
         e=create_engine('postgresql+psycopg://',creator=creator,poolclass=QueuePool,pool_size=1,max_overflow=0,pool_timeout=3,hide_parameters=True,skip_autocommit_rollback=u.username=='ingestion_worker_login',isolation_level='AUTOCOMMIT' if u.username=='ingestion_worker_login' else 'READ COMMITTED')
+        @event.listens_for(e,'checkout')
+        def mode_guard(connection,record,proxy):
+            if connection.autocommit!=(u.username=='ingestion_worker_login'):raise Denied('RUNTIME_TRANSACTION_MODE')
         self.engines.append(e);return e
     def close(self,engines):
         errors=[]
