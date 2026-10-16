@@ -182,6 +182,9 @@ not falsely labelled database time.
 7. SEPARATE at-most-one candidate allowance: from that immutable capture REVIEW
    freezes one genuinely new supported exact council/reference/URL/key/row hash,
    screening/factual keys and existing accepted COUPLED contract. Optional bound:
+   `AcceptanceBinding.screening_batch_key` must name its completed exact-hash
+   broker batch and already-completed exact screening child; the immutable
+   capture itself is not rewritten to append child identities.
    one detail observation,<=2requests/2,000,000 received-body bytes/45worker seconds,
    <=120commands/16connections/165controller seconds, existing memory/output/job
    limits and at most two reviewed write slots through shared admission/B2 and

@@ -157,6 +157,7 @@ class AcceptanceBinding:
     listing_revision:str
     retained_capture_sha256:str|None=None
     prior_accounting_sha256:str|None=None
+    screening_batch_key:str|None=None
 
 
 def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,check=lambda:None):
@@ -177,6 +178,14 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
         receipt=root['checkpoint']
         if not binding.retained_capture_sha256 or digest(receipt)!=binding.retained_capture_sha256:raise Denied('CONSUMED_OBSERVATION_NO_REPLAY')
         children=root['outcome']['children']
+        if binding.screening_batch_key:
+            batch=l.get(binding.screening_batch_key);progress=batch['checkpoint'] or {};plan=progress.get('plan',{})
+            if (batch['state']!='COMPLETE' or batch['task']!='LISTING_METADATA' or batch['contract']!='listing-batch-v1'
+                or batch['subject']!=root['subject'] or binding.discovery_key not in batch['dependencies']
+                or progress.get('kind')!='BATCH_PROGRESS_V1' or plan.get('capture_key')!=binding.discovery_key
+                or plan.get('capture_sha256')!=digest(receipt) or batch['revision']!=digest(plan)
+                or progress.get('next')!=plan.get('last')):raise Denied('NOMINATED_COMPLETED_BATCH_REQUIRED')
+            children=progress['children']
     else:
         if binding.retained_capture_sha256:raise Denied('RETAINED_CAPTURE_NOT_COMPLETE')
         def listing(row):check();return listing_reader(row)
@@ -200,6 +209,9 @@ def execute(coordinator,binding,*,listing_reader,detail_reader,envelope,council,
     expected=screen_row(r)
     if expected['disposition'] not in {'SUPPORTED_PROCESSING_PRIORITY','RELATED_APPLICATION_FOLLOW_THROUGH'}:return dict(result,outcome='DISCOVERY_SCREENING_ONLY_INSUFFICIENT_OR_EXCLUDED')
     check();screen_task=l.get(binding.screening_key)
+    if binding.screening_batch_key and (screen_task['state']!='COMPLETE' or screen_task['dependencies']!=[binding.discovery_key]
+        or screen_task['revision']!=digest(r) or screen_task['subject']!={'kind':'APPLICATION','council':receipt['council'],'reference':r['reference']}
+        or screen_task['task']!='SCREENING' or screen_task['contract']!='listing-screen-v1'):raise Denied('EXACT_COMPLETED_SCREENING_REQUIRED')
     sc=screen_task['checkpoint'] if screen_task['state']=='COMPLETE' else coordinator.screening(l.claim(binding.screening_key,lease_seconds=165))
     if any(sc[k]!=v for k,v in expected.items()):raise Denied('FORGED_SCREENING_RECEIPT')
     from sqlalchemy import select

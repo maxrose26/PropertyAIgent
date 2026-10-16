@@ -119,6 +119,27 @@ def test_retained_capture_continues_with_exact_nominee_without_second_observatio
  assert result['outcome']=='SUPPORTED_FACTS_VERIFIED'
 
 
+@pytest.mark.parametrize('mode',['supported','wrong_hash','unfinished','missing_child'])
+def test_batch_nomination_uses_completed_bound_child_without_listing_replay(engine,mode):
+ from verification.ingestion_storage.operational_controller import capture
+ l,co,b,a,raw,e=prepared(engine)
+ first=capture(co,b.discovery_key,listing_reader=lambda _: (a,outer()))
+ co.screening(l.claim(b.screening_key));receipt=l.get(b.discovery_key)['checkpoint']
+ plan=dict(capture_key=b.discovery_key,capture_sha256=first['checkpoint_sha256'],first=0,last=1)
+ if mode=='wrong_hash':plan['capture_sha256']='f'*64
+ batch=l.enqueue(l.get(b.discovery_key)['subject'],'LISTING_METADATA',contract='listing-batch-v1',revision=digest(plan),dependencies=[b.discovery_key])
+ # Owner-created retained fixture isolates nomination from the separately
+ # restricted-PG-tested broker materialisation protocol; no runtime mutation API.
+ with engine.begin() as c:
+  c.execute(W.update().where(W.c.key==b.discovery_key).values(outcome={'children':[]}))
+  c.execute(W.update().where(W.c.key==batch).values(state='QUEUED' if mode=='unfinished' else 'COMPLETE',checkpoint={'kind':'BATCH_PROGRESS_V1','plan':plan,'next':1,'children':[] if mode=='missing_child' else [b.screening_key]}))
+ frozen=replace(b,retained_capture_sha256=digest(receipt),screening_batch_key=batch)
+ def run():return execute(co,frozen,listing_reader=lambda _:pytest.fail('no refetch'),detail_reader=lambda _: (raw,outer()),envelope=e,council=get_council('bolton'))
+ if mode in {'wrong_hash','unfinished'}:
+  with pytest.raises(Denied,match='NOMINATED_COMPLETED_BATCH_REQUIRED'):run()
+ else:assert run()['outcome']==('SUPPORTED_FACTS_VERIFIED' if mode=='supported' else 'HOLD_CHANGED_ROW_OR_UNBOUND_TASK')
+
+
 def test_aggregate_database_allowance_survives_manual_nomination_pause():
  previous=dict(connection_attempts=3,driver_statements=90,elapsed_seconds=4.5,connections_closed=True,cleanup='CLOSED',statement_kinds={'cursor':90})
  b=DatabaseBudget(previous=previous)

@@ -372,6 +372,8 @@ def test_restricted_sql_claims_fencing_checkpoints_completion_and_shared_new_ide
    assert aggregate['supervised_seconds']<=300 and aggregate['exported_bytes']<=2*1024**2
    record_property('practical_aggregate',json.dumps(aggregate,sort_keys=True));record_property('practical_capture_sha256',digest(capture60))
    record_property('practical_allocation_receipts',json.dumps(allocation_receipts,sort_keys=True))
+   capacity=boot.execute("SELECT (SELECT sum(octet_length(to_jsonb(w)::text)) FROM public.ingestion_work_items w WHERE key=ANY(%s)),(SELECT sum(octet_length(to_jsonb(a)::text)) FROM public.ingestion_work_attempts a WHERE work_key=ANY(%s)),pg_total_relation_size('public.ingestion_work_items')+pg_total_relation_size('public.ingestion_work_attempts'),(SELECT count(*) FROM public.ingestion_work_attempts WHERE work_key=ANY(%s))",(queuekeys,queuekeys,queuekeys)).fetchone()
+   record_property('practical_capacity',json.dumps(dict(scope_items=len(queuekeys),scope_item_serialized_bytes=capacity[0],scope_attempt_serialized_bytes=capacity[1],whole_fixture_physical_bytes=capacity[2],scope_attempts=capacity[3],note='74includes_unexecuted_policy_sentinel;physical_includes_preceding_fixture_work'),sort_keys=True))
    # Exact grant mutation/expiry/other council denial, registration cannot extend.
    with connect(policy_role) as owner:
     with pytest.raises(psycopg.Error):owner.execute('SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(queue_payload),))
