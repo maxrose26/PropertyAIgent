@@ -1,0 +1,96 @@
+{
+  "accounted_bytes": 71914560,
+  "audit_bytes": 40000000,
+  "combined_allocated_seconds": 1200,
+  "exclusive_cut": "2026-10-16T00:00:00+01:00",
+  "no_parallel_stacking": true,
+  "no_retry": true,
+  "requests": 270,
+  "rows": [
+    {
+      "council": "manchester",
+      "end": "2026-10-15",
+      "entry_url": "https://arcusbe.manchester.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fV2FyZHNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1dhcmQifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1N0YXR1c19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25TdGF0dXMifSx7ImZpZWxkTmFtZSI6Ik5hbWUiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1JlY29yZFR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1R5cGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uVHlwZSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTE1IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZEZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0xNSIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRUbyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZVRvIn1dfV19",
+      "internal_transport_retry_limit": 0,
+      "operation": "CORRECTED_EXPLICIT_ZERO_OR_BOUNDED_ENUMERATION",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "rochdale",
+      "end": "2026-10-15",
+      "entry_url": "https://account.rochdale.gov.uk/pr/s/register-view?c__r=Arcus_BE_Public_Register&c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1NpdGVfQWRkcmVzc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfU2l0ZUFkZHJlc3MifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1Byb3Bvc2FsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9Qcm9wb3NhbCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fU3RhdHVzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblN0YXR1cyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVHlwZV9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfQXBwbGljYXRpb25UeXBlIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMTUiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fVmFsaWRfRGF0ZV9fYyIsImZpZWxkVmFsdWUiOiIyMDI2LTEwLTE1IiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RhdGVWYWxpZFRvIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19EZWNpc2lvbl9Ob3RpY2VfU2VudF9EYXRlX01hbnVhbF9fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGVjaXNpb25Ob3RpY2VTZW50RGF0ZUZyb20ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1dhcmRzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9XYXJkIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19QYXJpc2hlc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfUGFyaXNoIn1dfV19",
+      "internal_transport_retry_limit": 0,
+      "operation": "FIRST_PRIMARY_BRIDGE_OBSERVATION",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "salford",
+      "end": "2026-10-15",
+      "entry_url": "https://salfordcitycouncil.my.site.com/pr/s/register-view?c__q=eyJyZWdpc3RlciI6IkFyY3VzX0JFX1B1YmxpY19SZWdpc3RlciIsInJlcXVlc3RzIjpbeyJyZWdpc3Rlck5hbWUiOiJBcmN1c19CRV9QdWJsaWNfUmVnaXN0ZXIiLCJzZWFyY2hUeXBlIjoiYWR2YW5jZWQiLCJzZWFyY2hOYW1lIjoiUGxhbm5pbmdfQXBwbGljYXRpb25zIiwiYWR2YW5jZWRTZWFyY2hOYW1lIjoiUEFfQURWX0FsbCIsInNlYXJjaEZpbHRlcnMiOlt7ImZpZWxkTmFtZSI6IlNhbGZfU2l0ZV9BZGRyZXNzX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9TaXRlQWRkcmVzcyJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUHJvcG9zYWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX1Byb3Bvc2FsIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19TdGF0dXNfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uU3RhdHVzIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19XYXJkc19fYyIsImZpZWxkVmFsdWUiOiIiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfV2FyZCJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fUFNfU2NhbGVfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0FwcGxpY2F0aW9uX0dyb3VwIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19UeXBlX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9BcHBsaWNhdGlvblR5cGUifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX1ZhbGlkX0RhdGVfX2MiLCJmaWVsZFZhbHVlIjoiMjAyNi0xMC0xNSIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EYXRlVmFsaWRGcm9tIn0seyJmaWVsZE5hbWUiOiJhcmN1c2J1aWx0ZW52X19WYWxpZF9EYXRlX19jIiwiZmllbGRWYWx1ZSI6IjIwMjYtMTAtMTUiLCJmaWVsZERldmVsb3Blck5hbWUiOiJQQV9BRFZfRGF0ZVZhbGlkVG8ifSx7ImZpZWxkTmFtZSI6ImFyY3VzYnVpbHRlbnZfX0RlY2lzaW9uX05vdGljZV9TZW50X0RhdGVfTWFudWFsX19jIiwiZmllbGRWYWx1ZSI6IiIsImZpZWxkRGV2ZWxvcGVyTmFtZSI6IlBBX0FEVl9EZWNpc2lvbk5vdGljZVNlbnREYXRlRnJvbSJ9LHsiZmllbGROYW1lIjoiYXJjdXNidWlsdGVudl9fRGVjaXNpb25fTm90aWNlX1NlbnRfRGF0ZV9NYW51YWxfX2MiLCJmaWVsZFZhbHVlIjoiIiwiZmllbGREZXZlbG9wZXJOYW1lIjoiUEFfQURWX0RlY2lzaW9uTm90aWNlU2VudERhdGVUbyJ9XX1dfQ%3D%3D&c__r=Arcus_BE_Public_Register",
+      "internal_transport_retry_limit": 0,
+      "operation": "FIRST_PRIMARY_BRIDGE_OBSERVATION",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "stockport",
+      "end": "2026-10-15",
+      "entry_url": "https://planning.stockport.gov.uk/PlanningData-live/search.do?action=advanced&searchType=Application",
+      "internal_transport_retry_limit": 0,
+      "operation": "FIRST_PRIMARY_BRIDGE_OBSERVATION",
+      "semantics": "VALIDATED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "tameside",
+      "end": "2026-10-15",
+      "entry_url": "https://publicaccess.tameside.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "internal_transport_retry_limit": 0,
+      "operation": "FIRST_PRIMARY_BRIDGE_OBSERVATION",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    },
+    {
+      "council": "wigan",
+      "end": "2026-10-15",
+      "entry_url": "https://planning.wigan.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+      "internal_transport_retry_limit": 0,
+      "operation": "FIRST_PRIMARY_BRIDGE_OBSERVATION",
+      "semantics": "RECEIVED",
+      "start": "2026-10-15"
+    }
+  ],
+  "rss_bytes": 1610612736,
+  "runtime_base": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+  "source_calls": 6,
+  "source_scope_allocations": [
+    {
+      "cleanup_upload_seconds": 165,
+      "execution_seconds": 55,
+      "job_seconds": 480,
+      "name": "manchester-corrected-zero",
+      "rows": [
+        0
+      ],
+      "setup_seconds": 260
+    },
+    {
+      "cleanup_upload_seconds": 185,
+      "execution_seconds": 275,
+      "job_seconds": 720,
+      "name": "untouched-bridge-five",
+      "rows": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "setup_seconds": 260
+    }
+  ],
+  "status": "PROPOSED_NOT_REGISTERED_NOT_AUTHORISED",
+  "worker_allocation_seconds": 330
+}

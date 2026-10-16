@@ -1,0 +1,190 @@
+{
+  "candidate": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+  "tree": "97a84a85fc0d5867ae6820834b6b3722cb9a3c1a",
+  "required_pass": 15,
+  "failed": 0,
+  "skipped": [
+    {
+      "id": 116862445498,
+      "name": "probe",
+      "reason": "deliberate manual live probe; not required or authorised for this offline task"
+    }
+  ],
+  "checks": [
+    {
+      "id": 116862445498,
+      "name": "probe",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-16T07:25:37Z",
+      "completed_at": "2026-10-16T07:25:36Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133789/job/116862445498"
+    },
+    {
+      "id": 116862443515,
+      "name": "native",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:38Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133800/job/116862443515"
+    },
+    {
+      "id": 116862443276,
+      "name": "native",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:27:41Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133810/job/116862443276"
+    },
+    {
+      "id": 116862443258,
+      "name": "native",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:43Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133750/job/116862443258"
+    },
+    {
+      "id": 116862443204,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:28:08Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133754/job/116862443204"
+    },
+    {
+      "id": 116862443166,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:30Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133800/job/116862443166"
+    },
+    {
+      "id": 116862443055,
+      "name": "web",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:39Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133754/job/116862443055"
+    },
+    {
+      "id": 116862443018,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:33Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133750/job/116862443018"
+    },
+    {
+      "id": 116862443014,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:42Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133768/job/116862443014"
+    },
+    {
+      "id": 116862442993,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:44Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133798/job/116862442993"
+    },
+    {
+      "id": 116862442974,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:40Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133751/job/116862442974"
+    },
+    {
+      "id": 116862442903,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:57Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133810/job/116862442903"
+    },
+    {
+      "id": 116862442826,
+      "name": "offline",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:33Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133791/job/116862442826"
+    },
+    {
+      "id": 116862442745,
+      "name": "postgres-admission",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:38Z",
+      "completed_at": "2026-10-16T07:26:43Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867133751/job/116862442745"
+    },
+    {
+      "id": 116862424425,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:35Z",
+      "completed_at": "2026-10-16T07:27:23Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867127875/job/116862424425"
+    },
+    {
+      "id": 116862424115,
+      "name": "web",
+      "head_sha": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-16T07:25:35Z",
+      "completed_at": "2026-10-16T07:26:20Z",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/38867127875/job/116862424115"
+    }
+  ],
+  "validated_counts": {
+    "batch_offline": 827,
+    "discovery_offline": [
+      608,
+      121,
+      48
+    ],
+    "disposable_postgres": 12
+  },
+  "earlier_failure": {
+    "head": "f55e08a157506783cfa7aa487dd59737fa69a4f4",
+    "job_id": 116735223534,
+    "reason": "historical boundary dependency assertion; archived exact accepted bytes and exact successor pin corrected on final head"
+  },
+  "local_suites_repeated_this_task": 0
+}

@@ -1,0 +1,188 @@
+{
+  "base": "fa2fe834d6c4e01e2c0367cb851834bd0418ff8c",
+  "head": "bf80d347569ba27970a8a8ddf04c3d8ee861e1f6",
+  "tree": "97a84a85fc0d5867ae6820834b6b3722cb9a3c1a",
+  "changed_paths": [
+    {
+      "path": ".github/workflows/stage4-batch-offline.yml",
+      "status": "modified",
+      "sha": "8cd67a74887d95f7257f804f46ebc23ad38bcdd6",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": ".github/workflows/stage4-discovery-offline.yml",
+      "status": "modified",
+      "sha": "c0a2a9225c2cc19c72516e817c51ea0d83c90392",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/REVIEW-PACK.md",
+      "status": "added",
+      "sha": "6fa247bba0d1c2ed9106ee43e9b0589528882421",
+      "additions": 107,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/SHA256SUMS",
+      "status": "added",
+      "sha": "15bfc4b3ab65ef57fab7a919d9a3e7f431668866",
+      "additions": 12,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/VALIDATION.json",
+      "status": "added",
+      "sha": "2aedf1a7d51a704419343372740fc8fa4297f84d",
+      "additions": 70,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/candidate.diff",
+      "status": "added",
+      "sha": "6c98f2114703b0b06a66ee4582fe36251bcac1f7",
+      "additions": 684,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/capture-two-proposal.json",
+      "status": "added",
+      "sha": "78eabc1223448563444d86ab8938a875a2b48264",
+      "additions": 223,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/combined-budget-proposal.json",
+      "status": "added",
+      "sha": "5afedd9db983af4e391b7178b307678bc50ada25",
+      "additions": 50,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/delta-three-proposal.json",
+      "status": "added",
+      "sha": "fe5cd801478a560640885867889a12328133d3ab",
+      "additions": 47,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/diagnosis.json",
+      "status": "added",
+      "sha": "bcb6427f05d521b313694eaca82eb3dc52cebc94",
+      "additions": 31,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/discovery-tests.xml",
+      "status": "added",
+      "sha": "45bb7a71f5c71f2d0e35450bd26f0b5c14e3a91a",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/focused-tests.xml",
+      "status": "added",
+      "sha": "c360e46aa07d375e0b28d156e92cce8d96686038",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/metadata-415-held.json",
+      "status": "added",
+      "sha": "77470418d2147cef8d4fd30fa9876b25064da455",
+      "additions": 6238,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/remaining-work-ledger.json",
+      "status": "added",
+      "sha": "14676aff6208a71f828f767f621f3dd8857e36d8",
+      "additions": 1079,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/stage4-r0-execution/completion-blockers-20261016/source-six-proposal.json",
+      "status": "added",
+      "sha": "9c3f2b767ecf74dad21fe24551483e0f0c6a55f3",
+      "additions": 96,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_discovery_completion_blockers.py",
+      "status": "added",
+      "sha": "383aec9c67898838b90023db2436f59f45621a87",
+      "additions": 179,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_discovery_page_cap_transport.py",
+      "status": "modified",
+      "sha": "971edfe6a3d503c44111735448b116e106a14182",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_stage4_direct_registration.py",
+      "status": "modified",
+      "sha": "5ea5d8bb79d092cb59c8fe438007aa05a5784ca7",
+      "additions": 8,
+      "deletions": 1
+    },
+    {
+      "path": "verification/direct_reference/history/request-boundary-pre-no-retry.py.txt",
+      "status": "added",
+      "sha": "4fc28452ce7ae385f5ae1dd132d92e0024b63ca4",
+      "additions": 216,
+      "deletions": 0
+    },
+    {
+      "path": "verification/discovery/arcus_ui_audit.py",
+      "status": "modified",
+      "sha": "1c6ce2edcd287a57f572a7f30c21ce7b56e6f66d",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "verification/discovery/arcus_ui_window.py",
+      "status": "modified",
+      "sha": "0a58d640c36c1a1af616e99746cb983f93bd61df",
+      "additions": 43,
+      "deletions": 3
+    },
+    {
+      "path": "verification/discovery/finite_acceptance.py",
+      "status": "modified",
+      "sha": "7e40b1b01ba486a9f1cfaf96a91e628db6eeff5e",
+      "additions": 5,
+      "deletions": 3
+    },
+    {
+      "path": "verification/discovery/idox_window.py",
+      "status": "modified",
+      "sha": "e6b504625a8e493c80690362135a4d6a7debc373",
+      "additions": 5,
+      "deletions": 1
+    },
+    {
+      "path": "verification/stage26b_l1/request_boundary.py",
+      "status": "modified",
+      "sha": "645fb9a16b8dbdde2e344055f50e59246eb82b72",
+      "additions": 8,
+      "deletions": 3
+    }
+  ],
+  "reviewed_blob_verification": {
+    ".github/workflows/stage4-batch-offline.yml": "8cd67a74887d95f7257f804f46ebc23ad38bcdd6",
+    ".github/workflows/stage4-discovery-offline.yml": "c0a2a9225c2cc19c72516e817c51ea0d83c90392",
+    "tests/test_discovery_completion_blockers.py": "383aec9c67898838b90023db2436f59f45621a87",
+    "tests/test_discovery_page_cap_transport.py": "971edfe6a3d503c44111735448b116e106a14182",
+    "tests/test_stage4_direct_registration.py": "5ea5d8bb79d092cb59c8fe438007aa05a5784ca7",
+    "verification/direct_reference/history/request-boundary-pre-no-retry.py.txt": "4fc28452ce7ae385f5ae1dd132d92e0024b63ca4",
+    "verification/discovery/arcus_ui_audit.py": "1c6ce2edcd287a57f572a7f30c21ce7b56e6f66d",
+    "verification/discovery/arcus_ui_window.py": "0a58d640c36c1a1af616e99746cb983f93bd61df",
+    "verification/discovery/finite_acceptance.py": "7e40b1b01ba486a9f1cfaf96a91e628db6eeff5e",
+    "verification/discovery/idox_window.py": "e6b504625a8e493c80690362135a4d6a7debc373",
+    "verification/stage26b_l1/request_boundary.py": "645fb9a16b8dbdde2e344055f50e59246eb82b72"
+  }
+}

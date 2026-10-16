@@ -1,0 +1,31 @@
+{
+  "arcus": {
+    "demonstrated_code_gap": "Mandatory newline in has_text DOM textContent differs from rendered innerText linebreaks. Existing legacy reader test already modelled concatenated DOM text.",
+    "fix": "Prefix prefilter plus unchanged exact rendered first-line check; bounded whitelisted label-count evidence",
+    "historical_cause": "UNKNOWN_NO_RETAINED_METADATA_DOM",
+    "observed_records": 415,
+    "source_availability": "UNKNOWN"
+  },
+  "bury": {
+    "cause": "UNKNOWN_NO_RETAINED_PROOF_CAPABLE_RESPONSE",
+    "fix": "NONE",
+    "observed": "UNKNOWN no count/terminal proof"
+  },
+  "criteria": {
+    "demonstrated_gap": "Reader always waits for pagination before criteria, cannot handle sealed Manchester exact No results found paragraph",
+    "fix": "Exact zero marker alternative with criteria/category/blank controls verified and no rows/count/Next conflict",
+    "historical_cause": "Manchester compatible explanation only; Rochdale UNKNOWN. No timing/selector relaxation.",
+    "observed": "Rochdale historical and Manchester bridge typed RESULT_MARKER_VISIBLE timeout, no applied interval"
+  },
+  "oldham": {
+    "cause": "UNKNOWN_ERROR_PAGE_ZERO_ALTERNATE_STRUCTURE_NOT_DISTINGUISHABLE",
+    "fix": "NONE_NO_SUPPORTED_PARSER_CHANGE",
+    "observed": "SORT_FORM_PARSE order_by_selects=0 forms=1 body63259 SHA0a222a0db5debab048637d25ec0731642eb18f135282ab1c64867e1cf6ea31ef"
+  },
+  "retry": {
+    "contract_reading": "Original mandate expressly allowed accepted bounded internal HTTP retries; no-workflow-rerun must not be conflated. Conservative successor explicitly disables internal retries.",
+    "fix": "Opt-in max_transport_retries0 caller-to-private-worker-to-Boundary; historical default1 preserved",
+    "observed": "Bridge Bury retries1; adapter max_retries0 does not disable shared Boundary retry loop",
+    "trigger": "UNKNOWN_NO_EXCEPTION_CATEGORY_RETAINED"
+  }
+}
