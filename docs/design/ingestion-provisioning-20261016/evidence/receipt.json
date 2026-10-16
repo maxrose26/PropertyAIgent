@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "kind": "restricted-ingestion-provisioning-disposable-review",
+  "stage": "4_OPEN",
+  "candidate": "b8eba1cb5a4f33cda82970fbe997c699c491338b",
+  "tree": "66844ee85ca97d74f13b5b17aec034d67a040a3c",
+  "pull_request": 118,
+  "production_runtime": "eaed72d7d9e377d7e397b28db4e4936435ed85ec",
+  "accepted_preflight": {
+    "run": 38907801607,
+    "run_number": 1,
+    "attempt": 1,
+    "evidence": "b48769539effa9e209f79cd392120e7919c5bc07",
+    "repeated": false
+  },
+  "disposable_validation": {
+    "run": 38913573895,
+    "run_number": 125,
+    "attempt": 1,
+    "job": 117015229115,
+    "conclusion": "success",
+    "server_version": 170011,
+    "tests": 1,
+    "denials_sqlstate_42501": 30,
+    "real_restricted_logins": 2,
+    "real_scram_helper": true,
+    "github_secret_boundary": "MOCKED_NO_TRANSMISSION",
+    "migration_superuser": false,
+    "migration_bypassrls": false,
+    "rows": 4,
+    "attempts": 0,
+    "serialized_bytes": 4595,
+    "physical_bytes": 49152,
+    "pytest_seconds": 0.339,
+    "job_seconds": 61,
+    "cleanup": "DISPOSABLE_CONTAINER_STOP_CONFIRMED",
+    "source_calls": 0,
+    "production_connections": 0
+  },
+  "credential_helper_tests": {
+    "job": 117015229291,
+    "passed": 5,
+    "network": "DENIED",
+    "suite_total": 740
+  },
+  "artifacts": [
+    {
+      "id": 12051990541,
+      "sha256": "00e6ff35862a4dc115dbc7b94f63aafc63f21f583fb9e060f325287fc7c6ad92",
+      "file": "postgres17-original-artifact.zip",
+      "bytes": 587
+    },
+    {
+      "id": 12051696193,
+      "sha256": "0522f2220a9052793c5c5afa8d75dbcc89f0873e0916eeb06461090fc81bfc05",
+      "file": "offline-original-artifact.zip",
+      "bytes": 13567
+    }
+  ],
+  "production_authority": "PREPARATION_ONLY_NO_ROLE_OR_CREDENTIAL_OR_PERMISSION_ACTION",
+  "limitations": [
+    "Managed provider grant options and ambient ACLs not yet proven",
+    "Provider password/SCRAM audit redaction requires secure owner attestation",
+    "GitHub CLI upload mocked in disposable tests",
+    "Creator ADMIN-only residual retained by PostgreSQL 17; temporary SET/INHERIT/CREATE removed",
+    "Custom-login production pooler authentication untested; no fallback route",
+    "Storage acceptance is not operational pipeline acceptance",
+    "Production memory/statement/cleanup resource figures are proposals, not measured execution"
+  ],
+  "exact_head_checks": {
+    "success": 9,
+    "total": 9
+  }
+}
