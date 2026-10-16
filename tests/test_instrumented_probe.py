@@ -22,7 +22,7 @@ class ProbeContract(unittest.TestCase):
         from verification.discovery.r0_fixed80_qualification import case_definitions as fixed80_cases
         from verification.discovery.r0_bolton53_qualification import case_definitions as bolton53_cases
         from verification.discovery.narrow_oldham_source import case_definitions as oldham_two_cases
-        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape', 'discovery_manchester_search_shape', 'discovery_manchester_screening_20261001_03', 'discovery_manchester_ui_window', 'discovery_salford_ui_window', 'discovery_rochdale_ui_window'} | set(case_definitions()) | set(committee_cases()) | set(material_cases()) | set(fixed80_cases()) | set(bolton53_cases()) | set(oldham_two_cases()))
+        self.assertEqual(set(CASES), {'manchester', 'manchester_pending', 'salford', 'rochdale', 'trafford', 'discovery_manchester_shape', 'discovery_manchester_search_shape', 'discovery_manchester_screening_20261001_03', 'discovery_manchester_ui_window', 'discovery_salford_ui_window', 'discovery_rochdale_ui_window'} | set(case_definitions()) | set(committee_cases()) | set(material_cases()) | set(fixed80_cases()) | set(bolton53_cases()) | set(oldham_two_cases()) | {f'discovery_metadata_rollout_{i:02d}' for i in range(13)})
         for _, _, url in CASES.values():
             self.assertTrue(permitted_navigation(url, url))
             self.assertFalse(permitted_navigation(url + '&other=1', url))

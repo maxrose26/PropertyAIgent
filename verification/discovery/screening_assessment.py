@@ -52,16 +52,20 @@ def admit(sha,mh,authority,env,workflow_bytes=None):
     manifest()
 
 
-def assess(source):
+def assess(source, *, config=None, case=None, interval=None, historical_context=None):
     from .arcus_ui_config import SCREENING_CONFIG,SCREENING_CASE
     from .arcus_ui_audit import validate
     from .arcus_ui_transport import combined_bytes
     from .screening_capture import screen_row
+    config=SCREENING_CONFIG if config is None else config
+    case=SCREENING_CASE if case is None else case
+    interval=['2026-10-01','2026-10-03'] if interval is None else interval
+    historical_context=manifest()['historical_context'] if historical_context is None else historical_context
     enumeration='UNKNOWN'
     try:
-        if source.get('case')!=SCREENING_CASE or source.get('requested_interval')!=['2026-10-01','2026-10-03']:
+        if source.get('case')!=case or source.get('requested_interval')!=interval:
             raise ValueError('SOURCE_IDENTITY')
-        validate(source,SCREENING_CONFIG);enumeration='COMPLETE'
+        validate(source,config);enumeration='COMPLETE'
     except (ValueError,KeyError,TypeError):
         enumeration='INCOMPLETE' if source.get('listing_records') else 'FAILED'
     resource_ok=(type(source.get('requests')) is int and 0<=source['requests']<=80
@@ -85,7 +89,7 @@ def assess(source):
     citation_overflow=any(r['screen']['citations']['overflow'] for r in screens)
     full=enumeration=='COMPLETE' and resource_ok and bool(rows) and usable==len(rows) and not citation_overflow and not any(truncated.values())
     outcome='NO_GO' if not resource_ok else 'GO' if full else 'PARTIAL' if enumeration=='COMPLETE' or usable else 'NO_GO'
-    historic={r['reference'] for r in manifest()['historical_context']};current={r['reference'] for r in rows}
+    historic={r['reference'] for r in historical_context};current={r['reference'] for r in rows}
     return dict(outcome=outcome,enumeration_outcome=enumeration,proposal_capture=dict(rows=len(rows),usable=usable,full_mechanism_success=full),
         field_states=missing,truncated=truncated,citation_complete=bool(rows) and usable==len(rows) and not citation_overflow and not any(truncated.values()),
         rows=screens,screening_dispositions=dict(Counter(r['screen']['disposition'] for r in screens)),
