@@ -1,0 +1,50 @@
+{
+  "blocked_live_calls": 0,
+  "capture": {
+    "active_seconds": 480,
+    "approved_global_ceiling": 16,
+    "audit_bytes": 8000000,
+    "records_max": 2,
+    "requests": 4,
+    "source_bytes": 4000000,
+    "source_calls": 2,
+    "source_seconds": 110,
+    "total_allocated_seconds": 960
+  },
+  "combined": {
+    "audit_bytes_max": 50000000,
+    "no_parallel_stacking": true,
+    "rss_bytes": 1610612736,
+    "source_bytes_max": 75914560,
+    "source_calls_max": 8,
+    "source_requests_max": 274,
+    "total_allocated_seconds": 2520,
+    "worker_source_seconds": 440
+  },
+  "delta_comparison": {
+    "active_seconds": 60,
+    "audit_bytes": 2000000,
+    "connections_max": 1,
+    "data_queries": 1,
+    "identities": 3,
+    "total_allocated_seconds": 360
+  },
+  "independent_new_observations": 0,
+  "manifest_hashes": {
+    "capture": "dd2f305ec0f9e2f33addcc5dd465b1ca4fa975c4d7fa31c4e384f158681ed5d5",
+    "delta": "51d0cc9d8745687231c326007b2e588ae53d4d1a0f99ee355b632c495b01ef8d",
+    "metadata_held": "cf6aa89610a19f9251ab246554a50df551d118895fcf0d0b10ccbb8c1d3d23e6",
+    "source": "704a10a6c95fc510b9c1c72c14601048cdadc1aa999feacb15db0750b9126b67"
+  },
+  "no_budget_borrowing": true,
+  "source": {
+    "accounted_bytes": 71914560,
+    "audit_bytes": 40000000,
+    "calls": 6,
+    "requests": 270,
+    "sequential_scopes_max": 2,
+    "total_allocated_seconds": 1200,
+    "worker_allocation_seconds": 330
+  },
+  "status": "PROPOSED_ONLY_NEW_AUTHORITY_REQUIRED"
+}

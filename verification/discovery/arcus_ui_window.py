@@ -11,6 +11,18 @@ from .arcus_ui_config import MANCHESTER
 CASE='discovery_manchester_ui_window'
 AURA='https://arcusbe.manchester.gov.uk/pr/s/sfsites/aura'
 MAX_SEGMENTS=6
+METADATA_LABELS={'Proposal','Description','Site Address','Location of works','Application type'}
+
+
+def metadata_capture_evidence(value):
+    if (not isinstance(value,dict) or set(value)!={'version','row_item_count','label_counts','route'}
+        or type(value['version']) is not int or value['version']!=1
+        or value['route']!='VISIBLE_ROW_EXACT_RENDERED_LABEL_V2'
+        or type(value['row_item_count']) is not int or not 0<=value['row_item_count']<=20
+        or not isinstance(value['label_counts'],dict) or set(value['label_counts'])!=METADATA_LABELS
+        or any(type(n) is not int or n not in (0,1) for n in value['label_counts'].values())):
+        raise ValueError('metadata evidence shape')
+    return {**value,'label_counts':dict(value['label_counts'])}
 
 
 
@@ -50,6 +62,8 @@ def qualify_segment(marker,cards,expected_first,previous_total=None,config=MANCH
                 if item and (not isinstance(item.get('value'),str) or len(item['value'])>limit):raise ValueError('metadata value bound')
                 metadata[key]=dict(state='PRESENT_VALUE' if item and item['value'] else 'PRESENT_BLANK' if item else 'UNKNOWN',value=item['value'] if item else None,locator='visible listing field:'+item['label'] if item else 'NOT_CAPTURED',truncated=bool(item and item.get('truncated')))
             rows[-1]['fields']=metadata
+            if 'metadata_capture_evidence' in c:
+                rows[-1]['metadata_capture_evidence']=metadata_capture_evidence(c['metadata_capture_evidence'])
             rows[-1]['field_capture_scope']+=['proposal','address','application_type']
     if len({r['reference'] for r in rows})!=len(rows) or len({r['source_record_id'] for r in rows})!=len(rows):
         raise ValueError('duplicate page identity')
@@ -57,7 +71,7 @@ def qualify_segment(marker,cards,expected_first,previous_total=None,config=MANCH
 
 
 async def read_cards(page,config=MANCHESTER):
-    """Read only the two qualified fields through ordinary bounded locators."""
+    """Read exact row-bound fields; optional metadata never leaves its card."""
     cards=page.locator('div[role="list"].slds-box')
     count=await cards.count()
     if not 1<=count<=10: raise ValueError('card count')
@@ -85,10 +99,15 @@ async def read_cards(page,config=MANCHESTER):
             if len(value)>160: raise ValueError('field value bound')
             fields.append({'label':name,'value':value})
         if config.capture_metadata:
+            label_counts={}
             # Exact visible labels only; never read applicant/contact fields or raw HTML.
             for name,limit in [('Proposal',1024),('Description',1024),('Site Address',600),('Location of works',600),('Application type',160)]:
-                field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name)+r'\s*\n',re.I))
+                # has_text sees DOM textContent, not layout-produced innerText
+                # newlines. Match the prefix here, then verify the exact rendered
+                # first line below. Never loosen the final label/value contract.
+                field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name),re.I))
                 n=await field.count()
+                label_counts[name]=n
                 if n>1:raise ValueError('metadata label conflict')
                 if n==1:
                     text=await field.inner_text(timeout=1500);parts=text.strip().split('\n',1)
@@ -96,6 +115,9 @@ async def read_cards(page,config=MANCHESTER):
                     value=parts[1].strip()
                     fields.append({'label':name,'value':value[:limit],'truncated':len(value)>limit})
         out.append({'links':[{'text':ref,'href':href}],'fields':fields})
+        if config.capture_metadata:
+            out[-1]['metadata_capture_evidence']={'version':1,'row_item_count':await items.count(),
+                'label_counts':label_counts,'route':'VISIBLE_ROW_EXACT_RENDERED_LABEL_V2'}
     return out
 
 
@@ -119,7 +141,13 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
     audit.update(listing_stage='CRITERIA',listing_segments=[],listing_records=[],completeness='UNKNOWN',applied_interval=None,
                  source_qualification='CANDIDATE_PUBLIC_UI_CONTRACT',enumeration_evidence=None)
     try:
-        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000),audit)
+        # The sealed Manchester zero observation has a paragraph "No results
+        # found" and no pagination marker. Absence of pagination alone is NEVER
+        # zero evidence. Applied criteria and contradictory rows are checked below.
+        # Only Manchester has retained source evidence for this zero shape.
+        zero_supported=config.council=='manchester'
+        result_selector='p.pr-pagination__results, p:text-is("No results found")' if zero_supported else 'p.pr-pagination__results'
+        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator(result_selector).wait_for(state='visible',timeout=10000),audit)
         # An ordinary disclosure toggle exposes the source's retained filters.
         await criteria_control('CRITERIA_DISCLOSURE',lambda:page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000),audit)
         expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
@@ -133,6 +161,18 @@ async def enumerate_ui(page,audit,stopped,config=MANCHESTER):
             raise ValueError('category')
         audit['applied_interval']=[config.start,config.end]
         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'
+        zero=page.locator('p:text-is("No results found")')
+        if zero_supported and await zero.count():
+            if (await zero.count()!=1 or await zero.inner_text(timeout=1500)!='No results found'
+                or await page.locator('div[role="list"].slds-box').count()!=0
+                or await page.locator('p.pr-pagination__results').count()!=0
+                or await page.locator('a.pr-pagination__link').filter(has_text='Next').count()!=0):
+                raise ValueError('zero result conflict')
+            audit['explicit_zero_evidence']='EXACT_VISIBLE_ZERO_AND_RETAINED_CRITERIA_NO_ROWS_OR_NEXT'
+            audit['listing_segments']=[{'ordinal':1,'first':0,'last':0,'total':0,
+                'evidence_sha256':hashlib.sha256(b'No results found').hexdigest()}]
+            audit['enumeration_evidence']='COUNT_RECONCILED'
+            return
         expected_first=1; total=None; seen_refs=set();seen_keys=set()
         for ordinal in range(1,MAX_SEGMENTS+1):
             if stopped.is_set(): raise ValueError('resource stop')

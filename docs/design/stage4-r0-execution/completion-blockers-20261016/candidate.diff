@@ -1,0 +1,684 @@
+--- a/verification/discovery/arcus_ui_window.py
++++ b/verification/discovery/arcus_ui_window.py
+@@ -11,6 +11,18 @@
+ CASE='discovery_manchester_ui_window'
+ AURA='https://arcusbe.manchester.gov.uk/pr/s/sfsites/aura'
+ MAX_SEGMENTS=6
++METADATA_LABELS={'Proposal','Description','Site Address','Location of works','Application type'}
++
++
++def metadata_capture_evidence(value):
++    if (not isinstance(value,dict) or set(value)!={'version','row_item_count','label_counts','route'}
++        or type(value['version']) is not int or value['version']!=1
++        or value['route']!='VISIBLE_ROW_EXACT_RENDERED_LABEL_V2'
++        or type(value['row_item_count']) is not int or not 0<=value['row_item_count']<=20
++        or not isinstance(value['label_counts'],dict) or set(value['label_counts'])!=METADATA_LABELS
++        or any(type(n) is not int or n not in (0,1) for n in value['label_counts'].values())):
++        raise ValueError('metadata evidence shape')
++    return {**value,'label_counts':dict(value['label_counts'])}
+ 
+ 
+ 
+@@ -50,6 +62,8 @@
+                 if item and (not isinstance(item.get('value'),str) or len(item['value'])>limit):raise ValueError('metadata value bound')
+                 metadata[key]=dict(state='PRESENT_VALUE' if item and item['value'] else 'PRESENT_BLANK' if item else 'UNKNOWN',value=item['value'] if item else None,locator='visible listing field:'+item['label'] if item else 'NOT_CAPTURED',truncated=bool(item and item.get('truncated')))
+             rows[-1]['fields']=metadata
++            if 'metadata_capture_evidence' in c:
++                rows[-1]['metadata_capture_evidence']=metadata_capture_evidence(c['metadata_capture_evidence'])
+             rows[-1]['field_capture_scope']+=['proposal','address','application_type']
+     if len({r['reference'] for r in rows})!=len(rows) or len({r['source_record_id'] for r in rows})!=len(rows):
+         raise ValueError('duplicate page identity')
+@@ -57,7 +71,7 @@
+ 
+ 
+ async def read_cards(page,config=MANCHESTER):
+-    """Read only the two qualified fields through ordinary bounded locators."""
++    """Read exact row-bound fields; optional metadata never leaves its card."""
+     cards=page.locator('div[role="list"].slds-box')
+     count=await cards.count()
+     if not 1<=count<=10: raise ValueError('card count')
+@@ -85,10 +99,15 @@
+             if len(value)>160: raise ValueError('field value bound')
+             fields.append({'label':name,'value':value})
+         if config.capture_metadata:
++            label_counts={}
+             # Exact visible labels only; never read applicant/contact fields or raw HTML.
+             for name,limit in [('Proposal',1024),('Description',1024),('Site Address',600),('Location of works',600),('Application type',160)]:
+-                field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name)+r'\s*\n',re.I))
++                # has_text sees DOM textContent, not layout-produced innerText
++                # newlines. Match the prefix here, then verify the exact rendered
++                # first line below. Never loosen the final label/value contract.
++                field=items.filter(has_text=re.compile(r'^\s*'+re.escape(name),re.I))
+                 n=await field.count()
++                label_counts[name]=n
+                 if n>1:raise ValueError('metadata label conflict')
+                 if n==1:
+                     text=await field.inner_text(timeout=1500);parts=text.strip().split('\n',1)
+@@ -96,6 +115,9 @@
+                     value=parts[1].strip()
+                     fields.append({'label':name,'value':value[:limit],'truncated':len(value)>limit})
+         out.append({'links':[{'text':ref,'href':href}],'fields':fields})
++        if config.capture_metadata:
++            out[-1]['metadata_capture_evidence']={'version':1,'row_item_count':await items.count(),
++                'label_counts':label_counts,'route':'VISIBLE_ROW_EXACT_RENDERED_LABEL_V2'}
+     return out
+ 
+ 
+@@ -119,7 +141,13 @@
+     audit.update(listing_stage='CRITERIA',listing_segments=[],listing_records=[],completeness='UNKNOWN',applied_interval=None,
+                  source_qualification='CANDIDATE_PUBLIC_UI_CONTRACT',enumeration_evidence=None)
+     try:
+-        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator('p.pr-pagination__results').wait_for(state='visible',timeout=10000),audit)
++        # The sealed Manchester zero observation has a paragraph "No results
++        # found" and no pagination marker. Absence of pagination alone is NEVER
++        # zero evidence. Applied criteria and contradictory rows are checked below.
++        # Only Manchester has retained source evidence for this zero shape.
++        zero_supported=config.council=='manchester'
++        result_selector='p.pr-pagination__results, p:text-is("No results found")' if zero_supported else 'p.pr-pagination__results'
++        await criteria_control('RESULT_MARKER_VISIBLE',lambda:page.locator(result_selector).wait_for(state='visible',timeout=10000),audit)
+         # An ordinary disclosure toggle exposes the source's retained filters.
+         await criteria_control('CRITERIA_DISCLOSURE',lambda:page.get_by_role('button',name='Show the search criteria',exact=True).click(timeout=3000),audit)
+         expected={'Valid date from':datetime.strptime(config.start,'%Y-%m-%d').strftime('%d/%m/%Y'),'Valid date to':datetime.strptime(config.end,'%Y-%m-%d').strftime('%d/%m/%Y'),**{k:'' for k in config.blank_inputs}}
+@@ -133,6 +161,18 @@
+             raise ValueError('category')
+         audit['applied_interval']=[config.start,config.end]
+         audit['applied_evidence']='VISIBLE_RETAINED_CRITERIA_AND_ROW_VALID_DATES' if config.row_date else 'VISIBLE_RETAINED_VALID_DATE_CRITERIA'
++        zero=page.locator('p:text-is("No results found")')
++        if zero_supported and await zero.count():
++            if (await zero.count()!=1 or await zero.inner_text(timeout=1500)!='No results found'
++                or await page.locator('div[role="list"].slds-box').count()!=0
++                or await page.locator('p.pr-pagination__results').count()!=0
++                or await page.locator('a.pr-pagination__link').filter(has_text='Next').count()!=0):
++                raise ValueError('zero result conflict')
++            audit['explicit_zero_evidence']='EXACT_VISIBLE_ZERO_AND_RETAINED_CRITERIA_NO_ROWS_OR_NEXT'
++            audit['listing_segments']=[{'ordinal':1,'first':0,'last':0,'total':0,
++                'evidence_sha256':hashlib.sha256(b'No results found').hexdigest()}]
++            audit['enumeration_evidence']='COUNT_RECONCILED'
++            return
+         expected_first=1; total=None; seen_refs=set();seen_keys=set()
+         for ordinal in range(1,MAX_SEGMENTS+1):
+             if stopped.is_set(): raise ValueError('resource stop')
+--- a/verification/discovery/arcus_ui_audit.py
++++ b/verification/discovery/arcus_ui_audit.py
+@@ -27,6 +27,13 @@
+     rows=a['listing_records'];pages=a['listing_segments']
+     if not 1<=len(pages)<=6: raise ValueError('segment bound')
+     if not pages or pages[-1]['last']!=pages[-1]['total'] or len(rows)!=pages[-1]['total']: raise ValueError('total mismatch')
++    if not rows:
++        if (config.council!='manchester'
++            or pages!=[dict(ordinal=1,first=0,last=0,total=0,evidence_sha256=__import__('hashlib').sha256(b'No results found').hexdigest())]
++            or a.get('explicit_zero_evidence')!='EXACT_VISIBLE_ZERO_AND_RETAINED_CRITERIA_NO_ROWS_OR_NEXT'):
++            raise ValueError('zero evidence')
++        return {'outcome':'PUBLIC_UI_EXPLICIT_ZERO_AND_CRITERIA_QUALIFIED','completeness':'UNKNOWN',
++            'source_registry_qualified':False,'production_admission':False,'records':0,'segments':1}
+     cursor=1; total=pages[-1]['total']
+     for segment in pages:
+         if segment['first']!=cursor or segment['last']<cursor or segment['total']!=total:
+--- a/verification/discovery/idox_window.py
++++ b/verification/discovery/idox_window.py
+@@ -29,8 +29,11 @@
+     semantics: str = 'RECEIVED'
+     start: date = START
+     end: date = END
++    max_transport_retries: int = 1
+ 
+     def __post_init__(self):
++        if type(self.max_transport_retries) is not int or self.max_transport_retries not in (0,1):
++            raise ValueError('retry policy')
+         if self.council not in IDOX or self.semantics not in {'RECEIVED','VALIDATED'} or not self.start<=self.end or (self.end-self.start).days>27:
+             raise ValueError('unadmitted council/date window')
+ 
+@@ -55,7 +58,8 @@
+         self.config=config
+         super().__init__(Policy(config.council,config.semantics+':'+config.start.isoformat()+':'+config.end.isoformat(),'idox',
+             config.base,config.form_url),
+-            Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45),dispatch)
++            Budget(requests=10,per_reference=10,total_bytes=3_000_000,response_bytes=500_000,seconds=45),dispatch,
++            max_retries=config.max_transport_retries)
+         self.admitted_post=None
+         self.admitted_body=None
+         self.next_url=None
+--- a/verification/discovery/finite_acceptance.py
++++ b/verification/discovery/finite_acceptance.py
+@@ -33,12 +33,13 @@
+             cursor=stop+timedelta(days=1)
+     return dict(purpose=purpose,start=start,end=end,rule=RULE,limits=LIMITS.copy(),rows=rows)
+ 
+-def read(row):
++def read(row, *, no_transport_retry=False):
++    if type(no_transport_retry) is not bool:raise ValueError('retry policy')
+     if row['council'] not in ARCUS:
+         with tempfile.TemporaryDirectory(prefix='discovery-finite-idox-') as td:
+             path=Path(td)/'source.json'
+             env=dict(PATH='/usr/bin:/bin',HOME=td,TMPDIR=td,PYTHONDONTWRITEBYTECODE='1')
+-            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end'],'--output',str(path)],env=env,deadline=50)
++            code,expired=supervise([sys.executable,'-m','verification.discovery.finite_acceptance','--idox-worker',row['council'],row['start'],row['end']]+(['--no-transport-retry'] if no_transport_retry else [])+['--output',str(path)],env=env,deadline=50)
+             if expired or code!=0 or not path.is_file() or path.stat().st_size>512000:raise ValueError('bounded worker failure')
+             return retain_screening(json.loads(path.read_bytes()))
+     from verification.direct_reference.instrumented_probe import supervised
+@@ -111,10 +112,11 @@
+     """Private child entry only; no registered round/acceptance authority."""
+     import argparse
+     p=argparse.ArgumentParser();p.add_argument('--idox-worker',nargs=3,required=True);p.add_argument('--output',type=Path,required=True)
++    p.add_argument('--no-transport-retry',action='store_true')
+     a=p.parse_args();c,start,end=a.idox_worker
+     if c not in COUNCILS-ARCUS or a.output.exists():raise ValueError('bounded child')
+     if any(k in os.environ for k in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY')):raise ValueError('credential-free')
+-    result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end)))
++    result=live(WindowConfig(c,SEMANTICS[c],date.fromisoformat(start),date.fromisoformat(end),max_transport_retries=0 if a.no_transport_retry else 1))
+     raw=json.dumps(result,sort_keys=True).encode()
+     if len(raw)>512000:raise ValueError('bounded child audit')
+     a.output.write_bytes(raw)
+--- a/verification/stage26b_l1/request_boundary.py
++++ b/verification/stage26b_l1/request_boundary.py
+@@ -69,7 +69,10 @@
+             self.reject('PARTIAL_RETRIEVAL', 'response byte ceiling', True)
+ 
+ class Boundary:
+-    def __init__(self, policy, budget, dispatch):
++    def __init__(self, policy, budget, dispatch, *, max_retries=1):
++        if type(max_retries) is not int or max_retries not in (0,1):
++            raise ValueError('retry policy')
++        self.max_retries=max_retries
+         if policy.adapter not in ('idox', 'arcus') or not policy.reference.strip():
+             raise ValueError('Unsupported exact-reference policy')
+         self.policy, self.budget, self.dispatch = policy, budget, dispatch
+@@ -187,7 +190,7 @@
+             except (requests.Timeout, requests.ConnectionError) as exc:
+                 host = urlsplit(self.policy.base_url).hostname
+                 self.budget.host_failures[host] = self.budget.host_failures.get(host, 0) + 1
+-                if self.retries >= 1 or self.budget.host_failures[host] >= 2:
++                if self.retries >= self.max_retries or self.budget.host_failures[host] >= 2:
+                     self.budget.reject('TIMEOUT' if isinstance(exc, requests.Timeout) else 'SOURCE_UNAVAILABLE', 'transport failed')
+                 self.retries += 1
+                 # One retry, globally for this reference, including all browser assets.
+@@ -208,9 +211,11 @@
+                         response.close()
+ 
+     def audit(self, outcome):
+-        return dict(council=self.policy.council, reference=self.policy.reference, adapter=self.policy.adapter,
++        out=dict(council=self.policy.council, reference=self.policy.reference, adapter=self.policy.adapter,
+             outcome=outcome, requests_attempted=self.requests, redirects=self.redirects, retries=self.retries,
+             received_bytes=self.received_bytes, elapsed_seconds=round(time.monotonic()-self.budget.started, 3),
+             budget_exhaustion=bool(self.budget.failure and self.budget.failure.budget))
++        if self.max_retries==0:out['retry_policy']='NO_INTERNAL_RETRY'
++        return out
+ 
+     def close(self): self.closed = True
+--- a/tests/test_discovery_page_cap_transport.py
++++ b/tests/test_discovery_page_cap_transport.py
+@@ -29,7 +29,7 @@
+             async def inner_text(self, **kw):
+                 return f'Showing {page.segment*10+1} to {page.segment*10+10} of 73 results'
+             def filter(self, **kw): return self
+-            async def count(self): return 1
++            async def count(self): return 0 if selector=='p:text-is("No results found")' else 1
+             async def get_attribute(self, name): return '#'
+             async def click(self, **kw): page.segment+=1
+         return Locator()
+--- a/.github/workflows/stage4-discovery-offline.yml
++++ b/.github/workflows/stage4-discovery-offline.yml
+@@ -17,6 +17,8 @@
+       - 'verification/discovery/**'
+       - '.github/workflows/stage4-catchup-completion-*.yml'
+       - 'tests/test_discovery_completion.py'
++      - 'tests/test_discovery_completion_blockers.py'
++      - 'verification/stage26b_l1/request_boundary.py'
+       - 'tests/test_discovery_autonomous_mandate.py'
+       - '.github/workflows/stage4-r0-selective5-admission-once.yml'
+       - '.github/workflows/stage4-r0-mandate-partitions8-once.yml'
+@@ -56,7 +58,7 @@
+       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/discovery-venv"
+       - name: Pure discovery and pagination regressions, network denied
+         run: |
+-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_completion.py tests/test_discovery_autonomous_mandate.py tests/test_discovery_parent_registration.py tests/test_discovery_exact9_registration.py tests/test_discovery_parent_controls.py tests/test_discovery_bolton53_admission.py tests/test_discovery_criteria_containment.py tests/test_discovery_capped_criteria_screening.py tests/test_discovery_exact9_parent_preparation.py tests/test_discovery_exact16_registration.py tests/test_discovery_exact16_proposal.py tests/test_discovery_bolton53_registration.py tests/test_discovery_initial_application_contract.py tests/test_discovery_r0_registered_scopes.py tests/test_discovery_page_cap_transport.py tests/test_discovery_fixed80_qualification.py tests/test_discovery_finite_acceptance.py tests/test_discovery_r0_proposal.py tests/test_discovery_r0_recovery_proposal.py tests/test_discovery_r0_executable_proposals.py tests/test_discovery_r0_registration.py tests/test_discovery_contract.py tests/test_discovery_acceptance.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py tests/test_discovery_remaining_source.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
++          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_l1_registration_request_safety.py tests/test_discovery_completion_blockers.py tests/test_discovery_completion.py tests/test_discovery_autonomous_mandate.py tests/test_discovery_parent_registration.py tests/test_discovery_exact9_registration.py tests/test_discovery_parent_controls.py tests/test_discovery_bolton53_admission.py tests/test_discovery_criteria_containment.py tests/test_discovery_capped_criteria_screening.py tests/test_discovery_exact9_parent_preparation.py tests/test_discovery_exact16_registration.py tests/test_discovery_exact16_proposal.py tests/test_discovery_bolton53_registration.py tests/test_discovery_initial_application_contract.py tests/test_discovery_r0_registered_scopes.py tests/test_discovery_page_cap_transport.py tests/test_discovery_fixed80_qualification.py tests/test_discovery_finite_acceptance.py tests/test_discovery_r0_proposal.py tests/test_discovery_r0_recovery_proposal.py tests/test_discovery_r0_executable_proposals.py tests/test_discovery_r0_registration.py tests/test_discovery_contract.py tests/test_discovery_acceptance.py tests/test_discovery_admission.py tests/test_discovery_pagination.py tests/test_discovery_form_shape.py verification/bolton_recon/test_recon.py tests/test_instrumented_probe.py tests/test_discovery_arcus_shape.py tests/test_discovery_idox_listing.py tests/test_discovery_idox_window.py tests/test_discovery_idox_family.py tests/test_discovery_remaining_source.py tests/test_discovery_arcus_ui.py tests/test_discovery_arcus_transport.py -q --junitxml="$RUNNER_TEMP/discovery.xml"
+       - name: Fixed committee caller and field-level B2, network denied
+         run: |
+           env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/discovery-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_committee_exact.py tests/test_planning_status_verification.py tests/test_field_level_verification.py tests/test_arcus_b2_adapter.py tests/test_arcus_transport.py -q
+--- a/.github/workflows/stage4-batch-offline.yml
++++ b/.github/workflows/stage4-batch-offline.yml
+@@ -44,6 +44,8 @@
+       - 'verification/discovery/r0_identity_comparison.py'
+       - 'verification/discovery/arcus_ui_config.py'
+       - 'tests/test_discovery_completion.py'
++      - 'tests/test_discovery_completion_blockers.py'
++      - 'verification/stage26b_l1/request_boundary.py'
+       - '.github/workflows/stage4-catchup-completion-*.yml'
+       - 'docs/design/stage4-r0-execution/completion-mandate-20261015/**'
+       - 'verification/discovery/r0_proposal.py'
+@@ -93,7 +95,7 @@
+       - run: bash verification/ah_pg/setup.sh "$RUNNER_TEMP/direct-test-venv"
+       - name: Network-denied registration and accepted regressions
+         run: |
+-          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_completion.py tests/test_discovery_autonomous_mandate.py tests/test_discovery_parent_registration.py tests/test_discovery_exact9_registration.py tests/test_discovery_parent_controls.py tests/test_discovery_capped_criteria_screening.py tests/test_discovery_exact9_parent_preparation.py tests/test_discovery_exact16_registration.py tests/test_discovery_exact16_proposal.py tests/test_discovery_bolton53_registration.py tests/test_discovery_initial_application_contract.py tests/test_discovery_r0_registered_scopes.py -p verification.stage1_preservation_plugin tests/test_discovery_r0_registration.py tests/test_stage4_closure.py tests/test_stage4_status_only.py tests/test_stage4_catchup.py tests/test_stage4_batch_registration.py tests/test_stage4_batch.py tests/test_oldham_production_registration.py tests/test_stage4_persistence_acceptance.py tests/test_stage4_direct_reference.py tests/test_stage4_direct_registration.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
++          env -i HOME="$HOME" PATH=/usr/bin:/bin DATABASE_URL=sqlite:///:memory: "$RUNNER_TEMP/direct-test-venv/bin/python" verification/ah-offline-pytest.py tests/test_discovery_completion_blockers.py tests/test_discovery_completion.py tests/test_discovery_autonomous_mandate.py tests/test_discovery_parent_registration.py tests/test_discovery_exact9_registration.py tests/test_discovery_parent_controls.py tests/test_discovery_capped_criteria_screening.py tests/test_discovery_exact9_parent_preparation.py tests/test_discovery_exact16_registration.py tests/test_discovery_exact16_proposal.py tests/test_discovery_bolton53_registration.py tests/test_discovery_initial_application_contract.py tests/test_discovery_r0_registered_scopes.py -p verification.stage1_preservation_plugin tests/test_discovery_r0_registration.py tests/test_stage4_closure.py tests/test_stage4_status_only.py tests/test_stage4_catchup.py tests/test_stage4_batch_registration.py tests/test_stage4_batch.py tests/test_oldham_production_registration.py tests/test_stage4_persistence_acceptance.py tests/test_stage4_direct_reference.py tests/test_stage4_direct_registration.py tests/test_stage26b_b20.py tests/test_stage26b_b21.py tests/test_planning_status_verification.py verification/test_stage1_access.py verification/test_stage1_outbound.py -q --junitxml="$RUNNER_TEMP/direct-registration.xml"
+       - uses: actions/upload-artifact@v4
+         if: always()
+         with:
+--- /dev/null
++++ b/tests/test_discovery_completion_blockers.py
+@@ -0,0 +1,179 @@
++"""Offline only. Synthetic DOM doubles are explicitly not fresh council evidence."""
++import asyncio
++from dataclasses import replace
++from copy import deepcopy
++from unittest.mock import patch
++import pytest,requests
++from verification.discovery import arcus_ui_window as ui
++from verification.discovery.arcus_ui_config import MANCHESTER,dated_config
++from verification.discovery.idox_window import WindowConfig,run
++from verification.discovery.arcus_ui_audit import validate
++from verification.direct_reference.instrumented_probe import classify_ui_enumeration
++from tests.test_discovery_r0_recovery_proposal import evidence
++from tests.test_discovery_page_cap_transport import Page
++from tests.test_discovery_idox_window import Response
++from verification.bolton_recon.fixtures import FORM
++
++
++@pytest.fixture(autouse=True)
++def no_credentials(monkeypatch):
++    for key in ('DATABASE_URL','COMMITTEE_DATABASE_URL','OPENAI_API_KEY','ANTHROPIC_API_KEY'):
++        monkeypatch.delenv(key,raising=False)
++
++
++def sync_await(coro):
++    # All synthetic locators complete immediately; no event loop/network sockets.
++    try:coro.send(None)
++    except StopIteration as done:return done.value
++    raise AssertionError('synthetic locator unexpectedly scheduled IO')
++
++
++def test_metadata_textcontent_without_layout_newline_is_captured_and_private_fields_ignored():
++    class Leaf:
++        def __init__(self,texts,href=None): self.texts=texts;self.href=href
++        async def count(self):return len(self.texts)
++        async def inner_text(self,**kw):assert len(self.texts)==1;return self.texts[0]
++        async def get_attribute(self,*a,**kw):return self.href
++    class Items:
++        texts=['Reference\nTEST/1','Valid Date\n01/10/2026','Description\n49 dwellings','Site Address\nTest site','Applicant\nPRIVATE_CONTACT']
++        async def count(self):return len(self.texts)
++        def filter(self,has_text):return Leaf([v for v in self.texts if has_text.search(v.replace('\n',''))])
++    class Card:
++        def locator(self,s):
++            if s=='[role="listitem"]':return Items()
++            assert s=='a[href*="/detail/"]'
++            return Leaf(['TEST/1'],'/pr/s/detail/'+('a'*18)+'?c__r=Arcus_BE_Public_Register')
++    class Cards:
++        async def count(self):return 1
++        def nth(self,i):assert i==0;return Card()
++    class P:
++        def locator(self,s):assert s=='div[role="list"].slds-box';return Cards()
++    cfg=replace(MANCHESTER,start='2026-10-01',end='2026-10-03',capture_metadata=True)
++    cards=sync_await(ui.read_cards(P(),cfg))
++    row=ui.qualify_segment('Showing 1 to 1 of 1 results',cards,1,config=cfg)[3][0]
++    assert row['fields']['proposal']['value']=='49 dwellings'
++    assert row['fields']['application_type']['state']=='UNKNOWN'
++    assert row['metadata_capture_evidence']['label_counts']['Description']==1
++    assert 'PRIVATE_CONTACT' not in str(row)
++    # Default reference/date-only mode remains unchanged.
++    old=sync_await(ui.read_cards(P(),replace(cfg,capture_metadata=False)))
++    assert [x['label'] for x in old[0]['fields']]==['Reference','Valid Date']
++
++
++def zero_source(*,wrong_date=False,conflict=None):
++    row=dict(council='manchester',start='2026-10-15',end='2026-10-15',semantics='VALIDATED')
++    config=dated_config(MANCHESTER,row['start'],row['end']);a=evidence(row)
++    class P(Page):
++        def locator(self,selector):
++            old=super().locator(selector)
++            class L:
++                async def wait_for(self,**kw):return None
++                async def count(self):
++                    return 1 if selector=='p:text-is("No results found")' or selector==conflict else 0
++                async def inner_text(self,**kw):return 'No results found'
++                def filter(self,**kw):return self
++            return L()
++        def get_by_label(self,label,exact=True):
++            if wrong_date and label=='Valid date to':
++                class Bad:
++                    async def input_value(self,**kw):return '14/10/2026'
++                return Bad()
++            return super().get_by_label(label,exact)
++    sync_await(ui.enumerate_ui(P(config),a,asyncio.Event(),config))
++    classify_ui_enumeration(a,lambda reason:a.update(failure=reason,safety_failure=True))
++    return row,config,a
++
++
++def test_explicit_zero_through_worker_classifier_and_real_parent():
++    from verification.discovery import r0_recovery_proposal as parent,finite_acceptance as f
++    row,config,a=zero_source()
++    assert validate(a,config)['records']==0
++    assert f.classify(row,a)=='COMPLETE'
++    plan=dict(rows=[row]);out=parent._execute_fixed(plan,'synthetic',reader=lambda _:a,limits=dict(calls=1,requests=80,bytes=20*1024*1024,seconds=55,output_bytes=20000000),checkpoint=lambda _:None,clock=lambda:0)
++    assert out['results'][0]['enumeration_completeness']=='COMPLETE'
++    assert out['results'][0]['source']['listing_records']==[]
++    for change in [{'explicit_zero_evidence':None},{'applied_interval':None},{'safety_events':['WRONG_ORIGIN']},{'live_owned_survivors':1}]:
++        with pytest.raises(ValueError):validate(dict(a,**change),config)
++
++
++@pytest.mark.parametrize('options',[dict(wrong_date=True),dict(conflict='div[role="list"].slds-box'),dict(conflict='p.pr-pagination__results'),dict(conflict='a.pr-pagination__link')])
++def test_zero_requires_positive_criteria_and_no_contradiction(options):
++    _,_,a=zero_source(**options)
++    assert a['enumeration_evidence'] is None and a['failure']
++
++
++@pytest.mark.parametrize('failure',[requests.Timeout('PRIVATE'),requests.ConnectionError('PRIVATE'),502,503,504])
++def test_actual_idox_boundary_no_retry_policy_stops_first_attempt(failure):
++    calls=[];responses=[]
++    def dispatch(*a,**kw):
++        calls.append(1)
++        if isinstance(failure,Exception):raise failure
++        response=Response(b'upstream error');response.status_code=failure;responses.append(response);return response
++    out=run(dispatch,WindowConfig('bury',max_transport_retries=0))
++    assert len(calls)==1 and out['resource']['requests_attempted']==1 and out['resource']['retries']==0
++    assert out['failure'] and out['cleanup']=='BOUNDARY_CLOSED'
++    assert all(x.closed for x in responses) and 'PRIVATE' not in str(out)
++
++
++def test_retry_default_legacy_and_invalid_policy():
++    assert WindowConfig('bury').max_transport_retries==1
++    for value in [True,-1,2,'0']:
++        with pytest.raises(ValueError):WindowConfig('bury',max_transport_retries=value)
++
++
++def test_oldham_sort_failure_still_fails_closed_and_exports_no_html():
++    bodies=iter([FORM,b'<html><form><input value="PRIVATE_CONTACT"></form></html>'])
++    a=run(lambda *args,**kw:Response(next(bodies)),WindowConfig('oldham',max_transport_retries=0))
++    assert a['failure']=='ListingError:sort selector'
++    assert a['failure_diagnostic']['counts']['order_by_selects']==0
++    assert a['applied_interval'] is None and a['records']==[]
++    assert 'PRIVATE_CONTACT' not in str(a)
++
++
++def test_no_retry_actual_reader_child_config_boundary_wiring(tmp_path):
++    from verification.discovery import finite_acceptance as f
++    import json,sys
++    calls=[]
++    def supervised(command,**kw):
++        calls.append((command,kw))
++        assert '--no-transport-retry' in command
++        def source(config):
++            assert config.max_transport_retries==0
++            return run(lambda *a,**k:(_ for _ in ()).throw(requests.Timeout('SYNTHETIC')),config)
++        with patch.object(sys,'argv',command[2:]),patch.object(f,'live',source):f.main()
++        return 0,False
++    with patch.object(f,'supervise',supervised):
++        out=f.read(dict(council='wigan',start='2026-10-15',end='2026-10-15',semantics='RECEIVED'),no_transport_retry=True)
++    assert len(calls)==1 and out['resource']['requests_attempted']==1
++    assert out['resource']['retries']==0 and out['resource']['retry_policy']=='NO_INTERNAL_RETRY'
++    assert set(calls[0][1]['env'])=={'PATH','HOME','TMPDIR','PYTHONDONTWRITEBYTECODE'}
++
++
++def test_metadata_diagnostic_is_strict_bounded_and_cannot_export_payload():
++    safe=dict(version=1,row_item_count=6,label_counts={k:0 for k in ui.METADATA_LABELS},route='VISIBLE_ROW_EXACT_RENDERED_LABEL_V2')
++    assert ui.metadata_capture_evidence(safe)==safe
++    for mutation in [dict(safe,raw_html='PRIVATE'),dict(safe,row_item_count=21),dict(safe,label_counts={'Applicant':1}),dict(safe,label_counts=dict(safe['label_counts'],Description=True))]:
++        with pytest.raises(ValueError,match='metadata evidence shape'):ui.metadata_capture_evidence(mutation)
++
++
++@pytest.mark.parametrize('council',['rochdale','salford'])
++def test_unobserved_councils_do_not_acquire_manchester_zero_shape(council):
++    from verification.discovery.arcus_ui_config import UI_CASES
++    from playwright.async_api import TimeoutError as LocatorTimeout
++    cfg=dated_config(UI_CASES['discovery_'+council+'_ui_window'],'2026-10-15','2026-10-15');seen=[];a={}
++    class P:
++        def locator(self,selector):
++            seen.append(selector)
++            class L:
++                async def wait_for(self,**kw):raise LocatorTimeout('synthetic')
++            return L()
++    sync_await(ui.enumerate_ui(P(),a,asyncio.Event(),cfg))
++    assert seen==['p.pr-pagination__results'] and a['enumeration_evidence'] is None
++    assert a['applied_interval'] is None
++
++
++def test_zero_consumer_rejects_other_council_even_with_copied_proof():
++    from verification.discovery.arcus_ui_config import ROCHDALE
++    _,_,a=zero_source();cfg=dated_config(ROCHDALE,'2026-10-15','2026-10-15')
++    a.update(case='discovery_rochdale_ui_window',destination=cfg.destination)
++    with pytest.raises(ValueError,match='zero evidence'):validate(a,cfg)
+--- a/tests/test_stage4_direct_registration.py
++++ b/tests/test_stage4_direct_registration.py
+@@ -37,6 +37,12 @@
+             archive=root/'history/refresh-pre-diagnostics.py.txt'
+             assert hashlib.sha256(archive.read_bytes()).hexdigest()==digest
+             assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='e59301682bdb78ac2838db40214af583299596648d77b1cab0801267f5fc88d2'
++        elif path=='verification/stage26b_l1/request_boundary.py':
++            # The accepted/consumed boundary bytes remain immutable. Only this
++            # exact opt-in retry-policy successor may differ in the current tree.
++            assert digest=='ad243bd5148a90147fa5f04047e316355909cabf263d53d0f1827a6ba0660c76'
++            assert hashlib.sha256((root/'history/request-boundary-pre-no-retry.py.txt').read_bytes()).hexdigest()==digest
++            assert hashlib.sha256(Path(path).read_bytes()).hexdigest()=='188198827c2192dec97f75a373fa3f3bbd066cd5f245ebad43e576a7b6e90057'
+         else:
+             assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==digest
+     assert len(load_manifest())==202
+@@ -46,7 +52,8 @@
+     for path,digest in historical.items():
+         source=(root/'history/refresh-v1.py.txt' if path=='verification/direct_reference/refresh.py'
+                 else root/'history/models-v1.py.txt' if path=='app/db/models.py'
+-                else root/'history/idox-v1.py.txt' if path=='app/scrapers/idox_portal.py' else Path(path))
++                else root/'history/idox-v1.py.txt' if path=='app/scrapers/idox_portal.py'
++                else root/'history/request-boundary-pre-no-retry.py.txt' if path=='verification/stage26b_l1/request_boundary.py' else Path(path))
+         assert hashlib.sha256(source.read_bytes()).hexdigest()==digest
+     provenance=json.loads((root/'history/provenance.json').read_text())
+     assert provenance['original_live_sha']=='a0feeb7c1cd39c979e2a9018b82d764d1edcd76b'
+--- /dev/null
++++ b/verification/direct_reference/history/request-boundary-pre-no-retry.py.txt
+@@ -0,0 +1,216 @@
++"""Status-only request accounting. No database, model, or live entry point.
++
++Physical dispatch is injected; callers must also contain browser-native networking.
++This component alone is not authority to make a council request.
++"""
++from dataclasses import dataclass, field
++from urllib.parse import urlsplit, parse_qs, unquote
++import time
++import requests
++
++class BoundaryFailure(RuntimeError):
++    def __init__(self, outcome='PARTIAL_RETRIEVAL', reason='boundary rejected', *, budget=False):
++        super().__init__(reason)
++        self.outcome, self.reason, self.budget = outcome, reason, budget
++
++@dataclass(frozen=True)
++class Policy:
++    council: str
++    reference: str
++    adapter: str
++    base_url: str
++    search_url: str
++
++@dataclass
++class Budget:
++    requests: int = 20
++    per_reference: int = 10
++    total_bytes: int = 10_000_000
++    response_bytes: int = 2_000_000
++    seconds: float = 165
++    used_requests: int = 0
++    used_bytes: int = 0
++    by_reference: dict = field(default_factory=dict)
++    host_failures: dict = field(default_factory=dict)
++    started: float = field(default_factory=time.monotonic)
++    failure: BoundaryFailure | None = None
++
++    def __post_init__(self):
++        if not (0 < self.requests <= 20 and 0 < self.per_reference <= 10 and
++                0 < self.total_bytes <= 10_000_000 and 0 < self.response_bytes <= 2_000_000 and
++                0 < self.seconds <= 165):
++            raise ValueError('Canary bounds cannot be relaxed')
++
++    def reject(self, outcome, reason, budget=False):
++        self.failure = self.failure or BoundaryFailure(outcome, reason, budget=budget)
++        raise self.failure
++
++    def check(self):
++        if self.failure: raise self.failure
++        if time.monotonic() - self.started >= self.seconds:
++            self.reject('TIMEOUT', 'run deadline', True)
++
++    def charge_request(self, policy):
++        self.check()
++        host = urlsplit(policy.base_url).hostname
++        if self.host_failures.get(host, 0) >= 2:
++            self.reject('SOURCE_UNAVAILABLE', 'run-local host circuit open')
++        key = (policy.council, policy.reference)
++        # A blocked attempted dispatch is recorded too; it does not reach transport.
++        self.used_requests += 1
++        self.by_reference[key] = self.by_reference.get(key, 0) + 1
++        if self.used_requests > self.requests or self.by_reference[key] > self.per_reference:
++            self.reject('PARTIAL_RETRIEVAL', 'request ceiling', True)
++
++    def charge_bytes(self, size, response_size):
++        self.used_bytes += size
++        self.check()
++        if response_size > self.response_bytes or self.used_bytes > self.total_bytes:
++            self.reject('PARTIAL_RETRIEVAL', 'response byte ceiling', True)
++
++class Boundary:
++    def __init__(self, policy, budget, dispatch):
++        if policy.adapter not in ('idox', 'arcus') or not policy.reference.strip():
++            raise ValueError('Unsupported exact-reference policy')
++        self.policy, self.budget, self.dispatch = policy, budget, dispatch
++        self.keyval = None
++        self.detail_url = None
++        self.redirects = self.retries = self.requests = self.received_bytes = 0
++        self.closed = False
++
++    def unique(self, matches, *, complete=False):
++        matches = sorted(set(matches))
++        if len(matches) > 1:
++            self.budget.reject('AMBIGUOUS_SOURCE_RESULT', 'multiple plausible exact results')
++        if not matches:
++            self.budget.reject('REFERENCE_NOT_FOUND' if complete else 'PARTIAL_RETRIEVAL', 'no exact result')
++        if self.policy.adapter == 'idox': self.keyval = matches[0]
++        else: self.detail_url = matches[0]
++        return matches[0]
++
++    def validate(self, method, url, body=None):
++        self.budget.check()
++        if self.closed: self.budget.reject('PARTIAL_RETRIEVAL', 'closed transport')
++        u, b = urlsplit(url), urlsplit(self.policy.base_url)
++        if (u.scheme != 'https' or u.hostname != b.hostname or u.port not in (None, 443) or
++                u.username or u.password or u.fragment or '\\' in url):
++            self.budget.reject('PARTIAL_RETRIEVAL', 'origin rejected')
++        path = unquote(u.path)
++        if path != u.path or '..' in path or '//' in path:
++            self.budget.reject('PARTIAL_RETRIEVAL', 'noncanonical route')
++        method = method.upper()
++        q = parse_qs(u.query, keep_blank_values=True)
++        if body is not None and len(body) > 65536:
++            self.budget.reject('PARTIAL_RETRIEVAL', 'request payload ceiling', True)
++        base_path = b.path.rstrip('/')
++        if self.policy.adapter == 'idox':
++            if path == base_path + '/search.do':
++                if method not in ('GET', 'POST'): self.budget.reject('PARTIAL_RETRIEVAL', 'method rejected')
++                if method == 'GET' and url != self.policy.search_url:
++                    self.budget.reject('PARTIAL_RETRIEVAL', 'search expansion rejected')
++                if method == 'POST':
++                    fields = parse_qs((body or b'').decode('utf-8'), keep_blank_values=True)
++                    if fields.get('searchCriteria.reference') != [self.policy.reference]:
++                        self.budget.reject('PARTIAL_RETRIEVAL', 'exact reference required')
++                    for key, values in fields.items():
++                        if key.startswith('searchCriteria.') and key != 'searchCriteria.reference' and any(values):
++                            self.budget.reject('PARTIAL_RETRIEVAL', 'additional search criterion rejected')
++                if method == 'POST':
++                    if set(q): self.budget.reject('PARTIAL_RETRIEVAL', 'POST query rejected')
++                    # Only exact-reference and the synthetic fixture submit control
++                    # are admitted. Live form/CSRF fields remain unqualified.
++                    if set(fields) - {'searchCriteria.reference', 'action'}:
++                        self.budget.reject('PARTIAL_RETRIEVAL', 'unapproved form field')
++                    if 'action' in fields and fields['action'] != ['Search']:
++                        self.budget.reject('PARTIAL_RETRIEVAL', 'unapproved form action')
++                return
++            if path == base_path + '/advancedSearchResults.do' and method == 'GET' and not body:
++                if set(q) <= {'action'} and q.get('action', ['firstPage']) == ['firstPage']: return
++            if path == base_path + '/applicationDetails.do' and method == 'GET' and not body:
++                if set(q) == {'activeTab', 'keyVal'} and q['activeTab'] == ['summary'] and len(q['keyVal']) == 1:
++                    # A direct exact-search redirect is provisional until the detail Reference agrees.
++                    if self.keyval is None: self.keyval = q['keyVal'][0]
++                    if q['keyVal'] == [self.keyval]: return
++        else:
++            if method == 'GET' and not body and url in (self.policy.search_url, self.detail_url): return
++        # Status-only pages may load static resources on the exact council origin.
++        # No extensionless/XHR wildcard: undocumented endpoints fail closed.
++        if method == 'GET' and not body and not u.query and path.startswith(base_path + '/'):
++            if path.lower().endswith(('.css', '.js', '.png', '.jpg', '.gif', '.svg', '.woff', '.woff2', '.ico')):
++                if any(w in path.lower() for w in ('document', 'download', 'file', 'related', 'history')):
++                    self.budget.reject('PARTIAL_RETRIEVAL', 'discovery/document route rejected')
++                return
++        self.budget.reject('PARTIAL_RETRIEVAL', 'unapproved route class')
++
++    def request(self, method, url, *, body=None, headers=None, redirected=False):
++        self.validate(method, url, body)
++        if redirected:
++            self.redirects += 1
++            if self.redirects > 2: self.budget.reject('PARTIAL_RETRIEVAL', 'redirect ceiling', True)
++        while True:
++            self.budget.charge_request(self.policy)
++            self.requests += 1
++            response = None
++            charged = 0
++            try:
++                response = self.dispatch(method, url, data=body, headers=headers or {}, stream=True,
++                    allow_redirects=False, timeout=min(15, self.budget.seconds-(time.monotonic()-self.budget.started)),
++                    deadline=self.budget.started+self.budget.seconds)
++                payload = bytearray()
++                charged = 0
++                content_type = response.headers.get("Content-Type", "").lower()
++                if "attachment" in response.headers.get("Content-Disposition", "").lower() or any(t in content_type for t in ("application/pdf", "application/zip", "application/octet-stream")):
++                    self.budget.reject("PARTIAL_RETRIEVAL", "document response rejected")
++                for chunk in response.iter_content(65536):
++                    if not chunk: continue
++                    payload.extend(chunk)
++                    # Charge the larger of decoded and exposed wire-body position.
++                    # This guards decompression expansion and encoded-body overhead.
++                    raw = getattr(response, 'raw', None)
++                    wire = raw.tell() if raw is not None and hasattr(raw, 'tell') else 0
++                    measured = max(len(payload), wire)
++                    delta = measured - charged
++                    self.received_bytes += delta
++                    charged = measured
++                    self.budget.charge_bytes(delta, measured)
++                status = response.status_code
++                if status == 429: self.budget.reject('RATE_LIMITED', 'HTTP rate limit')
++                if status in (502, 503, 504):
++                    raise requests.ConnectionError('transient upstream response')
++                if status >= 400: self.budget.reject('SOURCE_UNAVAILABLE', 'HTTP failure')
++                if 300 <= status < 400:
++                    from urllib.parse import urljoin
++                    target = urljoin(url, response.headers.get('Location', ''))
++                    if not response.headers.get('Location'): self.budget.reject('PARTIAL_RETRIEVAL', 'missing redirect location')
++                    self.validate('GET', target)
++                return status, dict(response.headers), bytes(payload)
++            except (requests.Timeout, requests.ConnectionError) as exc:
++                host = urlsplit(self.policy.base_url).hostname
++                self.budget.host_failures[host] = self.budget.host_failures.get(host, 0) + 1
++                if self.retries >= 1 or self.budget.host_failures[host] >= 2:
++                    self.budget.reject('TIMEOUT' if isinstance(exc, requests.Timeout) else 'SOURCE_UNAVAILABLE', 'transport failed')
++                self.retries += 1
++                # One retry, globally for this reference, including all browser assets.
++                self.budget.check()
++            except BoundaryFailure: raise
++            except Exception:
++                self.budget.reject('PARTIAL_RETRIEVAL', 'unqualified transport failure')
++            finally:
++                if response is not None:
++                    try:
++                        raw = getattr(response, 'raw', None)
++                        wire = raw.tell() if raw is not None and hasattr(raw, 'tell') else 0
++                        measured = max(charged, wire)
++                        delta = measured - charged
++                        self.received_bytes += delta
++                        if delta: self.budget.charge_bytes(delta, measured)
++                    finally:
++                        response.close()
++
++    def audit(self, outcome):
++        return dict(council=self.policy.council, reference=self.policy.reference, adapter=self.policy.adapter,
++            outcome=outcome, requests_attempted=self.requests, redirects=self.redirects, retries=self.retries,
++            received_bytes=self.received_bytes, elapsed_seconds=round(time.monotonic()-self.budget.started, 3),
++            budget_exhaustion=bool(self.budget.failure and self.budget.failure.budget))
++
++    def close(self): self.closed = True

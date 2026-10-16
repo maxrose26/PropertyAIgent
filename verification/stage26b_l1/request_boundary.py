@@ -69,7 +69,10 @@ class Budget:
             self.reject('PARTIAL_RETRIEVAL', 'response byte ceiling', True)
 
 class Boundary:
-    def __init__(self, policy, budget, dispatch):
+    def __init__(self, policy, budget, dispatch, *, max_retries=1):
+        if type(max_retries) is not int or max_retries not in (0,1):
+            raise ValueError('retry policy')
+        self.max_retries=max_retries
         if policy.adapter not in ('idox', 'arcus') or not policy.reference.strip():
             raise ValueError('Unsupported exact-reference policy')
         self.policy, self.budget, self.dispatch = policy, budget, dispatch
@@ -187,7 +190,7 @@ class Boundary:
             except (requests.Timeout, requests.ConnectionError) as exc:
                 host = urlsplit(self.policy.base_url).hostname
                 self.budget.host_failures[host] = self.budget.host_failures.get(host, 0) + 1
-                if self.retries >= 1 or self.budget.host_failures[host] >= 2:
+                if self.retries >= self.max_retries or self.budget.host_failures[host] >= 2:
                     self.budget.reject('TIMEOUT' if isinstance(exc, requests.Timeout) else 'SOURCE_UNAVAILABLE', 'transport failed')
                 self.retries += 1
                 # One retry, globally for this reference, including all browser assets.
@@ -208,9 +211,11 @@ class Boundary:
                         response.close()
 
     def audit(self, outcome):
-        return dict(council=self.policy.council, reference=self.policy.reference, adapter=self.policy.adapter,
+        out=dict(council=self.policy.council, reference=self.policy.reference, adapter=self.policy.adapter,
             outcome=outcome, requests_attempted=self.requests, redirects=self.redirects, retries=self.retries,
             received_bytes=self.received_bytes, elapsed_seconds=round(time.monotonic()-self.budget.started, 3),
             budget_exhaustion=bool(self.budget.failure and self.budget.failure.budget))
+        if self.max_retries==0:out['retry_policy']='NO_INTERNAL_RETRY'
+        return out
 
     def close(self): self.closed = True
