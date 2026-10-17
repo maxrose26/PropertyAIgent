@@ -67,6 +67,11 @@ def test_registration_rejects_expiry_scope_and_hash_drift():
         project='zcikcfgpblzuzpanpdqd',environment=c.mapping.ENVIRONMENT,
         method='CLIENT_GENERATED_SCRAM_SHA_256_MEMORY_TO_PROTECTED_SECRET',revision='a'*40,
         limits=c.LIMITS,retired_mapping_sha256=c.RETIRED_BINDING,
+        consumed_controller_sha256=c.CONSUMED_CONTROLLER_BINDING,
+        memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO',
+        prior_audit_sha256=c.PRIOR_AUDIT_SHA256,
+        prior_supervised_seconds=c.PRIOR_SUPERVISED_SECONDS,
+        prior_export_reserved_bytes=c.PRIOR_EXPORT_RESERVED_BYTES,
         expires_at=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),
         hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in FILES})
     assert validate_registration(canonical(registration),'a'*40)==registration

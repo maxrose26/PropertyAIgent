@@ -24,9 +24,14 @@ import time
 
 from . import credential_mapping as mapping
 from .tls_trust import verified_trust, owned_resources
+from .memory_enforcement import WorkerMemory, owner_scope, MemoryUnavailable
 
 AUTHORITY = mapping.AUTHORITY
 CONTROLLER = 'verification.ingestion_storage.storage_controller'
+CONSUMED_CONTROLLER_BINDING = '802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279'
+PRIOR_AUDIT_SHA256 = 'f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0'
+PRIOR_SUPERVISED_SECONDS = 0.11050213100043038
+PRIOR_EXPORT_RESERVED_BYTES = 4096
 RETIRED_BINDING = 'e685c79086758f5b52bf5ceff5a8ad34fb2d9e2598e8670485b3ce3a07d7252d'
 PACKAGE = Path('docs/design/ingestion-provisioning-20261016')
 MANIFEST = Path('docs/design/ingestion-readiness-20261016/three-items.json')
@@ -34,6 +39,7 @@ LIMITS = dict(mapping.LIMITS, storage_commands=40, storage_connections=8,
               storage_active_seconds=30, provisioning_seconds=90,
               storage_seconds=120, teardown_seconds=30, teardown_commands=10, teardown_active_seconds=10)
 FILES = ['verification/ingestion_storage/storage_controller.py',
+         'verification/ingestion_storage/memory_enforcement.py',
          'verification/ingestion_storage/owner-requirements.txt',
          'verification/stage1-requirements.lock',
          'verification/ingestion_storage/credential_mapping.py',
@@ -45,13 +51,13 @@ FILES = ['verification/ingestion_storage/storage_controller.py',
 ROLE_NAMES = tuple(mapping.MAPPINGS)
 SECRETS = tuple(mapping.MAPPINGS.values())
 CONTROL_KEY = '0' * 64
-SUPERVISED_SECONDS = 240
+SUPERVISED_SECONDS = 240 - PRIOR_SUPERVISED_SECONDS
 CLOSURE_SECONDS = 2
 
 
 def safe_failure(exc):
     import re
-    code=str(exc) if isinstance(exc,Stop) and re.fullmatch(r'[A-Z_]{1,80}',str(exc)) else 'CONTROLLER_EXCEPTION'
+    code=str(exc) if isinstance(exc,(Stop,MemoryUnavailable)) and re.fullmatch(r'[A-Z_]{1,80}',str(exc)) else 'CONTROLLER_EXCEPTION'
     state=getattr(exc,'sqlstate',None)
     return dict(reason=code,sqlstate=state if isinstance(state,str) and re.fullmatch(r'[A-Z0-9]{5}',state) else None)
 
@@ -106,7 +112,12 @@ def validate_registration(body, revision, now=None):
                   endpoint='aws-0-eu-west-2.pooler.supabase.com:5432/postgres',
                   project='zcikcfgpblzuzpanpdqd', environment=mapping.ENVIRONMENT,
                   method='CLIENT_GENERATED_SCRAM_SHA_256_MEMORY_TO_PROTECTED_SECRET',
-                  revision=revision, limits=LIMITS, retired_mapping_sha256=RETIRED_BINDING)
+                  revision=revision, limits=LIMITS, retired_mapping_sha256=RETIRED_BINDING,
+                  consumed_controller_sha256=CONSUMED_CONTROLLER_BINDING,
+                  memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO',
+                  prior_audit_sha256=PRIOR_AUDIT_SHA256,
+                  prior_supervised_seconds=PRIOR_SUPERVISED_SECONDS,
+                  prior_export_reserved_bytes=PRIOR_EXPORT_RESERVED_BYTES)
     if set(value)!=set(expected)|{'expires_at','hashes'} or any(value.get(k)!=v for k,v in expected.items()):
         raise Stop('EXACT_STORAGE_BINDING_REQUIRED')
     expiry=datetime.fromisoformat(value['expires_at'])
@@ -449,7 +460,7 @@ class Journal:
         entry=dict(sequence=self.sequence,previous_sha256=self.head,event=event,payload=payload)
         digest=hashlib.sha256(canonical(entry)).hexdigest()
         line=canonical(dict(entry,sha256=digest))+b'\n'
-        if len(line)>16384 or self.bytes+len(line)>2*1024**2-32768: raise Stop('AUDIT_BOUND')
+        if len(line)>16384 or self.bytes+len(line)>2*1024**2-PRIOR_EXPORT_RESERVED_BYTES-32768: raise Stop('AUDIT_BOUND')
         self.stream.write(line);os.fsync(self.stream.fileno())
         self.head=digest;self.sequence+=1;self.bytes+=len(line)
     def close(self): self.stream.close()
@@ -514,7 +525,8 @@ def worker(pipe, raw, registration, aggregate_started):
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     resource.setrlimit(resource.RLIMIT_FSIZE,(0,0))
     # Audit belongs to parent; file payload writes are disabled in worker/gh.
-    resource.setrlimit(resource.RLIMIT_AS,(256*1024**2,256*1024**2))
+    # Address-space reservation is not physical memory. Inherited cgroup-v2
+    # limits, not RLIMIT_AS, constrain gh and every descendant together.
     for fd in (1,2):
         null=os.open(os.devnull,os.O_WRONLY);os.dup2(null,fd);os.close(null)
     baseline=owned_resources()
@@ -543,18 +555,34 @@ def worker(pipe, raw, registration, aggregate_started):
     finally: pipe.close()
 
 
+def _contained_worker(group, pipe, raw, registration, started):
+    try:
+        group.enter()
+    except BaseException:
+        pipe.close()
+        raise SystemExit(1) from None
+    worker(pipe, raw, registration, started)
+
+
 def supervise(raw, registration, journal):
     import psutil
     # Fork keeps the credential off argv/env/files and avoids pickling to disk.
     parent,child=multiprocessing.get_context('fork').Pipe(duplex=True)
-    started=time.monotonic();p=multiprocessing.get_context('fork').Process(target=worker,args=(child,raw,registration,started))
-    p.start();child.close();seen={};peak=0;closed=False;accepted=False;reason=None;phase='provisioning';phase_started=started
+    started=time.monotonic()
+    group=None;p=None;seen={};peak=0;closed=False;accepted=False;reason=None;phase='provisioning';phase_started=started
     try:
+        group=WorkerMemory.create()
+        journal.append('memory_enforcement',dict(kind='CGROUP_V2',memory_max=256*1024**2,swap_max=0,oom_group=1))
+        p=multiprocessing.get_context('fork').Process(target=_contained_worker,args=(group,child,raw,registration,started))
+        p.start();child.close()
         while p.is_alive() or parent.poll():
             elapsed=time.monotonic()-started
             if elapsed>=SUPERVISED_SECONDS-CLOSURE_SECONDS: raise Stop('SUPERVISED_DEADLINE')
             if time.monotonic()-phase_started>={'provisioning':90,'storage':120,'teardown':28}[phase]: raise Stop('PHASE_DEADLINE')
             if (journal.root/'STOP').exists(): raise Stop('OWNER_STOP')
+            memory=group.snapshot()
+            if any(memory[k] for k in ('kernel_memory_max_events','kernel_memory_oom','kernel_memory_oom_kill','outer_memory_max_events','outer_memory_oom','outer_memory_oom_kill')):
+                raise Stop('KERNEL_MEMORY_LIMIT')
             try:
                 process=psutil.Process(p.pid)
                 owned=[process]+process.children(recursive=True)
@@ -585,13 +613,13 @@ def supervise(raw, registration, journal):
     finally:
         # Session/process ownership is checked before group signals. Never
         # touch an unrelated process or the owner's keyring daemon.
-        if closed and accepted and not reason: p.join(timeout=min(.2,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
-        if p.is_alive():
+        if p is not None and p.pid is not None and closed and accepted and not reason: p.join(timeout=min(.2,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
+        if p is not None and p.pid is not None and p.is_alive():
             try:
                 if os.getpgid(p.pid)==p.pid: os.killpg(p.pid,signal.SIGTERM)
                 else: p.terminate()
             except ProcessLookupError: pass
-        p.join(timeout=min(1,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
+        if p is not None and p.pid is not None: p.join(timeout=min(1,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
         for pid,born in seen.items():
             try:
                 proc=psutil.Process(pid)
@@ -600,7 +628,7 @@ def supervise(raw, registration, journal):
                     reason=reason or 'OWNED_PROCESS_REQUIRED_KILL'
             except psutil.NoSuchProcess: pass
             except Exception: reason='CLEANUP_UNCERTAIN'
-        p.join(timeout=min(.5,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
+        if p is not None and p.pid is not None: p.join(timeout=min(.5,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
         survivors=[]
         for pid,born in seen.items():
             try:
@@ -611,17 +639,25 @@ def supervise(raw, registration, journal):
         try:
             for item in psutil.process_iter(['pid','status']):
                 try:
-                    if item.info['status']!=psutil.STATUS_ZOMBIE and os.getpgid(item.pid)==p.pid:
+                    if item.info['status']!=psutil.STATUS_ZOMBIE and p is not None and p.pid is not None and os.getpgid(item.pid)==p.pid:
                         item.kill();survivors.append(item.pid);reason='UNEXPECTED_OWNED_PROCESS'
                 except (ProcessLookupError,psutil.NoSuchProcess): pass
         except Exception: reason='CLEANUP_UNCERTAIN'
-        parent.close()
+        memory={}
+        try:
+            if group is not None: memory=group.close(started+SUPERVISED_SECONDS)
+            if any(memory.get(k) for k in ('kernel_memory_max_events','kernel_memory_oom','kernel_memory_oom_kill','outer_memory_max_events','outer_memory_oom','outer_memory_oom_kill')):
+                reason='KERNEL_MEMORY_LIMIT'
+            if memory.get('kernel_memory_forced_cleanup'): reason=reason or 'OWNED_PROCESS_REQUIRED_KILL'
+            if memory.get('kernel_memory_accounting_uncertain'): reason='MEMORY_CLEANUP_UNCERTAIN'
+        except BaseException: reason='MEMORY_CLEANUP_UNCERTAIN'
+        parent.close();child.close()
         elapsed=time.monotonic()-started
-        passed=accepted and closed and p.exitcode==0 and not reason and not survivors and elapsed<=SUPERVISED_SECONDS
+        passed=accepted and closed and p is not None and p.exitcode==0 and not reason and not survivors and elapsed<=SUPERVISED_SECONDS
         result=dict(status='STORAGE_ACCEPTED_ACCESS_DISABLED' if passed else 'STOP_RECONCILE_NO_RETRY',
-                    worker_exit=p.exitcode,elapsed_seconds=elapsed,peak_owned_rss_bytes=peak,
+                    worker_exit=p.exitcode if p is not None else None,elapsed_seconds=elapsed,peak_owned_rss_bytes=peak,
                     live_owned_survivors=len(survivors),cleanup='CLOSED' if passed else 'UNCERTAIN',
-                    reason=reason,audit_prefix_bytes=journal.bytes)
+                    reason=reason,audit_prefix_bytes=journal.bytes,**memory)
         journal.append('supervisor_result',result)
         result.update(audit_bytes=journal.bytes,audit_chain_head=journal.head,
                       audit_sha256=hashlib.sha256((journal.root/'events.jsonl').read_bytes()).hexdigest())
@@ -660,7 +696,12 @@ def main():
         if subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=args.revision or subprocess.check_output(['git','status','--porcelain'],text=True).strip(): raise Stop('CLEAN_EXACT_CHECKOUT_REQUIRED')
         verified_trust()
         if int(Path('/proc/self/stat').read_text().split(' ',1)[0])!=os.getpid(): raise Stop('PROCESS_NAMESPACE_UNSUPPORTED')
-        root=Path.home()/'.local/state/propertyaigent/storage-acceptance-once-20261016'
+        # Availability is checked before credential entry or authority use.
+        owner_scope()
+        prior=Path.home()/'.local/state/propertyaigent/storage-acceptance-once-20261016/events.jsonl'
+        if prior.is_symlink() or prior.stat().st_size!=1573 or hashlib.sha256(prior.read_bytes()).hexdigest()!=PRIOR_AUDIT_SHA256:
+            raise Stop('PRIOR_ATTEMPT_EVIDENCE_REQUIRED')
+        root=Path.home()/'.local/state/propertyaigent/storage-acceptance-memory-successor-20261017'
         journal=Journal(root,args.binding_sha256)
         resource.setrlimit(resource.RLIMIT_CORE,(0,0))
         try:
