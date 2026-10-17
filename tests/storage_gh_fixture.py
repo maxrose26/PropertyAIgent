@@ -88,7 +88,9 @@ def real_gh_store(tmp_path):
         def do_CONNECT(self):
             if self.path != host+':443':
                 self.send_error(403);return
-            with socket.create_connection(('127.0.0.1',server.server_port),timeout=10) as upstream:
+            with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as upstream:
+                upstream.settimeout(10)
+                upstream.connect(('127.0.0.1',server.server_port))
                 self.send_response(200);self.end_headers()
                 sockets=[self.connection,upstream]
                 while True:
@@ -122,11 +124,6 @@ def real_gh_store(tmp_path):
                               stderr=subprocess.PIPE,env=env,timeout=10,check=False)
         assert len(result.stdout)+len(result.stderr)<32768
         if result.returncode:
-            if command[1:3]==['api','user']:
-                # Public fixed GET with synthetic auth only; no credential or
-                # secret value has entered this subprocess. Bound diagnostics.
-                print('DISPOSABLE_GH_USER_STARTUP: '+result.stderr.decode(errors='replace')[:1000].replace('disposable_fixture_only','[fixture]'),flush=True)
-                raise AssertionError('DISPOSABLE_GH_USER_STARTUP')
             # Fixture-only diagnostic categories; no raw CLI output or values.
             import hashlib
             text=result.stderr.lower()
