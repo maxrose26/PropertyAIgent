@@ -459,6 +459,7 @@ def production_transport(raw, selected_address, root):
     import psycopg
     from .credential_mapping import validate_route
     u=validate_route(raw)
+    if not isinstance(u.password,str) or not u.password: raise Stop('MIGRATION_PASSWORD_REQUIRED')
     def connect(role,password):
         login=u.username if role=='migration' else role+'.zcikcfgpblzuzpanpdqd'
         return psycopg.connect(host=u.host,hostaddr=selected_address,port=u.port,
@@ -622,6 +623,7 @@ def local_preflight():
     """Existing owner authentication/secret metadata only; no DB calls."""
     env={**os.environ,'GH_HOST':'github.com','GH_DEBUG':'','GH_PROMPT_DISABLED':'1'}
     if any(os.environ.get(k) for k in ('GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN','GH_DEBUG')): raise Stop('KEYRING_AUTH_REQUIRED')
+    if any(os.environ.get(k) for k in ('PGSERVICE','PGSERVICEFILE','PGOPTIONS','PGPASSFILE','PGPASSWORD','PGSSLCERT','PGSSLKEY')): raise Stop('LIBPQ_ENVIRONMENT_OVERRIDE')
     commands=[(['gh','api','user','--jq','.login'],lambda b:b.strip()==b'maxrose26'),
               (['gh','api','--paginate','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets','--jq','.secrets[].name'],
                lambda b:not set(SECRETS)&set(b.decode().splitlines()))]

@@ -81,3 +81,26 @@ def test_safe_failure_never_exports_raw_driver_message():
     from verification.ingestion_storage.storage_controller import safe_failure
     assert safe_failure(ValueError('postgresql://secret-credential'))=={'reason':'CONTROLLER_EXCEPTION','sqlstate':None}
     assert safe_failure(Stop('OWNER_STOP'))['reason']=='OWNER_STOP'
+
+
+def test_production_transport_requires_explicit_password_no_fallback():
+    from verification.ingestion_storage import storage_controller as c
+    with pytest.raises(Stop,match='MIGRATION_PASSWORD_REQUIRED'):
+        c.production_transport('postgresql://postgres.zcikcfgpblzuzpanpdqd@aws-0-eu-west-2.pooler.supabase.com:5432/postgres','127.0.0.1','not-opened')
+
+
+def test_metadata_preflight_rejects_environment_and_existing_later_page_secret(monkeypatch):
+    from verification.ingestion_storage import storage_controller as c
+    for name in ('GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN','GH_DEBUG','PGSERVICE','PGSERVICEFILE','PGOPTIONS','PGPASSFILE','PGPASSWORD','PGSSLCERT','PGSSLKEY'):
+        monkeypatch.delenv(name,raising=False)
+    calls=[]
+    def metadata(command,seconds=10):
+        calls.append(command)
+        if 'user' in command:return b'maxrose26\n'
+        assert '--paginate' in command
+        return b'UNRELATED\nINGESTION_WORKER_DATABASE_URL\n'
+    monkeypatch.setattr(c,'metadata_command',metadata)
+    with pytest.raises(Stop,match='OWNER_ACCESS_OR_PREEXISTING_SECRET'):c.local_preflight()
+    assert len(calls)==2
+    monkeypatch.setenv('GH_TOKEN','DISPOSABLE_TEST_SENTINEL')
+    with pytest.raises(Stop,match='KEYRING_AUTH_REQUIRED'):c.local_preflight()
