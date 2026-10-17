@@ -1,0 +1,7 @@
+# Existing reviewed dependency versions; no model/browser runtime needed.
+-c ../stage1-requirements.lock
+cryptography
+psycopg[binary]
+SQLAlchemy
+python-dotenv
+psutil

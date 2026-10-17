@@ -34,6 +34,8 @@ LIMITS = dict(mapping.LIMITS, storage_commands=40, storage_connections=8,
               storage_active_seconds=30, provisioning_seconds=90,
               storage_seconds=120, teardown_seconds=30, teardown_commands=10)
 FILES = ['verification/ingestion_storage/storage_controller.py',
+         'verification/ingestion_storage/owner-requirements.txt',
+         'verification/stage1-requirements.lock',
          'verification/ingestion_storage/credential_mapping.py',
          'verification/ingestion_storage/tls_trust.py',
          'verification/discovery/route_validation.py',
@@ -43,6 +45,16 @@ FILES = ['verification/ingestion_storage/storage_controller.py',
 ROLE_NAMES = tuple(mapping.MAPPINGS)
 SECRETS = tuple(mapping.MAPPINGS.values())
 CONTROL_KEY = '0' * 64
+SUPERVISED_SECONDS = 240
+CLOSURE_SECONDS = 2
+
+
+def safe_failure(exc):
+    import re
+    code=str(exc) if isinstance(exc,Stop) and re.fullmatch(r'[A-Z_]{1,80}',str(exc)) else 'CONTROLLER_EXCEPTION'
+    state=getattr(exc,'sqlstate',None)
+    return dict(reason=code,sqlstate=state if isinstance(state,str) and re.fullmatch(r'[A-Z0-9]{5}',state) else None)
+
 
 class Stop(Exception):
     """Only fixed reason codes may cross the worker boundary."""
@@ -281,13 +293,13 @@ def deny(c, statement):
     else: raise Stop('DENIAL_UNEXPECTED_SUCCESS')
 
 
-def execute_sequence(connect, secret_operation, registration, emit, *, fault=None, clock=time.monotonic, migration_identity='postgres'):
+def execute_sequence(connect, secret_operation, registration, emit, *, fault=None, clock=time.monotonic, migration_identity='postgres', aggregate_started=None):
     """Same coordinator in production and tests; injected transports are private.
 
     Production CLI never accepts transport hooks, fixture URLs or fault flags.
     Tests use non-superuser fixture logins and a fake protected-secret boundary.
     """
-    budget=Budget(emit,clock=clock,started=clock()); credentials={}; open_native=None
+    budget=Budget(emit,clock=clock,started=clock() if aggregate_started is None else aggregate_started); credentials={}; open_native=None
     def event(name, payload): emit(name,payload)
     @contextmanager
     def connection(role):
@@ -305,7 +317,7 @@ def execute_sequence(connect, secret_operation, registration, emit, *, fault=Non
                 open_native=None; budget.open_connections=0
                 event('connection_closed',dict(role=role,**budget.snapshot()))
     def checkpoint(phase, state):
-        event('checkpoint',dict(phase=phase,state=state,**budget.snapshot()))
+        event('checkpoint',{**budget.snapshot(),'phase':phase,'state':state})
         if fault: fault(phase,state)
     def external_secret(operation, name, value=None):
         budget.check(); event('effect_intent',dict(effect='secret_'+operation,name=name))
@@ -404,10 +416,10 @@ def execute_sequence(connect, secret_operation, registration, emit, *, fault=Non
         checkpoint('teardown','VERIFIED')
         event('result',dict(status='STORAGE_SEQUENCE_VERIFIED_CLOSURE_PENDING',**budget.snapshot()))
         return budget
-    except BaseException:
+    except BaseException as exc:
         # No automatic replay, no finally-block DDL or secret compensation.
         # The journal's last intent/ack is authoritative for reconciliation.
-        event('stop',dict(reason='STOP_RECONCILE_NO_RETRY',**budget.snapshot()))
+        event('stop',dict(**safe_failure(exc),**budget.snapshot()))
         raise
     finally:
         credentials.clear()
@@ -452,6 +464,31 @@ def production_transport(raw, selected_address, root):
     return connect
 
 
+def metadata_command(command, seconds=10):
+    """Bounded credential-free stdout only; never used for token retrieval."""
+    import selectors
+    env={**os.environ,'GH_HOST':'github.com','GH_DEBUG':'','GH_PROMPT_DISABLED':'1'}
+    p=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,env=env)
+    data=bytearray();start=time.monotonic();selector=selectors.DefaultSelector()
+    selector.register(p.stdout,selectors.EVENT_READ)
+    try:
+        while selector.get_map():
+            if time.monotonic()-start>=seconds: raise Stop('GITHUB_METADATA_TIMEOUT')
+            for key,_ in selector.select(.025):
+                chunk=os.read(key.fd,4096)
+                if not chunk: selector.unregister(key.fileobj)
+                else:
+                    data.extend(chunk)
+                    if len(data)>32768: raise Stop('GITHUB_METADATA_BOUND')
+        code=p.wait(timeout=max(.01,seconds-(time.monotonic()-start)))
+        if code: raise Stop('GITHUB_METADATA_ACCESS')
+        return bytes(data)
+    finally:
+        selector.close();p.stdout.close()
+        if p.poll() is None:p.kill()
+        p.wait(timeout=1)
+
+
 def production_secrets(operation,name,value):
     env={**os.environ,'GH_HOST':'github.com','GH_DEBUG':'','GH_PROMPT_DISABLED':'1'}
     if operation=='set':
@@ -461,14 +498,12 @@ def production_secrets(operation,name,value):
             stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10,env=env)
         if result.returncode: raise Stop('SECRET_DELETE_UNCERTAIN')
     elif operation=='verify_absent':
-        result=subprocess.run(['gh','secret','list','--repo',mapping.REPO,'--env',mapping.ENVIRONMENT,'--json','name'],
-            stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,timeout=5,env=env)
-        if result.returncode or len(result.stdout)>32768: raise Stop('SECRET_METADATA_UNCERTAIN')
-        if set(SECRETS)&{r['name'] for r in json.loads(result.stdout)}: raise Stop('SECRET_REMAINS')
+        data=metadata_command(['gh','secret','list','--repo',mapping.REPO,'--env',mapping.ENVIRONMENT,'--json','name'],seconds=5)
+        if set(SECRETS)&{r['name'] for r in json.loads(data)}: raise Stop('SECRET_REMAINS')
     else: raise Stop('SECRET_OPERATION')
 
 
-def worker(pipe, raw, registration):
+def worker(pipe, raw, registration, aggregate_started):
     os.setsid()
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     resource.setrlimit(resource.RLIMIT_FSIZE,(0,0))
@@ -482,7 +517,7 @@ def worker(pipe, raw, registration):
         if pipe.recv_bytes(16)!=b'DURABLE': raise Stop('JOURNAL_ACK')
     try:
         emit('worker_ready',dict(pid=os.getpid()))
-        began=time.monotonic()
+        began=aggregate_started
         emit('checkpoint',dict(phase='owner_access',state='INTENT'))
         local_preflight()
         emit('checkpoint',dict(phase='owner_access',state='VERIFIED'))
@@ -491,12 +526,12 @@ def worker(pipe, raw, registration):
         if not answers or len(answers)>32: raise Stop('DNS_BOUND')
         selected=sorted({a[4][0] for a in answers})[0]
         emit('route',dict(host=u.host,port=u.port,database=u.database,selected_address=selected,tls='verify-full'))
-        execute_sequence(production_transport(raw,selected,root),production_secrets,registration,emit)
+        execute_sequence(production_transport(raw,selected,root),production_secrets,registration,emit,aggregate_started=aggregate_started)
         after=owned_resources()
         if after['socket_fds']-baseline['socket_fds'] or after['children']: raise Stop('CLEANUP_UNCERTAIN')
         emit('worker_closed',dict(cleanup='CLOSED',new_socket_fds=0,live_children=0,dns_and_execution_seconds=time.monotonic()-began))
-    except BaseException:
-        try: emit('worker_failed',dict(reason='STOP_RECONCILE_NO_RETRY',cleanup='UNCERTAIN'))
+    except BaseException as exc:
+        try: emit('worker_failed',dict(**safe_failure(exc),cleanup='UNCERTAIN'))
         except BaseException: pass
         raise SystemExit(1) from None
     finally: pipe.close()
@@ -506,12 +541,12 @@ def supervise(raw, registration, journal):
     import psutil
     # Fork keeps the credential off argv/env/files and avoids pickling to disk.
     parent,child=multiprocessing.get_context('fork').Pipe(duplex=True)
-    started=time.monotonic();p=multiprocessing.get_context('fork').Process(target=worker,args=(child,raw,registration))
+    started=time.monotonic();p=multiprocessing.get_context('fork').Process(target=worker,args=(child,raw,registration,started))
     p.start();child.close();seen={};peak=0;closed=False;accepted=False;reason=None;phase='provisioning';phase_started=started
     try:
         while p.is_alive() or parent.poll():
             elapsed=time.monotonic()-started
-            if elapsed>=238: raise Stop('SUPERVISED_DEADLINE')
+            if elapsed>=SUPERVISED_SECONDS-CLOSURE_SECONDS: raise Stop('SUPERVISED_DEADLINE')
             if time.monotonic()-phase_started>={'provisioning':90,'storage':120,'teardown':28}[phase]: raise Stop('PHASE_DEADLINE')
             if (journal.root/'STOP').exists(): raise Stop('OWNER_STOP')
             process=psutil.Process(p.pid)
@@ -532,26 +567,27 @@ def supervise(raw, registration, journal):
                 if event=='phase': phase=payload['phase'];phase_started=time.monotonic()
                 if event=='result': accepted=payload['status']=='STORAGE_SEQUENCE_VERIFIED_CLOSURE_PENDING'
                 if event=='worker_closed': closed=payload['cleanup']=='CLOSED'
+                if event=='worker_failed': reason=payload['reason']
                 parent.send_bytes(b'DURABLE')
-    except BaseException:
-        reason='SUPERVISOR_STOP_RECONCILE_NO_RETRY'
+    except BaseException as exc:
+        reason=safe_failure(exc)['reason']
     finally:
         # Session/process ownership is checked before group signals. Never
         # touch an unrelated process or the owner's keyring daemon.
-        if closed and accepted and not reason: p.join(timeout=min(.2,max(0,240-(time.monotonic()-started))))
+        if closed and accepted and not reason: p.join(timeout=min(.2,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
         if p.is_alive():
             try:
                 if os.getpgid(p.pid)==p.pid: os.killpg(p.pid,signal.SIGTERM)
                 else: p.terminate()
             except ProcessLookupError: pass
-        p.join(timeout=min(1,max(0,240-(time.monotonic()-started))))
+        p.join(timeout=min(1,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
         for pid,born in seen.items():
             try:
                 proc=psutil.Process(pid)
                 if proc.create_time()==born and proc.status()!=psutil.STATUS_ZOMBIE: proc.kill()
             except psutil.NoSuchProcess: pass
             except Exception: reason='CLEANUP_UNCERTAIN'
-        p.join(timeout=min(.5,max(0,240-(time.monotonic()-started))))
+        p.join(timeout=min(.5,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
         survivors=[]
         for pid,born in seen.items():
             try:
@@ -559,9 +595,16 @@ def supervise(raw, registration, journal):
                 if proc.create_time()==born and proc.status()!=psutil.STATUS_ZOMBIE: survivors.append(pid)
             except psutil.NoSuchProcess: pass
             except Exception: reason='CLEANUP_UNCERTAIN'
+        try:
+            for item in psutil.process_iter(['pid','status']):
+                try:
+                    if item.info['status']!=psutil.STATUS_ZOMBIE and os.getpgid(item.pid)==p.pid:
+                        item.kill();survivors.append(item.pid);reason='UNEXPECTED_OWNED_PROCESS'
+                except (ProcessLookupError,psutil.NoSuchProcess): pass
+        except Exception: reason='CLEANUP_UNCERTAIN'
         parent.close()
         elapsed=time.monotonic()-started
-        passed=accepted and closed and p.exitcode==0 and not reason and not survivors and elapsed<=240
+        passed=accepted and closed and p.exitcode==0 and not reason and not survivors and elapsed<=SUPERVISED_SECONDS
         result=dict(status='STORAGE_ACCEPTED_ACCESS_DISABLED' if passed else 'STOP_RECONCILE_NO_RETRY',
                     worker_exit=p.exitcode,elapsed_seconds=elapsed,peak_owned_rss_bytes=peak,
                     live_owned_survivors=len(survivors),cleanup='CLOSED' if passed else 'UNCERTAIN',
@@ -575,11 +618,11 @@ def local_preflight():
     env={**os.environ,'GH_HOST':'github.com','GH_DEBUG':'','GH_PROMPT_DISABLED':'1'}
     if any(os.environ.get(k) for k in ('GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN','GH_DEBUG')): raise Stop('KEYRING_AUTH_REQUIRED')
     commands=[(['gh','api','user','--jq','.login'],lambda b:b.strip()==b'maxrose26'),
-              (['gh','api','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets','--jq','.secrets[].name'],
+              (['gh','api','--paginate','repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets','--jq','.secrets[].name'],
                lambda b:not set(SECRETS)&set(b.decode().splitlines()))]
     for command,valid in commands:
-        r=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,stdin=subprocess.DEVNULL,timeout=10,env=env)
-        if r.returncode or len(r.stdout)>32768 or not valid(r.stdout): raise Stop('OWNER_ACCESS_OR_PREEXISTING_SECRET')
+        data=metadata_command(command)
+        if not valid(data): raise Stop('OWNER_ACCESS_OR_PREEXISTING_SECRET')
     # Read access to secret metadata is NOT described as proof of write access.
 
 
@@ -600,6 +643,7 @@ def main():
         registration=validate_registration(body,args.revision)
         if subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()!=args.revision or subprocess.check_output(['git','status','--porcelain'],text=True).strip(): raise Stop('CLEAN_EXACT_CHECKOUT_REQUIRED')
         verified_trust()
+        if int(Path('/proc/self/stat').read_text().split(' ',1)[0])!=os.getpid(): raise Stop('PROCESS_NAMESPACE_UNSUPPORTED')
         root=Path.home()/'.local/state/propertyaigent/storage-acceptance-once-20261016'
         journal=Journal(root,args.binding_sha256)
         resource.setrlimit(resource.RLIMIT_CORE,(0,0))
