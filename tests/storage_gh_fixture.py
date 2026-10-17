@@ -84,7 +84,8 @@ def real_gh_store(tmp_path):
              'GH_TOKEN':'disposable_fixture_only','GH_CONFIG_DIR':str(config),
              'SSL_CERT_FILE':str(pem),'GH_PROMPT_DISABLED':'1','GH_DEBUG':''}
         args=[gh,*command[1:]]
-        if args[1]=='api':args[2:2]=['--hostname',host]
+        # GH_HOST selects this isolated host:port. gh api's --hostname flag
+        # validates DNS hostnames and rejects a disposable high-port address.
         # Input is inherited only in a pipe. Never inspect or retain plaintext.
         result=subprocess.run(args,input=kwargs.get('input'),stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,env=env,timeout=10,check=False)
