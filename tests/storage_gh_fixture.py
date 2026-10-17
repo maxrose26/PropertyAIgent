@@ -16,7 +16,7 @@ import socket
 import ssl
 import subprocess
 import threading
-from urllib.parse import urlsplit, unquote
+from urllib.parse import urlsplit, unquote,parse_qs
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -76,6 +76,12 @@ def real_gh_store(tmp_path,request):
             if method=='GET' and path=='/user':return self.answer(200,{'login':'maxrose26'})
             if method=='GET' and path==prefix+'/public-key':return self.answer(200,{'key_id':'disposable-key','key':base64.b64encode(pub).decode()})
             if method=='GET' and path==prefix:return self.answer(200,{'total_count':len(ciphertexts),'secrets':[{'name':n} for n in sorted(ciphertexts)]})
+            contents='/repos/maxrose26/PropertyAIgent/contents/'
+            if operational and method=='GET' and path.startswith(contents):
+                revision=parse_qs(urlsplit(self.path).query)['ref'][0]
+                tree=git_objects[git_objects[revision]['tree']['sha']]['tree']
+                entry=next(x for x in tree if x['path']==path[len(contents):])
+                return self.answer(200,git_objects[entry['sha']])
             git_prefix='/repos/maxrose26/PropertyAIgent/git/'
             if operational and path.startswith(git_prefix):
                 target=path[len(git_prefix):]

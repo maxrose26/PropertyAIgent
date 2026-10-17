@@ -107,7 +107,7 @@ class Owner:
 
     def map_and_activate(self,github,*,url_factory):
         names=github.names()
-        if 'DATABASE_URL' not in names or any(n in names for n in SECRETS.values()):raise ValueError('EXACT_EMPTY_OPERATIONAL_MAPPINGS_REQUIRED')
+        if 'DATABASE_URL' not in names or 'INGESTION_STORAGE_DATABASE_URL' in names or any(n in names for n in SECRETS.values()):raise ValueError('EXACT_EMPTY_OPERATIONAL_MAPPINGS_REQUIRED')
         with self.connection() as c:
             for role,name in SECRETS.items():
                 password=secrets.token_urlsafe(48)
@@ -140,6 +140,9 @@ class Owner:
             self.q(c,'SELECT public.ingestion_register_bolton_exception(%s::jsonb)',(json.dumps(exception),),effect=True)
             self.q(c,'REVOKE ingestion_barrier_releaser FROM CURRENT_USER GRANTED BY CURRENT_USER',effect=True)
             self.q(c,'COMMIT',effect=True)
+            capability=self.q(c,"SELECT pg_has_role(current_user,'ingestion_storage_owner','USAGE'),pg_has_role(current_user,'ingestion_storage_owner','SET'),pg_has_role(current_user,'ingestion_barrier_releaser','USAGE'),pg_has_role(current_user,'ingestion_barrier_releaser','SET'),has_schema_privilege('ingestion_storage_owner','public','CREATE')")[0]
+            self.emit('temporary_owner_capability_readback',dict(flags=capability))
+            if capability!=(False,False,False,False,False):raise Uncertain('TEMPORARY_OWNER_CAPABILITY_REMAINS')
         self.emit('owner_registration_committed',dict(authority=authority,keys=sorted(bindings),binding_sha256=digest(grant)))
         self.authorities.append(authority)
         return bindings

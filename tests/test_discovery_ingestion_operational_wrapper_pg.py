@@ -54,7 +54,11 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
                 return response
             github=GitHub(journal.emit,lambda:holder['runner'].check(),runner=cli)
             def uri(r,p):return URL.create('postgresql+psycopg',username=r,password=p,host='127.0.0.1',port=5432,database=info['dbname']).render_as_string(hide_password=False)
-            runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role);holder['runner']=runner
+            native=None
+            if os.environ.get('INGESTION_OPERATIONAL_NATIVE')=='1':
+                from verification.ingestion_storage.operational_memory import OperationalMemory
+                native=OperationalMemory()
+            runner=Runner(registration,journal,connector,source_reader=source,github=github,url_factory=uri,identity=role,memory=native);holder['runner']=runner
             original_install=runner.owner.install
             def install_with_ambient_negatives():
                 original_install()
@@ -136,6 +140,7 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             assert runner.owner.connections<=13 and runner.owner.commands<=240
             record_property('required_wrapper',json.dumps(dict(aggregate=aggregate,admin=result['admin'],runtime_supervised_seconds=runner.runtime_seconds,admin_supervised_seconds=runner.admin_seconds,source_observations=len(source_calls),audit_bytes=journal.file.stat().st_size,github_cli_invocations=github.requests,status=result['status'],effective_denials=effective_denials,stored_query_text_retrieved=False),sort_keys=True))
         finally:
+            if 'native' in locals() and native is not None and native.controller.exists():native.close()
             boot.execute('DROP TABLE IF EXISTS public.ingestion_work_attempts,public.ingestion_work_items CASCADE')
             boot.execute('DROP EXTENSION IF EXISTS pg_stat_statements')
             boot.execute('DROP SCHEMA IF EXISTS extensions')

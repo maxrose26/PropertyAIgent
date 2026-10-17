@@ -1,0 +1,6 @@
+# Reuse owner dependencies and existing qualified Requests/Idox parser pins.
+# No browser, model or document runtime is installed by this required scope.
+-r owner-requirements.txt
+requests
+beautifulsoup4
+lxml

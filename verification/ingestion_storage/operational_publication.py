@@ -78,8 +78,10 @@ class GitHub:
         observed=self.call('GET',readref)
         if observed['object']['sha']!=new['sha']:raise Uncertain('PUBLICATION_HEAD_READBACK')
         for entry in elements:
-            blob=self.call('GET',REPO+'/git/blobs/'+entry['sha'])
+            # Read the path AT the committed revision. Reading an orphan blob
+            # by hash alone would not establish its membership in that commit.
+            blob=self.call('GET',REPO+'/contents/'+entry['path']+'?ref='+new['sha'])
             raw=base64.b64decode(blob['content'])
-            if raw!=files[entry['path'].split('/')[-1]]:raise Uncertain('PUBLICATION_BYTES_READBACK')
+            if blob['sha']!=entry['sha'] or raw!=files[entry['path'].split('/')[-1]]:raise Uncertain('PUBLICATION_BYTES_READBACK')
         self.emit('publication_verified',dict(commit=new['sha'],files={n:hashlib.sha256(b).hexdigest() for n,b in files.items()}))
         return new['sha']
