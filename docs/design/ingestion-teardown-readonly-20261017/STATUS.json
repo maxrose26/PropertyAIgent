@@ -1,0 +1,19 @@
+{
+  "status": "OWNER_RELEASED_UNUSED_READ_ONLY_PHASE",
+  "helper_sha256": "cbe64e7394dda45f3940f5a66f68935687cc505069743ec1dc779523b8f1b3a2",
+  "helper_blob": "76420b396ccdd3af6478e0674c07c9e3104dbafc",
+  "runtime_revision": "7cf8d32547b63d485de872afc2f717c3dce55322",
+  "max_connections": 1,
+  "max_driver_statements": 6,
+  "max_supervised_seconds": 10,
+  "memory_bytes": 268435456,
+  "prior_supervised_seconds": 6.463323766999565,
+  "prior_connections": 8,
+  "prior_commands": 139,
+  "old_teardown_commands_remaining": 0,
+  "expiry": "2026-10-18T08:54:58.469465Z",
+  "mutation_authority": false,
+  "full_original_archive_in_repository": false,
+  "owner_archive_transfer": "PENDING",
+  "focused_tests_passed": 12
+}
