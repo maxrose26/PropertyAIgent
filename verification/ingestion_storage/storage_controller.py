@@ -555,8 +555,13 @@ def supervise(raw, registration, journal):
             if elapsed>=SUPERVISED_SECONDS-CLOSURE_SECONDS: raise Stop('SUPERVISED_DEADLINE')
             if time.monotonic()-phase_started>={'provisioning':90,'storage':120,'teardown':28}[phase]: raise Stop('PHASE_DEADLINE')
             if (journal.root/'STOP').exists(): raise Stop('OWNER_STOP')
-            process=psutil.Process(p.pid)
-            owned=[process]+process.children(recursive=True);rss=0
+            try:
+                process=psutil.Process(p.pid)
+                owned=[process]+process.children(recursive=True)
+            except psutil.NoSuchProcess:
+                if p.is_alive(): raise Stop('PROCESS_ACCOUNTING')
+                owned=[]
+            rss=0
             for item in owned:
                 try:
                     seen[item.pid]=item.create_time()
@@ -590,7 +595,9 @@ def supervise(raw, registration, journal):
         for pid,born in seen.items():
             try:
                 proc=psutil.Process(pid)
-                if proc.create_time()==born and proc.status()!=psutil.STATUS_ZOMBIE: proc.kill()
+                if proc.create_time()==born and proc.status()!=psutil.STATUS_ZOMBIE:
+                    proc.kill()
+                    reason=reason or 'OWNED_PROCESS_REQUIRED_KILL'
             except psutil.NoSuchProcess: pass
             except Exception: reason='CLEANUP_UNCERTAIN'
         p.join(timeout=min(.5,max(0,SUPERVISED_SECONDS-(time.monotonic()-started))))
@@ -614,8 +621,10 @@ def supervise(raw, registration, journal):
         result=dict(status='STORAGE_ACCEPTED_ACCESS_DISABLED' if passed else 'STOP_RECONCILE_NO_RETRY',
                     worker_exit=p.exitcode,elapsed_seconds=elapsed,peak_owned_rss_bytes=peak,
                     live_owned_survivors=len(survivors),cleanup='CLOSED' if passed else 'UNCERTAIN',
-                    reason=reason,audit_bytes=journal.bytes)
+                    reason=reason,audit_prefix_bytes=journal.bytes)
         journal.append('supervisor_result',result)
+        result.update(audit_bytes=journal.bytes,audit_chain_head=journal.head,
+                      audit_sha256=hashlib.sha256((journal.root/'events.jsonl').read_bytes()).hexdigest())
         return result
 
 
