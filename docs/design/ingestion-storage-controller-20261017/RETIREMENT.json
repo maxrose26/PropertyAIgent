@@ -1,0 +1,13 @@
+{
+  "additional_allowance": false,
+  "authority": "AUTHORISE_RESTRICTED_INGESTION_CREDENTIAL_MAPPING_ONCE_20261016",
+  "previous_expiry": "2026-10-18T06:55:49.492537+00:00",
+  "previous_revision": "1088bc35def340f4b8ce9b5ec904e55bfb0fd605",
+  "previous_sha256": "e685c79086758f5b52bf5ceff5a8ad34fb2d9e2598e8670485b3ce3a07d7252d",
+  "previous_state": "RETIRED_UNUSED",
+  "production_execution": "NOT_STARTED",
+  "reason": "Mapping-only registration superseded by independently reviewed full finite controller",
+  "retired_at": "2026-10-17T08:54:58.469465+00:00",
+  "successor_revision": "dd6a94c171c7658b5c699c526d19e345fa6bef7b",
+  "successor_sha256": "802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279"
+}

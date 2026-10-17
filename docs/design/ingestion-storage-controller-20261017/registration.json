@@ -1,0 +1,50 @@
+{
+  "authority": "AUTHORISE_RESTRICTED_INGESTION_CREDENTIAL_MAPPING_ONCE_20261016",
+  "controller": "verification.ingestion_storage.storage_controller",
+  "endpoint": "aws-0-eu-west-2.pooler.supabase.com:5432/postgres",
+  "environment": "stage4-production-canary",
+  "expires_at": "2026-10-18T08:54:58.469465+00:00",
+  "hashes": {
+    "docs/design/ingestion-provisioning-20261016/activate.sql": "7a52a0880d52e6f84f6d454e93f64eae075e3b64aecd1c29e97200d130e96c5b",
+    "docs/design/ingestion-provisioning-20261016/install.sql": "c6e236f5e3b5bd06f91456849ddc34e3362ce0d5c9616c899aa863555ca52a48",
+    "docs/design/ingestion-provisioning-20261016/revoke.sql": "0a141f8d4737b3d0de0a33318949ccf17c1dc4d7240c1eb7eeb71b5e9a130d73",
+    "docs/design/ingestion-provisioning-20261016/storage-readback.sql": "5e5adbbbe102a356c569264e59d0096893edfe77924e0d8c3a90f978393f8ff1",
+    "docs/design/ingestion-readiness-20261016/three-items.json": "7883c1a8f99ce3e498fb73911713c3b531d4c73d20fd2524e3c9901e822e7b04",
+    "verification/discovery/route_validation.py": "fab37617d82da1cc0a2f36c33fbeed0b54165f279073dcc798a209b989760c8b",
+    "verification/ingestion_storage/credential_mapping.py": "437d0853cf8797a79c52f1249d922d0e255afd0e3db237045fa854fd80b1c4e7",
+    "verification/ingestion_storage/owner-requirements.txt": "5c90f5d606e7194daf6ff8798deb95db66b42ab0d44b8f90f1c93cdcb0484a4b",
+    "verification/ingestion_storage/storage_controller.py": "8859c848bff2a6190677d4bdfa147c3c4a849c4e8185341c88acd197e2f180d7",
+    "verification/ingestion_storage/tls_trust.py": "8c8669c54bfda869c14726540fb77219a96a23bd045b6e985b76d72a1229b723",
+    "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+    "verification/stage1-requirements.lock": "ec9b48dae871ecf6517e727e26cfab23c3e82ae079508ae0d0e3aadda58c3e2e"
+  },
+  "limits": {
+    "connection_attempts": 13,
+    "executable_grants": 0,
+    "expiry_seconds": 86400,
+    "exported_bytes": 2097152,
+    "mapping_seconds": 90,
+    "provisioning_seconds": 90,
+    "secret_puts": 2,
+    "storage_active_seconds": 30,
+    "storage_commands": 40,
+    "storage_connections": 8,
+    "storage_items": 3,
+    "storage_seconds": 120,
+    "supervised_seconds": 240,
+    "teardown_active_seconds": 10,
+    "teardown_commands": 10,
+    "teardown_seconds": 30,
+    "work_attempts": 0,
+    "worker_rss_bytes": 268435456
+  },
+  "method": "CLIENT_GENERATED_SCRAM_SHA_256_MEMORY_TO_PROTECTED_SECRET",
+  "project": "zcikcfgpblzuzpanpdqd",
+  "retired_mapping_sha256": "e685c79086758f5b52bf5ceff5a8ad34fb2d9e2598e8670485b3ce3a07d7252d",
+  "revision": "dd6a94c171c7658b5c699c526d19e345fa6bef7b",
+  "risk_acceptance": "ACCEPT_POSSIBLE_PROVIDER_SCRAM_VERIFIER_RETENTION_TWO_LOGINS_ONCE",
+  "roles": [
+    "ingestion_worker_login",
+    "ingestion_storage_login"
+  ]
+}
