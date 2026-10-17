@@ -13,6 +13,23 @@ from app.ingestion.sql_ledger import SQLLedger
 from app.ingestion.listing_screening import screen_row
 
 
+def runtime_principal(url, ssl):
+    """Bind pooler routing identity separately from the restricted SQL role."""
+    from sqlalchemy.engine import make_url
+    u=make_url(url)
+    roles={'ingestion_worker_login','ingestion_effect_login','ingestion_application_login'}
+    if (u.host,u.port,u.database)==('127.0.0.1',5432,'ingestion_provisioning_test'):
+        if u.username not in roles|{'ingestion_recovery_login'}:raise Denied('FIXED_DISPOSABLE_PRINCIPAL')
+        return u,u.username
+    identities={role+'.zcikcfgpblzuzpanpdqd':role for role in roles}
+    if u.username not in identities:raise Denied('NO_MIGRATION_OR_STRONGER_RUNTIME_PRINCIPAL')
+    from .tls_trust import verified_trust
+    ca,_=verified_trust()
+    if (u.host,u.port,u.database)!=('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres') or ssl!={'sslmode':'verify-full','sslrootcert':str(ca)}:raise Denied('REVIEWED_TLS_ENDPOINT_REQUIRED')
+    if u.drivername not in {'postgresql','postgresql+psycopg'} or u.query:raise Denied('REVIEWED_CONNECTION_CONFIGURATION_REQUIRED')
+    return u,identities[u.username]
+
+
 def batch_allocation(slot_keys,receipts,*,sealed_sha256,slot_key):
     """Finite manual acceptance allocation, not a scheduler or authority issuer.
 
@@ -70,16 +87,13 @@ class DatabaseBudget:
         # Reserve eight slots for finite rollback/closure; no commit after stop.
         if self.statements>=self.statement_cap-(0 if cleanup else 8):raise Denied('DRIVER_STATEMENT_BOUND')
         self.statements+=1;self.kinds[kind]=self.kinds.get(kind,0)+1
-    def engine(self,url,*,ssl=None):
+    def engine(self,url,*,ssl=None,hostaddr=None):
         import psycopg
-        from sqlalchemy.engine import make_url
-        u=make_url(url)
-        disposable=(u.host=='127.0.0.1' and u.port==5432 and u.database=='ingestion_provisioning_test')
-        if not disposable:
-            if u.username not in {'ingestion_worker_login','ingestion_effect_login','ingestion_application_login'}:raise Denied('NO_MIGRATION_OR_STRONGER_RUNTIME_PRINCIPAL')
-            from .tls_trust import verified_trust
-            ca,_=verified_trust()
-            if (u.host,u.port,u.database)!=('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres') or ssl!={'sslmode':'verify-full','sslrootcert':str(ca)}:raise Denied('REVIEWED_TLS_ENDPOINT_REQUIRED')
+        u,role=runtime_principal(url,ssl)
+        if any(k.startswith('PG') for k in __import__('os').environ):raise Denied('LIBPQ_ENVIRONMENT_OVERRIDE')
+        if u.host!='127.0.0.1':
+            import ipaddress
+            if not hostaddr or ipaddress.ip_address(hostaddr).version!=4:raise Denied('PINNED_REVIEWED_ADDRESS_REQUIRED')
         budget=self
         class Cursor(psycopg.Cursor):
             def execute(self,query,params=None,**kwargs):
@@ -101,18 +115,18 @@ class DatabaseBudget:
             budget.attempts+=1
             c=Connection.connect(host=u.host,port=u.port,dbname=u.database,user=u.username,password=u.password,
                 connect_timeout=3,prepare_threshold=None,cursor_factory=Cursor,autocommit=True,
-                options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**(ssl or {}))
+                options='-c statement_timeout=10000 -c lock_timeout=3000 -c idle_in_transaction_session_timeout=20000',**({'hostaddr':hostaddr} if hostaddr else {}),**(ssl or {}))
             budget.opened.append(c)
             try:
                 with c.cursor() as q:
-                    q.execute("SELECT current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout')")
-                    if q.fetchone()!=('10s','3s','20s'):raise Denied('SERVER_TIMEOUT_PROFILE')
+                    q.execute("SELECT current_setting('statement_timeout'),current_setting('lock_timeout'),current_setting('idle_in_transaction_session_timeout'),current_user,session_user,rolcanlogin,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_catalog.pg_roles WHERE rolname=current_user")
+                    if q.fetchone()!=('10s','3s','20s',role,role,True,False,False,False,False,False):raise Denied('SERVER_TIMEOUT_OR_RESTRICTED_IDENTITY_PROFILE')
                 c.rollback();return c
             except BaseException:c.close();raise
-        e=create_engine('postgresql+psycopg://',creator=creator,poolclass=QueuePool,pool_size=1,max_overflow=0,pool_timeout=3,hide_parameters=True,skip_autocommit_rollback=u.username=='ingestion_worker_login',isolation_level='AUTOCOMMIT' if u.username=='ingestion_worker_login' else 'READ COMMITTED')
+        e=create_engine('postgresql+psycopg://',creator=creator,poolclass=QueuePool,pool_size=1,max_overflow=0,pool_timeout=3,hide_parameters=True,skip_autocommit_rollback=role=='ingestion_worker_login',isolation_level='AUTOCOMMIT' if role=='ingestion_worker_login' else 'READ COMMITTED')
         @event.listens_for(e,'checkout')
         def mode_guard(connection,record,proxy):
-            if connection.autocommit!=(u.username=='ingestion_worker_login'):raise Denied('RUNTIME_TRANSACTION_MODE')
+            if connection.autocommit!=(role=='ingestion_worker_login'):raise Denied('RUNTIME_TRANSACTION_MODE')
         self.engines.append(e);return e
     def close(self,engines):
         errors=[]

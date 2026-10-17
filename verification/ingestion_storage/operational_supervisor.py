@@ -9,12 +9,17 @@ import psutil
 from app.security.document_process import proc_info,signal_owned_group
 
 
-def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False):
+def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False,memory_group=None):
  if not 0<seconds<=(45 if source else 165):raise ValueError('FIXED_DEADLINE')
  root=Path(root);root.mkdir(exist_ok=False)
  if any(k in environment for k in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GITHUB_TOKEN')):raise ValueError('UNNEEDED_CREDENTIAL')
  if source and not set(environment)<={'INGESTION_SOURCE_PRIVATE'}:raise ValueError('SOURCE_ENVIRONMENT_ALLOWLIST')
  if source and any('DATABASE' in k or 'PASSWORD' in k or 'TOKEN' in k or 'SECRET' in k for k in environment):raise ValueError('SOURCE_CREDENTIAL_FREE')
+ if memory_group is not None:
+  memory_group=Path(memory_group)
+  if not source or memory_group.name!='source' or memory_group.parent.name!='propertyaigent-operational-once.scope' or not str(memory_group).startswith('/sys/fs/cgroup/') or memory_group.is_symlink():raise ValueError('BOUND_SOURCE_MEMORY_GROUP')
+ def enter_memory():
+  if memory_group is not None:memory_group.joinpath('cgroup.procs').write_text(str(os.getpid()))
  env=dict(PATH='/usr/bin:/bin',HOME=str(root),TMPDIR=str(root),LANG='C.UTF-8',PYTHONNOUSERSITE='1',PYTHONDONTWRITEBYTECODE='1',OPENBLAS_NUM_THREADS='1')
  env.update(environment);started=time.monotonic();seen={};peak=0;reason=None;certain=True;survivors=[];child=None;identity=None
  maximum=512*1024 if source else 2*1024**2
@@ -23,7 +28,7 @@ def supervise(command,*,environment,root,seconds=165,stop_file=None,source=False
   if len(paths)>128 or any(p.is_symlink() for p in paths):raise ValueError('OUTPUT_PATH_BOUND')
   return sum(p.stat().st_size for p in paths if p.is_file())
  try:
-  child=subprocess.Popen(command,env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  child=subprocess.Popen(command,env=env,start_new_session=True,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,preexec_fn=enter_memory if memory_group is not None else None)
   identity=proc_info(child.pid);identity.update(group_host=child.pid,group_start=identity['start']);
   if identity['ppid']!=os.getpid():raise ValueError('PROCESS_NAMESPACE_MISMATCH')
   parent=psutil.Process(child.pid);seen[child.pid]=parent.create_time()
