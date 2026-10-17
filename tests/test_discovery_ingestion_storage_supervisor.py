@@ -2,6 +2,7 @@
 import json,os
 from pathlib import Path
 import pytest
+from tests.test_discovery_ingestion_memory_native import memory_group
 from verification.ingestion_storage.storage_controller import canonical
 
 def _supervisor_probe(pipe, raw, registration, aggregate_started):
@@ -24,7 +25,7 @@ def _supervisor_probe(pipe, raw, registration, aggregate_started):
 
 
 @pytest.mark.parametrize('mode',['success','deadline','stop','orphan'])
-def test_supervisor_closure_deadline_owner_stop_and_orphan_fence(monkeypatch,tmp_path,mode):
+def test_supervisor_closure_deadline_owner_stop_and_orphan_fence(monkeypatch,tmp_path,mode,memory_group):
     from verification.ingestion_storage import storage_controller as c
     import os
     if int(Path('/proc/self/stat').read_text().split(' ',1)[0])!=os.getpid():

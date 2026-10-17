@@ -137,9 +137,17 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - run: timeout --kill-after=2s 90s bash verification/ah_pg/setup.sh "$RUNNER_TEMP/provisioning-venv"
+      - name: Disposable kernel memory delegation, no production access
+        run: |
+          command -v gh
+          test -f /sys/fs/cgroup/cgroup.controllers
+          echo +memory | sudo tee /sys/fs/cgroup/cgroup.subtree_control >/dev/null
+          sudo mkdir /sys/fs/cgroup/propertyaigent-disposable-memory
+          sudo chown "$USER" /sys/fs/cgroup/propertyaigent-disposable-memory /sys/fs/cgroup/propertyaigent-disposable-memory/cgroup.procs /sys/fs/cgroup/propertyaigent-disposable-memory/cgroup.subtree_control
+          echo +memory > /sys/fs/cgroup/propertyaigent-disposable-memory/cgroup.subtree_control
       - name: Non-superuser exact provisioning and real login denials, disposable only
         run: |
-          timeout --kill-after=2s 120s env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_provisioning_pg.py tests/test_discovery_ingestion_operational_pg.py tests/test_discovery_ingestion_acceptance_native.py tests/test_discovery_ingestion_statistics_pg.py tests/test_discovery_ingestion_storage_controller_pg.py tests/test_discovery_ingestion_storage_supervisor.py -q --basetemp="$RUNNER_TEMP/provisioning-rehearsal" --junitxml="$RUNNER_TEMP/provisioning.xml"
+          timeout --kill-after=2s 120s env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_TEST_CGROUP_ROOT=/sys/fs/cgroup/propertyaigent-disposable-memory INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_provisioning_pg.py tests/test_discovery_ingestion_operational_pg.py tests/test_discovery_ingestion_acceptance_native.py tests/test_discovery_ingestion_statistics_pg.py tests/test_discovery_ingestion_storage_controller_pg.py tests/test_discovery_ingestion_storage_supervisor.py tests/test_discovery_ingestion_memory_native.py -q --basetemp="$RUNNER_TEMP/provisioning-rehearsal" --junitxml="$RUNNER_TEMP/provisioning.xml"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

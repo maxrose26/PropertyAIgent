@@ -10,6 +10,7 @@ from pathlib import Path
 import psycopg
 from psycopg import sql
 import pytest
+from tests.test_discovery_ingestion_memory_native import memory_group
 from verification.ingestion_storage import storage_controller as c
 ROLES=['ingestion_storage_owner','ingestion_storage_operator','ingestion_worker',
        'ingestion_authority_issuer','ingestion_barrier_releaser',*c.ROLE_NAMES]
@@ -174,7 +175,7 @@ def test_uncertain_revocation_commit_does_not_delete_secrets(fixture,tmp_path):
     assert not any(e['event']=='checkpoint' and e['payload']['phase']=='revocation' and e['payload']['state']=='VERIFIED' for e in events)
 
 
-def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_property):
+def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_property,memory_group):
     boot,connect,registration,secrets_boundary,store,calls=fixture
     # Exercise the real worker process, resource limits, private pipe protocol
     # and supervisor. Only source-free fixture transport/secret boundaries and
