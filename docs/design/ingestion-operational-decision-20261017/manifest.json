@@ -1,0 +1,161 @@
+{
+  "status": "PREPARATION_ONLY_EXECUTION_BLOCKED",
+  "stage": 4,
+  "accepted_storage_evidence": "14446a64073bd190aff40b337b3111d515408282",
+  "revision": "7cf8d32547b63d485de872afc2f717c3dce55322",
+  "tree": "68bf766cda023b1f15a19a63978903995391ec46",
+  "source": {
+    "council": "bolton",
+    "semantics": "RECEIVED",
+    "start": "2026-10-16",
+    "end": "2026-10-16",
+    "civil_interval": "[2026-10-16T00:00:00+01:00,2026-10-17T00:00:00+01:00)",
+    "utc_interval": "[2026-10-15T23:00:00Z,2026-10-16T23:00:00Z)",
+    "route": "https://paplanning.bolton.gov.uk/online-applications/search.do?action=advanced&searchType=Application",
+    "transport": "REQUESTS_IDOX",
+    "observations": 1,
+    "max_requests": 10,
+    "max_received_body_bytes": 3000000,
+    "max_response_body_bytes": 500000,
+    "max_pages": 6,
+    "max_rows": 60,
+    "max_worker_seconds": 45,
+    "retries": 0,
+    "documents": 0,
+    "models": 0,
+    "parents": 0
+  },
+  "capture_and_screening": {
+    "max_batches": 12,
+    "rows_per_batch": 5,
+    "max_driver_commands": 1040,
+    "max_connection_attempts": 40,
+    "max_returned_database_value_bytes": 4194304,
+    "max_aggregate_supervised_seconds": 300,
+    "max_slot_driver_commands": 120,
+    "max_slot_connections": 16,
+    "max_slot_seconds": 165,
+    "source_worker_audit_bytes": 524288,
+    "combined_exported_bytes": 2097152,
+    "max_files": 128,
+    "max_process_rss_bytes": 1073741824,
+    "max_owned_rss_bytes": 1610612736,
+    "job_seconds": 480,
+    "sequential": true,
+    "source_replay": false
+  },
+  "optional_writer": {
+    "enabled": false,
+    "max_candidates": 1,
+    "max_detail_requests": 2,
+    "max_received_body_bytes": 2000000,
+    "max_worker_seconds": 45,
+    "max_driver_commands": 120,
+    "max_connections": 16,
+    "max_supervised_seconds": 165,
+    "unit_facts": "UNKNOWN_OUTSIDE_SCOPE",
+    "replacement_candidates": 0,
+    "nominee": null,
+    "requires_exact_capture_batch_screening_row_and_coupled_contract_binding": true
+  },
+  "tls": {
+    "endpoint": "aws-0-eu-west-2.pooler.supabase.com:5432/postgres",
+    "project": "zcikcfgpblzuzpanpdqd",
+    "sslmode": "verify-full",
+    "ca_sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7"
+  },
+  "barrier": {
+    "original_stop": "CONSUMED_SALFORD_GLOBAL_STOP",
+    "run": "38884069913",
+    "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+    "storage_manual_stop": "STORAGE_TEST_STOP",
+    "max_exceptions": 3,
+    "maximum_expiry_hours": 24,
+    "workers_may_register": false,
+    "subsequent_hard_stop_invalidates_all": true
+  },
+  "execution_authority": null,
+  "registration_sha256": null,
+  "controller_sha256": null,
+  "expires_at": null,
+  "blockers": [
+    "PRODUCTION_CONTROLLER_ENTRYPOINT_AND_VERIFIED_ARCHIVE_PUBLISHER_NOT_WIRED",
+    "POOLED_RUNTIME_USERNAME_REJECTED_BY_CURRENT_FACTORY",
+    "OPERATIONAL_ACTIVATION_MISSING_ACCEPTED_EXACT_STATISTICS_BOUNDARY",
+    "NEW_FINITE_CREDENTIAL_RISK_SCOPE_REQUIRED_FOR_WORKER_REPROVISIONING_AND_EFFECT_LOGIN_OPTIONAL_APPLICATION_LOGIN",
+    "EXACT_STORAGE_MANUAL_STOP_DISPOSITION_AND_OWNER_REGISTRATION_PATH_TO_FREEZE",
+    "NEW_OPERATIONAL_SETUP_TEARDOWN_ALLOCATION_NOT_MEASURED_OR_ISSUED"
+  ],
+  "integrated_content": {
+    "verification/ingestion_storage/operational_controller.py": {
+      "sha256": "25472b03a8aa9e43c158f98785a00ee010de20ed4e8c394be4cbef8bbe77b3d4",
+      "git_blob": "f25ec9c95d4ff71fd839481053f73c3eec280bed",
+      "bytes": 19959
+    },
+    "verification/ingestion_storage/operational_rehearsal.py": {
+      "sha256": "c93cb6041d6ed51d145fc75c37120639b7498dbfb14ae724557de175adfab1d3",
+      "git_blob": "f37582db900925d443f584fe30dd089a64448243",
+      "bytes": 7082
+    },
+    "verification/ingestion_storage/operational_source.py": {
+      "sha256": "518c050c73800e8c43a708154f9efd58080fda52b238cc2b0b81a874ee72507e",
+      "git_blob": "58a1a610efc16b345b08e4b652fa77d0128feed8",
+      "bytes": 2989
+    },
+    "verification/ingestion_storage/operational_supervisor.py": {
+      "sha256": "7e6df5d7887ad4ff4397b01b6250a9f85481ee9b52bcf143639df381c23fafb8",
+      "git_blob": "633ca9c9df6bb297bb882d56a5806b9d3186efb2",
+      "bytes": 5005
+    },
+    "verification/ingestion_storage/credential_mapping.py": {
+      "sha256": "437d0853cf8797a79c52f1249d922d0e255afd0e3db237045fa854fd80b1c4e7",
+      "git_blob": "b06b632b839d794c3b48c9c989bb0a65fc573cc5",
+      "bytes": 10399
+    },
+    "verification/ingestion_storage/tls_trust.py": {
+      "sha256": "8c8669c54bfda869c14726540fb77219a96a23bd045b6e985b76d72a1229b723",
+      "git_blob": "54d860aae0645f376c7aa9c08f1b17bbfd76f8b8",
+      "bytes": 3542
+    },
+    "verification/ingestion_storage/trust/supabase-prod-ca-2021.crt": {
+      "sha256": "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7",
+      "git_blob": "3d693669b23c340c57a3457bdc8b6fefe1806cc5",
+      "bytes": 1367
+    },
+    "app/ingestion/batching.py": {
+      "sha256": "23ef9cfcf9707b04eb2a286df4e6ecc8ecd5d4f0464c2d1fe3cadbe4e7302c6a",
+      "git_blob": "acf016c30a349ac1fae9ca60584afeaf9211dc9a",
+      "bytes": 5823
+    },
+    "app/ingestion/sql_ledger.py": {
+      "sha256": "a52c00d7e9bfe7377107048e36515b14624a8673d27c18533997ddd741d64cf3",
+      "git_blob": "01c2a118103727b66608b0c00b433a4b9e9f5b97",
+      "bytes": 7069
+    },
+    "docs/design/ingestion-operational-20261016/worker.sql": {
+      "sha256": "a3b4ffbd04a2e9af34b95002516863482452e227d314a6aa0ddbc5d9bc0948c6",
+      "git_blob": "cd89b6d84ddc3c32e6549e32ae0ae7f3c45e04e1",
+      "bytes": 29513
+    },
+    "docs/design/ingestion-operational-acceptance-20261016/activate.sql": {
+      "sha256": "d8fdc41e1a2a28199d30c1e8a82323d2d9e44ce858dc497425871994a4c569ec",
+      "git_blob": "a110e46039ffbe357b0e9a39e752fb17265b9940",
+      "bytes": 7085
+    },
+    "docs/design/ingestion-operational-acceptance-20261016/runtime-mappings.sql": {
+      "sha256": "84a882449544ee6fd89a3f79e2383c47a90d11aefcf310ab9258b72f2f763d67",
+      "git_blob": "9b8354150e4d06ffa8be3a00e716c9b90b3c26c5",
+      "bytes": 1512
+    },
+    "docs/design/ingestion-operational-acceptance-20261016/application-writer.sql": {
+      "sha256": "2f8787b7ccfd1f93f5412221a8365b44d76a7c8a85b66c2b09366623cc4857c6",
+      "git_blob": "b4eeeeaf064da8a6d35ebae81d0bfd4f635ff9fa",
+      "bytes": 1607
+    },
+    "docs/design/ingestion-operational-acceptance-20261016/revoke.sql": {
+      "sha256": "245954385f743f29b5172ac73c4346f275c060f805e9181f7c28760b73a9b99a",
+      "git_blob": "070ac5a95d7bed396de2bd2734364b87dfb9f4d1",
+      "bytes": 1089
+    }
+  }
+}
