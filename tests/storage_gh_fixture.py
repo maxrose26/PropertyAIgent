@@ -10,6 +10,8 @@ import ipaddress
 import json
 import os
 import shutil
+import select
+import socket
 import ssl
 import subprocess
 import threading
@@ -33,7 +35,7 @@ def real_gh_store(tmp_path):
             .public_key(key.public_key()).serial_number(x509.random_serial_number())
             .not_valid_before(now-timedelta(minutes=1)).not_valid_after(now+timedelta(days=1))
             .add_extension(x509.BasicConstraints(ca=True, path_length=0), True)
-            .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]), False)
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName('storage-fixture.invalid')]), False)
             .sign(key, hashes.SHA256()))
     pem=tmp_path/'fixture-ca.pem'; pk=tmp_path/'fixture-tls.key'; config=tmp_path/'gh-fixture-config'; config.mkdir()
     pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
@@ -77,16 +79,40 @@ def real_gh_store(tmp_path):
     ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(pem,pk)
     server.socket=ctx.wrap_socket(server.socket,server_side=True)
     thread=threading.Thread(target=server.serve_forever,kwargs={'poll_interval':.02},daemon=True);thread.start()
-    host='127.0.0.1:%s'%server.server_port
+    # gh's repository parser intentionally removes a URL port. A fixed-name
+    # CONNECT proxy routes every permitted CLI request to this loopback TLS
+    # fixture without DNS, external network access or privileged port binding.
+    host='storage-fixture.invalid'
+    class Proxy(http.server.BaseHTTPRequestHandler):
+        def log_message(self,*args):pass
+        def do_CONNECT(self):
+            if self.path != host+':443':
+                self.send_error(403);return
+            with socket.create_connection(('127.0.0.1',server.server_port),timeout=10) as upstream:
+                self.send_response(200);self.end_headers()
+                sockets=[self.connection,upstream]
+                while True:
+                    ready,_,_=select.select(sockets,[],[],10)
+                    if not ready:return
+                    for source in ready:
+                        data=source.recv(65536)
+                        if not data:return
+                        (upstream if source is self.connection else self.connection).sendall(data)
+    proxy=http.server.ThreadingHTTPServer(('127.0.0.1',0),Proxy)
+    proxy.daemon_threads=True
+    proxy_thread=threading.Thread(target=proxy.serve_forever,kwargs={'poll_interval':.02},daemon=True)
+    proxy_thread.start()
     def cli(command,**kwargs):
         assert command[0]=='gh'
         env={**os.environ,'GH_HOST':host,'GH_ENTERPRISE_TOKEN':'disposable_fixture_only',
              'GH_TOKEN':'disposable_fixture_only','GH_CONFIG_DIR':str(config),
              'SSL_CERT_FILE':str(pem),'SSL_CERT_DIR':str(config),
-             'GH_PROMPT_DISABLED':'1','GH_DEBUG':''}
+             'GH_PROMPT_DISABLED':'1','GH_DEBUG':'',
+             'HTTPS_PROXY':'http://127.0.0.1:%s'%proxy.server_port,
+             'https_proxy':'http://127.0.0.1:%s'%proxy.server_port,
+             'NO_PROXY':'','no_proxy':''}
         args=[gh,*command[1:]]
-        # GH_HOST selects this isolated host:port. gh api's --hostname flag
-        # validates DNS hostnames and rejects a disposable high-port address.
+        # Both API and explicit repository routes must use the fixed fixture.
         if '--repo' in args:
             index=args.index('--repo')+1
             assert args[index]=='github.com/maxrose26/PropertyAIgent'
@@ -118,5 +144,7 @@ def real_gh_store(tmp_path):
         else:raise AssertionError('DISPOSABLE_UNKNOWN_OPERATION')
     try:yield metadata,secret,ciphertexts,requests
     finally:
+        proxy.shutdown();proxy.server_close();proxy_thread.join(timeout=2)
+        assert not proxy_thread.is_alive()
         server.shutdown();server.server_close();thread.join(timeout=2)
         assert not thread.is_alive()
