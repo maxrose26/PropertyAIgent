@@ -15,6 +15,7 @@ on:
       - 'app/scrapers/discovery_idox.py'
       - 'app/scrapers/arcus_portal.py'
       - 'tests/test_discovery_*.py'
+      - 'tests/storage_gh_fixture.py'
       - 'tests/test_instrumented_probe.py'
       - 'tests/fixtures/discovery/**'
       - 'verification/bolton_recon/*.py'

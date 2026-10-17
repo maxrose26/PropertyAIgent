@@ -28,10 +28,20 @@ from .memory_enforcement import WorkerMemory, owner_scope, MemoryUnavailable
 
 AUTHORITY = mapping.AUTHORITY
 CONTROLLER = 'verification.ingestion_storage.storage_controller'
-CONSUMED_CONTROLLER_BINDING = '802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279'
-PRIOR_AUDIT_SHA256 = 'f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0'
-PRIOR_SUPERVISED_SECONDS = 0.11050213100043038
-PRIOR_EXPORT_RESERVED_BYTES = 4096
+CONSUMED_CONTROLLER_BINDING = 'cfc38625cca22de33d973f42851d3ea908d0b35f2a9e2ccc7e7000e52b42b082'
+PRIOR_AUDIT_SHA256 = '5dda1e97c8dfc2a9a899c839e9c60d88f3c08bff05d5172579ad2efe1ade279e'
+PRIOR_SUPERVISED_SECONDS = 0.11050213100043038 + 1.1728088340005343
+PRIOR_CONNECTIONS = 1
+PRIOR_COMMANDS = 4
+PRIOR_DB_ACTIVE_SECONDS = 0.26088705100028164
+PRIOR_RETURNED_BYTES = 39
+ORIGINAL_EXPIRY = '2026-10-18T08:54:58.469465Z'
+MIGRATION_FLAGS = dict(rolsuper=False,rolcreaterole=True,rolcreatedb=True,rolbypassrls=True)
+PRIOR_ATTEMPTS = [
+    dict(directory='storage-acceptance-once-20261016',bytes=1573,sha256='f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0',registration_sha256='802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279',cleanup='UNCERTAIN'),
+    dict(directory='storage-acceptance-memory-successor-20261017',bytes=7005,sha256=PRIOR_AUDIT_SHA256,registration_sha256=CONSUMED_CONTROLLER_BINDING,cleanup='UNCERTAIN'),
+]
+PRIOR_EXPORT_RESERVED_BYTES = 16384
 RETIRED_BINDING = 'e685c79086758f5b52bf5ceff5a8ad34fb2d9e2598e8670485b3ce3a07d7252d'
 PACKAGE = Path('docs/design/ingestion-provisioning-20261016')
 MANIFEST = Path('docs/design/ingestion-readiness-20261016/three-items.json')
@@ -117,7 +127,11 @@ def validate_registration(body, revision, now=None):
                   memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO',
                   prior_audit_sha256=PRIOR_AUDIT_SHA256,
                   prior_supervised_seconds=PRIOR_SUPERVISED_SECONDS,
-                  prior_export_reserved_bytes=PRIOR_EXPORT_RESERVED_BYTES)
+                  prior_export_reserved_bytes=PRIOR_EXPORT_RESERVED_BYTES,
+                  prior_attempts=PRIOR_ATTEMPTS,prior_connections=PRIOR_CONNECTIONS,
+                  prior_commands=PRIOR_COMMANDS,prior_db_active_seconds=PRIOR_DB_ACTIVE_SECONDS,
+                  prior_returned_bytes=PRIOR_RETURNED_BYTES,
+                  migration_flags=MIGRATION_FLAGS,expires_at=ORIGINAL_EXPIRY)
     if set(value)!=set(expected)|{'expires_at','hashes'} or any(value.get(k)!=v for k,v in expected.items()):
         raise Stop('EXACT_STORAGE_BINDING_REQUIRED')
     expiry=datetime.fromisoformat(value['expires_at'])
@@ -149,25 +163,25 @@ class Budget:
     started: float = field(default_factory=time.monotonic)
     phase: str = 'provisioning'
     phase_started: float = 0
-    connections: int = 0
-    commands: int = 0
+    connections: int = PRIOR_CONNECTIONS
+    commands: int = PRIOR_COMMANDS
     storage_commands: int = 0
     storage_connections: int = 0
     teardown_commands: int = 0
-    active: float = 0
+    active: float = PRIOR_DB_ACTIVE_SECONDS
     storage_active: float = 0
     teardown_active: float = 0
-    returned_data_value_bytes: int = 0
+    returned_data_value_bytes: int = PRIOR_RETURNED_BYTES
     open_connections: int = 0
 
-    def __post_init__(self): self.phase_started=self.started
+    def __post_init__(self): self.phase_started=self.started-PRIOR_SUPERVISED_SECONDS
 
     def check(self):
         elapsed=self.clock()-self.started
         # 2s of the TOTAL 240s is reserved for owned-process closure.
         ceiling={'provisioning':90,'storage':120,'teardown':28}[self.phase]
-        if elapsed>=238 or self.clock()-self.phase_started>=ceiling: raise Stop('DEADLINE')
-        if self.phase!='teardown' and elapsed>=210: raise Stop('TEARDOWN_RESERVE')
+        if elapsed>=SUPERVISED_SECONDS-CLOSURE_SECONDS or self.clock()-self.phase_started>=ceiling: raise Stop('DEADLINE')
+        if self.phase!='teardown' and elapsed>=210-PRIOR_SUPERVISED_SECONDS: raise Stop('TEARDOWN_RESERVE')
 
     def enter(self, phase):
         self.check(); self.phase=phase; self.phase_started=self.clock()
@@ -179,7 +193,9 @@ class Budget:
                     teardown_commands=self.teardown_commands, active_seconds=self.active,
                     storage_active_seconds=self.storage_active, teardown_active_seconds=self.teardown_active,
                     returned_database_data_value_bytes=self.returned_data_value_bytes,
-                    elapsed_seconds=self.clock()-self.started, open_connections=self.open_connections)
+                    elapsed_seconds=self.clock()-self.started,
+                    cumulative_supervised_seconds=self.clock()-self.started+PRIOR_SUPERVISED_SECONDS,
+                    open_connections=self.open_connections)
 
     def before(self, operation):
         self.check()
@@ -308,6 +324,38 @@ def deny(c, statement):
     else: raise Stop('DENIAL_UNEXPECTED_SUCCESS')
 
 
+def migration_gate(c, emit, name='postgres'):
+    """One bounded catalogue read; safe identity/prerequisites precede effects."""
+    import re
+    row=c.execute("""SELECT current_user,session_user,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,
+        current_setting('server_version_num')::integer>=170000,
+        has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION'),
+        has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION'),
+        has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION'),
+        NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname IN
+          ('ingestion_storage_owner','ingestion_storage_operator','ingestion_worker',
+           'ingestion_authority_issuer','ingestion_barrier_releaser','ingestion_worker_login','ingestion_storage_login')),
+        to_regclass('public.ingestion_work_items') IS NULL AND
+        to_regclass('public.ingestion_work_attempts') IS NULL AND
+        to_regprocedure('public.ingestion_seed_storage_test()') IS NULL AND
+        to_regprocedure('public.ingestion_raise_stop(text)') IS NULL
+        FROM pg_roles WHERE rolname=current_user""").fetchone()
+    fields=('current_user','session_user',*MIGRATION_FLAGS,
+            'postgres17','schema_create_grant_option','schema_usage_grant_option',
+            'database_connect_grant_option','role_names_unused','ledger_objects_absent')
+    # Never serialize an unexpected arbitrary driver value or exception.
+    shaped=isinstance(row,(tuple,list)) and len(row)==len(fields)
+    identity={}
+    for i,key in enumerate(fields):
+        value=row[i] if shaped else None
+        identity[key]=value if (i<2 and isinstance(value,str) and re.fullmatch(r'[A-Za-z_][A-Za-z_0-9]{0,62}',value)) or (i>=2 and type(value) is bool) else None
+    emit('migration_identity',identity)
+    if not shaped or row[:2]!=(name,name) or any(type(row[i+2]) is not bool or row[i+2]!=value for i,value in enumerate(MIGRATION_FLAGS.values())):
+        raise Stop('MIGRATION_IDENTITY')
+    if any(value is not True for value in row[6:]):
+        raise Stop('MIGRATION_PREREQUISITES')
+
+
 def execute_sequence(connect, secret_operation, registration, emit, *, fault=None, clock=time.monotonic, migration_identity='postgres', aggregate_started=None):
     """Same coordinator in production and tests; injected transports are private.
 
@@ -343,8 +391,7 @@ def execute_sequence(connect, secret_operation, registration, emit, *, fault=Non
         with connection('migration') as c:
             for setting in ("SET statement_timeout='10s'", "SET lock_timeout='3s'", "SET idle_in_transaction_session_timeout='10s'"):
                 c.execute(setting)
-            identity=c.execute("SELECT current_user,session_user,rolsuper,rolcreaterole,rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone()
-            if identity!=(migration_identity,migration_identity,False,True,False): raise Stop('MIGRATION_IDENTITY')
+            migration_gate(c,event,migration_identity)
             # Exact install.sql includes prerequisite/ownership gates and one
             # transaction. No writes precede its own reviewed preconditions.
             script(c,'install.sql')
@@ -569,7 +616,7 @@ def supervise(raw, registration, journal):
     # Fork keeps the credential off argv/env/files and avoids pickling to disk.
     parent,child=multiprocessing.get_context('fork').Pipe(duplex=True)
     started=time.monotonic()
-    group=None;p=None;seen={};peak=0;closed=False;accepted=False;reason=None;phase='provisioning';phase_started=started
+    group=None;p=None;seen={};peak=0;closed=False;accepted=False;reason=None;phase='provisioning';phase_started=started-PRIOR_SUPERVISED_SECONDS
     try:
         group=WorkerMemory.create()
         journal.append('memory_enforcement',dict(kind='CGROUP_V2',memory_max=256*1024**2,swap_max=0,oom_group=1))
@@ -656,6 +703,7 @@ def supervise(raw, registration, journal):
         passed=accepted and closed and p is not None and p.exitcode==0 and not reason and not survivors and elapsed<=SUPERVISED_SECONDS
         result=dict(status='STORAGE_ACCEPTED_ACCESS_DISABLED' if passed else 'STOP_RECONCILE_NO_RETRY',
                     worker_exit=p.exitcode if p is not None else None,elapsed_seconds=elapsed,peak_owned_rss_bytes=peak,
+                    cumulative_supervised_seconds=elapsed+PRIOR_SUPERVISED_SECONDS,
                     live_owned_survivors=len(survivors),cleanup='CLOSED' if passed else 'UNCERTAIN',
                     reason=reason,audit_prefix_bytes=journal.bytes,**memory)
         journal.append('supervisor_result',result)
@@ -698,10 +746,11 @@ def main():
         if int(Path('/proc/self/stat').read_text().split(' ',1)[0])!=os.getpid(): raise Stop('PROCESS_NAMESPACE_UNSUPPORTED')
         # Availability is checked before credential entry or authority use.
         owner_scope()
-        prior=Path.home()/'.local/state/propertyaigent/storage-acceptance-once-20261016/events.jsonl'
-        if prior.is_symlink() or prior.stat().st_size!=1573 or hashlib.sha256(prior.read_bytes()).hexdigest()!=PRIOR_AUDIT_SHA256:
-            raise Stop('PRIOR_ATTEMPT_EVIDENCE_REQUIRED')
-        root=Path.home()/'.local/state/propertyaigent/storage-acceptance-memory-successor-20261017'
+        for attempt in PRIOR_ATTEMPTS:
+            prior=Path.home()/'.local/state/propertyaigent'/attempt['directory']/'events.jsonl'
+            if prior.is_symlink() or prior.stat().st_size!=attempt['bytes'] or hashlib.sha256(prior.read_bytes()).hexdigest()!=attempt['sha256']:
+                raise Stop('PRIOR_ATTEMPT_EVIDENCE_REQUIRED')
+        root=Path.home()/'.local/state/propertyaigent/storage-acceptance-identity-successor-20261017'
         journal=Journal(root,args.binding_sha256)
         resource.setrlimit(resource.RLIMIT_CORE,(0,0))
         try:

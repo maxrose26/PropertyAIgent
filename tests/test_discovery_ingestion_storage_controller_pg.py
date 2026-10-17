@@ -11,6 +11,7 @@ import psycopg
 from psycopg import sql
 import pytest
 from tests.test_discovery_ingestion_memory_native import memory_group
+from tests.storage_gh_fixture import real_gh_store
 from verification.ingestion_storage import storage_controller as c
 ROLES=['ingestion_storage_owner','ingestion_storage_operator','ingestion_worker',
        'ingestion_authority_issuer','ingestion_barrier_releaser',*c.ROLE_NAMES]
@@ -27,7 +28,7 @@ def fixture():
         assert boot.info.server_version>=170000
         boot.execute('CREATE TABLE public.applications(id integer PRIMARY KEY,address text)')
         boot.execute("INSERT INTO public.applications VALUES(1504,'PRESERVED'),(1505,'PRESERVED'),(1506,'PRESERVED'),(1507,'PENDING'),(1508,'PENDING')")
-        boot.execute(sql.SQL('CREATE ROLE provisioning_migrator LOGIN NOSUPERUSER NOCREATEDB CREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Literal(password)))
+        boot.execute(sql.SQL('CREATE ROLE provisioning_migrator LOGIN NOSUPERUSER CREATEDB CREATEROLE INHERIT BYPASSRLS PASSWORD {}').format(sql.Literal(password)))
         boot.execute('GRANT USAGE,CREATE ON SCHEMA public TO provisioning_migrator WITH GRANT OPTION')
         boot.execute('GRANT CONNECT ON DATABASE ingestion_provisioning_test TO provisioning_migrator WITH GRANT OPTION')
         def connect(role,credential):
@@ -63,7 +64,7 @@ def test_complete_controller_real_logins_and_finite_accounting(fixture,tmp_path,
     journal=c.Journal(tmp_path/'full-controller','b'*64)
     budget=c.execute_sequence(connect,secrets_boundary,registration,journal.append,migration_identity='provisioning_migrator')
     journal.close()
-    assert budget.connections==7 and budget.storage_connections==4
+    assert budget.connections==8 and budget.storage_connections==4
     assert budget.storage_commands==40 and budget.teardown_commands==10
     assert budget.storage_active<30 and budget.clock()-budget.started<240
     assert not store and calls==[('set',c.SECRETS[0]),('set',c.SECRETS[1]),('delete',c.SECRETS[0]),('delete',c.SECRETS[1]),('verify_absent',None)]
@@ -78,6 +79,40 @@ def test_complete_controller_real_logins_and_finite_accounting(fixture,tmp_path,
     record_property('real_restricted_logins',2);record_property('denials_42501',8)
     record_property('applications_1504_1508_preserved',True)
     record_property('source_calls',0);record_property('production_connections',0)
+
+
+@pytest.mark.parametrize('mutation',[
+    'ALTER ROLE ingestion_worker_login BYPASSRLS',
+    'ALTER ROLE ingestion_storage_login CREATEROLE',
+    'GRANT ingestion_storage_owner TO ingestion_worker_login',
+    'GRANT ingestion_authority_issuer TO ingestion_worker_login',
+    'GRANT ingestion_barrier_releaser TO ingestion_storage_login',
+])
+def test_restricted_runtime_privilege_drift_prevents_mapping(fixture,tmp_path,mutation):
+    boot,connect,registration,secrets_boundary,store,calls=fixture
+    journal=c.Journal(tmp_path/'runtime-denial','b'*64)
+    def corrupt(phase,state):
+        if (phase,state)==('installation_readback','VERIFIED'):boot.execute(mutation)
+    with pytest.raises(psycopg.Error):
+        c.execute_sequence(connect,secrets_boundary,registration,journal.append,
+                           migration_identity='provisioning_migrator',fault=corrupt)
+    journal.close()
+    assert not store and not calls
+    assert boot.execute('SELECT bool_and(NOT rolcanlogin) FROM pg_roles WHERE rolname=ANY(%s)',(list(c.ROLE_NAMES),)).fetchone()==(True,)
+
+
+def test_missing_grant_option_is_recorded_before_install(fixture,tmp_path):
+    boot,connect,registration,secrets_boundary,store,calls=fixture
+    boot.execute('REVOKE GRANT OPTION FOR CREATE ON SCHEMA public FROM provisioning_migrator')
+    journal=c.Journal(tmp_path/'grant-denial','b'*64)
+    with pytest.raises(c.Stop,match='MIGRATION_PREREQUISITES'):
+        c.execute_sequence(connect,secrets_boundary,registration,journal.append,migration_identity='provisioning_migrator')
+    journal.close()
+    events=[json.loads(s) for s in (journal.root/'events.jsonl').read_text().splitlines()]
+    identity=next(e['payload'] for e in events if e['event']=='migration_identity')
+    assert identity['rolbypassrls'] is True and identity['schema_create_grant_option'] is False
+    assert boot.execute("SELECT to_regclass('public.ingestion_work_items')").fetchone()==(None,)
+    assert not store and not calls
 
 
 @pytest.mark.parametrize('phase,state',[('installation','COMMITTED'),('mapping','MAPPED_NOLOGIN'),('first_seed','COMMITTED'),('revocation','INTENT')])
@@ -175,7 +210,7 @@ def test_uncertain_revocation_commit_does_not_delete_secrets(fixture,tmp_path):
     assert not any(e['event']=='checkpoint' and e['payload']['phase']=='revocation' and e['payload']['state']=='VERIFIED' for e in events)
 
 
-def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_property,memory_group):
+def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_property,memory_group,real_gh_store):
     boot,connect,registration,secrets_boundary,store,calls=fixture
     # Exercise the real worker process, resource limits, private pipe protocol
     # and supervisor. Only source-free fixture transport/secret boundaries and
@@ -184,9 +219,12 @@ def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_p
     def fixture_sequence(*args,**kwargs):
         return real_sequence(*args,**kwargs,migration_identity='provisioning_migrator')
     monkeypatch.setattr(c,'execute_sequence',fixture_sequence)
-    monkeypatch.setattr(c,'local_preflight',lambda:None)
+    metadata,real_secret,ciphertexts,requests=real_gh_store
+    for key in ('GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','GITHUB_ENTERPRISE_TOKEN','GH_DEBUG'):
+        monkeypatch.delenv(key,raising=False)
+    monkeypatch.setattr(c,'metadata_command',metadata)
     monkeypatch.setattr(c,'production_transport',lambda raw,address,root:connect)
-    monkeypatch.setattr(c,'production_secrets',secrets_boundary)
+    monkeypatch.setattr(c,'production_secrets',real_secret)
     monkeypatch.setattr(c.socket,'getaddrinfo',lambda *a,**k:[(2,1,6,'',('127.0.0.1',5432))])
     journal=c.Journal(tmp_path/'supervised-controller','b'*64)
     result=c.supervise('postgresql://postgres.zcikcfgpblzuzpanpdqd:DISPOSABLE_FIXTURE_ONLY@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',registration,journal)
@@ -195,4 +233,10 @@ def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_p
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()==(4,)
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()==(0,)
     assert boot.execute("SELECT count(*) FROM pg_authid WHERE rolname=ANY(%s) AND NOT rolcanlogin AND rolpassword IS NULL",(list(c.ROLE_NAMES),)).fetchone()==(2,)
+    assert not ciphertexts
+    assert len([r for r in requests if r[0]=='PUT'])==2
+    assert len([r for r in requests if r[0]=='DELETE'])==2
+    assert all('/secrets' in path or path=='/user' for method,path in requests)
+    record_property('real_gh_full_controller',True)
+    record_property('loopback_github_requests',len(requests))
     record_property('supervised_controller_result',json.dumps(result,sort_keys=True))

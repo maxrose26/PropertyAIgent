@@ -21,7 +21,7 @@ def test_sql_boundaries_preserve_every_reviewed_statement():
 def test_cumulative_limits_and_closure_reserves():
     now=[0.0];events=[]
     b=Budget(lambda *x:events.append(x),clock=lambda:now[0],started=0)
-    for _ in range(4): b.before('connect')
+    for _ in range(3): b.before('connect')
     with pytest.raises(Stop,match='PROVISION_CONNECTION_LIMIT'): b.before('connect')
     b.enter('storage')
     for _ in range(8): b.before('connect')
@@ -33,7 +33,7 @@ def test_cumulative_limits_and_closure_reserves():
     with pytest.raises(Stop,match='CONNECTION_LIMIT'): b.before('connect')
     for _ in range(10): b.before('command')
     with pytest.raises(Stop,match='TEARDOWN_COMMAND_LIMIT'): b.before('command')
-    assert b.storage_commands==40 and b.commands==50
+    assert b.storage_commands==40 and b.commands==54
     b.phase_started=210;now[0]=238
     with pytest.raises(Stop,match='DEADLINE'):b.check()
 
@@ -72,7 +72,10 @@ def test_registration_rejects_expiry_scope_and_hash_drift():
         prior_audit_sha256=c.PRIOR_AUDIT_SHA256,
         prior_supervised_seconds=c.PRIOR_SUPERVISED_SECONDS,
         prior_export_reserved_bytes=c.PRIOR_EXPORT_RESERVED_BYTES,
-        expires_at=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat(),
+        prior_attempts=c.PRIOR_ATTEMPTS,prior_connections=c.PRIOR_CONNECTIONS,
+        prior_commands=c.PRIOR_COMMANDS,prior_db_active_seconds=c.PRIOR_DB_ACTIVE_SECONDS,
+        prior_returned_bytes=c.PRIOR_RETURNED_BYTES,migration_flags=c.MIGRATION_FLAGS,
+        expires_at=c.ORIGINAL_EXPIRY,
         hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in FILES})
     assert validate_registration(canonical(registration),'a'*40)==registration
     for key,value in [('controller',c.mapping.CONTROLLER),('roles',['unreviewed']),('limits',{}),
@@ -109,3 +112,46 @@ def test_metadata_preflight_rejects_environment_and_existing_later_page_secret(m
     assert len(calls)==2
     monkeypatch.setenv('GH_TOKEN','DISPOSABLE_TEST_SENTINEL')
     with pytest.raises(Stop,match='KEYRING_AUTH_REQUIRED'):c.local_preflight()
+
+
+@pytest.mark.parametrize('index,value',[(0,'other'),(1,'other'),(2,True),(3,False),(4,False),(5,False),(3,1),(5,None)])
+def test_migration_profile_records_safe_flags_then_denies_drift(index,value):
+    from verification.ingestion_storage import storage_controller as c
+    row=['postgres','postgres',False,True,True,True,*([True]*6)]
+    row[index]=value
+    class Cursor:
+        def fetchone(self):return tuple(row)
+    class Connection:
+        def execute(self,statement):
+            assert statement.lstrip().startswith('SELECT')
+            return Cursor()
+    events=[]
+    with pytest.raises(Stop,match='MIGRATION_IDENTITY'):
+        c.migration_gate(Connection(),lambda k,v:events.append((k,v)))
+    assert events[0][0]=='migration_identity'
+    assert events[0][1]['rolbypassrls']==(value if index==5 and type(value)is bool else None if index==5 else True)
+
+
+@pytest.mark.parametrize('index',range(6,12))
+def test_grouped_migration_prerequisites_deny_before_install(index):
+    from verification.ingestion_storage import storage_controller as c
+    row=['postgres','postgres',False,True,True,True,*([True]*6)];row[index]=False
+    class Cursor:
+        def fetchone(self):return tuple(row)
+    class Connection:
+        def execute(self,statement):return Cursor()
+    events=[]
+    with pytest.raises(Stop,match='MIGRATION_PREREQUISITES'):
+        c.migration_gate(Connection(),lambda k,v:events.append((k,v)))
+    assert False in events[0][1].values()
+
+
+def test_migration_evidence_never_exports_unexpected_values():
+    from verification.ingestion_storage import storage_controller as c
+    sentinel='postgresql://SECRET_VALUE'
+    class Connection:
+        def execute(self,statement):return self
+        def fetchone(self):return (sentinel,'postgres',False,True,True,True,*([True]*6))
+    events=[]
+    with pytest.raises(Stop):c.migration_gate(Connection(),lambda k,v:events.append(v))
+    assert sentinel not in json.dumps(events)
