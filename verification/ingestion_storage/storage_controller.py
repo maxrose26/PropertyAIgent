@@ -31,6 +31,7 @@ CONTROLLER = 'verification.ingestion_storage.storage_controller'
 CONSUMED_CONTROLLER_BINDING = '802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279'
 PRIOR_AUDIT_SHA256 = 'f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0'
 PRIOR_SUPERVISED_SECONDS = 0.11050213100043038
+PRIOR_EXPORT_RESERVED_BYTES = 4096
 RETIRED_BINDING = 'e685c79086758f5b52bf5ceff5a8ad34fb2d9e2598e8670485b3ce3a07d7252d'
 PACKAGE = Path('docs/design/ingestion-provisioning-20261016')
 MANIFEST = Path('docs/design/ingestion-readiness-20261016/three-items.json')
@@ -115,7 +116,8 @@ def validate_registration(body, revision, now=None):
                   consumed_controller_sha256=CONSUMED_CONTROLLER_BINDING,
                   memory_enforcement='CGROUP_V2_FROM_EXEC_256M_SWAP_ZERO',
                   prior_audit_sha256=PRIOR_AUDIT_SHA256,
-                  prior_supervised_seconds=PRIOR_SUPERVISED_SECONDS)
+                  prior_supervised_seconds=PRIOR_SUPERVISED_SECONDS,
+                  prior_export_reserved_bytes=PRIOR_EXPORT_RESERVED_BYTES)
     if set(value)!=set(expected)|{'expires_at','hashes'} or any(value.get(k)!=v for k,v in expected.items()):
         raise Stop('EXACT_STORAGE_BINDING_REQUIRED')
     expiry=datetime.fromisoformat(value['expires_at'])
@@ -458,7 +460,7 @@ class Journal:
         entry=dict(sequence=self.sequence,previous_sha256=self.head,event=event,payload=payload)
         digest=hashlib.sha256(canonical(entry)).hexdigest()
         line=canonical(dict(entry,sha256=digest))+b'\n'
-        if len(line)>16384 or self.bytes+len(line)>2*1024**2-32768: raise Stop('AUDIT_BOUND')
+        if len(line)>16384 or self.bytes+len(line)>2*1024**2-PRIOR_EXPORT_RESERVED_BYTES-32768: raise Stop('AUDIT_BOUND')
         self.stream.write(line);os.fsync(self.stream.fileno())
         self.head=digest;self.sequence+=1;self.bytes+=len(line)
     def close(self): self.stream.close()

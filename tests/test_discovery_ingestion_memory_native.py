@@ -11,6 +11,13 @@ import pytest
 from verification.ingestion_storage import memory_enforcement as m
 
 
+def enter_with_worker_limits(group):
+    import resource
+    group.enter()
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
+
+
 @pytest.fixture
 def memory_group(monkeypatch):
     # Test-only path, never consulted by the production module or CLI.
@@ -38,7 +45,7 @@ def memory_group(monkeypatch):
 def test_real_gh_startup_under_kernel_memory_limit(memory_group, record_property):
     gh = shutil.which('gh')
     assert gh, 'Real Linux GitHub CLI is required'
-    p = subprocess.run([gh, '--version'], preexec_fn=memory_group.enter,
+    p = subprocess.run([gh, '--version'], preexec_fn=lambda:enter_with_worker_limits(memory_group),
                        capture_output=True, timeout=10, text=True)
     assert p.returncode == 0 and 'gh version' in p.stdout
     result = memory_group.close(time.monotonic()+2)
@@ -75,7 +82,7 @@ while True:
     x.append(bytearray(4*1024*1024))
 '''
     url = 'http://127.0.0.1:%s/' % server.server_port
-    p = subprocess.Popen([sys.executable, '-c', code, gh, url], preexec_fn=memory_group.enter,
+    p = subprocess.Popen([sys.executable, '-c', code, gh, url], preexec_fn=lambda:enter_with_worker_limits(memory_group),
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         p.wait(timeout=10)
@@ -97,6 +104,47 @@ while True:
 def test_missing_enforcement_fails_closed(tmp_path):
     with pytest.raises((OSError, m.MemoryUnavailable)):
         m.WorkerMemory.create_under(tmp_path)
+
+
+def test_enforcement_loss_still_kills_and_reconciles(memory_group):
+    p = subprocess.Popen([sys.executable, '-c', 'import time;time.sleep(20)'],
+                         preexec_fn=memory_group.enter)
+    try:
+        memory_group.path.joinpath('memory.max').write_text(str(m.LIMIT-4096))
+        with pytest.raises(m.MemoryUnavailable, match='MEMORY_ENFORCEMENT_LOST'):
+            memory_group.snapshot()
+        result = memory_group.close(time.monotonic()+2)
+        p.wait(timeout=2)
+        assert p.returncode < 0
+        assert result['kernel_memory_accounting_uncertain']
+        assert result['kernel_memory_forced_cleanup']
+        assert result['kernel_memory_group_removed']
+    finally:
+        if p.poll() is None:
+            p.kill()
+            p.wait(timeout=2)
+
+
+def test_outer_limit_is_verified_not_only_child(memory_group):
+    memory_group.path.parent.joinpath('memory.max').write_text(str(m.LIMIT-4096))
+    with pytest.raises(m.MemoryUnavailable, match='OUTER_MEMORY_ENFORCEMENT_LOST'):
+        memory_group.snapshot()
+    result = memory_group.close(time.monotonic()+2)
+    assert result['kernel_memory_accounting_uncertain']
+    assert result['kernel_memory_group_removed']
+
+
+def test_missing_kernel_enforcement_stops_before_worker_and_effects(monkeypatch,tmp_path):
+    from verification.ingestion_storage import storage_controller as c
+    def unavailable(cls):
+        raise c.MemoryUnavailable('MEMORY_DELEGATION_REQUIRED')
+    monkeypatch.setattr(c.WorkerMemory,'create',classmethod(unavailable))
+    journal=c.Journal(tmp_path/'unavailable','a'*64)
+    result=c.supervise('not-a-credential',{},journal)
+    journal.close()
+    assert result['reason']=='MEMORY_DELEGATION_REQUIRED'
+    assert result['status']=='STOP_RECONCILE_NO_RETRY'
+    assert result['worker_exit'] is None and result['cleanup']=='UNCERTAIN'
 
 
 if __name__ == '__main__':
