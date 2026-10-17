@@ -9,6 +9,22 @@ GRANT CREATE ON SCHEMA public TO ingestion_storage_owner;
 CREATE ROLE ingestion_effect_broker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
 CREATE ROLE ingestion_recovery_operator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO ingestion_effect_broker,ingestion_recovery_operator;
+-- Fixed read-only control diagnostics for the migration principal. It has
+-- ADMIN-only membership, not implicit SELECT; runtime logins get no EXECUTE.
+CREATE FUNCTION public.ingestion_acceptance_control() RETURNS jsonb
+LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $diagnostic$
+ SELECT jsonb_build_object('global_stop',outcome::jsonb->'global_stop',
+ 'manual_stop',outcome::jsonb->'manual_stop','hard_stop_generation',coalesce((outcome::jsonb->>'hard_stop_generation')::integer,0),
+ 'unexpired_grants',(SELECT count(*) FROM jsonb_each(outcome::jsonb->'grants') g WHERE (g.value->>'expires_at')::double precision>extract(epoch FROM statement_timestamp())))
+ FROM public.ingestion_work_items WHERE key=repeat('0',64)
+$diagnostic$;
+ALTER FUNCTION public.ingestion_acceptance_control() OWNER TO ingestion_storage_owner;
+REVOKE ALL ON FUNCTION public.ingestion_acceptance_control() FROM PUBLIC;
+DO $diagnostic_acl$ DECLARE r record; BEGIN
+ FOR r IN SELECT DISTINCT p.rolname FROM pg_proc f CROSS JOIN LATERAL aclexplode(f.proacl) a JOIN pg_roles p ON p.oid=a.grantee WHERE f.oid='public.ingestion_acceptance_control()'::regprocedure AND p.rolname<>'ingestion_storage_owner' LOOP
+ EXECUTE format('REVOKE ALL ON FUNCTION public.ingestion_acceptance_control() FROM %I',r.rolname);END LOOP;
+ EXECUTE format('GRANT EXECUTE ON FUNCTION public.ingestion_acceptance_control() TO %I',current_user);
+END $diagnostic_acl$;
 CREATE FUNCTION public.ingestion_bolton_allowed(ctl jsonb, authority text, subject jsonb) RETURNS boolean
 LANGUAGE sql STABLE SET search_path=pg_catalog AS $policy$
  SELECT coalesce(ctl->'global_stop'='{"reason":"CONSUMED_SALFORD_GLOBAL_STOP","run":"38884069913"}'::jsonb

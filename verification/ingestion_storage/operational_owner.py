@@ -71,14 +71,20 @@ class Owner:
             permissions=self.q(c,"SELECT has_schema_privilege(current_user,'public','USAGE WITH GRANT OPTION'),has_schema_privilege(current_user,'public','CREATE WITH GRANT OPTION'),has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION'),EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid='ingestion_storage_owner'::regrole AND member=(SELECT oid FROM pg_roles WHERE rolname=current_user) AND admin_option),bool_and(relowner='ingestion_storage_owner'::regrole AND relrowsecurity AND relforcerowsecurity) FROM pg_class WHERE oid IN ('public.ingestion_work_items'::regclass,'public.ingestion_work_attempts'::regclass)")[0]
             self.emit('migration_capabilities_observed',dict(values=permissions))
             if permissions!=(True,True,True,True,True):raise ValueError('MIGRATION_OWNERSHIP_OR_GRANT_OPTIONS')
+            # ADMIN does not imply table SELECT or role SET. Use the accepted
+            # installer self-grant only inside an explicitly rolled-back
+            # preflight transaction, never grant runtime owner membership.
+            self.q(c,'BEGIN',effect=True)
+            self.q(c,'GRANT ingestion_storage_owner TO CURRENT_USER WITH INHERIT TRUE, SET TRUE',effect=True)
             rows=self.q(c,"SELECT outcome FROM public.ingestion_work_items WHERE key=repeat('0',64)")
             ctl=rows[0][0];self.emit('control_observed',dict(global_stop=ctl.get('global_stop'),manual_stop=ctl.get('manual_stop'),hard_stop_generation=ctl.get('hard_stop_generation',0),grant_count=len(ctl['grants'])))
+            self.q(c,'ROLLBACK',effect=True)
             if ctl.get('global_stop')!=STOP or ctl.get('manual_stop')!='STORAGE_TEST_STOP' or ctl.get('hard_stop_generation',0)!=0 or ctl['grants'] or ctl.get('bolton_exceptions'):raise ValueError('EXACT_STORAGE_STOP_STATE')
             self.original_control=ctl
             password_access=self.q(c,"SELECT has_column_privilege(current_user,'pg_catalog.pg_authid','rolname','SELECT') AND has_column_privilege(current_user,'pg_catalog.pg_authid','rolpassword','SELECT')")[0][0]
             self.emit('password_boolean_read_permission',dict(permitted=password_access))
             if password_access is not True:raise ValueError('EXISTING_PASSWORD_BOOLEAN_READ_UNAVAILABLE')
-            roles=self.q(c,"SELECT rolname,rolcanlogin,rolpassword IS NULL FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(['ingestion_worker_login','ingestion_storage_login'],))
+            roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(['ingestion_worker_login','ingestion_storage_login'],))
             self.emit('existing_login_state',dict(roles=roles))
             if roles!=[('ingestion_storage_login',False,True),('ingestion_worker_login',False,True)]:raise ValueError('ACCEPTED_STORAGE_ACCESS_CHANGED')
             if self.q(c,"SELECT count(*) FROM pg_auth_members WHERE member=ANY(ARRAY['ingestion_worker_login'::regrole,'ingestion_storage_login'::regrole])")[0][0]!=0:raise ValueError('STORAGE_MEMBERSHIP_CHANGED')
@@ -152,7 +158,7 @@ class Owner:
                 self.q(c,sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(capability),sql.Identifier(role)),effect=True)
             self.q(c,'COMMIT',effect=True)
             # Observe actual safe fields, never password material or query text.
-            roles=self.q(c,"SELECT rolname,rolcanlogin,rolpassword IS NULL FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(list(ROLES),))
+            roles=self.q(c,"SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),))
             memberships=self.q(c,'SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])',(list(ROLES),))
             sessions=self.q(c,'SELECT pid,usename,state FROM pg_stat_activity WHERE usename=ANY(%s)',(list(ROLES),))
             self.emit('teardown_observed',dict(roles=roles,memberships=memberships,sessions=sessions))
@@ -166,10 +172,10 @@ class Owner:
         """Read-only actual state, within remaining13/240 administrative caps."""
         self.diagnostic_mode=True
         statements=[('BEGIN READ ONLY',None),
-          ("SELECT rolname,rolcanlogin,rolpassword IS NULL,rolsuper,rolcreaterole,rolcreatedb,rolbypassrls,rolreplication FROM pg_authid WHERE rolname=ANY(%s) ORDER BY rolname",(list(ROLES),)),
+          ("SELECT r.rolname,r.rolcanlogin,a.rolpassword IS NULL,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolbypassrls,r.rolreplication FROM pg_catalog.pg_roles r JOIN pg_catalog.pg_authid a ON a.rolname=r.rolname WHERE r.rolname=ANY(%s) ORDER BY r.rolname",(list(ROLES),)),
           ('SELECT m.member::regrole::text,m.roleid::regrole::text,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE m.member=ANY(%s::regrole[])',(list(ROLES),)),
           ('SELECT pid,usename,state FROM pg_stat_activity WHERE usename=ANY(%s)',(list(ROLES),)),
-          ("SELECT outcome::jsonb-'grants'-'bolton_exceptions' FROM public.ingestion_work_items WHERE key=repeat('0',64)",None),('ROLLBACK',None)]
+          ("SELECT public.ingestion_acceptance_control()",None),('ROLLBACK',None)]
         result={}
         with self.connection() as c:
             for key,(statement,params) in zip(('begin','roles','memberships','sessions','control','rollback'),statements):

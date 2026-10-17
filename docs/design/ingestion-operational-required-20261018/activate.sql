@@ -26,7 +26,7 @@ BEGIN
   THEN RAISE EXCEPTION 'RUNTIME_DIRECT_LEDGER_MUTATION'; END IF;
   IF login='ingestion_effect_login' AND (has_table_privilege(login,'public.ingestion_work_items','SELECT') OR has_any_column_privilege(login,'public.ingestion_work_items','SELECT') OR has_table_privilege(login,'public.ingestion_work_attempts','SELECT') OR has_any_column_privilege(login,'public.ingestion_work_attempts','SELECT'))
   THEN RAISE EXCEPTION 'BROKER_DIRECT_LEDGER_READ'; END IF;
-  IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='S' AND n.nspname NOT IN ('pg_catalog','information_schema') AND has_sequence_privilege(login,c.oid,'USAGE,SELECT,UPDATE'))
+  IF EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='S' AND n.nspname NOT IN ('pg_catalog','information_schema') AND CASE WHEN c.relkind='S' THEN has_sequence_privilege(login,c.oid,'USAGE,SELECT,UPDATE') ELSE false END)
   THEN RAISE EXCEPTION 'RUNTIME_SEQUENCE_ACCESS'; END IF;
   -- Exact latent SELECT ACLs only: schema lookup must remain DENIED. No new
   -- USAGE/SELECT grant, query-text retrieval, or statistics function invocation.

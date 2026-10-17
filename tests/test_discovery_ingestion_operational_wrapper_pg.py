@@ -95,7 +95,11 @@ def test_complete_required_wrapper_sixty_rows_pause_resume_and_teardown(tmp_path
             # credential/administrative counters remain in the living trusted
             # owner's RAM, not a file or a new credential mapping invocation.
             state=json.loads(checkpoint);assert state['capture_sha256']==__import__('app.ingestion.ledger',fromlist=['digest']).digest(runner.capture)
+            prior_capture=runner.receipts[runner.capture_key]
             runner=Runner.resume(runner);holder['runner']=runner
+            carried=runner.receipts[runner.capture_key]
+            assert all(carried['database'][k]>=prior_capture['database'][k] for k in ('driver_statements','connection_attempts','returned_data_value_bytes','elapsed_seconds'))
+            assert carried['supervised_seconds']>=prior_capture['supervised_seconds']
             assert runner.screen()=='SCREENING_COMPLETE' and len(source_calls)==1
             if fault=='teardown_lost_ack':
                 with pytest.raises(Uncertain):runner.finish()
