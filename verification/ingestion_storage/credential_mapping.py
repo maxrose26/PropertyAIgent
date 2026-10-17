@@ -2,8 +2,8 @@
 
 Never print raw exceptions, connection strings, passwords, SCRAM verifiers or
 GitHub CLI output. The CLI handles encryption to the existing environment key.
-Python cannot guarantee erasure of strings from process memory. No files/core
-credential files are produced by this helper; its consumption record is
+Python cannot guarantee erasure of strings from process memory. No credential
+files are produced by this helper; its consumption record is
 credential-free. Preserve the previously blocked entrypoint in git
 history; the old provider-attestation flag does not admit this method.
 """
@@ -67,10 +67,10 @@ def install_mapping(connection,*,attested=False,risk_binding=None,revision=None,
   validate_binding(risk_binding,revision)
   if (info.host,info.port,info.dbname,info.user)!=('aws-0-eu-west-2.pooler.supabase.com',5432,'postgres','postgres.zcikcfgpblzuzpanpdqd') or not connection.pgconn.ssl_in_use:raise ValueError('EXACT_MIGRATION_ROUTE_REQUIRED')
   if password_factory is not None:raise ValueError('PRODUCTION_ENTROPY_FACTORY_FORBIDDEN')
-  if connection.execute("SELECT current_user,session_user,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user)").fetchone()!=('postgres','postgres',False):raise ValueError('EXACT_MIGRATION_PRINCIPAL_REQUIRED')
  password_factory=password_factory or (lambda:secrets.token_urlsafe(48))
  connection.execute("SET statement_timeout='10s'")
  connection.execute("SET lock_timeout='3s'")
+ if not disposable and connection.execute("SELECT current_user,session_user,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user)").fetchone()!=('postgres','postgres',False):raise ValueError('EXACT_MIGRATION_PRINCIPAL_REQUIRED')
  receipts=[]
  for role,name in MAPPINGS.items():
   flags=connection.execute('SELECT rolcanlogin,rolsuper,rolcreaterole,rolbypassrls,rolcreatedb,rolreplication FROM pg_roles WHERE rolname=%s',(role,)).fetchone()
@@ -123,6 +123,7 @@ def main():
   if not addresses or len(addresses)>32:raise ValueError('DNS_BOUND')
   import psycopg
   with psycopg.connect(host=u.host,hostaddr=sorted({x[4][0] for x in addresses})[0],port=u.port,dbname=u.database,user=u.username,password=u.password,sslmode='verify-full',sslrootcert=str(root),connect_timeout=3,prepare_threshold=None,autocommit=True) as c:
+   c.execute("SET statement_timeout='10s'");c.execute("SET lock_timeout='3s'");c.execute("SET idle_in_transaction_session_timeout='10s'")
    # Rehearse the exact activation gates read-only before any password material.
    gate=Path('docs/design/ingestion-provisioning-20261016/activate.sql').read_text()
    gate=gate[:gate.index('ALTER ROLE ingestion_worker_login LOGIN;')].replace('BEGIN;','BEGIN READ ONLY;',1)+'ROLLBACK;'
