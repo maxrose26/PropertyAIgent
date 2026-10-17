@@ -26,6 +26,9 @@ def test_exact_statistics_baseline_real_logins(record_property):
   boot.execute(sql.SQL('CREATE ROLE statistics_migrator LOGIN NOSUPERUSER CREATEROLE NOINHERIT NOBYPASSRLS PASSWORD {}').format(sql.Literal(passwords['statistics_migrator'])))
   boot.execute('GRANT USAGE,CREATE ON SCHEMA public TO statistics_migrator WITH GRANT OPTION')
   boot.execute('GRANT CONNECT ON DATABASE ingestion_provisioning_test TO statistics_migrator WITH GRANT OPTION')
+  # Production postgres owns this schema; fixture migration access is separate
+  # from the two runtime logins, which never receive schema USAGE.
+  boot.execute('GRANT USAGE ON SCHEMA extensions TO statistics_migrator')
   try:
    with connect('statistics_migrator') as m:
     m.execute((package/'install.sql').read_text())
@@ -50,7 +53,7 @@ def test_exact_statistics_baseline_real_logins(record_property):
    for role in roles[-2:]:
     with connect(role) as c:
      assert c.execute('SELECT current_user,session_user').fetchone()==(role,role)
-     assert c.execute("SELECT has_schema_privilege(current_user,'extensions','USAGE'),has_table_privilege(current_user,'extensions.pg_stat_statements','SELECT'),pg_has_role(current_user,'pg_read_all_stats','MEMBER'),has_function_privilege(current_user,'extensions.pg_stat_statements_reset(oid,oid,bigint,boolean)','EXECUTE')").fetchone()==(False,True,False,False)
+     assert c.execute("SELECT has_schema_privilege(current_user,'extensions','USAGE'),has_table_privilege(current_user,(SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='extensions' AND c.relname='pg_stat_statements'),'SELECT'),pg_has_role(current_user,'pg_read_all_stats','MEMBER'),has_function_privilege(current_user,(SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='extensions' AND p.proname='pg_stat_statements_reset'),'EXECUTE')").fetchone()==(False,True,False,False)
      # Real SQL parse/access checks, not SET ROLE or catalogue-only assertions.
      for statement in ['SELECT 1 FROM extensions.pg_stat_statements LIMIT 0','SELECT 1 FROM extensions.pg_stat_statements_info LIMIT 0','SELECT extensions.pg_stat_statements(false)','SELECT extensions.pg_stat_statements_reset(0::oid,0::oid,0::bigint,false)']:
       with pytest.raises(psycopg.Error) as e:c.execute(statement)
