@@ -1,0 +1,12 @@
+{
+  "registration_sha256": "cfc38625cca22de33d973f42851d3ea908d0b35f2a9e2ccc7e7000e52b42b082",
+  "status": "CONSUMED_FAILED_BEFORE_INSTALL_SQL",
+  "reason": "MIGRATION_IDENTITY",
+  "cleanup": "UNCERTAIN",
+  "audit_sha256": "5dda1e97c8dfc2a9a899c839e9c60d88f3c08bff05d5172579ad2efe1ade279e",
+  "production_connections": 1,
+  "driver_commands": 4,
+  "installation": false,
+  "mapping": false,
+  "storage_accepted": false
+}
