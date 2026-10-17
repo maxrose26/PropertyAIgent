@@ -1,0 +1,121 @@
+{
+  "exact_tree": true,
+  "guarded_expected_head": "dc8d266224097c35cc1475964b0fd7a54f31490e",
+  "deployment_suppressed": "[skip render]",
+  "candidate_checks": [
+    {
+      "id": 117467070587,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031220/job/117467070587"
+    },
+    {
+      "id": 117467070380,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031220/job/117467070380"
+    },
+    {
+      "id": 117467049154,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057028131/job/117467049154"
+    },
+    {
+      "id": 117467048924,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057028131/job/117467048924"
+    },
+    {
+      "id": 117466997456,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031217/job/117466997456"
+    },
+    {
+      "id": 117466997270,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031217/job/117466997270"
+    },
+    {
+      "id": 117466994170,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031218/job/117466994170"
+    },
+    {
+      "id": 117466994156,
+      "name": "restricted-provisioning",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031218/job/117466994156"
+    },
+    {
+      "id": 117466994008,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031218/job/117466994008"
+    }
+  ],
+  "post_merge_checks": [
+    {
+      "id": 117467697070,
+      "name": "web",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269404/job/117467697070"
+    },
+    {
+      "id": 117467696990,
+      "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269404/job/117467696990"
+    },
+    {
+      "id": 117467696873,
+      "name": "postgres-admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269319/job/117467696873"
+    },
+    {
+      "id": 117467696828,
+      "name": "restricted-provisioning",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269319/job/117467696828"
+    },
+    {
+      "id": 117467696643,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269319/job/117467696643"
+    },
+    {
+      "id": 117467696248,
+      "name": "native",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269247/job/117467696248"
+    },
+    {
+      "id": 117467696091,
+      "name": "offline",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269247/job/117467696091"
+    }
+  ]
+}

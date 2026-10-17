@@ -1,0 +1,9 @@
+{
+  "status": "PREPARED_UNUSED_HELD",
+  "authority_released": false,
+  "production_invocations": 0,
+  "registration_sha256": "43bb06a2ee93cc77428e056eb8a19b2efe8f98e880ed42d0a0e0b2b69e33d5f3",
+  "expires_at": "2026-10-18T08:54:58.469465Z",
+  "prior_attempts": "BOTH_CONSUMED_UNCERTAIN_PRESERVED",
+  "next_decision": "Release only the exact unused successor, preserving both historical UNCERTAIN classifications, before original expiry. Current correction instruction forbids live query/provision/rerun. Production grant/ownership/ambient/secret-store conditions remain gates, not claimed facts."
+}

@@ -1,0 +1,278 @@
+{
+  "stage": 4,
+  "state": "OPEN",
+  "readiness": "OFFLINE_REHEARSED_INTEGRATED_PREPARED_UNUSED_HELD",
+  "candidate": "3fc9255a3d0f58616bc65db9b0ef7ee78d961894",
+  "tree": "68bf766cda023b1f15a19a63978903995391ec46",
+  "integrated_revision": "7cf8d32547b63d485de872afc2f717c3dce55322",
+  "pr": 125,
+  "accepted_predecessor_evidence": "013eb1c820e1634197604a5818d648c9c678387b",
+  "integration": {
+    "exact_tree": true,
+    "guarded_expected_head": "dc8d266224097c35cc1475964b0fd7a54f31490e",
+    "deployment_suppressed": "[skip render]",
+    "candidate_checks": [
+      {
+        "id": 117467070587,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031220/job/117467070587"
+      },
+      {
+        "id": 117467070380,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031220/job/117467070380"
+      },
+      {
+        "id": 117467049154,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057028131/job/117467049154"
+      },
+      {
+        "id": 117467048924,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057028131/job/117467048924"
+      },
+      {
+        "id": 117466997456,
+        "name": "offline",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031217/job/117466997456"
+      },
+      {
+        "id": 117466997270,
+        "name": "native",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031217/job/117466997270"
+      },
+      {
+        "id": 117466994170,
+        "name": "postgres-admission",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031218/job/117466994170"
+      },
+      {
+        "id": 117466994156,
+        "name": "restricted-provisioning",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031218/job/117466994156"
+      },
+      {
+        "id": 117466994008,
+        "name": "offline",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057031218/job/117466994008"
+      }
+    ],
+    "post_merge_checks": [
+      {
+        "id": 117467697070,
+        "name": "web",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269404/job/117467697070"
+      },
+      {
+        "id": 117467696990,
+        "name": "Stage 2 commercial evidence and Stage 1 security (offline)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269404/job/117467696990"
+      },
+      {
+        "id": 117467696873,
+        "name": "postgres-admission",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269319/job/117467696873"
+      },
+      {
+        "id": 117467696828,
+        "name": "restricted-provisioning",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269319/job/117467696828"
+      },
+      {
+        "id": 117467696643,
+        "name": "offline",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269319/job/117467696643"
+      },
+      {
+        "id": 117467696248,
+        "name": "native",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269247/job/117467696248"
+      },
+      {
+        "id": 117467696091,
+        "name": "offline",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/maxrose26/PropertyAIgent/actions/runs/39057269247/job/117467696091"
+      }
+    ]
+  },
+  "registration": {
+    "status": "PREPARED_UNUSED_HELD",
+    "sha256": "43bb06a2ee93cc77428e056eb8a19b2efe8f98e880ed42d0a0e0b2b69e33d5f3",
+    "bytes": 3779,
+    "git_blob": "1580775c5bcf1060df07dde8cb32104d108e5f3d",
+    "expires_at": "2026-10-18T08:54:58.469465Z",
+    "prior_attempts": [
+      {
+        "bytes": 1573,
+        "cleanup": "UNCERTAIN",
+        "directory": "storage-acceptance-once-20261016",
+        "registration_sha256": "802a4eae09ec897c1cc9c27704abeb9f6913eaeb919252ed64e98a452a055279",
+        "sha256": "f509bd0d5a53282d099ca68b6d5ceb0e60047dd500991395779ba483621aafc0"
+      },
+      {
+        "bytes": 7005,
+        "cleanup": "UNCERTAIN",
+        "directory": "storage-acceptance-memory-successor-20261017",
+        "registration_sha256": "cfc38625cca22de33d973f42851d3ea908d0b35f2a9e2ccc7e7000e52b42b082",
+        "sha256": "5dda1e97c8dfc2a9a899c839e9c60d88f3c08bff05d5172579ad2efe1ade279e"
+      }
+    ],
+    "remaining_supervised_seconds": 238.71668903499904,
+    "remaining_connections": 12,
+    "prior_spend": {
+      "supervised_seconds": 1.2833109650009646,
+      "connections": 1,
+      "commands": 4,
+      "db_active_seconds": 0.26088705100028164,
+      "returned_data_value_bytes": 39
+    },
+    "prior_export_reserved_bytes": 16384
+  },
+  "validation": {
+    "local_focused_passed": 42,
+    "restricted_sql_passed": 21,
+    "restricted_native_passed": 10,
+    "disposable_sql_usage": {
+      "active_seconds": 0.37375976200030436,
+      "commands": 138,
+      "connections": 8,
+      "cumulative_supervised_seconds": 1.479459994000976,
+      "elapsed_seconds": 0.19614860800000145,
+      "open_connections": 0,
+      "phase": "teardown",
+      "returned_database_data_value_bytes": 9452,
+      "storage_active_seconds": 0.04581526500001587,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.010206788999994387,
+      "teardown_commands": 10
+    },
+    "complete_real_gh_supervised_result": {
+      "audit_bytes": 106814,
+      "audit_chain_head": "8fe6264fac29c192e6a110e3ea2f71e619540cb27c34928bdfbab6cbd6c55fc9",
+      "audit_prefix_bytes": 105930,
+      "audit_sha256": "d43792dd84edc3d0752219933585c79413d524b52ba9c14742591ec497ea8e6a",
+      "cleanup": "CLOSED",
+      "cumulative_supervised_seconds": 2.6460478550009583,
+      "elapsed_seconds": 1.3627368899999937,
+      "kernel_memory_current_bytes": 1572864,
+      "kernel_memory_forced_cleanup": false,
+      "kernel_memory_group_removed": true,
+      "kernel_memory_max_events": 0,
+      "kernel_memory_oom": 0,
+      "kernel_memory_oom_kill": 0,
+      "kernel_memory_peak_bytes": 27025408,
+      "kernel_memory_populated": 0,
+      "live_owned_survivors": 0,
+      "outer_memory_current_bytes": 1589248,
+      "outer_memory_max_events": 0,
+      "outer_memory_oom": 0,
+      "outer_memory_oom_kill": 0,
+      "outer_memory_peak_bytes": 27041792,
+      "peak_owned_rss_bytes": 127053824,
+      "reason": null,
+      "status": "STORAGE_ACCEPTED_ACCESS_DISABLED",
+      "worker_exit": 0
+    },
+    "github_fixture_http_requests": {
+      "setup": 1,
+      "controller": 9,
+      "total": 10
+    },
+    "standalone_owner_gh_version": "2.45.0",
+    "standalone_gh_release_sha256": "79e89a14af6fc69163aee00e764e86d5809d0c6c77e6f229aebe7a4ed115ee67",
+    "standalone_under_rlimit_fsize_zero": "UPLOAD_DELETE_ABSENCE_PASS",
+    "runtime_login_count": 2,
+    "denials_42501": 8,
+    "exact_blocked_items": 3,
+    "control_records": 1,
+    "work_attempts": 0,
+    "executable_grants": 0,
+    "duplicate_seed": "NO_OP",
+    "production_connections": 0,
+    "council_calls": 0
+  },
+  "artifacts": [
+    {
+      "id": 12109896385,
+      "run": 39057031218,
+      "number": 178,
+      "attempt": 1,
+      "file": "postgres-original.zip",
+      "sha256": "3103174be027947eefa1201f81d3f2b4c971de9c070fd08a292e199819ffd68e",
+      "bytes": 65600
+    },
+    {
+      "id": 12109474550,
+      "run": 39057031217,
+      "number": 209,
+      "attempt": 1,
+      "file": "memory-original.zip",
+      "sha256": "0c5db3d66b565907d8663f502a7e11a261b64b1b304208d087c4aef1e910c518",
+      "bytes": 7895
+    },
+    {
+      "file": "provisioning.xml",
+      "sha256": "eebe5b25b66ed041d6a8c4c7cb2289c65b1954518086e4d9a7d69a0b7960f6d8"
+    },
+    {
+      "file": "kernel-memory.xml",
+      "sha256": "db701a0392009dc4074f3113d52edf2b8239c0d232c62b12df3333d51f312c7d"
+    }
+  ],
+  "boundaries": {
+    "migration_flags": {
+      "rolbypassrls": true,
+      "rolcreatedb": true,
+      "rolcreaterole": true,
+      "rolsuper": false
+    },
+    "runtime_flags": "NOSUPERUSER_NOCREATEROLE_NOCREATEDB_NOBYPASSRLS_NO_OWNER_ADMIN_ISSUER_RELEASER_MEMBERSHIP",
+    "sql_and_permissions_unchanged": true,
+    "old_cleanup": "BOTH_UNCERTAIN_UNCHANGED",
+    "production_storage_acceptance": "NOT_RUN",
+    "operational_activation": "NOT_AUTHORISED",
+    "salford_stop": "UNCHANGED",
+    "protected_ids": [
+      1504,
+      1505,
+      1506,
+      1507,
+      1508
+    ]
+  },
+  "next_decision": "Release only the exact unused successor, preserving both historical UNCERTAIN classifications, before original expiry. Current correction instruction forbids live query/provision/rerun. Production grant/ownership/ambient/secret-store conditions remain gates, not claimed facts."
+}
