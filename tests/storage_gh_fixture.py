@@ -89,7 +89,18 @@ def real_gh_store(tmp_path):
         result=subprocess.run(args,input=kwargs.get('input'),stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,env=env,timeout=10,check=False)
         assert len(result.stdout)+len(result.stderr)<32768
-        assert result.returncode==0, 'REAL_GH_DISPOSABLE_COMMAND_FAILED'
+        if result.returncode:
+            # Fixture-only diagnostic categories; no raw CLI output or values.
+            import hashlib
+            text=result.stderr.lower()
+            diagnostic=dict(exit=result.returncode,command=command[1:3],
+                certificate_error=b'certificate' in text,
+                authentication_error=b'auth' in text,
+                not_found=b'404' in text,connection_error=b'connect' in text,
+                stderr_sha256=hashlib.sha256(result.stderr).hexdigest())
+            from verification.ingestion_storage.storage_controller import Stop
+            category='CERTIFICATE' if diagnostic['certificate_error'] else 'AUTH' if diagnostic['authentication_error'] else 'NOT_FOUND' if diagnostic['not_found'] else 'CONNECT' if diagnostic['connection_error'] else 'OTHER'
+            raise Stop('GH_FIXTURE_'+category)
         return result
     def metadata(command,seconds=10):return cli(command).stdout
     def secret(operation,name,value):

@@ -229,7 +229,8 @@ def test_supervised_complete_postgres_path(fixture,tmp_path,monkeypatch,record_p
     journal=c.Journal(tmp_path/'supervised-controller','b'*64)
     result=c.supervise('postgresql://postgres.zcikcfgpblzuzpanpdqd:DISPOSABLE_FIXTURE_ONLY@aws-0-eu-west-2.pooler.supabase.com:5432/postgres',registration,journal)
     journal.close()
-    assert result['status']=='STORAGE_ACCEPTED_ACCESS_DISABLED' and result['cleanup']=='CLOSED'
+    events=[json.loads(s) for s in (journal.root/'events.jsonl').read_text().splitlines()]
+    assert result['status']=='STORAGE_ACCEPTED_ACCESS_DISABLED' and result['cleanup']=='CLOSED',json.dumps(dict(result=result,requests=requests,events=events[-4:]),sort_keys=True)
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_items').fetchone()==(4,)
     assert boot.execute('SELECT count(*) FROM public.ingestion_work_attempts').fetchone()==(0,)
     assert boot.execute("SELECT count(*) FROM pg_authid WHERE rolname=ANY(%s) AND NOT rolcanlogin AND rolpassword IS NULL",(list(c.ROLE_NAMES),)).fetchone()==(2,)

@@ -62,6 +62,7 @@ def test_journal_is_exclusive_durable_hash_chained_and_bounded(tmp_path):
 
 def test_registration_rejects_expiry_scope_and_hash_drift():
     from verification.ingestion_storage import storage_controller as c
+    now=datetime(2026,10,17,9,tzinfo=timezone.utc)
     registration=dict(authority=c.AUTHORITY,controller=c.CONTROLLER,risk_acceptance=c.mapping.RISK,
         roles=list(c.ROLE_NAMES),endpoint='aws-0-eu-west-2.pooler.supabase.com:5432/postgres',
         project='zcikcfgpblzuzpanpdqd',environment=c.mapping.ENVIRONMENT,
@@ -77,12 +78,14 @@ def test_registration_rejects_expiry_scope_and_hash_drift():
         prior_returned_bytes=c.PRIOR_RETURNED_BYTES,migration_flags=c.MIGRATION_FLAGS,
         expires_at=c.ORIGINAL_EXPIRY,
         hashes={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in FILES})
-    assert validate_registration(canonical(registration),'a'*40)==registration
+    assert validate_registration(canonical(registration),'a'*40,now=now)==registration
     for key,value in [('controller',c.mapping.CONTROLLER),('roles',['unreviewed']),('limits',{}),
                       ('expires_at',(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat()),
                       ('hashes',{p:'0'*64 for p in FILES})]:
         changed={**registration,key:value}
-        with pytest.raises(Stop): validate_registration(canonical(changed),'a'*40)
+        with pytest.raises(Stop): validate_registration(canonical(changed),'a'*40,now=now)
+    with pytest.raises(Stop,match='REGISTRATION_EXPIRY'):
+        validate_registration(canonical(registration),'a'*40,now=datetime(2026,10,18,9,tzinfo=timezone.utc))
 
 
 def test_safe_failure_never_exports_raw_driver_message():
