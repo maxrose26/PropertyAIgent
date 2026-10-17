@@ -4,6 +4,7 @@ Only CLI transport/auth/public-key and protected-store boundaries differ.
 Password/SCRAM values are never logged or written. PUT sees sealed ciphertext.
 """
 import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 import http.server
 import ipaddress
@@ -25,7 +26,7 @@ import pytest
 
 
 @pytest.fixture
-def real_gh_store(tmp_path):
+def real_gh_store(tmp_path,request):
     gh = shutil.which('gh')
     assert gh, 'Real Linux gh required'
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -41,11 +42,29 @@ def real_gh_store(tmp_path):
     pem.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     pk.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
     pub=x25519.X25519PrivateKey.generate().public_key().public_bytes(serialization.Encoding.Raw,serialization.PublicFormat.Raw)
-    ciphertexts={}; requests=[]
+    operational=getattr(request,'param',None)=='operational'
+    ciphertexts={'DATABASE_URL':b'disposable-preserved'} if operational else {}; requests=[]
     names={'INGESTION_WORKER_DATABASE_URL','INGESTION_STORAGE_DATABASE_URL'}
+    if operational:names|={'INGESTION_EFFECT_DATABASE_URL','INGESTION_APPLICATION_DATABASE_URL'}
+    git_objects={};git_head=['1'*40]
     prefix='/repos/maxrose26/PropertyAIgent/environments/stage4-production-canary/secrets'
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self,*args):pass
+        def git_body(self):
+            if self.headers.get('Transfer-Encoding','').lower()!='chunked':
+                n=int(self.headers.get('Content-Length','0'))
+                if not 0<n<3*1024**2:raise ValueError('FIXTURE_BODY_BOUND')
+                return self.rfile.read(n)
+            body=bytearray()
+            for _ in range(4096):
+                n=int(self.rfile.readline(80).strip(),16)
+                if n==0:
+                    if self.rfile.readline(3)!=b'\r\n':raise ValueError('FIXTURE_CHUNK')
+                    return bytes(body)
+                if n<0 or len(body)+n>=3*1024**2:raise ValueError('FIXTURE_BODY_BOUND')
+                body.extend(self.rfile.read(n))
+                if self.rfile.read(2)!=b'\r\n':raise ValueError('FIXTURE_CHUNK')
+            raise ValueError('FIXTURE_CHUNK_BOUND')
         def answer(self,status,value=None):
             body=b'' if value is None else json.dumps(value).encode()
             self.send_response(status); self.send_header('Content-Type','application/json')
@@ -57,6 +76,27 @@ def real_gh_store(tmp_path):
             if method=='GET' and path=='/user':return self.answer(200,{'login':'maxrose26'})
             if method=='GET' and path==prefix+'/public-key':return self.answer(200,{'key_id':'disposable-key','key':base64.b64encode(pub).decode()})
             if method=='GET' and path==prefix:return self.answer(200,{'total_count':len(ciphertexts),'secrets':[{'name':n} for n in sorted(ciphertexts)]})
+            git_prefix='/repos/maxrose26/PropertyAIgent/git/'
+            if operational and path.startswith(git_prefix):
+                target=path[len(git_prefix):]
+                if method=='GET' and target.startswith('ref/heads/'):return self.answer(200,{'object':{'sha':git_head[0]}})
+                if method=='GET' and target=='commits/'+'1'*40:return self.answer(200,{'tree':{'sha':'2'*40}})
+                if method=='GET' and target.startswith('blobs/'):
+                    value=git_objects.get(target[6:]);return self.answer(200,value) if value else self.answer(404)
+                if method=='GET' and target.startswith('commits/'):
+                    value=git_objects.get(target[8:]);return self.answer(200,value) if value else self.answer(404)
+                if method in ('POST','PATCH'):
+                    value=json.loads(self.git_body())
+                    if target=='blobs':
+                        raw=base64.b64decode(value['content']);sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+                    else:sha=hashlib.sha1(json.dumps(value,sort_keys=True).encode()).hexdigest()
+                    if target.startswith('refs/heads/'):
+                        if value.get('force') is not False or git_objects[value['sha']]['parents']!=[git_head[0]]:return self.answer(409)
+                        git_head[0]=value['sha'];return self.answer(200,{'object':{'sha':git_head[0]}})
+                    git_objects[sha]=dict(value,sha=sha)
+                    if target=='commits':git_objects[sha]['tree']={'sha':value['tree']}
+                    return self.answer(201,{'sha':sha})
+                return self.answer(404)
             name=path.removeprefix(prefix+'/')
             if name not in names:return self.answer(404,{'message':'DISPOSABLE_UNKNOWN_PATH'})
             if method=='PUT':
@@ -91,6 +131,8 @@ def real_gh_store(tmp_path):
         def do_GET(self):self.handle_request('GET')
         def do_PUT(self):self.handle_request('PUT')
         def do_DELETE(self):self.handle_request('DELETE')
+        def do_POST(self):self.handle_request('POST')
+        def do_PATCH(self):self.handle_request('PATCH')
     server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler)
     server.daemon_threads=True
     ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(pem,pk)
@@ -139,7 +181,7 @@ def real_gh_store(tmp_path):
         # Input is inherited only in a pipe. Never inspect or retain plaintext.
         result=subprocess.run(args,input=kwargs.get('input'),stdout=subprocess.PIPE,
                               stderr=subprocess.PIPE,env=env,timeout=10,check=False)
-        assert len(result.stdout)+len(result.stderr)<32768
+        assert len(result.stdout)+len(result.stderr)<(3*1024**2 if operational else 32768)
         if result.returncode:
             # Fixture-only diagnostic categories; no raw CLI output or values.
             import hashlib
@@ -154,6 +196,7 @@ def real_gh_store(tmp_path):
             raise Stop('GH_FIXTURE_'+category)
         return result
     def metadata(command,seconds=10):return cli(command).stdout
+    metadata.cli=cli
     def secret(operation,name,value):
         from verification.ingestion_storage import credential_mapping as mapping
         if operation=='set':mapping.put_secret(name,value,runner=cli)

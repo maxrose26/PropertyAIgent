@@ -154,6 +154,9 @@ jobs:
       - name: Existing restricted SQL and failure recovery, disposable only
         run: |
           timeout --kill-after=2s 120s env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_provisioning_pg.py tests/test_discovery_ingestion_operational_pg.py tests/test_discovery_ingestion_acceptance_native.py tests/test_discovery_ingestion_statistics_pg.py tests/test_discovery_ingestion_storage_controller_pg.py -k 'not test_supervised_complete_postgres_path' -q --basetemp="$RUNNER_TEMP/provisioning-rehearsal" --junitxml="$RUNNER_TEMP/provisioning.xml"
+      - name: Complete required operational wrapper, real gh and restricted PG17
+        run: |
+          timeout --kill-after=2s 90s env -i HOME="$HOME" PATH=/usr/bin:/bin INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_ingestion_operational_pooler_identity.py tests/test_discovery_ingestion_operational_wrapper.py tests/test_discovery_ingestion_operational_wrapper_pg.py -q --basetemp="$RUNNER_TEMP/operational-wrapper-rehearsal" --junitxml="$RUNNER_TEMP/operational-wrapper.xml"
       - name: Focused controller and real gh within kernel ceiling
         run: |
           timeout --kill-after=2s 120s sudo systemd-run --scope --unit=propertyaigent-storage-memory-20261017 -p Delegate=memory -p MemoryMax=268435456 -p MemorySwapMax=0 -p OOMPolicy=kill bash verification/ingestion_storage/memory_ci_scope.sh "$(id -u)" "$(id -g)" suite env HOME="$HOME" PATH=/usr/bin:/bin INGESTION_PROVISIONING_TEST_URL=postgresql://provisioning_bootstrap:disposable_fixture_only@127.0.0.1:5432/ingestion_provisioning_test "$RUNNER_TEMP/provisioning-venv/bin/python" -m pytest tests/test_discovery_ingestion_storage_controller_pg.py::test_supervised_complete_postgres_path tests/test_discovery_ingestion_storage_supervisor.py tests/test_discovery_ingestion_memory_native.py -k 'not test_real_gh_and_descendant_excess_killed_together' -q --basetemp="$RUNNER_TEMP/kernel-rehearsal" --junitxml="$RUNNER_TEMP/kernel-memory.xml"
@@ -164,5 +167,6 @@ jobs:
           path: |
             ${{ runner.temp }}/provisioning.xml
             ${{ runner.temp }}/kernel-memory.xml
+            ${{ runner.temp }}/operational-wrapper.xml
             ${{ runner.temp }}/provisioning-rehearsal/**/practical-worker-*/*.json
           retention-days: 14
