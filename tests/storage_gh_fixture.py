@@ -146,7 +146,9 @@ def real_gh_store(tmp_path):
         elif operation=='verify_absent':
             assert not json.loads(cli(['gh','secret','list','--repo',mapping.REPO,'--env',mapping.ENVIRONMENT,'--json','name']).stdout)
         else:raise AssertionError('DISPOSABLE_UNKNOWN_OPERATION')
-    try:yield metadata,secret,ciphertexts,requests
+    try:
+        assert cli(['gh','api','user','--jq','.login']).stdout.strip()==b'maxrose26'
+        yield metadata,secret,ciphertexts,requests
     finally:
         proxy.shutdown();proxy.server_close();proxy_thread.join(timeout=2)
         assert not proxy_thread.is_alive()
