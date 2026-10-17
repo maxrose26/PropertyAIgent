@@ -1,0 +1,318 @@
+{
+  "stage": 4,
+  "state": "OPEN",
+  "status": "STORAGE_CHECKS_VERIFIED_TEARDOWN_INCOMPLETE",
+  "runtime_revision": "7cf8d32547b63d485de872afc2f717c3dce55322",
+  "tree": "68bf766cda023b1f15a19a63978903995391ec46",
+  "registration_sha256": "43bb06a2ee93cc77428e056eb8a19b2efe8f98e880ed42d0a0e0b2b69e33d5f3",
+  "registration_status": "CONSUMED_NO_RETRY",
+  "systemd_invocation": "6ee93a9ad895419a8f84dc8484de3258",
+  "audit": {
+    "owner_local_full_hash_chain_verified": true,
+    "full_original_available_to_assistant": false,
+    "reported_bytes": 104114,
+    "reported_sha256": "788351d1bf68d282640a88f0c5627631a57b447bd4028db2ee781290ce73b560",
+    "reported_entries": 182,
+    "independently_verified_selected_event_hashes": 10,
+    "independently_verified_tail_chain": [
+      174,
+      181
+    ],
+    "owner_excerpt_sha256": "a5b87857068aa6e937826fd8f5ccc233157a32b1c3d7b8df6bf39a6d191cee3a",
+    "owner_excerpt_bytes": 12665
+  },
+  "migration_identity": {
+    "current_user": "postgres",
+    "database_connect_grant_option": true,
+    "ledger_objects_absent": true,
+    "postgres17": true,
+    "rolbypassrls": true,
+    "rolcreatedb": true,
+    "rolcreaterole": true,
+    "role_names_unused": true,
+    "rolsuper": false,
+    "schema_create_grant_option": true,
+    "schema_usage_grant_option": true,
+    "session_user": "postgres"
+  },
+  "storage": {
+    "attempts": 0,
+    "denials": 8,
+    "duplicate_seed": "NO_OP",
+    "executable_grants": 0,
+    "physical_bytes": 49152,
+    "rows": [
+      {
+        "attempt_count": 0,
+        "authority": null,
+        "checkpoint": null,
+        "contract": "v1",
+        "dependencies": [],
+        "eligible_at": 0,
+        "fence": 0,
+        "key": "0000000000000000000000000000000000000000000000000000000000000000",
+        "lease_until": null,
+        "limits": {},
+        "max_attempts": 1,
+        "next_action": "OPERATOR_REVIEW",
+        "outcome": {
+          "global_stop": {
+            "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+            "run": "38884069913"
+          },
+          "grants": {},
+          "manual_stop": "STORAGE_TEST_STOP"
+        },
+        "owner": null,
+        "phase": "IDLE",
+        "priority": 0,
+        "reason": null,
+        "revision": "v1",
+        "state": "CONTROL",
+        "subject": {
+          "kind": "CONTROL"
+        },
+        "task": "CONTROL"
+      },
+      {
+        "attempt_count": 0,
+        "authority": null,
+        "checkpoint": {
+          "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+          "live_allowance": {
+            "source_calls": 0,
+            "writes": 0
+          },
+          "retained_evidence": {
+            "checkpoint_sha256": "d2d7349ea85710aadb804c8a547934d4d034f0a9984a9f19c1a58586117f6da1",
+            "durable_reference": {
+              "bytes": 298338,
+              "commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+              "path": "docs/design/stage4-r0-execution/manchester-screening-result-20261016/remaining-coverage-ledger.json",
+              "sha256": "188f70940318c4114bdbfd1bd0615699fb2e4ebabc72f4203e0bebeb52640f30"
+            },
+            "record_id": "a0rSl00000tnpbVIAQ"
+          }
+        },
+        "contract": "storage-acceptance-blocked-v1",
+        "dependencies": [],
+        "eligible_at": 0,
+        "fence": 0,
+        "key": "0eff5d22b28ee79039d151382ac0321e26350b9ccb10c58f46b82050dab82bf9",
+        "lease_until": null,
+        "limits": {
+          "aggregate_rss": 1610612736,
+          "audit_bytes": 2097152,
+          "bytes": 20971520,
+          "outer_seconds": 60,
+          "pages": 6,
+          "requests": 80,
+          "rows": 60,
+          "source_rss": 1073741824,
+          "worker_seconds": 45
+        },
+        "max_attempts": 1,
+        "next_action": "REVIEW_ONLY",
+        "outcome": null,
+        "owner": null,
+        "phase": "IDLE",
+        "priority": 0,
+        "reason": "ROCHDALE_SOURCE_QUALIFICATION_NOT_EXECUTED",
+        "revision": "20261016",
+        "state": "UNSUPPORTED_CONTRACT",
+        "subject": {
+          "council": "rochdale",
+          "kind": "APPLICATION",
+          "reference": "PL/2026/0882"
+        },
+        "task": "LISTING_METADATA"
+      },
+      {
+        "attempt_count": 0,
+        "authority": null,
+        "checkpoint": {
+          "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+          "live_allowance": {
+            "source_calls": 0,
+            "writes": 0
+          },
+          "retained_evidence": {
+            "application_id_context": 1507,
+            "durable_reference": {
+              "bytes": 1805,
+              "commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+              "path": "docs/design/stage4-r0-execution/narrow-continuation-20261016/recovery-screening-plan-20261016/artifacts/oldham/checkpoints/000.json",
+              "sha256": "bf909d799d7f97fd5250ab26a78f65309a1d869e4a9faf231b16a77e404763d0"
+            },
+            "outcome": "COMMITTED_PENDING_IDENTITY; FACTS_WITHHELD",
+            "run": "38871588708"
+          }
+        },
+        "contract": "storage-acceptance-blocked-v1",
+        "dependencies": [],
+        "eligible_at": 0,
+        "fence": 0,
+        "key": "16c9c4d1fb67d844ddb29b092217c3b5a7c42eb8ba63e296611ce2f617779f6d",
+        "lease_until": null,
+        "limits": {
+          "aggregate_rss": 1610612736,
+          "audit_bytes": 2097152,
+          "bytes": 20971520,
+          "outer_seconds": 60,
+          "pages": 6,
+          "requests": 80,
+          "rows": 60,
+          "source_rss": 1073741824,
+          "worker_seconds": 45
+        },
+        "max_attempts": 1,
+        "next_action": "REVIEW_ONLY",
+        "outcome": null,
+        "owner": null,
+        "phase": "IDLE",
+        "priority": 0,
+        "reason": "COUPLED_FACTS_WITHHELD_NO_SUPPORTED_DECISION",
+        "revision": "20261016",
+        "state": "UNSUPPORTED_CONTRACT",
+        "subject": {
+          "council": "oldham",
+          "kind": "APPLICATION",
+          "reference": "NMA/356901/26"
+        },
+        "task": "FACTUAL_REFRESH"
+      },
+      {
+        "attempt_count": 0,
+        "authority": null,
+        "checkpoint": {
+          "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+          "live_allowance": {
+            "source_calls": 0,
+            "writes": 0
+          },
+          "retained_evidence": {
+            "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+            "durable_reference": {
+              "bytes": 4298,
+              "commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+              "path": "docs/design/stage4-r0-execution/metadata-rollout-result-20261016/scopes/00/artifact/checkpoints/000.json",
+              "sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"
+            },
+            "run": "38884069913"
+          }
+        },
+        "contract": "storage-acceptance-blocked-v1",
+        "dependencies": [],
+        "eligible_at": 0,
+        "fence": 0,
+        "key": "c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3",
+        "lease_until": null,
+        "limits": {
+          "aggregate_rss": 1610612736,
+          "audit_bytes": 2097152,
+          "bytes": 20971520,
+          "outer_seconds": 60,
+          "pages": 6,
+          "requests": 80,
+          "rows": 60,
+          "source_rss": 1073741824,
+          "worker_seconds": 45
+        },
+        "max_attempts": 1,
+        "next_action": "REVIEW_ONLY",
+        "outcome": null,
+        "owner": null,
+        "phase": "IDLE",
+        "priority": 0,
+        "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+        "revision": "20261016",
+        "state": "SAFETY_BLOCKED",
+        "subject": {
+          "council": "salford",
+          "end": "2026-10-14",
+          "kind": "DISCOVERY_SCOPE",
+          "semantics": "VALIDATED",
+          "start": "2026-10-08"
+        },
+        "task": "LISTING_METADATA"
+      }
+    ],
+    "serialized_bytes": 4595
+  },
+  "accounting": {
+    "active_seconds": 2.9165738029942077,
+    "commands": 139,
+    "connections": 8,
+    "cumulative_supervised_seconds": 6.444222600000103,
+    "elapsed_seconds": 5.160911334998673,
+    "open_connections": 0,
+    "phase": "teardown",
+    "returned_database_data_value_bytes": 9429,
+    "role": "migration",
+    "storage_active_seconds": 0.7638419260038063,
+    "storage_commands": 40,
+    "storage_connections": 4,
+    "teardown_active_seconds": 0.17419392399642675,
+    "teardown_commands": 10
+  },
+  "supervisor": {
+    "audit_prefix_bytes": 103219,
+    "cleanup": "UNCERTAIN",
+    "cumulative_supervised_seconds": 6.463323766999565,
+    "elapsed_seconds": 5.1800128019986005,
+    "kernel_memory_current_bytes": 1355776,
+    "kernel_memory_forced_cleanup": false,
+    "kernel_memory_group_removed": true,
+    "kernel_memory_max_events": 0,
+    "kernel_memory_oom": 0,
+    "kernel_memory_oom_kill": 0,
+    "kernel_memory_peak_bytes": 19546112,
+    "kernel_memory_populated": 0,
+    "live_owned_survivors": 0,
+    "outer_memory_current_bytes": 107433984,
+    "outer_memory_max_events": 0,
+    "outer_memory_oom": 0,
+    "outer_memory_oom_kill": 0,
+    "outer_memory_peak_bytes": 128180224,
+    "peak_owned_rss_bytes": 103444480,
+    "reason": "TEARDOWN_READBACK",
+    "status": "STOP_RECONCILE_NO_RETRY",
+    "worker_exit": 1
+  },
+  "remaining_aggregate": {
+    "connections": 5,
+    "supervised_seconds": 233.53667623300043,
+    "teardown_commands": 0
+  },
+  "teardown": {
+    "revocation_script": "Control flow reached post-COMMIT SELECT; script returned. Effective state not verified.",
+    "effective_readback": "FAILED; three integer counts not recorded",
+    "cause": "UNDETERMINED; no inference from serialized byte count",
+    "secret_deletion": "NOT_REACHED; no deletion acknowledged",
+    "secret_absence": "NOT_VERIFIED",
+    "cleanup": "UNCERTAIN"
+  },
+  "preserved": {
+    "prior_attempts_cleanup": "BOTH_UNCERTAIN_UNCHANGED",
+    "salford_stop": true,
+    "ids_1504_1508": "NO_APPLICATION_WRITES_IN_CONTROLLER"
+  },
+  "next_review": {
+    "request": "One separate bounded read-only teardown reconciliation, not rerun or new provisioning",
+    "proposed_connections": 1,
+    "proposed_statements": 6,
+    "proposed_supervised_seconds": 10,
+    "exact_targets": [
+      "ingestion_worker_login",
+      "ingestion_storage_login"
+    ],
+    "reads": [
+      "Safe role flags and exact memberships",
+      "Exact-role session PID/backend_start/state/database only; no query text",
+      "Protected-secret names only"
+    ],
+    "mutations": 0,
+    "reason_additional_allowance_required": "Original teardown phase used all10commands; unused aggregate capacity does not reset the phase ceiling",
+    "after_readback": "Return exact facts; only then complete already-reviewed cleanup if certain. Residual session termination requires exact-PID permission. No blind revocation/seed replay/compensation."
+  }
+}

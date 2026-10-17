@@ -1,0 +1,402 @@
+[
+  {
+    "event": "migration_identity",
+    "payload": {
+      "current_user": "postgres",
+      "database_connect_grant_option": true,
+      "ledger_objects_absent": true,
+      "postgres17": true,
+      "rolbypassrls": true,
+      "rolcreatedb": true,
+      "rolcreaterole": true,
+      "role_names_unused": true,
+      "rolsuper": false,
+      "schema_create_grant_option": true,
+      "schema_usage_grant_option": true,
+      "session_user": "postgres"
+    },
+    "previous_sha256": "a6d9e9b944335aedf55337043c4a3ac26209e162a25f44097b1fdebde51adff7",
+    "sequence": 12,
+    "sha256": "b4bb48a9783332ebdf8971c56e29a0c212ee8a4635bd45ff8adde4fbe4784f15"
+  },
+  {
+    "event": "storage_readback",
+    "payload": {
+      "attempts": 0,
+      "denials": 8,
+      "duplicate_seed": "NO_OP",
+      "executable_grants": 0,
+      "physical_bytes": 49152,
+      "rows": [
+        {
+          "attempt_count": 0,
+          "authority": null,
+          "checkpoint": null,
+          "contract": "v1",
+          "dependencies": [],
+          "eligible_at": 0,
+          "fence": 0,
+          "key": "0000000000000000000000000000000000000000000000000000000000000000",
+          "lease_until": null,
+          "limits": {},
+          "max_attempts": 1,
+          "next_action": "OPERATOR_REVIEW",
+          "outcome": {
+            "global_stop": {
+              "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+              "run": "38884069913"
+            },
+            "grants": {},
+            "manual_stop": "STORAGE_TEST_STOP"
+          },
+          "owner": null,
+          "phase": "IDLE",
+          "priority": 0,
+          "reason": null,
+          "revision": "v1",
+          "state": "CONTROL",
+          "subject": {
+            "kind": "CONTROL"
+          },
+          "task": "CONTROL"
+        },
+        {
+          "attempt_count": 0,
+          "authority": null,
+          "checkpoint": {
+            "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+            "live_allowance": {
+              "source_calls": 0,
+              "writes": 0
+            },
+            "retained_evidence": {
+              "checkpoint_sha256": "d2d7349ea85710aadb804c8a547934d4d034f0a9984a9f19c1a58586117f6da1",
+              "durable_reference": {
+                "bytes": 298338,
+                "commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+                "path": "docs/design/stage4-r0-execution/manchester-screening-result-20261016/remaining-coverage-ledger.json",
+                "sha256": "188f70940318c4114bdbfd1bd0615699fb2e4ebabc72f4203e0bebeb52640f30"
+              },
+              "record_id": "a0rSl00000tnpbVIAQ"
+            }
+          },
+          "contract": "storage-acceptance-blocked-v1",
+          "dependencies": [],
+          "eligible_at": 0,
+          "fence": 0,
+          "key": "0eff5d22b28ee79039d151382ac0321e26350b9ccb10c58f46b82050dab82bf9",
+          "lease_until": null,
+          "limits": {
+            "aggregate_rss": 1610612736,
+            "audit_bytes": 2097152,
+            "bytes": 20971520,
+            "outer_seconds": 60,
+            "pages": 6,
+            "requests": 80,
+            "rows": 60,
+            "source_rss": 1073741824,
+            "worker_seconds": 45
+          },
+          "max_attempts": 1,
+          "next_action": "REVIEW_ONLY",
+          "outcome": null,
+          "owner": null,
+          "phase": "IDLE",
+          "priority": 0,
+          "reason": "ROCHDALE_SOURCE_QUALIFICATION_NOT_EXECUTED",
+          "revision": "20261016",
+          "state": "UNSUPPORTED_CONTRACT",
+          "subject": {
+            "council": "rochdale",
+            "kind": "APPLICATION",
+            "reference": "PL/2026/0882"
+          },
+          "task": "LISTING_METADATA"
+        },
+        {
+          "attempt_count": 0,
+          "authority": null,
+          "checkpoint": {
+            "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+            "live_allowance": {
+              "source_calls": 0,
+              "writes": 0
+            },
+            "retained_evidence": {
+              "application_id_context": 1507,
+              "durable_reference": {
+                "bytes": 1805,
+                "commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+                "path": "docs/design/stage4-r0-execution/narrow-continuation-20261016/recovery-screening-plan-20261016/artifacts/oldham/checkpoints/000.json",
+                "sha256": "bf909d799d7f97fd5250ab26a78f65309a1d869e4a9faf231b16a77e404763d0"
+              },
+              "outcome": "COMMITTED_PENDING_IDENTITY; FACTS_WITHHELD",
+              "run": "38871588708"
+            }
+          },
+          "contract": "storage-acceptance-blocked-v1",
+          "dependencies": [],
+          "eligible_at": 0,
+          "fence": 0,
+          "key": "16c9c4d1fb67d844ddb29b092217c3b5a7c42eb8ba63e296611ce2f617779f6d",
+          "lease_until": null,
+          "limits": {
+            "aggregate_rss": 1610612736,
+            "audit_bytes": 2097152,
+            "bytes": 20971520,
+            "outer_seconds": 60,
+            "pages": 6,
+            "requests": 80,
+            "rows": 60,
+            "source_rss": 1073741824,
+            "worker_seconds": 45
+          },
+          "max_attempts": 1,
+          "next_action": "REVIEW_ONLY",
+          "outcome": null,
+          "owner": null,
+          "phase": "IDLE",
+          "priority": 0,
+          "reason": "COUPLED_FACTS_WITHHELD_NO_SUPPORTED_DECISION",
+          "revision": "20261016",
+          "state": "UNSUPPORTED_CONTRACT",
+          "subject": {
+            "council": "oldham",
+            "kind": "APPLICATION",
+            "reference": "NMA/356901/26"
+          },
+          "task": "FACTUAL_REFRESH"
+        },
+        {
+          "attempt_count": 0,
+          "authority": null,
+          "checkpoint": {
+            "evidence_commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+            "live_allowance": {
+              "source_calls": 0,
+              "writes": 0
+            },
+            "retained_evidence": {
+              "checkpoint_sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e",
+              "durable_reference": {
+                "bytes": 4298,
+                "commit": "e2db0277b99c3b8ff57b5fb808b6c83aa4643e7c",
+                "path": "docs/design/stage4-r0-execution/metadata-rollout-result-20261016/scopes/00/artifact/checkpoints/000.json",
+                "sha256": "a2345cf136fc92abf13bb55772f5c14a7a299b7f2b9cb0b89fe6037ccdb8a10e"
+              },
+              "run": "38884069913"
+            }
+          },
+          "contract": "storage-acceptance-blocked-v1",
+          "dependencies": [],
+          "eligible_at": 0,
+          "fence": 0,
+          "key": "c1f526eed20e392382001cad4d28eb5bc16e5d1c0f92adb282fe7b1cc775f3f3",
+          "lease_until": null,
+          "limits": {
+            "aggregate_rss": 1610612736,
+            "audit_bytes": 2097152,
+            "bytes": 20971520,
+            "outer_seconds": 60,
+            "pages": 6,
+            "requests": 80,
+            "rows": 60,
+            "source_rss": 1073741824,
+            "worker_seconds": 45
+          },
+          "max_attempts": 1,
+          "next_action": "REVIEW_ONLY",
+          "outcome": null,
+          "owner": null,
+          "phase": "IDLE",
+          "priority": 0,
+          "reason": "CONSUMED_SALFORD_GLOBAL_STOP",
+          "revision": "20261016",
+          "state": "SAFETY_BLOCKED",
+          "subject": {
+            "council": "salford",
+            "end": "2026-10-14",
+            "kind": "DISCOVERY_SCOPE",
+            "semantics": "VALIDATED",
+            "start": "2026-10-08"
+          },
+          "task": "LISTING_METADATA"
+        }
+      ],
+      "serialized_bytes": 4595
+    },
+    "previous_sha256": "d0415e3a20cc0acd5204c36b5ff96c946d7695567a171c789ffe3734e2e52c19",
+    "sequence": 163,
+    "sha256": "16aebcb33cf8e2a830f48cb42b09bb3af87ad117d54849cb14b0475378b4c45e"
+  },
+  {
+    "event": "budget",
+    "payload": {
+      "active_seconds": 2.8738509529966905,
+      "commands": 136,
+      "connections": 8,
+      "cumulative_supervised_seconds": 6.388729287001297,
+      "elapsed_seconds": 5.105418221999571,
+      "open_connections": 1,
+      "phase": "teardown",
+      "returned_database_data_value_bytes": 9422,
+      "storage_active_seconds": 0.7638419260038063,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.13147107399890956,
+      "teardown_commands": 7
+    },
+    "previous_sha256": "a3837e25ac194b21ae21156e9cbfb30e6cc9bb66fd4e664bc3e74bb2f3126df5",
+    "sequence": 174,
+    "sha256": "638f8223d49ff4238ea3f7414e8c5c390b6d0416ac2e26695bf430c3cf5a773b"
+  },
+  {
+    "event": "budget",
+    "payload": {
+      "active_seconds": 2.8837284959963654,
+      "commands": 137,
+      "connections": 8,
+      "cumulative_supervised_seconds": 6.401817105000191,
+      "elapsed_seconds": 5.118506040000284,
+      "open_connections": 1,
+      "phase": "teardown",
+      "returned_database_data_value_bytes": 9422,
+      "storage_active_seconds": 0.7638419260038063,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.14134861699858448,
+      "teardown_commands": 8
+    },
+    "previous_sha256": "638f8223d49ff4238ea3f7414e8c5c390b6d0416ac2e26695bf430c3cf5a773b",
+    "sequence": 175,
+    "sha256": "e9c054bf4c754a662b73aa486db8065f1200b77541d2eb3770c54e23efc15a4f"
+  },
+  {
+    "event": "budget",
+    "payload": {
+      "active_seconds": 2.8934272519954902,
+      "commands": 138,
+      "connections": 8,
+      "cumulative_supervised_seconds": 6.414469510001254,
+      "elapsed_seconds": 5.131158444999528,
+      "open_connections": 1,
+      "phase": "teardown",
+      "returned_database_data_value_bytes": 9422,
+      "storage_active_seconds": 0.7638419260038063,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.15104737299770932,
+      "teardown_commands": 9
+    },
+    "previous_sha256": "e9c054bf4c754a662b73aa486db8065f1200b77541d2eb3770c54e23efc15a4f",
+    "sequence": 176,
+    "sha256": "2559b9387ccdcaea1fcc08571f1c8a05c20a41e498b4a8f4f25ed2d9a18dca1d"
+  },
+  {
+    "event": "budget",
+    "payload": {
+      "active_seconds": 2.9029785359953166,
+      "commands": 139,
+      "connections": 8,
+      "cumulative_supervised_seconds": 6.427338821001285,
+      "elapsed_seconds": 5.144027755999559,
+      "open_connections": 1,
+      "phase": "teardown",
+      "returned_database_data_value_bytes": 9422,
+      "storage_active_seconds": 0.7638419260038063,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.16059865699753573,
+      "teardown_commands": 10
+    },
+    "previous_sha256": "2559b9387ccdcaea1fcc08571f1c8a05c20a41e498b4a8f4f25ed2d9a18dca1d",
+    "sequence": 177,
+    "sha256": "2eaaca1be2f2702349a2759028b54686cd575584f79299b7cbf2613bf7dabaf0"
+  },
+  {
+    "event": "connection_closed",
+    "payload": {
+      "active_seconds": 2.9165738029942077,
+      "commands": 139,
+      "connections": 8,
+      "cumulative_supervised_seconds": 6.444222600000103,
+      "elapsed_seconds": 5.160911334998673,
+      "open_connections": 0,
+      "phase": "teardown",
+      "returned_database_data_value_bytes": 9429,
+      "role": "migration",
+      "storage_active_seconds": 0.7638419260038063,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.17419392399642675,
+      "teardown_commands": 10
+    },
+    "previous_sha256": "2eaaca1be2f2702349a2759028b54686cd575584f79299b7cbf2613bf7dabaf0",
+    "sequence": 178,
+    "sha256": "2a070882e722325886fe5b3a39a347decd153388868b844375ca214fb457d900"
+  },
+  {
+    "event": "stop",
+    "payload": {
+      "active_seconds": 2.9165738029942077,
+      "commands": 139,
+      "connections": 8,
+      "cumulative_supervised_seconds": 6.447484799999984,
+      "elapsed_seconds": 5.164173434999611,
+      "open_connections": 0,
+      "phase": "teardown",
+      "reason": "TEARDOWN_READBACK",
+      "returned_database_data_value_bytes": 9429,
+      "sqlstate": null,
+      "storage_active_seconds": 0.7638419260038063,
+      "storage_commands": 40,
+      "storage_connections": 4,
+      "teardown_active_seconds": 0.17419392399642675,
+      "teardown_commands": 10
+    },
+    "previous_sha256": "2a070882e722325886fe5b3a39a347decd153388868b844375ca214fb457d900",
+    "sequence": 179,
+    "sha256": "0f9481140ae2227ec23f9b1fddb9057ff3502a136c3dcbd4b8292373cbaad551"
+  },
+  {
+    "event": "worker_failed",
+    "payload": {
+      "cleanup": "UNCERTAIN",
+      "reason": "TEARDOWN_READBACK",
+      "sqlstate": null
+    },
+    "previous_sha256": "0f9481140ae2227ec23f9b1fddb9057ff3502a136c3dcbd4b8292373cbaad551",
+    "sequence": 180,
+    "sha256": "04dca51672cd3a81853650c921fcc6b5de43620ba78c4e2e9d83957c0360b76f"
+  },
+  {
+    "event": "supervisor_result",
+    "payload": {
+      "audit_prefix_bytes": 103219,
+      "cleanup": "UNCERTAIN",
+      "cumulative_supervised_seconds": 6.463323766999565,
+      "elapsed_seconds": 5.1800128019986005,
+      "kernel_memory_current_bytes": 1355776,
+      "kernel_memory_forced_cleanup": false,
+      "kernel_memory_group_removed": true,
+      "kernel_memory_max_events": 0,
+      "kernel_memory_oom": 0,
+      "kernel_memory_oom_kill": 0,
+      "kernel_memory_peak_bytes": 19546112,
+      "kernel_memory_populated": 0,
+      "live_owned_survivors": 0,
+      "outer_memory_current_bytes": 107433984,
+      "outer_memory_max_events": 0,
+      "outer_memory_oom": 0,
+      "outer_memory_oom_kill": 0,
+      "outer_memory_peak_bytes": 128180224,
+      "peak_owned_rss_bytes": 103444480,
+      "reason": "TEARDOWN_READBACK",
+      "status": "STOP_RECONCILE_NO_RETRY",
+      "worker_exit": 1
+    },
+    "previous_sha256": "04dca51672cd3a81853650c921fcc6b5de43620ba78c4e2e9d83957c0360b76f",
+    "sequence": 181,
+    "sha256": "b741c4b08b8ef067087e2510ec24963fa601cbbd87e3beda4617e87b663af691"
+  }
+]
